@@ -28,7 +28,7 @@ def _create_app(client: TestClient, token: str, name: str | None = None) -> dict
         headers=_auth(token),
         json={
             "name": name or f"patch-base-{uuid.uuid4().hex[:6]}",
-            "allowed_token_scopes": ["portal:self_read"],
+            "allowed_token_scopes": ["portal:applications:read"],
             "allowed_api_key_scopes": ["events:read"],
         },
     )
@@ -65,12 +65,12 @@ class TestPatchThirdPartyApp:
         resp = client.patch(
             f"{BASE_URL}/{app['id']}",
             headers=_auth(admin_token_tenant_a),
-            json={"allowed_token_scopes": ["portal:self_read", "portal:directory_read"]},
+            json={"allowed_token_scopes": ["portal:applications:read", "portal:directory:read"]},
         )
         assert resp.status_code == 200, resp.text
         assert set(resp.json()["allowed_token_scopes"]) == {
-            "portal:self_read",
-            "portal:directory_read",
+            "portal:applications:read",
+            "portal:directory:read",
         }
 
     def test_patch_invalid_token_scope_returns_422(

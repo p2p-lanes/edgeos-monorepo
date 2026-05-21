@@ -125,7 +125,7 @@ class TestJwtCarriesPerAppScopes:
             name=f"restricted-{uuid.uuid4().hex[:6]}",
             key_hash=hash_key(raw_key),
             prefix=raw_key[:8],
-            allowed_token_scopes=["portal:self_read"],
+            allowed_token_scopes=["portal:applications:read"],
             allowed_api_key_scopes=[],
             active=True,
         )
@@ -144,7 +144,7 @@ class TestJwtCarriesPerAppScopes:
         )
         assert resp.status_code == 200, resp.text
         payload = decode_access_token(resp.json()["access_token"])
-        assert list(payload.scopes) == ["portal:self_read"]
+        assert list(payload.scopes) == ["portal:applications:read"]
         assert payload.issued_by_app_id == restricted_app.id
 
         # Cleanup

@@ -42,7 +42,7 @@ def docs_app(db: Session, tenant_a: Tenants) -> tuple[ThirdPartyApps, str]:
         db,
         tenant_id=tenant_a.id,
         name=f"docs-test-{uuid.uuid4().hex[:6]}",
-        allowed_token_scopes=["portal:api_keys_manage"],
+        allowed_token_scopes=["portal:api_keys:manage"],
         allowed_api_key_scopes=[],
     )
 
@@ -56,7 +56,7 @@ def multi_scope_app(db: Session, tenant_a: Tenants) -> tuple[ThirdPartyApps, str
         db,
         tenant_id=tenant_a.id,
         name=f"multi-docs-{uuid.uuid4().hex[:6]}",
-        allowed_token_scopes=["portal:self_read", "portal:api_keys_manage"],
+        allowed_token_scopes=["portal:applications:read", "portal:api_keys:manage"],
         allowed_api_key_scopes=[],
     )
 
@@ -154,9 +154,9 @@ class TestMeAccessDocsJson:
         data = resp.json()
         # docs_app only has portal:api_keys_manage — portal:self_read must not appear
         returned_scopes = {item["scope"] for item in data}
-        assert "portal:self_read" not in returned_scopes
+        assert "portal:applications:read" not in returned_scopes
         # portal:api_keys_manage should be present (it has registered routes)
-        assert "portal:api_keys_manage" in returned_scopes
+        assert "portal:api_keys:manage" in returned_scopes
 
     def test_json_known_scope_has_endpoints(
         self,
@@ -178,7 +178,7 @@ class TestMeAccessDocsJson:
         assert resp.status_code == 200, resp.text
         data = resp.json()
         scope_entry = next(
-            (x for x in data if x.get("scope") == "portal:api_keys_manage"),
+            (x for x in data if x.get("scope") == "portal:api_keys:manage"),
             None,
         )
         assert scope_entry is not None, "portal:api_keys_manage not in response"
@@ -290,7 +290,7 @@ class TestMeAccessDocsMarkdown:
         )
         resp = client.get(BASE_URL + "?format=markdown", headers=_bearer(token))
         assert resp.status_code == 200, resp.text
-        assert "portal:api_keys_manage" in resp.text
+        assert "portal:api_keys:manage" in resp.text
 
     def test_legacy_jwt_markdown(
         self,
@@ -304,7 +304,7 @@ class TestMeAccessDocsMarkdown:
             subject=h.id,
             token_type="human",
             issued_via="third_party",
-            scopes=["portal:self_read"],
+            scopes=["portal:applications:read"],
         )
         resp = client.get(BASE_URL + "?format=markdown", headers=_bearer(token))
         assert resp.status_code == 200, resp.text

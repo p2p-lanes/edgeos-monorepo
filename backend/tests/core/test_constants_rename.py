@@ -45,9 +45,9 @@ def test_max_token_scopes_contains_expected_values() -> None:
     """THIRD_PARTY_TOKEN_SCOPES_MAX contains the v1 platform defaults."""
     from app.core.security import THIRD_PARTY_TOKEN_SCOPES_MAX
 
-    assert "portal:self_read" in THIRD_PARTY_TOKEN_SCOPES_MAX
-    assert "portal:directory_read" in THIRD_PARTY_TOKEN_SCOPES_MAX
-    assert "portal:api_keys_manage" in THIRD_PARTY_TOKEN_SCOPES_MAX
+    assert "portal:applications:read" in THIRD_PARTY_TOKEN_SCOPES_MAX
+    assert "portal:directory:read" in THIRD_PARTY_TOKEN_SCOPES_MAX
+    assert "portal:api_keys:manage" in THIRD_PARTY_TOKEN_SCOPES_MAX
 
 
 def test_max_api_key_scopes_contains_expected_values() -> None:

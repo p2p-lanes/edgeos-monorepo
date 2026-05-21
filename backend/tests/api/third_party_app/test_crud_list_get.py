@@ -42,7 +42,7 @@ def _create_app(
         headers.update(_tenant_header(tenant_id))
     payload = {
         "name": name or f"app-{uuid.uuid4().hex[:6]}",
-        "allowed_token_scopes": ["portal:self_read"],
+        "allowed_token_scopes": ["portal:applications:read"],
         "allowed_api_key_scopes": [],
     }
     resp = client.post(BASE_URL, headers=headers, json=payload)

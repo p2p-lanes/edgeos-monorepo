@@ -53,11 +53,11 @@ class TestTokenPayloadCarriesScopesAndIssuedVia:
             exp=datetime.now(UTC) + timedelta(minutes=30),
             token_type="human",
             issued_via="portal",
-            scopes=["portal:self_read"],
+            scopes=["portal:applications:read"],
         )
 
         assert payload.issued_via == "portal"
-        assert payload.scopes == ["portal:self_read"]
+        assert payload.scopes == ["portal:applications:read"]
 
     def test_token_payload_defaults(self) -> None:
         from datetime import UTC, datetime, timedelta

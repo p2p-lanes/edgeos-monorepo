@@ -35,7 +35,7 @@ def _auth_tenant(token: str, tenant_id: uuid.UUID) -> dict[str, str]:
 
 _VALID_CREATE = {
     "name": "test-app",
-    "allowed_token_scopes": ["portal:self_read"],
+    "allowed_token_scopes": ["portal:applications:read"],
     "allowed_api_key_scopes": ["events:read"],
 }
 
@@ -54,7 +54,7 @@ class TestCreateThirdPartyApp:
             headers=_auth(admin_token_tenant_a),
             json={
                 "name": f"create-test-{uuid.uuid4().hex[:6]}",
-                "allowed_token_scopes": ["portal:self_read"],
+                "allowed_token_scopes": ["portal:applications:read"],
                 "allowed_api_key_scopes": ["events:read"],
             },
         )
@@ -81,7 +81,7 @@ class TestCreateThirdPartyApp:
             headers=_auth(admin_token_tenant_a),
             json={
                 "name": name,
-                "allowed_token_scopes": ["portal:self_read"],
+                "allowed_token_scopes": ["portal:applications:read"],
                 "allowed_api_key_scopes": ["events:read"],
             },
         )
@@ -89,7 +89,7 @@ class TestCreateThirdPartyApp:
         data = resp.json()
         assert data["name"] == name
         assert data["tenant_id"] == str(tenant_a.id)
-        assert data["allowed_token_scopes"] == ["portal:self_read"]
+        assert data["allowed_token_scopes"] == ["portal:applications:read"]
         assert data["allowed_api_key_scopes"] == ["events:read"]
         assert data["active"] is True
         assert data["revoked_at"] is None
@@ -106,7 +106,7 @@ class TestCreateThirdPartyApp:
             headers=_auth(admin_token_tenant_a),
             json={
                 "name": name,
-                "allowed_token_scopes": ["portal:self_read"],
+                "allowed_token_scopes": ["portal:applications:read"],
                 "allowed_api_key_scopes": [],
             },
         )
@@ -155,7 +155,7 @@ class TestCreateScopeValidation:
             headers=_auth(admin_token_tenant_a),
             json={
                 "name": f"bad-ak-scope-{uuid.uuid4().hex[:6]}",
-                "allowed_token_scopes": ["portal:self_read"],
+                "allowed_token_scopes": ["portal:applications:read"],
                 "allowed_api_key_scopes": ["admin:everything"],
             },
         )
@@ -172,7 +172,7 @@ class TestCreateScopeValidation:
             headers=_auth(admin_token_tenant_a),
             json={
                 "name": "",
-                "allowed_token_scopes": ["portal:self_read"],
+                "allowed_token_scopes": ["portal:applications:read"],
                 "allowed_api_key_scopes": [],
             },
         )
@@ -194,7 +194,7 @@ class TestCreateNameUniqueness:
             headers=_auth(admin_token_tenant_a),
             json={
                 "name": name,
-                "allowed_token_scopes": ["portal:self_read"],
+                "allowed_token_scopes": ["portal:applications:read"],
                 "allowed_api_key_scopes": [],
             },
         )
@@ -205,7 +205,7 @@ class TestCreateNameUniqueness:
             headers=_auth(admin_token_tenant_a),
             json={
                 "name": name.upper(),
-                "allowed_token_scopes": ["portal:self_read"],
+                "allowed_token_scopes": ["portal:applications:read"],
                 "allowed_api_key_scopes": [],
             },
         )
@@ -224,7 +224,7 @@ class TestCreateNameUniqueness:
             headers=_auth(admin_token_tenant_a),
             json={
                 "name": name,
-                "allowed_token_scopes": ["portal:self_read"],
+                "allowed_token_scopes": ["portal:applications:read"],
                 "allowed_api_key_scopes": [],
             },
         )
@@ -239,7 +239,7 @@ class TestCreateNameUniqueness:
             headers=_auth(admin_token_tenant_a),
             json={
                 "name": name,
-                "allowed_token_scopes": ["portal:self_read"],
+                "allowed_token_scopes": ["portal:applications:read"],
                 "allowed_api_key_scopes": [],
             },
         )
@@ -261,7 +261,7 @@ class TestCreateSuperadmin:
             headers=_auth_tenant(superadmin_token, tenant_b.id),
             json={
                 "name": f"sa-create-{uuid.uuid4().hex[:6]}",
-                "allowed_token_scopes": ["portal:self_read"],
+                "allowed_token_scopes": ["portal:applications:read"],
                 "allowed_api_key_scopes": [],
             },
         )

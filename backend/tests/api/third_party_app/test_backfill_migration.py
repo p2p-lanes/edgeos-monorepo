@@ -85,9 +85,9 @@ class TestBackfillMigration:
         ).first()
         assert row is not None
         scopes = row[0]
-        assert "portal:self_read" in scopes
-        assert "portal:directory_read" in scopes
-        assert "portal:api_keys_manage" in scopes
+        assert "portal:applications:read" in scopes
+        assert "portal:directory:read" in scopes
+        assert "portal:api_keys:manage" in scopes
 
     def test_legacy_app_has_default_api_key_scopes(
         self,

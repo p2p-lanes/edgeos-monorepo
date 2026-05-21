@@ -57,7 +57,7 @@ class TestPerAppScopeSubset:
             name=f"per-app-ok-{uuid.uuid4().hex[:6]}",
             key_hash=hash_key(raw_key),
             prefix=raw_key[:8],
-            allowed_token_scopes=["portal:self_read", "portal:api_keys_manage"],
+            allowed_token_scopes=["portal:applications:read", "portal:api_keys:manage"],
             allowed_api_key_scopes=["events:read"],
             active=True,
         )
@@ -72,7 +72,7 @@ class TestPerAppScopeSubset:
             subject=human.id,
             token_type="human",
             issued_via="third_party",
-            scopes=["portal:self_read", "portal:api_keys_manage"],
+            scopes=["portal:applications:read", "portal:api_keys:manage"],
             issued_by_app_id=app.id,
         )
         resp = client.post(
@@ -102,7 +102,7 @@ class TestPerAppScopeSubset:
             name=f"per-app-block-{uuid.uuid4().hex[:6]}",
             key_hash=hash_key(raw_key),
             prefix=raw_key[:8],
-            allowed_token_scopes=["portal:self_read", "portal:api_keys_manage"],
+            allowed_token_scopes=["portal:applications:read", "portal:api_keys:manage"],
             allowed_api_key_scopes=["events:read"],
             active=True,
         )
@@ -117,7 +117,7 @@ class TestPerAppScopeSubset:
             subject=human.id,
             token_type="human",
             issued_via="third_party",
-            scopes=["portal:self_read", "portal:api_keys_manage"],
+            scopes=["portal:applications:read", "portal:api_keys:manage"],
             issued_by_app_id=app.id,
         )
         resp = client.post(
@@ -148,7 +148,7 @@ class TestPerAppScopeSubset:
             name=f"per-app-revoked-{uuid.uuid4().hex[:6]}",
             key_hash=hash_key(raw_key),
             prefix=raw_key[:8],
-            allowed_token_scopes=["portal:self_read", "portal:api_keys_manage"],
+            allowed_token_scopes=["portal:applications:read", "portal:api_keys:manage"],
             allowed_api_key_scopes=["events:read"],
             active=True,
         )
@@ -164,7 +164,7 @@ class TestPerAppScopeSubset:
             subject=human.id,
             token_type="human",
             issued_via="third_party",
-            scopes=["portal:self_read", "portal:api_keys_manage"],
+            scopes=["portal:applications:read", "portal:api_keys:manage"],
             issued_by_app_id=app.id,
         )
 
@@ -207,7 +207,7 @@ class TestLegacyJwtFallback:
             subject=human.id,
             token_type="human",
             issued_via="third_party",
-            scopes=["portal:self_read", "portal:api_keys_manage"],
+            scopes=["portal:applications:read", "portal:api_keys:manage"],
         )
         resp = client.post(
             CREATE_URL,
@@ -233,7 +233,7 @@ class TestLegacyJwtFallback:
             subject=human.id,
             token_type="human",
             issued_via="third_party",
-            scopes=["portal:self_read", "portal:api_keys_manage"],
+            scopes=["portal:applications:read", "portal:api_keys:manage"],
         )
         resp = client.post(
             CREATE_URL,
@@ -259,7 +259,7 @@ class TestLegacyJwtFallback:
             subject=human.id,
             token_type="human",
             issued_via="third_party",
-            scopes=["portal:self_read", "portal:api_keys_manage"],
+            scopes=["portal:applications:read", "portal:api_keys:manage"],
         )
         resp = client.post(
             CREATE_URL,

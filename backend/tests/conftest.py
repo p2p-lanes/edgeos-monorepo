@@ -557,7 +557,7 @@ def third_party_jwt_factory():
         def test_something(third_party_jwt_factory, some_human):
             token = third_party_jwt_factory(human=some_human)
             # or with custom scopes:
-            token = third_party_jwt_factory(human=some_human, scopes=["portal:self_read"])
+            token = third_party_jwt_factory(human=some_human, scopes=["portal:applications:read"])
     """
 
     def _factory(

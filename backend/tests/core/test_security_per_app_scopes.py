@@ -46,7 +46,7 @@ class TestCreateAccessTokenEncodesAppId:
             subject=subject,
             token_type="human",
             issued_via="third_party",
-            scopes=["portal:self_read"],
+            scopes=["portal:applications:read"],
             issued_by_app_id=app_id,
         )
         payload = decode_access_token(token)
@@ -59,7 +59,7 @@ class TestCreateAccessTokenEncodesAppId:
             subject=subject,
             token_type="human",
             issued_via="third_party",
-            scopes=["portal:self_read"],
+            scopes=["portal:applications:read"],
         )
         payload = decode_access_token(token)
         assert payload.issued_by_app_id is None
@@ -82,7 +82,7 @@ class TestCreateAccessTokenEncodesAppId:
             subject=subject,
             token_type="human",
             issued_via="third_party",
-            scopes=["portal:self_read"],
+            scopes=["portal:applications:read"],
             issued_by_app_id=app_id,
         )
         payload = decode_access_token(token)

@@ -72,7 +72,7 @@ class TestRequireHumanScope:
         from app.core.dependencies.users import require_human_scope
 
         payload = _human_payload(["portal:*"])
-        guard = require_human_scope("portal:self_read")
+        guard = require_human_scope("portal:applications:read")
         # Should not raise
         guard(payload)
 
@@ -88,7 +88,7 @@ class TestRequireHumanScope:
         payload = decode_access_token(token)
         assert "portal:*" in payload.scopes  # confirm synthesis happened
 
-        guard = require_human_scope("portal:directory_read")
+        guard = require_human_scope("portal:directory:read")
         # Should not raise
         guard(payload)
 
@@ -96,16 +96,16 @@ class TestRequireHumanScope:
         """A token with the exact requested scope passes."""
         from app.core.dependencies.users import require_human_scope
 
-        payload = _human_payload(["portal:self_read"])
-        guard = require_human_scope("portal:self_read")
+        payload = _human_payload(["portal:applications:read"])
+        guard = require_human_scope("portal:applications:read")
         guard(payload)  # Should not raise
 
     def test_require_human_scope_rejects_missing_scope(self) -> None:
         """A token without the required scope and without portal:* raises 403."""
         from app.core.dependencies.users import require_human_scope
 
-        payload = _human_payload(["portal:self_read"])
-        guard = require_human_scope("portal:directory_read")
+        payload = _human_payload(["portal:applications:read"])
+        guard = require_human_scope("portal:directory:read")
         with pytest.raises(HTTPException) as exc_info:
             guard(payload)
         assert exc_info.value.status_code == 403
@@ -122,7 +122,7 @@ class TestRequireHumanScope:
         # Build a payload with scopes=[] directly — simulates a future non-human
         # token or a specially crafted payload bypassing decode.
         payload = _human_payload([])
-        guard = require_human_scope("portal:self_read")
+        guard = require_human_scope("portal:applications:read")
         with pytest.raises(HTTPException) as exc_info:
             guard(payload)
         assert exc_info.value.status_code == 403
@@ -132,7 +132,7 @@ class TestRequireHumanScope:
         from app.core.dependencies.users import require_human_scope
 
         payload = _human_payload(["portal:*"])
-        guard = require_human_scope("portal:directory_read")
+        guard = require_human_scope("portal:directory:read")
         guard(payload)  # Should not raise
 
     def test_require_human_scope_wildcard_token_passes_api_keys_manage(self) -> None:
@@ -140,15 +140,15 @@ class TestRequireHumanScope:
         from app.core.dependencies.users import require_human_scope
 
         payload = _human_payload(["portal:*"])
-        guard = require_human_scope("portal:api_keys_manage")
+        guard = require_human_scope("portal:api_keys:manage")
         guard(payload)  # Should not raise
 
     def test_require_human_scope_specific_token_fails_other_scope(self) -> None:
         """Token with only portal:self_read fails portal:api_keys_manage (REQ-SE-03)."""
         from app.core.dependencies.users import require_human_scope
 
-        payload = _human_payload(["portal:self_read"])
-        guard = require_human_scope("portal:api_keys_manage")
+        payload = _human_payload(["portal:applications:read"])
+        guard = require_human_scope("portal:api_keys:manage")
         with pytest.raises(HTTPException) as exc_info:
             guard(payload)
         assert exc_info.value.status_code == 403
@@ -266,7 +266,7 @@ class TestBackwardsCompatibility:
         assert "portal:*" in payload.scopes
 
         # Must pass all three guards.
-        for scope in ("portal:self_read", "portal:directory_read", "portal:api_keys_manage"):
+        for scope in ("portal:applications:read", "portal:directory:read", "portal:api_keys:manage"):
             guard = require_human_scope(scope)  # type: ignore[arg-type]
             guard(payload)  # Should not raise
 
@@ -277,23 +277,23 @@ class TestBackwardsCompatibility:
         token = create_access_token(
             subject=uuid.uuid4(),
             token_type="human",
-            scopes=["portal:self_read"],
+            scopes=["portal:applications:read"],
             issued_via="third_party",
         )
         payload = decode_access_token(token)
 
         # self_read passes
-        guard_self = require_human_scope("portal:self_read")
+        guard_self = require_human_scope("portal:applications:read")
         guard_self(payload)
 
         # directory_read fails
-        guard_dir = require_human_scope("portal:directory_read")
+        guard_dir = require_human_scope("portal:directory:read")
         with pytest.raises(HTTPException) as exc_info:
             guard_dir(payload)
         assert exc_info.value.status_code == 403
 
         # api_keys_manage fails
-        guard_keys = require_human_scope("portal:api_keys_manage")
+        guard_keys = require_human_scope("portal:api_keys:manage")
         with pytest.raises(HTTPException) as exc_info:
             guard_keys(payload)
         assert exc_info.value.status_code == 403

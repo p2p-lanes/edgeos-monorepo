@@ -28,7 +28,7 @@ def _create_app(client: TestClient, token: str) -> dict:
         headers=_auth(token),
         json={
             "name": f"rotate-base-{uuid.uuid4().hex[:6]}",
-            "allowed_token_scopes": ["portal:self_read"],
+            "allowed_token_scopes": ["portal:applications:read"],
             "allowed_api_key_scopes": [],
         },
     )
@@ -151,7 +151,7 @@ class TestRotateThirdPartyApp:
             headers=_auth(admin_token_tenant_b),
             json={
                 "name": f"b-rotate-{uuid.uuid4().hex[:6]}",
-                "allowed_token_scopes": ["portal:self_read"],
+                "allowed_token_scopes": ["portal:applications:read"],
                 "allowed_api_key_scopes": [],
             },
         )

@@ -59,11 +59,11 @@ class TestScopeRoutesRegistryInvariant:
                 assert r.summary, f"RouteDoc for {scope} has empty summary"
 
     def test_known_scope_portal_api_keys_manage_has_routes(self) -> None:
-        """portal:api_keys_manage scope must have at least one registered route."""
+        """portal:api_keys:manage scope must have at least one registered route."""
         from app.api.access.introspection import SCOPE_ROUTES_REGISTRY
 
-        assert "portal:api_keys_manage" in SCOPE_ROUTES_REGISTRY, (
-            "portal:api_keys_manage not in registry — "
+        assert "portal:api_keys:manage" in SCOPE_ROUTES_REGISTRY, (
+            "portal:api_keys:manage not in registry — "
             "check @scope_route decoration on api_key router"
         )
-        assert len(SCOPE_ROUTES_REGISTRY["portal:api_keys_manage"]) >= 1
+        assert len(SCOPE_ROUTES_REGISTRY["portal:api_keys:manage"]) >= 1

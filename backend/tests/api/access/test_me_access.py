@@ -42,7 +42,7 @@ def access_app(db: Session, tenant_a: Tenants) -> tuple[ThirdPartyApps, str]:
         db,
         tenant_id=tenant_a.id,
         name=f"access-test-{uuid.uuid4().hex[:6]}",
-        allowed_token_scopes=["portal:self_read"],
+        allowed_token_scopes=["portal:applications:read"],
         allowed_api_key_scopes=["events:read"],
     )
 
@@ -106,7 +106,7 @@ class TestMeAccessAuth:
             subject=h.id,
             token_type="human",
             issued_via="third_party",
-            scopes=["portal:self_read"],
+            scopes=["portal:applications:read"],
         )
         resp = client.get(BASE_URL, headers=_bearer(token))
         assert resp.status_code == 200, resp.text
@@ -150,13 +150,13 @@ class TestMeAccessResponseShape:
             subject=h.id,
             token_type="human",
             issued_via="third_party",
-            scopes=["portal:self_read", "portal:directory_read"],
+            scopes=["portal:applications:read", "portal:directory:read"],
         )
         resp = client.get(BASE_URL, headers=_bearer(token))
         assert resp.status_code == 200, resp.text
         data = resp.json()
         assert data["app_name"] == "legacy"
-        assert set(data["scopes"]) == {"portal:self_read", "portal:directory_read"}
+        assert set(data["scopes"]) == {"portal:applications:read", "portal:directory:read"}
 
     def test_revoked_app_returns_401(
         self,
@@ -171,7 +171,7 @@ class TestMeAccessResponseShape:
             db,
             tenant_id=tenant_a.id,
             name=f"revoke-me-{uuid.uuid4().hex[:6]}",
-            allowed_token_scopes=["portal:self_read"],
+            allowed_token_scopes=["portal:applications:read"],
             allowed_api_key_scopes=[],
         )
         h = _make_human(db, tenant_a)
