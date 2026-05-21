@@ -9,10 +9,7 @@ from __future__ import annotations
 
 import uuid
 
-import pytest
 from fastapi.testclient import TestClient
-
-from app.api.tenant.models import Tenants
 
 BASE_URL = "/api/v1/third-party-apps"
 

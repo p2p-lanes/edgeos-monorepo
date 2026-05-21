@@ -7,11 +7,12 @@ REQ-7.1: Returns the platform MAX constants.
 
 from __future__ import annotations
 
-import uuid
-
 from fastapi.testclient import TestClient
 
-from app.core.security import THIRD_PARTY_API_KEY_SCOPES_MAX, THIRD_PARTY_TOKEN_SCOPES_MAX
+from app.core.security import (
+    THIRD_PARTY_API_KEY_SCOPES_MAX,
+    THIRD_PARTY_TOKEN_SCOPES_MAX,
+)
 
 BASE_URL = "/api/v1/third-party-apps"
 SCOPES_URL = f"{BASE_URL}/available-scopes"
@@ -71,7 +72,6 @@ class TestAvailableScopes:
         superadmin_token: str,
     ) -> None:
         """SUPERADMIN can also call available-scopes."""
-        from app.api.tenant.models import Tenants
 
         resp = client.get(SCOPES_URL, headers=_auth(superadmin_token))
         # SUPERADMIN may need X-Tenant-Id for tenant session but available-scopes

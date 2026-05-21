@@ -11,8 +11,6 @@ import uuid
 from fastapi.testclient import TestClient
 from sqlmodel import Session
 
-from app.api.api_key.crud import hash_key
-
 BASE_URL = "/api/v1/third-party-apps"
 
 
@@ -48,7 +46,6 @@ class TestRotateThirdPartyApp:
     ) -> None:
         """REQ-6.5.a — rotate returns new raw key in response."""
         app = _create_app(client, admin_token_tenant_a)
-        old_prefix = app["prefix"]
 
         resp = client.post(
             f"{BASE_URL}/{app['id']}/rotate",
@@ -69,7 +66,6 @@ class TestRotateThirdPartyApp:
     ) -> None:
         """After rotation, prefix is updated in the DB."""
         app = _create_app(client, admin_token_tenant_a)
-        old_prefix = app["prefix"]
 
         rotate_resp = client.post(
             f"{BASE_URL}/{app['id']}/rotate",
@@ -90,8 +86,9 @@ class TestRotateThirdPartyApp:
         db: Session,
     ) -> None:
         """REQ-6.5.b — old key is invalid for validation after rotation."""
-        from app.api.third_party_app.crud import validate_third_party_key
         from fastapi import HTTPException
+
+        from app.api.third_party_app.crud import validate_third_party_key
 
         # Create and immediately get the app; we need to test key validation
         # via the CRUD layer directly, since we don't have the raw key from create

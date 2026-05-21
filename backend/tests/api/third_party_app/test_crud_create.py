@@ -10,12 +10,9 @@ from __future__ import annotations
 
 import uuid
 
-import pytest
 from fastapi.testclient import TestClient
-from sqlmodel import Session
 
 from app.api.tenant.models import Tenants
-from app.api.user.models import Users
 
 BASE_URL = "/api/v1/third-party-apps"
 
