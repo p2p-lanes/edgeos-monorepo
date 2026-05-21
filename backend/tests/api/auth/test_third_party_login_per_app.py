@@ -13,7 +13,6 @@ import uuid
 from datetime import UTC, datetime
 from unittest.mock import patch
 
-import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session
 
@@ -135,7 +134,7 @@ class TestJwtCarriesPerAppScopes:
         db.refresh(restricted_app)
 
         email = f"pa-restricted-{uuid.uuid4().hex[:8]}@example.com"
-        human = _make_human(db, tenant=tenant_a, email=email)
+        _make_human(db, tenant=tenant_a, email=email)
 
         code = _do_login_and_capture_code(client, raw_key, email)
         resp = client.post(
@@ -170,7 +169,7 @@ class TestLastUsedAtBehavior:
         email = f"pa-login-notouch-{uuid.uuid4().hex[:8]}@example.com"
         _make_human(db, tenant=tenant, email=email)
 
-        async def _fake_send(_self, **kwargs):  # noqa: ANN001
+        async def _fake_send(_self, **_kwargs):  # noqa: ANN001
             return True
 
         with patch.object(EmailService, "send_login_code_human", _fake_send):

@@ -4,12 +4,17 @@ Slice 1 ships:
   validate_third_party_key — resolves (Tenants, ThirdPartyApps) from a raw key.
   touch_last_used          — bumps last_used_at on successful authenticate.
 
+Slice 2 adds:
+  get_for_authorization    — loads an active, non-revoked app by id for scope
+                             enforcement at api-key minting and self-discovery.
+
 Full admin CRUD (create, list, patch, rotate, soft_delete) ships in slice 3.
 """
 
 from __future__ import annotations
 
 import secrets
+import uuid
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
@@ -74,3 +79,22 @@ def touch_last_used(session: Session, app: ThirdPartyApps) -> None:
     app.last_used_at = datetime.now(UTC)
     session.add(app)
     session.commit()
+
+
+def get_for_authorization(
+    session: Session,
+    app_id: uuid.UUID,
+) -> ThirdPartyApps | None:
+    """Load an active, non-revoked ThirdPartyApps row by id.
+
+    Used at api-key minting and self-discovery to enforce per-app scope
+    subsets. Returns None when the app has been deleted or revoked after
+    the JWT was minted — callers should treat None as a 401.
+    """
+    return session.exec(
+        select(ThirdPartyApps).where(
+            ThirdPartyApps.id == app_id,
+            ThirdPartyApps.active.is_(True),
+            ThirdPartyApps.revoked_at.is_(None),
+        )
+    ).first()

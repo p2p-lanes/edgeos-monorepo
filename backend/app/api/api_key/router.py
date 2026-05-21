@@ -72,10 +72,25 @@ async def create_api_key(
     __: HumanCanManageApiKeys,
     ___: RequireHumanScopeApiKeysManage,
 ) -> ApiKeyCreated:
-    # REQ-AK-04: third-party JWTs may only mint keys within THIRD_PARTY_API_KEY_SCOPES_MAX.
-    # LEGACY-V1-FALLBACK — remove >=30d after deploy (per-app scope enforcement in slice 2).
+    # REQ-4.1 / REQ-5.1: third-party JWT scope enforcement.
     if getattr(token_payload, "issued_via", "portal") == "third_party":
-        invalid = set(payload.scopes) - THIRD_PARTY_API_KEY_SCOPES_MAX
+        if token_payload.issued_by_app_id is not None:
+            # v2 path: per-app ceiling — check app.allowed_api_key_scopes.
+            from app.api.third_party_app.crud import get_for_authorization
+
+            app = get_for_authorization(db, token_payload.issued_by_app_id)
+            if app is None:
+                # App was deleted/revoked between JWT mint and now.
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Third-party app no longer authorized.",
+                )
+            allowed = set(app.allowed_api_key_scopes)
+        else:
+            # LEGACY-V1-FALLBACK — remove >=30d after deploy.
+            allowed = set(THIRD_PARTY_API_KEY_SCOPES_MAX)
+
+        invalid = set(payload.scopes) - allowed
         if invalid:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
