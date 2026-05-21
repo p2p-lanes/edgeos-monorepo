@@ -705,6 +705,7 @@
       "creation_restricted_heading": "Event creation is restricted",
       "creation_restricted_message": "Only admins can create events for this pop-up.",
       "no_popup_error": "No popup",
+      "no_timezone_error": "No timezone configured for this popup",
       "no_venue_option": "Meeting",
       "custom_location_option": "Custom location",
       "venues_group_label": "Venues",

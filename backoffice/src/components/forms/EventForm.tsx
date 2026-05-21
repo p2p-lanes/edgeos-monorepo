@@ -80,6 +80,14 @@ interface EventFormProps {
   initialVenueId?: string
   /** Preselected start time (UTC ISO) for "create event" mode. */
   initialStartIso?: string
+  /**
+   * Popup-configured timezone. Required: must be resolved by the parent
+   * route before mounting the form so the initial wall-clock value and the
+   * `timezone` field are consistent from the first render. Avoids the
+   * silent "UTC" fallback that used to shift events by the popup↔UTC
+   * offset when the user typed before settings finished loading.
+   */
+  popupTimezone: string
   onSuccess: () => void
 }
 
@@ -117,6 +125,7 @@ export function EventForm({
   defaultValues,
   initialVenueId,
   initialStartIso,
+  popupTimezone,
   onSuccess,
 }: EventFormProps) {
   const navigate = useNavigate()
@@ -178,7 +187,7 @@ export function EventForm({
   const [repeat, setRepeat] = useState<RepeatState>(() =>
     parseRruleToState(
       defaultValues?.rrule ?? null,
-      defaultValues?.timezone ?? "UTC",
+      defaultValues?.timezone ?? popupTimezone,
     ),
   )
 
@@ -316,9 +325,9 @@ export function EventForm({
       kind: defaultValues?.kind ?? "",
       start_time: formatForInput(
         defaultValues?.start_time ?? initialStartIso,
-        defaultValues?.timezone,
+        defaultValues?.timezone ?? popupTimezone,
       ),
-      timezone: defaultValues?.timezone ?? "UTC",
+      timezone: defaultValues?.timezone ?? popupTimezone,
       cover_url: defaultValues?.cover_url ?? "",
       meeting_url: defaultValues?.meeting_url ?? "",
       max_participant: defaultValues?.max_participant?.toString() ?? "",
@@ -649,7 +658,10 @@ export function EventForm({
     },
     enabled: !!selectedPopupId,
   })
-  const popupTz = popupSettings?.timezone ?? "UTC"
+  // Use the prop-supplied popup timezone (resolved by the parent route)
+  // rather than `popupSettings?.timezone`, so the form has a definitive
+  // value from the first render and never falls back to "UTC".
+  const popupTz = popupTimezone
 
   // Popup window (start_date / end_date) used to constrain the date picker
   // to the active popup's calendar — mirrors the portal event create flow.
@@ -706,33 +718,6 @@ export function EventForm({
     }
     return null
   }, [popup?.start_date, popup?.end_date, isClosedOnDate])
-
-  // For new events, default the timezone field to the popup's configured tz
-  // as soon as settings load — users shouldn't have to hunt for it, and the
-  // UTC fallback creates silent round-trip drift against the calendars.
-  //
-  // The form is initialized BEFORE popupSettings resolves, so the naive
-  // datetime input was formatted with the "UTC" fallback. We also re-format
-  // it here: if we only updated `timezone`, the input would still hold the
-  // UTC wall-time but get re-interpreted as popup-tz on submit, silently
-  // shifting the event by the tz offset.
-  useEffect(() => {
-    if (isEdit || !popupSettings?.timezone) return
-    const tz = popupSettings.timezone
-    const sourceIso = initialStartIso
-    if (sourceIso) {
-      // Only re-format when the input still holds the value we set at
-      // mount (UTC fallback conversion). If the user already typed into
-      // the field we respect their input.
-      const mountFormatted = utcToLocalTzNaive(sourceIso, "UTC")
-      if (form.state.values.start_time === mountFormatted) {
-        form.setFieldValue("start_time", utcToLocalTzNaive(sourceIso, tz))
-      }
-    }
-    if (!form.state.values.timezone || form.state.values.timezone === "UTC") {
-      form.setFieldValue("timezone", tz)
-    }
-  }, [isEdit, popupSettings?.timezone, initialStartIso, form])
 
   const dayBounds = useMemo(() => {
     if (!dateStr) return null

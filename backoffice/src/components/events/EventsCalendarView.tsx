@@ -121,8 +121,7 @@ export function EventsCalendarView({
     currentMonth.getFullYear() === maxDate.getFullYear() &&
     currentMonth.getMonth() === maxDate.getMonth()
 
-  const { formatTime, formatDayKey, formatGridDayKey } =
-    useEventTimezone(popupId)
+  const { formatTime, formatDayKey } = useEventTimezone(popupId)
 
   const { data } = useQuery({
     queryKey: [
@@ -154,8 +153,12 @@ export function EventsCalendarView({
 
   const events = data?.results ?? []
 
+  // Grid cells are calendar days (number labels) — match them against
+  // events by formatting both sides in the popup's timezone, so an event
+  // saved as "June 4 1pm popup-tz" lands in the "June 4" cell regardless
+  // of where the browser is.
   function getEventsForDate(date: Date): EventPublic[] {
-    const cellKey = formatGridDayKey(date)
+    const cellKey = localYmd(date)
     return events.filter((e) => formatDayKey(e.start_time) === cellKey)
   }
 
@@ -219,8 +222,7 @@ export function EventsCalendarView({
             const isOutOfRange =
               (!!minYmd && cellYmd < minYmd) || (!!maxYmd && cellYmd > maxYmd)
             const isSelected =
-              selectedDate &&
-              formatGridDayKey(d) === formatGridDayKey(selectedDate)
+              selectedDate && localYmd(d) === localYmd(selectedDate)
             return (
               <button
                 key={i}

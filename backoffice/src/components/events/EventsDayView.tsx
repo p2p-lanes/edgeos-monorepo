@@ -1,3 +1,4 @@
+import { dayBoundsInTz } from "@edgeos/shared-events"
 import { useQuery } from "@tanstack/react-query"
 import { addDays, format, startOfDay, subDays } from "date-fns"
 import {
@@ -139,23 +140,21 @@ export function EventsDayView({
   const scrollRef = useRef<HTMLDivElement>(null)
   const mobileScrollRef = useRef<HTMLDivElement>(null)
 
-  // 24h ±1 day window in UTC. Padding catches events whose UTC start lands
-  // on the day before/after when re-projected into the popup's timezone.
+  // Day-key is the YYYY-MM-DD the user picked in the date picker — interpret
+  // it as a calendar day in the popup's timezone so bucketing matches the
+  // calendar view and the backend's wall-clock view of the event.
+  const dayKey = useMemo(() => localYmd(selectedDate), [selectedDate])
+
+  // 24h ±1 day window anchored at the popup-tz day boundaries. Padding
+  // catches events that straddle midnight in the popup tz so the projected
+  // bucket stays inside the queried range.
   const window = useMemo(() => {
-    const start = new Date(selectedDate)
-    start.setHours(0, 0, 0, 0)
+    const { start } = dayBoundsInTz(dayKey, timezone)
     return {
       startAfter: subDays(start, 1).toISOString(),
       startBefore: addDays(start, 2).toISOString(),
     }
-  }, [selectedDate])
-
-  const dayKey = useMemo(() => {
-    const y = selectedDate.getFullYear()
-    const m = String(selectedDate.getMonth() + 1).padStart(2, "0")
-    const d = String(selectedDate.getDate()).padStart(2, "0")
-    return `${y}-${m}-${d}`
-  }, [selectedDate])
+  }, [dayKey, timezone])
 
   const { data: venuesData } = useQuery({
     queryKey: ["event-venues", { popupId, limit: 200 }],

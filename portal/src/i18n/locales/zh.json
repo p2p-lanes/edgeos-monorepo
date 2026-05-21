@@ -704,6 +704,7 @@
       "creation_restricted_heading": "创建活动受限",
       "creation_restricted_message": "仅管理员可为此 pop-up 创建活动。",
       "no_popup_error": "无 popup",
+      "no_timezone_error": "未为此 popup 配置时区",
       "no_venue_option": "会议",
       "custom_location_option": "自定义地点",
       "venues_group_label": "场地",

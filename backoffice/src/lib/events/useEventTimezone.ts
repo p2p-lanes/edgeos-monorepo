@@ -66,15 +66,6 @@ export function useEventTimezone(popupId: string | undefined) {
       }).format(new Date(dateStr))
     }
 
-    // YYYY-MM-DD from a nominal local Date (no timezone conversion).
-    // Used for matching calendar grid cells against event day-keys.
-    const formatGridDayKey = (d: Date) => {
-      const y = d.getFullYear()
-      const m = String(d.getMonth() + 1).padStart(2, "0")
-      const day = String(d.getDate()).padStart(2, "0")
-      return `${y}-${m}-${day}`
-    }
-
     return {
       timezone,
       isLoading,
@@ -82,7 +73,6 @@ export function useEventTimezone(popupId: string | undefined) {
       formatDateShort,
       formatDateFull,
       formatDayKey,
-      formatGridDayKey,
     }
   }, [timezone, isLoading])
 }
