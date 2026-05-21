@@ -48,7 +48,9 @@ describe("todayInTz", () => {
   it("differs from UTC by at most one day in LA", () => {
     const utcKey = todayInTz("UTC")
     const laKey = todayInTz("America/Los_Angeles")
-    const [u, l] = [utcKey, laKey].map((k) => new Date(`${k}T00:00:00Z`).getTime())
+    const [u, l] = [utcKey, laKey].map((k) =>
+      new Date(`${k}T00:00:00Z`).getTime(),
+    )
     expect(Math.abs(u - l)).toBeLessThanOrEqual(24 * 60 * 60 * 1000)
   })
 })
@@ -71,7 +73,10 @@ describe("formatDateKeyInTz", () => {
   it("event before UTC midnight stays on the previous LA day", () => {
     // 06:00Z 2026-06-04 == 23:00 2026-06-03 in LA (UTC-7).
     expect(
-      formatDateKeyInTz(new Date("2026-06-04T06:00:00Z"), "America/Los_Angeles"),
+      formatDateKeyInTz(
+        new Date("2026-06-04T06:00:00Z"),
+        "America/Los_Angeles",
+      ),
     ).toBe("2026-06-03")
   })
 

@@ -265,7 +265,9 @@ describe("NewPortalEventPage – wrapper gating + displayTz contract", () => {
     render(<NewPortalEventPage />)
 
     await waitFor(() => {
-      expect(screen.getByText(/events\.list\.events_disabled_heading/)).toBeTruthy()
+      expect(
+        screen.getByText(/events\.list\.events_disabled_heading/),
+      ).toBeTruthy()
     })
     expect(screen.queryByTestId("schedule-fields")).toBeNull()
   })
