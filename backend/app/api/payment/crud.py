@@ -138,6 +138,36 @@ def calculate_insurance_amount(
     )
 
 
+def calculate_contribution_amount(
+    popup: "Any",
+    products_subtotal: Decimal,
+) -> Decimal:
+    """Pure function: compute contribution amount from popup settings + pre-fee subtotal.
+
+    Contribution is MANDATORY when enabled at popup level — there is no buyer opt-in
+    flag. Mirrors `calculate_insurance_amount` shape but drops the per-product
+    eligibility filter (contribution applies over the full pre-fee order subtotal).
+
+    Args:
+        popup: Object with .contribution_enabled (bool) and
+            .contribution_percentage (Decimal|None).
+        products_subtotal: Pre-fee snapshot of the order amount
+            (post-discount, pre-insurance, pre-contribution).
+
+    Returns:
+        Contribution amount rounded to 2 decimal places.
+        Returns Decimal("0") if contribution is disabled or percentage is None.
+    """
+    if not popup.contribution_enabled:
+        return Decimal("0")
+    if popup.contribution_percentage is None:
+        return Decimal("0")
+
+    return (products_subtotal * popup.contribution_percentage / 100).quantize(
+        MONEY_PRECISION, rounding=ROUND_HALF_UP
+    )
+
+
 def _require_application_id(application_id: uuid.UUID | None) -> uuid.UUID:
     """Narrow optional application ids for application-based flows."""
     if application_id is None:
