@@ -21,6 +21,10 @@ vi.mock("@/providers/tenantProvider", () => ({
   useTenant: () => mockUseTenant(),
 }))
 
+vi.mock("../hooks/useCheckoutRuntime", () => ({
+  useCheckoutRuntime: () => ({ data: undefined }),
+}))
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
