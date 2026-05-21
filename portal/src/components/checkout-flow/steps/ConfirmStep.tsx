@@ -10,6 +10,7 @@ import {
   ShoppingBag,
   Sparkles,
   Ticket,
+  Utensils,
   X,
 } from "lucide-react"
 import { useState } from "react"
@@ -41,6 +42,7 @@ export default function ConfirmStep() {
     buyerValues,
     buyerGeneralError,
     creditsEnabled,
+    removeMealPlan,
   } = useCheckout()
   const { getCity } = useCityProvider()
   const popup = getCity()
@@ -108,6 +110,7 @@ export default function ConfirmStep() {
     cart.housing ||
     cart.merch.length > 0 ||
     cart.patron ||
+    cart.mealPlans.length > 0 ||
     Object.values(cart.dynamicItems).some((items) => items.length > 0) ||
     hasEditChanges
 
@@ -357,6 +360,55 @@ export default function ConfirmStep() {
                 <span className="font-medium text-foreground">
                   {formatCurrency(cart.patron.amount)}
                 </span>
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* Meal Plans Section — one row per (attendee × weekly product). Mirrors
+            the cart-drawer rows: attendee name + product name + price, with a
+            remove button to drop that week from the cart. */}
+        {cart.mealPlans.length > 0 && (
+          <>
+            <div className="border-t border-border" />
+            <div className="px-5 py-4">
+              <div className="flex items-center gap-2 mb-3">
+                <Utensils className="w-4 h-4 text-muted-foreground" />
+                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                  Meal Plans
+                </span>
+              </div>
+              <div className="space-y-1">
+                {cart.mealPlans.map((mp) => (
+                  <div
+                    key={`${mp.attendeeId}-${mp.productId}`}
+                    className="flex items-center justify-between text-sm py-0.5"
+                  >
+                    <div className="min-w-0 flex-1 pr-2">
+                      <p className="text-sm font-medium text-foreground truncate">
+                        {getAttendeeName(mp.attendeeId)}
+                      </p>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {mp.product.name}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="font-medium text-foreground">
+                        {formatCurrency(mp.product.price)}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          removeMealPlan(mp.attendeeId, mp.productId)
+                        }
+                        aria-label={`Remove ${mp.product.name}`}
+                        className="p-1 text-muted-foreground hover:text-destructive transition-colors"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           </>

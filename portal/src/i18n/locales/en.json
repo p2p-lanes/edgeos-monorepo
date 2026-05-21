@@ -331,6 +331,7 @@
       "ticket": "Ticket",
       "housing": "Housing",
       "merch": "Merch",
+      "meal_plan": "Meal plan",
       "other": "Other"
     },
     "discounts": {

@@ -2,6 +2,7 @@ import uuid
 from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, field_validator
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PgUUID
 from sqlmodel import Column, Field, SQLModel
 
@@ -128,6 +129,13 @@ class AttendeeProductsBase(SQLModel):
         nullable=True,
         index=True,
     )
+    # Per-purchase metadata blob. Populated by step-specific submission logic
+    # (e.g. meal_plan_select stores daily_choices + dietary_restriction +
+    # special_request). NULL for products that don't collect metadata.
+    purchase_metadata: dict | None = Field(
+        default=None,
+        sa_column=Column(JSONB, nullable=True),
+    )
 
 
 class AttendeeProductPublic(BaseModel):
@@ -156,6 +164,7 @@ class AttendeeProductPublic(BaseModel):
     product_category: str | None = None
     duration_type: str | None = None
     last_scan_at: datetime | None = None
+    purchase_metadata: dict | None = None
 
     model_config = ConfigDict(from_attributes=True, extra="forbid")
 

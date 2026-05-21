@@ -8,6 +8,7 @@ import {
   ShoppingBag,
   Tag,
   Ticket,
+  Utensils,
   X,
 } from "lucide-react"
 import { useTranslation } from "react-i18next"
@@ -29,6 +30,7 @@ export default function CartItemList() {
     clearHousing,
     updateMerchQuantity,
     clearPatron,
+    removeMealPlan,
     clearPromoCode,
     removeDynamicItem,
     isEditing,
@@ -233,6 +235,48 @@ export default function CartItemList() {
                 <X className="w-4 h-4" />
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Meal Plans — one row per (attendee × week). Total = sum of weekly
+          product prices; click X to remove that week from the cart. */}
+      {cart.mealPlans.length > 0 && (
+        <div className="mb-4">
+          <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+            Meal Plans
+          </h4>
+          <div className="space-y-2">
+            {cart.mealPlans.map((mp) => (
+              <div
+                key={`${mp.attendeeId}-${mp.productId}`}
+                className="flex items-center justify-between py-2 border-b border-border last:border-0"
+              >
+                <div className="flex items-center gap-3 flex-1 min-w-0">
+                  <Utensils className="w-4 h-4 text-muted-foreground shrink-0" />
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-foreground truncate">
+                      {getAttendeeName(mp.attendeeId)}
+                    </p>
+                    <p className="text-xs text-muted-foreground truncate">
+                      {mp.product.name}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium text-foreground">
+                    {formatCurrency(mp.product.price)}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => removeMealPlan(mp.attendeeId, mp.productId)}
+                    className="p-1 text-muted-foreground hover:text-destructive transition-colors"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       )}
