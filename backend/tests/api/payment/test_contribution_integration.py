@@ -24,6 +24,7 @@ from app.api.application.schemas import ApplicationStatus
 from app.api.attendee.models import Attendees
 from app.api.human.models import Humans
 from app.api.popup.models import Popups
+from app.api.product.models import Products
 from app.api.shared.enums import SaleType
 from app.api.tenant.models import Tenants
 from app.core.security import create_access_token
@@ -70,9 +71,7 @@ def _make_product(
     *,
     price: str,
     insurance_eligible: bool = True,
-) -> "Popups":
-    from app.api.product.models import Products
-
+) -> Products:
     product = Products(
         tenant_id=tenant.id,
         popup_id=popup.id,
