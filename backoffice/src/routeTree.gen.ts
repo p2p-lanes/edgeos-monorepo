@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as LayoutRouteImport } from './routes/_layout'
 import { Route as LayoutIndexRouteImport } from './routes/_layout/index'
+import { Route as LayoutThirdPartyAppsRouteImport } from './routes/_layout/third-party-apps'
 import { Route as LayoutSettingsRouteImport } from './routes/_layout/settings'
 import { Route as LayoutPaymentsRouteImport } from './routes/_layout/payments'
 import { Route as LayoutCheckInRouteImport } from './routes/_layout/check-in'
@@ -79,6 +80,11 @@ const LayoutRoute = LayoutRouteImport.update({
 const LayoutIndexRoute = LayoutIndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => LayoutRoute,
+} as any)
+const LayoutThirdPartyAppsRoute = LayoutThirdPartyAppsRouteImport.update({
+  id: '/third-party-apps',
+  path: '/third-party-apps',
   getParentRoute: () => LayoutRoute,
 } as any)
 const LayoutSettingsRoute = LayoutSettingsRouteImport.update({
@@ -373,6 +379,7 @@ export interface FileRoutesByFullPath {
   '/check-in': typeof LayoutCheckInRoute
   '/payments': typeof LayoutPaymentsRoute
   '/settings': typeof LayoutSettingsRoute
+  '/third-party-apps': typeof LayoutThirdPartyAppsRoute
   '/admin/new': typeof LayoutAdminNewRoute
   '/applications/$id': typeof LayoutApplicationsIdRoute
   '/applications/new': typeof LayoutApplicationsNewRoute
@@ -430,6 +437,7 @@ export interface FileRoutesByTo {
   '/check-in': typeof LayoutCheckInRoute
   '/payments': typeof LayoutPaymentsRoute
   '/settings': typeof LayoutSettingsRoute
+  '/third-party-apps': typeof LayoutThirdPartyAppsRoute
   '/': typeof LayoutIndexRoute
   '/admin/new': typeof LayoutAdminNewRoute
   '/applications/$id': typeof LayoutApplicationsIdRoute
@@ -490,6 +498,7 @@ export interface FileRoutesById {
   '/_layout/check-in': typeof LayoutCheckInRoute
   '/_layout/payments': typeof LayoutPaymentsRoute
   '/_layout/settings': typeof LayoutSettingsRoute
+  '/_layout/third-party-apps': typeof LayoutThirdPartyAppsRoute
   '/_layout/': typeof LayoutIndexRoute
   '/_layout/admin/new': typeof LayoutAdminNewRoute
   '/_layout/applications/$id': typeof LayoutApplicationsIdRoute
@@ -551,6 +560,7 @@ export interface FileRouteTypes {
     | '/check-in'
     | '/payments'
     | '/settings'
+    | '/third-party-apps'
     | '/admin/new'
     | '/applications/$id'
     | '/applications/new'
@@ -608,6 +618,7 @@ export interface FileRouteTypes {
     | '/check-in'
     | '/payments'
     | '/settings'
+    | '/third-party-apps'
     | '/'
     | '/admin/new'
     | '/applications/$id'
@@ -667,6 +678,7 @@ export interface FileRouteTypes {
     | '/_layout/check-in'
     | '/_layout/payments'
     | '/_layout/settings'
+    | '/_layout/third-party-apps'
     | '/_layout/'
     | '/_layout/admin/new'
     | '/_layout/applications/$id'
@@ -744,6 +756,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof LayoutIndexRouteImport
+      parentRoute: typeof LayoutRoute
+    }
+    '/_layout/third-party-apps': {
+      id: '/_layout/third-party-apps'
+      path: '/third-party-apps'
+      fullPath: '/third-party-apps'
+      preLoaderRoute: typeof LayoutThirdPartyAppsRouteImport
       parentRoute: typeof LayoutRoute
     }
     '/_layout/settings': {
@@ -1134,6 +1153,7 @@ interface LayoutRouteChildren {
   LayoutCheckInRoute: typeof LayoutCheckInRoute
   LayoutPaymentsRoute: typeof LayoutPaymentsRoute
   LayoutSettingsRoute: typeof LayoutSettingsRoute
+  LayoutThirdPartyAppsRoute: typeof LayoutThirdPartyAppsRoute
   LayoutIndexRoute: typeof LayoutIndexRoute
   LayoutAdminNewRoute: typeof LayoutAdminNewRoute
   LayoutApplicationsIdRoute: typeof LayoutApplicationsIdRoute
@@ -1192,6 +1212,7 @@ const LayoutRouteChildren: LayoutRouteChildren = {
   LayoutCheckInRoute: LayoutCheckInRoute,
   LayoutPaymentsRoute: LayoutPaymentsRoute,
   LayoutSettingsRoute: LayoutSettingsRoute,
+  LayoutThirdPartyAppsRoute: LayoutThirdPartyAppsRoute,
   LayoutIndexRoute: LayoutIndexRoute,
   LayoutAdminNewRoute: LayoutAdminNewRoute,
   LayoutApplicationsIdRoute: LayoutApplicationsIdRoute,
