@@ -13,6 +13,12 @@ interface UseCartSummaryParams {
   merch: SelectedMerchItem[]
   patron: SelectedPatronItem | null
   insuranceAmount: number
+  /**
+   * Contribution fee amount in absolute currency units.
+   * Source from popup config only — never recompute client-side from a
+   * percentage; the backend is the single source of truth for the rate.
+   */
+  contributionAmount: number
   isEditing: boolean
   editCredit: number
   monthUpgradeCredit: number
@@ -26,6 +32,7 @@ export function useCartSummary({
   merch,
   patron,
   insuranceAmount,
+  contributionAmount,
   isEditing,
   editCredit,
   monthUpgradeCredit,
@@ -42,13 +49,15 @@ export function useCartSummary({
     const merchSubtotal = merch.reduce((sum, m) => sum + m.totalPrice, 0)
     const patronSubtotal = patron?.amount ?? 0
     const insuranceSubtotal = insuranceAmount
+    const contributionSubtotal = contributionAmount
 
     const originalSubtotal =
       passesOriginalSubtotal +
       housingSubtotal +
       merchSubtotal +
       patronSubtotal +
-      insuranceSubtotal
+      insuranceSubtotal +
+      contributionSubtotal
     // Apply discount on the original subtotal so the result is idempotent even
     // if PassesProvider has already mutated pass prices via priceStrategy.
     const promoDiscount = (originalSubtotal * discountValue) / 100
@@ -71,6 +80,7 @@ export function useCartSummary({
       merchSubtotal,
       patronSubtotal,
       insuranceSubtotal,
+      contributionSubtotal,
       dynamicSubtotal: 0,
       subtotal: originalSubtotal,
       discount: promoDiscount,
@@ -84,6 +94,7 @@ export function useCartSummary({
     merch,
     patron,
     insuranceAmount,
+    contributionAmount,
     isEditing,
     editCredit,
     monthUpgradeCredit,

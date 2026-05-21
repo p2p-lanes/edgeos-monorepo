@@ -581,6 +581,28 @@ export function CheckoutProvider({
     },
   )
 
+  // Contribution fee — derived from popup config (mandatory when enabled).
+  // The popup is the single source of truth for the rate; there is no buyer
+  // opt-in toggle. We calculate client-side from popup.contribution_percentage
+  // so the summary line renders before submit (transparency requirement).
+  const contributionAmount = useMemo<number>(() => {
+    if (!city?.contribution_enabled) return 0
+    const pct = Number(city.contribution_percentage)
+    if (Number.isNaN(pct) || pct <= 0) return 0
+    // Pre-fee subtotal: passes + housing + merch + patron (mirrors backend
+    // _apply_discounts snapshot: post-discount, before insurance and contribution)
+    const passesSubtotal = selectedPasses.reduce(
+      (sum, p) => sum + (p.originalPrice ?? p.price),
+      0,
+    )
+    const housingTotal = housing?.totalPrice ?? 0
+    const merchTotal = merch.reduce((sum, m) => sum + m.totalPrice, 0)
+    const patronTotal = patron?.amount ?? 0
+    const preFeeSubtotal =
+      passesSubtotal + housingTotal + merchTotal + patronTotal
+    return Math.round(((preFeeSubtotal * pct) / 100) * 100) / 100
+  }, [city, selectedPasses, housing, merch, patron])
+
   // Defence-in-depth: take the highest discount available so the total reflects
   // it even if one of the state vectors lags (DiscountProvider's <= guard
   // rejecting an update, or usePromoCode's re-validation effect clobbering
@@ -597,6 +619,7 @@ export function CheckoutProvider({
     merch,
     patron,
     insuranceAmount,
+    contributionAmount,
     isEditing,
     editCredit,
     monthUpgradeCredit,
