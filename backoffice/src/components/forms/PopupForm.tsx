@@ -1210,7 +1210,7 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
                         onBlur={field.handleBlur}
                         onChange={(e) => field.handleChange(e.target.value)}
                         disabled={readOnly || !contributionEnabled}
-                        className="max-w-xs text-sm"
+                        className="w-80 max-w-xs text-sm field-sizing-fixed"
                         rows={3}
                       />
                     </InlineRow>
