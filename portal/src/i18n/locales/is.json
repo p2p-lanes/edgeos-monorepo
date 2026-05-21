@@ -236,6 +236,10 @@
         "previous_image_aria": "Fyrri mynd",
         "next_image_aria": "Næsta mynd"
       }
+    },
+    "contribution": {
+      "fallbackLabel": "Viðbót við viðburð",
+      "fallbackDescription": "Styður við framkvæmd viðburðarins"
     }
   },
   "openCheckout": {

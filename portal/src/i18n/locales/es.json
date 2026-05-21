@@ -246,6 +246,10 @@
         "previous_image_aria": "Imagen anterior",
         "next_image_aria": "Siguiente imagen"
       }
+    },
+    "contribution": {
+      "fallbackLabel": "Contribución al evento",
+      "fallbackDescription": "Apoya la realización del evento"
     }
   },
   "openCheckout": {
