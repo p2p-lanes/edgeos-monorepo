@@ -1,13 +1,25 @@
 "use client"
 
-import { Heart, Home, Shield, ShoppingBag, Tag, Ticket, X } from "lucide-react"
+import {
+  HandCoins,
+  Heart,
+  Home,
+  Shield,
+  ShoppingBag,
+  Tag,
+  Ticket,
+  X,
+} from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { resolveStepIcon } from "@/lib/checkoutStepIcons"
 import { useCheckout } from "@/providers/checkoutProvider"
+import { useCityProvider } from "@/providers/cityProvider"
 import { formatCurrency } from "@/types/checkout"
 
 export default function CartItemList() {
   const { t } = useTranslation()
+  const { getCity } = useCityProvider()
+  const popup = getCity()
   const {
     cart,
     summary,
@@ -288,6 +300,36 @@ export default function CartItemList() {
               {formatCurrency(summary.insuranceSubtotal)}
             </span>
           </div>
+        </div>
+      )}
+
+      {/* Contribution fee — mandatory when popup has it enabled; no buyer toggle */}
+      {summary.contributionSubtotal > 0 && (
+        <div className="mb-4">
+          <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+            {popup?.contribution_label ||
+              t("checkout.contribution.fallbackLabel")}
+          </h4>
+          <div className="flex items-center justify-between py-2">
+            <div className="flex items-center gap-3">
+              <HandCoins className="w-4 h-4 text-muted-foreground shrink-0" />
+              <span className="text-sm font-medium text-foreground">
+                {popup?.contribution_label ||
+                  t("checkout.contribution.fallbackLabel")}
+                {popup?.contribution_percentage
+                  ? ` (${Number(popup.contribution_percentage)}%)`
+                  : ""}
+              </span>
+            </div>
+            <span className="text-sm font-medium text-foreground">
+              {formatCurrency(summary.contributionSubtotal)}
+            </span>
+          </div>
+          {popup?.contribution_description && (
+            <p className="text-xs text-muted-foreground mt-1 ml-7">
+              {popup.contribution_description}
+            </p>
+          )}
         </div>
       )}
 
