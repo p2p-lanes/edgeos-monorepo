@@ -390,11 +390,21 @@ def require_human_scope(scope: HumanScope):
 
     Raises HTTP 403 otherwise. Does NOT re-check JWT authenticity — additive on
     top of ``get_current_human``.
+
+    The returned callable carries a ``scope`` attribute so the registry walker
+    in ``app.api.access.introspection`` can introspect which scope each
+    dependency enforces without inspecting closure cells.
     """
 
     def _guard(
         token_payload: Annotated[TokenPayload, Depends(get_token_payload)],
     ) -> None:
+        # API key callers are governed by _PAT_ROUTE_POLICIES in core.security
+        # which enforces a route-specific api-key-side scope (e.g. rsvp:write).
+        # Skipping the human-scope check here avoids requiring api keys to also
+        # carry a portal:* scope they cannot meaningfully hold.
+        if token_payload.via_api_key:
+            return
         if "portal:*" in token_payload.scopes:
             return
         if scope in token_payload.scopes:
@@ -407,6 +417,8 @@ def require_human_scope(scope: HumanScope):
             ),
         )
 
+    # Attach scope for introspection by register_scope_routes.
+    _guard.scope = scope  # type: ignore[attr-defined]
     return _guard
 
 
@@ -702,8 +714,19 @@ AdminOrApiKey_TranslationsWrite = Annotated["UserPublic", Depends(CurrentAdminOr
 AdminOrApiKeySession_TranslationsRead = Annotated[Session, Depends(get_admin_or_api_key_tenant_session("translations:read"))]
 AdminOrApiKeySession_TranslationsWrite = Annotated[Session, Depends(get_admin_or_api_key_tenant_session("translations:write"))]
 
-# Portal scope guards (require_human_scope based) — Annotated wrappers
-RequireHumanScopePortalStar = Annotated[None, Depends(require_human_scope("portal:*"))]
-RequireHumanScopeSelfRead = Annotated[None, Depends(require_human_scope("portal:self_read"))]
-RequireHumanScopeDirectoryRead = Annotated[None, Depends(require_human_scope("portal:directory_read"))]
-RequireHumanScopeApiKeysManage = Annotated[None, Depends(require_human_scope("portal:api_keys_manage"))]
+# DRY helper for scope-gated routes. Use directly in the route decorator's
+# `dependencies=[...]` list instead of declaring a per-scope Annotated alias:
+#
+#   @router.get(
+#       "/me",
+#       summary="Get your profile",
+#       dependencies=[needs("portal:profile:read")],
+#   )
+#   async def get_me(current_human: CurrentHuman, ...) -> HumanPublic: ...
+#
+# The registry walker (app.api.access.introspection.register_scope_routes)
+# auto-discovers each route's scope by inspecting its dependency tree, so
+# adding or renaming a scope is a string change at the call site only.
+def needs(scope: HumanScope):
+    """Return a FastAPI Depends that enforces the given HumanScope."""
+    return Depends(require_human_scope(scope))

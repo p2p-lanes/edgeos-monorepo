@@ -114,12 +114,3 @@ class TenantPublic(TenantBase):
     # Computed projection — NOT a DB column. Populated by the router after resolving
     # the active direct-sale popup for tenants in landing_mode=checkout.
     active_popup_slug: str | None = None
-    # Display fragment for the third-party key (prefix only — hash is NEVER exposed).
-    third_party_key_prefix: str | None = None
-
-
-class ThirdPartyKeyRotated(SQLModel):
-    """Returned by the rotate endpoint. The raw api_key is shown ONCE and never stored."""
-
-    api_key: str
-    prefix: str

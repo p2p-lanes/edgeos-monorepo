@@ -18,7 +18,7 @@ export type AbandonedCartPublic = {
  */
 export type AdminApiKeyCreate = {
     name: string;
-    scopes: Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write')>;
+    scopes: Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:read' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write')>;
     expires_at?: (string | null);
 };
 
@@ -31,7 +31,7 @@ export type AdminApiKeyCreated = {
     id: string;
     name: string;
     prefix: string;
-    scopes: Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write')>;
+    scopes: Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:read' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write')>;
     created_at: string;
     last_used_at?: (string | null);
     expires_at?: (string | null);
@@ -46,7 +46,7 @@ export type AdminApiKeyPublic = {
     id: string;
     name: string;
     prefix: string;
-    scopes: Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write')>;
+    scopes: Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:read' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write')>;
     created_at: string;
     last_used_at?: (string | null);
     expires_at?: (string | null);
@@ -65,7 +65,7 @@ export type AITranslateRequest = {
 export type ApiKeyCreate = {
     name: string;
     expires_at?: (string | null);
-    scopes?: Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write')>;
+    scopes?: Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:read' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write')>;
 };
 
 /**
@@ -76,7 +76,7 @@ export type ApiKeyCreated = {
     id: string;
     name: string;
     prefix: string;
-    scopes: Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write')>;
+    scopes: Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:read' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write')>;
     created_at: string;
     last_used_at?: (string | null);
     expires_at?: (string | null);
@@ -91,7 +91,7 @@ export type ApiKeyPublic = {
     id: string;
     name: string;
     prefix: string;
-    scopes: Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write')>;
+    scopes: Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:read' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write')>;
     created_at: string;
     last_used_at?: (string | null);
     expires_at?: (string | null);
@@ -494,6 +494,9 @@ export type AttendeeProductPublic = {
     product_category?: (string | null);
     duration_type?: (string | null);
     last_scan_at?: (string | null);
+    purchase_metadata?: ({
+    [key: string]: unknown;
+} | null);
 };
 
 /**
@@ -638,6 +641,17 @@ export type AuthCodeSentResponse = {
     expires_in_minutes?: number;
 };
 
+/**
+ * Static response for GET /third-party-apps/available-scopes.
+ *
+ * Returns the platform MAX constants so the frontend create modal can
+ * populate its multi-select options without hardcoding scope strings.
+ */
+export type AvailableScopes = {
+    token_scopes: Array<(string)>;
+    api_key_scopes: Array<(string)>;
+};
+
 export type BaseFieldConfigPublic = {
     id: string;
     tenant_id: string;
@@ -693,6 +707,27 @@ export type CartItemHousing = {
     product_id: string;
     check_in: string;
     check_out: string;
+};
+
+/**
+ * Meal-plan selection in cart (one row per attendee × weekly product).
+ *
+ * All metadata fields are nullable in cart because the buyer fills them
+ * incrementally — completeness is enforced only at checkout submission.
+ *
+ * `daily_choices` maps ISO weekday dates (YYYY-MM-DD) to menu_option keys
+ * (or the literal "chef" for chef's choice). `dietary_restriction` and
+ * `special_request` apply at the attendee level — the frontend / reducer
+ * keeps them in sync across every meal_plans entry for that attendee.
+ */
+export type CartItemMealPlan = {
+    attendee_id: string;
+    product_id: string;
+    daily_choices?: ({
+    [key: string]: (string);
+} | null);
+    dietary_restriction?: (string | null);
+    special_request?: (string | null);
 };
 
 /**
@@ -761,6 +796,7 @@ export type CartState = {
     housing?: (CartItemHousing | null);
     merch?: Array<CartItemMerch>;
     patron?: (CartItemPatron | null);
+    meal_plans?: Array<CartItemMealPlan>;
     promo_code?: (string | null);
     insurance?: boolean;
     current_step?: (string | null);
@@ -1986,6 +2022,11 @@ export type ListModel_TenantPublic_ = {
     paging: Paging;
 };
 
+export type ListModel_ThirdPartyAppPublic_ = {
+    results: Array<ThirdPartyAppPublic>;
+    paging: Paging;
+};
+
 export type ListModel_TicketingStepPublic_ = {
     results: Array<TicketingStepPublic>;
     paging: Paging;
@@ -1999,6 +2040,15 @@ export type ListModel_TrackPublic_ = {
 export type ListModel_UserPublic_ = {
     results: Array<UserPublic>;
     paging: Paging;
+};
+
+/**
+ * Response shape for GET /me/access.
+ */
+export type MeAccess = {
+    app_name: string;
+    scopes: Array<(string)>;
+    api_key_scopes: Array<(string)>;
 };
 
 /**
@@ -2102,6 +2152,9 @@ export type PaymentProductRequest_Input = {
     attendee_id: string;
     quantity?: number;
     unit_price_override?: (number | string | null);
+    purchase_metadata?: ({
+    [key: string]: unknown;
+} | null);
 };
 
 /**
@@ -2112,6 +2165,9 @@ export type PaymentProductRequest_Output = {
     attendee_id: string;
     quantity?: number;
     unit_price_override?: (string | null);
+    purchase_metadata?: ({
+    [key: string]: unknown;
+} | null);
 };
 
 /**
@@ -2886,7 +2942,6 @@ export type TenantPublic = {
     landing_mode?: LandingMode;
     id: string;
     active_popup_slug?: (string | null);
-    third_party_key_prefix?: (string | null);
 };
 
 export type TenantUpdate = {
@@ -2899,6 +2954,66 @@ export type TenantUpdate = {
     custom_domain?: (string | null);
     custom_domain_active?: (boolean | null);
     landing_mode?: (LandingMode | null);
+};
+
+/**
+ * Request body for creating a third-party app.
+ */
+export type ThirdPartyAppCreate = {
+    name: string;
+    allowed_token_scopes?: Array<('portal:*' | 'portal:profile:read' | 'portal:profile:write' | 'portal:applications:read' | 'portal:applications:write' | 'portal:attendees:write' | 'portal:payments:read' | 'portal:directory:read' | 'portal:api_keys:manage')>;
+    allowed_api_key_scopes?: Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:read' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write')>;
+};
+
+/**
+ * Response returned ONCE at app creation (and at key rotation).
+ *
+ * ``raw_key`` is the cleartext token; never stored, shown once only.
+ */
+export type ThirdPartyAppCreated = {
+    id: string;
+    tenant_id: string;
+    name: string;
+    prefix: string;
+    allowed_token_scopes: Array<(string)>;
+    allowed_api_key_scopes: Array<(string)>;
+    active: boolean;
+    last_used_at: (string | null);
+    revoked_at: (string | null);
+    created_at: string;
+    updated_at: string;
+    raw_key: string;
+};
+
+/**
+ * Safe public representation of a ThirdPartyApps row.
+ *
+ * NEVER includes key_hash or any raw key material.
+ */
+export type ThirdPartyAppPublic = {
+    id: string;
+    tenant_id: string;
+    name: string;
+    prefix: string;
+    allowed_token_scopes: Array<(string)>;
+    allowed_api_key_scopes: Array<(string)>;
+    active: boolean;
+    last_used_at: (string | null);
+    revoked_at: (string | null);
+    created_at: string;
+    updated_at: string;
+};
+
+/**
+ * Request body for PATCH /third-party-apps/{id}.
+ *
+ * All fields are optional. Scope validators only fire when the field is
+ * provided (not-None).
+ */
+export type ThirdPartyAppUpdate = {
+    name?: (string | null);
+    allowed_token_scopes?: (Array<('portal:*' | 'portal:profile:read' | 'portal:profile:write' | 'portal:applications:read' | 'portal:applications:write' | 'portal:attendees:write' | 'portal:payments:read' | 'portal:directory:read' | 'portal:api_keys:manage')> | null);
+    allowed_api_key_scopes?: (Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:read' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write')> | null);
 };
 
 /**
@@ -2920,14 +3035,6 @@ export type ThirdPartyHumanLogin = {
 export type ThirdPartyHumanVerify = {
     email: string;
     code: string;
-};
-
-/**
- * Returned by the rotate endpoint. The raw api_key is shown ONCE and never stored.
- */
-export type ThirdPartyKeyRotated = {
-    api_key: string;
-    prefix: string;
 };
 
 /**
@@ -5211,17 +5318,70 @@ export type TenantsDeleteCredentialsData = {
 
 export type TenantsDeleteCredentialsResponse = (void);
 
-export type TenantsRotateThirdPartyKeyData = {
-    tenantId: string;
+export type ThirdPartyAppsGetAvailableScopesResponse = (AvailableScopes);
+
+export type ThirdPartyAppsCreateThirdPartyAppData = {
+    requestBody: ThirdPartyAppCreate;
+    xTenantId?: (string | null);
 };
 
-export type TenantsRotateThirdPartyKeyResponse = (ThirdPartyKeyRotated);
+export type ThirdPartyAppsCreateThirdPartyAppResponse = (ThirdPartyAppCreated);
 
-export type TenantsDeleteThirdPartyKeyData = {
-    tenantId: string;
+export type ThirdPartyAppsListThirdPartyAppsData = {
+    xTenantId?: (string | null);
 };
 
-export type TenantsDeleteThirdPartyKeyResponse = (void);
+export type ThirdPartyAppsListThirdPartyAppsResponse = (ListModel_ThirdPartyAppPublic_);
+
+export type ThirdPartyAppsGetThirdPartyAppData = {
+    appId: string;
+    xTenantId?: (string | null);
+};
+
+export type ThirdPartyAppsGetThirdPartyAppResponse = (ThirdPartyAppPublic);
+
+export type ThirdPartyAppsUpdateThirdPartyAppData = {
+    appId: string;
+    requestBody: ThirdPartyAppUpdate;
+    xTenantId?: (string | null);
+};
+
+export type ThirdPartyAppsUpdateThirdPartyAppResponse = (ThirdPartyAppPublic);
+
+export type ThirdPartyAppsRevokeThirdPartyAppData = {
+    appId: string;
+    xTenantId?: (string | null);
+};
+
+export type ThirdPartyAppsRevokeThirdPartyAppResponse = (void);
+
+export type ThirdPartyAppsRotateThirdPartyAppData = {
+    appId: string;
+    xTenantId?: (string | null);
+};
+
+export type ThirdPartyAppsRotateThirdPartyAppResponse = (ThirdPartyAppCreated);
+
+export type ThirdPartyDiscoveryGetThirdPartyWhoamiData = {
+    xThirdPartyApiKey?: (string | null);
+};
+
+export type ThirdPartyDiscoveryGetThirdPartyWhoamiResponse = (MeAccess);
+
+export type ThirdPartyDiscoveryGetThirdPartyDocsData = {
+    format?: 'json' | 'markdown';
+    xThirdPartyApiKey?: (string | null);
+};
+
+export type ThirdPartyDiscoveryGetThirdPartyDocsResponse = (unknown);
+
+export type ThirdPartyDiscoveryGetThirdPartyOpenapiData = {
+    xThirdPartyApiKey?: (string | null);
+};
+
+export type ThirdPartyDiscoveryGetThirdPartyOpenapiResponse = ({
+    [key: string]: unknown;
+});
 
 export type TicketingStepsListPortalTicketingStepsData = {
     popupId: string;

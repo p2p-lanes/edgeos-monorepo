@@ -129,3 +129,10 @@ async def health_check():
 
 
 application.include_router(api_router, prefix=settings.API_V1_STR)
+
+# Populate the scope-routes registry AFTER all routes are registered.
+# This must run at module import time (not inside a startup event) so that
+# the registry is available for the first request.
+from app.api.access.introspection import register_scope_routes  # noqa: E402
+
+register_scope_routes(application)

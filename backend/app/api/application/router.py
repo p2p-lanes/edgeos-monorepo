@@ -43,8 +43,7 @@ from app.core.dependencies.users import (
     AdminOrApiKeySession_ApplicationsWrite,
     CurrentHuman,
     HumanTenantSession,
-    RequireHumanScopeDirectoryRead,
-    RequireHumanScopeSelfRead,
+    needs,
 )
 from app.services.email_helpers import send_application_status_email
 
@@ -256,11 +255,15 @@ async def get_application(
     return _build_application_public(application)
 
 
-@router.get("/my/applications", response_model=ListModel[ApplicationPublic])
+@router.get(
+    "/my/applications",
+    response_model=ListModel[ApplicationPublic],
+    summary="List your applications",
+    dependencies=[needs("portal:applications:read")],
+)
 async def list_my_applications(
     db: HumanTenantSession,
     current_human: CurrentHuman,
-    _scope: RequireHumanScopeSelfRead,
     skip: PaginationSkip = 0,
     limit: PaginationLimit = 100,
 ) -> ListModel[ApplicationPublic]:
@@ -277,11 +280,15 @@ async def list_my_applications(
     )
 
 
-@router.get("/my/tickets", response_model=list[AttendeeWithTickets])
+@router.get(
+    "/my/tickets",
+    response_model=list[AttendeeWithTickets],
+    summary="List your tickets",
+    dependencies=[needs("portal:applications:read")],
+)
 async def list_my_tickets(
     db: HumanTenantSession,
     current_human: CurrentHuman,
-    _scope: RequireHumanScopeSelfRead,
 ) -> list[AttendeeWithTickets]:
     """List all tickets for the current human (Portal).
 
@@ -335,12 +342,16 @@ async def list_my_tickets(
     return results
 
 
-@router.get("/my/participation/{popup_id}", response_model=ParticipationResponse)
+@router.get(
+    "/my/participation/{popup_id}",
+    response_model=ParticipationResponse,
+    summary="Get your participation in a popup",
+    dependencies=[needs("portal:applications:read")],
+)
 async def get_my_participation(
     popup_id: uuid.UUID,
     db: HumanTenantSession,
     current_human: CurrentHuman,
-    _scope: RequireHumanScopeSelfRead,
 ) -> ParticipationResponse:
     """Get participation status for the current human in a popup (Portal).
 
@@ -388,12 +399,16 @@ async def get_my_participation(
     return NoParticipation()
 
 
-@router.get("/my/{popup_id}/purchases", response_model=list[AttendeePurchases])
+@router.get(
+    "/my/{popup_id}/purchases",
+    response_model=list[AttendeePurchases],
+    summary="List your purchases for a popup",
+    dependencies=[needs("portal:applications:read")],
+)
 async def get_my_purchases(
     popup_id: uuid.UUID,
     db: HumanTenantSession,
     current_human: CurrentHuman,
-    _scope: RequireHumanScopeSelfRead,
 ) -> list[AttendeePurchases]:
     """Get purchased products grouped by attendee for a popup (Portal)."""
     from app.api.attendee.crud import attendees_crud
@@ -426,12 +441,16 @@ async def get_my_purchases(
     return results
 
 
-@router.get("/my/{popup_id}", response_model=ApplicationPublic)
+@router.get(
+    "/my/{popup_id}",
+    response_model=ApplicationPublic,
+    summary="Get your application for a popup",
+    dependencies=[needs("portal:applications:read")],
+)
 async def get_my_application(
     popup_id: uuid.UUID,
     db: HumanTenantSession,
     current_human: CurrentHuman,
-    _scope: RequireHumanScopeSelfRead,
 ) -> ApplicationPublic:
     """Get current human's application for a popup (Portal)."""
     application = crud.applications_crud.get_by_human_popup(
@@ -450,6 +469,7 @@ async def get_my_application(
 @router.post(
     "/my/detach-companion",
     status_code=status.HTTP_204_NO_CONTENT,
+    summary="Detach yourself as a companion from another application",
     responses={
         409: {
             "description": (
@@ -458,12 +478,13 @@ async def get_my_application(
             ),
         },
     },
+
+    dependencies=[needs("portal:applications:write")],
 )
 async def detach_companion(
     body: DetachCompanionRequest,
     db: HumanTenantSession,
     current_human: CurrentHuman,
-    _scope: RequireHumanScopeSelfRead,
 ) -> None:
     """Remove the current human from being a companion on another applicant's
     application for the given popup.
@@ -510,13 +531,16 @@ async def detach_companion(
 
 
 @router.post(
-    "/my", response_model=ApplicationPublic, status_code=status.HTTP_201_CREATED
+    "/my",
+    response_model=ApplicationPublic,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create your application",
+    dependencies=[needs("portal:applications:write")],
 )
 async def create_my_application(
     app_in: ApplicationCreate,
     db: HumanTenantSession,
     current_human: CurrentHuman,
-    _scope: RequireHumanScopeSelfRead,
 ) -> ApplicationPublic:
     """Create an application for the current human (Portal)."""
     # Check for existing application
@@ -566,13 +590,17 @@ async def create_my_application(
     return _build_application_public(application)
 
 
-@router.patch("/my/{popup_id}", response_model=ApplicationPublic)
+@router.patch(
+    "/my/{popup_id}",
+    response_model=ApplicationPublic,
+    summary="Update your application for a popup",
+    dependencies=[needs("portal:applications:write")],
+)
 async def update_my_application(
     popup_id: uuid.UUID,
     app_in: ApplicationUpdate,
     db: HumanTenantSession,
     current_human: CurrentHuman,
-    _scope: RequireHumanScopeSelfRead,
 ) -> ApplicationPublic:
     """Update current human's application (Portal)."""
     application = crud.applications_crud.get_by_human_popup(
@@ -828,13 +856,15 @@ def _ensure_attendee_directory_enabled(
 
 
 @router.get(
-    "/my/directory/{popup_id}", response_model=ListModel[AttendeesDirectoryEntry]
+    "/my/directory/{popup_id}",
+    response_model=ListModel[AttendeesDirectoryEntry],
+    summary="List the attendees directory for a popup",
+    dependencies=[needs("portal:directory:read")],
 )
 async def list_attendees_directory(
     popup_id: uuid.UUID,
     db: HumanTenantSession,
     _: CurrentHuman,
-    _scope: RequireHumanScopeDirectoryRead,
     skip: PaginationSkip = 0,
     limit: PaginationLimit = 100,
     q: str | None = None,
@@ -862,12 +892,15 @@ async def list_attendees_directory(
     )
 
 
-@router.get("/my/directory/{popup_id}/csv")
+@router.get(
+    "/my/directory/{popup_id}/csv",
+    summary="Export the attendees directory for a popup as CSV",
+    dependencies=[needs("portal:directory:read")],
+)
 async def export_attendees_directory_csv(
     popup_id: uuid.UUID,
     db: HumanTenantSession,
     _: CurrentHuman,
-    _scope: RequireHumanScopeDirectoryRead,
     q: str | None = None,
 ) -> Response:
     """Export attendees directory as CSV (Portal).
@@ -927,13 +960,14 @@ async def export_attendees_directory_csv(
     "/my/{popup_id}/attendees",
     response_model=ApplicationPublic,
     status_code=status.HTTP_201_CREATED,
+    summary="Add an attendee to your application",
+    dependencies=[needs("portal:attendees:write")],
 )
 async def add_my_attendee(
     popup_id: uuid.UUID,
     attendee_in: AttendeeCreate,
     db: HumanTenantSession,
     current_human: CurrentHuman,
-    _scope: RequireHumanScopeSelfRead,
 ) -> ApplicationPublic:
     """Add an attendee to current human's application (Portal)."""
     application = crud.applications_crud.get_by_human_popup(
@@ -961,6 +995,8 @@ async def add_my_attendee(
 @router.patch(
     "/my/{popup_id}/attendees/{attendee_id}",
     response_model=ApplicationPublic,
+    summary="Update an attendee on your application",
+    dependencies=[needs("portal:attendees:write")],
 )
 async def update_my_attendee(
     popup_id: uuid.UUID,
@@ -968,7 +1004,6 @@ async def update_my_attendee(
     attendee_in: AttendeeUpdate,
     db: HumanTenantSession,
     current_human: CurrentHuman,
-    _scope: RequireHumanScopeSelfRead,
 ) -> ApplicationPublic:
     """Update an attendee in current human's application (Portal)."""
     from app.api.attendee.crud import attendees_crud
@@ -1011,13 +1046,14 @@ async def update_my_attendee(
 @router.delete(
     "/my/{popup_id}/attendees/{attendee_id}",
     response_model=ApplicationPublic,
+    summary="Remove an attendee from your application",
+    dependencies=[needs("portal:attendees:write")],
 )
 async def delete_my_attendee(
     popup_id: uuid.UUID,
     attendee_id: uuid.UUID,
     db: HumanTenantSession,
     current_human: CurrentHuman,
-    _scope: RequireHumanScopeSelfRead,
 ) -> ApplicationPublic:
     """Delete an attendee from current human's application (Portal)."""
     application = crud.applications_crud.get_by_human_popup(
@@ -1087,12 +1123,13 @@ async def review_scholarship(
 @portal_router.get(
     "/popup/{popup_id}/access",
     response_model=PopupAccessResponse,
+    summary="Resolve your access for a popup",
+    dependencies=[needs("portal:applications:write")],
 )
 async def get_popup_access(
     popup_id: uuid.UUID,
     db: HumanTenantSession,
     current_human: CurrentHuman,
-    _scope: RequireHumanScopeSelfRead,
 ) -> PopupAccessResponse:
     """Resolve access for the authenticated Human to a specific popup.
 
