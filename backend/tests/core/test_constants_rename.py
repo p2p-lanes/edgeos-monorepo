@@ -8,9 +8,6 @@ RED-phase for Slice 1 task 1.4:
 
 from __future__ import annotations
 
-import importlib
-import sys
-
 
 def test_third_party_token_scopes_max_importable() -> None:
     """THIRD_PARTY_TOKEN_SCOPES_MAX is importable from app.core.security."""

@@ -13,7 +13,6 @@ then verify invariants that the migration must have established.
 
 from __future__ import annotations
 
-import pytest
 from sqlmodel import Session, text
 
 

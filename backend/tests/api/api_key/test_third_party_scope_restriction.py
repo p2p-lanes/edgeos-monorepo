@@ -39,11 +39,11 @@ class TestThirdPartyJwtApiKeyMintingRestriction:
         self,
         client: TestClient,
         db: Session,
-        third_party_enabled_tenant: tuple[Tenants, str],
+        third_party_enabled_tenant,
         third_party_jwt_factory,
     ) -> None:
         """events:read is in THIRD_PARTY_API_KEY_SCOPES → key created (201)."""
-        tenant, _raw = third_party_enabled_tenant
+        tenant, _app, _raw = third_party_enabled_tenant
         email = f"tp-mint-ok-{uuid.uuid4().hex[:8]}@example.com"
         human = _make_human(db, tenant=tenant, email=email)
         token = third_party_jwt_factory(human=human)
@@ -59,7 +59,7 @@ class TestThirdPartyJwtApiKeyMintingRestriction:
         self,
         client: TestClient,
         db: Session,
-        third_party_enabled_tenant: tuple[Tenants, str],
+        third_party_enabled_tenant,
         third_party_jwt_factory,
     ) -> None:
         """venues:write is NOT in THIRD_PARTY_API_KEY_SCOPES → 403.
@@ -69,7 +69,7 @@ class TestThirdPartyJwtApiKeyMintingRestriction:
         """
         from datetime import UTC, datetime, timedelta
 
-        tenant, _raw = third_party_enabled_tenant
+        tenant, _app, _raw = third_party_enabled_tenant
         email = f"tp-mint-block-{uuid.uuid4().hex[:8]}@example.com"
         human = _make_human(db, tenant=tenant, email=email)
         token = third_party_jwt_factory(human=human)
@@ -86,7 +86,7 @@ class TestThirdPartyJwtApiKeyMintingRestriction:
         self,
         client: TestClient,
         db: Session,
-        third_party_enabled_tenant: tuple[Tenants, str],
+        third_party_enabled_tenant,
         third_party_jwt_factory,
     ) -> None:
         """Mixed scopes where venues:write is not in subset → 403.
@@ -96,7 +96,7 @@ class TestThirdPartyJwtApiKeyMintingRestriction:
         """
         from datetime import UTC, datetime, timedelta
 
-        tenant, _raw = third_party_enabled_tenant
+        tenant, _app, _raw = third_party_enabled_tenant
         email = f"tp-mint-mixed-{uuid.uuid4().hex[:8]}@example.com"
         human = _make_human(db, tenant=tenant, email=email)
         token = third_party_jwt_factory(human=human)
@@ -117,12 +117,12 @@ class TestPortalJwtApiKeyMintingUnchanged:
         self,
         client: TestClient,
         db: Session,
-        third_party_enabled_tenant: tuple[Tenants, str],
+        third_party_enabled_tenant,
     ) -> None:
         """Regular portal JWT (no issued_via / scopes=portal:*) can mint events:read."""
         from app.core.security import create_access_token
 
-        tenant, _raw = third_party_enabled_tenant
+        tenant, _app, _raw = third_party_enabled_tenant
         email = f"portal-mint-ok-{uuid.uuid4().hex[:8]}@example.com"
         human = _make_human(db, tenant=tenant, email=email)
         # Mint a legacy-style portal JWT (no scopes, no issued_via)

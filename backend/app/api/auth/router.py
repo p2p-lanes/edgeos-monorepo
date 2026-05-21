@@ -1,10 +1,6 @@
-import secrets
-
-from fastapi import APIRouter, Header, HTTPException, status
+from fastapi import APIRouter, Header
 from loguru import logger
-from sqlmodel import select
 
-from app.api.api_key.crud import hash_key as hash_api_key
 from app.api.auth.crud import (
     authenticate_human,
     authenticate_user,
@@ -22,43 +18,11 @@ from app.api.auth.schemas import (
     UserVerify,
 )
 from app.api.shared.enums import UserRole
-from app.api.tenant.models import Tenants
+from app.api.third_party_app.crud import validate_third_party_key
 from app.core.dependencies.users import SessionDep
-from app.core.security import THIRD_PARTY_TOKEN_SCOPES, Token, create_access_token
+from app.core.security import THIRD_PARTY_TOKEN_SCOPES_MAX, Token, create_access_token
 
 router = APIRouter(prefix="/auth", tags=["auth"])
-
-
-def _validate_third_party_key(
-    session,
-    raw_key: str,
-) -> Tenants:
-    """Resolve the tenant from the third-party API key alone.
-
-    Hashes the raw key, looks up the tenant by the (partially unique) hash
-    column. All failure branches collapse to a single 401 — callers cannot
-    distinguish unknown key, wrong key, or disabled tenant from each other.
-    """
-    key_hash = hash_api_key(raw_key)
-    tenant = session.exec(
-        select(Tenants).where(Tenants.third_party_api_key_hash == key_hash)
-    ).first()
-
-    if tenant is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid third-party credentials",
-        )
-
-    # Defensive constant-time compare — the index lookup is already a strict
-    # equality match, but the explicit check makes the timing path uniform.
-    if not secrets.compare_digest(key_hash, tenant.third_party_api_key_hash or ""):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid third-party credentials",
-        )
-
-    return tenant
 
 
 @router.post("/user/login", response_model=AuthCodeSentResponse)
@@ -229,7 +193,7 @@ async def third_party_human_login(
     On any validation failure (wrong key, unknown email) the response is 401
     to prevent existence leakage.
     """
-    tenant = _validate_third_party_key(session, x_third_party_api_key)
+    tenant, _app = validate_third_party_key(session, x_third_party_api_key)
 
     email, expiration_minutes = await login_existing_human(
         session=session,
@@ -258,7 +222,7 @@ async def third_party_human_authenticate(
     The JWT grants portal:self_read, portal:directory_read, and
     portal:api_keys_manage on the portal surface; it does NOT grant admin access.
     """
-    tenant = _validate_third_party_key(session, x_third_party_api_key)
+    tenant, _app = validate_third_party_key(session, x_third_party_api_key)
 
     human = await authenticate_human(
         session=session,
@@ -271,7 +235,7 @@ async def third_party_human_authenticate(
     access_token = create_access_token(
         subject=human.id,
         token_type="human",
-        scopes=list(THIRD_PARTY_TOKEN_SCOPES),
+        scopes=list(THIRD_PARTY_TOKEN_SCOPES_MAX),
         issued_via="third_party",
     )
     logger.info(f"Third-party human authenticated: {human.email}")

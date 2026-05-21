@@ -63,18 +63,19 @@ AnyScope = HumanScope | ApiKeyScope
 # Scope universe constants
 # ---------------------------------------------------------------------------
 
-# Scopes embedded in a JWT issued by the third-party OTP flow. These are
-# HumanScope values — the third-party user gets portal access, not admin access.
-THIRD_PARTY_TOKEN_SCOPES: tuple[HumanScope, ...] = (
+# Maximum scopes embeddable in a JWT issued by the third-party OTP flow.
+# These are HumanScope values — the third-party user gets portal access,
+# not admin access. Per-app subsets are drawn from this ceiling.
+THIRD_PARTY_TOKEN_SCOPES_MAX: tuple[HumanScope, ...] = (
     "portal:self_read",
     "portal:directory_read",
     "portal:api_keys_manage",
 )
 
-# Scopes that a human may request when minting an API key via the third-party
-# OTP surface. Intentionally narrow — external partners get event-read and
-# rsvp-write only.
-THIRD_PARTY_API_KEY_SCOPES: frozenset[str] = frozenset({
+# Maximum scopes a human may request when minting an API key via the
+# third-party OTP surface. Per-app subsets are drawn from this ceiling.
+# Intentionally narrow — external partners get event-read and rsvp-write only.
+THIRD_PARTY_API_KEY_SCOPES_MAX: frozenset[str] = frozenset({
     "events:read",
     "rsvp:write",
 })

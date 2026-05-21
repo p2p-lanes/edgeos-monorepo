@@ -11,7 +11,7 @@ from app.core.dependencies.users import (
     RequireHumanScopeApiKeysManage,
 )
 from app.core.security import (
-    THIRD_PARTY_API_KEY_SCOPES,
+    THIRD_PARTY_API_KEY_SCOPES_MAX,
     TokenPayload,
     get_token_payload,
 )
@@ -72,9 +72,10 @@ async def create_api_key(
     __: HumanCanManageApiKeys,
     ___: RequireHumanScopeApiKeysManage,
 ) -> ApiKeyCreated:
-    # REQ-AK-04: third-party JWTs may only mint keys within THIRD_PARTY_API_KEY_SCOPES.
+    # REQ-AK-04: third-party JWTs may only mint keys within THIRD_PARTY_API_KEY_SCOPES_MAX.
+    # LEGACY-V1-FALLBACK — remove >=30d after deploy (per-app scope enforcement in slice 2).
     if getattr(token_payload, "issued_via", "portal") == "third_party":
-        invalid = set(payload.scopes) - THIRD_PARTY_API_KEY_SCOPES
+        invalid = set(payload.scopes) - THIRD_PARTY_API_KEY_SCOPES_MAX
         if invalid:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,

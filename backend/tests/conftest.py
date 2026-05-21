@@ -19,7 +19,7 @@ from app.api.tenant.models import Tenants
 from app.api.user.models import Users
 from app.core.dependencies.users import get_session
 from app.core.security import (
-    THIRD_PARTY_TOKEN_SCOPES,
+    THIRD_PARTY_TOKEN_SCOPES_MAX,
     create_access_token,
 )
 from app.core.tenant_db import ensure_tenant_credentials, tenant_connection_manager
@@ -467,22 +467,46 @@ def with_origin(host: str) -> dict[str, str]:
 
 
 @pytest.fixture(scope="session")
-def third_party_enabled_tenant(db: Session, tenant_a: Tenants) -> tuple[Tenants, str]:
-    """tenant_a pre-configured with a third-party API key hash.
+def third_party_enabled_tenant(db: Session, tenant_a: Tenants):
+    """tenant_a pre-configured with a ThirdPartyApps 'legacy' row.
 
-    Returns (tenant, raw_key) so tests can verify both key validation and
-    prefix display.
+    Returns (tenant, app, raw_key) so tests can verify key validation,
+    app lookup, and prefix display.
+
+    The raw_key is deterministic so multiple tests can share the same
+    session-scoped fixture without re-hashing.
     """
+    from app.api.third_party_app.models import ThirdPartyApps
+
     raw_key = "tp_test_secret_key_for_tests_only"
     key_hash = api_key_crud.hash_key(raw_key)
 
-    tenant_a.third_party_api_key_hash = key_hash
-    tenant_a.third_party_key_prefix = raw_key[:8]
-    db.add(tenant_a)
-    db.commit()
-    db.refresh(tenant_a)
+    # Check if the legacy app row already exists (idempotent fixture).
+    from sqlmodel import select
 
-    return tenant_a, raw_key
+    app = db.exec(
+        select(ThirdPartyApps).where(
+            ThirdPartyApps.tenant_id == tenant_a.id,
+            ThirdPartyApps.name == "legacy",
+            ThirdPartyApps.key_hash == key_hash,
+        )
+    ).first()
+
+    if app is None:
+        app = ThirdPartyApps(
+            tenant_id=tenant_a.id,
+            name="legacy",
+            key_hash=key_hash,
+            prefix=raw_key[:8],
+            allowed_token_scopes=list(THIRD_PARTY_TOKEN_SCOPES_MAX),
+            allowed_api_key_scopes=["events:read", "rsvp:write"],
+            active=True,
+        )
+        db.add(app)
+        db.commit()
+        db.refresh(app)
+
+    return tenant_a, app, raw_key
 
 
 @pytest.fixture()
@@ -543,7 +567,7 @@ def third_party_jwt_factory():
         return create_access_token(
             subject=human.id,
             token_type="human",
-            scopes=scopes if scopes is not None else list(THIRD_PARTY_TOKEN_SCOPES),
+            scopes=scopes if scopes is not None else list(THIRD_PARTY_TOKEN_SCOPES_MAX),
             issued_via="third_party",
         )
 
