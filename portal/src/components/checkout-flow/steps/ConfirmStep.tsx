@@ -442,27 +442,23 @@ export default function ConfirmStep() {
           <>
             <div className="border-t border-border" />
             <div className="px-5 py-4">
-              <div className="flex items-center gap-2 mb-3">
-                <HandCoins className="w-4 h-4 text-muted-foreground" />
-                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                  {popup?.contribution_label ||
-                    t("checkout.contribution.fallbackLabel")}
-                </span>
-              </div>
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">
-                  {popup?.contribution_label ||
-                    t("checkout.contribution.fallbackLabel")}
-                  {popup?.contribution_percentage
-                    ? ` (${Number(popup.contribution_percentage)}%)`
-                    : ""}
-                </span>
+              <div className="flex items-center justify-between gap-3 text-sm">
+                <div className="flex items-center gap-2 min-w-0">
+                  <HandCoins className="w-4 h-4 text-muted-foreground shrink-0" />
+                  <span className="text-foreground">
+                    {popup?.contribution_label ||
+                      t("checkout.contribution.fallbackLabel")}
+                    {popup?.contribution_percentage
+                      ? ` (${Number(popup.contribution_percentage)}%)`
+                      : ""}
+                  </span>
+                </div>
                 <span className="font-medium text-foreground">
                   {formatCurrency(summary.contributionSubtotal)}
                 </span>
               </div>
               {popup?.contribution_description && (
-                <p className="text-xs text-muted-foreground mt-2">
+                <p className="text-xs text-muted-foreground mt-2 ml-6">
                   {popup.contribution_description}
                 </p>
               )}
