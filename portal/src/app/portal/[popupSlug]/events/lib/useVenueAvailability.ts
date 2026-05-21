@@ -98,11 +98,20 @@ export function useVenueAvailability(
       }),
     enabled: !!popupId,
   })
-  const venues = venuesData?.results ?? []
+  const allVenues = venuesData?.results ?? []
+
+  // Hide unbookable venues from the dropdown — they're admin-only. We still
+  // resolve ``selectedVenue`` against the unfiltered list so an event that
+  // was assigned an unbookable venue by an admin keeps rendering its
+  // details (and ``VenueSelect`` will stamp the missing item back in).
+  const venues = useMemo(
+    () => allVenues.filter((v) => v.booking_mode !== "unbookable"),
+    [allVenues],
+  )
 
   const selectedVenue: EventVenuePublic | undefined = useMemo(
-    () => venues.find((v) => v.id === venueId),
-    [venues, venueId],
+    () => allVenues.find((v) => v.id === venueId),
+    [allVenues, venueId],
   )
 
   const isVenueClosedOnDay = useMemo(() => {

@@ -1160,8 +1160,9 @@ export function EventForm({
 
         {selectedVenue && isVenueUnbookable && (
           <div className="px-1 py-3">
-            <p className="rounded-md border border-destructive/30 bg-destructive/10 p-2 text-xs text-destructive">
-              This venue is marked as unbookable. Date selection is disabled.
+            <p className="rounded-md border border-muted-foreground/20 bg-muted/40 p-2 text-xs text-muted-foreground">
+              This venue is marked unbookable for portal submissions. As an
+              admin you can still create events here.
             </p>
           </div>
         )}
@@ -1256,7 +1257,7 @@ export function EventForm({
         <InlineRow label="Date" description="Day the event takes place">
           <DatePicker
             value={dateStr}
-            disabled={readOnly || isVenueUnbookable}
+            disabled={readOnly}
             disabledDays={isDateOutsidePopupWindow}
             closedDays={
               isClosedOnDate
@@ -1331,7 +1332,7 @@ export function EventForm({
                 const date = dateStr || new Date().toISOString().slice(0, 10)
                 form.setFieldValue("start_time", `${date}T${hhmm}`)
               }}
-              disabled={readOnly || isVenueUnbookable}
+              disabled={readOnly}
               fits={venueIdValue ? startFits : true}
               placeholder={
                 venueIdValue && startSlotOptions.length === 0
