@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 from fastapi import APIRouter, HTTPException, status
 from fastapi.responses import Response
 
+from app.api.access.introspection import scope_route
 from app.api.application import crud
 from app.api.application.schemas import (
     ApplicantParticipation,
@@ -256,7 +257,12 @@ async def get_application(
     return _build_application_public(application)
 
 
-@router.get("/my/applications", response_model=ListModel[ApplicationPublic])
+@router.get(
+    "/my/applications",
+    response_model=ListModel[ApplicationPublic],
+    summary="List your applications",
+)
+@scope_route("portal:self_read")
 async def list_my_applications(
     db: HumanTenantSession,
     current_human: CurrentHuman,
@@ -277,7 +283,12 @@ async def list_my_applications(
     )
 
 
-@router.get("/my/tickets", response_model=list[AttendeeWithTickets])
+@router.get(
+    "/my/tickets",
+    response_model=list[AttendeeWithTickets],
+    summary="List your tickets",
+)
+@scope_route("portal:self_read")
 async def list_my_tickets(
     db: HumanTenantSession,
     current_human: CurrentHuman,
@@ -335,7 +346,12 @@ async def list_my_tickets(
     return results
 
 
-@router.get("/my/participation/{popup_id}", response_model=ParticipationResponse)
+@router.get(
+    "/my/participation/{popup_id}",
+    response_model=ParticipationResponse,
+    summary="Get your participation in a popup",
+)
+@scope_route("portal:self_read")
 async def get_my_participation(
     popup_id: uuid.UUID,
     db: HumanTenantSession,
@@ -388,7 +404,12 @@ async def get_my_participation(
     return NoParticipation()
 
 
-@router.get("/my/{popup_id}/purchases", response_model=list[AttendeePurchases])
+@router.get(
+    "/my/{popup_id}/purchases",
+    response_model=list[AttendeePurchases],
+    summary="List your purchases for a popup",
+)
+@scope_route("portal:self_read")
 async def get_my_purchases(
     popup_id: uuid.UUID,
     db: HumanTenantSession,
@@ -426,7 +447,12 @@ async def get_my_purchases(
     return results
 
 
-@router.get("/my/{popup_id}", response_model=ApplicationPublic)
+@router.get(
+    "/my/{popup_id}",
+    response_model=ApplicationPublic,
+    summary="Get your application for a popup",
+)
+@scope_route("portal:self_read")
 async def get_my_application(
     popup_id: uuid.UUID,
     db: HumanTenantSession,
@@ -450,6 +476,7 @@ async def get_my_application(
 @router.post(
     "/my/detach-companion",
     status_code=status.HTTP_204_NO_CONTENT,
+    summary="Detach yourself as a companion from another application",
     responses={
         409: {
             "description": (
@@ -459,6 +486,7 @@ async def get_my_application(
         },
     },
 )
+@scope_route("portal:self_read")
 async def detach_companion(
     body: DetachCompanionRequest,
     db: HumanTenantSession,
@@ -510,8 +538,12 @@ async def detach_companion(
 
 
 @router.post(
-    "/my", response_model=ApplicationPublic, status_code=status.HTTP_201_CREATED
+    "/my",
+    response_model=ApplicationPublic,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create your application",
 )
+@scope_route("portal:self_read")
 async def create_my_application(
     app_in: ApplicationCreate,
     db: HumanTenantSession,
@@ -566,7 +598,12 @@ async def create_my_application(
     return _build_application_public(application)
 
 
-@router.patch("/my/{popup_id}", response_model=ApplicationPublic)
+@router.patch(
+    "/my/{popup_id}",
+    response_model=ApplicationPublic,
+    summary="Update your application for a popup",
+)
+@scope_route("portal:self_read")
 async def update_my_application(
     popup_id: uuid.UUID,
     app_in: ApplicationUpdate,
@@ -828,8 +865,11 @@ def _ensure_attendee_directory_enabled(
 
 
 @router.get(
-    "/my/directory/{popup_id}", response_model=ListModel[AttendeesDirectoryEntry]
+    "/my/directory/{popup_id}",
+    response_model=ListModel[AttendeesDirectoryEntry],
+    summary="List the attendees directory for a popup",
 )
+@scope_route("portal:directory_read")
 async def list_attendees_directory(
     popup_id: uuid.UUID,
     db: HumanTenantSession,
@@ -862,7 +902,11 @@ async def list_attendees_directory(
     )
 
 
-@router.get("/my/directory/{popup_id}/csv")
+@router.get(
+    "/my/directory/{popup_id}/csv",
+    summary="Export the attendees directory for a popup as CSV",
+)
+@scope_route("portal:directory_read")
 async def export_attendees_directory_csv(
     popup_id: uuid.UUID,
     db: HumanTenantSession,
@@ -927,7 +971,9 @@ async def export_attendees_directory_csv(
     "/my/{popup_id}/attendees",
     response_model=ApplicationPublic,
     status_code=status.HTTP_201_CREATED,
+    summary="Add an attendee to your application",
 )
+@scope_route("portal:self_read")
 async def add_my_attendee(
     popup_id: uuid.UUID,
     attendee_in: AttendeeCreate,
@@ -961,7 +1007,9 @@ async def add_my_attendee(
 @router.patch(
     "/my/{popup_id}/attendees/{attendee_id}",
     response_model=ApplicationPublic,
+    summary="Update an attendee on your application",
 )
+@scope_route("portal:self_read")
 async def update_my_attendee(
     popup_id: uuid.UUID,
     attendee_id: uuid.UUID,
@@ -1011,7 +1059,9 @@ async def update_my_attendee(
 @router.delete(
     "/my/{popup_id}/attendees/{attendee_id}",
     response_model=ApplicationPublic,
+    summary="Remove an attendee from your application",
 )
+@scope_route("portal:self_read")
 async def delete_my_attendee(
     popup_id: uuid.UUID,
     attendee_id: uuid.UUID,
@@ -1087,7 +1137,9 @@ async def review_scholarship(
 @portal_router.get(
     "/popup/{popup_id}/access",
     response_model=PopupAccessResponse,
+    summary="Resolve your access for a popup",
 )
+@scope_route("portal:self_read")
 async def get_popup_access(
     popup_id: uuid.UUID,
     db: HumanTenantSession,
