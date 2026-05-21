@@ -13,6 +13,7 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session
 
+from app.api.human.models import Humans
 from app.api.tenant.models import Tenants
 from app.api.third_party_app.models import ThirdPartyApps
 from app.core.security import create_access_token
@@ -22,6 +23,14 @@ BASE_URL = "/api/v1/me/access/docs"
 
 def _bearer(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
+
+
+def _make_human(db: Session, tenant: Tenants) -> Humans:
+    h = Humans(tenant_id=tenant.id, email=f"md-{uuid.uuid4().hex[:8]}@test.com")
+    db.add(h)
+    db.commit()
+    db.refresh(h)
+    return h
 
 
 @pytest.fixture(scope="module")
@@ -52,25 +61,14 @@ def multi_scope_app(db: Session, tenant_a: Tenants) -> tuple[ThirdPartyApps, str
     )
 
 
-def _make_human(tenant: Tenants) -> object:
-    from app.api.human.models import Humans
-    from sqlmodel import Session
-    from app.core.db import engine
-
-    h = Humans(tenant_id=tenant.id, email=f"docs-{uuid.uuid4().hex[:6]}@test.com")
-    with Session(engine) as db:
-        db.add(h)
-        db.commit()
-        db.refresh(h)
-    return h
-
-
 class TestMeAccessDocsAuth:
     """REQ-9.1 — Same gate as /me/access."""
 
-    def test_portal_jwt_rejected(self, client: TestClient, tenant_a: Tenants) -> None:
+    def test_portal_jwt_rejected(
+        self, client: TestClient, db: Session, tenant_a: Tenants
+    ) -> None:
         """Portal JWT gets 401 on /docs."""
-        h = _make_human(tenant_a)
+        h = _make_human(db, tenant_a)
         token = create_access_token(
             subject=h.id,
             token_type="human",
@@ -96,12 +94,13 @@ class TestMeAccessDocsJson:
     def test_json_format_default(
         self,
         client: TestClient,
+        db: Session,
         docs_app: tuple[ThirdPartyApps, str],
         tenant_a: Tenants,
     ) -> None:
-        """Default (no format) returns JSON with scopes array."""
+        """Default (no format) returns JSON list with scope entries."""
         app, _ = docs_app
-        h = _make_human(tenant_a)
+        h = _make_human(db, tenant_a)
         token = create_access_token(
             subject=h.id,
             token_type="human",
@@ -111,18 +110,18 @@ class TestMeAccessDocsJson:
         resp = client.get(BASE_URL, headers=_bearer(token))
         assert resp.status_code == 200, resp.text
         data = resp.json()
-        # Response is a list of {scope, endpoints} or dict — check the envelope
-        assert isinstance(data, (list, dict)), f"Unexpected type: {type(data)}"
+        assert isinstance(data, list), f"Expected list, got: {type(data)}"
 
     def test_json_explicit_format(
         self,
         client: TestClient,
+        db: Session,
         docs_app: tuple[ThirdPartyApps, str],
         tenant_a: Tenants,
     ) -> None:
-        """?format=json returns JSON with proper scope keys."""
+        """?format=json returns JSON list."""
         app, _ = docs_app
-        h = _make_human(tenant_a)
+        h = _make_human(db, tenant_a)
         token = create_access_token(
             subject=h.id,
             token_type="human",
@@ -131,16 +130,19 @@ class TestMeAccessDocsJson:
         )
         resp = client.get(BASE_URL + "?format=json", headers=_bearer(token))
         assert resp.status_code == 200, resp.text
+        data = resp.json()
+        assert isinstance(data, list)
 
     def test_json_only_includes_caller_scopes(
         self,
         client: TestClient,
+        db: Session,
         docs_app: tuple[ThirdPartyApps, str],
         tenant_a: Tenants,
     ) -> None:
         """REQ-9.2.a — scope filtering: only caller's scopes appear."""
         app, _ = docs_app
-        h = _make_human(tenant_a)
+        h = _make_human(db, tenant_a)
         token = create_access_token(
             subject=h.id,
             token_type="human",
@@ -150,25 +152,22 @@ class TestMeAccessDocsJson:
         resp = client.get(BASE_URL + "?format=json", headers=_bearer(token))
         assert resp.status_code == 200, resp.text
         data = resp.json()
-        # Collect all scope keys present in response
-        if isinstance(data, list):
-            returned_scopes = {item["scope"] for item in data}
-        else:
-            returned_scopes = set(data.get("scopes", {}).keys())
-        # portal:self_read should NOT appear for docs_app (it only has api_keys_manage)
+        # docs_app only has portal:api_keys_manage — portal:self_read must not appear
+        returned_scopes = {item["scope"] for item in data}
         assert "portal:self_read" not in returned_scopes
+        # portal:api_keys_manage should be present (it has registered routes)
+        assert "portal:api_keys_manage" in returned_scopes
 
     def test_json_known_scope_has_endpoints(
         self,
         client: TestClient,
+        db: Session,
         docs_app: tuple[ThirdPartyApps, str],
         tenant_a: Tenants,
     ) -> None:
         """REQ-9.2.b — each scope entry lists at least one endpoint."""
-        from app.api.access.introspection import SCOPE_ROUTES_REGISTRY
-
         app, _ = docs_app
-        h = _make_human(tenant_a)
+        h = _make_human(db, tenant_a)
         token = create_access_token(
             subject=h.id,
             token_type="human",
@@ -178,29 +177,27 @@ class TestMeAccessDocsJson:
         resp = client.get(BASE_URL + "?format=json", headers=_bearer(token))
         assert resp.status_code == 200, resp.text
         data = resp.json()
-        # If the registry has routes for portal:api_keys_manage, they should appear
-        if "portal:api_keys_manage" in SCOPE_ROUTES_REGISTRY:
-            if isinstance(data, list):
-                scope_entry = next(
-                    (x for x in data if x.get("scope") == "portal:api_keys_manage"),
-                    None,
-                )
-                if scope_entry is not None:
-                    assert len(scope_entry["endpoints"]) >= 1
-                    for ep in scope_entry["endpoints"]:
-                        assert "method" in ep
-                        assert "path" in ep
-                        assert "summary" in ep
+        scope_entry = next(
+            (x for x in data if x.get("scope") == "portal:api_keys_manage"),
+            None,
+        )
+        assert scope_entry is not None, "portal:api_keys_manage not in response"
+        assert len(scope_entry["endpoints"]) >= 1
+        for ep in scope_entry["endpoints"]:
+            assert "method" in ep
+            assert "path" in ep
+            assert "summary" in ep
 
     def test_invalid_format_returns_422(
         self,
         client: TestClient,
+        db: Session,
         docs_app: tuple[ThirdPartyApps, str],
         tenant_a: Tenants,
     ) -> None:
         """REQ-9.3.b — ?format=xml returns 422."""
         app, _ = docs_app
-        h = _make_human(tenant_a)
+        h = _make_human(db, tenant_a)
         token = create_access_token(
             subject=h.id,
             token_type="human",
@@ -217,12 +214,13 @@ class TestMeAccessDocsMarkdown:
     def test_markdown_format_returns_text_content_type(
         self,
         client: TestClient,
+        db: Session,
         docs_app: tuple[ThirdPartyApps, str],
         tenant_a: Tenants,
     ) -> None:
         """REQ-9.3.a — Content-Type includes text/markdown or text/plain."""
         app, _ = docs_app
-        h = _make_human(tenant_a)
+        h = _make_human(db, tenant_a)
         token = create_access_token(
             subject=h.id,
             token_type="human",
@@ -237,12 +235,13 @@ class TestMeAccessDocsMarkdown:
     def test_markdown_body_non_empty(
         self,
         client: TestClient,
+        db: Session,
         docs_app: tuple[ThirdPartyApps, str],
         tenant_a: Tenants,
     ) -> None:
         """Markdown body is non-empty."""
         app, _ = docs_app
-        h = _make_human(tenant_a)
+        h = _make_human(db, tenant_a)
         token = create_access_token(
             subject=h.id,
             token_type="human",
@@ -256,12 +255,13 @@ class TestMeAccessDocsMarkdown:
     def test_markdown_contains_app_name(
         self,
         client: TestClient,
+        db: Session,
         docs_app: tuple[ThirdPartyApps, str],
         tenant_a: Tenants,
     ) -> None:
         """Markdown body contains the app name in a heading."""
         app, _ = docs_app
-        h = _make_human(tenant_a)
+        h = _make_human(db, tenant_a)
         token = create_access_token(
             subject=h.id,
             token_type="human",
@@ -275,12 +275,13 @@ class TestMeAccessDocsMarkdown:
     def test_markdown_contains_scope_heading(
         self,
         client: TestClient,
+        db: Session,
         docs_app: tuple[ThirdPartyApps, str],
         tenant_a: Tenants,
     ) -> None:
-        """Markdown body contains at least one scope as a heading."""
+        """Markdown body contains portal:api_keys_manage as a heading."""
         app, _ = docs_app
-        h = _make_human(tenant_a)
+        h = _make_human(db, tenant_a)
         token = create_access_token(
             subject=h.id,
             token_type="human",
@@ -289,25 +290,16 @@ class TestMeAccessDocsMarkdown:
         )
         resp = client.get(BASE_URL + "?format=markdown", headers=_bearer(token))
         assert resp.status_code == 200, resp.text
-        # Scope headings use ## format
         assert "portal:api_keys_manage" in resp.text
 
     def test_legacy_jwt_markdown(
         self,
         client: TestClient,
+        db: Session,
         tenant_a: Tenants,
     ) -> None:
         """Legacy JWT also gets valid markdown response."""
-        from app.api.human.models import Humans
-        from sqlmodel import Session
-        from app.core.db import engine
-
-        h = Humans(tenant_id=tenant_a.id, email=f"leg-md-{uuid.uuid4().hex[:6]}@test.com")
-        with Session(engine) as db:
-            db.add(h)
-            db.commit()
-            db.refresh(h)
-
+        h = _make_human(db, tenant_a)
         token = create_access_token(
             subject=h.id,
             token_type="human",

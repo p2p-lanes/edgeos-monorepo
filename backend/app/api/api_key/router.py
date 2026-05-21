@@ -3,6 +3,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
+from app.api.access.introspection import scope_route
 from app.api.api_key import crud
 from app.api.api_key.schemas import ApiKeyCreate, ApiKeyCreated, ApiKeyPublic
 from app.core.dependencies.users import (
@@ -50,7 +51,8 @@ def _require_human_can_manage_api_keys(current_human: CurrentHuman) -> None:
 HumanCanManageApiKeys = Annotated[None, Depends(_require_human_can_manage_api_keys)]
 
 
-@router.get("", response_model=list[ApiKeyPublic])
+@router.get("", response_model=list[ApiKeyPublic], summary="List your API keys")
+@scope_route("portal:api_keys_manage")
 async def list_api_keys(
     db: HumanTenantSession,
     current_human: CurrentHuman,
@@ -62,7 +64,8 @@ async def list_api_keys(
     return [ApiKeyPublic.model_validate(r) for r in rows]
 
 
-@router.post("", response_model=ApiKeyCreated, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=ApiKeyCreated, status_code=status.HTTP_201_CREATED, summary="Create an API key")
+@scope_route("portal:api_keys_manage")
 async def create_api_key(
     payload: ApiKeyCreate,
     db: HumanTenantSession,
@@ -108,7 +111,8 @@ async def create_api_key(
     return ApiKeyCreated.model_validate({**row.model_dump(), "key": raw})
 
 
-@router.delete("/{key_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{key_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Revoke an API key")
+@scope_route("portal:api_keys_manage")
 async def revoke_api_key(
     key_id: uuid.UUID,
     db: HumanTenantSession,

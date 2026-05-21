@@ -13,6 +13,7 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session
 
+from app.api.human.models import Humans
 from app.api.tenant.models import Tenants
 from app.api.third_party_app.models import ThirdPartyApps
 from app.core.security import create_access_token
@@ -24,54 +25,36 @@ def _bearer(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
-def _make_app(
-    db: Session,
-    tenant: Tenants,
-    *,
-    name: str,
-    token_scopes: list[str] | None = None,
-    api_key_scopes: list[str] | None = None,
-) -> tuple[ThirdPartyApps, str]:
-    """Create a ThirdPartyApps row; return (app, raw_key)."""
-    from app.api.third_party_app import crud
-
-    return crud.create(
-        db,
-        tenant_id=tenant.id,
-        name=name,
-        allowed_token_scopes=token_scopes or ["portal:self_read"],
-        allowed_api_key_scopes=api_key_scopes or [],
-    )
+def _make_human(db: Session, tenant: Tenants) -> Humans:
+    h = Humans(tenant_id=tenant.id, email=f"ma-{uuid.uuid4().hex[:8]}@test.com")
+    db.add(h)
+    db.commit()
+    db.refresh(h)
+    return h
 
 
 @pytest.fixture(scope="module")
 def access_app(db: Session, tenant_a: Tenants) -> tuple[ThirdPartyApps, str]:
-    """Session-scoped third-party app for /me/access tests."""
-    return _make_app(
+    """Third-party app for /me/access tests."""
+    from app.api.third_party_app import crud
+
+    return crud.create(
         db,
-        tenant_a,
+        tenant_id=tenant_a.id,
         name=f"access-test-{uuid.uuid4().hex[:6]}",
-        token_scopes=["portal:self_read"],
-        api_key_scopes=["events:read"],
+        allowed_token_scopes=["portal:self_read"],
+        allowed_api_key_scopes=["events:read"],
     )
 
 
 class TestMeAccessAuth:
     """REQ-8.1 — Only third-party JWTs accepted."""
 
-    def test_portal_jwt_rejected(self, client: TestClient, tenant_a: Tenants) -> None:
+    def test_portal_jwt_rejected(
+        self, client: TestClient, db: Session, tenant_a: Tenants
+    ) -> None:
         """Regular portal JWT (issued_via=portal) gets 401."""
-        from app.api.human.models import Humans
-
-        h = Humans(tenant_id=tenant_a.id, email=f"portal-{uuid.uuid4().hex[:6]}@test.com")
-        from sqlmodel import Session
-        from app.core.db import engine
-
-        with Session(engine) as db:
-            db.add(h)
-            db.commit()
-            db.refresh(h)
-
+        h = _make_human(db, tenant_a)
         token = create_access_token(
             subject=h.id,
             token_type="human",
@@ -95,21 +78,13 @@ class TestMeAccessAuth:
     def test_v2_third_party_jwt_accepted(
         self,
         client: TestClient,
+        db: Session,
         access_app: tuple[ThirdPartyApps, str],
         tenant_a: Tenants,
     ) -> None:
         """v2 JWT with issued_by_app_id gets 200."""
         app, _ = access_app
-        from app.api.human.models import Humans
-        from sqlmodel import Session
-        from app.core.db import engine
-
-        h = Humans(tenant_id=tenant_a.id, email=f"v2-{uuid.uuid4().hex[:6]}@test.com")
-        with Session(engine) as db:
-            db.add(h)
-            db.commit()
-            db.refresh(h)
-
+        h = _make_human(db, tenant_a)
         token = create_access_token(
             subject=h.id,
             token_type="human",
@@ -122,19 +97,11 @@ class TestMeAccessAuth:
     def test_legacy_v1_third_party_jwt_accepted(
         self,
         client: TestClient,
+        db: Session,
         tenant_a: Tenants,
     ) -> None:
         """Legacy JWT (issued_via=third_party, no issued_by_app_id) gets 200."""
-        from app.api.human.models import Humans
-        from sqlmodel import Session
-        from app.core.db import engine
-
-        h = Humans(tenant_id=tenant_a.id, email=f"legacy-{uuid.uuid4().hex[:6]}@test.com")
-        with Session(engine) as db:
-            db.add(h)
-            db.commit()
-            db.refresh(h)
-
+        h = _make_human(db, tenant_a)
         token = create_access_token(
             subject=h.id,
             token_type="human",
@@ -151,21 +118,13 @@ class TestMeAccessResponseShape:
     def test_v2_response_matches_app_row(
         self,
         client: TestClient,
+        db: Session,
         access_app: tuple[ThirdPartyApps, str],
         tenant_a: Tenants,
     ) -> None:
         """REQ-8.2.a — app_name, scopes, api_key_scopes match the app row."""
         app, _ = access_app
-        from app.api.human.models import Humans
-        from sqlmodel import Session
-        from app.core.db import engine
-
-        h = Humans(tenant_id=tenant_a.id, email=f"shape-{uuid.uuid4().hex[:6]}@test.com")
-        with Session(engine) as db:
-            db.add(h)
-            db.commit()
-            db.refresh(h)
-
+        h = _make_human(db, tenant_a)
         token = create_access_token(
             subject=h.id,
             token_type="human",
@@ -182,19 +141,11 @@ class TestMeAccessResponseShape:
     def test_legacy_response_uses_legacy_app_name(
         self,
         client: TestClient,
+        db: Session,
         tenant_a: Tenants,
     ) -> None:
         """REQ-8.3.a — legacy JWT returns app_name='legacy' and embedded scopes."""
-        from app.api.human.models import Humans
-        from sqlmodel import Session
-        from app.core.db import engine
-
-        h = Humans(tenant_id=tenant_a.id, email=f"leg2-{uuid.uuid4().hex[:6]}@test.com")
-        with Session(engine) as db:
-            db.add(h)
-            db.commit()
-            db.refresh(h)
-
+        h = _make_human(db, tenant_a)
         token = create_access_token(
             subject=h.id,
             token_type="human",
@@ -215,9 +166,6 @@ class TestMeAccessResponseShape:
     ) -> None:
         """App deleted between JWT mint and call returns 401."""
         from app.api.third_party_app import crud
-        from app.api.human.models import Humans
-        from sqlmodel import Session
-        from app.core.db import engine
 
         app, _ = crud.create(
             db,
@@ -226,12 +174,7 @@ class TestMeAccessResponseShape:
             allowed_token_scopes=["portal:self_read"],
             allowed_api_key_scopes=[],
         )
-        h = Humans(tenant_id=tenant_a.id, email=f"rev-{uuid.uuid4().hex[:6]}@test.com")
-        with Session(engine) as db_main:
-            db_main.add(h)
-            db_main.commit()
-            db_main.refresh(h)
-
+        h = _make_human(db, tenant_a)
         token = create_access_token(
             subject=h.id,
             token_type="human",

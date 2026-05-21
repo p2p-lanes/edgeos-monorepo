@@ -18,9 +18,8 @@ from app.api.auth.schemas import (
     UserVerify,
 )
 from app.api.shared.enums import UserRole
-from app.api.third_party_app.crud import validate_third_party_key
+from app.api.third_party_app.crud import touch_last_used, validate_third_party_key
 from app.core.dependencies.users import SessionDep
-from app.api.third_party_app.crud import touch_last_used
 from app.core.security import THIRD_PARTY_TOKEN_SCOPES_MAX, Token, create_access_token
 
 router = APIRouter(prefix="/auth", tags=["auth"])

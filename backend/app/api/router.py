@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 
 from app.api import (
+    access,
     admin_api_key,
     api_key,
     application,
@@ -48,6 +49,7 @@ api_router.include_router(human.router)
 api_router.include_router(api_key.router)
 api_router.include_router(admin_api_key.router)
 api_router.include_router(third_party_app.router)
+api_router.include_router(access.router.router)
 api_router.include_router(popup.router)
 api_router.include_router(attendee_category.router)
 
