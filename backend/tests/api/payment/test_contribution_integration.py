@@ -28,7 +28,6 @@ from app.api.shared.enums import SaleType
 from app.api.tenant.models import Tenants
 from app.core.security import create_access_token
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -49,9 +48,13 @@ def _make_popup(
         slug=f"contribution-integration-{uuid.uuid4().hex[:8]}",
         tenant_id=tenant.id,
         contribution_enabled=contribution_enabled,
-        contribution_percentage=Decimal(contribution_percentage) if contribution_percentage else None,
+        contribution_percentage=Decimal(contribution_percentage)
+        if contribution_percentage
+        else None,
         insurance_enabled=insurance_enabled,
-        insurance_percentage=Decimal(insurance_percentage) if insurance_percentage else None,
+        insurance_percentage=Decimal(insurance_percentage)
+        if insurance_percentage
+        else None,
         sale_type=sale_type,
     )
     db.add(popup)
