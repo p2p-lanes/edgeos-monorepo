@@ -1,5 +1,5 @@
 import uuid
-from datetime import date, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import httpx
@@ -276,7 +276,7 @@ async def update_venue(
     update_data = venue_in.model_dump(exclude_unset=True, exclude={"property_type_ids"})
     for k, v in update_data.items():
         setattr(venue, k, v)
-    venue.updated_at = datetime.utcnow()
+    venue.updated_at = datetime.now(UTC)
     _set_property_types(db, venue, venue_in.property_type_ids)
     db.commit()
     db.refresh(venue)
@@ -782,7 +782,7 @@ async def update_portal_venue(
     )
     for k, v in update_data.items():
         setattr(venue, k, v)
-    venue.updated_at = datetime.utcnow()
+    venue.updated_at = datetime.now(UTC)
     if venue_in.property_type_ids is not None:
         _set_property_types(db, venue, venue_in.property_type_ids)
     db.commit()

@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime, time
+from datetime import UTC, datetime, time
 from typing import TYPE_CHECKING
 
 from sqlalchemy import Text, Time
@@ -55,7 +55,7 @@ class VenuePropertyTypes(SQLModel, table=True):
     name: str = Field(max_length=100)
     icon: str | None = Field(default=None, max_length=100)
     created_at: datetime = Field(
-        default_factory=datetime.utcnow, sa_type=DateTime(timezone=True)
+        default_factory=lambda: datetime.now(UTC), sa_type=DateTime(timezone=True)
     )
 
     properties: list["VenueProperties"] = Relationship(
@@ -96,7 +96,7 @@ class VenuePhotos(SQLModel, table=True):
     image_url: str = Field(sa_type=Text())
     position: int = Field(default=0)
     created_at: datetime = Field(
-        default_factory=datetime.utcnow, sa_type=DateTime(timezone=True)
+        default_factory=lambda: datetime.now(UTC), sa_type=DateTime(timezone=True)
     )
 
     venue: "EventVenues" = Relationship(back_populates="photos")
@@ -140,7 +140,7 @@ class VenueExceptions(SQLModel, table=True):
     reason: str | None = Field(default=None, sa_type=Text())
     is_closed: bool = Field(default=True)
     created_at: datetime = Field(
-        default_factory=datetime.utcnow, sa_type=DateTime(timezone=True)
+        default_factory=lambda: datetime.now(UTC), sa_type=DateTime(timezone=True)
     )
 
     venue: "EventVenues" = Relationship(back_populates="exceptions")

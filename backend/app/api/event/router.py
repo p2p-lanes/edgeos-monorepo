@@ -584,7 +584,7 @@ def _check_recurrence_conflicts(
 
 def _render_ics(event) -> str:
     """Render a minimal, RFC-5545-compliant VCALENDAR string for one event."""
-    dtstamp = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
+    dtstamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     dtstart = event.start_time.strftime("%Y%m%dT%H%M%SZ")
     dtend = event.end_time.strftime("%Y%m%dT%H%M%SZ")
     summary = (event.title or "").replace("\n", " ").replace(",", r"\,")
