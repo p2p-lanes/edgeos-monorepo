@@ -99,6 +99,14 @@ export function usePaymentSubmit({
   }, [])
 
   const submitPayment = useCallback(async (): Promise<PaymentSubmitResult> => {
+    // Guard against double-submits that bypass the disabled-button state:
+    // bfcache restore resets isSubmitting to false, and the post-success
+    // reset can race the redirect. Without this, the same checkout can be
+    // re-posted from the same browser session.
+    if (isSubmitting || paymentCompleteRef.current) {
+      return { success: false, error: "Payment already submitted" }
+    }
+
     if (submitMode === "application" && !applicationId) {
       return { success: false, error: "Application not available" }
     }
@@ -300,6 +308,7 @@ export function usePaymentSubmit({
     submitMode,
     router,
     creditsEnabled,
+    isSubmitting,
   ])
 
   return { submitPayment, isSubmitting }
