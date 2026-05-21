@@ -5,7 +5,7 @@ from enum import StrEnum
 from typing import Self
 
 from pydantic import ConfigDict, field_validator, model_validator
-from sqlalchemy import Boolean, Column, Numeric
+from sqlalchemy import Boolean, Column, Numeric, Text
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlmodel import Field, SQLModel, String
 
@@ -32,6 +32,23 @@ def validate_popup_insurance_config(enabled: bool, pct: "Decimal | None") -> Non
     if pct > 100:
         raise ValueError(
             "insurance_percentage must be <= 100 (it represents a percentage)"
+        )
+
+
+def validate_popup_contribution_config(enabled: bool, pct: "Decimal | None") -> None:
+    """Validate contribution_percentage bounds when contribution is enabled.
+
+    Raises ValueError if enabled=True and pct is None, <= 0, or > 100.
+    """
+    if not enabled:
+        return
+    if pct is None or pct <= 0:
+        raise ValueError(
+            "contribution_percentage must be > 0 when contribution_enabled is True"
+        )
+    if pct > 100:
+        raise ValueError(
+            "contribution_percentage must be <= 100 (it represents a percentage)"
         )
 
 
@@ -127,6 +144,19 @@ class PopupBase(SQLModel):
         default=None,
         sa_column=Column(Numeric(5, 2), nullable=True),
     )
+    contribution_enabled: bool = Field(
+        default=False,
+        sa_column=Column(Boolean, nullable=False, server_default="false"),
+    )
+    contribution_percentage: Decimal | None = Field(
+        default=None,
+        sa_column=Column(Numeric(5, 2), nullable=True),
+    )
+    contribution_label: str | None = Field(default=None, max_length=255)
+    contribution_description: str | None = Field(
+        default=None,
+        sa_column=Column(Text(), nullable=True),
+    )
     application_layout: ApplicationLayout = Field(
         default=ApplicationLayout.single_page,
         sa_column=Column(String, nullable=False, server_default="single_page"),
@@ -188,6 +218,10 @@ class PopupCreate(SQLModel):
     supported_languages: list[str] = ["en"]
     insurance_enabled: bool = False
     insurance_percentage: Decimal | None = None
+    contribution_enabled: bool = False
+    contribution_percentage: Decimal | None = None
+    contribution_label: str | None = None
+    contribution_description: str | None = None
     application_layout: ApplicationLayout = ApplicationLayout.single_page
     events_enabled: bool = True
     self_check_in_enabled: bool = False
@@ -211,6 +245,9 @@ class PopupCreate(SQLModel):
             )
         validate_popup_insurance_config(
             self.insurance_enabled, self.insurance_percentage
+        )
+        validate_popup_contribution_config(
+            self.contribution_enabled, self.contribution_percentage
         )
         return self
 
@@ -252,6 +289,10 @@ class PopupUpdate(SQLModel):
     supported_languages: list[str] | None = None
     insurance_enabled: bool | None = None
     insurance_percentage: Decimal | None = None
+    contribution_enabled: bool | None = None
+    contribution_percentage: Decimal | None = None
+    contribution_label: str | None = None
+    contribution_description: str | None = None
     application_layout: ApplicationLayout | None = None
     events_enabled: bool | None = None
     self_check_in_enabled: bool | None = None
@@ -283,6 +324,9 @@ class PopupUpdate(SQLModel):
         # Validate insurance only when insurance_enabled is explicitly set to True
         if self.insurance_enabled is True:
             validate_popup_insurance_config(True, self.insurance_percentage)
+        # Validate contribution only when contribution_enabled is explicitly set to True
+        if self.contribution_enabled is True:
+            validate_popup_contribution_config(True, self.contribution_percentage)
         return self
 
 
@@ -318,6 +362,10 @@ class PopupPublic(SQLModel):
     supported_languages: list[str] = ["en"]
     insurance_enabled: bool = False
     insurance_percentage: Decimal | None = None
+    contribution_enabled: bool = False
+    contribution_percentage: Decimal | None = None
+    contribution_label: str | None = None
+    contribution_description: str | None = None
     application_layout: ApplicationLayout = ApplicationLayout.single_page
     events_enabled: bool = True
     show_attendee_directory: bool = False

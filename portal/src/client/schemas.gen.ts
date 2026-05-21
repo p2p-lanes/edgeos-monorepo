@@ -10161,6 +10161,12 @@ export const PaymentPreviewSchema = {
             title: 'Insurance Amount',
             default: '0'
         },
+        contribution_amount: {
+            type: 'string',
+            pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$',
+            title: 'Contribution Amount',
+            default: '0'
+        },
         currency: {
             type: 'string',
             title: 'Currency',
@@ -10491,6 +10497,12 @@ export const PaymentPublicSchema = {
             type: 'string',
             pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$',
             title: 'Insurance Amount',
+            default: '0'
+        },
+        contribution_amount: {
+            type: 'string',
+            pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$',
+            title: 'Contribution Amount',
             default: '0'
         },
         currency: {
@@ -11200,6 +11212,46 @@ export const PopupAdminSchema = {
             ],
             title: 'Insurance Percentage'
         },
+        contribution_enabled: {
+            type: 'boolean',
+            title: 'Contribution Enabled',
+            default: false
+        },
+        contribution_percentage: {
+            anyOf: [
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Contribution Percentage'
+        },
+        contribution_label: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 255
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Contribution Label'
+        },
+        contribution_description: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Contribution Description'
+        },
         application_layout: {
             '$ref': '#/components/schemas/ApplicationLayout',
             default: 'single_page'
@@ -11563,6 +11615,48 @@ export const PopupCreateSchema = {
             ],
             title: 'Insurance Percentage'
         },
+        contribution_enabled: {
+            type: 'boolean',
+            title: 'Contribution Enabled',
+            default: false
+        },
+        contribution_percentage: {
+            anyOf: [
+                {
+                    type: 'number'
+                },
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Contribution Percentage'
+        },
+        contribution_label: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Contribution Label'
+        },
+        contribution_description: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Contribution Description'
+        },
         application_layout: {
             '$ref': '#/components/schemas/ApplicationLayout',
             default: 'single_page'
@@ -11845,6 +11939,45 @@ export const PopupPublicSchema = {
                 }
             ],
             title: 'Insurance Percentage'
+        },
+        contribution_enabled: {
+            type: 'boolean',
+            title: 'Contribution Enabled',
+            default: false
+        },
+        contribution_percentage: {
+            anyOf: [
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Contribution Percentage'
+        },
+        contribution_label: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Contribution Label'
+        },
+        contribution_description: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Contribution Description'
         },
         application_layout: {
             '$ref': '#/components/schemas/ApplicationLayout',
@@ -12368,6 +12501,54 @@ export const PopupUpdateSchema = {
                 }
             ],
             title: 'Insurance Percentage'
+        },
+        contribution_enabled: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Contribution Enabled'
+        },
+        contribution_percentage: {
+            anyOf: [
+                {
+                    type: 'number'
+                },
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Contribution Percentage'
+        },
+        contribution_label: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Contribution Label'
+        },
+        contribution_description: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Contribution Description'
         },
         application_layout: {
             anyOf: [

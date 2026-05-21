@@ -3,6 +3,7 @@
 import {
   AlertCircle,
   CloudRain,
+  HandCoins,
   Heart,
   Home,
   Loader2,
@@ -432,6 +433,39 @@ export default function ConfirmStep() {
                   {formatCurrency(summary.insuranceSubtotal)}
                 </span>
               </div>
+            </div>
+          </>
+        )}
+
+        {/* Contribution fee — mandatory when popup has it enabled; no buyer toggle */}
+        {summary.contributionSubtotal > 0 && (
+          <>
+            <div className="border-t border-border" />
+            <div className="px-5 py-4">
+              <div className="flex items-center gap-2 mb-3">
+                <HandCoins className="w-4 h-4 text-muted-foreground" />
+                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                  {popup?.contribution_label ||
+                    t("checkout.contribution.fallbackLabel")}
+                </span>
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">
+                  {popup?.contribution_label ||
+                    t("checkout.contribution.fallbackLabel")}
+                  {popup?.contribution_percentage
+                    ? ` (${Number(popup.contribution_percentage)}%)`
+                    : ""}
+                </span>
+                <span className="font-medium text-foreground">
+                  {formatCurrency(summary.contributionSubtotal)}
+                </span>
+              </div>
+              {popup?.contribution_description && (
+                <p className="text-xs text-muted-foreground mt-2">
+                  {popup.contribution_description}
+                </p>
+              )}
             </div>
           </>
         )}

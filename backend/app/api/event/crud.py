@@ -151,13 +151,17 @@ class EventsCRUD(BaseCRUD[Events, EventCreate, EventUpdate]):
 
         The window MUST already include the caller's setup/teardown buffer.
         Overlap rule: existing.start < window_end AND existing.end > window_start.
-        Cancelled and rejected events are ignored (they free the slot).
+        Draft, cancelled and rejected events are ignored (they free the slot).
         """
         # Pull all potentially-relevant rows. Non-recurring rows can be
         # filtered directly. Recurring masters (rrule IS NOT NULL) need to
         # be expanded on-the-fly since their start_time only marks the
         # first occurrence.
-        freed_statuses = [EventStatus.CANCELLED, EventStatus.REJECTED]
+        freed_statuses = [
+            EventStatus.DRAFT,
+            EventStatus.CANCELLED,
+            EventStatus.REJECTED,
+        ]
         non_recurring = (
             select(Events)
             .where(Events.venue_id == venue_id)

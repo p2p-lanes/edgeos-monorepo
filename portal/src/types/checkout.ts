@@ -147,6 +147,7 @@ export interface CheckoutCartSummary {
   patronSubtotal: number
   mealPlansSubtotal: number
   insuranceSubtotal: number
+  contributionSubtotal: number
   dynamicSubtotal: number
   subtotal: number
   discount: number
@@ -271,6 +272,7 @@ export function createInitialSummary(): CheckoutCartSummary {
     patronSubtotal: 0,
     mealPlansSubtotal: 0,
     insuranceSubtotal: 0,
+    contributionSubtotal: 0,
     dynamicSubtotal: 0,
     subtotal: 0,
     discount: 0,

@@ -564,12 +564,17 @@ def _compute_availability(
     tz = ZoneInfo(tz_name)
 
     # --- Busy from events (+ setup/teardown) and closed exceptions --------
-    # Cancelled and rejected events no longer hold their slot; treat them
-    # as freed availability so calendars don't show ghost blocks.
+    # Drafts, cancelled and rejected events no longer hold their slot; treat
+    # them as freed availability so calendars don't show ghost blocks and
+    # draft proposals don't lock the venue against other bookings.
     events_query = (
         select(Events)
         .where(Events.venue_id == venue.id)
-        .where(Events.status.notin_([EventStatus.CANCELLED, EventStatus.REJECTED]))
+        .where(
+            Events.status.notin_(
+                [EventStatus.DRAFT, EventStatus.CANCELLED, EventStatus.REJECTED]
+            )
+        )
         .where(Events.start_time < end)
         .where(Events.end_time > start)
     )

@@ -138,6 +138,36 @@ def calculate_insurance_amount(
     )
 
 
+def calculate_contribution_amount(
+    popup: "Any",
+    products_subtotal: Decimal,
+) -> Decimal:
+    """Pure function: compute contribution amount from popup settings + pre-fee subtotal.
+
+    Contribution is MANDATORY when enabled at popup level — there is no buyer opt-in
+    flag. Mirrors `calculate_insurance_amount` shape but drops the per-product
+    eligibility filter (contribution applies over the full pre-fee order subtotal).
+
+    Args:
+        popup: Object with .contribution_enabled (bool) and
+            .contribution_percentage (Decimal|None).
+        products_subtotal: Pre-fee snapshot of the order amount
+            (post-discount, pre-insurance, pre-contribution).
+
+    Returns:
+        Contribution amount rounded to 2 decimal places.
+        Returns Decimal("0") if contribution is disabled or percentage is None.
+    """
+    if not popup.contribution_enabled:
+        return Decimal("0")
+    if popup.contribution_percentage is None:
+        return Decimal("0")
+
+    return (products_subtotal * popup.contribution_percentage / 100).quantize(
+        MONEY_PRECISION, rounding=ROUND_HALF_UP
+    )
+
+
 def _require_application_id(application_id: uuid.UUID | None) -> uuid.UUID:
     """Narrow optional application ids for application-based flows."""
     if application_id is None:
@@ -1267,12 +1297,25 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 response.group_id = None
                 response.scholarship_discount = True
 
+        # Capture pre-fee snapshot BEFORE any fees are added.
+        # Both insurance and contribution must read from the same pre-fee baseline
+        # so neither fee compounds the other (see design ADR-2).
+        pre_fee_amount = response.amount
+
         # Calculate insurance if requested (application-flow only — POPUP-6)
         if obj.insurance:
             popup = application.popup if application else None
             insurance_amount = self._calculate_insurance(session, obj.products, popup)
             response.insurance_amount = insurance_amount
             response.amount += insurance_amount
+
+        # Calculate contribution fee (mandatory when popup enables it — no buyer opt-in).
+        # Uses the pre-fee snapshot so contribution base does not include insurance.
+        popup = application.popup if application else None
+        if popup and popup.contribution_enabled and popup.contribution_percentage:
+            contribution_amount = calculate_contribution_amount(popup, pre_fee_amount)
+            response.contribution_amount = contribution_amount
+            response.amount += contribution_amount
 
         return response
 
@@ -1448,6 +1491,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 status=PaymentStatus.APPROVED.value,
                 amount=preview.amount,
                 insurance_amount=preview.insurance_amount,
+                contribution_amount=preview.contribution_amount,
                 currency=preview.currency,
                 coupon_id=preview.coupon_id,
                 coupon_code=preview.coupon_code,
@@ -1587,6 +1631,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             status=simplefi_response.status,
             amount=preview.amount,
             insurance_amount=preview.insurance_amount,
+            contribution_amount=preview.contribution_amount,
             currency=preview.currency,
             coupon_id=preview.coupon_id,
             coupon_code=preview.coupon_code,
