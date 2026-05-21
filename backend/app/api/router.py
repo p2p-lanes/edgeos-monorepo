@@ -28,6 +28,7 @@ from app.api import (
     popup_reviewer,
     product,
     tenant,
+    third_party_app,
     ticketing_step,
     track,
     translation,
@@ -46,6 +47,7 @@ api_router.include_router(tenant.router)
 api_router.include_router(human.router)
 api_router.include_router(api_key.router)
 api_router.include_router(admin_api_key.router)
+api_router.include_router(third_party_app.router)
 api_router.include_router(popup.router)
 api_router.include_router(attendee_category.router)
 
