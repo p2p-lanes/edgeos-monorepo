@@ -25,7 +25,6 @@ import {
 } from "@/client"
 import { DangerZone } from "@/components/Common/DangerZone"
 import { FieldError } from "@/components/Common/FieldError"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { DatePicker } from "@/components/ui/date-picker"
 import { ImageUpload } from "@/components/ui/image-upload"
@@ -83,11 +82,6 @@ interface EventFormProps {
   initialStartIso?: string
   onSuccess: () => void
 }
-
-const EVENT_STATUSES = [
-  { value: "draft", label: "Draft" },
-  { value: "published", label: "Public" },
-] as const
 
 const VISIBILITY_OPTIONS = [
   {
@@ -343,7 +337,6 @@ export function EventForm({
       require_approval: false,
       highlighted: defaultValues?.highlighted ?? false,
       host_display_name: defaultValues?.host_display_name ?? "",
-      status: defaultValues?.status ?? "draft",
       tags: defaultValues?.tags ?? [],
     },
     onSubmit: ({ value }) => {
@@ -391,6 +384,9 @@ export function EventForm({
 
       const hostDisplayName = value.host_display_name.trim() || null
 
+      const finalStatus =
+        submitActionRef.current === "draft" ? "draft" : "published"
+
       if (isEdit) {
         const payload: EventUpdate = {
           title: value.title,
@@ -412,7 +408,7 @@ export function EventForm({
           visibility: value.visibility,
           require_approval: value.require_approval,
           highlighted: value.highlighted,
-          status: value.status,
+          status: finalStatus,
           tags,
         }
         updateMutation.mutate(payload)
@@ -438,7 +434,7 @@ export function EventForm({
           visibility: value.visibility,
           require_approval: value.require_approval,
           highlighted: value.highlighted,
-          status: value.status,
+          status: finalStatus,
           tags,
           recurrence: buildRecurrence(repeat, value.timezone || "UTC"),
         }
@@ -446,6 +442,8 @@ export function EventForm({
       }
     },
   })
+
+  const submitActionRef = useRef<"draft" | "publish">("publish")
 
   const isPending = createMutation.isPending || updateMutation.isPending
 
@@ -1014,6 +1012,7 @@ export function EventForm({
           )
           return
         }
+        submitActionRef.current = "publish"
         form.handleSubmit().catch((err: unknown) => {
           showErrorToast(
             err instanceof Error ? err.message : "Error submitting form",
@@ -1042,57 +1041,6 @@ export function EventForm({
               disabled={readOnly}
             />
             <FieldError errors={field.state.meta.errors} />
-            <div className="mt-3">
-              <form.Field name="status">
-                {(statusField) => (
-                  <div className="flex items-center gap-2">
-                    <Select
-                      value={statusField.state.value}
-                      onValueChange={(v) =>
-                        statusField.handleChange(
-                          v as (typeof EVENT_STATUSES)[number]["value"],
-                        )
-                      }
-                      disabled={readOnly}
-                    >
-                      <SelectTrigger className="w-auto border-0 bg-transparent p-0 shadow-none focus:ring-0">
-                        {statusField.state.value === "published" ? (
-                          <Badge
-                            variant={
-                              visibilityValue === "unlisted"
-                                ? "secondary"
-                                : "outline"
-                            }
-                            className={
-                              visibilityValue === "private"
-                                ? "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300 border-transparent"
-                                : undefined
-                            }
-                          >
-                            {visibilityValue === "unlisted"
-                              ? "Unlisted"
-                              : visibilityValue === "private"
-                                ? "Private"
-                                : "Public"}
-                          </Badge>
-                        ) : (
-                          <Badge variant="secondary">
-                            <SelectValue />
-                          </Badge>
-                        )}
-                      </SelectTrigger>
-                      <SelectContent>
-                        {EVENT_STATUSES.map((s) => (
-                          <SelectItem key={s.value} value={s.value}>
-                            {s.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-              </form.Field>
-            </div>
           </div>
         )}
       </form.Field>
@@ -1852,7 +1800,7 @@ export function EventForm({
         </InlineSection>
       )}
 
-      <div className="flex gap-4">
+      <div className="flex items-center justify-between gap-4">
         <Button
           type="button"
           variant="outline"
@@ -1861,25 +1809,44 @@ export function EventForm({
           {readOnly ? "Back" : "Cancel"}
         </Button>
         {!readOnly && (
-          <div className="flex flex-col items-start gap-1">
-            <LoadingButton
-              type="submit"
-              loading={isPending}
-              disabled={
-                effectiveAvailability.status === "unavailable" ||
-                effectiveAvailability.status === "partially-unavailable"
-              }
-            >
-              {isEdit ? "Save Changes" : "Create Event"}
-            </LoadingButton>
+          <div className="flex flex-col items-end gap-1">
+            <div className="flex gap-2">
+              <LoadingButton
+                type="button"
+                variant="outline"
+                loading={isPending && submitActionRef.current === "draft"}
+                disabled={isPending}
+                onClick={() => {
+                  submitActionRef.current = "draft"
+                  form.handleSubmit()
+                }}
+              >
+                Save as Draft
+              </LoadingButton>
+              <LoadingButton
+                type="button"
+                loading={isPending && submitActionRef.current === "publish"}
+                disabled={
+                  isPending ||
+                  effectiveAvailability.status === "unavailable" ||
+                  effectiveAvailability.status === "partially-unavailable"
+                }
+                onClick={() => {
+                  submitActionRef.current = "publish"
+                  form.handleSubmit()
+                }}
+              >
+                Publish Event
+              </LoadingButton>
+            </div>
             {effectiveAvailability.status === "unavailable" && (
               <p className="text-xs text-destructive">
-                Pick a time the venue is open and free before submitting.
+                Pick a time the venue is open and free before publishing.
               </p>
             )}
             {effectiveAvailability.status === "partially-unavailable" && (
               <p className="text-xs text-destructive">
-                Resolve the conflicting occurrences before submitting.
+                Resolve the conflicting occurrences before publishing.
               </p>
             )}
           </div>

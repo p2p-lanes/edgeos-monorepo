@@ -88,6 +88,10 @@ class PaymentBase(SQLModel):
         default=Decimal("0"),
         sa_column=Column(Numeric(10, 2), nullable=False, server_default="0"),
     )
+    contribution_amount: Decimal = Field(
+        default=Decimal("0"),
+        sa_column=Column(Numeric(10, 2), nullable=False, server_default="0"),
+    )
     currency: str = Field(default="USD")
     settlement_currency: str | None = Field(
         default=None,
@@ -204,6 +208,7 @@ class PaymentPreview(BaseModel):
     original_amount: Decimal
     amount: Decimal
     insurance_amount: Decimal = Decimal("0")
+    contribution_amount: Decimal = Decimal("0")
     currency: str = "USD"
     edit_passes: bool = False
 

@@ -14,8 +14,10 @@ import {
 } from "react"
 import { createPortal } from "react-dom"
 import { useTranslation } from "react-i18next"
+import { toast } from "sonner"
 
 import {
+  ApiError,
   EventParticipantsService,
   type EventPublic,
   EventsService,
@@ -452,6 +454,15 @@ export default function EventsPage() {
   // must not. Use occurrence_id (set only on virtual occurrences) to decide.
   const rsvpBodyFor = (e: EventPublic) =>
     e.occurrence_id ? { occurrence_start: e.start_time } : undefined
+  const toastRsvpError = (err: unknown) => {
+    const fallback = t("events.rsvp.action_error") as string
+    let detail = fallback
+    if (err instanceof ApiError && err.body && typeof err.body === "object") {
+      const body = err.body as { detail?: unknown }
+      if (typeof body.detail === "string") detail = body.detail
+    }
+    toast.error(detail)
+  }
   const rsvpMutation = useMutation({
     mutationFn: (e: EventPublic) =>
       EventParticipantsService.registerForEvent({
@@ -461,6 +472,7 @@ export default function EventsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["portal-events"] })
     },
+    onError: toastRsvpError,
   })
   const cancelRsvpMutation = useMutation({
     mutationFn: (e: EventPublic) =>
@@ -471,7 +483,20 @@ export default function EventsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["portal-events"] })
     },
+    onError: toastRsvpError,
   })
+  // The row whose RSVP request is currently in flight, in the
+  // `${id}:${start_time}` format ListBody matches against. Including the
+  // occurrence start in the key keeps the spinner pinned to the specific
+  // recurring instance the user clicked rather than every row sharing
+  // the same event id.
+  const pendingRsvpKey: string | null = (() => {
+    const pending =
+      (rsvpMutation.isPending && rsvpMutation.variables) ||
+      (cancelRsvpMutation.isPending && cancelRsvpMutation.variables) ||
+      null
+    return pending ? `${pending.id}:${pending.start_time}` : null
+  })()
 
   const hideMutation = useMutation({
     mutationFn: (eventId: string) => EventsService.hidePortalEvent({ eventId }),
@@ -757,6 +782,7 @@ export default function EventsPage() {
             currentHumanId={currentHuman?.id}
             onRsvp={(e) => rsvpMutation.mutate(e)}
             onCancelRsvp={(e) => cancelRsvpMutation.mutate(e)}
+            pendingRsvpKey={pendingRsvpKey}
             onHide={(id) => hideMutation.mutate(id)}
             onUnhide={(id) => unhideMutation.mutate(id)}
           />

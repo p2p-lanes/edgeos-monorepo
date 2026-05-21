@@ -246,6 +246,10 @@
         "previous_image_aria": "Previous image",
         "next_image_aria": "Next image"
       }
+    },
+    "contribution": {
+      "fallbackLabel": "Event contribution",
+      "fallbackDescription": "Helps fund the event"
     }
   },
   "openCheckout": {
@@ -563,7 +567,8 @@
       "check_in": "Check in",
       "check_in_opens_at_start": "Check-in opens at start time",
       "registered": "Registered",
-      "checked_in": "Checked in"
+      "checked_in": "Checked in",
+      "action_error": "Couldn't update your RSVP. Please try again."
     },
     "login_required": {
       "title": "Sign in to view this event",

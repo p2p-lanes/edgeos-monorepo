@@ -9,6 +9,7 @@ import {
   EyeOff,
   Filter,
   Layers,
+  Loader2,
   MapPin,
   Pencil,
   Repeat,
@@ -70,6 +71,12 @@ interface ListBodyProps {
   currentHumanId?: string | null
   onRsvp?: (event: EventPublic) => void
   onCancelRsvp?: (event: EventPublic) => void
+  /**
+   * Key (``${event.id}:${event.start_time}``) of the row whose RSVP
+   * mutation is currently in flight. The matching button renders a
+   * spinner and is disabled until the request settles.
+   */
+  pendingRsvpKey?: string | null
   onHide?: (eventId: string) => void
   onUnhide?: (eventId: string) => void
 }
@@ -94,6 +101,7 @@ export function ListBody({
   currentHumanId,
   onRsvp,
   onCancelRsvp,
+  pendingRsvpKey,
   onHide,
   onUnhide,
 }: ListBodyProps) {
@@ -269,33 +277,48 @@ export function ListBody({
                   {isAuthed && (
                     <div className="absolute bottom-2 right-2 flex items-center gap-1.5">
                       {event.status === "published" &&
-                        (event.my_rsvp_status &&
-                        event.my_rsvp_status !== "cancelled" ? (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.preventDefault()
-                              e.stopPropagation()
-                              onCancelRsvp?.(event)
-                            }}
-                            className="inline-flex h-7 items-center gap-1 rounded-md border border-emerald-300 bg-emerald-50 px-2 text-xs font-medium text-emerald-700 hover:bg-emerald-100 dark:border-emerald-500/40 dark:bg-emerald-950/40 dark:text-emerald-300 dark:hover:bg-emerald-950/60"
-                          >
-                            <CheckCircle className="h-3 w-3" />
-                            {t("events.rsvp.going")}
-                          </button>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.preventDefault()
-                              e.stopPropagation()
-                              onRsvp?.(event)
-                            }}
-                            className="inline-flex h-7 items-center gap-1 rounded-md border bg-background px-2 text-xs font-medium shadow-sm hover:bg-muted"
-                          >
-                            {t("events.rsvp.rsvp")}
-                          </button>
-                        ))}
+                        (() => {
+                          const rsvpKey = `${event.id}:${event.start_time}`
+                          const isRsvpPending = pendingRsvpKey === rsvpKey
+                          const isRsvped =
+                            event.my_rsvp_status &&
+                            event.my_rsvp_status !== "cancelled"
+                          return isRsvped ? (
+                            <button
+                              type="button"
+                              disabled={isRsvpPending}
+                              onClick={(e) => {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                onCancelRsvp?.(event)
+                              }}
+                              className="inline-flex h-7 items-center gap-1 rounded-md border border-emerald-300 bg-emerald-50 px-2 text-xs font-medium text-emerald-700 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-emerald-500/40 dark:bg-emerald-950/40 dark:text-emerald-300 dark:hover:bg-emerald-950/60"
+                            >
+                              {isRsvpPending ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              ) : (
+                                <CheckCircle className="h-3 w-3" />
+                              )}
+                              {t("events.rsvp.going")}
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              disabled={isRsvpPending}
+                              onClick={(e) => {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                onRsvp?.(event)
+                              }}
+                              className="inline-flex h-7 items-center gap-1 rounded-md border bg-background px-2 text-xs font-medium shadow-sm hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                              {isRsvpPending && (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              )}
+                              {t("events.rsvp.rsvp")}
+                            </button>
+                          )
+                        })()}
                       <button
                         type="button"
                         onClick={(e) => {

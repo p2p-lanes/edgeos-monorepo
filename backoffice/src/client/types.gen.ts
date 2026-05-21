@@ -2081,6 +2081,7 @@ export type PaymentPreview = {
     original_amount: string;
     amount: string;
     insurance_amount?: string;
+    contribution_amount?: string;
     currency?: string;
     edit_passes?: boolean;
     coupon_id?: (string | null);
@@ -2141,6 +2142,7 @@ export type PaymentPublic = {
     status?: string;
     amount?: string;
     insurance_amount?: string;
+    contribution_amount?: string;
     currency?: string;
     settlement_currency?: (string | null);
     rate?: (string | null);
@@ -2265,6 +2267,10 @@ export type PopupAdmin = {
     supported_languages?: Array<(string)>;
     insurance_enabled?: boolean;
     insurance_percentage?: (string | null);
+    contribution_enabled?: boolean;
+    contribution_percentage?: (string | null);
+    contribution_label?: (string | null);
+    contribution_description?: (string | null);
     application_layout?: ApplicationLayout;
     events_enabled?: boolean;
     self_check_in_enabled?: boolean;
@@ -2309,6 +2315,10 @@ export type PopupCreate = {
     supported_languages?: Array<(string)>;
     insurance_enabled?: boolean;
     insurance_percentage?: (number | string | null);
+    contribution_enabled?: boolean;
+    contribution_percentage?: (number | string | null);
+    contribution_label?: (string | null);
+    contribution_description?: (string | null);
     application_layout?: ApplicationLayout;
     events_enabled?: boolean;
     self_check_in_enabled?: boolean;
@@ -2351,6 +2361,10 @@ export type PopupPublic = {
     supported_languages?: Array<(string)>;
     insurance_enabled?: boolean;
     insurance_percentage?: (string | null);
+    contribution_enabled?: boolean;
+    contribution_percentage?: (string | null);
+    contribution_label?: (string | null);
+    contribution_description?: (string | null);
     application_layout?: ApplicationLayout;
     events_enabled?: boolean;
     show_attendee_directory?: boolean;
@@ -2426,6 +2440,10 @@ export type PopupUpdate = {
     supported_languages?: (Array<(string)> | null);
     insurance_enabled?: (boolean | null);
     insurance_percentage?: (number | string | null);
+    contribution_enabled?: (boolean | null);
+    contribution_percentage?: (number | string | null);
+    contribution_label?: (string | null);
+    contribution_description?: (string | null);
     application_layout?: (ApplicationLayout | null);
     events_enabled?: (boolean | null);
     self_check_in_enabled?: (boolean | null);
