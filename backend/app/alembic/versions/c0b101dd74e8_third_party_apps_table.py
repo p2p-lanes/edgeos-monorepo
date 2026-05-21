@@ -26,7 +26,7 @@ than one active third-party app (would lose data on collapse to a single
 column).
 
 Revision ID: c0b101dd74e8
-Revises: 3e8f4a2b1c5d
+Revises: a1f9c2e8b5d1
 Create Date: 2026-05-21
 """
 
@@ -41,7 +41,7 @@ from app.alembic.utils import (
 
 # revision identifiers, used by Alembic.
 revision = "c0b101dd74e8"
-down_revision = "3e8f4a2b1c5d"
+down_revision = "a1f9c2e8b5d1"
 branch_labels = None
 depends_on = None
 
