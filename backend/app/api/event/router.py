@@ -1987,10 +1987,14 @@ async def list_portal_events(
     # filter here unconditionally.
     visible = [e for e in visible if e.status != EventStatus.CANCELLED]
 
-    def _rsvp_lookup_key(e) -> tuple[uuid.UUID, datetime | None] | None:
+    def _rsvp_lookup_key(e) -> tuple[uuid.UUID, datetime | None]:
         """Build the ``(event_id, occurrence_start)`` key used to find this
-        user's RSVP row. Returns ``None`` for series-master rows surfaced
-        directly (RSVPs are per-occurrence, not series-wide).
+        user's RSVP row. RSVPs for recurring events are per-occurrence, so
+        every recurring row — expanded pseudo-rows, detached override
+        children, and the master itself — maps to its own occurrence's
+        ``start_time``. The master's ``start_time`` IS the first
+        occurrence's dtstart, so it shares the same key as its expanded
+        siblings.
         """
         is_expanded = e.__dict__.get("_occurrence_id") is not None
         if is_expanded:
@@ -1998,7 +2002,7 @@ async def list_portal_events(
         if getattr(e, "recurrence_master_id", None):
             return (e.recurrence_master_id, e.start_time)
         if getattr(e, "rrule", None):
-            return None
+            return (e.id, e.start_time)
         return (e.id, None)
 
     if rsvped_only:
@@ -2173,6 +2177,12 @@ async def get_portal_event(
     from app.api.event_participant.models import EventParticipants
 
     rsvp_event_id = event.recurrence_master_id or event.id
+    # RSVPs for recurring events are per-occurrence. When the detail page
+    # lands on a series master without ?occ=, treat it as the first
+    # occurrence (the master's own start_time IS the first occurrence's
+    # dtstart) so we find the RSVP row the portal just created.
+    if occurrence_start is None and event.rrule:
+        occurrence_start = event.start_time
     rsvp_q = (
         select(EventParticipants.status)
         .where(EventParticipants.profile_id == current_human.id)

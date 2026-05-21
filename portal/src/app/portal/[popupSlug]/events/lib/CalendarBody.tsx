@@ -167,10 +167,12 @@ export function CalendarBody({
     enabled: isAuthed && !useOverride && !!popupId,
   })
 
-  // For recurring instances we must include occurrence_start; one-off events
-  // must not. Use occurrence_id (set only on virtual occurrences) to decide.
+  // Recurring events require occurrence_start so the RSVP targets a single
+  // instance. That includes both expanded pseudo-rows (have occurrence_id)
+  // AND the series master itself, whose start_time IS the first occurrence.
+  // One-off events must not send it.
   const rsvpBodyFor = (e: EventPublic) =>
-    e.occurrence_id ? { occurrence_start: e.start_time } : undefined
+    e.rrule || e.occurrence_id ? { occurrence_start: e.start_time } : undefined
   const toastRsvpError = (err: unknown) => {
     const fallback = t("events.rsvp.action_error") as string
     let detail = fallback
