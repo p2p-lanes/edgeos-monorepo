@@ -638,6 +638,17 @@ export type AuthCodeSentResponse = {
     expires_in_minutes?: number;
 };
 
+/**
+ * Static response for GET /third-party-apps/available-scopes.
+ *
+ * Returns the platform MAX constants so the frontend create modal can
+ * populate its multi-select options without hardcoding scope strings.
+ */
+export type AvailableScopes = {
+    token_scopes: Array<(string)>;
+    api_key_scopes: Array<(string)>;
+};
+
 export type BaseFieldConfigPublic = {
     id: string;
     tenant_id: string;
@@ -1986,6 +1997,11 @@ export type ListModel_TenantPublic_ = {
     paging: Paging;
 };
 
+export type ListModel_ThirdPartyAppPublic_ = {
+    results: Array<ThirdPartyAppPublic>;
+    paging: Paging;
+};
+
 export type ListModel_TicketingStepPublic_ = {
     results: Array<TicketingStepPublic>;
     paging: Paging;
@@ -1999,6 +2015,15 @@ export type ListModel_TrackPublic_ = {
 export type ListModel_UserPublic_ = {
     results: Array<UserPublic>;
     paging: Paging;
+};
+
+/**
+ * Response shape for GET /me/access.
+ */
+export type MeAccess = {
+    app_name: string;
+    scopes: Array<(string)>;
+    api_key_scopes: Array<(string)>;
 };
 
 /**
@@ -2868,7 +2893,6 @@ export type TenantPublic = {
     landing_mode?: LandingMode;
     id: string;
     active_popup_slug?: (string | null);
-    third_party_key_prefix?: (string | null);
 };
 
 export type TenantUpdate = {
@@ -2881,6 +2905,66 @@ export type TenantUpdate = {
     custom_domain?: (string | null);
     custom_domain_active?: (boolean | null);
     landing_mode?: (LandingMode | null);
+};
+
+/**
+ * Request body for creating a third-party app.
+ */
+export type ThirdPartyAppCreate = {
+    name: string;
+    allowed_token_scopes?: Array<('portal:*' | 'portal:self_read' | 'portal:directory_read' | 'portal:api_keys_manage')>;
+    allowed_api_key_scopes?: Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write')>;
+};
+
+/**
+ * Response returned ONCE at app creation (and at key rotation).
+ *
+ * ``raw_key`` is the cleartext token; never stored, shown once only.
+ */
+export type ThirdPartyAppCreated = {
+    id: string;
+    tenant_id: string;
+    name: string;
+    prefix: string;
+    allowed_token_scopes: Array<(string)>;
+    allowed_api_key_scopes: Array<(string)>;
+    active: boolean;
+    last_used_at: (string | null);
+    revoked_at: (string | null);
+    created_at: string;
+    updated_at: string;
+    raw_key: string;
+};
+
+/**
+ * Safe public representation of a ThirdPartyApps row.
+ *
+ * NEVER includes key_hash or any raw key material.
+ */
+export type ThirdPartyAppPublic = {
+    id: string;
+    tenant_id: string;
+    name: string;
+    prefix: string;
+    allowed_token_scopes: Array<(string)>;
+    allowed_api_key_scopes: Array<(string)>;
+    active: boolean;
+    last_used_at: (string | null);
+    revoked_at: (string | null);
+    created_at: string;
+    updated_at: string;
+};
+
+/**
+ * Request body for PATCH /third-party-apps/{id}.
+ *
+ * All fields are optional. Scope validators only fire when the field is
+ * provided (not-None).
+ */
+export type ThirdPartyAppUpdate = {
+    name?: (string | null);
+    allowed_token_scopes?: (Array<('portal:*' | 'portal:self_read' | 'portal:directory_read' | 'portal:api_keys_manage')> | null);
+    allowed_api_key_scopes?: (Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write')> | null);
 };
 
 /**
@@ -2902,14 +2986,6 @@ export type ThirdPartyHumanLogin = {
 export type ThirdPartyHumanVerify = {
     email: string;
     code: string;
-};
-
-/**
- * Returned by the rotate endpoint. The raw api_key is shown ONCE and never stored.
- */
-export type ThirdPartyKeyRotated = {
-    api_key: string;
-    prefix: string;
 };
 
 /**
@@ -4831,6 +4907,14 @@ export type HumansListHumanApiKeysData = {
 
 export type HumansListHumanApiKeysResponse = (Array<ApiKeyPublic>);
 
+export type MeAccessGetMeAccessResponse = (MeAccess);
+
+export type MeAccessGetMeAccessDocsData = {
+    format?: 'json' | 'markdown';
+};
+
+export type MeAccessGetMeAccessDocsResponse = (unknown);
+
 export type PaymentsListPaymentsData = {
     applicationId?: (string | null);
     externalId?: (string | null);
@@ -5193,17 +5277,49 @@ export type TenantsDeleteCredentialsData = {
 
 export type TenantsDeleteCredentialsResponse = (void);
 
-export type TenantsRotateThirdPartyKeyData = {
-    tenantId: string;
+export type ThirdPartyAppsGetAvailableScopesResponse = (AvailableScopes);
+
+export type ThirdPartyAppsCreateThirdPartyAppData = {
+    requestBody: ThirdPartyAppCreate;
+    xTenantId?: (string | null);
 };
 
-export type TenantsRotateThirdPartyKeyResponse = (ThirdPartyKeyRotated);
+export type ThirdPartyAppsCreateThirdPartyAppResponse = (ThirdPartyAppCreated);
 
-export type TenantsDeleteThirdPartyKeyData = {
-    tenantId: string;
+export type ThirdPartyAppsListThirdPartyAppsData = {
+    xTenantId?: (string | null);
 };
 
-export type TenantsDeleteThirdPartyKeyResponse = (void);
+export type ThirdPartyAppsListThirdPartyAppsResponse = (ListModel_ThirdPartyAppPublic_);
+
+export type ThirdPartyAppsGetThirdPartyAppData = {
+    appId: string;
+    xTenantId?: (string | null);
+};
+
+export type ThirdPartyAppsGetThirdPartyAppResponse = (ThirdPartyAppPublic);
+
+export type ThirdPartyAppsUpdateThirdPartyAppData = {
+    appId: string;
+    requestBody: ThirdPartyAppUpdate;
+    xTenantId?: (string | null);
+};
+
+export type ThirdPartyAppsUpdateThirdPartyAppResponse = (ThirdPartyAppPublic);
+
+export type ThirdPartyAppsRevokeThirdPartyAppData = {
+    appId: string;
+    xTenantId?: (string | null);
+};
+
+export type ThirdPartyAppsRevokeThirdPartyAppResponse = (void);
+
+export type ThirdPartyAppsRotateThirdPartyAppData = {
+    appId: string;
+    xTenantId?: (string | null);
+};
+
+export type ThirdPartyAppsRotateThirdPartyAppResponse = (ThirdPartyAppCreated);
 
 export type TicketingStepsListPortalTicketingStepsData = {
     popupId: string;
