@@ -350,12 +350,8 @@ export default function CartItemList() {
       {/* Contribution fee — mandatory when popup has it enabled; no buyer toggle */}
       {summary.contributionSubtotal > 0 && (
         <div className="mb-4">
-          <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-            {popup?.contribution_label ||
-              t("checkout.contribution.fallbackLabel")}
-          </h4>
           <div className="flex items-center justify-between py-2">
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 min-w-0">
               <HandCoins className="w-4 h-4 text-muted-foreground shrink-0" />
               <span className="text-sm font-medium text-foreground">
                 {popup?.contribution_label ||

@@ -1,6 +1,14 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { render, screen, waitFor } from "@testing-library/react"
 import type { ReactNode } from "react"
 import { PopupCheckoutContent } from "./PopupCheckoutContent"
+
+function renderWithClient(ui: ReactNode) {
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  })
+  return render(<QueryClientProvider client={client}>{ui}</QueryClientProvider>)
+}
 
 const mockReplace = vi.fn()
 const mockUseQueryClient = vi.fn()
@@ -139,7 +147,7 @@ describe("PopupCheckoutContent application schema gating", () => {
       isLoading: false,
     })
 
-    render(
+    renderWithClient(
       <PopupCheckoutContent
         popup={popup as never}
         background={{ className: "bg" }}
@@ -175,7 +183,7 @@ describe("PopupCheckoutContent application schema gating", () => {
       isLoading: false,
     })
 
-    render(
+    renderWithClient(
       <PopupCheckoutContent
         popup={popup as never}
         background={{ className: "bg" }}
@@ -205,7 +213,7 @@ describe("PopupCheckoutContent application schema gating", () => {
       isLoading: false,
     })
 
-    render(
+    renderWithClient(
       <PopupCheckoutContent
         popup={popup as never}
         background={{ className: "bg" }}

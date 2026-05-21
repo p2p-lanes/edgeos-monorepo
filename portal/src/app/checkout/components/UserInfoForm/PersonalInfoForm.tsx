@@ -199,6 +199,10 @@ const PersonalInfoForm = ({
 
           <div className="grid gap-4 md:grid-cols-2">
             {section.fields.map(({ name, field }) => {
+              // Email is rendered standalone above with the change-email
+              // button; skip it here to avoid a duplicate input.
+              if (name === "email") return null
+
               if (name === "gender" && genderField) {
                 const showSpecify = displayGender === "Specify"
                 const genderSpansFullRow =
