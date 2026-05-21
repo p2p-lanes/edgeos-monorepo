@@ -522,7 +522,6 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                                 (popup.slug or "")[:3].upper()
                             ),
                             payment_id=payment.id,
-                            purchase_metadata=line.purchase_metadata,
                         )
                     )
                     session.add(
