@@ -246,6 +246,10 @@
         "previous_image_aria": "Previous image",
         "next_image_aria": "Next image"
       }
+    },
+    "contribution": {
+      "fallbackLabel": "Event contribution",
+      "fallbackDescription": "Helps fund the event"
     }
   },
   "openCheckout": {
