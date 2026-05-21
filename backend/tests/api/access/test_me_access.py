@@ -187,3 +187,33 @@ class TestMeAccessResponseShape:
 
         resp = client.get(BASE_URL, headers=_bearer(token))
         assert resp.status_code == 401, resp.text
+
+
+class TestMeAccessApiKeyDiscovery:
+    """Pre-login discovery: agent has only the raw third-party api key and
+    needs to learn what scopes the app exposes before triggering OTP login."""
+
+    def test_api_key_only_returns_app_scopes(
+        self,
+        client: TestClient,
+        access_app: tuple[ThirdPartyApps, str],
+    ) -> None:
+        """X-Third-Party-Api-Key alone (no JWT) returns the app's scope set."""
+        app, raw_key = access_app
+        resp = client.get(
+            BASE_URL,
+            headers={"X-Third-Party-Api-Key": raw_key},
+        )
+        assert resp.status_code == 200, resp.text
+        body = resp.json()
+        assert body["app_name"] == app.name
+        assert set(body["scopes"]) == set(app.allowed_token_scopes)
+        assert set(body["api_key_scopes"]) == set(app.allowed_api_key_scopes)
+
+    def test_unknown_api_key_returns_401(self, client: TestClient) -> None:
+        """An api key that doesn't match any app row returns 401."""
+        resp = client.get(
+            BASE_URL,
+            headers={"X-Third-Party-Api-Key": "definitely-not-a-real-key"},
+        )
+        assert resp.status_code == 401, resp.text
