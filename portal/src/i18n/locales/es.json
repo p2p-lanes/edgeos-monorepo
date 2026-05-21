@@ -563,7 +563,8 @@
       "check_in": "Check-in",
       "check_in_opens_at_start": "El check-in se habilita al comenzar el evento",
       "registered": "Anotado",
-      "checked_in": "Check-in realizado"
+      "checked_in": "Check-in realizado",
+      "action_error": "No pudimos actualizar tu RSVP. Por favor intentá de nuevo."
     },
     "login_required": {
       "title": "Iniciá sesión para ver el evento",

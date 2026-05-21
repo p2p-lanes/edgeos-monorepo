@@ -12,6 +12,7 @@ import {
   Crown,
   Home,
   Layers,
+  Loader2,
   Maximize2,
   Minimize2,
   Repeat,
@@ -20,8 +21,10 @@ import {
 import Link from "next/link"
 import { Fragment, useEffect, useMemo, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
+import { toast } from "sonner"
 
 import {
+  ApiError,
   EventParticipantsService,
   type EventPublic,
   EventsService,
@@ -238,6 +241,15 @@ export function DayBody({
   // must not. Use occurrence_id (set only on virtual occurrences) to decide.
   const rsvpBodyFor = (e: EventPublic) =>
     e.occurrence_id ? { occurrence_start: e.start_time } : undefined
+  const toastRsvpError = (err: unknown) => {
+    const fallback = t("events.rsvp.action_error") as string
+    let detail = fallback
+    if (err instanceof ApiError && err.body && typeof err.body === "object") {
+      const body = err.body as { detail?: unknown }
+      if (typeof body.detail === "string") detail = body.detail
+    }
+    toast.error(detail)
+  }
   const rsvpMutation = useMutation({
     mutationFn: (e: EventPublic) =>
       EventParticipantsService.registerForEvent({
@@ -247,6 +259,7 @@ export function DayBody({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["portal-events-day"] })
     },
+    onError: toastRsvpError,
   })
   const cancelRsvpMutation = useMutation({
     mutationFn: (e: EventPublic) =>
@@ -257,7 +270,17 @@ export function DayBody({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["portal-events-day"] })
     },
+    onError: toastRsvpError,
   })
+  // Tracks the in-flight RSVP target so the spinner stays on the
+  // specific event card (and recurring instance) the user clicked.
+  const pendingRsvpKey: string | null = (() => {
+    const pending =
+      (rsvpMutation.isPending && rsvpMutation.variables) ||
+      (cancelRsvpMutation.isPending && cancelRsvpMutation.variables) ||
+      null
+    return pending ? `${pending.id}:${pending.start_time}` : null
+  })()
 
   // "HH:MM" in the popup timezone (24h) -> minutes since 00:00.
   const minutesInTz = useMemo(() => {
@@ -766,36 +789,50 @@ export function DayBody({
                               )}
                             {isAuthed &&
                               !isShort &&
-                              event.status === "published" && (
-                                <div className="absolute bottom-1 right-1">
-                                  {isRsvpd ? (
-                                    <button
-                                      type="button"
-                                      onClick={(e) => {
-                                        e.preventDefault()
-                                        e.stopPropagation()
-                                        cancelRsvpMutation.mutate(event)
-                                      }}
-                                      className="inline-flex items-center gap-0.5 rounded border border-emerald-300 bg-emerald-50 px-1 py-0.5 text-[9px] font-medium text-emerald-700 hover:bg-emerald-100 dark:border-emerald-500/40 dark:bg-emerald-950/40 dark:text-emerald-300 dark:hover:bg-emerald-950/60"
-                                    >
-                                      <CheckCircle className="h-2.5 w-2.5" />
-                                      {t("events.rsvp.going")}
-                                    </button>
-                                  ) : (
-                                    <button
-                                      type="button"
-                                      onClick={(e) => {
-                                        e.preventDefault()
-                                        e.stopPropagation()
-                                        rsvpMutation.mutate(event)
-                                      }}
-                                      className="inline-flex items-center rounded border bg-background px-1 py-0.5 text-[9px] font-medium hover:bg-muted"
-                                    >
-                                      {t("events.rsvp.rsvp")}
-                                    </button>
-                                  )}
-                                </div>
-                              )}
+                              event.status === "published" &&
+                              (() => {
+                                const rsvpKey = `${event.id}:${event.start_time}`
+                                const isRsvpPending = pendingRsvpKey === rsvpKey
+                                return (
+                                  <div className="absolute bottom-1 right-1">
+                                    {isRsvpd ? (
+                                      <button
+                                        type="button"
+                                        disabled={isRsvpPending}
+                                        onClick={(e) => {
+                                          e.preventDefault()
+                                          e.stopPropagation()
+                                          cancelRsvpMutation.mutate(event)
+                                        }}
+                                        className="inline-flex items-center gap-0.5 rounded border border-emerald-300 bg-emerald-50 px-1 py-0.5 text-[9px] font-medium text-emerald-700 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-emerald-500/40 dark:bg-emerald-950/40 dark:text-emerald-300 dark:hover:bg-emerald-950/60"
+                                      >
+                                        {isRsvpPending ? (
+                                          <Loader2 className="h-2.5 w-2.5 animate-spin" />
+                                        ) : (
+                                          <CheckCircle className="h-2.5 w-2.5" />
+                                        )}
+                                        {t("events.rsvp.going")}
+                                      </button>
+                                    ) : (
+                                      <button
+                                        type="button"
+                                        disabled={isRsvpPending}
+                                        onClick={(e) => {
+                                          e.preventDefault()
+                                          e.stopPropagation()
+                                          rsvpMutation.mutate(event)
+                                        }}
+                                        className="inline-flex items-center gap-0.5 rounded border bg-background px-1 py-0.5 text-[9px] font-medium hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+                                      >
+                                        {isRsvpPending && (
+                                          <Loader2 className="h-2.5 w-2.5 animate-spin" />
+                                        )}
+                                        {t("events.rsvp.rsvp")}
+                                      </button>
+                                    )}
+                                  </div>
+                                )
+                              })()}
                           </Link>
                         )
                       },

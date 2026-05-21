@@ -553,7 +553,8 @@
       "check_in": "Innrita",
       "check_in_opens_at_start": "Innritun opnar á upphafstíma",
       "registered": "Skráður",
-      "checked_in": "Innritaður"
+      "checked_in": "Innritaður",
+      "action_error": "Ekki tókst að uppfæra RSVP. Vinsamlegast reyndu aftur."
     },
     "login_required": {
       "title": "Skráðu þig inn til að sjá þennan viðburð",

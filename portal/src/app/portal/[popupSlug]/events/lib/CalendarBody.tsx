@@ -21,6 +21,7 @@ import {
   Clock,
   Crown,
   Layers,
+  Loader2,
   MapPin,
   Repeat,
   Tag,
@@ -29,8 +30,10 @@ import {
 import Link from "next/link"
 import { useEffect, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
+import { toast } from "sonner"
 
 import {
+  ApiError,
   EventParticipantsService,
   type EventPublic,
   EventsService,
@@ -168,6 +171,15 @@ export function CalendarBody({
   // must not. Use occurrence_id (set only on virtual occurrences) to decide.
   const rsvpBodyFor = (e: EventPublic) =>
     e.occurrence_id ? { occurrence_start: e.start_time } : undefined
+  const toastRsvpError = (err: unknown) => {
+    const fallback = t("events.rsvp.action_error") as string
+    let detail = fallback
+    if (err instanceof ApiError && err.body && typeof err.body === "object") {
+      const body = err.body as { detail?: unknown }
+      if (typeof body.detail === "string") detail = body.detail
+    }
+    toast.error(detail)
+  }
   const rsvpMutation = useMutation({
     mutationFn: (e: EventPublic) =>
       EventParticipantsService.registerForEvent({
@@ -177,6 +189,7 @@ export function CalendarBody({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["portal-events-calendar"] })
     },
+    onError: toastRsvpError,
   })
   const cancelRsvpMutation = useMutation({
     mutationFn: (e: EventPublic) =>
@@ -187,7 +200,18 @@ export function CalendarBody({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["portal-events-calendar"] })
     },
+    onError: toastRsvpError,
   })
+  // Tracks the in-flight RSVP target so we can pin the spinner to the
+  // specific event (and recurring occurrence) the user clicked instead
+  // of flipping every "Going" button on the day.
+  const pendingRsvpKey: string | null = (() => {
+    const pending =
+      (rsvpMutation.isPending && rsvpMutation.variables) ||
+      (cancelRsvpMutation.isPending && cancelRsvpMutation.variables) ||
+      null
+    return pending ? `${pending.id}:${pending.start_time}` : null
+  })()
 
   const events = useOverride ? (eventsOverride ?? []) : (data?.results ?? [])
 
@@ -461,29 +485,48 @@ export function CalendarBody({
                           </div>
                         </div>
                       </Link>
-                      {isAuthed && event.status === "published" && (
-                        <div className="absolute top-2 right-2">
-                          {event.my_rsvp_status &&
-                          event.my_rsvp_status !== "cancelled" ? (
-                            <button
-                              type="button"
-                              onClick={() => cancelRsvpMutation.mutate(event)}
-                              className="inline-flex items-center gap-1 rounded-md border border-emerald-300 bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700 hover:bg-emerald-100 dark:border-emerald-500/40 dark:bg-emerald-950/40 dark:text-emerald-300 dark:hover:bg-emerald-950/60"
-                            >
-                              <CheckCircle className="h-3 w-3" />
-                              {t("events.rsvp.going")}
-                            </button>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={() => rsvpMutation.mutate(event)}
-                              className="inline-flex items-center gap-1 rounded-md border bg-background px-2 py-1 text-xs font-medium hover:bg-muted"
-                            >
-                              {t("events.rsvp.rsvp")}
-                            </button>
-                          )}
-                        </div>
-                      )}
+                      {isAuthed &&
+                        event.status === "published" &&
+                        (() => {
+                          const rsvpKey = `${event.id}:${event.start_time}`
+                          const isRsvpPending = pendingRsvpKey === rsvpKey
+                          const isRsvped =
+                            event.my_rsvp_status &&
+                            event.my_rsvp_status !== "cancelled"
+                          return (
+                            <div className="absolute top-2 right-2">
+                              {isRsvped ? (
+                                <button
+                                  type="button"
+                                  disabled={isRsvpPending}
+                                  onClick={() =>
+                                    cancelRsvpMutation.mutate(event)
+                                  }
+                                  className="inline-flex items-center gap-1 rounded-md border border-emerald-300 bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-emerald-500/40 dark:bg-emerald-950/40 dark:text-emerald-300 dark:hover:bg-emerald-950/60"
+                                >
+                                  {isRsvpPending ? (
+                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                  ) : (
+                                    <CheckCircle className="h-3 w-3" />
+                                  )}
+                                  {t("events.rsvp.going")}
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  disabled={isRsvpPending}
+                                  onClick={() => rsvpMutation.mutate(event)}
+                                  className="inline-flex items-center gap-1 rounded-md border bg-background px-2 py-1 text-xs font-medium hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+                                >
+                                  {isRsvpPending && (
+                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                  )}
+                                  {t("events.rsvp.rsvp")}
+                                </button>
+                              )}
+                            </div>
+                          )
+                        })()}
                     </div>
                   )
                 })}
