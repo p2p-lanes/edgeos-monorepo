@@ -87,7 +87,7 @@ export const AdminApiKeyCreateSchema = {
         scopes: {
             items: {
                 type: 'string',
-                enum: ['events:read', 'events:write', 'rsvp:write', 'venues:write', 'applications:read', 'applications:write', 'attendees:read', 'attendees:write', 'humans:read', 'humans:write', 'groups:read', 'groups:write', 'products:read', 'products:write', 'coupons:read', 'coupons:write', 'forms:read', 'forms:write', 'payments:read', 'tracks:read', 'tracks:write', 'ticketing_steps:read', 'ticketing_steps:write', 'translations:read', 'translations:write']
+                enum: ['events:read', 'events:write', 'rsvp:write', 'venues:read', 'venues:write', 'applications:read', 'applications:write', 'attendees:read', 'attendees:write', 'humans:read', 'humans:write', 'groups:read', 'groups:write', 'products:read', 'products:write', 'coupons:read', 'coupons:write', 'forms:read', 'forms:write', 'payments:read', 'tracks:read', 'tracks:write', 'ticketing_steps:read', 'ticketing_steps:write', 'translations:read', 'translations:write']
             },
             type: 'array',
             minItems: 1,
@@ -130,7 +130,7 @@ export const AdminApiKeyCreatedSchema = {
         scopes: {
             items: {
                 type: 'string',
-                enum: ['events:read', 'events:write', 'rsvp:write', 'venues:write', 'applications:read', 'applications:write', 'attendees:read', 'attendees:write', 'humans:read', 'humans:write', 'groups:read', 'groups:write', 'products:read', 'products:write', 'coupons:read', 'coupons:write', 'forms:read', 'forms:write', 'payments:read', 'tracks:read', 'tracks:write', 'ticketing_steps:read', 'ticketing_steps:write', 'translations:read', 'translations:write']
+                enum: ['events:read', 'events:write', 'rsvp:write', 'venues:read', 'venues:write', 'applications:read', 'applications:write', 'attendees:read', 'attendees:write', 'humans:read', 'humans:write', 'groups:read', 'groups:write', 'products:read', 'products:write', 'coupons:read', 'coupons:write', 'forms:read', 'forms:write', 'payments:read', 'tracks:read', 'tracks:write', 'ticketing_steps:read', 'ticketing_steps:write', 'translations:read', 'translations:write']
             },
             type: 'array',
             title: 'Scopes'
@@ -207,7 +207,7 @@ export const AdminApiKeyPublicSchema = {
         scopes: {
             items: {
                 type: 'string',
-                enum: ['events:read', 'events:write', 'rsvp:write', 'venues:write', 'applications:read', 'applications:write', 'attendees:read', 'attendees:write', 'humans:read', 'humans:write', 'groups:read', 'groups:write', 'products:read', 'products:write', 'coupons:read', 'coupons:write', 'forms:read', 'forms:write', 'payments:read', 'tracks:read', 'tracks:write', 'ticketing_steps:read', 'ticketing_steps:write', 'translations:read', 'translations:write']
+                enum: ['events:read', 'events:write', 'rsvp:write', 'venues:read', 'venues:write', 'applications:read', 'applications:write', 'attendees:read', 'attendees:write', 'humans:read', 'humans:write', 'groups:read', 'groups:write', 'products:read', 'products:write', 'coupons:read', 'coupons:write', 'forms:read', 'forms:write', 'payments:read', 'tracks:read', 'tracks:write', 'ticketing_steps:read', 'ticketing_steps:write', 'translations:read', 'translations:write']
             },
             type: 'array',
             title: 'Scopes'
@@ -283,7 +283,7 @@ export const ApiKeyCreateSchema = {
         scopes: {
             items: {
                 type: 'string',
-                enum: ['events:read', 'events:write', 'rsvp:write', 'venues:write', 'applications:read', 'applications:write', 'attendees:read', 'attendees:write', 'humans:read', 'humans:write', 'groups:read', 'groups:write', 'products:read', 'products:write', 'coupons:read', 'coupons:write', 'forms:read', 'forms:write', 'payments:read', 'tracks:read', 'tracks:write', 'ticketing_steps:read', 'ticketing_steps:write', 'translations:read', 'translations:write']
+                enum: ['events:read', 'events:write', 'rsvp:write', 'venues:read', 'venues:write', 'applications:read', 'applications:write', 'attendees:read', 'attendees:write', 'humans:read', 'humans:write', 'groups:read', 'groups:write', 'products:read', 'products:write', 'coupons:read', 'coupons:write', 'forms:read', 'forms:write', 'payments:read', 'tracks:read', 'tracks:write', 'ticketing_steps:read', 'ticketing_steps:write', 'translations:read', 'translations:write']
             },
             type: 'array',
             title: 'Scopes'
@@ -313,7 +313,7 @@ export const ApiKeyCreatedSchema = {
         scopes: {
             items: {
                 type: 'string',
-                enum: ['events:read', 'events:write', 'rsvp:write', 'venues:write', 'applications:read', 'applications:write', 'attendees:read', 'attendees:write', 'humans:read', 'humans:write', 'groups:read', 'groups:write', 'products:read', 'products:write', 'coupons:read', 'coupons:write', 'forms:read', 'forms:write', 'payments:read', 'tracks:read', 'tracks:write', 'ticketing_steps:read', 'ticketing_steps:write', 'translations:read', 'translations:write']
+                enum: ['events:read', 'events:write', 'rsvp:write', 'venues:read', 'venues:write', 'applications:read', 'applications:write', 'attendees:read', 'attendees:write', 'humans:read', 'humans:write', 'groups:read', 'groups:write', 'products:read', 'products:write', 'coupons:read', 'coupons:write', 'forms:read', 'forms:write', 'payments:read', 'tracks:read', 'tracks:write', 'ticketing_steps:read', 'ticketing_steps:write', 'translations:read', 'translations:write']
             },
             type: 'array',
             title: 'Scopes'
@@ -389,7 +389,7 @@ export const ApiKeyPublicSchema = {
         scopes: {
             items: {
                 type: 'string',
-                enum: ['events:read', 'events:write', 'rsvp:write', 'venues:write', 'applications:read', 'applications:write', 'attendees:read', 'attendees:write', 'humans:read', 'humans:write', 'groups:read', 'groups:write', 'products:read', 'products:write', 'coupons:read', 'coupons:write', 'forms:read', 'forms:write', 'payments:read', 'tracks:read', 'tracks:write', 'ticketing_steps:read', 'ticketing_steps:write', 'translations:read', 'translations:write']
+                enum: ['events:read', 'events:write', 'rsvp:write', 'venues:read', 'venues:write', 'applications:read', 'applications:write', 'attendees:read', 'attendees:write', 'humans:read', 'humans:write', 'groups:read', 'groups:write', 'products:read', 'products:write', 'coupons:read', 'coupons:write', 'forms:read', 'forms:write', 'payments:read', 'tracks:read', 'tracks:write', 'ticketing_steps:read', 'ticketing_steps:write', 'translations:read', 'translations:write']
             },
             type: 'array',
             title: 'Scopes'
@@ -14980,7 +14980,7 @@ export const ThirdPartyAppCreateSchema = {
         allowed_token_scopes: {
             items: {
                 type: 'string',
-                enum: ['portal:*', 'portal:self_read', 'portal:directory_read', 'portal:api_keys_manage']
+                enum: ['portal:*', 'portal:self_read', 'portal:directory_read', 'portal:api_keys_manage', 'portal:rsvp_manage']
             },
             type: 'array',
             title: 'Allowed Token Scopes'
@@ -14988,7 +14988,7 @@ export const ThirdPartyAppCreateSchema = {
         allowed_api_key_scopes: {
             items: {
                 type: 'string',
-                enum: ['events:read', 'events:write', 'rsvp:write', 'venues:write', 'applications:read', 'applications:write', 'attendees:read', 'attendees:write', 'humans:read', 'humans:write', 'groups:read', 'groups:write', 'products:read', 'products:write', 'coupons:read', 'coupons:write', 'forms:read', 'forms:write', 'payments:read', 'tracks:read', 'tracks:write', 'ticketing_steps:read', 'ticketing_steps:write', 'translations:read', 'translations:write']
+                enum: ['events:read', 'events:write', 'rsvp:write', 'venues:read', 'venues:write', 'applications:read', 'applications:write', 'attendees:read', 'attendees:write', 'humans:read', 'humans:write', 'groups:read', 'groups:write', 'products:read', 'products:write', 'coupons:read', 'coupons:write', 'forms:read', 'forms:write', 'payments:read', 'tracks:read', 'tracks:write', 'ticketing_steps:read', 'ticketing_steps:write', 'translations:read', 'translations:write']
             },
             type: 'array',
             title: 'Allowed Api Key Scopes'
@@ -15186,7 +15186,7 @@ export const ThirdPartyAppUpdateSchema = {
                 {
                     items: {
                         type: 'string',
-                        enum: ['portal:*', 'portal:self_read', 'portal:directory_read', 'portal:api_keys_manage']
+                        enum: ['portal:*', 'portal:self_read', 'portal:directory_read', 'portal:api_keys_manage', 'portal:rsvp_manage']
                     },
                     type: 'array'
                 },
@@ -15201,7 +15201,7 @@ export const ThirdPartyAppUpdateSchema = {
                 {
                     items: {
                         type: 'string',
-                        enum: ['events:read', 'events:write', 'rsvp:write', 'venues:write', 'applications:read', 'applications:write', 'attendees:read', 'attendees:write', 'humans:read', 'humans:write', 'groups:read', 'groups:write', 'products:read', 'products:write', 'coupons:read', 'coupons:write', 'forms:read', 'forms:write', 'payments:read', 'tracks:read', 'tracks:write', 'ticketing_steps:read', 'ticketing_steps:write', 'translations:read', 'translations:write']
+                        enum: ['events:read', 'events:write', 'rsvp:write', 'venues:read', 'venues:write', 'applications:read', 'applications:write', 'attendees:read', 'attendees:write', 'humans:read', 'humans:write', 'groups:read', 'groups:write', 'products:read', 'products:write', 'coupons:read', 'coupons:write', 'forms:read', 'forms:write', 'payments:read', 'tracks:read', 'tracks:write', 'ticketing_steps:read', 'ticketing_steps:write', 'translations:read', 'translations:write']
                     },
                     type: 'array'
                 },

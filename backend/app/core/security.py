@@ -23,6 +23,7 @@ HumanScope = Literal[
     "portal:self_read",
     "portal:directory_read",
     "portal:api_keys_manage",
+    "portal:rsvp_manage",
 ]
 
 # Admin API-key scope universe. Defined here (not in app.api.api_key.schemas)
@@ -32,6 +33,7 @@ ApiKeyScope = Literal[
     "events:read",
     "events:write",
     "rsvp:write",
+    "venues:read",
     "venues:write",
     "applications:read",
     "applications:write",
@@ -70,6 +72,7 @@ THIRD_PARTY_TOKEN_SCOPES_MAX: tuple[HumanScope, ...] = (
     "portal:self_read",
     "portal:directory_read",
     "portal:api_keys_manage",
+    "portal:rsvp_manage",
 )
 
 # Maximum scopes a human may request when minting an API key via the
@@ -78,6 +81,7 @@ THIRD_PARTY_TOKEN_SCOPES_MAX: tuple[HumanScope, ...] = (
 THIRD_PARTY_API_KEY_SCOPES_MAX: frozenset[str] = frozenset({
     "events:read",
     "rsvp:write",
+    "venues:read",
 })
 
 # Full admin scope universe. Explicitly EXCLUDES: email_templates, users,
@@ -86,6 +90,7 @@ ADMIN_API_KEY_SCOPES: frozenset[str] = frozenset({
     "events:read",
     "events:write",
     "rsvp:write",
+    "venues:read",
     "venues:write",
     "applications:read",
     "applications:write",
@@ -153,39 +158,51 @@ class TokenPayload(BaseModel):
     issued_by_app_id: uuid.UUID | None = None
 
 
-_PAT_ROUTE_POLICIES: dict[str, tuple[tuple[str, bool, ApiKeyScope], ...]] = {
+# Each entry: (route, exact_match, scopes_any_of). The api key must carry at
+# least one of `scopes_any_of` for the route to be accessible.
+_PAT_ROUTE_POLICIES: dict[
+    str, tuple[tuple[str, bool, tuple[ApiKeyScope, ...]], ...]
+] = {
     "GET": (
-        ("/api/v1/events/portal/events", False, "events:read"),
-        ("/api/v1/event-participants/portal/participants", False, "events:read"),
-        ("/api/v1/event-venues/portal/venues", False, "events:read"),
-        ("/api/v1/event-settings/portal/settings", False, "events:read"),
-        ("/api/v1/tracks/portal/tracks", False, "events:read"),
-        ("/api/v1/popups/portal/list", True, "events:read"),
-        ("/api/v1/popups/portal/", False, "events:read"),
+        ("/api/v1/events/portal/events", False, ("events:read",)),
+        ("/api/v1/event-participants/portal/participants", False, ("events:read",)),
+        ("/api/v1/event-venues/portal/venues", False, ("events:read", "venues:read")),
+        ("/api/v1/event-settings/portal/settings", False, ("events:read",)),
+        ("/api/v1/tracks/portal/tracks", False, ("events:read",)),
+        ("/api/v1/popups/portal/list", True, ("events:read",)),
+        ("/api/v1/popups/portal/", False, ("events:read",)),
     ),
     "POST": (
-        ("/api/v1/events/portal/events", True, "events:write"),
-        ("/api/v1/events/portal/events/", False, "events:write"),
-        ("/api/v1/event-venues/portal/venues", True, "venues:write"),
-        ("/api/v1/event-participants/portal/register/", False, "rsvp:write"),
-        ("/api/v1/event-participants/portal/cancel-registration/", False, "rsvp:write"),
+        ("/api/v1/events/portal/events", True, ("events:write",)),
+        ("/api/v1/events/portal/events/", False, ("events:write",)),
+        ("/api/v1/event-venues/portal/venues", True, ("venues:write",)),
+        ("/api/v1/event-participants/portal/register/", False, ("rsvp:write",)),
+        (
+            "/api/v1/event-participants/portal/cancel-registration/",
+            False,
+            ("rsvp:write",),
+        ),
     ),
     "PATCH": (
-        ("/api/v1/event-venues/portal/venues/", False, "venues:write"),
-        ("/api/v1/events/portal/events/", False, "events:write"),
+        ("/api/v1/event-venues/portal/venues/", False, ("venues:write",)),
+        ("/api/v1/events/portal/events/", False, ("events:write",)),
     ),
     "DELETE": (
-        ("/api/v1/event-venues/portal/venues/", False, "venues:write"),
-        ("/api/v1/events/portal/events/", False, "events:write"),
+        ("/api/v1/event-venues/portal/venues/", False, ("venues:write",)),
+        ("/api/v1/events/portal/events/", False, ("events:write",)),
     ),
 }
 
 
-def _required_scope_for_pat(method: str, path: str) -> ApiKeyScope | None:
+def _required_scopes_for_pat(
+    method: str, path: str
+) -> tuple[ApiKeyScope, ...] | None:
+    """Return the tuple of any-of scopes the route requires, or None if the
+    route is not in the PAT whitelist."""
     allowed_routes = _PAT_ROUTE_POLICIES.get(method, ())
-    for route, exact, scope in allowed_routes:
+    for route, exact, scopes in allowed_routes:
         if path == route if exact else path.startswith(route):
-            return scope
+            return scopes
     return None
 
 
@@ -201,9 +218,9 @@ def _enforce_api_key_policy(request: Request, payload: TokenPayload) -> None:
 
     path = request.url.path
     method = request.method.upper()
-    required_scope = _required_scope_for_pat(method, path)
+    required_scopes = _required_scopes_for_pat(method, path)
 
-    if required_scope is None:
+    if required_scopes is None:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=(
@@ -212,10 +229,10 @@ def _enforce_api_key_policy(request: Request, payload: TokenPayload) -> None:
             ),
         )
 
-    if required_scope not in payload.scopes:
+    if not any(s in payload.scopes for s in required_scopes):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"API key lacks required scope: {required_scope}",
+            detail=f"API key lacks required scope: {required_scopes[0]}",
         )
 
 

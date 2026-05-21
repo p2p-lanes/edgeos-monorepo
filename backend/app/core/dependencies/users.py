@@ -399,6 +399,12 @@ def require_human_scope(scope: HumanScope):
     def _guard(
         token_payload: Annotated[TokenPayload, Depends(get_token_payload)],
     ) -> None:
+        # API key callers are governed by _PAT_ROUTE_POLICIES in core.security
+        # which enforces a route-specific api-key-side scope (e.g. rsvp:write).
+        # Skipping the human-scope check here avoids requiring api keys to also
+        # carry a portal:* scope they cannot meaningfully hold.
+        if token_payload.via_api_key:
+            return
         if "portal:*" in token_payload.scopes:
             return
         if scope in token_payload.scopes:
@@ -713,3 +719,4 @@ RequireHumanScopePortalStar = Annotated[None, Depends(require_human_scope("porta
 RequireHumanScopeSelfRead = Annotated[None, Depends(require_human_scope("portal:self_read"))]
 RequireHumanScopeDirectoryRead = Annotated[None, Depends(require_human_scope("portal:directory_read"))]
 RequireHumanScopeApiKeysManage = Annotated[None, Depends(require_human_scope("portal:api_keys_manage"))]
+RequireHumanScopeRsvpManage = Annotated[None, Depends(require_human_scope("portal:rsvp_manage"))]

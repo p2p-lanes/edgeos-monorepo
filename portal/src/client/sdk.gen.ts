@@ -414,7 +414,7 @@ export class ApplicationsService {
     }
     
     /**
-     * List My Applications
+     * List your applications
      * List applications for the current human (Portal).
      * @param data The data for the request.
      * @param data.skip Number of items to skip
@@ -437,7 +437,7 @@ export class ApplicationsService {
     }
     
     /**
-     * List My Tickets
+     * List your tickets
      * List all tickets for the current human (Portal).
      *
      * Returns all attendee records linked to this human, including:
@@ -456,7 +456,7 @@ export class ApplicationsService {
     }
     
     /**
-     * Get My Participation
+     * Get your participation in a popup
      * Get participation status for the current human in a popup (Portal).
      *
      * Returns a discriminated union:
@@ -482,7 +482,7 @@ export class ApplicationsService {
     }
     
     /**
-     * Get My Purchases
+     * List your purchases for a popup
      * Get purchased products grouped by attendee for a popup (Portal).
      * @param data The data for the request.
      * @param data.popupId
@@ -503,7 +503,7 @@ export class ApplicationsService {
     }
     
     /**
-     * Get My Application
+     * Get your application for a popup
      * Get current human's application for a popup (Portal).
      * @param data The data for the request.
      * @param data.popupId
@@ -524,7 +524,7 @@ export class ApplicationsService {
     }
     
     /**
-     * Update My Application
+     * Update your application for a popup
      * Update current human's application (Portal).
      * @param data The data for the request.
      * @param data.popupId
@@ -548,7 +548,7 @@ export class ApplicationsService {
     }
     
     /**
-     * Detach Companion
+     * Detach yourself as a companion from another application
      * Remove the current human from being a companion on another applicant's
      * application for the given popup.
      *
@@ -578,7 +578,7 @@ export class ApplicationsService {
     }
     
     /**
-     * Create My Application
+     * Create your application
      * Create an application for the current human (Portal).
      * @param data The data for the request.
      * @param data.requestBody
@@ -598,7 +598,7 @@ export class ApplicationsService {
     }
     
     /**
-     * List Attendees Directory
+     * List the attendees directory for a popup
      * List attendees directory for a popup (Portal).
      *
      * Returns accepted applications with at least one product.
@@ -630,7 +630,7 @@ export class ApplicationsService {
     }
     
     /**
-     * Export Attendees Directory Csv
+     * Export the attendees directory for a popup as CSV
      * Export attendees directory as CSV (Portal).
      *
      * No pagination — fetches all matching entries.
@@ -657,7 +657,7 @@ export class ApplicationsService {
     }
     
     /**
-     * Add My Attendee
+     * Add an attendee to your application
      * Add an attendee to current human's application (Portal).
      * @param data The data for the request.
      * @param data.popupId
@@ -681,7 +681,7 @@ export class ApplicationsService {
     }
     
     /**
-     * Update My Attendee
+     * Update an attendee on your application
      * Update an attendee in current human's application (Portal).
      * @param data The data for the request.
      * @param data.popupId
@@ -707,7 +707,7 @@ export class ApplicationsService {
     }
     
     /**
-     * Delete My Attendee
+     * Remove an attendee from your application
      * Delete an attendee from current human's application (Portal).
      * @param data The data for the request.
      * @param data.popupId
@@ -2398,7 +2398,7 @@ export class EventParticipantsService {
     }
     
     /**
-     * Register For Event
+     * RSVP to an event
      * Register current human for an event (portal).
      * @param data The data for the request.
      * @param data.eventId
@@ -2422,7 +2422,7 @@ export class EventParticipantsService {
     }
     
     /**
-     * Cancel Registration
+     * Cancel your RSVP to an event
      * Cancel current human's registration (portal).
      *
      * Body is reused from RegisterRequest for the optional ``occurrence_start``
@@ -5646,7 +5646,7 @@ export class PortalService {
     }
     
     /**
-     * Get Popup Access
+     * Resolve your access for a popup
      * Resolve access for the authenticated Human to a specific popup.
      *
      * Runs the 7-step access ladder and returns a structured tristate response:
