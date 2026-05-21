@@ -297,6 +297,19 @@ function getColumns(hasInvoice: boolean): ColumnDef<PaymentPublic>[] {
       },
     },
     {
+      accessorKey: "contribution_amount",
+      header: "Contribution",
+      cell: ({ row }) => {
+        const val = row.original.contribution_amount
+        const num = Number(val)
+        return num > 0 ? (
+          <span className="font-mono">${val}</span>
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        )
+      },
+    },
+    {
       accessorKey: "coupon_code",
       header: "Coupon",
       cell: ({ row }) =>
@@ -396,8 +409,13 @@ function PaymentSubRow({ row }: { row: Row<PaymentPublic> }) {
     0,
   )
   const total = Number(payment.amount)
-  const discountAmount = subtotal - total
+  const insuranceAmount = Number(payment.insurance_amount ?? 0)
+  const contributionAmount = Number(payment.contribution_amount ?? 0)
+  const discountAmount = subtotal + insuranceAmount + contributionAmount - total
   const hasDiscount = discountAmount > 0.01
+  const hasInsurance = insuranceAmount > 0.01
+  const hasContribution = contributionAmount > 0.01
+  const hasBreakdown = hasDiscount || hasInsurance || hasContribution
 
   let discountLabel = "Discount"
   if (payment.coupon_code) {
@@ -460,33 +478,56 @@ function PaymentSubRow({ row }: { row: Row<PaymentPublic> }) {
           ))}
         </tbody>
         <tfoot className="text-sm">
-          {hasDiscount && (
-            <>
-              <tr className="border-t border-border/40">
-                <td
-                  colSpan={4}
-                  className="pt-2 text-right text-muted-foreground"
-                >
-                  Subtotal
-                </td>
-                <td className="pt-2 pl-4 text-right font-mono tabular-nums text-muted-foreground">
-                  ${subtotal.toFixed(2)}
-                </td>
-              </tr>
-              <tr>
-                <td
-                  colSpan={4}
-                  className="py-0.5 text-right text-muted-foreground"
-                >
-                  {discountLabel}
-                </td>
-                <td className="py-0.5 pl-4 text-right font-mono tabular-nums text-green-600">
-                  -${discountAmount.toFixed(2)}
-                </td>
-              </tr>
-            </>
+          {hasBreakdown && (
+            <tr className="border-t border-border/40">
+              <td colSpan={4} className="pt-2 text-right text-muted-foreground">
+                Subtotal
+              </td>
+              <td className="pt-2 pl-4 text-right font-mono tabular-nums text-muted-foreground">
+                ${subtotal.toFixed(2)}
+              </td>
+            </tr>
           )}
-          <tr className={hasDiscount ? "" : "border-t border-border/40"}>
+          {hasDiscount && (
+            <tr>
+              <td
+                colSpan={4}
+                className="py-0.5 text-right text-muted-foreground"
+              >
+                {discountLabel}
+              </td>
+              <td className="py-0.5 pl-4 text-right font-mono tabular-nums text-green-600">
+                -${discountAmount.toFixed(2)}
+              </td>
+            </tr>
+          )}
+          {hasInsurance && (
+            <tr>
+              <td
+                colSpan={4}
+                className="py-0.5 text-right text-muted-foreground"
+              >
+                Insurance
+              </td>
+              <td className="py-0.5 pl-4 text-right font-mono tabular-nums">
+                +${insuranceAmount.toFixed(2)}
+              </td>
+            </tr>
+          )}
+          {hasContribution && (
+            <tr>
+              <td
+                colSpan={4}
+                className="py-0.5 text-right text-muted-foreground"
+              >
+                Contribution
+              </td>
+              <td className="py-0.5 pl-4 text-right font-mono tabular-nums">
+                +${contributionAmount.toFixed(2)}
+              </td>
+            </tr>
+          )}
+          <tr className={hasBreakdown ? "" : "border-t border-border/40"}>
             <td colSpan={4} className="pt-1.5 text-right font-semibold">
               Total
             </td>
@@ -548,6 +589,7 @@ function PaymentsTableContent() {
       hiddenOnMobile={[
         "source",
         "insurance_amount",
+        "contribution_amount",
         "coupon_code",
         "created_at",
         "products",
@@ -611,6 +653,7 @@ function Payments() {
         { key: "status", label: "Status" },
         { key: "source", label: "Source" },
         { key: "insurance_amount", label: "Insurance" },
+        { key: "contribution_amount", label: "Contribution" },
         { key: "coupon_code", label: "Coupon" },
         { key: "created_at", label: "Date", type: "date" },
       ])
