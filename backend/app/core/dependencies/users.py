@@ -390,6 +390,10 @@ def require_human_scope(scope: HumanScope):
 
     Raises HTTP 403 otherwise. Does NOT re-check JWT authenticity — additive on
     top of ``get_current_human``.
+
+    The returned callable carries a ``scope`` attribute so the registry walker
+    in ``app.api.access.introspection`` can introspect which scope each
+    dependency enforces without inspecting closure cells.
     """
 
     def _guard(
@@ -407,6 +411,8 @@ def require_human_scope(scope: HumanScope):
             ),
         )
 
+    # Attach scope for introspection by register_scope_routes.
+    _guard.scope = scope  # type: ignore[attr-defined]
     return _guard
 
 
