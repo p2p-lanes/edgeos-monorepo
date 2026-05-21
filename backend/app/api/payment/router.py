@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Annotated, Literal
 from fastapi import APIRouter, HTTPException, Query, Request, Response, status
 from sqlmodel import Session
 
+from app.api.access.introspection import scope_route
 from app.api.payment.crud import payments_crud
 from app.api.payment.models import Payments
 from app.api.payment.schemas import (
@@ -495,7 +496,9 @@ async def update_payment(
     "/my/application-fee",
     response_model=PaymentPublic,
     status_code=status.HTTP_201_CREATED,
+    summary="Create application fee payment",
 )
+@scope_route("portal:self_read")
 async def create_my_application_fee(
     fee_in: ApplicationFeeCreate,
     db: HumanTenantSession,
@@ -521,7 +524,8 @@ async def create_my_application_fee(
     return PaymentPublic.model_validate(payment)
 
 
-@router.get("/my/popup/{popup_id}", response_model=ListModel[PaymentPublic])
+@router.get("/my/popup/{popup_id}", response_model=ListModel[PaymentPublic], summary="List your payments for a popup")
+@scope_route("portal:self_read")
 async def list_my_payments_by_popup(
     popup_id: uuid.UUID,
     db: HumanTenantSession,

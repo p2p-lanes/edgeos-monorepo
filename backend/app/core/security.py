@@ -63,18 +63,19 @@ AnyScope = HumanScope | ApiKeyScope
 # Scope universe constants
 # ---------------------------------------------------------------------------
 
-# Scopes embedded in a JWT issued by the third-party OTP flow. These are
-# HumanScope values — the third-party user gets portal access, not admin access.
-THIRD_PARTY_TOKEN_SCOPES: tuple[HumanScope, ...] = (
+# Maximum scopes embeddable in a JWT issued by the third-party OTP flow.
+# These are HumanScope values — the third-party user gets portal access,
+# not admin access. Per-app subsets are drawn from this ceiling.
+THIRD_PARTY_TOKEN_SCOPES_MAX: tuple[HumanScope, ...] = (
     "portal:self_read",
     "portal:directory_read",
     "portal:api_keys_manage",
 )
 
-# Scopes that a human may request when minting an API key via the third-party
-# OTP surface. Intentionally narrow — external partners get event-read and
-# rsvp-write only.
-THIRD_PARTY_API_KEY_SCOPES: frozenset[str] = frozenset({
+# Maximum scopes a human may request when minting an API key via the
+# third-party OTP surface. Per-app subsets are drawn from this ceiling.
+# Intentionally narrow — external partners get event-read and rsvp-write only.
+THIRD_PARTY_API_KEY_SCOPES_MAX: frozenset[str] = frozenset({
     "events:read",
     "rsvp:write",
 })
@@ -142,6 +143,14 @@ class TokenPayload(BaseModel):
     # get_admin_or_api_key_tenant_session resolve tenant without going through
     # CurrentUser. NOT serialised into any JWT.
     api_key_tenant_id: uuid.UUID | None = None
+    # Identifies which ThirdPartyApps row minted this JWT. Drives per-app scope
+    # enforcement at api-key minting and self-discovery.
+    # None for portal JWTs and for legacy v1 third-party JWTs in flight at
+    # deploy time.
+    # Grace-period contract: if issued_via=="third_party" AND issued_by_app_id
+    # is None, the JWT is a legacy v1 token and its embedded scopes are
+    # authoritative.
+    issued_by_app_id: uuid.UUID | None = None
 
 
 _PAT_ROUTE_POLICIES: dict[str, tuple[tuple[str, bool, ApiKeyScope], ...]] = {
@@ -218,6 +227,7 @@ def create_access_token(
     issued_via: Literal["portal", "third_party"] = "portal",
     via_api_key: bool = False,
     api_key_id: str | None = None,
+    issued_by_app_id: uuid.UUID | None = None,
 ) -> str:
     """Mint a signed JWT.
 
@@ -225,6 +235,10 @@ def create_access_token(
     values to keep legacy token payloads minimal. The exception: when
     ``issued_via="third_party"``, ``scopes`` is always encoded because it is
     the defining property of a third-party token.
+
+    ``issued_by_app_id``: when set, encoded as a string UUID in the payload.
+    Identifies the ThirdPartyApps row that authorized this JWT issuance.
+    Omitted for portal JWTs and for legacy v1 third-party JWTs.
     """
     if expires_delta:
         expire = datetime.now(UTC) + expires_delta
@@ -250,6 +264,8 @@ def create_access_token(
         to_encode["via_api_key"] = True
     if api_key_id is not None:
         to_encode["api_key_id"] = api_key_id
+    if issued_by_app_id is not None:
+        to_encode["issued_by_app_id"] = str(issued_by_app_id)
 
     return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=ALGORITHM)
 
@@ -275,6 +291,10 @@ def decode_access_token(token: str) -> TokenPayload:
         issued_via: str = payload.get("issued_via", "portal")
         via_api_key: bool = payload.get("via_api_key", False)
         api_key_id: str | None = payload.get("api_key_id")
+        raw_app_id: str | None = payload.get("issued_by_app_id")
+        issued_by_app_id: uuid.UUID | None = (
+            uuid.UUID(raw_app_id) if raw_app_id else None
+        )
 
         # Grace-period synthesis for human tokens with absent/empty scopes.
         if token_type == "human" and not raw_scopes and issued_via == "portal":
@@ -288,6 +308,7 @@ def decode_access_token(token: str) -> TokenPayload:
             scopes=raw_scopes,  # type: ignore[arg-type]
             via_api_key=via_api_key,
             api_key_id=api_key_id,
+            issued_by_app_id=issued_by_app_id,
         )
     except jwt.ExpiredSignatureError:
         raise HTTPException(

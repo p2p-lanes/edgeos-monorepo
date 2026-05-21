@@ -2988,6 +2988,32 @@ export const AuthCodeSentResponseSchema = {
     description: 'Response after successfully sending auth code.'
 } as const;
 
+export const AvailableScopesSchema = {
+    properties: {
+        token_scopes: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Token Scopes'
+        },
+        api_key_scopes: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Api Key Scopes'
+        }
+    },
+    type: 'object',
+    required: ['token_scopes', 'api_key_scopes'],
+    title: 'AvailableScopes',
+    description: `Static response for GET /third-party-apps/available-scopes.
+
+Returns the platform MAX constants so the frontend create modal can
+populate its multi-select options without hardcoding scope strings.`
+} as const;
+
 export const BaseFieldConfigPublicSchema = {
     properties: {
         id: {
@@ -9760,6 +9786,24 @@ export const ListModel_TenantPublic_Schema = {
     title: 'ListModel[TenantPublic]'
 } as const;
 
+export const ListModel_ThirdPartyAppPublic_Schema = {
+    properties: {
+        results: {
+            items: {
+                '$ref': '#/components/schemas/ThirdPartyAppPublic'
+            },
+            type: 'array',
+            title: 'Results'
+        },
+        paging: {
+            '$ref': '#/components/schemas/Paging'
+        }
+    },
+    type: 'object',
+    required: ['results', 'paging'],
+    title: 'ListModel[ThirdPartyAppPublic]'
+} as const;
+
 export const ListModel_TicketingStepPublic_Schema = {
     properties: {
         results: {
@@ -9812,6 +9856,33 @@ export const ListModel_UserPublic_Schema = {
     type: 'object',
     required: ['results', 'paging'],
     title: 'ListModel[UserPublic]'
+} as const;
+
+export const MeAccessSchema = {
+    properties: {
+        app_name: {
+            type: 'string',
+            title: 'App Name'
+        },
+        scopes: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Scopes'
+        },
+        api_key_scopes: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Api Key Scopes'
+        }
+    },
+    type: 'object',
+    required: ['app_name', 'scopes', 'api_key_scopes'],
+    title: 'MeAccess',
+    description: 'Response shape for GET /me/access.'
 } as const;
 
 export const NoParticipationSchema = {
@@ -14680,17 +14751,6 @@ export const TenantPublicSchema = {
                 }
             ],
             title: 'Active Popup Slug'
-        },
-        third_party_key_prefix: {
-            anyOf: [
-                {
-                    type: 'string'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Third Party Key Prefix'
         }
     },
     type: 'object',
@@ -14804,6 +14864,257 @@ export const TenantUpdateSchema = {
     title: 'TenantUpdate'
 } as const;
 
+export const ThirdPartyAppCreateSchema = {
+    properties: {
+        name: {
+            type: 'string',
+            maxLength: 100,
+            minLength: 1,
+            title: 'Name'
+        },
+        allowed_token_scopes: {
+            items: {
+                type: 'string',
+                enum: ['portal:*', 'portal:self_read', 'portal:directory_read', 'portal:api_keys_manage']
+            },
+            type: 'array',
+            title: 'Allowed Token Scopes'
+        },
+        allowed_api_key_scopes: {
+            items: {
+                type: 'string',
+                enum: ['events:read', 'events:write', 'rsvp:write', 'venues:write', 'applications:read', 'applications:write', 'attendees:read', 'attendees:write', 'humans:read', 'humans:write', 'groups:read', 'groups:write', 'products:read', 'products:write', 'coupons:read', 'coupons:write', 'forms:read', 'forms:write', 'payments:read', 'tracks:read', 'tracks:write', 'ticketing_steps:read', 'ticketing_steps:write', 'translations:read', 'translations:write']
+            },
+            type: 'array',
+            title: 'Allowed Api Key Scopes'
+        }
+    },
+    type: 'object',
+    required: ['name'],
+    title: 'ThirdPartyAppCreate',
+    description: 'Request body for creating a third-party app.'
+} as const;
+
+export const ThirdPartyAppCreatedSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        tenant_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Tenant Id'
+        },
+        name: {
+            type: 'string',
+            title: 'Name'
+        },
+        prefix: {
+            type: 'string',
+            title: 'Prefix'
+        },
+        allowed_token_scopes: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Allowed Token Scopes'
+        },
+        allowed_api_key_scopes: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Allowed Api Key Scopes'
+        },
+        active: {
+            type: 'boolean',
+            title: 'Active'
+        },
+        last_used_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Last Used At'
+        },
+        revoked_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Revoked At'
+        },
+        created_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Created At'
+        },
+        updated_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Updated At'
+        },
+        raw_key: {
+            type: 'string',
+            title: 'Raw Key'
+        }
+    },
+    type: 'object',
+    required: ['id', 'tenant_id', 'name', 'prefix', 'allowed_token_scopes', 'allowed_api_key_scopes', 'active', 'last_used_at', 'revoked_at', 'created_at', 'updated_at', 'raw_key'],
+    title: 'ThirdPartyAppCreated',
+    description: `Response returned ONCE at app creation (and at key rotation).
+
+\`\`raw_key\`\` is the cleartext token; never stored, shown once only.`
+} as const;
+
+export const ThirdPartyAppPublicSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        tenant_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Tenant Id'
+        },
+        name: {
+            type: 'string',
+            title: 'Name'
+        },
+        prefix: {
+            type: 'string',
+            title: 'Prefix'
+        },
+        allowed_token_scopes: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Allowed Token Scopes'
+        },
+        allowed_api_key_scopes: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Allowed Api Key Scopes'
+        },
+        active: {
+            type: 'boolean',
+            title: 'Active'
+        },
+        last_used_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Last Used At'
+        },
+        revoked_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Revoked At'
+        },
+        created_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Created At'
+        },
+        updated_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Updated At'
+        }
+    },
+    type: 'object',
+    required: ['id', 'tenant_id', 'name', 'prefix', 'allowed_token_scopes', 'allowed_api_key_scopes', 'active', 'last_used_at', 'revoked_at', 'created_at', 'updated_at'],
+    title: 'ThirdPartyAppPublic',
+    description: `Safe public representation of a ThirdPartyApps row.
+
+NEVER includes key_hash or any raw key material.`
+} as const;
+
+export const ThirdPartyAppUpdateSchema = {
+    properties: {
+        name: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 100,
+                    minLength: 1
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Name'
+        },
+        allowed_token_scopes: {
+            anyOf: [
+                {
+                    items: {
+                        type: 'string',
+                        enum: ['portal:*', 'portal:self_read', 'portal:directory_read', 'portal:api_keys_manage']
+                    },
+                    type: 'array'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Allowed Token Scopes'
+        },
+        allowed_api_key_scopes: {
+            anyOf: [
+                {
+                    items: {
+                        type: 'string',
+                        enum: ['events:read', 'events:write', 'rsvp:write', 'venues:write', 'applications:read', 'applications:write', 'attendees:read', 'attendees:write', 'humans:read', 'humans:write', 'groups:read', 'groups:write', 'products:read', 'products:write', 'coupons:read', 'coupons:write', 'forms:read', 'forms:write', 'payments:read', 'tracks:read', 'tracks:write', 'ticketing_steps:read', 'ticketing_steps:write', 'translations:read', 'translations:write']
+                    },
+                    type: 'array'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Allowed Api Key Scopes'
+        }
+    },
+    type: 'object',
+    title: 'ThirdPartyAppUpdate',
+    description: `Request body for PATCH /third-party-apps/{id}.
+
+All fields are optional. Scope validators only fire when the field is
+provided (not-None).`
+} as const;
+
 export const ThirdPartyHumanLoginSchema = {
     properties: {
         email: {
@@ -14843,23 +15154,6 @@ export const ThirdPartyHumanVerifySchema = {
 
 The API key comes from the X-Third-Party-Api-Key header; the tenant is
 resolved server-side from the key.`
-} as const;
-
-export const ThirdPartyKeyRotatedSchema = {
-    properties: {
-        api_key: {
-            type: 'string',
-            title: 'Api Key'
-        },
-        prefix: {
-            type: 'string',
-            title: 'Prefix'
-        }
-    },
-    type: 'object',
-    required: ['api_key', 'prefix'],
-    title: 'ThirdPartyKeyRotated',
-    description: 'Returned by the rotate endpoint. The raw api_key is shown ONCE and never stored.'
 } as const;
 
 export const TicketAttendeeSnapshotSchema = {

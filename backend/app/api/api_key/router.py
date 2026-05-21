@@ -3,6 +3,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
+from app.api.access.introspection import scope_route
 from app.api.api_key import crud
 from app.api.api_key.schemas import ApiKeyCreate, ApiKeyCreated, ApiKeyPublic
 from app.core.dependencies.users import (
@@ -11,7 +12,7 @@ from app.core.dependencies.users import (
     RequireHumanScopeApiKeysManage,
 )
 from app.core.security import (
-    THIRD_PARTY_API_KEY_SCOPES,
+    THIRD_PARTY_API_KEY_SCOPES_MAX,
     TokenPayload,
     get_token_payload,
 )
@@ -50,7 +51,8 @@ def _require_human_can_manage_api_keys(current_human: CurrentHuman) -> None:
 HumanCanManageApiKeys = Annotated[None, Depends(_require_human_can_manage_api_keys)]
 
 
-@router.get("", response_model=list[ApiKeyPublic])
+@router.get("", response_model=list[ApiKeyPublic], summary="List your API keys")
+@scope_route("portal:api_keys_manage")
 async def list_api_keys(
     db: HumanTenantSession,
     current_human: CurrentHuman,
@@ -62,7 +64,8 @@ async def list_api_keys(
     return [ApiKeyPublic.model_validate(r) for r in rows]
 
 
-@router.post("", response_model=ApiKeyCreated, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=ApiKeyCreated, status_code=status.HTTP_201_CREATED, summary="Create an API key")
+@scope_route("portal:api_keys_manage")
 async def create_api_key(
     payload: ApiKeyCreate,
     db: HumanTenantSession,
@@ -72,9 +75,25 @@ async def create_api_key(
     __: HumanCanManageApiKeys,
     ___: RequireHumanScopeApiKeysManage,
 ) -> ApiKeyCreated:
-    # REQ-AK-04: third-party JWTs may only mint keys within THIRD_PARTY_API_KEY_SCOPES.
+    # REQ-4.1 / REQ-5.1: third-party JWT scope enforcement.
     if getattr(token_payload, "issued_via", "portal") == "third_party":
-        invalid = set(payload.scopes) - THIRD_PARTY_API_KEY_SCOPES
+        if token_payload.issued_by_app_id is not None:
+            # v2 path: per-app ceiling — check app.allowed_api_key_scopes.
+            from app.api.third_party_app.crud import get_for_authorization
+
+            app = get_for_authorization(db, token_payload.issued_by_app_id)
+            if app is None:
+                # App was deleted/revoked between JWT mint and now.
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Third-party app no longer authorized.",
+                )
+            allowed = set(app.allowed_api_key_scopes)
+        else:
+            # LEGACY-V1-FALLBACK — remove >=30d after deploy.
+            allowed = set(THIRD_PARTY_API_KEY_SCOPES_MAX)
+
+        invalid = set(payload.scopes) - allowed
         if invalid:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -92,7 +111,8 @@ async def create_api_key(
     return ApiKeyCreated.model_validate({**row.model_dump(), "key": raw})
 
 
-@router.delete("/{key_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{key_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Revoke an API key")
+@scope_route("portal:api_keys_manage")
 async def revoke_api_key(
     key_id: uuid.UUID,
     db: HumanTenantSession,

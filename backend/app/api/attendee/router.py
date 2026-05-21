@@ -3,6 +3,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Query, status
 
+from app.api.access.introspection import scope_route
 from app.api.attendee import crud
 from app.api.attendee.schemas import (
     AttendeeCreate,
@@ -138,7 +139,9 @@ def _build_attendee_with_origin(
     "/my/popup/{popup_id}",
     response_model=ListModel[AttendeeWithOriginPublic],
     tags=["portal"],
+    summary="List your attendees for a popup",
 )
+@scope_route("portal:directory_read")
 async def list_my_attendees_by_popup(
     popup_id: uuid.UUID,
     db: HumanTenantSession,
@@ -171,7 +174,9 @@ async def list_my_attendees_by_popup(
     "/my/popup/{popup_id}",
     response_model=AttendeeWithOriginPublic,
     tags=["portal"],
+    summary="Create a companion attendee",
 )
+@scope_route("portal:self_read")
 async def create_my_attendee_for_popup(
     popup_id: uuid.UUID,
     attendee_in: AttendeeCreate,
@@ -294,7 +299,9 @@ async def create_my_attendee_for_popup(
     "/my/popup/{popup_id}/{attendee_id}",
     response_model=AttendeeWithOriginPublic,
     tags=["portal"],
+    summary="Update your attendee",
 )
+@scope_route("portal:self_read")
 async def update_my_attendee_for_popup(
     popup_id: uuid.UUID,
     attendee_id: uuid.UUID,
@@ -350,7 +357,9 @@ async def update_my_attendee_for_popup(
 @router.delete(
     "/my/popup/{popup_id}/{attendee_id}",
     tags=["portal"],
+    summary="Delete your attendee",
 )
+@scope_route("portal:self_read")
 async def delete_my_attendee_for_popup(
     popup_id: uuid.UUID,
     attendee_id: uuid.UUID,

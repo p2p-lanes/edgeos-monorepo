@@ -23,8 +23,8 @@ from app.core.config import settings
 from app.core.security import (
     ADMIN_API_KEY_SCOPES,
     ALGORITHM,
-    THIRD_PARTY_API_KEY_SCOPES,
-    THIRD_PARTY_TOKEN_SCOPES,
+    THIRD_PARTY_API_KEY_SCOPES_MAX,
+    THIRD_PARTY_TOKEN_SCOPES_MAX,
     ApiKeyScope,
     HumanScope,
     create_access_token,
@@ -82,13 +82,13 @@ class TestCreateDecodeRoundtrip:
         token = create_access_token(
             subject=uuid.uuid4(),
             token_type="human",
-            scopes=list(THIRD_PARTY_TOKEN_SCOPES),
+            scopes=list(THIRD_PARTY_TOKEN_SCOPES_MAX),
             issued_via="third_party",
         )
         payload = decode_access_token(token)
 
         assert payload.issued_via == "third_party"
-        assert set(payload.scopes) == set(THIRD_PARTY_TOKEN_SCOPES)
+        assert set(payload.scopes) == set(THIRD_PARTY_TOKEN_SCOPES_MAX)
 
     def test_create_decode_roundtrip_default_no_scopes(self) -> None:
         """Token created without scopes decodes to empty list (not portal:*)."""
@@ -161,7 +161,7 @@ class TestScopeUniverses:
     def test_third_party_token_scopes_disjoint_from_api_key_universe(
         self,
     ) -> None:
-        """THIRD_PARTY_TOKEN_SCOPES (HumanScope) must not overlap ApiKeyScope."""
+        """THIRD_PARTY_TOKEN_SCOPES_MAX (HumanScope) must not overlap ApiKeyScope."""
         human_scopes = set(get_args(HumanScope))
         api_key_scopes = set(get_args(ApiKeyScope))
         overlap = human_scopes & api_key_scopes
@@ -176,11 +176,11 @@ class TestScopeUniverses:
                 )
 
     def test_third_party_api_key_scopes_is_subset_of_admin_scopes(self) -> None:
-        """THIRD_PARTY_API_KEY_SCOPES is a proper subset of ADMIN_API_KEY_SCOPES."""
-        assert THIRD_PARTY_API_KEY_SCOPES.issubset(ADMIN_API_KEY_SCOPES)
+        """THIRD_PARTY_API_KEY_SCOPES_MAX is a proper subset of ADMIN_API_KEY_SCOPES."""
+        assert THIRD_PARTY_API_KEY_SCOPES_MAX.issubset(ADMIN_API_KEY_SCOPES)
 
     def test_third_party_token_scopes_all_in_human_scope_literal(self) -> None:
-        """Every value in THIRD_PARTY_TOKEN_SCOPES must be a valid HumanScope."""
+        """Every value in THIRD_PARTY_TOKEN_SCOPES_MAX must be a valid HumanScope."""
         human_scope_values = set(get_args(HumanScope))
-        for scope in THIRD_PARTY_TOKEN_SCOPES:
+        for scope in THIRD_PARTY_TOKEN_SCOPES_MAX:
             assert scope in human_scope_values, f"'{scope}' not in HumanScope"

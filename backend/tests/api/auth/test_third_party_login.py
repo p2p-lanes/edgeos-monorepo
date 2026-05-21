@@ -19,7 +19,7 @@ from sqlmodel import Session, select
 
 from app.api.human.models import Humans
 from app.api.tenant.models import Tenants
-from app.core.security import THIRD_PARTY_TOKEN_SCOPES, decode_access_token
+from app.core.security import THIRD_PARTY_TOKEN_SCOPES_MAX, decode_access_token
 
 LOGIN_URL = "/api/v1/auth/human/third-party/login"
 AUTH_URL = "/api/v1/auth/human/third-party/authenticate"
@@ -69,11 +69,11 @@ class TestThirdPartyLoginKeyValidation:
     def test_wrong_api_key_returns_401(
         self,
         client: TestClient,
-        third_party_enabled_tenant: tuple[Tenants, str],
+        third_party_enabled_tenant,
         db: Session,
     ) -> None:
         """A key that doesn't match any tenant's stored hash → 401."""
-        tenant, _raw = third_party_enabled_tenant
+        tenant, _app, _raw = third_party_enabled_tenant
         email = f"key-mismatch-{uuid.uuid4().hex[:6]}@example.com"
         _make_human(db, tenant=tenant, email=email)
 
@@ -92,9 +92,8 @@ class TestThirdPartyLoginKeyValidation:
         """An arbitrary key that no tenant has registered → 401 (collapses with the
         wrong-key branch — callers cannot distinguish disabled vs unknown).
         """
-        # tenant_b has no third_party_api_key_hash set; the key below doesn't
+        # tenant_b has no third_party_apps rows; the key below doesn't
         # match any row either way.
-        assert tenant_b.third_party_api_key_hash is None
         resp = client.post(
             LOGIN_URL,
             headers=_login_headers("any_key"),
@@ -113,10 +112,10 @@ class TestThirdPartyLoginExistingHumanOnly:
         self,
         client: TestClient,
         db: Session,
-        third_party_enabled_tenant: tuple[Tenants, str],
+        third_party_enabled_tenant,
     ) -> None:
         """Unknown email → generic error (401 or 404). No new human row created."""
-        tenant, raw_key = third_party_enabled_tenant
+        tenant, _app, raw_key = third_party_enabled_tenant
         email = f"tp-ghost-{uuid.uuid4().hex[:8]}@example.com"
 
         before_count = len(
@@ -158,10 +157,10 @@ class TestThirdPartyLoginHappyPath:
         self,
         client: TestClient,
         db: Session,
-        third_party_enabled_tenant: tuple[Tenants, str],
+        third_party_enabled_tenant,
     ) -> None:
         """Valid key + existing human → mail sent, 200 response."""
-        tenant, raw_key = third_party_enabled_tenant
+        tenant, _app, raw_key = third_party_enabled_tenant
         email = f"tp-login-ok-{uuid.uuid4().hex[:8]}@example.com"
         _make_human(db, tenant=tenant, email=email)
 
@@ -198,12 +197,12 @@ class TestThirdPartyAuthenticate:
         self,
         client: TestClient,
         db: Session,
-        third_party_enabled_tenant: tuple[Tenants, str],
+        third_party_enabled_tenant,
     ) -> None:
         """Valid OTP verify → JWT where issued_via=third_party, scopes=THIRD_PARTY_TOKEN_SCOPES."""
         from unittest.mock import patch
 
-        tenant, raw_key = third_party_enabled_tenant
+        tenant, _app, raw_key = third_party_enabled_tenant
         email = f"tp-auth-ok-{uuid.uuid4().hex[:8]}@example.com"
         _make_human(db, tenant=tenant, email=email)
 
@@ -236,20 +235,20 @@ class TestThirdPartyAuthenticate:
 
         payload = decode_access_token(token_data["access_token"])
         assert payload.issued_via == "third_party"
-        assert set(payload.scopes) == set(THIRD_PARTY_TOKEN_SCOPES)
+        assert set(payload.scopes) == set(THIRD_PARTY_TOKEN_SCOPES_MAX)
 
     def test_wrong_code_returns_error(
         self,
         client: TestClient,
         db: Session,
-        third_party_enabled_tenant: tuple[Tenants, str],
+        third_party_enabled_tenant,
     ) -> None:
         """Correct key, correct email, wrong OTP → non-200."""
         from unittest.mock import patch
 
         from app.services.email import EmailService
 
-        tenant, raw_key = third_party_enabled_tenant
+        tenant, _app, raw_key = third_party_enabled_tenant
         email = f"tp-wrong-code-{uuid.uuid4().hex[:8]}@example.com"
         _make_human(db, tenant=tenant, email=email)
 
@@ -275,10 +274,10 @@ class TestThirdPartyAuthenticate:
         self,
         client: TestClient,
         db: Session,
-        third_party_enabled_tenant: tuple[Tenants, str],
+        third_party_enabled_tenant,
     ) -> None:
         """Authenticate with wrong key → 401 even if code would be valid."""
-        tenant, _raw = third_party_enabled_tenant
+        tenant, _app, _raw = third_party_enabled_tenant
         email = f"tp-auth-badkey-{uuid.uuid4().hex[:8]}@example.com"
         _make_human(db, tenant=tenant, email=email)
 
@@ -300,11 +299,11 @@ class TestThirdPartyJwtAccess:
         self,
         client: TestClient,
         db: Session,
-        third_party_enabled_tenant: tuple[Tenants, str],
+        third_party_enabled_tenant,
         third_party_jwt_factory,
     ) -> None:
         """A JWT minted via third-party path can call GET /humans/me."""
-        tenant, _raw = third_party_enabled_tenant
+        tenant, _app, _raw = third_party_enabled_tenant
         email = f"tp-me-{uuid.uuid4().hex[:8]}@example.com"
         human = _make_human(db, tenant=tenant, email=email)
 
@@ -328,7 +327,7 @@ class TestCrossFlowOtpIsolation:
         self,
         client: TestClient,
         db: Session,
-        third_party_enabled_tenant: tuple[Tenants, str],
+        third_party_enabled_tenant,
     ) -> None:
         """An OTP emitted via third-party login must be rejected by the
         regular portal /auth/human/authenticate endpoint."""
@@ -336,7 +335,7 @@ class TestCrossFlowOtpIsolation:
 
         from app.services.email import EmailService
 
-        tenant, raw_key = third_party_enabled_tenant
+        tenant, _app, raw_key = third_party_enabled_tenant
         email = f"tp-isolate-{uuid.uuid4().hex[:8]}@example.com"
         _make_human(db, tenant=tenant, email=email)
 

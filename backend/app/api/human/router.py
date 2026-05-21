@@ -3,6 +3,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Header, HTTPException, status
 
+from app.api.access.introspection import scope_route
 from app.api.api_key import crud as api_key_crud
 from app.api.api_key.schemas import ApiKeyPublic
 from app.api.human import crud
@@ -113,7 +114,8 @@ async def create_human(
     return HumanPublic.model_validate(human)
 
 
-@router.get("/me", response_model=HumanPublic)
+@router.get("/me", response_model=HumanPublic, summary="Get your profile")
+@scope_route("portal:self_read")
 async def get_current_human_info(
     current_user: CurrentHuman,
     _scope: RequireHumanScopeSelfRead,
@@ -121,7 +123,8 @@ async def get_current_human_info(
     return HumanPublic.model_validate(current_user)
 
 
-@router.get("/me/profile-stats", response_model=HumanProfileStats)
+@router.get("/me/profile-stats", response_model=HumanProfileStats, summary="Get your profile stats")
+@scope_route("portal:self_read")
 async def get_current_human_profile_stats(
     current_human: CurrentHuman,
     db: HumanTenantSession,
@@ -131,7 +134,8 @@ async def get_current_human_profile_stats(
     return crud.get_profile_stats(db, current_human.id)
 
 
-@router.patch("/me", response_model=HumanPublic)
+@router.patch("/me", response_model=HumanPublic, summary="Update your profile")
+@scope_route("portal:self_read")
 async def update_current_human(
     human_in: HumanProfileUpdate,
     current_human: CurrentHuman,
@@ -151,7 +155,8 @@ async def update_current_human(
     return HumanPublic.model_validate(updated)
 
 
-@router.get("/portal/search", response_model=ListModel[HumanPortalPublic])
+@router.get("/portal/search", response_model=ListModel[HumanPortalPublic], summary="Search participants directory")
+@scope_route("portal:directory_read")
 async def search_humans_portal(
     db: HumanTenantSession,
     _: CurrentHuman,
