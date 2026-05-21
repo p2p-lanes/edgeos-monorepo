@@ -18,7 +18,7 @@ from app.api.tenant.models import Tenants
 from app.api.third_party_app.models import ThirdPartyApps
 from app.core.security import create_access_token
 
-BASE_URL = "/api/v1/me/access/docs"
+BASE_URL = "/api/v1/third-party-apps/docs"
 
 
 def _bearer(token: str) -> dict[str, str]:

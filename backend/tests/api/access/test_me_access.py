@@ -18,7 +18,7 @@ from app.api.tenant.models import Tenants
 from app.api.third_party_app.models import ThirdPartyApps
 from app.core.security import create_access_token
 
-BASE_URL = "/api/v1/me/access"
+BASE_URL = "/api/v1/third-party-apps/whoami"
 
 
 def _bearer(token: str) -> dict[str, str]:
@@ -216,4 +216,39 @@ class TestMeAccessApiKeyDiscovery:
             BASE_URL,
             headers={"X-Third-Party-Api-Key": "definitely-not-a-real-key"},
         )
+        assert resp.status_code == 401, resp.text
+
+
+class TestThirdPartyOpenAPI:
+    """GET /third-party-apps/openapi.json — filtered OpenAPI 3.x spec."""
+
+    OPENAPI_URL = "/api/v1/third-party-apps/openapi.json"
+
+    def test_api_key_returns_filtered_spec(
+        self,
+        client: TestClient,
+        access_app: tuple[ThirdPartyApps, str],
+    ) -> None:
+        """Caller with only the api key gets a curated OpenAPI doc."""
+        _app, raw_key = access_app
+        resp = client.get(
+            self.OPENAPI_URL,
+            headers={"X-Third-Party-Api-Key": raw_key},
+        )
+        assert resp.status_code == 200, resp.text
+        spec = resp.json()
+        assert "openapi" in spec
+        assert "paths" in spec
+        # Always-allowed surface present
+        assert "/api/v1/auth/human/third-party/login" in spec["paths"]
+        assert "/api/v1/third-party-apps/whoami" in spec["paths"]
+        # Admin-only routes are filtered out
+        assert "/api/v1/third-party-apps" not in spec["paths"]  # bare POST admin
+        assert "/api/v1/admin-api-keys" not in spec["paths"]
+        # Info banner mentions third-party
+        assert "third-party" in spec["info"]["title"].lower()
+
+    def test_unauthenticated_rejected(self, client: TestClient) -> None:
+        """No auth = 401."""
+        resp = client.get(self.OPENAPI_URL)
         assert resp.status_code == 401, resp.text

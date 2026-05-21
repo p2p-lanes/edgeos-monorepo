@@ -4956,14 +4956,6 @@ export type HumansListHumanApiKeysData = {
 
 export type HumansListHumanApiKeysResponse = (Array<ApiKeyPublic>);
 
-export type MeAccessGetMeAccessResponse = (MeAccess);
-
-export type MeAccessGetMeAccessDocsData = {
-    format?: 'json' | 'markdown';
-};
-
-export type MeAccessGetMeAccessDocsResponse = (unknown);
-
 export type PaymentsListPaymentsData = {
     applicationId?: (string | null);
     externalId?: (string | null);
@@ -5369,6 +5361,27 @@ export type ThirdPartyAppsRotateThirdPartyAppData = {
 };
 
 export type ThirdPartyAppsRotateThirdPartyAppResponse = (ThirdPartyAppCreated);
+
+export type ThirdPartyDiscoveryGetThirdPartyWhoamiData = {
+    xThirdPartyApiKey?: (string | null);
+};
+
+export type ThirdPartyDiscoveryGetThirdPartyWhoamiResponse = (MeAccess);
+
+export type ThirdPartyDiscoveryGetThirdPartyDocsData = {
+    format?: 'json' | 'markdown';
+    xThirdPartyApiKey?: (string | null);
+};
+
+export type ThirdPartyDiscoveryGetThirdPartyDocsResponse = (unknown);
+
+export type ThirdPartyDiscoveryGetThirdPartyOpenapiData = {
+    xThirdPartyApiKey?: (string | null);
+};
+
+export type ThirdPartyDiscoveryGetThirdPartyOpenapiResponse = ({
+    [key: string]: unknown;
+});
 
 export type TicketingStepsListPortalTicketingStepsData = {
     popupId: string;
