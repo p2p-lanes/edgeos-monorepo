@@ -1,1 +1,3 @@
-# Router registered in slice 3. Module skeleton only for slice 1.
+from app.api.third_party_app.router import router
+
+__all__ = ["router"]
