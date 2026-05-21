@@ -18,12 +18,20 @@ from app.core.db import engine
 # Human/portal scope universe. These map to what a portal JWT (or a JWT issued
 # by the third-party OTP surface) may carry. They are completely disjoint from
 # ApiKeyScope so that a union type can be used on TokenPayload.scopes.
+# Each granular scope describes WHICH resource + WHICH action. New routes
+# attach a scope inline via `dependencies=[needs("portal:resource:action")]`
+# (see app.core.dependencies.users.needs). The registry walker discovers the
+# scope automatically — no per-scope alias needed.
 HumanScope = Literal[
     "portal:*",
-    "portal:self_read",
-    "portal:directory_read",
-    "portal:api_keys_manage",
-    "portal:rsvp_manage",
+    "portal:profile:read",
+    "portal:profile:write",
+    "portal:applications:read",
+    "portal:applications:write",
+    "portal:attendees:write",
+    "portal:payments:read",
+    "portal:directory:read",
+    "portal:api_keys:manage",
 ]
 
 # Admin API-key scope universe. Defined here (not in app.api.api_key.schemas)
@@ -69,11 +77,20 @@ AnyScope = HumanScope | ApiKeyScope
 # These are HumanScope values — the third-party user gets portal access,
 # not admin access. Per-app subsets are drawn from this ceiling.
 THIRD_PARTY_TOKEN_SCOPES_MAX: tuple[HumanScope, ...] = (
-    "portal:self_read",
-    "portal:directory_read",
-    "portal:api_keys_manage",
-    "portal:rsvp_manage",
+    "portal:profile:read",
+    "portal:profile:write",
+    "portal:applications:read",
+    "portal:applications:write",
+    "portal:attendees:write",
+    "portal:payments:read",
+    "portal:directory:read",
+    "portal:api_keys:manage",
 )
+# Note: RSVP write capability is delivered through the api-key surface (the
+# `rsvp:write` ApiKeyScope in THIRD_PARTY_API_KEY_SCOPES_MAX). The agent
+# mints an api key via portal:api_keys:manage and uses it against the
+# /event-participants/portal/{register,cancel-registration} endpoints, so a
+# dedicated JWT-level rsvp scope would be redundant.
 
 # Maximum scopes a human may request when minting an API key via the
 # third-party OTP surface. Per-app subsets are drawn from this ceiling.

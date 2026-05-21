@@ -14980,7 +14980,7 @@ export const ThirdPartyAppCreateSchema = {
         allowed_token_scopes: {
             items: {
                 type: 'string',
-                enum: ['portal:*', 'portal:self_read', 'portal:directory_read', 'portal:api_keys_manage', 'portal:rsvp_manage']
+                enum: ['portal:*', 'portal:profile:read', 'portal:profile:write', 'portal:applications:read', 'portal:applications:write', 'portal:attendees:write', 'portal:payments:read', 'portal:directory:read', 'portal:api_keys:manage']
             },
             type: 'array',
             title: 'Allowed Token Scopes'
@@ -15186,7 +15186,7 @@ export const ThirdPartyAppUpdateSchema = {
                 {
                     items: {
                         type: 'string',
-                        enum: ['portal:*', 'portal:self_read', 'portal:directory_read', 'portal:api_keys_manage', 'portal:rsvp_manage']
+                        enum: ['portal:*', 'portal:profile:read', 'portal:profile:write', 'portal:applications:read', 'portal:applications:write', 'portal:attendees:write', 'portal:payments:read', 'portal:directory:read', 'portal:api_keys:manage']
                     },
                     type: 'array'
                 },

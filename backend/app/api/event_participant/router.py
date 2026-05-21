@@ -4,7 +4,6 @@ from datetime import UTC, datetime
 from fastapi import APIRouter, HTTPException, status
 from loguru import logger
 
-from app.api.access.introspection import scope_route
 from app.api.event_participant import crud
 from app.api.event_participant.schemas import (
     EventParticipantCreate,
@@ -21,7 +20,7 @@ from app.core.dependencies.users import (
     AdminOrApiKeySession_RsvpWrite,
     CurrentHuman,
     HumanTenantSession,
-    RequireHumanScopeRsvpManage,
+    needs,
 )
 
 router = APIRouter(prefix="/event-participants", tags=["event-participants"])
@@ -231,13 +230,16 @@ async def list_portal_participants(
     "/portal/register/{event_id}",
     response_model=EventParticipantPublic,
     summary="RSVP to an event",
+    # JWT path: only the portal:* wildcard (regular portal users) passes.
+    # Third-party JWTs must use the api-key surface with `rsvp:write`.
+    # API-key callers bypass this guard (see require_human_scope) and are
+    # gated by _PAT_ROUTE_POLICIES in core.security.
+    dependencies=[needs("portal:*")],
 )
-@scope_route("portal:rsvp_manage")
 async def register_for_event(
     event_id: uuid.UUID,
     db: HumanTenantSession,
     current_human: CurrentHuman,
-    _scope: RequireHumanScopeRsvpManage,
     body: RegisterRequest | None = None,
 ) -> EventParticipantPublic:
     """Register current human for an event (portal)."""
@@ -349,13 +351,16 @@ async def _notify_rsvp(
     "/portal/cancel-registration/{event_id}",
     response_model=EventParticipantPublic,
     summary="Cancel your RSVP to an event",
+    # JWT path: only the portal:* wildcard (regular portal users) passes.
+    # Third-party JWTs must use the api-key surface with `rsvp:write`.
+    # API-key callers bypass this guard (see require_human_scope) and are
+    # gated by _PAT_ROUTE_POLICIES in core.security.
+    dependencies=[needs("portal:*")],
 )
-@scope_route("portal:rsvp_manage")
 async def cancel_registration(
     event_id: uuid.UUID,
     db: HumanTenantSession,
     current_human: CurrentHuman,
-    _scope: RequireHumanScopeRsvpManage,
     body: RegisterRequest | None = None,
 ) -> EventParticipantPublic:
     """Cancel current human's registration (portal).

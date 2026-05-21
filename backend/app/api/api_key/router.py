@@ -3,13 +3,12 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from app.api.access.introspection import scope_route
 from app.api.api_key import crud
 from app.api.api_key.schemas import ApiKeyCreate, ApiKeyCreated, ApiKeyPublic
 from app.core.dependencies.users import (
     CurrentHuman,
     HumanTenantSession,
-    RequireHumanScopeApiKeysManage,
+    needs,
 )
 from app.core.security import (
     THIRD_PARTY_API_KEY_SCOPES_MAX,
@@ -51,21 +50,29 @@ def _require_human_can_manage_api_keys(current_human: CurrentHuman) -> None:
 HumanCanManageApiKeys = Annotated[None, Depends(_require_human_can_manage_api_keys)]
 
 
-@router.get("", response_model=list[ApiKeyPublic], summary="List your API keys")
-@scope_route("portal:api_keys_manage")
+@router.get(
+    "",
+    response_model=list[ApiKeyPublic],
+    summary="List your API keys",
+    dependencies=[needs("portal:api_keys:manage")],
+)
 async def list_api_keys(
     db: HumanTenantSession,
     current_human: CurrentHuman,
     _: JwtOnly,
     __: HumanCanManageApiKeys,
-    ___: RequireHumanScopeApiKeysManage,
 ) -> list[ApiKeyPublic]:
     rows = crud.list_for_human(db, current_human.id)
     return [ApiKeyPublic.model_validate(r) for r in rows]
 
 
-@router.post("", response_model=ApiKeyCreated, status_code=status.HTTP_201_CREATED, summary="Create an API key")
-@scope_route("portal:api_keys_manage")
+@router.post(
+    "",
+    response_model=ApiKeyCreated,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create an API key",
+    dependencies=[needs("portal:api_keys:manage")],
+)
 async def create_api_key(
     payload: ApiKeyCreate,
     db: HumanTenantSession,
@@ -73,7 +80,6 @@ async def create_api_key(
     token_payload: Annotated[TokenPayload, Depends(get_token_payload)],
     _: JwtOnly,
     __: HumanCanManageApiKeys,
-    ___: RequireHumanScopeApiKeysManage,
 ) -> ApiKeyCreated:
     # REQ-4.1 / REQ-5.1: third-party JWT scope enforcement.
     if getattr(token_payload, "issued_via", "portal") == "third_party":
@@ -111,15 +117,18 @@ async def create_api_key(
     return ApiKeyCreated.model_validate({**row.model_dump(), "key": raw})
 
 
-@router.delete("/{key_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Revoke an API key")
-@scope_route("portal:api_keys_manage")
+@router.delete(
+    "/{key_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Revoke an API key",
+    dependencies=[needs("portal:api_keys:manage")],
+)
 async def revoke_api_key(
     key_id: uuid.UUID,
     db: HumanTenantSession,
     current_human: CurrentHuman,
     _: JwtOnly,
     __: HumanCanManageApiKeys,
-    ___: RequireHumanScopeApiKeysManage,
 ) -> None:
     row = crud.get_for_human(db, key_id, current_human.id)
     if not row:

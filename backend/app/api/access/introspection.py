@@ -1,31 +1,31 @@
-"""Scope-routes registry for /me/access/docs.
+"""Scope-routes registry for /third-party-apps/docs and /openapi.json.
 
-Design D-2: static registry populated by a @scope_route decorator and
-finalized at app startup by register_scope_routes(application).
+The registry maps each HumanScope to the routes that require it. It is
+populated at startup by walking every APIRoute's dependency tree and
+collecting `.scope` attributes set by `require_human_scope` (see
+`app.core.dependencies.users`).
 
-Usage — decorate a route handler with @scope_route(scope) BEFORE the FastAPI
-decorator applies:
+There is no per-route decorator: the scope is declared exactly once at the
+route definition via:
 
-    @router.get("/api-keys", summary="List your API keys")
-    @scope_route("portal:api_keys_manage")
-    async def list_api_keys(...): ...
+    @router.get(
+        "/foo",
+        summary="Get foo",
+        dependencies=[needs("portal:profile:read")],
+    )
+    async def get_foo(...): ...
 
-Then call register_scope_routes(application) once in app.main after
-application.include_router(api_router, ...).
+The walker handles nested dependencies (Depends within Depends), so a scope
+attached deep in the dependency tree still surfaces in the registry.
 """
 
 from __future__ import annotations
 
-from collections.abc import Callable
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from fastapi import FastAPI
-
-# ---------------------------------------------------------------------------
-# RouteDoc dataclass
-# ---------------------------------------------------------------------------
 
 
 @dataclass(frozen=True)
@@ -35,64 +35,39 @@ class RouteDoc:
     summary: str
 
 
-# ---------------------------------------------------------------------------
-# Registry — populated by register_scope_routes() at startup
-# ---------------------------------------------------------------------------
-
 # scope -> list of routes that require that scope
 SCOPE_ROUTES_REGISTRY: dict[str, list[RouteDoc]] = {}
 
 
-# ---------------------------------------------------------------------------
-# Decorator
-# ---------------------------------------------------------------------------
-
-
-def scope_route(scope: str) -> Callable:
-    """Decorator factory that marks a route handler as scope-protected.
-
-    Attaches ``__scope_routes__`` set to the handler function. At startup,
-    ``register_scope_routes`` walks all registered APIRoute instances, reads
-    this attribute, and populates SCOPE_ROUTES_REGISTRY.
-
-    Apply AFTER the @router.get/post/... decorator so that FastAPI's route
-    object wraps the already-marked function:
-
-        @router.get("/foo", summary="Get foo")
-        @scope_route("portal:self_read")
-        async def get_foo(...): ...
-    """
-
-    def decorator(fn: Callable) -> Callable:
-        existing: set[str] = getattr(fn, "__scope_routes__", set())
-        fn.__scope_routes__ = existing | {scope}  # type: ignore[attr-defined]
-        return fn
-
-    return decorator
-
-
-# ---------------------------------------------------------------------------
-# Startup hook
-# ---------------------------------------------------------------------------
+def _collect_scopes(dependant: Any) -> set[str]:
+    """Walk a FastAPI Dependant tree and return every `.scope` attribute
+    attached to a dependency's callable (set by `require_human_scope`)."""
+    scopes: set[str] = set()
+    call = getattr(dependant, "call", None)
+    if call is not None:
+        scope = getattr(call, "scope", None)
+        if isinstance(scope, str):
+            scopes.add(scope)
+    for sub in getattr(dependant, "dependencies", []) or []:
+        scopes |= _collect_scopes(sub)
+    return scopes
 
 
 def register_scope_routes(app: FastAPI) -> None:
     """Walk all registered APIRoutes and populate SCOPE_ROUTES_REGISTRY.
 
-    Must be called AFTER application.include_router(...) so all routes are
-    already registered. Called once in app.main at module level.
-
-    The registry is keyed by scope string; each value is a list of RouteDoc.
-    Duplicate (scope, method, path) triples are deduplicated.
+    Must be called AFTER `application.include_router(...)` so every route is
+    visible. Idempotent — re-running clears and rebuilds the registry.
     """
     from fastapi.routing import APIRoute
 
+    SCOPE_ROUTES_REGISTRY.clear()
     seen: set[tuple[str, str, str]] = set()
 
     for route in app.routes:
         if not isinstance(route, APIRoute):
             continue
-        scopes: set[str] = getattr(route.endpoint, "__scope_routes__", set())
+        scopes = _collect_scopes(route.dependant)
         for scope in scopes:
             method = next(iter(route.methods), "GET")
             path = route.path

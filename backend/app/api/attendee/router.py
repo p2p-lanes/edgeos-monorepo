@@ -3,7 +3,6 @@ from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Query, status
 
-from app.api.access.introspection import scope_route
 from app.api.attendee import crud
 from app.api.attendee.schemas import (
     AttendeeCreate,
@@ -32,9 +31,8 @@ from app.core.dependencies.users import (
     CurrentCheckInOperator,
     CurrentHuman,
     HumanTenantSession,
-    RequireHumanScopeDirectoryRead,
-    RequireHumanScopeSelfRead,
     TenantSession,
+    needs,
 )
 
 router = APIRouter(prefix="/attendees", tags=["attendees"])
@@ -140,13 +138,12 @@ def _build_attendee_with_origin(
     response_model=ListModel[AttendeeWithOriginPublic],
     tags=["portal"],
     summary="List your attendees for a popup",
+    dependencies=[needs("portal:applications:read")],
 )
-@scope_route("portal:directory_read")
 async def list_my_attendees_by_popup(
     popup_id: uuid.UUID,
     db: HumanTenantSession,
     current_human: CurrentHuman,
-    _scope: RequireHumanScopeDirectoryRead,
     skip: PaginationSkip = 0,
     limit: _AttendeeLimit = 50,
 ) -> ListModel[AttendeeWithOriginPublic]:
@@ -175,14 +172,13 @@ async def list_my_attendees_by_popup(
     response_model=AttendeeWithOriginPublic,
     tags=["portal"],
     summary="Create a companion attendee",
+    dependencies=[needs("portal:attendees:write")],
 )
-@scope_route("portal:self_read")
 async def create_my_attendee_for_popup(
     popup_id: uuid.UUID,
     attendee_in: AttendeeCreate,
     db: HumanTenantSession,
     current_human: CurrentHuman,
-    _scope: RequireHumanScopeSelfRead,
 ) -> AttendeeWithOriginPublic:
     """Create a companion attendee (spouse/child) for the current Human's application.
 
@@ -300,15 +296,14 @@ async def create_my_attendee_for_popup(
     response_model=AttendeeWithOriginPublic,
     tags=["portal"],
     summary="Update your attendee",
+    dependencies=[needs("portal:attendees:write")],
 )
-@scope_route("portal:self_read")
 async def update_my_attendee_for_popup(
     popup_id: uuid.UUID,
     attendee_id: uuid.UUID,
     attendee_in: AttendeeUpdate,
     db: HumanTenantSession,
     current_human: CurrentHuman,
-    _scope: RequireHumanScopeSelfRead,
 ) -> AttendeeWithOriginPublic:
     """Update a companion attendee using the dual-path auth predicate.
 
@@ -358,14 +353,13 @@ async def update_my_attendee_for_popup(
     "/my/popup/{popup_id}/{attendee_id}",
     tags=["portal"],
     summary="Delete your attendee",
+    dependencies=[needs("portal:attendees:write")],
 )
-@scope_route("portal:self_read")
 async def delete_my_attendee_for_popup(
     popup_id: uuid.UUID,
     attendee_id: uuid.UUID,
     db: HumanTenantSession,
     current_human: CurrentHuman,
-    _scope: RequireHumanScopeSelfRead,
 ) -> dict:
     """Delete a companion attendee using the dual-path auth predicate.
 
