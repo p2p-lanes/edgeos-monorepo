@@ -1471,18 +1471,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                     session.delete(ap)
                 session.flush()
 
-            # Auto-approve and add products directly
-            self._add_products_to_attendees(session, obj.products)
-
-            # Get product details for snapshot
-            product_ids = [p.product_id for p in obj.products]
-            prod_statement = select(Products).where(
-                Products.id.in_(product_ids),  # type: ignore[attr-defined]
-                Products.deleted_at.is_(None),  # type: ignore[attr-defined]
-            )
-            products_map = {p.id: p for p in session.exec(prod_statement).all()}
-
-            # Create payment record for audit trail
+            # Create payment record first so AttendeeProducts can link to it.
             payment = Payments(
                 tenant_id=application.tenant_id,
                 application_id=obj.application_id,
@@ -1501,6 +1490,19 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             )
             session.add(payment)
             session.flush()
+
+            # Auto-approve and add products directly
+            self._add_products_to_attendees(
+                session, obj.products, payment_id=payment.id
+            )
+
+            # Get product details for snapshot
+            product_ids = [p.product_id for p in obj.products]
+            prod_statement = select(Products).where(
+                Products.id.in_(product_ids),  # type: ignore[attr-defined]
+                Products.deleted_at.is_(None),  # type: ignore[attr-defined]
+            )
+            products_map = {p.id: p for p in session.exec(prod_statement).all()}
 
             # Create product snapshots
             for req_prod in obj.products:
@@ -1743,7 +1745,9 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 )
                 for pp in payment.products_snapshot
             ]
-            self._add_products_to_attendees(session, products_to_add)
+            self._add_products_to_attendees(
+                session, products_to_add, payment_id=payment.id
+            )
 
             # Create ambassador group if patreon product was purchased.
             # Direct-sale payments have no application — skip ambassador logic
@@ -2006,7 +2010,9 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 )
                 for pp in payment.products_snapshot
             ]
-            self._add_products_to_attendees(session, products_to_add)
+            self._add_products_to_attendees(
+                session, products_to_add, payment_id=payment.id
+            )
 
         session.add(payment)
         session.commit()
