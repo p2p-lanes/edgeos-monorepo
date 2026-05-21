@@ -35,7 +35,6 @@ from app.api.human.models import Humans
 from app.api.popup.models import Popups
 from app.api.tenant.models import Tenants
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------

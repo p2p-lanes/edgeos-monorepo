@@ -102,6 +102,7 @@ def _build_attendee_with_origin(
                 last_scan_at=(
                     last_scan_by_ticket.get(ap.id) if last_scan_by_ticket else None
                 ),
+                purchase_metadata=ap.purchase_metadata,
             )
         )
     origin = "application" if attendee.application_id is not None else "direct_sale"
