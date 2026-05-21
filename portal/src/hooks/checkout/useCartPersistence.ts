@@ -1,6 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query"
 import { type MutableRefObject, useCallback, useEffect } from "react"
-import { resolveMaxQuantity } from "@/components/ui/QuantitySelector"
 import {
   type CartState,
   useCart,
@@ -8,6 +7,7 @@ import {
   useSaveCart,
 } from "@/hooks/useCartApi"
 import { checkAndClearPurchasePending } from "@/hooks/usePaymentRedirect"
+import { getProductAvailability } from "@/lib/product-availability"
 import { queryKeys } from "@/lib/query-keys"
 import type {
   CheckoutStep,
@@ -207,50 +207,66 @@ export function useCartPersistence({
     const { setHousing, setMerch, setPatron, setMealPlans, setInsurance } =
       restorationSetters
 
-    // Restore housing
+    // Restore housing — skip products that are sold_out / ended / upcoming.
     if (savedCart.housing) {
       const product = products.find(
         (p) => p.id === savedCart.housing?.product_id,
       )
       if (product) {
-        const start = new Date(savedCart.housing.check_in)
-        const end = new Date(savedCart.housing.check_out)
-        const nights = Math.max(
-          1,
-          Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)),
-        )
-        const savedQuantity = savedCart.housing.quantity ?? 1
-        const maxQty = resolveMaxQuantity(product)
-        const quantity = Math.max(1, Math.min(savedQuantity, maxQty))
-        const basePrice = housingPricePerDay
-          ? product.price * nights
-          : product.price
-        setHousing({
-          productId: product.id,
-          product,
-          checkIn: savedCart.housing.check_in,
-          checkOut: savedCart.housing.check_out,
-          nights,
-          pricePerNight: product.price,
-          totalPrice: basePrice * quantity,
-          pricePerDay: housingPricePerDay,
-          quantity,
-        })
+        const { canSelect, maxAllowedQuantity } =
+          getProductAvailability(product)
+        if (canSelect) {
+          const start = new Date(savedCart.housing.check_in)
+          const end = new Date(savedCart.housing.check_out)
+          const nights = Math.max(
+            1,
+            Math.ceil(
+              (end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24),
+            ),
+          )
+          const savedQuantity = savedCart.housing.quantity ?? 1
+          const quantity = Math.max(
+            1,
+            Math.min(savedQuantity, maxAllowedQuantity),
+          )
+          const basePrice = housingPricePerDay
+            ? product.price * nights
+            : product.price
+          setHousing({
+            productId: product.id,
+            product,
+            checkIn: savedCart.housing.check_in,
+            checkOut: savedCart.housing.check_out,
+            nights,
+            pricePerNight: product.price,
+            totalPrice: basePrice * quantity,
+            pricePerDay: housingPricePerDay,
+            quantity,
+          })
+        }
       }
     }
 
-    // Restore merch
+    // Restore merch — drop items whose product is no longer selectable.
     if (savedCart.merch?.length) {
       const restoredMerch = savedCart.merch.reduce<SelectedMerchItem[]>(
         (acc, saved) => {
           const product = products.find((p) => p.id === saved.product_id)
           if (!product || saved.quantity <= 0) return acc
+          const { canSelect, maxAllowedQuantity } =
+            getProductAvailability(product)
+          if (!canSelect) return acc
+          const quantity =
+            maxAllowedQuantity === Number.POSITIVE_INFINITY
+              ? saved.quantity
+              : Math.min(saved.quantity, maxAllowedQuantity)
+          if (quantity <= 0) return acc
           acc.push({
             productId: product.id,
             product,
-            quantity: saved.quantity,
+            quantity,
             unitPrice: product.price,
-            totalPrice: product.price * saved.quantity,
+            totalPrice: product.price * quantity,
           })
           return acc
         },
@@ -259,12 +275,13 @@ export function useCartPersistence({
       if (restoredMerch.length > 0) setMerch(restoredMerch)
     }
 
-    // Restore patron
+    // Restore patron — donation products are not stock-bound, but still respect
+    // sale-window state (upcoming/ended).
     if (savedCart.patron) {
       const product = products.find(
         (p) => p.id === savedCart.patron?.product_id,
       )
-      if (product) {
+      if (product && getProductAvailability(product).canSelect) {
         setPatron({
           productId: product.id,
           product,

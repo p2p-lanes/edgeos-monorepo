@@ -101,6 +101,21 @@ describe("useMerchSelection — client-side max_per_order cap", () => {
     })
     expect(result.current.merch).toHaveLength(0)
   })
+
+  it("refuses to add a sold-out product (cap set, remaining=0)", () => {
+    const product = makeMerchProduct({
+      id: "merch-sold",
+      total_stock_cap: 1,
+      total_stock_remaining: 0,
+    })
+    const { result } = renderHook(() => useMerchSelection([product]))
+
+    act(() => {
+      result.current.updateMerchQuantity("merch-sold", 1)
+    })
+
+    expect(result.current.merch).toHaveLength(0)
+  })
 })
 
 describe("useMerchSelection — id-lookup against full active product list", () => {

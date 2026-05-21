@@ -1,6 +1,7 @@
 import uuid
 from datetime import datetime
 
+from pydantic import field_validator
 from sqlalchemy import UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlmodel import Column, DateTime, Field, SQLModel
@@ -30,3 +31,8 @@ class PendingHumans(SQLModel, table=True):
 
     picture_url: str | None = Field(default=None, max_length=500)
     red_flag: bool = Field(default=False)
+
+    @field_validator("email", mode="after")
+    @classmethod
+    def normalize_email(cls, v: str) -> str:
+        return v.lower().strip()

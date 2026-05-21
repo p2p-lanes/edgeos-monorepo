@@ -11,11 +11,12 @@ from app.api.ticketing_step.schemas import (
     TicketingStepUpdate,
 )
 from app.core.dependencies.users import (
+    AdminOrApiKey_TicketingStepsRead,
+    AdminOrApiKey_TicketingStepsWrite,
+    AdminOrApiKeySession_TicketingStepsRead,
+    AdminOrApiKeySession_TicketingStepsWrite,
     CurrentHuman,
-    CurrentOperator,
-    CurrentUser,
     HumanTenantSession,
-    TenantSession,
 )
 
 router = APIRouter(prefix="/ticketing-steps", tags=["ticketing-steps"])
@@ -37,8 +38,8 @@ async def list_portal_ticketing_steps(
 
 @router.get("", response_model=ListModel[TicketingStepPublic])
 async def list_ticketing_steps(
-    db: TenantSession,
-    _: CurrentUser,
+    db: AdminOrApiKeySession_TicketingStepsRead,
+    _: AdminOrApiKey_TicketingStepsRead,
     popup_id: uuid.UUID | None = None,
     skip: PaginationSkip = 0,
     limit: PaginationLimit = 100,
@@ -59,8 +60,8 @@ async def list_ticketing_steps(
 @router.get("/{step_id}", response_model=TicketingStepPublic)
 async def get_ticketing_step(
     step_id: uuid.UUID,
-    db: TenantSession,
-    _: CurrentUser,
+    db: AdminOrApiKeySession_TicketingStepsRead,
+    _: AdminOrApiKey_TicketingStepsRead,
 ) -> TicketingStepPublic:
     step = crud.ticketing_steps_crud.get(db, step_id)
 
@@ -124,8 +125,8 @@ def _validate_template_config_fk(
 )
 async def create_ticketing_step(
     step_in: TicketingStepCreate,
-    db: TenantSession,
-    current_user: CurrentOperator,
+    db: AdminOrApiKeySession_TicketingStepsWrite,
+    current_user: AdminOrApiKey_TicketingStepsWrite,
 ) -> TicketingStepPublic:
     if current_user.role == UserRole.SUPERADMIN:
         from app.api.popup.crud import popups_crud
@@ -166,8 +167,8 @@ async def create_ticketing_step(
 async def update_ticketing_step(
     step_id: uuid.UUID,
     step_in: TicketingStepUpdate,
-    db: TenantSession,
-    _current_user: CurrentOperator,
+    db: AdminOrApiKeySession_TicketingStepsWrite,
+    _current_user: AdminOrApiKey_TicketingStepsWrite,
 ) -> TicketingStepPublic:
     step = crud.ticketing_steps_crud.get(db, step_id)
 
@@ -201,8 +202,8 @@ async def update_ticketing_step(
 @router.delete("/{step_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_ticketing_step(
     step_id: uuid.UUID,
-    db: TenantSession,
-    _current_user: CurrentOperator,
+    db: AdminOrApiKeySession_TicketingStepsWrite,
+    _current_user: AdminOrApiKey_TicketingStepsWrite,
 ) -> None:
     step = crud.ticketing_steps_crud.get(db, step_id)
 

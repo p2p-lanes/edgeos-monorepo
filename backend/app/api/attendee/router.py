@@ -24,10 +24,15 @@ from app.api.check_in.crud import (
 from app.api.check_in.schemas import CheckInPayload
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
 from app.core.dependencies.users import (
+    AdminOrApiKey_AttendeesWrite,
+    AdminOrApiKeySession_AttendeesWrite,
+    CheckInOrApiKey_AttendeesRead,
+    CheckInOrApiKeySession_AttendeesRead,
     CurrentCheckInOperator,
     CurrentHuman,
-    CurrentOperator,
     HumanTenantSession,
+    RequireHumanScopeDirectoryRead,
+    RequireHumanScopeSelfRead,
     TenantSession,
 )
 
@@ -138,6 +143,7 @@ async def list_my_attendees_by_popup(
     popup_id: uuid.UUID,
     db: HumanTenantSession,
     current_human: CurrentHuman,
+    _scope: RequireHumanScopeDirectoryRead,
     skip: PaginationSkip = 0,
     limit: _AttendeeLimit = 50,
 ) -> ListModel[AttendeeWithOriginPublic]:
@@ -171,6 +177,7 @@ async def create_my_attendee_for_popup(
     attendee_in: AttendeeCreate,
     db: HumanTenantSession,
     current_human: CurrentHuman,
+    _scope: RequireHumanScopeSelfRead,
 ) -> AttendeeWithOriginPublic:
     """Create a companion attendee (spouse/child) for the current Human's application.
 
@@ -294,6 +301,7 @@ async def update_my_attendee_for_popup(
     attendee_in: AttendeeUpdate,
     db: HumanTenantSession,
     current_human: CurrentHuman,
+    _scope: RequireHumanScopeSelfRead,
 ) -> AttendeeWithOriginPublic:
     """Update a companion attendee using the dual-path auth predicate.
 
@@ -348,6 +356,7 @@ async def delete_my_attendee_for_popup(
     attendee_id: uuid.UUID,
     db: HumanTenantSession,
     current_human: CurrentHuman,
+    _scope: RequireHumanScopeSelfRead,
 ) -> dict:
     """Delete a companion attendee using the dual-path auth predicate.
 
@@ -385,8 +394,8 @@ async def delete_my_attendee_for_popup(
 
 @router.get("", response_model=ListModel[AttendeeListItem])
 async def list_attendees(
-    db: TenantSession,
-    _: CurrentCheckInOperator,
+    db: CheckInOrApiKeySession_AttendeesRead,
+    _: CheckInOrApiKey_AttendeesRead,
     application_id: uuid.UUID | None = None,
     popup_id: uuid.UUID | None = None,
     email: str | None = None,
@@ -445,8 +454,8 @@ async def list_attendees(
 @router.get("/{attendee_id}", response_model=AttendeeWithOriginPublic)
 async def get_attendee(
     attendee_id: uuid.UUID,
-    db: TenantSession,
-    _: CurrentCheckInOperator,
+    db: CheckInOrApiKeySession_AttendeesRead,
+    _: CheckInOrApiKey_AttendeesRead,
 ) -> AttendeeWithOriginPublic:
     """Get a single attendee with full ticket details (BO only).
 
@@ -473,8 +482,8 @@ async def get_attendee(
 async def update_attendee(
     attendee_id: uuid.UUID,
     attendee_in: AttendeeUpdate,
-    db: TenantSession,
-    _current_user: CurrentOperator,
+    db: AdminOrApiKeySession_AttendeesWrite,
+    _current_user: AdminOrApiKey_AttendeesWrite,
 ) -> AttendeeWithOriginPublic:
     """Update an attendee (BO only)."""
 
@@ -495,8 +504,8 @@ async def update_attendee(
 @router.delete("/{attendee_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_attendee(
     attendee_id: uuid.UUID,
-    db: TenantSession,
-    _current_user: CurrentOperator,
+    db: AdminOrApiKeySession_AttendeesWrite,
+    _current_user: AdminOrApiKey_AttendeesWrite,
 ) -> None:
     """Delete an attendee (BO only)."""
 

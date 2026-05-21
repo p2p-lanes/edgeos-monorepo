@@ -37,11 +37,14 @@ from app.api.attendee.schemas import (
 from app.api.shared.enums import SaleType, UserRole
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
 from app.core.dependencies.users import (
-    CurrentAdmin,
+    AdminOrApiKey_ApplicationsRead,
+    AdminOrApiKey_ApplicationsWrite,
+    AdminOrApiKeySession_ApplicationsRead,
+    AdminOrApiKeySession_ApplicationsWrite,
     CurrentHuman,
-    CurrentOperator,
     HumanTenantSession,
-    TenantSession,
+    RequireHumanScopeDirectoryRead,
+    RequireHumanScopeSelfRead,
 )
 from app.services.email_helpers import send_application_status_email
 
@@ -137,8 +140,8 @@ def _build_application_public(
 
 @router.get("", response_model=ListModel[ApplicationPublic])
 async def list_applications(
-    db: TenantSession,
-    _: CurrentOperator,
+    db: AdminOrApiKeySession_ApplicationsRead,
+    _: AdminOrApiKey_ApplicationsRead,
     popup_id: uuid.UUID | None = None,
     human_id: uuid.UUID | None = None,
     reviewed_by: uuid.UUID | None = None,
@@ -192,8 +195,8 @@ async def list_applications(
 @router.post("", response_model=ApplicationPublic, status_code=status.HTTP_201_CREATED)
 async def create_application_admin(
     app_in: ApplicationAdminCreate,
-    db: TenantSession,
-    current_user: CurrentOperator,
+    db: AdminOrApiKeySession_ApplicationsWrite,
+    current_user: AdminOrApiKey_ApplicationsWrite,
 ) -> ApplicationPublic:
     """Create an application as admin (BO only - superadmin for testing).
 
@@ -238,8 +241,8 @@ async def create_application_admin(
 @router.get("/{application_id}", response_model=ApplicationPublic)
 async def get_application(
     application_id: uuid.UUID,
-    db: TenantSession,
-    _: CurrentOperator,
+    db: AdminOrApiKeySession_ApplicationsRead,
+    _: AdminOrApiKey_ApplicationsRead,
 ) -> ApplicationPublic:
     """Get a single application (BO only)."""
     application = crud.applications_crud.get(db, application_id)
@@ -257,6 +260,7 @@ async def get_application(
 async def list_my_applications(
     db: HumanTenantSession,
     current_human: CurrentHuman,
+    _scope: RequireHumanScopeSelfRead,
     skip: PaginationSkip = 0,
     limit: PaginationLimit = 100,
 ) -> ListModel[ApplicationPublic]:
@@ -277,6 +281,7 @@ async def list_my_applications(
 async def list_my_tickets(
     db: HumanTenantSession,
     current_human: CurrentHuman,
+    _scope: RequireHumanScopeSelfRead,
 ) -> list[AttendeeWithTickets]:
     """List all tickets for the current human (Portal).
 
@@ -335,6 +340,7 @@ async def get_my_participation(
     popup_id: uuid.UUID,
     db: HumanTenantSession,
     current_human: CurrentHuman,
+    _scope: RequireHumanScopeSelfRead,
 ) -> ParticipationResponse:
     """Get participation status for the current human in a popup (Portal).
 
@@ -387,6 +393,7 @@ async def get_my_purchases(
     popup_id: uuid.UUID,
     db: HumanTenantSession,
     current_human: CurrentHuman,
+    _scope: RequireHumanScopeSelfRead,
 ) -> list[AttendeePurchases]:
     """Get purchased products grouped by attendee for a popup (Portal)."""
     from app.api.attendee.crud import attendees_crud
@@ -424,6 +431,7 @@ async def get_my_application(
     popup_id: uuid.UUID,
     db: HumanTenantSession,
     current_human: CurrentHuman,
+    _scope: RequireHumanScopeSelfRead,
 ) -> ApplicationPublic:
     """Get current human's application for a popup (Portal)."""
     application = crud.applications_crud.get_by_human_popup(
@@ -455,6 +463,7 @@ async def detach_companion(
     body: DetachCompanionRequest,
     db: HumanTenantSession,
     current_human: CurrentHuman,
+    _scope: RequireHumanScopeSelfRead,
 ) -> None:
     """Remove the current human from being a companion on another applicant's
     application for the given popup.
@@ -507,6 +516,7 @@ async def create_my_application(
     app_in: ApplicationCreate,
     db: HumanTenantSession,
     current_human: CurrentHuman,
+    _scope: RequireHumanScopeSelfRead,
 ) -> ApplicationPublic:
     """Create an application for the current human (Portal)."""
     # Check for existing application
@@ -562,6 +572,7 @@ async def update_my_application(
     app_in: ApplicationUpdate,
     db: HumanTenantSession,
     current_human: CurrentHuman,
+    _scope: RequireHumanScopeSelfRead,
 ) -> ApplicationPublic:
     """Update current human's application (Portal)."""
     application = crud.applications_crud.get_by_human_popup(
@@ -823,6 +834,7 @@ async def list_attendees_directory(
     popup_id: uuid.UUID,
     db: HumanTenantSession,
     _: CurrentHuman,
+    _scope: RequireHumanScopeDirectoryRead,
     skip: PaginationSkip = 0,
     limit: PaginationLimit = 100,
     q: str | None = None,
@@ -855,6 +867,7 @@ async def export_attendees_directory_csv(
     popup_id: uuid.UUID,
     db: HumanTenantSession,
     _: CurrentHuman,
+    _scope: RequireHumanScopeDirectoryRead,
     q: str | None = None,
 ) -> Response:
     """Export attendees directory as CSV (Portal).
@@ -920,6 +933,7 @@ async def add_my_attendee(
     attendee_in: AttendeeCreate,
     db: HumanTenantSession,
     current_human: CurrentHuman,
+    _scope: RequireHumanScopeSelfRead,
 ) -> ApplicationPublic:
     """Add an attendee to current human's application (Portal)."""
     application = crud.applications_crud.get_by_human_popup(
@@ -954,6 +968,7 @@ async def update_my_attendee(
     attendee_in: AttendeeUpdate,
     db: HumanTenantSession,
     current_human: CurrentHuman,
+    _scope: RequireHumanScopeSelfRead,
 ) -> ApplicationPublic:
     """Update an attendee in current human's application (Portal)."""
     from app.api.attendee.crud import attendees_crud
@@ -1002,6 +1017,7 @@ async def delete_my_attendee(
     attendee_id: uuid.UUID,
     db: HumanTenantSession,
     current_human: CurrentHuman,
+    _scope: RequireHumanScopeSelfRead,
 ) -> ApplicationPublic:
     """Delete an attendee from current human's application (Portal)."""
     application = crud.applications_crud.get_by_human_popup(
@@ -1026,8 +1042,8 @@ async def delete_my_attendee(
 async def review_scholarship(
     application_id: uuid.UUID,
     decision: ScholarshipDecisionRequest,
-    db: TenantSession,
-    _: CurrentAdmin,
+    db: AdminOrApiKeySession_ApplicationsWrite,
+    _: AdminOrApiKey_ApplicationsWrite,
 ) -> ApplicationPublic:
     """Approve or reject a scholarship request on an application (BO admin only).
 
@@ -1076,6 +1092,7 @@ async def get_popup_access(
     popup_id: uuid.UUID,
     db: HumanTenantSession,
     current_human: CurrentHuman,
+    _scope: RequireHumanScopeSelfRead,
 ) -> PopupAccessResponse:
     """Resolve access for the authenticated Human to a specific popup.
 

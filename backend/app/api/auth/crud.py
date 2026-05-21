@@ -215,6 +215,103 @@ async def authenticate_user(
     return user
 
 
+async def _send_human_code(
+    session: Session,
+    *,
+    tenant_id: uuid.UUID,
+    human: "Humans",
+    origin: str = "portal",
+) -> tuple[str, int]:
+    """Generate and send an OTP for an already-resolved human record.
+
+    Shared by login_human (existing-human branch) and login_existing_human
+    (third-party surface). Never creates a pending row — callers are
+    responsible for ensuring the human record already exists.
+
+    `origin` tags the code so the verify path can enforce flow isolation
+    (a third-party code cannot be redeemed via the portal flow). Defaults
+    to "portal" to keep the regular human login backwards-compatible.
+
+    Returns (email, CODE_EXPIRATION_MINUTES).
+    """
+    auth_code = generate_auth_code()
+    tenant = session.get(Tenants, tenant_id)
+
+    if is_redis_available():
+        auth_code_store.store_human_code(
+            tenant_id, human.email, auth_code, is_pending=False, origin=origin
+        )
+        logger.debug(f"Auth code stored in Redis for existing human: {human.email}")
+    else:
+        code_expiration = create_code_expiration(CODE_EXPIRATION_MINUTES)
+        human.auth_code = auth_code
+        human.code_expiration = code_expiration
+        human.auth_attempts = 0
+        human.auth_code_origin = origin
+        session.add(human)
+        session.commit()
+
+    email_service = get_email_service()
+    success = await email_service.send_login_code_human(
+        to=human.email,
+        subject=f"Your Login Code - {tenant.name if tenant else settings.PROJECT_NAME}",
+        context=LoginCodeHumanContext(
+            first_name=human.display_name,
+            tenant_name=tenant.name if tenant else settings.PROJECT_NAME,
+            auth_code=auth_code,
+            expiration_minutes=CODE_EXPIRATION_MINUTES,
+        ),
+        tenant_id=tenant_id,
+        from_address=tenant.sender_email if tenant else settings.SENDER_EMAIL,
+        from_name=tenant.sender_name if tenant else settings.SENDER_NAME,
+        db_session=session,
+    )
+
+    if not success:
+        logger.error(f"Failed to send auth code email to {human.email}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to send authentication code",
+        )
+
+    logger.info(f"Auth code sent to human: {human.email}")
+    return human.email, CODE_EXPIRATION_MINUTES
+
+
+async def login_existing_human(
+    session: Session,
+    *,
+    tenant_id: uuid.UUID,
+    email: str,
+) -> tuple[str, int]:
+    """Send OTP for an EXISTING human. Never creates a pending row.
+
+    Used by the third-party login surface where the partner has already
+    onboarded the user out-of-band and only needs portal access.
+
+    On unknown email raises 401 to keep the response indistinguishable
+    from the invalid-api-key case (non-disclosing per REQ-TP-03).
+    """
+    check_rate_limit(f"third_party_human:{tenant_id}:{email.lower()}")
+
+    existing = session.exec(
+        select(Humans).where(
+            Humans.email == email,
+            Humans.tenant_id == tenant_id,
+        )
+    ).first()
+
+    if not existing:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication failed",
+        )
+
+    return await _send_human_code(
+        session, tenant_id=tenant_id, human=existing, origin="third_party"
+    )
+
+
 async def login_human(
     session: Session,
     data: HumanAuth,
@@ -229,58 +326,18 @@ async def login_human(
     )
     existing_human = session.exec(statement).first()
 
-    # Generate code
-    auth_code = generate_auth_code()
-
     tenant = session.get(Tenants, data.tenant_id)
 
     if existing_human:
-        # Human exists: store auth code
-        if is_redis_available():
-            auth_code_store.store_human_code(
-                data.tenant_id, data.email, auth_code, is_pending=False
-            )
-            logger.debug(f"Auth code stored in Redis for existing human: {data.email}")
-        else:
-            # Fall back to database storage
-            code_expiration = create_code_expiration(CODE_EXPIRATION_MINUTES)
-            existing_human.auth_code = auth_code
-            existing_human.code_expiration = code_expiration
-            existing_human.auth_attempts = 0
-            session.add(existing_human)
-            session.commit()
-
-        # Get display name from latest application for email personalization
-        display_name = existing_human.display_name
-
-        # Send email with code
-        email_service = get_email_service()
-        success = await email_service.send_login_code_human(
-            to=data.email,
-            subject=f"Your Login Code - {tenant.name if tenant else settings.PROJECT_NAME}",
-            context=LoginCodeHumanContext(
-                first_name=display_name,
-                tenant_name=tenant.name if tenant else settings.PROJECT_NAME,
-                auth_code=auth_code,
-                expiration_minutes=CODE_EXPIRATION_MINUTES,
-            ),
+        # Delegate to shared helper — sends code for the resolved human record
+        return await _send_human_code(
+            session,
             tenant_id=data.tenant_id,
-            from_address=tenant.sender_email if tenant else settings.SENDER_EMAIL,
-            from_name=tenant.sender_name if tenant else settings.SENDER_NAME,
-            db_session=session,
+            human=existing_human,
         )
 
-        if not success:
-            logger.error(f"Failed to send auth code email to {data.email}")
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to send authentication code",
-            )
-
-        logger.info(f"Auth code sent to existing human: {data.email}")
-        return data.email, CODE_EXPIRATION_MINUTES
-
     # Human doesn't exist: create pending record
+    auth_code = generate_auth_code()
     if is_redis_available():
         # Store pending human data and auth code in Redis
         pending_human_store.store(
@@ -358,6 +415,7 @@ async def authenticate_human(
     email: str,
     tenant_id: uuid.UUID,
     code: str,
+    expected_origin: str = "portal",
 ) -> Humans:
     """
     Verify authentication code for a human.
@@ -365,17 +423,13 @@ async def authenticate_human(
     If human exists: authenticate using human record (like user authentication).
     If human doesn't exist: create human from pending record after validation.
 
-    Args:
-        session: Database session
-        email: Human's email address
-        tenant_id: Tenant ID
-        code: 6-digit authentication code
+    `expected_origin` scopes verification to codes that were emitted by the
+    matching flow (portal vs third_party). Codes stored with a different
+    origin will not be found in Redis (different key prefix) and will fail
+    the DB-fallback origin check. The pending-human branch is portal-only.
 
-    Returns:
-        Authenticated human
-
-    Raises:
-        HTTPException: If verification fails
+    Legacy compat: a row whose `auth_code_origin` is NULL is treated as
+    portal-origin so in-flight codes from before the upgrade still work.
     """
     # First check if human already exists
     human_statement = select(Humans).where(
@@ -388,7 +442,7 @@ async def authenticate_human(
         # Human exists: authenticate
         if is_redis_available():
             is_valid, error_message = auth_code_store.verify_human_code(
-                tenant_id, email, code, is_pending=False
+                tenant_id, email, code, is_pending=False, origin=expected_origin
             )
             if not is_valid:
                 if "Maximum" in error_message:
@@ -414,6 +468,15 @@ async def authenticate_human(
                     detail="Maximum authentication attempts exceeded. Please request a new code.",
                 )
 
+            stored_origin = existing_human.auth_code_origin or "portal"
+            if stored_origin != expected_origin:
+                # Same human, valid code in storage, but emitted by a
+                # different flow. Reject without leaking which flow.
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Invalid authentication code",
+                )
+
             is_valid, error_message = is_code_valid(
                 stored_code=existing_human.auth_code,
                 provided_code=code,
@@ -434,6 +497,7 @@ async def authenticate_human(
             existing_human.auth_code = None
             existing_human.code_expiration = None
             existing_human.auth_attempts = 0
+            existing_human.auth_code_origin = None
             session.add(existing_human)
             session.commit()
 

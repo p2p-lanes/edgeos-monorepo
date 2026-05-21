@@ -6,13 +6,12 @@ import { useTranslation } from "react-i18next"
 import { useApplication } from "@/providers/applicationProvider"
 import { useCityProvider } from "@/providers/cityProvider"
 
-// Mirrors the sidebar's exposure rule for API Keys / API Docs in
+// Mirrors the sidebar's exposure rule for Agentic Access in
 // useResources.ts: shown on application-based flows (applicant or
 // companion) once the application is accepted and the events module is
-// enabled at the popup level. Direct-sale flows never expose these
-// subsections, so navigating to /portal/api-keys or /portal/docs by URL
-// must fall through to the unavailable state instead of rendering the
-// page.
+// enabled at the popup level. Direct-sale flows never expose this
+// subsection, so navigating to /portal/agentic-access by URL must fall
+// through to the unavailable state instead of rendering the page.
 export function useEventsApiAccess(): { allowed: boolean } {
   const { getCity } = useCityProvider()
   const { getRelevantApplication, participation } = useApplication()

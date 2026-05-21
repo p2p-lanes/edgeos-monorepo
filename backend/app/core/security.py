@@ -11,10 +11,107 @@ from sqlmodel import Session
 from app.core.config import settings
 from app.core.db import engine
 
-# Defined here (not in app.api.api_key.schemas) to avoid an import cycle:
-# api_key.router imports from core.dependencies.users which imports from
-# core.security, so security cannot import back into the api_key package.
-ApiKeyScope = Literal["events:read", "events:write", "rsvp:write", "venues:write"]
+# ---------------------------------------------------------------------------
+# Scope type definitions
+# ---------------------------------------------------------------------------
+
+# Human/portal scope universe. These map to what a portal JWT (or a JWT issued
+# by the third-party OTP surface) may carry. They are completely disjoint from
+# ApiKeyScope so that a union type can be used on TokenPayload.scopes.
+HumanScope = Literal[
+    "portal:*",
+    "portal:self_read",
+    "portal:directory_read",
+    "portal:api_keys_manage",
+]
+
+# Admin API-key scope universe. Defined here (not in app.api.api_key.schemas)
+# to avoid an import cycle: api_key.router imports from core.dependencies.users
+# which imports from core.security, so security cannot import back into api_key.
+ApiKeyScope = Literal[
+    "events:read",
+    "events:write",
+    "rsvp:write",
+    "venues:write",
+    "applications:read",
+    "applications:write",
+    "attendees:read",
+    "attendees:write",
+    "humans:read",
+    "humans:write",
+    "groups:read",
+    "groups:write",
+    "products:read",
+    "products:write",
+    "coupons:read",
+    "coupons:write",
+    "forms:read",
+    "forms:write",
+    "payments:read",
+    "tracks:read",
+    "tracks:write",
+    "ticketing_steps:read",
+    "ticketing_steps:write",
+    "translations:read",
+    "translations:write",
+]
+
+# Union used for TokenPayload.scopes — accepts both universes.
+AnyScope = HumanScope | ApiKeyScope
+
+# ---------------------------------------------------------------------------
+# Scope universe constants
+# ---------------------------------------------------------------------------
+
+# Scopes embedded in a JWT issued by the third-party OTP flow. These are
+# HumanScope values — the third-party user gets portal access, not admin access.
+THIRD_PARTY_TOKEN_SCOPES: tuple[HumanScope, ...] = (
+    "portal:self_read",
+    "portal:directory_read",
+    "portal:api_keys_manage",
+)
+
+# Scopes that a human may request when minting an API key via the third-party
+# OTP surface. Intentionally narrow — external partners get event-read and
+# rsvp-write only.
+THIRD_PARTY_API_KEY_SCOPES: frozenset[str] = frozenset({
+    "events:read",
+    "rsvp:write",
+})
+
+# Full admin scope universe. Explicitly EXCLUDES: email_templates, users,
+# tenants, tenants:credentials, popup_reviewers, payments:write.
+ADMIN_API_KEY_SCOPES: frozenset[str] = frozenset({
+    "events:read",
+    "events:write",
+    "rsvp:write",
+    "venues:write",
+    "applications:read",
+    "applications:write",
+    "attendees:read",
+    "attendees:write",
+    "humans:read",
+    "humans:write",
+    "groups:read",
+    "groups:write",
+    "products:read",
+    "products:write",
+    "coupons:read",
+    "coupons:write",
+    "forms:read",
+    "forms:write",
+    "payments:read",
+    "tracks:read",
+    "tracks:write",
+    "ticketing_steps:read",
+    "ticketing_steps:write",
+    "translations:read",
+    "translations:write",
+})
+
+# ---------------------------------------------------------------------------
+# JWT helpers
+# ---------------------------------------------------------------------------
 
 ALGORITHM = "HS256"
 
@@ -31,11 +128,20 @@ class TokenPayload(BaseModel):
     exp: datetime
     token_type: str | None = None
     api_key_id: str | None = None
-    scopes: list[ApiKeyScope] = Field(default_factory=list)
     # True when this payload was synthesised from an API key rather than a
     # JWT. Sensitive endpoints (e.g. API key management) reject these so a
     # leaked key cannot mint further keys.
     via_api_key: bool = False
+    # How the token was originally issued. Used by scope enforcement to decide
+    # which scope universe applies (portal vs third_party surface).
+    issued_via: Literal["portal", "third_party"] = "portal"
+    # Scopes attached to this token. Empty list = legacy token (grace period
+    # logic in decode_access_token synthesises ["portal:*"] for human tokens).
+    scopes: list[AnyScope] = Field(default_factory=list)
+    # Internal — set only by _resolve_api_key for admin-owned keys. Lets
+    # get_admin_or_api_key_tenant_session resolve tenant without going through
+    # CurrentUser. NOT serialised into any JWT.
+    api_key_tenant_id: uuid.UUID | None = None
 
 
 _PAT_ROUTE_POLICIES: dict[str, tuple[tuple[str, bool, ApiKeyScope], ...]] = {
@@ -78,6 +184,12 @@ def _enforce_api_key_policy(request: Request, payload: TokenPayload) -> None:
     if not payload.via_api_key:
         return
 
+    # Admin-owned api keys (token_type="user") are governed by the
+    # CurrentAdminOrApiKey dependency, not by _PAT_ROUTE_POLICIES. Skip the
+    # portal whitelist check for them.
+    if payload.token_type == "user":
+        return
+
     path = request.url.path
     method = request.method.upper()
     required_scope = _required_scope_for_pat(method, path)
@@ -102,7 +214,18 @@ def create_access_token(
     subject: str | uuid.UUID,
     token_type: str | None = None,
     expires_delta: timedelta | None = None,
+    scopes: list[AnyScope] | None = None,
+    issued_via: Literal["portal", "third_party"] = "portal",
+    via_api_key: bool = False,
+    api_key_id: str | None = None,
 ) -> str:
+    """Mint a signed JWT.
+
+    ``scopes`` and ``issued_via`` are encoded only when they carry non-default
+    values to keep legacy token payloads minimal. The exception: when
+    ``issued_via="third_party"``, ``scopes`` is always encoded because it is
+    the defining property of a third-party token.
+    """
     if expires_delta:
         expire = datetime.now(UTC) + expires_delta
     else:
@@ -116,17 +239,55 @@ def create_access_token(
     }
     if token_type:
         to_encode["token_type"] = token_type
+    if issued_via != "portal":
+        to_encode["issued_via"] = issued_via
+    if scopes:
+        to_encode["scopes"] = list(scopes)
+    elif issued_via == "third_party":
+        # Always encode scopes for third-party tokens even if empty.
+        to_encode["scopes"] = []
+    if via_api_key:
+        to_encode["via_api_key"] = True
+    if api_key_id is not None:
+        to_encode["api_key_id"] = api_key_id
 
     return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=ALGORITHM)
 
 
 def decode_access_token(token: str) -> TokenPayload:
+    """Decode a JWT and return a TokenPayload.
+
+    Grace-period rule (backward compat):
+        If ``token_type == "human"`` and the JWT carries no ``scopes`` field
+        (or ``scopes == []``) and no ``issued_via`` field, synthesise
+        ``scopes=["portal:*"]`` and ``issued_via="portal"``. This covers
+        legacy portal JWTs in flight at deploy time. The grace period self-
+        bounds via the token's own ``exp``.
+
+    User tokens (``token_type == "user"``) do NOT receive grace synthesis —
+    admin scope enforcement runs in ``CurrentAdminOrApiKey`` which treats a
+    missing scopes field on a user JWT as "JWT path → trust role guard".
+    """
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[ALGORITHM])
+        token_type: str | None = payload.get("token_type")
+        raw_scopes: list[str] = payload.get("scopes", [])
+        issued_via: str = payload.get("issued_via", "portal")
+        via_api_key: bool = payload.get("via_api_key", False)
+        api_key_id: str | None = payload.get("api_key_id")
+
+        # Grace-period synthesis for human tokens with absent/empty scopes.
+        if token_type == "human" and not raw_scopes and issued_via == "portal":
+            raw_scopes = ["portal:*"]
+
         return TokenPayload(
             sub=payload["sub"],
             exp=payload["exp"],
-            token_type=payload.get("token_type"),
+            token_type=token_type,
+            issued_via=issued_via,
+            scopes=raw_scopes,  # type: ignore[arg-type]
+            via_api_key=via_api_key,
+            api_key_id=api_key_id,
         )
     except jwt.ExpiredSignatureError:
         raise HTTPException(
@@ -144,8 +305,17 @@ def decode_access_token(token: str) -> TokenPayload:
 
 def _resolve_api_key(token: str) -> TokenPayload:
     """Look up a raw API key on the global engine and return a TokenPayload
-    that mirrors the human JWT shape so downstream dependencies (e.g.
-    ``get_current_human``) can stay oblivious to the auth method.
+    that mirrors the human or user JWT shape so downstream dependencies can
+    stay oblivious to the auth method.
+
+    For human-owned keys (human_id set): returns ``token_type="human"`` with
+    ``sub=human_id``, same as the previous behaviour.
+
+    For admin-owned keys (user_id set, human_id None): returns
+    ``token_type="user"`` with ``sub=user_id`` and sets
+    ``api_key_tenant_id`` from the key row so that
+    ``get_admin_or_api_key_tenant_session`` can resolve the tenant without
+    going through ``CurrentUser`` (FLAG-2 fix).
 
     The lookup runs on the unscoped ``engine`` because at this point the
     request hasn't established a tenant context yet — RLS would otherwise
@@ -155,7 +325,6 @@ def _resolve_api_key(token: str) -> TokenPayload:
     # of the API surface and pulls in models that themselves transitively
     # depend on app.core.*.
     from app.api.api_key import crud as api_key_crud
-    from app.api.human.models import Humans
 
     with Session(engine) as session:
         row = api_key_crud.lookup_active_by_raw(session, token)
@@ -165,23 +334,48 @@ def _resolve_api_key(token: str) -> TokenPayload:
                 detail="Invalid or revoked API key",
                 headers={"WWW-Authenticate": "Bearer"},
             )
-        human = session.get(Humans, row.human_id)
-        if human is None or human.red_flag:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="API key owner is blocked from using API keys.",
+
+        # Branch on ownership type.
+        if row.human_id is not None:
+            # Human-owned key: original path.
+            from app.api.human.models import Humans
+
+            human = session.get(Humans, row.human_id)
+            if human is None or human.red_flag:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="API key owner is blocked from using API keys.",
+                )
+            api_key_crud.touch_last_used(session, row)
+            return TokenPayload(
+                sub=str(row.human_id),
+                exp=datetime.now(UTC) + timedelta(minutes=1),
+                token_type="human",
+                api_key_id=str(row.id),
+                scopes=row.scopes,  # type: ignore[arg-type]
+                via_api_key=True,
             )
-        api_key_crud.touch_last_used(session, row)
-        # Synthesise a far-future exp so the BaseModel field is satisfied;
-        # actual revocation/expiry is enforced at lookup time, not via JWT
-        # exp checks.
-        return TokenPayload(
-            sub=str(row.human_id),
-            exp=datetime.now(UTC) + timedelta(minutes=1),
-            token_type="human",
-            api_key_id=str(row.id),
-            scopes=row.scopes,
-            via_api_key=True,
+
+        # Admin-owned key (user_id is set).
+        if row.user_id is not None:
+            api_key_crud.touch_last_used(session, row)
+            return TokenPayload(
+                sub=str(row.user_id),
+                exp=datetime.now(UTC) + timedelta(minutes=1),
+                token_type="user",
+                api_key_id=str(row.id),
+                scopes=row.scopes,  # type: ignore[arg-type]
+                via_api_key=True,
+                # api_key_tenant_id lets get_admin_or_api_key_tenant_session
+                # resolve the tenant from the key row without needing CurrentUser.
+                api_key_tenant_id=row.tenant_id,
+            )
+
+        # Constraint violation: both are null. Should never happen in production
+        # because the DB CHECK constraint prevents it, but we guard defensively.
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="API key row has neither human_id nor user_id set.",
         )
 
 
