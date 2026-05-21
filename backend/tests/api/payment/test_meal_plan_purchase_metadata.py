@@ -40,7 +40,6 @@ from app.api.popup.models import Popups
 from app.api.product.models import Products
 from app.api.tenant.models import Tenants
 
-
 SAMPLE_METADATA = {
     "daily_choices": {
         "2026-06-01": "veggie",
