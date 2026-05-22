@@ -102,7 +102,7 @@ function VenueSelectImpl({
       <SelectTrigger className="w-full">
         <span className="truncate text-left">{triggerLabel}</span>
       </SelectTrigger>
-      <SelectContent>
+      <SelectContent className="max-h-[min(20rem,60svh)]">
         <SelectItem
           value={NONE_VALUE}
           className={cn(

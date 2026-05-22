@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 from enum import Enum
 from typing import Literal
 
@@ -119,11 +119,11 @@ class EventBase(SQLModel):
     # entry in Gmail / Apple Calendar / Outlook instead of creating a new one.
     ical_sequence: int = Field(default=0, ge=0)
     created_at: datetime = Field(
-        default_factory=datetime.utcnow,
+        default_factory=lambda: datetime.now(UTC),
         sa_type=DateTime(timezone=True),
     )
     updated_at: datetime = Field(
-        default_factory=datetime.utcnow,
+        default_factory=lambda: datetime.now(UTC),
         sa_type=DateTime(timezone=True),
     )
 

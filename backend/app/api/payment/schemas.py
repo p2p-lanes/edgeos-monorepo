@@ -69,6 +69,13 @@ class PaymentProductBase(SQLModel):
         default="USD",
         sa_column=Column(String(3), nullable=False, server_default="USD"),
     )
+    # Mirrors attendee_products.purchase_metadata. Captured at payment-creation
+    # time so the SimpleFI-webhook approval path can propagate it when
+    # materializing AttendeeProducts rows from this snapshot.
+    purchase_metadata: dict | None = Field(
+        default=None,
+        sa_column=Column(JSONB, nullable=True),
+    )
 
 
 class PaymentBase(SQLModel):
@@ -142,6 +149,12 @@ class PaymentProductRequest(BaseModel):
     attendee_id: uuid.UUID
     quantity: int = 1
     unit_price_override: Decimal | None = None
+    # Per-purchase metadata blob. Currently populated by the meal_plan_select
+    # step with {daily_choices, dietary_restriction, special_request}. When set,
+    # the resulting AttendeeProducts row(s) carry this blob in
+    # attendee_products.purchase_metadata. NULL for products that don't collect
+    # metadata.
+    purchase_metadata: dict | None = None
 
     @model_validator(mode="after")
     def validate_unit_price_override(self) -> "PaymentProductRequest":

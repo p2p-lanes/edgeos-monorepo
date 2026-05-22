@@ -704,6 +704,7 @@
       "creation_restricted_heading": "La creación de eventos está restringida",
       "creation_restricted_message": "Solo los admins pueden crear eventos para este pop-up.",
       "no_popup_error": "Sin popup",
+      "no_timezone_error": "El popup no tiene zona horaria configurada",
       "no_venue_option": "Reunión",
       "custom_location_option": "Ubicación personalizada",
       "venues_group_label": "Venues",

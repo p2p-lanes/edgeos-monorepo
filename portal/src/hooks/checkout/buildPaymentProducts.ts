@@ -7,6 +7,7 @@ import type { AttendeePassState } from "@/types/Attendee"
 import type {
   SelectedDynamicItem,
   SelectedHousingItem,
+  SelectedMealPlanItem,
   SelectedMerchItem,
   SelectedPassItem,
   SelectedPatronItem,
@@ -18,6 +19,7 @@ interface BuildPaymentProductsParams {
   housing: SelectedHousingItem | null
   merch: SelectedMerchItem[]
   patron: SelectedPatronItem | null
+  selectedMealPlans?: SelectedMealPlanItem[]
   dynamicItems: Record<string, SelectedDynamicItem[]>
   isEditing: boolean
   appCredit: string | number | null | undefined
@@ -73,6 +75,7 @@ export function buildPaymentProducts({
   housing,
   merch,
   patron,
+  selectedMealPlans = [],
   dynamicItems,
   isEditing,
   appCredit,
@@ -198,6 +201,22 @@ export function buildPaymentProducts({
           })
         }
       }
+    }
+
+    // Add meal plans — one PaymentProductRequest per (attendee, weekly product),
+    // each carrying the per-purchase metadata blob the backend persists onto
+    // AttendeeProducts.purchase_metadata.
+    for (const item of selectedMealPlans) {
+      products.push({
+        product_id: item.productId,
+        attendee_id: item.attendeeId,
+        quantity: 1,
+        purchase_metadata: {
+          daily_choices: item.dailyChoices,
+          dietary_restriction: item.dietaryRestriction,
+          special_request: item.specialRequest,
+        },
+      })
     }
   }
 

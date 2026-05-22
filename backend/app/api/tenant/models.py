@@ -22,6 +22,7 @@ if TYPE_CHECKING:
     from app.api.popup.models import Popups
     from app.api.product.models import Products
     from app.api.tenant.credential_models import TenantCredentials
+    from app.api.third_party_app.models import ThirdPartyApps
     from app.api.ticketing_step.models import TicketingSteps
     from app.api.translation.models import Translations
     from app.api.user.models import Users
@@ -40,16 +41,9 @@ class Tenants(TenantBase, table=True):
         ),
     )
 
-    # Third-party OTP surface. Presence of a non-null hash means the feature
-    # is enabled for this tenant. The cleartext key is NEVER stored; only the
-    # peppered SHA-256 hash and an 8-char prefix for display.
-    third_party_api_key_hash: str | None = Field(
-        default=None,
-        max_length=64,
-    )
-    third_party_key_prefix: str | None = Field(
-        default=None,
-        max_length=20,
+    # Third-party app integrations (replaces v1 single-key columns)
+    third_party_apps: list["ThirdPartyApps"] = Relationship(
+        back_populates="tenant", cascade_delete=True
     )
 
     # Core relationships

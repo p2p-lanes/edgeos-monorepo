@@ -73,7 +73,6 @@ def _make_pending_payment_with_snapshot(
         name="Link Attendee",
         category="main",
         email=f"att-{uuid.uuid4().hex[:8]}@test.com",
-        check_in_code=f"L{uuid.uuid4().hex[:4].upper()}",
     )
     db.add(attendee)
     db.flush()

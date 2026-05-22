@@ -23,9 +23,8 @@ from app.core.dependencies.users import (
     CurrentHuman,
     CurrentSuperadmin,
     HumanTenantSession,
-    RequireHumanScopeDirectoryRead,
-    RequireHumanScopeSelfRead,
     TenantSession,
+    needs,
 )
 from app.services.email_helpers import send_application_status_email
 
@@ -113,30 +112,42 @@ async def create_human(
     return HumanPublic.model_validate(human)
 
 
-@router.get("/me", response_model=HumanPublic)
+@router.get(
+    "/me",
+    response_model=HumanPublic,
+    summary="Get your profile",
+    dependencies=[needs("portal:profile:read")],
+)
 async def get_current_human_info(
     current_user: CurrentHuman,
-    _scope: RequireHumanScopeSelfRead,
 ) -> HumanPublic:
     return HumanPublic.model_validate(current_user)
 
 
-@router.get("/me/profile-stats", response_model=HumanProfileStats)
+@router.get(
+    "/me/profile-stats",
+    response_model=HumanProfileStats,
+    summary="Get your profile stats",
+    dependencies=[needs("portal:profile:read")],
+)
 async def get_current_human_profile_stats(
     current_human: CurrentHuman,
     db: HumanTenantSession,
-    _scope: RequireHumanScopeSelfRead,
 ) -> HumanProfileStats:
     """Aggregate popup history and total days attended for the profile page."""
     return crud.get_profile_stats(db, current_human.id)
 
 
-@router.patch("/me", response_model=HumanPublic)
+@router.patch(
+    "/me",
+    response_model=HumanPublic,
+    summary="Update your profile",
+    dependencies=[needs("portal:profile:write")],
+)
 async def update_current_human(
     human_in: HumanProfileUpdate,
     current_human: CurrentHuman,
     db: HumanTenantSession,
-    _scope: RequireHumanScopeSelfRead,
 ) -> HumanPublic:
     """Update the current authenticated human's profile."""
     human = crud.get(db, current_human.id)
@@ -151,11 +162,15 @@ async def update_current_human(
     return HumanPublic.model_validate(updated)
 
 
-@router.get("/portal/search", response_model=ListModel[HumanPortalPublic])
+@router.get(
+    "/portal/search",
+    response_model=ListModel[HumanPortalPublic],
+    summary="Search participants directory",
+    dependencies=[needs("portal:directory:read")],
+)
 async def search_humans_portal(
     db: HumanTenantSession,
     _: CurrentHuman,
-    _scope: RequireHumanScopeDirectoryRead,
     search: str | None = None,
     skip: PaginationSkip = 0,
     limit: PaginationLimit = 20,

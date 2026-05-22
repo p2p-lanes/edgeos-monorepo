@@ -36,7 +36,6 @@ function createAttendee(products: ProductsPass[]): AttendeePassState {
     category: "main",
     email: "main@example.com",
     gender: null,
-    check_in_code: "",
     poap_url: null,
     created_at: null,
     updated_at: null,

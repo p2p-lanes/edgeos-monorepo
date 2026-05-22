@@ -350,13 +350,24 @@ class ApplicationSnapshotPublic(BaseModel):
 class AttendeeTicketInfo(BaseModel):
     """Per-ticket info exposed on companion participation responses.
 
-    `check_in_code` is the per-ticket code from `attendee_products` — the
-    source of truth post-`ticket-as-first-class-entity`. New clients MUST read
-    from this list rather than the legacy `AttendeeInfo.check_in_code`.
+    `check_in_code` is the per-ticket code from `attendee_products`. Check-in
+    codes belong to purchased tickets, not to attendees.
+
+    `product_name`, `product_category`, and `requires_check_in` are
+    denormalized from the related Product so the portal can render the same
+    per-ticket QR list the main applicant sees without an extra round-trip.
+
+    `last_scan_at` is the most recent occurred_at from check_ins for this
+    ticket (None when never scanned). The portal uses it to flag already-used
+    QR codes — same behavior as the main applicant's pass view.
     """
 
     id: uuid.UUID
     check_in_code: str
+    product_name: str | None = None
+    product_category: str | None = None
+    requires_check_in: bool = False
+    last_scan_at: datetime | None = None
 
 
 class AttendeeInfo(BaseModel):
@@ -365,10 +376,6 @@ class AttendeeInfo(BaseModel):
     id: uuid.UUID
     name: str
     category: str | None = None
-    # Legacy attendee-level code. Kept for backwards compatibility with old
-    # clients that read it directly. New attendees no longer populate it —
-    # clients SHOULD prefer `tickets[].check_in_code`.
-    check_in_code: str | None = None
     tickets: list[AttendeeTicketInfo] = []
 
 

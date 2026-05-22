@@ -26,6 +26,7 @@ function makeProduct(id: string): ProductsPass {
 function makeAttendee(
   category: string,
   products: ProductsPass[],
+  categoryId?: string,
 ): AttendeePassState {
   return {
     id: "attendee-1",
@@ -33,6 +34,7 @@ function makeAttendee(
     popup_id: "popup-1",
     name: "Test Attendee",
     category,
+    category_id: categoryId ?? null,
     products,
   } as AttendeePassState
 }
@@ -57,13 +59,13 @@ describe("buildSectionGroups — attendee_categories filtering", () => {
     ]
 
     const mainResult = buildSectionGroups(
-      makeAttendee("main", [prodSpouse]),
+      makeAttendee("main", [prodSpouse], "main"),
       sections,
     )
     expect(mainResult).toHaveLength(0)
 
     const spouseResult = buildSectionGroups(
-      makeAttendee("spouse", [prodSpouse]),
+      makeAttendee("spouse", [prodSpouse], "spouse"),
       sections,
     )
     expect(spouseResult).toHaveLength(1)
@@ -82,13 +84,16 @@ describe("buildSectionGroups — attendee_categories filtering", () => {
     ]
 
     expect(
-      buildSectionGroups(makeAttendee("spouse", [prodSpouse]), sections),
+      buildSectionGroups(
+        makeAttendee("spouse", [prodSpouse], "spouse"),
+        sections,
+      ),
     ).toHaveLength(1)
     expect(
-      buildSectionGroups(makeAttendee("kid", [prodSpouse]), sections),
+      buildSectionGroups(makeAttendee("kid", [prodSpouse], "kid"), sections),
     ).toHaveLength(1)
     expect(
-      buildSectionGroups(makeAttendee("main", [prodSpouse]), sections),
+      buildSectionGroups(makeAttendee("main", [prodSpouse], "main"), sections),
     ).toHaveLength(0)
   })
 
@@ -107,42 +112,6 @@ describe("buildSectionGroups — attendee_categories filtering", () => {
       const result = buildSectionGroups(makeAttendee(cat, [prodAll]), sections)
       expect(result).toHaveLength(1)
     }
-  })
-
-  it("kid-gated section: teen attendee is included via normalisation", () => {
-    const sections = [
-      {
-        key: "kid-only",
-        label: "Kid Section",
-        order: 0,
-        product_ids: ["prod-spouse"],
-        attendee_categories: ["kid"],
-      },
-    ]
-
-    const result = buildSectionGroups(
-      makeAttendee("teen", [prodSpouse]),
-      sections,
-    )
-    expect(result).toHaveLength(1)
-  })
-
-  it("kid-gated section: baby attendee is included via normalisation", () => {
-    const sections = [
-      {
-        key: "kid-only",
-        label: "Kid Section",
-        order: 0,
-        product_ids: ["prod-spouse"],
-        attendee_categories: ["kid"],
-      },
-    ]
-
-    const result = buildSectionGroups(
-      makeAttendee("baby", [prodSpouse]),
-      sections,
-    )
-    expect(result).toHaveLength(1)
   })
 
   it("empty attendee_categories list: section hidden for all attendees", () => {

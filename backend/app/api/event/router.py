@@ -273,6 +273,7 @@ def _find_venue_availability_issue(
     start_time: datetime,
     end_time: datetime,
     exclude_event_id: uuid.UUID | None = None,
+    allow_unbookable: bool = False,
 ) -> tuple[int, str] | None:
     """Same gates as :func:`_check_venue_availability`, but returns
     ``(status_code, detail)`` instead of raising.
@@ -282,6 +283,10 @@ def _find_venue_availability_issue(
     the offending occurrence's local label so a 409 says *which* day in
     the series clashed instead of just "Venue already booked". Returns
     ``None`` when the window is clean.
+
+    ``allow_unbookable`` lets backoffice (admin) callers bypass the
+    UNBOOKABLE check — the flag is a portal-facing restriction only. The
+    open-hours and conflict gates still apply.
     """
     from app.api.event_venue.models import EventVenues
     from app.api.event_venue.schemas import VenueBookingMode
@@ -290,7 +295,7 @@ def _find_venue_availability_issue(
     if not venue:
         return (404, "Venue not found")
     effective_mode = _resolve_effective_booking_mode(db, venue, start_time, end_time)
-    if effective_mode == VenueBookingMode.UNBOOKABLE.value:
+    if not allow_unbookable and effective_mode == VenueBookingMode.UNBOOKABLE.value:
         return (409, "Venue is not bookable at the selected time")
 
     open_hours_issue = _find_venue_open_hours_issue(db, venue, start_time, end_time)
@@ -322,6 +327,7 @@ def _check_venue_availability(
     start_time: datetime,
     end_time: datetime,
     exclude_event_id: uuid.UUID | None = None,
+    allow_unbookable: bool = False,
 ) -> None:
     """Raise 400/409 if the window is outside open hours or collides with
     an existing booking."""
@@ -331,6 +337,7 @@ def _check_venue_availability(
         start_time=start_time,
         end_time=end_time,
         exclude_event_id=exclude_event_id,
+        allow_unbookable=allow_unbookable,
     )
     if issue is not None:
         raise HTTPException(status_code=issue[0], detail=issue[1])
@@ -518,6 +525,7 @@ def _check_recurrence_conflicts(
     exdates: list | None,
     exclude_event_id: uuid.UUID | None = None,
     timezone: str = "UTC",
+    allow_unbookable: bool = False,
 ) -> None:
     """For recurring events, expand each instance and run the anti-overlap
     venue check. Bails out on first conflict with 409.
@@ -534,6 +542,7 @@ def _check_recurrence_conflicts(
             start_time=start_time,
             end_time=end_time,
             exclude_event_id=exclude_event_id,
+            allow_unbookable=allow_unbookable,
         )
         return
 
@@ -548,6 +557,7 @@ def _check_recurrence_conflicts(
             start_time=start_time,
             end_time=end_time,
             exclude_event_id=exclude_event_id,
+            allow_unbookable=allow_unbookable,
         )
         return
 
@@ -571,6 +581,7 @@ def _check_recurrence_conflicts(
             start_time=occ_start,
             end_time=occ_start + duration,
             exclude_event_id=exclude_event_id,
+            allow_unbookable=allow_unbookable,
         )
         if issue is None:
             continue
@@ -584,7 +595,7 @@ def _check_recurrence_conflicts(
 
 def _render_ics(event) -> str:
     """Render a minimal, RFC-5545-compliant VCALENDAR string for one event."""
-    dtstamp = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
+    dtstamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     dtstart = event.start_time.strftime("%Y%m%dT%H%M%SZ")
     dtend = event.end_time.strftime("%Y%m%dT%H%M%SZ")
     summary = (event.title or "").replace("\n", " ").replace(",", r"\,")
@@ -875,6 +886,7 @@ async def create_event(
             rrule_str=rrule_str,
             exdates=None,
             timezone=event_in.timezone,
+            allow_unbookable=True,
         )
 
     tenant_id = (
@@ -945,6 +957,7 @@ async def update_event(
             exdates=list(event.recurrence_exdates or []),
             exclude_event_id=event.id,
             timezone=event_in.timezone or event.timezone,
+            allow_unbookable=True,
         )
 
     # Transition: switching to a venue clears any prior custom location, and
@@ -1254,8 +1267,15 @@ async def delete_occurrence(
 def _run_availability_check(
     db: Session,
     payload: EventAvailabilityCheck,
+    *,
+    allow_unbookable: bool = False,
 ) -> EventAvailabilityResult:
-    """Shared implementation for the user- and portal-facing availability checks."""
+    """Shared implementation for the user- and portal-facing availability checks.
+
+    ``allow_unbookable`` lets backoffice (admin) callers continue past the
+    UNBOOKABLE check — it's a portal-facing restriction only. The remaining
+    conflict scan still runs so admins still see overlapping bookings.
+    """
     from app.api.event_venue.models import EventVenues
     from app.api.event_venue.schemas import VenueBookingMode
 
@@ -1265,7 +1285,7 @@ def _run_availability_check(
     effective_mode = _resolve_effective_booking_mode(
         db, venue, payload.start_time, payload.end_time
     )
-    if effective_mode == VenueBookingMode.UNBOOKABLE.value:
+    if not allow_unbookable and effective_mode == VenueBookingMode.UNBOOKABLE.value:
         return EventAvailabilityResult(
             available=False,
             conflicts=[],
@@ -1301,7 +1321,7 @@ async def check_availability(
     _: AdminOrApiKey_EventsRead,
 ) -> EventAvailabilityResult:
     """Check whether a venue is free for a candidate time window."""
-    return _run_availability_check(db, payload)
+    return _run_availability_check(db, payload, allow_unbookable=True)
 
 
 @router.post(
@@ -1405,6 +1425,7 @@ async def check_recurring_availability(
                 end_time=payload.end_time,
                 exclude_event_id=payload.exclude_event_id,
             ),
+            allow_unbookable=True,
         )
         if single.available:
             return EventRecurringAvailabilityResult(
@@ -1467,6 +1488,7 @@ async def check_recurring_availability(
             start_time=occ_start,
             end_time=occ_start + duration,
             exclude_event_id=payload.exclude_event_id,
+            allow_unbookable=True,
         )
         if issue is None:
             continue
@@ -1987,10 +2009,14 @@ async def list_portal_events(
     # filter here unconditionally.
     visible = [e for e in visible if e.status != EventStatus.CANCELLED]
 
-    def _rsvp_lookup_key(e) -> tuple[uuid.UUID, datetime | None] | None:
+    def _rsvp_lookup_key(e) -> tuple[uuid.UUID, datetime | None]:
         """Build the ``(event_id, occurrence_start)`` key used to find this
-        user's RSVP row. Returns ``None`` for series-master rows surfaced
-        directly (RSVPs are per-occurrence, not series-wide).
+        user's RSVP row. RSVPs for recurring events are per-occurrence, so
+        every recurring row — expanded pseudo-rows, detached override
+        children, and the master itself — maps to its own occurrence's
+        ``start_time``. The master's ``start_time`` IS the first
+        occurrence's dtstart, so it shares the same key as its expanded
+        siblings.
         """
         is_expanded = e.__dict__.get("_occurrence_id") is not None
         if is_expanded:
@@ -1998,7 +2024,7 @@ async def list_portal_events(
         if getattr(e, "recurrence_master_id", None):
             return (e.recurrence_master_id, e.start_time)
         if getattr(e, "rrule", None):
-            return None
+            return (e.id, e.start_time)
         return (e.id, None)
 
     if rsvped_only:
@@ -2173,6 +2199,12 @@ async def get_portal_event(
     from app.api.event_participant.models import EventParticipants
 
     rsvp_event_id = event.recurrence_master_id or event.id
+    # RSVPs for recurring events are per-occurrence. When the detail page
+    # lands on a series master without ?occ=, treat it as the first
+    # occurrence (the master's own start_time IS the first occurrence's
+    # dtstart) so we find the RSVP row the portal just created.
+    if occurrence_start is None and event.rrule:
+        occurrence_start = event.start_time
     rsvp_q = (
         select(EventParticipants.status)
         .where(EventParticipants.profile_id == current_human.id)

@@ -18,6 +18,7 @@ import { FormPageLayout } from "@/components/Common/FormPageLayout"
 import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
 import {
   CONTENT_ONLY_TEMPLATES,
+  getStepTypeDefinition,
   TEMPLATE_DEFINITIONS,
 } from "@/components/ticketing-step-builder/constants"
 import { TEMPLATE_CONFIG_REGISTRY } from "@/components/ticketing-step-builder/template-configs"
@@ -247,14 +248,32 @@ function StepConfigContent({ stepId }: { stepId: string }) {
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="step-title">Title</Label>
             <div className="flex gap-1.5">
-              <Input
-                id="step-emoji"
-                aria-label="Step emoji"
-                value={emoji}
-                onChange={(e) => setEmoji(e.target.value.slice(0, 8))}
-                placeholder="🎟️"
-                className="w-16 text-center text-lg"
-              />
+              <div className="relative w-16">
+                <Input
+                  id="step-emoji"
+                  aria-label="Step emoji"
+                  value={emoji}
+                  onChange={(e) => setEmoji(e.target.value.slice(0, 8))}
+                  className="w-full text-center text-lg"
+                />
+                {/* When the operator hasn't picked a custom emoji, render the
+                    step-type's resolved default icon inside the input so the
+                    preview matches what the checkout nav will actually show.
+                    Replaces the legacy hardcoded "🎟️" placeholder which made
+                    every step look like Tickets by default. */}
+                {!emoji &&
+                  (() => {
+                    const DefaultIcon = getStepTypeDefinition(
+                      step.step_type,
+                    )?.icon
+                    return DefaultIcon ? (
+                      <DefaultIcon
+                        className="absolute inset-0 m-auto h-4 w-4 text-muted-foreground pointer-events-none"
+                        aria-hidden="true"
+                      />
+                    ) : null
+                  })()}
+              </div>
               <Input
                 id="step-title"
                 value={title}
@@ -264,7 +283,7 @@ function StepConfigContent({ stepId }: { stepId: string }) {
             </div>
             <p className="text-xs text-muted-foreground">
               Optional emoji replaces the default icon in the checkout step nav.
-              Leave blank to keep the built-in icon.
+              Leave blank to keep the built-in icon (shown faded above).
             </p>
           </div>
 

@@ -29,6 +29,7 @@ import {
   useCreditCalculation,
   useHousingSelection,
   useInsuranceCalculation,
+  useMealPlanSelection,
   useMerchSelection,
   usePatronSelection,
   usePaymentSubmit,
@@ -86,6 +87,26 @@ interface CheckoutContextValue {
     isCustom?: boolean,
   ) => void
   clearPatron: () => void
+  /** Add a meal-plan cart entry for (attendee, weekly product). `weekdayDates`
+   *  are the Mon–Fri ISO dates derived by the variant from the step's
+   *  template_config coverage range. The reducer seeds dailyChoices to
+   *  {date: "chef"} for every weekday. */
+  addMealPlan: (
+    attendeeId: string,
+    productId: string,
+    weekdayDates: string[],
+  ) => void
+  removeMealPlan: (attendeeId: string, productId: string) => void
+  setMealPlanDailyChoice: (
+    attendeeId: string,
+    productId: string,
+    date: string,
+    menuKey: string,
+  ) => void
+  /** Per-attendee field — synced across every meal-plan entry for the attendee. */
+  setMealPlanDietaryRestriction: (attendeeId: string, value: string) => void
+  /** Per-attendee field — synced across every meal-plan entry for the attendee. */
+  setMealPlanSpecialRequest: (attendeeId: string, value: string) => void
   applyPromoCode: (code: string) => Promise<boolean>
   clearPromoCode: () => void
   toggleInsurance: () => void
@@ -358,6 +379,16 @@ export function CheckoutProvider({
   const { patron, setPatron, setPatronAmount, clearPatron } =
     usePatronSelection(allActiveProducts)
 
+  const {
+    mealPlans: selectedMealPlans,
+    setMealPlans: setSelectedMealPlans,
+    addMealPlan,
+    removeMealPlan,
+    setMealPlanDailyChoice,
+    setMealPlanDietaryRestriction,
+    setMealPlanSpecialRequest,
+  } = useMealPlanSelection(allActiveProducts)
+
   const [insurance, setInsurance] = useState(false)
   const [termsAccepted, setTermsAccepted] = useState(false)
   const [dynamicItems, setDynamicItems] = useState<
@@ -461,6 +492,7 @@ export function CheckoutProvider({
     housing,
     merch,
     patron,
+    selectedMealPlans,
     promoCode: "",
     promoCodeValid: false,
     insurance,
@@ -484,6 +516,7 @@ export function CheckoutProvider({
       setHousing,
       setMerch,
       setPatron,
+      setMealPlans: setSelectedMealPlans,
       setInsurance,
     },
     hasRestoredCheckoutRef,
@@ -540,6 +573,7 @@ export function CheckoutProvider({
     housing,
     merch,
     patron,
+    selectedMealPlans,
     promoCode,
     promoCodeValid,
     insurance,
@@ -557,6 +591,7 @@ export function CheckoutProvider({
     housing,
     merch,
     patron,
+    selectedMealPlans,
     promoCode,
     promoCodeValid,
     insurance,
@@ -618,6 +653,7 @@ export function CheckoutProvider({
     housing,
     merch,
     patron,
+    mealPlans: selectedMealPlans,
     insuranceAmount,
     contributionAmount,
     isEditing,
@@ -636,6 +672,7 @@ export function CheckoutProvider({
     setHousing(null)
     setMerch([])
     setPatron(null)
+    setSelectedMealPlans([])
     setPromoCode("")
     setPromoCodeValid(false)
     setPromoCodeDiscount(0)
@@ -647,6 +684,7 @@ export function CheckoutProvider({
     setHousing,
     setMerch,
     setPatron,
+    setSelectedMealPlans,
     setPromoCode,
     setPromoCodeValid,
     setPromoCodeDiscount,
@@ -710,6 +748,7 @@ export function CheckoutProvider({
       housing,
       merch,
       patron,
+      mealPlans: selectedMealPlans,
       promoCode,
       promoCodeValid,
       promoCodeDiscount,
@@ -723,6 +762,7 @@ export function CheckoutProvider({
       housing,
       merch,
       patron,
+      selectedMealPlans,
       promoCode,
       promoCodeValid,
       promoCodeDiscount,
@@ -794,6 +834,7 @@ export function CheckoutProvider({
     !!housing ||
     merch.length > 0 ||
     !!patron ||
+    selectedMealPlans.length > 0 ||
     Object.values(dynamicItems).some((items) => items.length > 0)
 
   // Dynamic item actions
@@ -908,6 +949,7 @@ export function CheckoutProvider({
     clearHousing()
     setMerch([])
     clearPatron()
+    setSelectedMealPlans([])
     clearPromoCode()
     setInsurance(false)
     setDynamicItems({})
@@ -917,6 +959,7 @@ export function CheckoutProvider({
     clearHousing,
     setMerch,
     clearPatron,
+    setSelectedMealPlans,
     clearPromoCode,
   ])
 
@@ -932,6 +975,7 @@ export function CheckoutProvider({
     housing,
     merch,
     patron,
+    selectedMealPlans,
     dynamicItems,
     promoCode,
     promoCodeValid,
@@ -997,6 +1041,11 @@ export function CheckoutProvider({
     updateMerchQuantity,
     setPatronAmount,
     clearPatron,
+    addMealPlan,
+    removeMealPlan,
+    setMealPlanDailyChoice,
+    setMealPlanDietaryRestriction,
+    setMealPlanSpecialRequest,
     applyPromoCode,
     clearPromoCode,
     toggleInsurance,

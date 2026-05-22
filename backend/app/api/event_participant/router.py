@@ -20,6 +20,7 @@ from app.core.dependencies.users import (
     AdminOrApiKeySession_RsvpWrite,
     CurrentHuman,
     HumanTenantSession,
+    needs,
 )
 
 router = APIRouter(prefix="/event-participants", tags=["event-participants"])
@@ -225,7 +226,16 @@ async def list_portal_participants(
     )
 
 
-@router.post("/portal/register/{event_id}", response_model=EventParticipantPublic)
+@router.post(
+    "/portal/register/{event_id}",
+    response_model=EventParticipantPublic,
+    summary="RSVP to an event",
+    # JWT path: only the portal:* wildcard (regular portal users) passes.
+    # Third-party JWTs must use the api-key surface with `rsvp:write`.
+    # API-key callers bypass this guard (see require_human_scope) and are
+    # gated by _PAT_ROUTE_POLICIES in core.security.
+    dependencies=[needs("portal:*")],
+)
 async def register_for_event(
     event_id: uuid.UUID,
     db: HumanTenantSession,
@@ -338,7 +348,14 @@ async def _notify_rsvp(
 
 
 @router.post(
-    "/portal/cancel-registration/{event_id}", response_model=EventParticipantPublic
+    "/portal/cancel-registration/{event_id}",
+    response_model=EventParticipantPublic,
+    summary="Cancel your RSVP to an event",
+    # JWT path: only the portal:* wildcard (regular portal users) passes.
+    # Third-party JWTs must use the api-key surface with `rsvp:write`.
+    # API-key callers bypass this guard (see require_human_scope) and are
+    # gated by _PAT_ROUTE_POLICIES in core.security.
+    dependencies=[needs("portal:*")],
 )
 async def cancel_registration(
     event_id: uuid.UUID,

@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy import Text
@@ -19,10 +19,10 @@ class TrackBase(SQLModel):
         sa_column=Column(JSONB, nullable=False, server_default="[]"),
     )
     created_at: datetime = Field(
-        default_factory=datetime.utcnow, sa_type=DateTime(timezone=True)
+        default_factory=lambda: datetime.now(UTC), sa_type=DateTime(timezone=True)
     )
     updated_at: datetime = Field(
-        default_factory=datetime.utcnow, sa_type=DateTime(timezone=True)
+        default_factory=lambda: datetime.now(UTC), sa_type=DateTime(timezone=True)
     )
 
 

@@ -74,7 +74,6 @@ def _make_attendee(
         human_id=human.id,
         name="GAP Test Attendee",
         category="main",
-        check_in_code=None,
         email=human.email,
     )
     db.add(attendee)

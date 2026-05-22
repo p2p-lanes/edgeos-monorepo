@@ -18,11 +18,20 @@ from app.core.db import engine
 # Human/portal scope universe. These map to what a portal JWT (or a JWT issued
 # by the third-party OTP surface) may carry. They are completely disjoint from
 # ApiKeyScope so that a union type can be used on TokenPayload.scopes.
+# Each granular scope describes WHICH resource + WHICH action. New routes
+# attach a scope inline via `dependencies=[needs("portal:resource:action")]`
+# (see app.core.dependencies.users.needs). The registry walker discovers the
+# scope automatically — no per-scope alias needed.
 HumanScope = Literal[
     "portal:*",
-    "portal:self_read",
-    "portal:directory_read",
-    "portal:api_keys_manage",
+    "portal:profile:read",
+    "portal:profile:write",
+    "portal:applications:read",
+    "portal:applications:write",
+    "portal:attendees:write",
+    "portal:payments:read",
+    "portal:directory:read",
+    "portal:api_keys:manage",
 ]
 
 # Admin API-key scope universe. Defined here (not in app.api.api_key.schemas)
@@ -32,6 +41,7 @@ ApiKeyScope = Literal[
     "events:read",
     "events:write",
     "rsvp:write",
+    "venues:read",
     "venues:write",
     "applications:read",
     "applications:write",
@@ -63,20 +73,32 @@ AnyScope = HumanScope | ApiKeyScope
 # Scope universe constants
 # ---------------------------------------------------------------------------
 
-# Scopes embedded in a JWT issued by the third-party OTP flow. These are
-# HumanScope values — the third-party user gets portal access, not admin access.
-THIRD_PARTY_TOKEN_SCOPES: tuple[HumanScope, ...] = (
-    "portal:self_read",
-    "portal:directory_read",
-    "portal:api_keys_manage",
+# Maximum scopes embeddable in a JWT issued by the third-party OTP flow.
+# These are HumanScope values — the third-party user gets portal access,
+# not admin access. Per-app subsets are drawn from this ceiling.
+THIRD_PARTY_TOKEN_SCOPES_MAX: tuple[HumanScope, ...] = (
+    "portal:profile:read",
+    "portal:profile:write",
+    "portal:applications:read",
+    "portal:applications:write",
+    "portal:attendees:write",
+    "portal:payments:read",
+    "portal:directory:read",
+    "portal:api_keys:manage",
 )
+# Note: RSVP write capability is delivered through the api-key surface (the
+# `rsvp:write` ApiKeyScope in THIRD_PARTY_API_KEY_SCOPES_MAX). The agent
+# mints an api key via portal:api_keys:manage and uses it against the
+# /event-participants/portal/{register,cancel-registration} endpoints, so a
+# dedicated JWT-level rsvp scope would be redundant.
 
-# Scopes that a human may request when minting an API key via the third-party
-# OTP surface. Intentionally narrow — external partners get event-read and
-# rsvp-write only.
-THIRD_PARTY_API_KEY_SCOPES: frozenset[str] = frozenset({
+# Maximum scopes a human may request when minting an API key via the
+# third-party OTP surface. Per-app subsets are drawn from this ceiling.
+# Intentionally narrow — external partners get event-read and rsvp-write only.
+THIRD_PARTY_API_KEY_SCOPES_MAX: frozenset[str] = frozenset({
     "events:read",
     "rsvp:write",
+    "venues:read",
 })
 
 # Full admin scope universe. Explicitly EXCLUDES: email_templates, users,
@@ -85,6 +107,7 @@ ADMIN_API_KEY_SCOPES: frozenset[str] = frozenset({
     "events:read",
     "events:write",
     "rsvp:write",
+    "venues:read",
     "venues:write",
     "applications:read",
     "applications:write",
@@ -142,41 +165,61 @@ class TokenPayload(BaseModel):
     # get_admin_or_api_key_tenant_session resolve tenant without going through
     # CurrentUser. NOT serialised into any JWT.
     api_key_tenant_id: uuid.UUID | None = None
+    # Identifies which ThirdPartyApps row minted this JWT. Drives per-app scope
+    # enforcement at api-key minting and self-discovery.
+    # None for portal JWTs and for legacy v1 third-party JWTs in flight at
+    # deploy time.
+    # Grace-period contract: if issued_via=="third_party" AND issued_by_app_id
+    # is None, the JWT is a legacy v1 token and its embedded scopes are
+    # authoritative.
+    issued_by_app_id: uuid.UUID | None = None
 
 
-_PAT_ROUTE_POLICIES: dict[str, tuple[tuple[str, bool, ApiKeyScope], ...]] = {
+# Each entry: (route, exact_match, scopes_any_of). The api key must carry at
+# least one of `scopes_any_of` for the route to be accessible.
+_PAT_ROUTE_POLICIES: dict[
+    str, tuple[tuple[str, bool, tuple[ApiKeyScope, ...]], ...]
+] = {
     "GET": (
-        ("/api/v1/events/portal/events", False, "events:read"),
-        ("/api/v1/event-participants/portal/participants", False, "events:read"),
-        ("/api/v1/event-venues/portal/venues", False, "events:read"),
-        ("/api/v1/event-settings/portal/settings", False, "events:read"),
-        ("/api/v1/tracks/portal/tracks", False, "events:read"),
-        ("/api/v1/popups/portal/list", True, "events:read"),
-        ("/api/v1/popups/portal/", False, "events:read"),
+        ("/api/v1/events/portal/events", False, ("events:read",)),
+        ("/api/v1/event-participants/portal/participants", False, ("events:read",)),
+        ("/api/v1/event-venues/portal/venues", False, ("events:read", "venues:read")),
+        ("/api/v1/event-settings/portal/settings", False, ("events:read",)),
+        ("/api/v1/tracks/portal/tracks", False, ("events:read",)),
+        ("/api/v1/popups/portal/list", True, ("events:read",)),
+        ("/api/v1/popups/portal/", False, ("events:read",)),
     ),
     "POST": (
-        ("/api/v1/events/portal/events", True, "events:write"),
-        ("/api/v1/events/portal/events/", False, "events:write"),
-        ("/api/v1/event-venues/portal/venues", True, "venues:write"),
-        ("/api/v1/event-participants/portal/register/", False, "rsvp:write"),
-        ("/api/v1/event-participants/portal/cancel-registration/", False, "rsvp:write"),
+        ("/api/v1/events/portal/events", True, ("events:write",)),
+        ("/api/v1/events/portal/events/", False, ("events:write",)),
+        ("/api/v1/event-venues/portal/venues", True, ("venues:write",)),
+        ("/api/v1/event-participants/portal/register/", False, ("rsvp:write",)),
+        (
+            "/api/v1/event-participants/portal/cancel-registration/",
+            False,
+            ("rsvp:write",),
+        ),
     ),
     "PATCH": (
-        ("/api/v1/event-venues/portal/venues/", False, "venues:write"),
-        ("/api/v1/events/portal/events/", False, "events:write"),
+        ("/api/v1/event-venues/portal/venues/", False, ("venues:write",)),
+        ("/api/v1/events/portal/events/", False, ("events:write",)),
     ),
     "DELETE": (
-        ("/api/v1/event-venues/portal/venues/", False, "venues:write"),
-        ("/api/v1/events/portal/events/", False, "events:write"),
+        ("/api/v1/event-venues/portal/venues/", False, ("venues:write",)),
+        ("/api/v1/events/portal/events/", False, ("events:write",)),
     ),
 }
 
 
-def _required_scope_for_pat(method: str, path: str) -> ApiKeyScope | None:
+def _required_scopes_for_pat(
+    method: str, path: str
+) -> tuple[ApiKeyScope, ...] | None:
+    """Return the tuple of any-of scopes the route requires, or None if the
+    route is not in the PAT whitelist."""
     allowed_routes = _PAT_ROUTE_POLICIES.get(method, ())
-    for route, exact, scope in allowed_routes:
+    for route, exact, scopes in allowed_routes:
         if path == route if exact else path.startswith(route):
-            return scope
+            return scopes
     return None
 
 
@@ -192,9 +235,9 @@ def _enforce_api_key_policy(request: Request, payload: TokenPayload) -> None:
 
     path = request.url.path
     method = request.method.upper()
-    required_scope = _required_scope_for_pat(method, path)
+    required_scopes = _required_scopes_for_pat(method, path)
 
-    if required_scope is None:
+    if required_scopes is None:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=(
@@ -203,10 +246,10 @@ def _enforce_api_key_policy(request: Request, payload: TokenPayload) -> None:
             ),
         )
 
-    if required_scope not in payload.scopes:
+    if not any(s in payload.scopes for s in required_scopes):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"API key lacks required scope: {required_scope}",
+            detail=f"API key lacks required scope: {required_scopes[0]}",
         )
 
 
@@ -218,6 +261,7 @@ def create_access_token(
     issued_via: Literal["portal", "third_party"] = "portal",
     via_api_key: bool = False,
     api_key_id: str | None = None,
+    issued_by_app_id: uuid.UUID | None = None,
 ) -> str:
     """Mint a signed JWT.
 
@@ -225,6 +269,10 @@ def create_access_token(
     values to keep legacy token payloads minimal. The exception: when
     ``issued_via="third_party"``, ``scopes`` is always encoded because it is
     the defining property of a third-party token.
+
+    ``issued_by_app_id``: when set, encoded as a string UUID in the payload.
+    Identifies the ThirdPartyApps row that authorized this JWT issuance.
+    Omitted for portal JWTs and for legacy v1 third-party JWTs.
     """
     if expires_delta:
         expire = datetime.now(UTC) + expires_delta
@@ -250,6 +298,8 @@ def create_access_token(
         to_encode["via_api_key"] = True
     if api_key_id is not None:
         to_encode["api_key_id"] = api_key_id
+    if issued_by_app_id is not None:
+        to_encode["issued_by_app_id"] = str(issued_by_app_id)
 
     return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=ALGORITHM)
 
@@ -275,6 +325,10 @@ def decode_access_token(token: str) -> TokenPayload:
         issued_via: str = payload.get("issued_via", "portal")
         via_api_key: bool = payload.get("via_api_key", False)
         api_key_id: str | None = payload.get("api_key_id")
+        raw_app_id: str | None = payload.get("issued_by_app_id")
+        issued_by_app_id: uuid.UUID | None = (
+            uuid.UUID(raw_app_id) if raw_app_id else None
+        )
 
         # Grace-period synthesis for human tokens with absent/empty scopes.
         if token_type == "human" and not raw_scopes and issued_via == "portal":
@@ -288,6 +342,7 @@ def decode_access_token(token: str) -> TokenPayload:
             scopes=raw_scopes,  # type: ignore[arg-type]
             via_api_key=via_api_key,
             api_key_id=api_key_id,
+            issued_by_app_id=issued_by_app_id,
         )
     except jwt.ExpiredSignatureError:
         raise HTTPException(

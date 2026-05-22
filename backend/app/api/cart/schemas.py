@@ -37,6 +37,25 @@ class CartItemPatron(BaseModel):
     is_custom_amount: bool = False
 
 
+class CartItemMealPlan(BaseModel):
+    """Meal-plan selection in cart (one row per attendee × weekly product).
+
+    All metadata fields are nullable in cart because the buyer fills them
+    incrementally — completeness is enforced only at checkout submission.
+
+    `daily_choices` maps ISO weekday dates (YYYY-MM-DD) to menu_option keys
+    (or the literal "chef" for chef's choice). `dietary_restriction` and
+    `special_request` apply at the attendee level — the frontend / reducer
+    keeps them in sync across every meal_plans entry for that attendee.
+    """
+
+    attendee_id: str
+    product_id: str
+    daily_choices: dict[str, str] | None = None
+    dietary_restriction: str | None = None
+    special_request: str | None = None
+
+
 class CartState(BaseModel):
     """Full cart state stored as JSONB."""
 
@@ -44,6 +63,7 @@ class CartState(BaseModel):
     housing: CartItemHousing | None = None
     merch: list[CartItemMerch] = []
     patron: CartItemPatron | None = None
+    meal_plans: list[CartItemMealPlan] = []
     promo_code: str | None = None
     insurance: bool = False
     current_step: str | None = None
