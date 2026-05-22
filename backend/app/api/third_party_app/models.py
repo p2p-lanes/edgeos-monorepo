@@ -11,7 +11,7 @@ cannot express a functional WHERE clause portably.
 """
 
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from sqlalchemy import Index, text
@@ -69,11 +69,11 @@ class ThirdPartyApps(SQLModel, table=True):
         sa_column=Column(DateTime(timezone=True), nullable=True),
     )
     created_at: datetime = Field(
-        default_factory=datetime.utcnow,
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )
     updated_at: datetime = Field(
-        default_factory=datetime.utcnow,
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )
 
