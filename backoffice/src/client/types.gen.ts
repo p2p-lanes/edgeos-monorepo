@@ -439,7 +439,6 @@ export type AttendeeInfo = {
     id: string;
     name: string;
     category?: (string | null);
-    check_in_code?: (string | null);
     tickets?: Array<AttendeeTicketInfo>;
 };
 
@@ -448,7 +447,7 @@ export type AttendeeInfo = {
  *
  * Uses ProductWithQuantity for the products field to preserve the legacy
  * shape returned by the list endpoint. Use AttendeePublic for detail views
- * where AttendeeProductPublic (with check_in_code) is needed.
+ * where AttendeeProductPublic (with per-ticket check_in_code) is needed.
  */
 export type AttendeeListItem = {
     tenant_id: string;
@@ -459,7 +458,6 @@ export type AttendeeListItem = {
     category_id?: (string | null);
     email?: (string | null);
     gender?: (string | null);
-    check_in_code?: (string | null);
     poap_url?: (string | null);
     id: string;
     category?: (string | null);
@@ -503,7 +501,8 @@ export type AttendeeProductPublic = {
  * Attendee schema for API responses (detail view).
  *
  * products is typed as list[AttendeeProductPublic] so each entry carries
- * check_in_code, payment_id, and requires_check_in. The list endpoint
+ * its own check_in_code, payment_id, and requires_check_in. Check-in codes
+ * belong to purchased tickets, not to the attendee itself. The list endpoint
  * (GET /attendees) uses the separate AttendeeListItem schema which keeps
  * the legacy ProductWithQuantity shape for backwards compatibility.
  *
@@ -519,7 +518,6 @@ export type AttendeePublic = {
     category_id?: (string | null);
     email?: (string | null);
     gender?: (string | null);
-    check_in_code?: (string | null);
     poap_url?: (string | null);
     id: string;
     category?: (string | null);
@@ -570,13 +568,24 @@ export type AttendeeStats = {
 /**
  * Per-ticket info exposed on companion participation responses.
  *
- * `check_in_code` is the per-ticket code from `attendee_products` — the
- * source of truth post-`ticket-as-first-class-entity`. New clients MUST read
- * from this list rather than the legacy `AttendeeInfo.check_in_code`.
+ * `check_in_code` is the per-ticket code from `attendee_products`. Check-in
+ * codes belong to purchased tickets, not to attendees.
+ *
+ * `product_name`, `product_category`, and `requires_check_in` are
+ * denormalized from the related Product so the portal can render the same
+ * per-ticket QR list the main applicant sees without an extra round-trip.
+ *
+ * `last_scan_at` is the most recent occurred_at from check_ins for this
+ * ticket (None when never scanned). The portal uses it to flag already-used
+ * QR codes — same behavior as the main applicant's pass view.
  */
 export type AttendeeTicketInfo = {
     id: string;
     check_in_code: string;
+    product_name?: (string | null);
+    product_category?: (string | null);
+    requires_check_in?: boolean;
+    last_scan_at?: (string | null);
 };
 
 /**
@@ -607,7 +616,6 @@ export type AttendeeWithOriginPublic = {
     category_id?: (string | null);
     email?: (string | null);
     gender?: (string | null);
-    check_in_code?: (string | null);
     poap_url?: (string | null);
     id: string;
     category?: (string | null);
@@ -625,7 +633,6 @@ export type AttendeeWithTickets = {
     name: string;
     email: (string | null);
     category?: (string | null);
-    check_in_code?: (string | null);
     popup_id: string;
     popup_name: string;
     popup_slug?: (string | null);

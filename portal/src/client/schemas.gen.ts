@@ -2021,17 +2021,6 @@ export const AttendeeInfoSchema = {
             ],
             title: 'Category'
         },
-        check_in_code: {
-            anyOf: [
-                {
-                    type: 'string'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Check In Code'
-        },
         tickets: {
             items: {
                 '$ref': '#/components/schemas/AttendeeTicketInfo'
@@ -2121,17 +2110,6 @@ export const AttendeeListItemSchema = {
             ],
             title: 'Gender'
         },
-        check_in_code: {
-            anyOf: [
-                {
-                    type: 'string'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Check In Code'
-        },
         poap_url: {
             anyOf: [
                 {
@@ -2199,7 +2177,7 @@ export const AttendeeListItemSchema = {
 
 Uses ProductWithQuantity for the products field to preserve the legacy
 shape returned by the list endpoint. Use AttendeePublic for detail views
-where AttendeeProductPublic (with check_in_code) is needed.`
+where AttendeeProductPublic (with per-ticket check_in_code) is needed.`
 } as const;
 
 export const AttendeeProductPublicSchema = {
@@ -2391,17 +2369,6 @@ export const AttendeePublicSchema = {
             ],
             title: 'Gender'
         },
-        check_in_code: {
-            anyOf: [
-                {
-                    type: 'string'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Check In Code'
-        },
         poap_url: {
             anyOf: [
                 {
@@ -2468,7 +2435,8 @@ export const AttendeePublicSchema = {
     description: `Attendee schema for API responses (detail view).
 
 products is typed as list[AttendeeProductPublic] so each entry carries
-check_in_code, payment_id, and requires_check_in. The list endpoint
+its own check_in_code, payment_id, and requires_check_in. Check-in codes
+belong to purchased tickets, not to the attendee itself. The list endpoint
 (GET /attendees) uses the separate AttendeeListItem schema which keeps
 the legacy ProductWithQuantity shape for backwards compatibility.
 
@@ -2544,6 +2512,45 @@ export const AttendeeTicketInfoSchema = {
         check_in_code: {
             type: 'string',
             title: 'Check In Code'
+        },
+        product_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Product Name'
+        },
+        product_category: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Product Category'
+        },
+        requires_check_in: {
+            type: 'boolean',
+            title: 'Requires Check In',
+            default: false
+        },
+        last_scan_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Last Scan At'
         }
     },
     type: 'object',
@@ -2551,9 +2558,16 @@ export const AttendeeTicketInfoSchema = {
     title: 'AttendeeTicketInfo',
     description: `Per-ticket info exposed on companion participation responses.
 
-\`check_in_code\` is the per-ticket code from \`attendee_products\` — the
-source of truth post-\`ticket-as-first-class-entity\`. New clients MUST read
-from this list rather than the legacy \`AttendeeInfo.check_in_code\`.`
+\`check_in_code\` is the per-ticket code from \`attendee_products\`. Check-in
+codes belong to purchased tickets, not to attendees.
+
+\`product_name\`, \`product_category\`, and \`requires_check_in\` are
+denormalized from the related Product so the portal can render the same
+per-ticket QR list the main applicant sees without an extra round-trip.
+
+\`last_scan_at\` is the most recent occurred_at from check_ins for this
+ticket (None when never scanned). The portal uses it to flag already-used
+QR codes — same behavior as the main applicant's pass view.`
 } as const;
 
 export const AttendeeUpdateSchema = {
@@ -2671,17 +2685,6 @@ export const AttendeeWithOriginPublicSchema = {
             ],
             title: 'Gender'
         },
-        check_in_code: {
-            anyOf: [
-                {
-                    type: 'string'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Check In Code'
-        },
         poap_url: {
             anyOf: [
                 {
@@ -2792,17 +2795,6 @@ export const AttendeeWithTicketsSchema = {
                 }
             ],
             title: 'Category'
-        },
-        check_in_code: {
-            anyOf: [
-                {
-                    type: 'string'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Check In Code'
         },
         popup_id: {
             type: 'string',

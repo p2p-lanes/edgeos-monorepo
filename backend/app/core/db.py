@@ -1,5 +1,4 @@
 import json
-import secrets
 import uuid
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -28,11 +27,6 @@ def _load_seed_data() -> dict:
     """Load seed data from JSON file."""
     with open(SEED_DATA_PATH) as f:
         return json.load(f)
-
-
-def _generate_check_in_code() -> str:
-    """Generate a unique check-in code for attendees."""
-    return secrets.token_hex(4).upper()
 
 
 def _seed_superadmin(session: Session) -> None:
@@ -736,7 +730,6 @@ def _seed_applications(
                 category_id=category_id,
                 email=attendee_data.get("email"),
                 gender=attendee_data.get("gender"),
-                check_in_code=None,
             )
             session.add(attendee)
             session.commit()

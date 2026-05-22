@@ -133,7 +133,6 @@ def _make_attendee(
         name="Contribution Tester",
         category="main",
         email=human.email,
-        check_in_code=f"CTR{uuid.uuid4().hex[:6].upper()}",
     )
     db.add(attendee)
     db.commit()

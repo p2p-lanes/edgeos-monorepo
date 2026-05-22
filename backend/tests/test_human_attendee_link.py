@@ -271,7 +271,6 @@ class TestHumanAttendeeLink:
             popup_id=popup.id,
             name="Attendee 1",
             category="main",
-            check_in_code=f"FIND{uuid.uuid4().hex[:4].upper()}",
             email="test-find@example.com",
             human_id=human.id,
         )
@@ -282,7 +281,6 @@ class TestHumanAttendeeLink:
             popup_id=popup.id,
             name="Attendee 2",
             category="spouse",
-            check_in_code=f"FIND{uuid.uuid4().hex[:4].upper()}",
             email="test-find@example.com",
             human_id=human.id,
         )

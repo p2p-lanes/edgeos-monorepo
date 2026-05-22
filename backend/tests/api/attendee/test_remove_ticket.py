@@ -61,7 +61,6 @@ def _make_attendee(db: Session, tenant: Tenants, popup: Popups) -> Attendees:
         human_id=human.id,
         name="Remove Ticket Test",
         category="main",
-        check_in_code=None,
     )
     db.add(attendee)
     db.commit()

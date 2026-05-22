@@ -99,7 +99,6 @@ def _make_direct_attendee(
         human_id=human.id,
         name="Direct Attendee",
         category="main",
-        check_in_code=f"HA{uuid.uuid4().hex[:4].upper()}",
     )
     db.add(attendee)
     db.commit()
@@ -133,7 +132,6 @@ def _make_companion_attendee(
         human_id=companion.id,
         name="Companion Person",
         category="spouse",
-        check_in_code=f"HC{uuid.uuid4().hex[:4].upper()}",
     )
     db.add(attendee)
     db.commit()

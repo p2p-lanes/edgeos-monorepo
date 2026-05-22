@@ -80,7 +80,6 @@ def _make_attendee(
         name="Test Attendee",
         category="main",
         email=f"attendee-{uuid.uuid4().hex[:8]}@test.com",
-        check_in_code=f"T{uuid.uuid4().hex[:4].upper()}",
     )
     db.add(attendee)
     db.commit()

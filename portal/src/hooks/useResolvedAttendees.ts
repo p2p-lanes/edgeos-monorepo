@@ -60,7 +60,6 @@ export function useResolvedAttendees(): AttendeePassState[] {
       category: "main",
       email: user.email,
       gender: user.gender ?? null,
-      check_in_code: null,
       poap_url: null,
       created_at: null,
       updated_at: null,

@@ -1,9 +1,11 @@
 /**
- * Tests for attendees route — Phase 8.4 (ticket-as-first-class-entity)
+ * Tests for attendees route.
  *
  * Covers:
  * (a) flattenAttendeesForCsv: expands attendee + per-ticket rows for CSV export
- * (b) ViewAttendee dialog: shows per-ticket check_in_codes from products[]
+ * (b) AttendeeDetailsContent: shows per-ticket check_in_codes from products[]
+ *     and hides the Check-in section entirely when the attendee has no
+ *     purchased products (codes belong to tickets, not attendees).
  */
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { render, screen } from "@testing-library/react"
@@ -78,10 +80,6 @@ function makeWrapper() {
 }
 
 // ── (a) CSV flattening ────────────────────────────────────────────────────────
-// NOTE: flattenAttendeesForCsv accepts AttendeeListItem[] whose products field
-// is ProductWithQuantity[] (list endpoint shape). ProductWithQuantity carries
-// only the product id (p.id) — no check_in_code. So ticket_check_in_code is
-// always "" in the CSV; per-ticket codes are only available in the detail view.
 
 describe("flattenAttendeesForCsv", () => {
   it("returns one row per ticket when attendee has multiple products", () => {
@@ -93,8 +91,6 @@ describe("flattenAttendeesForCsv", () => {
       email: "alice@example.com",
       category: "main",
       gender: null,
-      check_in_code: null,
-      // ProductWithQuantity shape — only id and name are required for the test
       products: [
         {
           id: "prod-1",
@@ -118,20 +114,11 @@ describe("flattenAttendeesForCsv", () => {
     }
     const rows = flattenAttendeesForCsv([attendee as never])
     expect(rows).toHaveLength(2)
-    // ticket_check_in_code is always "" — list endpoint does not carry per-ticket codes
-    expect(rows[0]).toMatchObject({
-      name: "Alice",
-      ticket_check_in_code: "",
-      product_id: "prod-1",
-    })
-    expect(rows[1]).toMatchObject({
-      name: "Alice",
-      ticket_check_in_code: "",
-      product_id: "prod-2",
-    })
+    expect(rows[0]).toMatchObject({ name: "Alice", product_id: "prod-1" })
+    expect(rows[1]).toMatchObject({ name: "Alice", product_id: "prod-2" })
   })
 
-  it("returns one row with empty ticket fields when attendee has no products", () => {
+  it("returns one row with empty product_id when attendee has no products", () => {
     const attendee = {
       id: "att-1",
       tenant_id: "tenant-1",
@@ -140,16 +127,11 @@ describe("flattenAttendeesForCsv", () => {
       email: "bob@example.com",
       category: "main",
       gender: null,
-      check_in_code: null,
       products: [],
     }
     const rows = flattenAttendeesForCsv([attendee as never])
     expect(rows).toHaveLength(1)
-    expect(rows[0]).toMatchObject({
-      name: "Bob",
-      ticket_check_in_code: "",
-      product_id: "",
-    })
+    expect(rows[0]).toMatchObject({ name: "Bob", product_id: "" })
   })
 
   it("handles mixed attendees — preserves attendee-level data in each row", () => {
@@ -162,7 +144,6 @@ describe("flattenAttendeesForCsv", () => {
         email: "alice@example.com",
         category: "main",
         gender: "female",
-        check_in_code: null,
         products: [
           {
             id: "prod-1",
@@ -183,7 +164,6 @@ describe("flattenAttendeesForCsv", () => {
         email: null,
         category: "spouse",
         gender: null,
-        check_in_code: null,
         products: [],
       },
     ]
@@ -191,12 +171,11 @@ describe("flattenAttendeesForCsv", () => {
     expect(rows).toHaveLength(2)
     expect(rows[0].name).toBe("Alice")
     expect(rows[1].name).toBe("Bob")
-    expect(rows[1].ticket_check_in_code).toBe("")
+    expect(rows[1].product_id).toBe("")
   })
 })
 
 // ── (b) AttendeeDetailsContent — per-ticket check_in_codes ──────────────────────
-// AttendeeDetailsContent accepts AttendeeWithOriginPublic (detail endpoint shape).
 // products[] is AttendeeProductPublic[] so each entry has check_in_code.
 
 describe("AttendeeDetailsContent", () => {
@@ -209,7 +188,6 @@ describe("AttendeeDetailsContent", () => {
       email: "alice@example.com",
       category: "main",
       gender: null,
-      check_in_code: null,
       origin: "direct_sale",
       products: [
         {
@@ -235,7 +213,7 @@ describe("AttendeeDetailsContent", () => {
     expect(screen.getByText("TICKET-CODE-B")).toBeInTheDocument()
   })
 
-  it("shows fallback attendee-level check_in_code when no products", async () => {
+  it("does not render check-in section when attendee has no purchased products", async () => {
     const attendee = {
       id: "att-1",
       tenant_id: "tenant-1",
@@ -244,7 +222,6 @@ describe("AttendeeDetailsContent", () => {
       email: "alice@example.com",
       category: "main",
       gender: null,
-      check_in_code: "ATT-LEGACY-CODE",
       origin: "direct_sale",
       products: [],
     }
@@ -253,6 +230,6 @@ describe("AttendeeDetailsContent", () => {
       wrapper: makeWrapper(),
     })
 
-    expect(screen.getByText("ATT-LEGACY-CODE")).toBeInTheDocument()
+    expect(screen.queryByText("Check-in")).not.toBeInTheDocument()
   })
 })

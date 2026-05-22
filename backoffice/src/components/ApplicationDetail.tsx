@@ -942,20 +942,12 @@ export function ApplicationDetail({
           <Separator />
           <InlineSection title={`Companions (${companions.length})`}>
             {companions.map((attendee) => (
-              <div
-                key={attendee.id}
-                className="flex items-center justify-between py-3"
-              >
-                <div>
-                  <p className="text-sm font-medium">{attendee.name}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {attendee.email} ·{" "}
-                    <span className="capitalize">{attendee.category}</span>
-                  </p>
-                </div>
-                <code className="rounded bg-muted px-2 py-1 font-mono text-xs">
-                  {attendee.check_in_code}
-                </code>
+              <div key={attendee.id} className="py-3">
+                <p className="text-sm font-medium">{attendee.name}</p>
+                <p className="text-xs text-muted-foreground">
+                  {attendee.email} ·{" "}
+                  <span className="capitalize">{attendee.category}</span>
+                </p>
               </div>
             ))}
           </InlineSection>
