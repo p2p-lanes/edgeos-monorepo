@@ -24,6 +24,10 @@ class GroupBase(SQLModel):
     ambassador_id: uuid.UUID | None = Field(
         default=None, foreign_key="humans.id", nullable=True, index=True
     )
+    # Groups-rework: explicit behaviour flags replacing implicit bool(group_id) logic
+    auto_approve_applications: bool = Field(default=False)
+    express_checkout: bool = Field(default=False)
+    enable_private_events: bool = Field(default=False)
 
 
 class GroupPublic(GroupBase):

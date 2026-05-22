@@ -118,6 +118,12 @@ class EventBase(SQLModel):
     # venue, cancel) so updated invitation emails replace the prior calendar
     # entry in Gmail / Apple Calendar / Outlook instead of creating a new one.
     ical_sequence: int = Field(default=0, ge=0)
+    # Groups-rework: links a PRIVATE event to a group for group-scoped access.
+    # Semantics: visibility=PRIVATE AND group_id IS NOT NULL → group-scoped PRIVATE.
+    # visibility=PRIVATE AND group_id IS NULL → invitation-based PRIVATE (existing behavior).
+    group_id: uuid.UUID | None = Field(
+        default=None, foreign_key="groups.id", nullable=True
+    )
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(UTC),
         sa_type=DateTime(timezone=True),

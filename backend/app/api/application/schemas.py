@@ -111,6 +111,14 @@ class ApplicationBase(SQLModel):
     )
     incentive_currency: str | None = Field(default=None, max_length=10, nullable=True)
 
+    # Groups-rework: attribution columns for invite/referral flows
+    invite_id: uuid.UUID | None = Field(
+        default=None, foreign_key="invites.id", nullable=True
+    )
+    referral_id: uuid.UUID | None = Field(
+        default=None, foreign_key="referrals.id", nullable=True
+    )
+
 
 class ApplicationPublic(BaseModel):
     """Application schema for API responses."""
