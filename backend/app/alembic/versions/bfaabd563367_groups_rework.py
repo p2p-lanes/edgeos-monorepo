@@ -124,7 +124,6 @@ def upgrade() -> None:
             "current_uses", sa.Integer(), nullable=False, server_default=sa.text("0")
         ),
         sa.Column("used_at", sa.DateTime(timezone=True), nullable=True),
-        sa.Column("recipient_human_id", postgresql.UUID(as_uuid=True), nullable=True),
         sa.Column("redeemed_by_human_id", postgresql.UUID(as_uuid=True), nullable=True),
         sa.Column(
             "legacy_migrated_from_group_id",
@@ -148,9 +147,6 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id"),
         sa.ForeignKeyConstraint(["tenant_id"], ["tenants.id"], ondelete="CASCADE"),
         sa.ForeignKeyConstraint(["popup_id"], ["popups.id"], ondelete="CASCADE"),
-        sa.ForeignKeyConstraint(
-            ["recipient_human_id"], ["humans.id"], ondelete="SET NULL"
-        ),
         sa.ForeignKeyConstraint(
             ["redeemed_by_human_id"], ["humans.id"], ondelete="SET NULL"
         ),

@@ -61,9 +61,6 @@ class Invites(SQLModel, table=True):
     used_at: datetime | None = Field(
         default=None, nullable=True, sa_type=DateTime(timezone=True)
     )
-    recipient_human_id: uuid.UUID | None = Field(
-        default=None, foreign_key="humans.id", nullable=True
-    )
     redeemed_by_human_id: uuid.UUID | None = Field(
         default=None, foreign_key="humans.id", nullable=True
     )
@@ -93,9 +90,6 @@ class Invites(SQLModel, table=True):
     # Relationships
     tenant: "Tenants" = Relationship()
     popup: "Popups" = Relationship()
-    recipient_human: Optional["Humans"] = Relationship(
-        sa_relationship_kwargs={"foreign_keys": "[Invites.recipient_human_id]"},
-    )
     redeemed_by_human: Optional["Humans"] = Relationship(
         sa_relationship_kwargs={"foreign_keys": "[Invites.redeemed_by_human_id]"},
     )
