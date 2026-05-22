@@ -10,6 +10,7 @@ import {
   type ThirdPartyAppCreated,
   type ThirdPartyAppPublic,
   ThirdPartyAppsService,
+  type ThirdPartyAppUpdate,
 } from "@/client"
 import { DataTable } from "@/components/Common/DataTable"
 import { EmptyState } from "@/components/Common/EmptyState"
@@ -296,6 +297,203 @@ function CreateAppDialog({
   )
 }
 
+function EditAppDialog({
+  app,
+  availableScopes,
+  onClose,
+}: {
+  app: ThirdPartyAppPublic
+  availableScopes: AvailableScopes
+  onClose: () => void
+}) {
+  const { showSuccessToast, showErrorToast } = useCustomToast()
+  const queryClient = useQueryClient()
+
+  const [name, setName] = useState(app.name)
+  const [tokenScopes, setTokenScopes] = useState<string[]>(
+    app.allowed_token_scopes,
+  )
+  const [apiKeyScopes, setApiKeyScopes] = useState<string[]>(
+    app.allowed_api_key_scopes,
+  )
+  const [nameError, setNameError] = useState("")
+  const [scopeError, setScopeError] = useState("")
+
+  const updateMutation = useMutation({
+    mutationFn: () => {
+      const requestBody: ThirdPartyAppUpdate = {}
+      const trimmedName = name.trim()
+      if (trimmedName !== app.name) {
+        requestBody.name = trimmedName
+      }
+      if (!sameScopes(tokenScopes, app.allowed_token_scopes)) {
+        requestBody.allowed_token_scopes =
+          tokenScopes as ThirdPartyAppUpdate["allowed_token_scopes"]
+      }
+      if (!sameScopes(apiKeyScopes, app.allowed_api_key_scopes)) {
+        requestBody.allowed_api_key_scopes =
+          apiKeyScopes as ThirdPartyAppUpdate["allowed_api_key_scopes"]
+      }
+      return ThirdPartyAppsService.updateThirdPartyApp({
+        appId: app.id,
+        requestBody,
+      })
+    },
+    onSuccess: () => {
+      showSuccessToast("App updated")
+      queryClient.invalidateQueries({ queryKey: ["third-party-apps"] })
+      onClose()
+    },
+    onError: createErrorHandler(showErrorToast),
+  })
+
+  function toggleScope(
+    scope: string,
+    current: string[],
+    setter: (v: string[]) => void,
+  ) {
+    setter(
+      current.includes(scope)
+        ? current.filter((s) => s !== scope)
+        : [...current, scope],
+    )
+    setScopeError("")
+  }
+
+  const addedTokenScopes = tokenScopes.filter(
+    (s) => !app.allowed_token_scopes.includes(s),
+  )
+  const addedApiKeyScopes = apiKeyScopes.filter(
+    (s) => !app.allowed_api_key_scopes.includes(s),
+  )
+  const isExpandingScopes =
+    addedTokenScopes.length > 0 || addedApiKeyScopes.length > 0
+
+  const hasChanges =
+    name.trim() !== app.name ||
+    !sameScopes(tokenScopes, app.allowed_token_scopes) ||
+    !sameScopes(apiKeyScopes, app.allowed_api_key_scopes)
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    let valid = true
+    if (!name.trim()) {
+      setNameError("Name is required")
+      valid = false
+    }
+    if (tokenScopes.length === 0) {
+      setScopeError("Select at least one token scope")
+      valid = false
+    }
+    if (!valid) return
+    updateMutation.mutate()
+  }
+
+  return (
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
+        <form onSubmit={handleSubmit}>
+          <DialogHeader>
+            <DialogTitle>Edit third-party app</DialogTitle>
+            <DialogDescription>
+              Update the name or adjust the scopes this app can request. The
+              existing key keeps working — rotate separately if you need a new
+              one.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-5 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-app-name">Name</Label>
+              <Input
+                id="edit-app-name"
+                placeholder="e.g. Acme Integration"
+                value={name}
+                onChange={(e) => {
+                  setName(e.target.value)
+                  setNameError("")
+                }}
+              />
+              {nameError && (
+                <p className="text-sm text-destructive">{nameError}</p>
+              )}
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <Label>Token scopes</Label>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Scopes the JWT minted by this app can carry.
+                </p>
+              </div>
+              {scopeError && (
+                <p className="text-sm text-destructive">{scopeError}</p>
+              )}
+              <ScopeGroup
+                label="Portal"
+                scopes={availableScopes.token_scopes}
+                selectedScopes={tokenScopes}
+                onToggle={(s) => toggleScope(s, tokenScopes, setTokenScopes)}
+              />
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <Label>API key scopes</Label>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Scopes the app is allowed to request when minting API keys.
+                </p>
+              </div>
+              <ScopeGroup
+                label="API keys"
+                scopes={availableScopes.api_key_scopes}
+                selectedScopes={apiKeyScopes}
+                onToggle={(s) => toggleScope(s, apiKeyScopes, setApiKeyScopes)}
+              />
+            </div>
+
+            {isExpandingScopes && (
+              <div className="flex items-start gap-2 rounded-md border border-amber-500/50 bg-amber-500/10 p-3">
+                <AlertTriangle className="h-4 w-4 shrink-0 text-amber-500 mt-0.5" />
+                <div className="text-xs text-muted-foreground space-y-1">
+                  <p className="font-medium text-foreground">
+                    You are broadening this app's permissions.
+                  </p>
+                  {addedTokenScopes.length > 0 && (
+                    <p>New token scopes: {addedTokenScopes.join(", ")}</p>
+                  )}
+                  {addedApiKeyScopes.length > 0 && (
+                    <p>New API key scopes: {addedApiKeyScopes.join(", ")}</p>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={onClose}>
+              Cancel
+            </Button>
+            <LoadingButton
+              type="submit"
+              loading={updateMutation.isPending}
+              disabled={!hasChanges}
+            >
+              Save changes
+            </LoadingButton>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function sameScopes(a: string[], b: string[]): boolean {
+  if (a.length !== b.length) return false
+  const setB = new Set(b)
+  return a.every((s) => setB.has(s))
+}
+
 function RotateConfirmDialog({
   appName,
   appId,
@@ -404,10 +602,17 @@ function ThirdPartyAppsTable({ onCreateClick }: { onCreateClick: () => void }) {
   const [revokeTarget, setRevokeTarget] = useState<ThirdPartyAppPublic | null>(
     null,
   )
+  const [editTarget, setEditTarget] = useState<ThirdPartyAppPublic | null>(null)
 
   const { data, isLoading } = useQuery({
     queryKey: ["third-party-apps"],
     queryFn: () => ThirdPartyAppsService.listThirdPartyApps(),
+  })
+
+  const { data: availableScopes } = useQuery({
+    queryKey: ["third-party-apps-available-scopes"],
+    queryFn: () => ThirdPartyAppsService.getAvailableScopes(),
+    enabled: editTarget !== null,
   })
 
   const columns: ColumnDef<ThirdPartyAppPublic>[] = [
@@ -492,6 +697,16 @@ function ThirdPartyAppsTable({ onCreateClick }: { onCreateClick: () => void }) {
               size="sm"
               onClick={(e) => {
                 e.stopPropagation()
+                setEditTarget(row.original)
+              }}
+            >
+              Edit
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation()
                 setRotateTarget(row.original)
               }}
             >
@@ -554,6 +769,14 @@ function ThirdPartyAppsTable({ onCreateClick }: { onCreateClick: () => void }) {
           appName={revokeTarget.name}
           appId={revokeTarget.id}
           onClose={() => setRevokeTarget(null)}
+        />
+      )}
+
+      {editTarget && availableScopes && (
+        <EditAppDialog
+          app={editTarget}
+          availableScopes={availableScopes}
+          onClose={() => setEditTarget(null)}
         />
       )}
 
