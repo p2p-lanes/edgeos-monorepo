@@ -309,12 +309,22 @@ function EditAppDialog({
   const { showSuccessToast, showErrorToast } = useCustomToast()
   const queryClient = useQueryClient()
 
-  const [name, setName] = useState(app.name)
-  const [tokenScopes, setTokenScopes] = useState<string[]>(
-    app.allowed_token_scopes,
+  const validTokenScopes = new Set(availableScopes.token_scopes)
+  const validApiKeyScopes = new Set(availableScopes.api_key_scopes)
+
+  const legacyTokenScopes = app.allowed_token_scopes.filter(
+    (s) => !validTokenScopes.has(s),
   )
-  const [apiKeyScopes, setApiKeyScopes] = useState<string[]>(
-    app.allowed_api_key_scopes,
+  const legacyApiKeyScopes = app.allowed_api_key_scopes.filter(
+    (s) => !validApiKeyScopes.has(s),
+  )
+
+  const [name, setName] = useState(app.name)
+  const [tokenScopes, setTokenScopes] = useState<string[]>(() =>
+    app.allowed_token_scopes.filter((s) => validTokenScopes.has(s)),
+  )
+  const [apiKeyScopes, setApiKeyScopes] = useState<string[]>(() =>
+    app.allowed_api_key_scopes.filter((s) => validApiKeyScopes.has(s)),
   )
   const [nameError, setNameError] = useState("")
   const [scopeError, setScopeError] = useState("")
@@ -451,6 +461,26 @@ function EditAppDialog({
                 onToggle={(s) => toggleScope(s, apiKeyScopes, setApiKeyScopes)}
               />
             </div>
+
+            {(legacyTokenScopes.length > 0 ||
+              legacyApiKeyScopes.length > 0) && (
+              <div className="flex items-start gap-2 rounded-md border border-amber-500/50 bg-amber-500/10 p-3">
+                <AlertTriangle className="h-4 w-4 shrink-0 text-amber-500 mt-0.5" />
+                <div className="text-xs text-muted-foreground space-y-1">
+                  <p className="font-medium text-foreground">
+                    Legacy scopes will be removed on save.
+                  </p>
+                  {legacyTokenScopes.length > 0 && (
+                    <p>Token scopes dropped: {legacyTokenScopes.join(", ")}</p>
+                  )}
+                  {legacyApiKeyScopes.length > 0 && (
+                    <p>
+                      API key scopes dropped: {legacyApiKeyScopes.join(", ")}
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
 
             {isExpandingScopes && (
               <div className="flex items-start gap-2 rounded-md border border-amber-500/50 bg-amber-500/10 p-3">
