@@ -125,7 +125,6 @@ def _make_direct_payment(
         human_id=human.id,
         name="Direct Sale Buyer",
         category="main",
-        check_in_code=f"D{uuid.uuid4().hex[:5].upper()}",
     )
     db.add(attendee)
     db.flush()

@@ -133,7 +133,6 @@ def _make_payment_with_product(
         name="Integ Attendee",
         category="main",
         email=f"att-{suffix}@test.com",
-        check_in_code=f"I{suffix[:4].upper()}",
     )
     db.add(attendee)
     db.flush()
@@ -536,7 +535,6 @@ class TestApplicationFlowEnforcement:
             name="Test Attendee",
             category="main",
             email=f"test-{uuid.uuid4().hex[:6]}@test.com",
-            check_in_code=f"T{uuid.uuid4().hex[:4].upper()}",
         )
         db.add(attendee)
         db.commit()

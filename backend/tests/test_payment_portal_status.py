@@ -88,7 +88,6 @@ def _make_attendee(
         name=name,
         category="main",
         email=human.email,
-        check_in_code=f"PAY{uuid.uuid4().hex[:6].upper()}",
     )
     db.add(attendee)
     db.commit()

@@ -93,7 +93,6 @@ def _make_direct_attendee(
         human_id=human.id,
         name="Direct Attendee",
         category="main",
-        check_in_code=f"CA{uuid.uuid4().hex[:4].upper()}",
     )
     db.add(attendee)
     db.flush()
@@ -135,7 +134,6 @@ def _make_companion_attendee(
         human_id=human.id,  # the companion's human_id
         name="Companion Person",
         category="spouse",
-        check_in_code=f"CP{uuid.uuid4().hex[:4].upper()}",
     )
     db.add(attendee)
     db.flush()

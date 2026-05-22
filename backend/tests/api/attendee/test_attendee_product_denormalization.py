@@ -83,7 +83,6 @@ def _make_attendee(
         human_id=human.id,
         name=f"Denorm Attendee {suffix}",
         category="main",
-        check_in_code=None,
         email=human.email,
     )
     db.add(attendee)

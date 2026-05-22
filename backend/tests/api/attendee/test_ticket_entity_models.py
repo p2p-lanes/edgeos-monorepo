@@ -1,9 +1,8 @@
-"""Tests for Phase 3 — ticket entity model and schema changes.
+"""Tests for the ticket entity model and schema shape.
 
-TDD phase: RED — written before model updates.
 These assert the new shape (id, check_in_code, payment_id on AttendeeProducts;
-nullable check_in_code on Attendees; UUID PK on PaymentProducts;
-requires_check_in on Products).
+no check_in_code on Attendees — check-in codes belong to tickets, not
+attendees; UUID PK on PaymentProducts; requires_check_in on Products).
 
 Spec: C1/Ticket Identity, C5/payment-products-uuid-pk, Addendum #1201
 Design: §2.5, §3.1, §3.4
@@ -71,8 +70,6 @@ class TestAttendeeProductsModel:
             human_id=human.id,
             application_id=None,
             name="AP Model Test",
-            category="main",
-            check_in_code=None,  # nullable post-migration
             email=human.email,
         )
         db.add(attendee)
@@ -81,9 +78,7 @@ class TestAttendeeProductsModel:
 
         from app.api.product.models import Products
 
-        product = db.exec(
-            __import__("sqlmodel").select(Products).limit(1)
-        ).first()
+        product = db.exec(__import__("sqlmodel").select(Products).limit(1)).first()
         if product is None:
             pytest.skip("No products in DB to test against")
 
@@ -106,38 +101,17 @@ class TestAttendeeProductsModel:
         assert ticket.payment_id is None
 
 
-class TestAttendeesCheckInCodeNullable:
-    """Attendees.check_in_code must be nullable after migration."""
+class TestAttendeesHasNoCheckInCode:
+    """Attendees model must not expose a check_in_code field.
 
-    def test_attendee_can_be_created_with_null_check_in_code(
-        self, db: Session, tenant_a, popup_tenant_a
-    ) -> None:
-        """Creating an Attendees row with check_in_code=None must succeed."""
-        from app.api.human.models import Humans
+    Check-in codes live on AttendeeProducts (one per purchased ticket).
+    """
 
-        human = Humans(
-            tenant_id=tenant_a.id,
-            email=f"nullcic-{uuid.uuid4().hex[:6]}@test.com",
+    def test_attendees_model_has_no_check_in_code_field(self) -> None:
+        assert "check_in_code" not in Attendees.model_fields, (
+            "Attendees must not have a 'check_in_code' field — "
+            "codes belong to AttendeeProducts (per-ticket)"
         )
-        db.add(human)
-        db.commit()
-        db.refresh(human)
-
-        attendee = Attendees(
-            tenant_id=tenant_a.id,
-            popup_id=popup_tenant_a.id,
-            human_id=human.id,
-            application_id=None,
-            name="Nullable CIC Test",
-            category="main",
-            check_in_code=None,
-            email=human.email,
-        )
-        db.add(attendee)
-        db.commit()
-        db.refresh(attendee)
-
-        assert attendee.check_in_code is None
 
 
 class TestPaymentProductsModel:

@@ -107,7 +107,6 @@ def _make_pending_payment(
         name="Restore Attendee",
         category="main",
         email=f"att-{uuid.uuid4().hex[:8]}@test.com",
-        check_in_code=f"R{uuid.uuid4().hex[:4].upper()}",
     )
     db.add(attendee)
     db.flush()
@@ -366,7 +365,6 @@ class TestUpdateStatusCancelledRejectedRestoration:
             name="Approved Attendee",
             category="main",
             email=f"att-approved-{uuid.uuid4().hex[:8]}@test.com",
-            check_in_code=f"A{uuid.uuid4().hex[:4].upper()}",
         )
         db.add(attendee)
         db.flush()

@@ -63,7 +63,6 @@ function buildVirtualBuyerAttendee(
     category: "main",
     email: null,
     gender: null,
-    check_in_code: "",
     poap_url: null,
     created_at: null,
     updated_at: null,

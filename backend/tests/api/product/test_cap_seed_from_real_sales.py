@@ -85,7 +85,6 @@ def _record_sale(
         name="Sale Attendee",
         category="main",
         email=f"att-{uuid.uuid4().hex[:8]}@test.com",
-        check_in_code=f"S{uuid.uuid4().hex[:4].upper()}",
     )
     db.add(attendee)
     db.flush()

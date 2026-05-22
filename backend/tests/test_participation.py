@@ -138,7 +138,6 @@ def _make_attendee(
         popup_id=application.popup_id,
         name=name,
         category_id=cat_id,
-        check_in_code=None,
         human_id=human_id,
         email=email,
     )
@@ -213,7 +212,6 @@ class TestFindCompanionForPopup:
             popup_id=popup.id,
             name="Companion Spouse",
             category="spouse",
-            check_in_code=f"C{uuid.uuid4().hex[:5].upper()}",
             human_id=companion_human.id,
             email="companion-crud@test.com",
         )
@@ -280,7 +278,6 @@ class TestFindCompanionForPopup:
             popup_id=popup.id,
             name="Self",
             category="main",
-            check_in_code=f"S{uuid.uuid4().hex[:5].upper()}",
             human_id=human.id,
         )
         db.add(attendee)

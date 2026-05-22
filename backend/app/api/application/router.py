@@ -91,7 +91,6 @@ def _build_application_public(
             category=a.category,
             email=a.email,
             gender=a.gender,
-            check_in_code=a.check_in_code,
             poap_url=a.poap_url,
             created_at=getattr(a, "created_at", None),
             updated_at=getattr(a, "updated_at", None),
@@ -332,7 +331,6 @@ async def list_my_tickets(
                 name=attendee.name,
                 email=attendee.email,
                 category=attendee.category,
-                check_in_code=attendee.check_in_code,
                 popup_id=popup.id,
                 popup_name=popup.name,
                 popup_slug=popup.slug,
@@ -373,6 +371,7 @@ async def get_my_participation(
 
     # 2. Check if human is a companion on someone else's application
     from app.api.attendee.crud import attendees_crud
+    from app.api.check_in.crud import get_last_scan_by_tickets
 
     attendee = attendees_crud.find_companion_for_popup(
         db, human_id=current_human.id, popup_id=popup_id
@@ -381,14 +380,27 @@ async def get_my_participation(
         from app.api.application.schemas import AttendeeTicketInfo
 
         host_human = attendee.application.human if attendee.application else None
+        # Single aggregation across all of this companion's tickets so the
+        # portal can flag already-scanned QR codes without N+1 lookups —
+        # matches the pattern used for the main applicant pass view.
+        ticket_ids = [ap.id for ap in attendee.attendee_products]
+        last_scan_by_ticket = get_last_scan_by_tickets(db, ticket_ids)
         return CompanionParticipation(
             attendee=AttendeeInfo(
                 id=attendee.id,
                 name=attendee.name,
                 category=attendee.category,
-                check_in_code=attendee.check_in_code,
                 tickets=[
-                    AttendeeTicketInfo(id=ap.id, check_in_code=ap.check_in_code)
+                    AttendeeTicketInfo(
+                        id=ap.id,
+                        check_in_code=ap.check_in_code,
+                        product_name=ap.product.name if ap.product else None,
+                        product_category=ap.product.category if ap.product else None,
+                        requires_check_in=(
+                            ap.product.requires_check_in if ap.product else False
+                        ),
+                        last_scan_at=last_scan_by_ticket.get(ap.id),
+                    )
                     for ap in attendee.attendee_products
                 ],
             ),
@@ -507,9 +519,7 @@ async def detach_companion(
         return  # idempotent no-op
 
     if companion.attendee_products:
-        host_human = (
-            companion.application.human if companion.application else None
-        )
+        host_human = companion.application.human if companion.application else None
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail={
@@ -665,9 +675,7 @@ async def update_my_application(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Group does not belong to this popup",
             )
-        if not group.is_open and not group.has_whitelisted_email(
-            current_human.email
-        ):
+        if not group.is_open and not group.has_whitelisted_email(current_human.email):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Your email is not whitelisted for this group",
@@ -705,15 +713,11 @@ async def update_my_application(
 
         if current_human.red_flag:
             application.status = ApplicationStatus.REJECTED.value
-            crud.applications_crud.create_snapshot(
-                db, application, "auto_rejected"
-            )
+            crud.applications_crud.create_snapshot(db, application, "auto_rejected")
         else:
             application.status = ApplicationStatus.ACCEPTED.value
             application.accepted_at = datetime.now(UTC)
-            crud.applications_crud.create_snapshot(
-                db, application, "auto_accepted"
-            )
+            crud.applications_crud.create_snapshot(db, application, "auto_accepted")
             # Sync GroupMembers junction (vigente membership). Application.group_id
             # was set via setattr above; the junction is the authoritative source
             # for "currently in this group" — see commit 756f55a.
