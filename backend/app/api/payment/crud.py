@@ -219,11 +219,21 @@ def _get_credit(application: Applications, discount_value: Decimal) -> Decimal:
 def _calculate_amounts(
     session: Session,
     requested_products: list[PaymentProductRequest],
-) -> tuple[Decimal, Decimal, Decimal]:
+) -> tuple[Decimal, Decimal]:
     """
-    Calculate standard, supporter, and patreon amounts.
+    Calculate standard and non-discountable amounts.
 
-    Returns: (standard_amount, supporter_amount, patreon_amount)
+    Buckets:
+      - standard: regular discountable products (coupons / group / scholarship
+        discounts reduce this side only)
+      - non_discountable: products with `discountable=False`, including patreon
+        donations (forced via the schema validator). Charged in full, immune to
+        any discount.
+
+    Patreon products are a sub-case of non-discountable: their stored `price`
+    is 0 and the buyer-chosen donation lives on `unit_price_override`.
+
+    Returns: (standard_amount, non_discountable_amount)
     """
     product_ids = list({rp.product_id for rp in requested_products})
     statement = select(Products).where(
@@ -244,41 +254,38 @@ def _calculate_amounts(
         if attendee_id not in attendees:
             attendees[attendee_id] = {
                 "standard": Decimal("0"),
-                "supporter": Decimal("0"),
-                "patreon": Decimal("0"),
+                "non_discountable": Decimal("0"),
             }
 
-        if product_model.category == "patreon":
-            # Patron donations are independent from ticket prices. The amount
-            # lives on the request's unit_price_override (raw popup currency
-            # units, quantity is always 1). product_model.price is 0 for
-            # patreon products and must not be used to derive the donation
-            # amount. Tickets in the same order are still charged in full.
-            donation_amount = req_prod.unit_price_override or Decimal("0")
-            attendees[attendee_id]["patreon"] += donation_amount
-        elif product_model.category == "supporter":
-            attendees[attendee_id]["supporter"] += product_model.price * quantity
+        if not product_model.discountable:
+            # Patreon donations carry their amount on unit_price_override
+            # (product.price is always 0 for patreon). All other
+            # non-discountable products use the regular price * quantity.
+            if product_model.category == "patreon":
+                line_amount = req_prod.unit_price_override or Decimal("0")
+            else:
+                line_amount = product_model.price * quantity
+            attendees[attendee_id]["non_discountable"] += line_amount
         else:
             attendees[attendee_id]["standard"] += product_model.price * quantity
 
     standard_amount = sum((a["standard"] for a in attendees.values()), Decimal("0"))
-    supporter_amount = sum((a["supporter"] for a in attendees.values()), Decimal("0"))
-    patreon_amount = sum((a["patreon"] for a in attendees.values()), Decimal("0"))
-
-    logger.info(
-        "Amounts calculated - Standard: {}, Supporter: {}, Patreon: {}",
-        standard_amount,
-        supporter_amount,
-        patreon_amount,
+    non_discountable_amount = sum(
+        (a["non_discountable"] for a in attendees.values()), Decimal("0")
     )
 
-    return standard_amount, supporter_amount, patreon_amount
+    logger.info(
+        "Amounts calculated - Standard: {}, NonDiscountable: {}",
+        standard_amount,
+        non_discountable_amount,
+    )
+
+    return standard_amount, non_discountable_amount
 
 
 def _calculate_price(
     standard_amount: Decimal,
-    supporter_amount: Decimal,
-    patreon_amount: Decimal,
+    non_discountable_amount: Decimal,
     discount_value: Decimal,
     application: Applications,
     edit_passes: bool,
@@ -292,7 +299,7 @@ def _calculate_price(
         discounted_standard = _get_discounted_price(standard_amount, discount_value)
     discounted_standard = discounted_standard - credit
 
-    return discounted_standard + supporter_amount + patreon_amount
+    return discounted_standard + non_discountable_amount
 
 
 class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
@@ -480,7 +487,6 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         buyer_name = (
             f"{obj.buyer.first_name} {obj.buyer.last_name}".strip() or obj.buyer.email
         )
-        amount = Decimal("0")
 
         payment = Payments(
             tenant_id=tenant.id,
@@ -506,9 +512,18 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 email=obj.buyer.email,
             )
 
+            # Split products into discountable vs non-discountable buckets so
+            # admin-flagged products (and patreon donations, even though they
+            # don't appear in this flow today) bypass any coupon discount.
+            discountable_amount = Decimal("0")
+            non_discountable_amount = Decimal("0")
             for line in obj.products:
                 product = products_map[line.product_id]
-                amount += product.price * line.quantity
+                line_total = product.price * line.quantity
+                if product.category == "patreon" or not product.discountable:
+                    non_discountable_amount += line_total
+                else:
+                    discountable_amount += line_total
 
                 for _ in range(line.quantity):
                     # One AttendeeProducts row per ticket — Design §2.2
@@ -539,20 +554,30 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                         )
                     )
 
-            amount = amount.quantize(MONEY_PRECISION, rounding=ROUND_HALF_UP)
+            discountable_amount = discountable_amount.quantize(
+                MONEY_PRECISION, rounding=ROUND_HALF_UP
+            )
+            non_discountable_amount = non_discountable_amount.quantize(
+                MONEY_PRECISION, rounding=ROUND_HALF_UP
+            )
 
-            if obj.coupon_code:
+            # Skip coupon when there is nothing in the discountable bucket — a
+            # coupon would land with zero effect and waste a single-use code.
+            # Portal hides the input; this guards crafted requests.
+            if obj.coupon_code and discountable_amount > Decimal("0"):
                 coupon = coupons_crud.validate_coupon(
                     session, code=obj.coupon_code, popup_id=popup.id
                 )
                 discount_value = Decimal(str(coupon.discount_value))
-                amount = _get_discounted_price(amount, discount_value)
+                discountable_amount = _get_discounted_price(
+                    discountable_amount, discount_value
+                )
                 payment.coupon_id = coupon.id
                 payment.coupon_code = coupon.code
                 payment.discount_value = discount_value
                 coupons_crud.use_coupon(session, coupon.id)
 
-            payment.amount = amount
+            payment.amount = discountable_amount + non_discountable_amount
 
             if not popup.simplefi_api_key:
                 raise HTTPException(
@@ -591,7 +616,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             }
 
             simplefi_response = simplefi_client.create_payment(
-                amount=amount,
+                amount=payment.amount,
                 popup_slug=popup.slug,
                 tenant_slug=tenant.slug,
                 currency=popup.currency,
@@ -1221,16 +1246,15 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             discount_value=discount_assigned,
         )
 
-        standard_amount, supporter_amount, patreon_amount = _calculate_amounts(
+        standard_amount, non_discountable_amount = _calculate_amounts(
             session,
             obj.products,
         )
 
-        response.original_amount = standard_amount + supporter_amount + patreon_amount
+        response.original_amount = standard_amount + non_discountable_amount
         response.amount = _calculate_price(
             standard_amount=standard_amount,
-            supporter_amount=supporter_amount,
-            patreon_amount=patreon_amount,
+            non_discountable_amount=non_discountable_amount,
             discount_value=discount_assigned,
             application=application,
             edit_passes=obj.edit_passes,
@@ -1242,8 +1266,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             group_discount = application.group.discount_percentage or Decimal("0")
             discounted_amount = _calculate_price(
                 standard_amount=standard_amount,
-                supporter_amount=supporter_amount,
-                patreon_amount=patreon_amount,
+                non_discountable_amount=non_discountable_amount,
                 discount_value=group_discount,
                 application=application,
                 edit_passes=obj.edit_passes,
@@ -1252,8 +1275,11 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 response.amount = discounted_amount
                 response.discount_value = group_discount
 
-        # Check coupon code
-        if obj.coupon_code:
+        # Check coupon code. Skip when there is nothing discountable in the
+        # cart — applying a coupon would be a no-op and risks burning a
+        # single-use coupon for the buyer. Portal hides the input; this guards
+        # crafted requests.
+        if obj.coupon_code and standard_amount > Decimal("0"):
             coupon = coupons_crud.validate_coupon(
                 session,
                 code=obj.coupon_code,
@@ -1262,8 +1288,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             coupon_discount = Decimal(str(coupon.discount_value))
             discounted_amount = _calculate_price(
                 standard_amount=standard_amount,
-                supporter_amount=supporter_amount,
-                patreon_amount=patreon_amount,
+                non_discountable_amount=non_discountable_amount,
                 discount_value=coupon_discount,
                 application=application,
                 edit_passes=obj.edit_passes,
@@ -1282,8 +1307,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             scholarship_discount_pct = Decimal(str(application.discount_percentage))
             discounted_amount = _calculate_price(
                 standard_amount=standard_amount,
-                supporter_amount=supporter_amount,
-                patreon_amount=patreon_amount,
+                non_discountable_amount=non_discountable_amount,
                 discount_value=scholarship_discount_pct,
                 application=application,
                 edit_passes=obj.edit_passes,
@@ -1301,8 +1325,10 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         # so neither fee compounds the other (see design ADR-2).
         pre_fee_amount = response.amount
 
-        # Calculate insurance if requested (application-flow only — POPUP-6)
-        if obj.insurance:
+        # Calculate insurance if requested (application-flow only — POPUP-6).
+        # If discounts dropped the order to $0, there is nothing left to insure,
+        # so skip the calc even when the toggle was persisted as true.
+        if obj.insurance and pre_fee_amount > Decimal("0"):
             popup = application.popup if application else None
             insurance_amount = self._calculate_insurance(session, obj.products, popup)
             response.insurance_amount = insurance_amount

@@ -114,13 +114,41 @@ export default function ConfirmStep() {
     Object.values(cart.dynamicItems).some((items) => items.length > 0) ||
     hasEditChanges
 
-  // Insurance available if popup has insurance enabled with a valid percentage
+  // Insurance available if popup has insurance enabled with a valid percentage.
+  // Gate on the post-discount product subtotal so insurance is hidden whenever
+  // there are no products left to insure — covers coupons that drop it to $0,
+  // group/scholarship discounts of 100%, and patreon zeroing other products.
   const isInsuranceEnabled =
     popup?.insurance_enabled === true && popup?.insurance_percentage != null
+  const discountedProductsSubtotal =
+    summary.discountableSubtotal - summary.discount
   const hasInsurableProducts =
     isInsuranceEnabled &&
     cart.insurancePotentialPrice > 0 &&
-    summary.grandTotal - summary.insuranceSubtotal > 0
+    discountedProductsSubtotal > 0
+
+  // Hide the coupon input when there is nothing in the cart that a discount
+  // could apply to. Covers the patreon-only case naturally (patreon products
+  // are forced `discountable=false` by the backend, so a cart with only a
+  // donation reports `discountableSubtotal === 0`). Without this the buyer
+  // can type a code, see "Code applied!", and watch the total stay the same.
+  const hasDiscountableItems = summary.discountableSubtotal > 0
+
+  // Mirror of useCartSummary's helper — anything an admin flagged as
+  // non-discountable (patreon donations are coerced to this on write).
+  const isNonDiscountable = (product?: { discountable?: boolean | null }) =>
+    product?.discountable === false
+
+  // When the cart mixes discountable and non-discountable items AND a discount
+  // is applied, the bare "Promo Discount" label hides why the discount is
+  // smaller than the full subtotal. Append "(eligible items)" to clarify.
+  const nonDiscountableTotal =
+    summary.subtotal -
+    summary.discountableSubtotal -
+    summary.insuranceSubtotal -
+    summary.contributionSubtotal
+  const showEligibleQualifier = summary.discount > 0 && nonDiscountableTotal > 0
+  const notEligibleCaption = t("checkout.discount.not_eligible_caption")
 
   // Extract template_config from the confirm step's nested 'insurance' sub-config
   const confirmStep = stepConfigs.find((s) => s.step_type === "confirm")
@@ -204,16 +232,23 @@ export default function ConfirmStep() {
                   {passes.map((pass) => (
                     <div
                       key={pass.productId}
-                      className="flex items-center justify-between text-sm py-0.5"
+                      className="flex items-start justify-between text-sm py-0.5"
                     >
-                      <span className="text-muted-foreground">
-                        {pass.quantity > 1 && (
-                          <span className="text-muted-foreground">
-                            {pass.quantity} ×{" "}
+                      <div className="flex flex-col">
+                        <span className="text-muted-foreground">
+                          {pass.quantity > 1 && (
+                            <span className="text-muted-foreground">
+                              {pass.quantity} ×{" "}
+                            </span>
+                          )}
+                          {pass.product.name}
+                        </span>
+                        {isNonDiscountable(pass.product) && (
+                          <span className="text-xs text-muted-foreground/70">
+                            {notEligibleCaption}
                           </span>
                         )}
-                        {pass.product.name}
-                      </span>
+                      </div>
                       <span className="font-medium text-foreground">
                         {formatCurrency(pass.originalPrice ?? pass.price)}
                       </span>
@@ -246,16 +281,23 @@ export default function ConfirmStep() {
                     {items.map((item) => (
                       <div
                         key={item.productId}
-                        className="flex items-center justify-between text-sm"
+                        className="flex items-start justify-between text-sm"
                       >
-                        <span className="text-muted-foreground">
-                          {item.quantity > 1 && (
-                            <span className="text-muted-foreground">
-                              {item.quantity} ×{" "}
+                        <div className="flex flex-col">
+                          <span className="text-muted-foreground">
+                            {item.quantity > 1 && (
+                              <span className="text-muted-foreground">
+                                {item.quantity} ×{" "}
+                              </span>
+                            )}
+                            {item.product.name}
+                          </span>
+                          {isNonDiscountable(item.product) && (
+                            <span className="text-xs text-muted-foreground/70">
+                              {notEligibleCaption}
                             </span>
                           )}
-                          {item.product.name}
-                        </span>
+                        </div>
                         <span className="font-medium text-foreground">
                           {formatCurrency(item.price)}
                         </span>
@@ -298,6 +340,11 @@ export default function ConfirmStep() {
                     {formatCheckoutDate(cart.housing.checkIn)} –{" "}
                     {formatCheckoutDate(cart.housing.checkOut)}
                   </p>
+                  {isNonDiscountable(cart.housing.product) && (
+                    <p className="text-xs text-muted-foreground/70">
+                      {notEligibleCaption}
+                    </p>
+                  )}
                 </div>
                 <span className="font-medium text-foreground text-sm">
                   {formatCurrency(cart.housing.totalPrice)}
@@ -322,16 +369,23 @@ export default function ConfirmStep() {
                 {cart.merch.map((item) => (
                   <div
                     key={item.productId}
-                    className="flex items-center justify-between text-sm"
+                    className="flex items-start justify-between text-sm"
                   >
-                    <span className="text-muted-foreground">
-                      {item.quantity > 1 && (
-                        <span className="text-muted-foreground">
-                          {item.quantity} ×{" "}
+                    <div className="flex flex-col">
+                      <span className="text-muted-foreground">
+                        {item.quantity > 1 && (
+                          <span className="text-muted-foreground">
+                            {item.quantity} ×{" "}
+                          </span>
+                        )}
+                        {item.product.name}
+                      </span>
+                      {isNonDiscountable(item.product) && (
+                        <span className="text-xs text-muted-foreground/70">
+                          {notEligibleCaption}
                         </span>
                       )}
-                      {item.product.name}
-                    </span>
+                    </div>
                     <span className="font-medium text-foreground">
                       {formatCurrency(item.totalPrice)}
                     </span>
@@ -353,10 +407,15 @@ export default function ConfirmStep() {
                   Patron
                 </span>
               </div>
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">
-                  Community contribution
-                </span>
+              <div className="flex items-start justify-between text-sm">
+                <div className="flex flex-col">
+                  <span className="text-muted-foreground">
+                    Community contribution
+                  </span>
+                  <span className="text-xs text-muted-foreground/70">
+                    {notEligibleCaption}
+                  </span>
+                </div>
                 <span className="font-medium text-foreground">
                   {formatCurrency(cart.patron.amount)}
                 </span>
@@ -391,6 +450,11 @@ export default function ConfirmStep() {
                       <p className="text-xs text-muted-foreground truncate">
                         {mp.product.name}
                       </p>
+                      {isNonDiscountable(mp.product) && (
+                        <p className="text-xs text-muted-foreground/70">
+                          {notEligibleCaption}
+                        </p>
+                      )}
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       <span className="font-medium text-foreground">
@@ -467,7 +531,7 @@ export default function ConfirmStep() {
         )}
 
         {/* Promo Code Section */}
-        {popup?.allows_coupons && (
+        {popup?.allows_coupons && hasDiscountableItems && (
           <>
             <div className="border-t border-border" />
             <div className="px-4 sm:px-5 py-4">
@@ -588,7 +652,11 @@ export default function ConfirmStep() {
           )}
           {summary.discount > 0 && (
             <div className="flex justify-between text-sm text-green-600 mb-2">
-              <span>Promo Discount</span>
+              <span>
+                {showEligibleQualifier
+                  ? t("checkout.discount.promo_discount_eligible_label")
+                  : "Promo Discount"}
+              </span>
               <span>-{formatCurrency(summary.discount)}</span>
             </div>
           )}

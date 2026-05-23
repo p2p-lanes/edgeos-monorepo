@@ -616,28 +616,6 @@ export function CheckoutProvider({
     },
   )
 
-  // Contribution fee — derived from popup config (mandatory when enabled).
-  // The popup is the single source of truth for the rate; there is no buyer
-  // opt-in toggle. We calculate client-side from popup.contribution_percentage
-  // so the summary line renders before submit (transparency requirement).
-  const contributionAmount = useMemo<number>(() => {
-    if (!city?.contribution_enabled) return 0
-    const pct = Number(city.contribution_percentage)
-    if (Number.isNaN(pct) || pct <= 0) return 0
-    // Pre-fee subtotal: passes + housing + merch + patron (mirrors backend
-    // _apply_discounts snapshot: post-discount, before insurance and contribution)
-    const passesSubtotal = selectedPasses.reduce(
-      (sum, p) => sum + (p.originalPrice ?? p.price),
-      0,
-    )
-    const housingTotal = housing?.totalPrice ?? 0
-    const merchTotal = merch.reduce((sum, m) => sum + m.totalPrice, 0)
-    const patronTotal = patron?.amount ?? 0
-    const preFeeSubtotal =
-      passesSubtotal + housingTotal + merchTotal + patronTotal
-    return Math.round(((preFeeSubtotal * pct) / 100) * 100) / 100
-  }, [city, selectedPasses, housing, merch, patron])
-
   // Defence-in-depth: take the highest discount available so the total reflects
   // it even if one of the state vectors lags (DiscountProvider's <= guard
   // rejecting an update, or usePromoCode's re-validation effect clobbering
@@ -647,6 +625,94 @@ export function CheckoutProvider({
     promoCodeDiscount ?? 0,
   )
 
+  // Discount base mirrors backend `_calculate_price` (payment/crud.py): the
+  // discount applies only to items where `product.discountable !== false`.
+  // Patreon products are forced to `discountable=false` by the backend schema
+  // validator, so the single check covers donations too.
+  const discountableProductsSubtotal = useMemo(() => {
+    const isNonDiscountable = (product: { discountable?: boolean | null }) =>
+      product.discountable === false
+    const standardPassesSubtotal = selectedPasses
+      .filter((p) => !isNonDiscountable(p.product))
+      .reduce((sum, p) => sum + (p.originalPrice ?? p.price), 0)
+    const housingTotal =
+      housing && !isNonDiscountable(housing.product) ? housing.totalPrice : 0
+    const merchTotal = merch
+      .filter((m) => !isNonDiscountable(m.product))
+      .reduce((sum, m) => sum + m.totalPrice, 0)
+    const mealPlansTotal = selectedMealPlans
+      .filter((m) => m.product && !isNonDiscountable(m.product))
+      .reduce((sum, m) => sum + (m.product?.price ?? 0), 0)
+    const standardDynamicSubtotal = Object.values(dynamicItems)
+      .flat()
+      .filter((item) => !isNonDiscountable(item.product))
+      .reduce((sum, item) => sum + item.price, 0)
+    return (
+      standardPassesSubtotal +
+      housingTotal +
+      merchTotal +
+      mealPlansTotal +
+      standardDynamicSubtotal
+    )
+  }, [selectedPasses, housing, merch, selectedMealPlans, dynamicItems])
+
+  // Non-discountable products: anything flagged `product.discountable=false`
+  // (patreon products are coerced to this by the backend validator) plus the
+  // patron donation amount. Charged in full alongside the discounted standard
+  // subtotal.
+  const nonDiscountableProductsSubtotal = useMemo(() => {
+    const isNonDiscountable = (product: { discountable?: boolean | null }) =>
+      product.discountable === false
+    const nonDiscountablePasses = selectedPasses
+      .filter((p) => isNonDiscountable(p.product))
+      .reduce((sum, p) => sum + (p.originalPrice ?? p.price), 0)
+    const nonDiscountableHousing =
+      housing && isNonDiscountable(housing.product) ? housing.totalPrice : 0
+    const nonDiscountableMerch = merch
+      .filter((m) => isNonDiscountable(m.product))
+      .reduce((sum, m) => sum + m.totalPrice, 0)
+    const nonDiscountableMealPlans = selectedMealPlans
+      .filter((m) => m.product && isNonDiscountable(m.product))
+      .reduce((sum, m) => sum + (m.product?.price ?? 0), 0)
+    const nonDiscountableDynamic = Object.values(dynamicItems)
+      .flat()
+      .filter((item) => isNonDiscountable(item.product))
+      .reduce((sum, item) => sum + item.price, 0)
+    return (
+      nonDiscountablePasses +
+      nonDiscountableHousing +
+      nonDiscountableMerch +
+      nonDiscountableMealPlans +
+      nonDiscountableDynamic +
+      (patron?.amount ?? 0)
+    )
+  }, [selectedPasses, housing, merch, selectedMealPlans, dynamicItems, patron])
+
+  const discountedProductsAmount = Math.max(
+    0,
+    discountableProductsSubtotal * (1 - effectiveDiscount / 100),
+  )
+
+  // Mirrors backend `pre_fee_amount` (payment/crud.py:1302): post-discount
+  // standard subtotal plus non-discountable items. This is the base both for
+  // contribution and for the "anything left to pay" gate.
+  const preFeeAmount =
+    discountedProductsAmount + nonDiscountableProductsSubtotal
+
+  // Contribution fee — derived from popup config (mandatory when enabled).
+  // The popup is the single source of truth for the rate; there is no buyer
+  // opt-in toggle. We calculate client-side from popup.contribution_percentage
+  // so the summary line renders before submit (transparency requirement).
+  // Base mirrors backend: % of pre_fee_amount (post-discount standard + non
+  // discountable). Zero when there is nothing being charged for products.
+  const contributionAmount = useMemo<number>(() => {
+    if (!city?.contribution_enabled) return 0
+    if (preFeeAmount <= 0) return 0
+    const pct = Number(city.contribution_percentage)
+    if (Number.isNaN(pct) || pct <= 0) return 0
+    return Math.round(((preFeeAmount * pct) / 100) * 100) / 100
+  }, [city, preFeeAmount])
+
   // Cart summary
   const { summary } = useCartSummary({
     selectedPasses,
@@ -654,6 +720,7 @@ export function CheckoutProvider({
     merch,
     patron,
     mealPlans: selectedMealPlans,
+    dynamicItems,
     insuranceAmount,
     contributionAmount,
     isEditing,
@@ -689,6 +756,25 @@ export function CheckoutProvider({
     setPromoCodeValid,
     setPromoCodeDiscount,
   ])
+
+  // If discounts (group, scholarship, or coupon) drop the product subtotal to
+  // $0, force the insurance toggle off so the persisted line item stops
+  // counting even when the InsuranceCard is hidden.
+  useEffect(() => {
+    if (discountedProductsAmount <= 0 && insurance) {
+      setInsurance(false)
+    }
+  }, [discountedProductsAmount, insurance])
+
+  // If the cart has nothing discountable (e.g. only items flagged
+  // `discountable: false`), a coupon code would land with zero effect and the
+  // single-use coupons would be wasted. Drop any applied coupon so the UI
+  // stays consistent with the hidden input below.
+  useEffect(() => {
+    if (discountableProductsSubtotal === 0 && (promoCodeValid || promoCode)) {
+      clearPromoCode()
+    }
+  }, [discountableProductsSubtotal, promoCodeValid, promoCode, clearPromoCode])
 
   // Loading states
   const isLoading = promoIsLoading
@@ -731,15 +817,6 @@ export function CheckoutProvider({
     hasRestoredStepRef.current = true
     setCurrentStep(stepToRestore as CheckoutStep)
   }, [availableSteps, initialStep, setCurrentStep])
-
-  // Dynamic subtotal
-  const dynamicSubtotal = useMemo(
-    () =>
-      Object.values(dynamicItems)
-        .flat()
-        .reduce((sum, item) => sum + item.price, 0),
-    [dynamicItems],
-  )
 
   // Build cart state
   const cart = useMemo<CheckoutCartState>(
@@ -1006,22 +1083,12 @@ export function CheckoutProvider({
         : null,
   })
 
-  const finalSummary = useMemo(
-    () => ({
-      ...summary,
-      dynamicSubtotal,
-      subtotal: summary.subtotal + dynamicSubtotal,
-      grandTotal: summary.grandTotal + dynamicSubtotal,
-    }),
-    [summary, dynamicSubtotal],
-  )
-
   const value: CheckoutContextValue = {
     currentStep,
     availableSteps,
     stepConfigs: effectiveConfiguredSteps,
     cart,
-    summary: finalSummary,
+    summary,
     allProducts: products,
     productsByStepId,
     getProductsForStep,

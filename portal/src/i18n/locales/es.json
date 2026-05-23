@@ -250,6 +250,10 @@
     "contribution": {
       "fallbackLabel": "Contribución al evento",
       "fallbackDescription": "Apoya la realización del evento"
+    },
+    "discount": {
+      "not_eligible_caption": "No aplica descuento",
+      "promo_discount_eligible_label": "Descuento (items elegibles)"
     }
   },
   "openCheckout": {

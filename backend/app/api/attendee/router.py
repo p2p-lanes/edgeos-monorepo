@@ -80,8 +80,15 @@ def _build_attendee_with_origin(
             else None
         )
         if snapshot is not None:
-            product_name = snapshot.product_name
-            product_category = snapshot.product_category
+            product_name = snapshot.product_name or (
+                ap.product.name if ap.product else None
+            )
+            # "" snapshots are a backend artifact (crud writes product.category
+            # or "") and break portal icon resolution — treat them like a
+            # missing snapshot and fall back to the live product category.
+            product_category = snapshot.product_category or (
+                ap.product.category if ap.product else None
+            )
         else:
             product_name = ap.product.name if ap.product else None
             product_category = ap.product.category if ap.product else None

@@ -1,5 +1,6 @@
 "use client"
 
+import { dedupTicketEntries } from "@/app/portal/[popupSlug]/passes/utils/dedupTickets"
 import { resolvePopupCheckoutPolicy } from "@/checkout/popupCheckoutPolicy"
 import type { AttendeeWithOriginPublic } from "@/client"
 import { sortAttendees } from "@/helpers/filters"
@@ -79,11 +80,16 @@ export function useResolvedAttendees(): AttendeePassState[] {
   // per-ticket AttendeeProductPublic rows — all denormalized product fields
   // (product_name, product_category, start_date, end_date, duration_type)
   // are populated by the backend, so no client-side join is needed.
+  //
+  // ticket_entries is deduped here to hide historical double-Payment-APPROVED
+  // rows from the public passes view (see dedupTicketEntries for full
+  // context and the day/meal_plan exceptions). The raw `products` field on
+  // the attendee is left untouched for buy-mode / cart consumers.
   const withTicketEntries = humanAttendees.map(
     (attendee: AttendeeWithOriginPublic): AttendeePassState => ({
       ...(attendee as unknown as AttendeePassState),
       products: [],
-      ticket_entries: attendee.products ?? [],
+      ticket_entries: dedupTicketEntries(attendee.products ?? []),
     }),
   )
   return sortAttendees(withTicketEntries)

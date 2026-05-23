@@ -86,6 +86,14 @@ class ProductBase(SQLModel):
         default=False,
         sa_column=Column(Boolean, nullable=False, server_default="false"),
     )
+    # Controls whether coupon / group / scholarship discounts reduce this
+    # product's price. Default true. Set false on items that must always be
+    # charged in full (e.g. meal plans for popups that mandate it). Patreon
+    # products are non-discountable by category and ignore this flag.
+    discountable: bool = Field(
+        default=True,
+        sa_column=Column(Boolean, nullable=False, server_default="true"),
+    )
 
 
 class ProductPublic(ProductBase):
@@ -136,6 +144,7 @@ class ProductCreate(BaseModel):
     max_per_order: int | None = Field(default=None, ge=1)
     insurance_eligible: bool = False
     requires_check_in: bool = False
+    discountable: bool = True
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
@@ -147,6 +156,13 @@ class ProductCreate(BaseModel):
                 "Patron products must have a price of 0. "
                 "The donation amount is set by the donor at checkout."
             )
+        return self
+
+    @model_validator(mode="after")
+    def coerce_patreon_discountable(self) -> "ProductCreate":
+        """Patreon products are donations and always non-discountable."""
+        if self.category == "patreon":
+            self.discountable = False
         return self
 
     @model_validator(mode="after")
@@ -209,6 +225,7 @@ class ProductUpdate(BaseModel):
     max_per_order: int | None = Field(default=None, ge=1)
     insurance_eligible: bool | None = None
     requires_check_in: bool | None = None
+    discountable: bool | None = None
 
     @model_validator(mode="after")
     def validate_patreon_price(self) -> "ProductUpdate":
@@ -218,6 +235,13 @@ class ProductUpdate(BaseModel):
                 "Patron products must have a price of 0. "
                 "The donation amount is set by the donor at checkout."
             )
+        return self
+
+    @model_validator(mode="after")
+    def coerce_patreon_discountable(self) -> "ProductUpdate":
+        """When updating to category=patreon, force discountable=false."""
+        if self.category == "patreon":
+            self.discountable = False
         return self
 
     @model_validator(mode="after")
@@ -261,6 +285,7 @@ class ProductBatchItem(BaseModel):
     max_per_order: int | None = Field(default=None, ge=1)
     insurance_eligible: bool = False
     requires_check_in: bool = False
+    discountable: bool = True
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
@@ -270,6 +295,13 @@ class ProductBatchItem(BaseModel):
         if self.category != "ticket":
             if self.duration_type is not None:
                 raise ValueError("duration_type can only be set for ticket products")
+        return self
+
+    @model_validator(mode="after")
+    def coerce_patreon_discountable(self) -> "ProductBatchItem":
+        """Patreon products are donations and always non-discountable."""
+        if self.category == "patreon":
+            self.discountable = False
         return self
 
     @model_validator(mode="after")
