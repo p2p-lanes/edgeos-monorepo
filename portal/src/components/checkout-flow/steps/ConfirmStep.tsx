@@ -136,9 +136,8 @@ export default function ConfirmStep() {
 
   // Mirror of useCartSummary's helper — anything an admin flagged as
   // non-discountable (patreon donations are coerced to this on write).
-  const isNonDiscountable = (product?: {
-    discountable?: boolean | null
-  }) => product?.discountable === false
+  const isNonDiscountable = (product?: { discountable?: boolean | null }) =>
+    product?.discountable === false
 
   // When the cart mixes discountable and non-discountable items AND a discount
   // is applied, the bare "Promo Discount" label hides why the discount is
@@ -148,8 +147,7 @@ export default function ConfirmStep() {
     summary.discountableSubtotal -
     summary.insuranceSubtotal -
     summary.contributionSubtotal
-  const showEligibleQualifier =
-    summary.discount > 0 && nonDiscountableTotal > 0
+  const showEligibleQualifier = summary.discount > 0 && nonDiscountableTotal > 0
   const notEligibleCaption = t("checkout.discount.not_eligible_caption")
 
   // Extract template_config from the confirm step's nested 'insurance' sub-config
