@@ -250,6 +250,10 @@
     "contribution": {
       "fallbackLabel": "活动贡献费",
       "fallbackDescription": "支持活动的举办"
+    },
+    "discount": {
+      "not_eligible_caption": "不符合折扣条件",
+      "promo_discount_eligible_label": "促销折扣（符合条件的商品）"
     }
   },
   "openCheckout": {

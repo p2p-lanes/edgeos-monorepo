@@ -240,6 +240,10 @@
     "contribution": {
       "fallbackLabel": "Viðbót við viðburð",
       "fallbackDescription": "Styður við framkvæmd viðburðarins"
+    },
+    "discount": {
+      "not_eligible_caption": "Ekki gjaldgengt fyrir afslátt",
+      "promo_discount_eligible_label": "Afsláttur (gjaldgengar vörur)"
     }
   },
   "openCheckout": {
