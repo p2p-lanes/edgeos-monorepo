@@ -11,6 +11,7 @@ import {
   QrCode,
   Shield,
   ShieldCheck,
+  TicketPercent,
 } from "lucide-react"
 import { useMemo, useState } from "react"
 import {
@@ -205,6 +206,7 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
       sale_starts_at: defaultValues?.sale_starts_at ?? "",
       sale_ends_at: defaultValues?.sale_ends_at ?? "",
       insurance_eligible: defaultValues?.insurance_eligible ?? false,
+      discountable: defaultValues?.discountable ?? true,
     },
     onSubmit: ({ value }) => {
       if (readOnly) return
@@ -246,6 +248,7 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
           total_stock_cap: totalStockCap,
           max_per_order: maxPerOrder,
           insurance_eligible: value.insurance_eligible,
+          discountable: value.discountable,
         })
       } else {
         if (!selectedPopupId) {
@@ -272,6 +275,7 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
           total_stock_cap: totalStockCap ?? undefined,
           max_per_order: maxPerOrder ?? undefined,
           insurance_eligible: value.insurance_eligible,
+          discountable: value.discountable,
         })
       }
     },
@@ -643,6 +647,55 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
               </InlineRow>
             )}
           </form.Field>
+
+          <form.Subscribe selector={(state) => state.values.category}>
+            {(category) => (
+              <form.Field name="discountable">
+                {(field) => {
+                  // Patreon donations are never discountable by policy — the
+                  // backend coerces the field on write, so mirror that in the
+                  // form: force value=false, disable the checkbox, and show
+                  // why.
+                  const isPatreon = category === "patreon"
+                  const isDisabled = readOnly || isPatreon
+                  const effectiveChecked = isPatreon ? false : field.state.value
+
+                  return (
+                    <InlineRow
+                      icon={
+                        <TicketPercent className="h-4 w-4 text-muted-foreground" />
+                      }
+                      label="Discountable"
+                      description={
+                        isPatreon
+                          ? "Patreon donations are never discountable"
+                          : "When off, coupons and group/scholarship discounts never reduce this product's price (e.g. mandatory meal plans)"
+                      }
+                    >
+                      <div className="flex items-center gap-2">
+                        <Checkbox
+                          id="discountable"
+                          checked={effectiveChecked}
+                          onCheckedChange={(checked) =>
+                            field.handleChange(checked === true)
+                          }
+                          disabled={isDisabled}
+                          title={
+                            isPatreon
+                              ? "Patreon donations are never discountable"
+                              : undefined
+                          }
+                        />
+                        <Label htmlFor="discountable" className="text-sm">
+                          Eligible for discounts
+                        </Label>
+                      </div>
+                    </InlineRow>
+                  )
+                }}
+              </form.Field>
+            )}
+          </form.Subscribe>
 
           <form.Field name="requires_check_in">
             {(field) => (

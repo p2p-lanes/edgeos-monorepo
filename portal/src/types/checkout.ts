@@ -148,6 +148,12 @@ export interface CheckoutCartSummary {
   mealPlansSubtotal: number
   insuranceSubtotal: number
   contributionSubtotal: number
+  /**
+   * Sum of items eligible for discounts (passes + housing + merch + patron +
+   * meal plans). Excludes insurance and contribution — they are charged in
+   * full regardless of any discount applied.
+   */
+  discountableSubtotal: number
   dynamicSubtotal: number
   subtotal: number
   discount: number
@@ -273,6 +279,7 @@ export function createInitialSummary(): CheckoutCartSummary {
     mealPlansSubtotal: 0,
     insuranceSubtotal: 0,
     contributionSubtotal: 0,
+    discountableSubtotal: 0,
     dynamicSubtotal: 0,
     subtotal: 0,
     discount: 0,

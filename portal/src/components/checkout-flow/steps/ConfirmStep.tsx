@@ -114,13 +114,25 @@ export default function ConfirmStep() {
     Object.values(cart.dynamicItems).some((items) => items.length > 0) ||
     hasEditChanges
 
-  // Insurance available if popup has insurance enabled with a valid percentage
+  // Insurance available if popup has insurance enabled with a valid percentage.
+  // Gate on the post-discount product subtotal so insurance is hidden whenever
+  // there are no products left to insure — covers coupons that drop it to $0,
+  // group/scholarship discounts of 100%, and patreon zeroing other products.
   const isInsuranceEnabled =
     popup?.insurance_enabled === true && popup?.insurance_percentage != null
+  const discountedProductsSubtotal =
+    summary.discountableSubtotal - summary.discount
   const hasInsurableProducts =
     isInsuranceEnabled &&
     cart.insurancePotentialPrice > 0 &&
-    summary.grandTotal - summary.insuranceSubtotal > 0
+    discountedProductsSubtotal > 0
+
+  // Hide the coupon input when there is nothing in the cart that a discount
+  // could apply to. Covers the patreon-only case naturally (patreon products
+  // are forced `discountable=false` by the backend, so a cart with only a
+  // donation reports `discountableSubtotal === 0`). Without this the buyer
+  // can type a code, see "Code applied!", and watch the total stay the same.
+  const hasDiscountableItems = summary.discountableSubtotal > 0
 
   // Extract template_config from the confirm step's nested 'insurance' sub-config
   const confirmStep = stepConfigs.find((s) => s.step_type === "confirm")
@@ -467,7 +479,7 @@ export default function ConfirmStep() {
         )}
 
         {/* Promo Code Section */}
-        {popup?.allows_coupons && (
+        {popup?.allows_coupons && hasDiscountableItems && (
           <>
             <div className="border-t border-border" />
             <div className="px-4 sm:px-5 py-4">
