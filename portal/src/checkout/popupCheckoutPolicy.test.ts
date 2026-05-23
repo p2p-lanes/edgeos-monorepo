@@ -46,12 +46,6 @@ describe("getEffectiveCheckoutMode", () => {
     )
   })
 
-  it("returns simple_quantity for supporter regardless of popup mode", () => {
-    expect(
-      getEffectiveCheckoutMode("supporter", CHECKOUT_MODE.PASS_SYSTEM),
-    ).toBe(CHECKOUT_MODE.SIMPLE_QUANTITY)
-  })
-
   it("returns simple_quantity for merch regardless of popup mode", () => {
     expect(getEffectiveCheckoutMode("merch", CHECKOUT_MODE.PASS_SYSTEM)).toBe(
       CHECKOUT_MODE.SIMPLE_QUANTITY,

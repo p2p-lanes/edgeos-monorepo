@@ -2591,6 +2591,7 @@ export type ProductBatchItem = {
     max_per_order?: (number | null);
     insurance_eligible?: boolean;
     requires_check_in?: boolean;
+    discountable?: boolean;
 };
 
 /**
@@ -2618,6 +2619,7 @@ export type ProductBatchResult = {
     max_per_order?: (number | null);
     insurance_eligible?: boolean;
     requires_check_in?: boolean;
+    discountable?: boolean;
     id: string;
     success: boolean;
     err_msg?: (string | null);
@@ -2658,6 +2660,7 @@ export type ProductCreate = {
     max_per_order?: (number | null);
     insurance_eligible?: boolean;
     requires_check_in?: boolean;
+    discountable?: boolean;
 };
 
 /**
@@ -2698,6 +2701,7 @@ export type ProductPublic = {
     max_per_order?: (number | null);
     insurance_eligible?: boolean;
     requires_check_in?: boolean;
+    discountable?: boolean;
     id: string;
 };
 
@@ -2723,6 +2727,7 @@ export type ProductUpdate = {
     max_per_order?: (number | null);
     insurance_eligible?: (boolean | null);
     requires_check_in?: (boolean | null);
+    discountable?: (boolean | null);
 };
 
 /**
@@ -2750,6 +2755,7 @@ export type ProductWithQuantity = {
     max_per_order?: (number | null);
     insurance_eligible?: boolean;
     requires_check_in?: boolean;
+    discountable?: boolean;
     id: string;
     quantity?: number;
 };

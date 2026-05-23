@@ -12980,6 +12980,11 @@ export const ProductBatchItemSchema = {
             type: 'boolean',
             title: 'Requires Check In',
             default: false
+        },
+        discountable: {
+            type: 'boolean',
+            title: 'Discountable',
+            default: true
         }
     },
     type: 'object',
@@ -13157,6 +13162,11 @@ export const ProductBatchResultSchema = {
             type: 'boolean',
             title: 'Requires Check In',
             default: false
+        },
+        discountable: {
+            type: 'boolean',
+            title: 'Discountable',
+            default: true
         },
         id: {
             type: 'string',
@@ -13395,6 +13405,11 @@ export const ProductCreateSchema = {
             type: 'boolean',
             title: 'Requires Check In',
             default: false
+        },
+        discountable: {
+            type: 'boolean',
+            title: 'Discountable',
+            default: true
         }
     },
     type: 'object',
@@ -13592,6 +13607,11 @@ export const ProductPublicSchema = {
             type: 'boolean',
             title: 'Requires Check In',
             default: false
+        },
+        discountable: {
+            type: 'boolean',
+            title: 'Discountable',
+            default: true
         },
         id: {
             type: 'string',
@@ -13826,6 +13846,17 @@ export const ProductUpdateSchema = {
                 }
             ],
             title: 'Requires Check In'
+        },
+        discountable: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Discountable'
         }
     },
     type: 'object',
@@ -14002,6 +14033,11 @@ export const ProductWithQuantitySchema = {
             type: 'boolean',
             title: 'Requires Check In',
             default: false
+        },
+        discountable: {
+            type: 'boolean',
+            title: 'Discountable',
+            default: true
         },
         id: {
             type: 'string',

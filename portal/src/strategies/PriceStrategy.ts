@@ -28,8 +28,7 @@ class DefaultPriceStrategy implements PriceStrategy {
     hasPatreonPurchased: boolean,
     discount: number,
   ): number {
-    const isSpecialProduct =
-      product.category === "patreon" || product.category === "supporter"
+    const isSpecialProduct = product.category === "patreon"
     const originalPrice = product.original_price || product.price || 0
     const effective = getEffectiveCheckoutMode(
       product.category,
@@ -45,11 +44,7 @@ class DefaultPriceStrategy implements PriceStrategy {
       return 0
     }
 
-    if (
-      product.category !== "patreon" &&
-      product.category !== "supporter" &&
-      discount > 0
-    ) {
+    if (product.category !== "patreon" && discount > 0) {
       return originalPrice * (1 - discount / 100) * (product.quantity || 1)
       // if (discount.discount_type === 'percentage') {
       //   return originalPrice * (1 - discount.discount_value / 100);
