@@ -176,7 +176,6 @@ class TestCheckInModel:
             human_id=human.id,
             name="Schema Test Attendee",
             category="main",
-            check_in_code=None,
         )
         db.add(attendee)
         db.commit()

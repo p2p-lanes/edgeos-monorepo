@@ -82,7 +82,6 @@ def _make_attendee(
         human_id=human.id,
         name=f"Snap Attendee {suffix}",
         category="main",
-        check_in_code=None,
         email=human.email,
     )
     db.add(attendee)
@@ -92,7 +91,11 @@ def _make_attendee(
 
 
 def _make_payment(
-    db: Session, tenant: Tenants, popup: Popups, *, status: str = PaymentStatus.APPROVED.value
+    db: Session,
+    tenant: Tenants,
+    popup: Popups,
+    *,
+    status: str = PaymentStatus.APPROVED.value,
 ) -> Payments:
     payment = Payments(
         id=uuid.uuid4(),
@@ -200,9 +203,7 @@ def test_snapshot_overrides_live_product(
         snapshot_name="Snapshotted Pass",
         snapshot_category="patreon",
     )
-    _make_ticket(
-        db, tenant_a, attendee, product, payment_id=payment.id, suffix="s1"
-    )
+    _make_ticket(db, tenant_a, attendee, product, payment_id=payment.id, suffix="s1")
 
     loaded = _load_attendee_with_relations(db, attendee.id)
     result = _build_attendee_with_origin(loaded)
@@ -229,9 +230,7 @@ def test_no_payment_id_falls_back_to_live_product(
     )
     human = _make_human(db, tenant_a, suffix="s2")
     attendee = _make_attendee(db, tenant_a, popup_tenant_a, human, suffix="s2")
-    _make_ticket(
-        db, tenant_a, attendee, product, payment_id=None, suffix="s2"
-    )
+    _make_ticket(db, tenant_a, attendee, product, payment_id=None, suffix="s2")
 
     loaded = _load_attendee_with_relations(db, attendee.id)
     result = _build_attendee_with_origin(loaded)
@@ -267,9 +266,7 @@ def test_missing_snapshot_falls_back_to_live_product(
         db, tenant_a, popup_tenant_a, status=PaymentStatus.CANCELLED.value
     )
     # Intentionally no _make_payment_product → no snapshot row for this triple.
-    _make_ticket(
-        db, tenant_a, attendee, product, payment_id=payment.id, suffix="s3"
-    )
+    _make_ticket(db, tenant_a, attendee, product, payment_id=payment.id, suffix="s3")
 
     loaded = _load_attendee_with_relations(db, attendee.id)
     result = _build_attendee_with_origin(loaded)
@@ -311,9 +308,7 @@ def test_product_renamed_after_purchase_snapshot_wins(
         snapshot_name="Original Pass",
         snapshot_category="ticket",
     )
-    _make_ticket(
-        db, tenant_a, attendee, product, payment_id=payment.id, suffix="s4"
-    )
+    _make_ticket(db, tenant_a, attendee, product, payment_id=payment.id, suffix="s4")
 
     # Operator edits the product after the sale.
     product.name = "Renamed Pass v2"
@@ -327,4 +322,47 @@ def test_product_renamed_after_purchase_snapshot_wins(
     assert len(result.products) == 1
     ap = result.products[0]
     assert ap.product_name == "Original Pass"
+    assert ap.product_category == "ticket"
+
+
+# ---------------------------------------------------------------------------
+# Scenario 5: Empty-string snapshot category → fallback to live product
+# ---------------------------------------------------------------------------
+
+
+def test_empty_snapshot_category_falls_back_to_live_product(
+    db: Session,
+    tenant_a: Tenants,
+    popup_tenant_a: Popups,
+) -> None:
+    """Snapshot has product_category="" (backend writes product.category or "").
+
+    The portal's getCategoryIcon falls through to a generic Box icon on empty
+    strings, which surfaced as duplicate-looking ticket rows rendering with
+    different icons. Empty snapshot fields must be treated like a missing
+    snapshot and fall back to the live product values.
+    """
+    product = _make_product(
+        db, tenant_a, popup_tenant_a, name="Live Month Pass", category="ticket"
+    )
+    human = _make_human(db, tenant_a, suffix="s5")
+    attendee = _make_attendee(db, tenant_a, popup_tenant_a, human, suffix="s5")
+    payment = _make_payment(db, tenant_a, popup_tenant_a)
+    _make_payment_product(
+        db,
+        tenant_a,
+        payment,
+        product,
+        attendee,
+        snapshot_name="",
+        snapshot_category="",
+    )
+    _make_ticket(db, tenant_a, attendee, product, payment_id=payment.id, suffix="s5")
+
+    loaded = _load_attendee_with_relations(db, attendee.id)
+    result = _build_attendee_with_origin(loaded)
+
+    assert len(result.products) == 1
+    ap = result.products[0]
+    assert ap.product_name == "Live Month Pass"
     assert ap.product_category == "ticket"

@@ -240,6 +240,10 @@
     "contribution": {
       "fallbackLabel": "Viðbót við viðburð",
       "fallbackDescription": "Styður við framkvæmd viðburðarins"
+    },
+    "discount": {
+      "not_eligible_caption": "Ekki gjaldgengt fyrir afslátt",
+      "promo_discount_eligible_label": "Afsláttur (gjaldgengar vörur)"
     }
   },
   "openCheckout": {
@@ -694,6 +698,7 @@
       "creation_restricted_heading": "Gerð viðburða er takmörkuð",
       "creation_restricted_message": "Aðeins stjórnendur geta búið til viðburði fyrir þennan popup.",
       "no_popup_error": "Enginn popup",
+      "no_timezone_error": "Engin tímabelti stillt fyrir þennan popup",
       "no_venue_option": "Fundur",
       "custom_location_option": "Sérsniðin staðsetning",
       "venues_group_label": "Staðir",

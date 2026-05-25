@@ -83,7 +83,6 @@ def _make_attendee(
         human_id=human.id,
         name=f"Denorm Attendee {suffix}",
         category="main",
-        check_in_code=None,
         email=human.email,
     )
     db.add(attendee)
@@ -246,6 +245,7 @@ def test_denorm_null_product_guard(
     mock_ap.check_in_code = "NULLPROD1"
     mock_ap.payment_id = None
     mock_ap.product = None  # simulate unloaded / orphaned relationship
+    mock_ap.purchase_metadata = None
 
     # Patch the ORM relationship on the loaded attendee
     from sqlmodel import select

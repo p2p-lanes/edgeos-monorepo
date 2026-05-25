@@ -2,10 +2,14 @@
 
 import { QrCode, Ticket, Users } from "lucide-react"
 import { useState } from "react"
+import { useTranslation } from "react-i18next"
 import QRcode from "@/app/portal/[popupSlug]/passes/components/common/QRcode"
+import {
+  compareByCategory,
+  getCategoryIcon,
+} from "@/app/portal/[popupSlug]/passes/utils/categoryDisplay"
 import type { CompanionParticipation } from "@/client"
 import { Badge } from "@/components/ui/badge"
-import { useMyTicketsQuery } from "@/hooks/useMyTicketsQuery"
 import { cn } from "@/lib/utils"
 import { useCityProvider } from "@/providers/cityProvider"
 
@@ -22,24 +26,22 @@ interface CompanionPassesProps {
 }
 
 export function CompanionPasses({ participation }: CompanionPassesProps) {
+  const { t } = useTranslation()
   const { attendee, application_status } = participation
-  const [isQrModalOpen, setIsQrModalOpen] = useState(false)
   const { getCity } = useCityProvider()
   const city = getCity()
 
-  const { data: allTickets = [] } = useMyTicketsQuery()
-
-  const myTicketEntry = allTickets.find((t) => t.id === attendee.id)
-  const tickets = myTicketEntry?.products ?? []
-
-  // Prefer the per-ticket check-in code (source of truth post-`ticket-as-first-class-entity`).
-  // Fall back to the legacy attendee-level code for old data still carrying it.
-  const checkInCode =
-    attendee.tickets?.[0]?.check_in_code ?? attendee.check_in_code ?? null
+  // Per-ticket QR modal state — same pattern as AttendeeTicket (main applicant).
+  const [activeTicket, setActiveTicket] = useState<{
+    code: string
+    lastScanAt: string | null
+  } | null>(null)
 
   const isAccepted = application_status === "accepted"
+  const tickets = [...(attendee.tickets ?? [])]
+    .filter((t) => t.product_category !== "patreon")
+    .sort(compareByCategory)
   const hasTickets = tickets.length > 0
-  const canShowCheckIn = isAccepted && hasTickets && !!checkInCode
 
   return (
     <div className="space-y-6 pb-24 lg:pb-0">
@@ -75,45 +77,58 @@ export function CompanionPasses({ participation }: CompanionPassesProps) {
           <h3 className="text-sm font-medium text-muted-foreground mb-3">
             Your Passes
           </h3>
-          {tickets.length > 0 ? (
-            <div className="space-y-2">
-              {tickets.map((ticket, idx) => (
-                <div
-                  key={`${ticket.name}-${idx}`}
-                  className={cn(
-                    "flex items-center gap-3 py-3 px-4 rounded-lg bg-muted/30",
-                  )}
-                >
-                  <Ticket className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                  <div className="flex items-baseline gap-2 flex-1 min-w-0">
-                    <span className="font-medium text-sm">{ticket.name}</span>
+          {hasTickets ? (
+            <div>
+              {tickets.map((ticket, idx) => {
+                const CategoryIcon = getCategoryIcon(ticket.product_category)
+                const isScanned = ticket.last_scan_at != null
+                return (
+                  <div
+                    key={ticket.id}
+                    className={cn(
+                      "flex items-center gap-3 py-3",
+                      idx !== tickets.length - 1 &&
+                        "border-b border-dotted border-border",
+                    )}
+                  >
+                    <CategoryIcon className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                    <div className="flex items-baseline gap-2 flex-1 min-w-0">
+                      <span className="font-medium text-sm">
+                        {ticket.product_name ?? ticket.check_in_code}
+                      </span>
+                    </div>
+                    {ticket.requires_check_in && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setActiveTicket({
+                            code: ticket.check_in_code,
+                            lastScanAt: ticket.last_scan_at ?? null,
+                          })
+                        }
+                        aria-label={
+                          isScanned
+                            ? t("passes.qr_already_scanned")
+                            : t("passes.check_in_code")
+                        }
+                        className={cn(
+                          "transition-colors cursor-pointer flex-shrink-0",
+                          isScanned
+                            ? "text-yellow-500 hover:text-yellow-700"
+                            : "text-muted-foreground hover:text-foreground",
+                        )}
+                      >
+                        <QrCode className="h-5 w-5" />
+                      </button>
+                    )}
                   </div>
-                  {ticket.quantity && ticket.quantity > 1 && (
-                    <span className="text-xs text-muted-foreground">
-                      x{ticket.quantity}
-                    </span>
-                  )}
-                </div>
-              ))}
+                )
+              })}
             </div>
           ) : (
             <p className="text-sm text-muted-foreground py-4 text-center">
               No passes assigned yet. Check back later.
             </p>
-          )}
-
-          {/* Check-in Code */}
-          {canShowCheckIn && (
-            <div className="border-t mt-4 pt-4">
-              <button
-                type="button"
-                onClick={() => setIsQrModalOpen(true)}
-                className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-              >
-                <QrCode className="h-4 w-4" />
-                <span>View Check-in Code</span>
-              </button>
-            </div>
           )}
         </div>
       )}
@@ -126,13 +141,14 @@ export function CompanionPasses({ participation }: CompanionPassesProps) {
         </div>
       )}
 
-      {canShowCheckIn && checkInCode && (
-        <QRcode
-          check_in_code={checkInCode}
-          isOpen={isQrModalOpen}
-          onOpenChange={setIsQrModalOpen}
-        />
-      )}
+      <QRcode
+        check_in_code={activeTicket?.code ?? ""}
+        lastScanAt={activeTicket?.lastScanAt ?? null}
+        isOpen={activeTicket !== null}
+        onOpenChange={(open) => {
+          if (!open) setActiveTicket(null)
+        }}
+      />
     </div>
   )
 }

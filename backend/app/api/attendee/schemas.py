@@ -2,6 +2,7 @@ import uuid
 from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, field_validator
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PgUUID
 from sqlmodel import Column, Field, SQLModel
 
@@ -29,7 +30,6 @@ class AttendeeBase(SQLModel):
     )
     email: str | None = Field(default=None, nullable=True)
     gender: str | None = Field(default=None, nullable=True)
-    check_in_code: str | None = Field(default=None, index=True, nullable=True)
     poap_url: str | None = Field(default=None, nullable=True)
 
 
@@ -37,7 +37,8 @@ class AttendeePublic(AttendeeBase):
     """Attendee schema for API responses (detail view).
 
     products is typed as list[AttendeeProductPublic] so each entry carries
-    check_in_code, payment_id, and requires_check_in. The list endpoint
+    its own check_in_code, payment_id, and requires_check_in. Check-in codes
+    belong to purchased tickets, not to the attendee itself. The list endpoint
     (GET /attendees) uses the separate AttendeeListItem schema which keeps
     the legacy ProductWithQuantity shape for backwards compatibility.
 
@@ -100,7 +101,6 @@ class AttendeeInternalCreate(AttendeeCreate):
     """Internal attendee schema with all fields."""
 
     application_id: uuid.UUID
-    check_in_code: str
 
 
 class AttendeeProductsBase(SQLModel):
@@ -127,6 +127,13 @@ class AttendeeProductsBase(SQLModel):
         foreign_key="payments.id",
         nullable=True,
         index=True,
+    )
+    # Per-purchase metadata blob. Populated by step-specific submission logic
+    # (e.g. meal_plan_select stores daily_choices + dietary_restriction +
+    # special_request). NULL for products that don't collect metadata.
+    purchase_metadata: dict | None = Field(
+        default=None,
+        sa_column=Column(JSONB, nullable=True),
     )
 
 
@@ -156,6 +163,7 @@ class AttendeeProductPublic(BaseModel):
     product_category: str | None = None
     duration_type: str | None = None
     last_scan_at: datetime | None = None
+    purchase_metadata: dict | None = None
 
     model_config = ConfigDict(from_attributes=True, extra="forbid")
 
@@ -224,7 +232,6 @@ class AttendeeWithTickets(BaseModel):
     name: str
     email: str | None
     category: str | None = None
-    check_in_code: str | None = None
     popup_id: uuid.UUID
     popup_name: str
     popup_slug: str | None = None
@@ -253,7 +260,7 @@ class AttendeeListItem(AttendeeBase):
 
     Uses ProductWithQuantity for the products field to preserve the legacy
     shape returned by the list endpoint. Use AttendeePublic for detail views
-    where AttendeeProductPublic (with check_in_code) is needed.
+    where AttendeeProductPublic (with per-ticket check_in_code) is needed.
     """
 
     id: uuid.UUID

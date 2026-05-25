@@ -55,17 +55,15 @@ type FlatAttendeeRow = {
   email: string | null | undefined
   category: string
   gender: string | null | undefined
-  ticket_check_in_code: string
   product_id: string
 }
 
 /**
  * Expand each attendee into one row per purchased ticket.
- * Attendees with no products emit a single row with empty ticket fields
- * so they still appear in the CSV.
- *
- * Accepts AttendeeListItem (list endpoint shape) where products are
- * ProductWithQuantity rows — we only need the product_id for the CSV.
+ * Attendees with no products emit a single row with an empty product_id so
+ * they still appear in the CSV. Per-ticket check_in_codes are not exported
+ * here — the list endpoint does not carry them; staff can read them from
+ * the attendee detail dialog.
  */
 export function flattenAttendeesForCsv(
   attendees: AttendeeListItem[],
@@ -79,7 +77,6 @@ export function flattenAttendeesForCsv(
           email: att.email,
           category: att.category ?? "",
           gender: att.gender,
-          ticket_check_in_code: "",
           product_id: "",
         },
       ]
@@ -89,9 +86,6 @@ export function flattenAttendeesForCsv(
       email: att.email,
       category: att.category ?? "",
       gender: att.gender,
-      // ProductWithQuantity from list endpoint does not carry check_in_code;
-      // use empty string for CSV — full codes are in the detail view.
-      ticket_check_in_code: "",
       product_id: String(p.id),
     }))
   })
@@ -172,33 +166,26 @@ export function AttendeeDetailsContent({
         )}
       </InlineSection>
 
-      <Separator />
-
-      {/* Check-in — show per-ticket codes when products have them */}
-      <InlineSection title="Check-in" className="px-6 py-4">
-        {products.length > 0 ? (
-          products.map((p) => (
-            <InlineRow
-              key={p.id}
-              icon={<QrCode className="h-4 w-4 text-muted-foreground" />}
-              label="Ticket code"
-            >
-              <span className="font-mono text-sm font-medium">
-                {p.check_in_code}
-              </span>
-            </InlineRow>
-          ))
-        ) : (
-          <InlineRow
-            icon={<QrCode className="h-4 w-4 text-muted-foreground" />}
-            label="Code"
-          >
-            <span className="font-mono text-sm font-medium">
-              {attendee.check_in_code ?? "N/A"}
-            </span>
-          </InlineRow>
-        )}
-      </InlineSection>
+      {/* Check-in — only render when the attendee actually purchased tickets.
+          Codes belong to purchased products, not to attendees. */}
+      {products.length > 0 && (
+        <>
+          <Separator />
+          <InlineSection title="Check-in" className="px-6 py-4">
+            {products.map((p) => (
+              <InlineRow
+                key={p.id}
+                icon={<QrCode className="h-4 w-4 text-muted-foreground" />}
+                label="Ticket code"
+              >
+                <span className="font-mono text-sm font-medium">
+                  {p.check_in_code}
+                </span>
+              </InlineRow>
+            ))}
+          </InlineSection>
+        </>
+      )}
 
       {/* Footer */}
       <Separator />
@@ -392,7 +379,6 @@ function Attendees() {
         { key: "email", label: "Email" },
         { key: "category", label: "Category" },
         { key: "gender", label: "Gender" },
-        { key: "ticket_check_in_code", label: "Ticket Check-in Code" },
         { key: "product_id", label: "Product ID" },
       ])
     } finally {

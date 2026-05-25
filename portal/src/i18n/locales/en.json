@@ -250,6 +250,10 @@
     "contribution": {
       "fallbackLabel": "Event contribution",
       "fallbackDescription": "Helps fund the event"
+    },
+    "discount": {
+      "not_eligible_caption": "Not eligible for discount",
+      "promo_discount_eligible_label": "Promo Discount (eligible items)"
     }
   },
   "openCheckout": {
@@ -331,6 +335,7 @@
       "ticket": "Ticket",
       "housing": "Housing",
       "merch": "Merch",
+      "meal_plan": "Meal plan",
       "other": "Other"
     },
     "discounts": {
@@ -704,6 +709,7 @@
       "creation_restricted_heading": "Event creation is restricted",
       "creation_restricted_message": "Only admins can create events for this pop-up.",
       "no_popup_error": "No popup",
+      "no_timezone_error": "No timezone configured for this popup",
       "no_venue_option": "Meeting",
       "custom_location_option": "Custom location",
       "venues_group_label": "Venues",

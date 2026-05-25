@@ -18,9 +18,11 @@
     }
   },
   "scripts": {
-    "lint": "echo 'No lint script'"
+    "lint": "echo 'No lint script'",
+    "test": "vitest run"
   },
   "devDependencies": {
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4"
   }
 }

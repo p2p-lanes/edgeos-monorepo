@@ -36,7 +36,6 @@ function createAttendee(products: ProductsPass[]): AttendeePassState {
     category: "main",
     email: "main@example.com",
     gender: null,
-    check_in_code: "",
     poap_url: null,
     created_at: null,
     updated_at: null,
@@ -136,20 +135,16 @@ describe("getProductStrategy — category-scoped selection", () => {
     )
   })
 
-  it("supporter under pass_system uses SimpleQuantityProductStrategy (toggles selected)", () => {
-    const supporter = createProduct({
-      id: "s1",
-      category: "supporter",
+  it("non-ticket category under pass_system uses SimpleQuantityProductStrategy (toggles selected)", () => {
+    const merch = createProduct({
+      id: "m1",
+      category: "merch",
       selected: false,
       max_per_order: 1,
     })
-    const attendees = [createAttendee([supporter])]
-    const strategy = getProductStrategy(
-      supporter,
-      false,
-      CHECKOUT_MODE.PASS_SYSTEM,
-    )
-    const result = strategy.handleSelection(attendees, "attendee-1", supporter)
+    const attendees = [createAttendee([merch])]
+    const strategy = getProductStrategy(merch, false, CHECKOUT_MODE.PASS_SYSTEM)
+    const result = strategy.handleSelection(attendees, "attendee-1", merch)
     expect(result[0]?.products[0]?.selected).toBe(true)
   })
 

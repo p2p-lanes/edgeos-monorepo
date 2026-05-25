@@ -10,14 +10,16 @@ import { format } from "date-fns"
 import {
   CalendarDays,
   CalendarIcon,
-  CalendarRange,
   CheckCircle2,
   Plus,
   Repeat,
+  Search,
   Video,
+  X,
   XCircle,
 } from "lucide-react"
-import { Suspense, useCallback, useMemo, useState } from "react"
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react"
+import { createPortal } from "react-dom"
 
 import {
   type EventPublic,
@@ -33,6 +35,12 @@ import { DataTable, SortableHeader } from "@/components/Common/DataTable"
 import { EmptyState } from "@/components/Common/EmptyState"
 import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
+import { EventsCalendarView } from "@/components/events/EventsCalendarView"
+import { EventsDayView } from "@/components/events/EventsDayView"
+import {
+  type EventsView,
+  EventsViewSwitcher,
+} from "@/components/events/EventsViewSwitcher"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Calendar } from "@/components/ui/calendar"
@@ -45,6 +53,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
 import { LoadingButton } from "@/components/ui/loading-button"
 import {
   Popover,
@@ -85,11 +94,15 @@ const EVENT_STATUS_OPTIONS: { value: EventStatus; label: string }[] = [
   { value: "rejected", label: "Rejected" },
 ]
 
+const VALID_EVENT_VIEWS: Set<string> = new Set(["table", "calendar", "day"])
+
 type EventsSearchParams = TableSearchParams & {
   status?: EventStatus
   venueId?: string
   startDate?: string
   endDate?: string
+  view?: EventsView
+  date?: string
 }
 
 export const Route = createFileRoute("/_layout/events/")({
@@ -109,6 +122,12 @@ export const Route = createFileRoute("/_layout/events/")({
     ...(typeof raw.endDate === "string" &&
     /^\d{4}-\d{2}-\d{2}$/.test(raw.endDate)
       ? { endDate: raw.endDate }
+      : {}),
+    ...(typeof raw.view === "string" && VALID_EVENT_VIEWS.has(raw.view)
+      ? { view: raw.view as EventsView }
+      : {}),
+    ...(typeof raw.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(raw.date)
+      ? { date: raw.date }
       : {}),
   }),
   head: () => ({
@@ -628,6 +647,18 @@ function EventDateRangeFilter({
   // and anchor the calendar to the popup's first day by default.
   const minDate = parseYmd(popupStart?.slice(0, 10))
   const maxDate = parseYmd(popupEnd?.slice(0, 10))
+  // Comparing Dates directly here is unsafe: react-day-picker hands us
+  // cells at local midnight, while parseYmd anchors at noon to dodge DST
+  // edge cases — so a cell on the boundary day would read as "<minDate"
+  // and get disabled. Pin the comparison to YMD strings instead.
+  const minYmd = popupStart?.slice(0, 10) ?? undefined
+  const maxYmd = popupEnd?.slice(0, 10) ?? undefined
+  const cellYmd = (d: Date) => {
+    const y = d.getFullYear()
+    const mm = String(d.getMonth() + 1).padStart(2, "0")
+    const dd = String(d.getDate()).padStart(2, "0")
+    return `${y}-${mm}-${dd}`
+  }
 
   const label =
     from && to
@@ -664,8 +695,9 @@ function EventDateRangeFilter({
             onEndChange(range?.to ? formatYmd(range.to) : undefined)
           }}
           disabled={(d) => {
-            if (minDate && d < minDate) return true
-            if (maxDate && d > maxDate) return true
+            const ymd = cellYmd(d)
+            if (minYmd && ymd < minYmd) return true
+            if (maxYmd && ymd > maxYmd) return true
             return false
           }}
           startMonth={minDate}
@@ -690,7 +722,11 @@ function EventDateRangeFilter({
   )
 }
 
-function EventsTableContent() {
+function EventsTableContent({
+  onRowClick,
+}: {
+  onRowClick: (event: EventPublic) => void
+}) {
   const searchParams = Route.useSearch()
   const navigate = useNavigate()
   const { selectedPopupId } = useWorkspace()
@@ -699,24 +735,6 @@ function EventsTableContent() {
     "/events",
   )
   const { status, venueId, startDate, endDate } = searchParams
-  // Picking an occurrence row pops a "series or this only" prompt; non-recurring
-  // rows skip the dialog and navigate straight to /events/:id/edit.
-  const [occurrenceEditTarget, setOccurrenceEditTarget] =
-    useState<EventPublic | null>(null)
-
-  const handleRowClick = useCallback(
-    (event: EventPublic) => {
-      if (parseOccurrenceId(event.occurrence_id)) {
-        setOccurrenceEditTarget(event)
-        return
-      }
-      navigate({
-        to: "/events/$eventId/edit",
-        params: { eventId: event.id },
-      })
-    },
-    [navigate],
-  )
 
   const setStatus = useCallback(
     (value: EventStatus | undefined) => {
@@ -886,7 +904,7 @@ function EventsTableContent() {
         hiddenOnMobile={["kind", "host", "venue_id", "start_time"]}
         searchValue={search}
         onSearchChange={setSearch}
-        onRowClick={handleRowClick}
+        onRowClick={onRowClick}
         serverPagination={{
           total: events.paging.total,
           pagination: pagination,
@@ -939,16 +957,236 @@ function EventsTableContent() {
           ) : undefined
         }
       />
-      <EditOccurrenceDialog
-        event={occurrenceEditTarget}
-        onClose={() => setOccurrenceEditTarget(null)}
-      />
     </div>
   )
 }
 
+function CalendarDayToolbar({
+  popupId,
+  status,
+  venueId,
+  search,
+  setStatus,
+  setVenueId,
+  setSearch,
+}: {
+  popupId: string
+  status: EventStatus | undefined
+  venueId: string | undefined
+  search: string
+  setStatus: (value: EventStatus | undefined) => void
+  setVenueId: (value: string | undefined) => void
+  setSearch: (value: string) => void
+}) {
+  const { data: venues } = useQuery({
+    queryKey: ["event-venues", { popupId, limit: 200 }],
+    queryFn: () => EventVenuesService.listVenues({ popupId, limit: 200 }),
+    enabled: !!popupId,
+  })
+
+  const [localSearch, setLocalSearch] = useState(search)
+  useEffect(() => {
+    setLocalSearch(search)
+  }, [search])
+
+  // Debounce search so we don't push a URL update on every keystroke.
+  useEffect(() => {
+    if (localSearch === search) return
+    const id = setTimeout(() => setSearch(localSearch), 300)
+    return () => clearTimeout(id)
+  }, [localSearch, search, setSearch])
+
+  return (
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-3">
+      <div className="relative w-full min-w-0 sm:max-w-xs">
+        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          placeholder="Search by title..."
+          value={localSearch}
+          onChange={(e) => setLocalSearch(e.target.value)}
+          className="pl-9 pr-8"
+        />
+        {localSearch && (
+          <button
+            type="button"
+            onClick={() => {
+              setLocalSearch("")
+              setSearch("")
+            }}
+            className="absolute right-2 top-1/2 -translate-y-1/2 rounded-sm p-0.5 text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        )}
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <EventStatusFilter selected={status} onSelect={setStatus} />
+        <EventVenueFilter
+          venues={venues?.results ?? []}
+          selected={venueId}
+          onSelect={setVenueId}
+        />
+      </div>
+    </div>
+  )
+}
+
+function parseSelectedDate(value: string | undefined): Date | null {
+  if (!value) return null
+  const [y, m, d] = value.split("-").map(Number)
+  if (!y || !m || !d) return null
+  return new Date(y, m - 1, d, 12, 0, 0)
+}
+
 function EventsPage() {
   const { selectedPopupId } = useWorkspace()
+  const navigate = useNavigate()
+  const searchParams = Route.useSearch()
+  const view: EventsView = searchParams.view ?? "table"
+  const selectedDate = parseSelectedDate(searchParams.date)
+  // Picking an occurrence row pops a "series or this only" prompt; non-recurring
+  // rows skip the dialog and navigate straight to /events/:id/edit.
+  const [occurrenceEditTarget, setOccurrenceEditTarget] =
+    useState<EventPublic | null>(null)
+
+  const { data: popup } = useQuery({
+    queryKey: ["popup", selectedPopupId],
+    queryFn: () => PopupsService.getPopup({ popupId: selectedPopupId! }),
+    enabled: !!selectedPopupId,
+  })
+  const popupStart = popup?.start_date ?? null
+  const popupEnd = popup?.end_date ?? null
+
+  // Day-view fullscreen overlay. Local state only — refreshes drop the
+  // overlay. Switching away from day view auto-collapses it so we never
+  // leave a hidden overlay floating over table/calendar.
+  const [isDayFullscreen, setIsDayFullscreen] = useState(false)
+  useEffect(() => {
+    if (view !== "day" && isDayFullscreen) setIsDayFullscreen(false)
+  }, [view, isDayFullscreen])
+  // Lock body scroll while fullscreen so the overlay's inner scroll owns
+  // vertical movement; restore prior value on cleanup.
+  useEffect(() => {
+    if (!isDayFullscreen) return
+    const prev = document.body.style.overflow
+    document.body.style.overflow = "hidden"
+    return () => {
+      document.body.style.overflow = prev
+    }
+  }, [isDayFullscreen])
+  // Esc closes the overlay.
+  useEffect(() => {
+    if (!isDayFullscreen) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setIsDayFullscreen(false)
+    }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  }, [isDayFullscreen])
+  const toggleDayFullscreen = useCallback(
+    () => setIsDayFullscreen((v) => !v),
+    [],
+  )
+  // Track mount so createPortal's `document.body` target is available
+  // (SSR-safe even though TanStack Router is client-rendered).
+  const [isMounted, setIsMounted] = useState(false)
+  useEffect(() => {
+    setIsMounted(true)
+  }, [])
+
+  const handleRowClick = useCallback(
+    (event: EventPublic) => {
+      if (parseOccurrenceId(event.occurrence_id)) {
+        setOccurrenceEditTarget(event)
+        return
+      }
+      navigate({
+        to: "/events/$eventId/edit",
+        params: { eventId: event.id },
+      })
+    },
+    [navigate],
+  )
+
+  const setView = useCallback(
+    (next: EventsView) => {
+      navigate({
+        to: "/events",
+        search: (prev: Record<string, unknown>) => {
+          const prevDate = typeof prev.date === "string" ? prev.date : undefined
+          return {
+            ...prev,
+            view: next === "table" ? undefined : next,
+            date: next === "day" ? prevDate : undefined,
+          }
+        },
+        replace: true,
+      })
+    },
+    [navigate],
+  )
+
+  const setDate = useCallback(
+    (next: Date) => {
+      const y = next.getFullYear()
+      const m = String(next.getMonth() + 1).padStart(2, "0")
+      const d = String(next.getDate()).padStart(2, "0")
+      navigate({
+        to: "/events",
+        search: (prev: Record<string, unknown>) => ({
+          ...prev,
+          date: `${y}-${m}-${d}`,
+        }),
+        replace: true,
+      })
+    },
+    [navigate],
+  )
+
+  const setStatusGlobal = useCallback(
+    (value: EventStatus | undefined) => {
+      navigate({
+        to: "/events",
+        search: (prev: Record<string, unknown>) => ({
+          ...prev,
+          status: value,
+          page: 0,
+        }),
+        replace: true,
+      })
+    },
+    [navigate],
+  )
+
+  const setVenueIdGlobal = useCallback(
+    (value: string | undefined) => {
+      navigate({
+        to: "/events",
+        search: (prev: Record<string, unknown>) => ({
+          ...prev,
+          venueId: value,
+          page: 0,
+        }),
+        replace: true,
+      })
+    },
+    [navigate],
+  )
+
+  const setSearchGlobal = useCallback(
+    (value: string) => {
+      navigate({
+        to: "/events",
+        search: (prev: Record<string, unknown>) => ({
+          ...prev,
+          search: value || undefined,
+          page: 0,
+        }),
+        replace: true,
+      })
+    },
+    [navigate],
+  )
 
   return (
     <div className="flex flex-col gap-6">
@@ -961,12 +1199,7 @@ function EventsPage() {
         </div>
         {selectedPopupId && (
           <div className="flex items-center gap-2">
-            <Button variant="outline" asChild>
-              <Link to="/events/day-by-venue">
-                <CalendarRange className="mr-2 h-4 w-4" />
-                Day by venue
-              </Link>
-            </Button>
+            <EventsViewSwitcher view={view} onViewChange={setView} />
             <Button asChild>
               <Link to="/events/new">
                 <Plus className="mr-2 h-4 w-4" />
@@ -979,12 +1212,101 @@ function EventsPage() {
       {selectedPopupId ? (
         <QueryErrorBoundary>
           <Suspense fallback={<Skeleton className="h-64 w-full" />}>
-            <EventsTableContent />
+            {view === "table" && (
+              <EventsTableContent onRowClick={handleRowClick} />
+            )}
+            {view === "calendar" && (
+              <div className="space-y-3">
+                <CalendarDayToolbar
+                  popupId={selectedPopupId}
+                  status={searchParams.status}
+                  venueId={searchParams.venueId}
+                  search={searchParams.search ?? ""}
+                  setStatus={setStatusGlobal}
+                  setVenueId={setVenueIdGlobal}
+                  setSearch={setSearchGlobal}
+                />
+                <EventsCalendarView
+                  popupId={selectedPopupId}
+                  status={searchParams.status}
+                  venueId={searchParams.venueId}
+                  search={searchParams.search ?? ""}
+                  popupStart={popupStart}
+                  popupEnd={popupEnd}
+                  onEventClick={handleRowClick}
+                />
+              </div>
+            )}
+            {view === "day" && !isDayFullscreen && (
+              <div className="space-y-3">
+                <CalendarDayToolbar
+                  popupId={selectedPopupId}
+                  status={searchParams.status}
+                  venueId={searchParams.venueId}
+                  search={searchParams.search ?? ""}
+                  setStatus={setStatusGlobal}
+                  setVenueId={setVenueIdGlobal}
+                  setSearch={setSearchGlobal}
+                />
+                <EventsDayView
+                  popupId={selectedPopupId}
+                  status={searchParams.status}
+                  venueId={searchParams.venueId}
+                  search={searchParams.search ?? ""}
+                  selectedDate={selectedDate}
+                  onSelectedDateChange={setDate}
+                  popupStart={popupStart}
+                  popupEnd={popupEnd}
+                  onEventClick={handleRowClick}
+                  isFullscreen={false}
+                  onToggleFullscreen={toggleDayFullscreen}
+                />
+              </div>
+            )}
           </Suspense>
         </QueryErrorBoundary>
       ) : (
         <WorkspaceAlert resource="events" />
       )}
+      {isMounted &&
+        isDayFullscreen &&
+        view === "day" &&
+        selectedPopupId &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-50 flex flex-col gap-3 bg-background p-3 sm:p-4 overflow-y-auto"
+            role="dialog"
+            aria-modal="true"
+          >
+            <CalendarDayToolbar
+              popupId={selectedPopupId}
+              status={searchParams.status}
+              venueId={searchParams.venueId}
+              search={searchParams.search ?? ""}
+              setStatus={setStatusGlobal}
+              setVenueId={setVenueIdGlobal}
+              setSearch={setSearchGlobal}
+            />
+            <EventsDayView
+              popupId={selectedPopupId}
+              status={searchParams.status}
+              venueId={searchParams.venueId}
+              search={searchParams.search ?? ""}
+              selectedDate={selectedDate}
+              onSelectedDateChange={setDate}
+              popupStart={popupStart}
+              popupEnd={popupEnd}
+              onEventClick={handleRowClick}
+              isFullscreen={true}
+              onToggleFullscreen={toggleDayFullscreen}
+            />
+          </div>,
+          document.body,
+        )}
+      <EditOccurrenceDialog
+        event={occurrenceEditTarget}
+        onClose={() => setOccurrenceEditTarget(null)}
+      />
     </div>
   )
 }

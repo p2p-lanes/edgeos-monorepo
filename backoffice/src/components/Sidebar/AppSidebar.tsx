@@ -81,12 +81,14 @@ const eventItems: Item[] = [
 // Admin items (admins and superadmins)
 const adminItems: Item[] = [{ icon: Users, title: "Users", path: "/admin" }]
 
-// Agentic access items (admins and superadmins only)
-const agenticItems: Item[] = [
-  { icon: KeyRound, title: "API Keys", path: "/api-keys" },
-]
+// Third-party Apps is always visible to admins/superadmins.
+const thirdPartyAppsItem: Item = {
+  icon: Building2,
+  title: "Third-party Apps",
+  path: "/third-party-apps",
+}
 
-// Feature flag: surface the Agentic access section in the sidebar.
+// Feature flag: surface the API Keys entry in the Agentic access section.
 // The /api-keys route and CRUD endpoints stay live (admins can still create
 // keys via the API), but the UI entry is hidden until we are ready to expose
 // it to users.
@@ -201,16 +203,23 @@ export function AppSidebar() {
           </SidebarGroup>
         )}
 
-        {/* Agentic access (API Keys + Docs) — admins and superadmins only.
-            Gated behind SHOW_AGENTIC_ACCESS while the feature is hidden. */}
-        {SHOW_AGENTIC_ACCESS &&
-          (currentUser?.role === "admin" ||
-            currentUser?.role === "superadmin") && (
-            <SidebarGroup>
-              <SidebarGroupLabel>Agentic access</SidebarGroupLabel>
-              <Main items={agenticItems} />
-            </SidebarGroup>
-          )}
+        {/* Agentic access — admins and superadmins only.
+            Third-party Apps is always visible.
+            API Keys entry is gated behind SHOW_AGENTIC_ACCESS. */}
+        {(currentUser?.role === "admin" ||
+          currentUser?.role === "superadmin") && (
+          <SidebarGroup>
+            <SidebarGroupLabel>Agentic access</SidebarGroupLabel>
+            <Main
+              items={[
+                thirdPartyAppsItem,
+                ...(SHOW_AGENTIC_ACCESS
+                  ? [{ icon: KeyRound, title: "API Keys", path: "/api-keys" }]
+                  : []),
+              ]}
+            />
+          </SidebarGroup>
+        )}
       </SidebarContent>
       <SidebarFooter>
         <SidebarAppearance />

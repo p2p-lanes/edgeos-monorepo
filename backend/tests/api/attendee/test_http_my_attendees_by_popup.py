@@ -136,7 +136,6 @@ def _make_app_attendee(
         human_id=human.id,
         name=name,
         category=category,
-        check_in_code=f"AB{uuid.uuid4().hex[:4].upper()}",
     )
     db.add(attendee)
     db.commit()
@@ -161,7 +160,6 @@ def _make_direct_attendee(
         human_id=human.id,
         name=name,
         category=category,
-        check_in_code=f"DB{uuid.uuid4().hex[:4].upper()}",
     )
     db.add(attendee)
     db.commit()
@@ -527,7 +525,6 @@ class TestUpdateMyAttendeeForPopupHttp:
             human_id=companion.id,
             name="Companion Original",
             category="spouse",
-            check_in_code=f"CO{uuid.uuid4().hex[:4].upper()}",
         )
         db.add(attendee)
         db.commit()
@@ -563,7 +560,6 @@ class TestUpdateMyAttendeeForPopupHttp:
             human_id=companion.id,
             name="Companion Self Original",
             category="spouse",
-            check_in_code=f"CS{uuid.uuid4().hex[:4].upper()}",
         )
         db.add(attendee)
         db.commit()

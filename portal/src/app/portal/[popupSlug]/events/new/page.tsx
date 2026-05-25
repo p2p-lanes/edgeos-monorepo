@@ -16,8 +16,10 @@ import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 import {
   ApiError,
+  type EventSettingsPublic,
   EventsService,
   HumansService,
+  type PopupPublic,
   type TrackPublic,
   TracksService,
 } from "@/client"
@@ -38,23 +40,97 @@ import { EventScheduleFields } from "../components/EventScheduleFields"
 import { EventVenueField } from "../components/EventVenueField"
 import { HostDisplayField } from "../components/HostDisplayField"
 import { todayInTz, useEventScheduling } from "../lib/useEventScheduling"
-import {
-  useEventTimezone,
-  usePortalEventSettings,
-} from "../lib/useEventTimezone"
+import { usePortalEventSettings } from "../lib/useEventTimezone"
 import { useFileUpload } from "../lib/useFileUpload"
 import { usePopupWindow } from "../lib/usePopupWindow"
 import { useVenueAvailability } from "../lib/useVenueAvailability"
 
 type Visibility = "public" | "private" | "unlisted"
 
+/**
+ * Wrapper that resolves popup + settings (and therefore the popup timezone)
+ * BEFORE mounting the form. The previous implementation initialized scheduling
+ * state with a "UTC" fallback while settings were still loading, which left
+ * `useEventScheduling`'s lazy-init date/time strings in UTC even after the
+ * popup timezone arrived — a silent offset shift if the user typed early.
+ *
+ * Splitting the page in two lets us keep `useEventScheduling`'s lazy
+ * initialisation (which is the right shape for an uncontrolled form) and
+ * still guarantee the displayTz it sees on the first render is final.
+ */
 export default function NewPortalEventPage() {
   const { t } = useTranslation()
-  const router = useRouter()
-  const queryClient = useQueryClient()
   const { getCity } = useCityProvider()
   const city = getCity()
   const popupId = city?.id
+
+  const { data: settings, isLoading: settingsLoading } =
+    usePortalEventSettings(popupId)
+
+  // City loads from the layout provider; popupId may be undefined for a
+  // beat. Treat that as part of the same gating pass so we never mount the
+  // form without a definitive timezone.
+  if (!popupId || settingsLoading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="h-5 w-5 animate-spin" />
+      </div>
+    )
+  }
+
+  const moduleEnabled = city?.events_enabled ?? true
+  const creationEnabled = settings?.event_enabled ?? true
+  const canCreate = (settings?.can_publish_event ?? "everyone") === "everyone"
+
+  if (!moduleEnabled || !creationEnabled) {
+    return (
+      <GatedMessage
+        title={t("events.list.events_disabled_heading")}
+        message={t("events.list.events_disabled_message", {
+          cityName: city?.name ?? "",
+        })}
+      />
+    )
+  }
+  if (!canCreate) {
+    return (
+      <GatedMessage
+        title={t("events.form.creation_restricted_heading")}
+        message={t("events.form.creation_restricted_message")}
+      />
+    )
+  }
+
+  // Settings always carry a timezone (DB default is "UTC"), but be
+  // defensive: an empty string would re-introduce the fallback bug.
+  const displayTz = settings?.timezone || "UTC"
+
+  return (
+    <NewPortalEventForm
+      city={city}
+      popupId={popupId}
+      settings={settings ?? null}
+      displayTz={displayTz}
+    />
+  )
+}
+
+interface NewPortalEventFormProps {
+  city: PopupPublic | null
+  popupId: string
+  settings: EventSettingsPublic | null
+  displayTz: string
+}
+
+function NewPortalEventForm({
+  city,
+  popupId,
+  settings,
+  displayTz,
+}: NewPortalEventFormProps) {
+  const { t } = useTranslation()
+  const router = useRouter()
+  const queryClient = useQueryClient()
 
   // Current human is used by the "Use my name" quick-fill on the Displayed
   // host field. Mirrors the same query already used by the event list and
@@ -70,8 +146,6 @@ export default function NewPortalEventPage() {
       .trim() ||
     currentHuman?.email ||
     ""
-  const { timezone } = useEventTimezone(popupId)
-  const displayTz = timezone || "UTC"
 
   const {
     popupStartKey,
@@ -85,13 +159,6 @@ export default function NewPortalEventPage() {
 
   const { uploadFile, isUploading } = useFileUpload()
   const fileRef = useRef<HTMLInputElement>(null)
-
-  // ---- settings-driven gates ------------------------------------------
-  const { data: settings, isLoading: settingsLoading } =
-    usePortalEventSettings(popupId)
-  const moduleEnabled = city?.events_enabled ?? true
-  const creationEnabled = settings?.event_enabled ?? true
-  const canCreate = (settings?.can_publish_event ?? "everyone") === "everyone"
 
   // ---- form state -----------------------------------------------------
   const [title, setTitle] = useState("")
@@ -171,8 +238,7 @@ export default function NewPortalEventPage() {
   // ---- tracks --------------------------------------------------------
   const { data: tracksData } = useQuery({
     queryKey: ["portal-tracks", popupId],
-    queryFn: () =>
-      TracksService.listPortalTracks({ popupId: popupId!, limit: 200 }),
+    queryFn: () => TracksService.listPortalTracks({ popupId, limit: 200 }),
     enabled: !!popupId,
   })
   const tracks: TrackPublic[] = tracksData?.results ?? []
@@ -187,7 +253,12 @@ export default function NewPortalEventPage() {
   // ---- mutation -------------------------------------------------------
   const createMutation = useMutation({
     mutationFn: () => {
-      if (!popupId) throw new Error(t("events.form.no_popup_error"))
+      // Hard guard: the parent route already gates on a definitive tz, but
+      // surface a clear error if something upstream regresses rather than
+      // silently posting an event with an empty / wrong timezone.
+      if (!displayTz) {
+        throw new Error(t("events.form.no_timezone_error"))
+      }
       return EventsService.createPortalEvent({
         requestBody: {
           popup_id: popupId,
@@ -195,7 +266,7 @@ export default function NewPortalEventPage() {
           content: content || null,
           start_time: startIso,
           end_time: endIso,
-          timezone: timezone || "UTC",
+          timezone: displayTz,
           venue_id: !isCustomLocation && venueId ? venueId : null,
           custom_location_name: isCustomLocation
             ? customLocationName.trim() || null
@@ -284,33 +355,6 @@ export default function NewPortalEventPage() {
     maxParticipants !== "" &&
     parseInt(maxParticipants, 10) > venueMaxCapacity
 
-  // ---- gates ----------------------------------------------------------
-  if (settingsLoading) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <Loader2 className="h-5 w-5 animate-spin" />
-      </div>
-    )
-  }
-  if (!moduleEnabled || !creationEnabled) {
-    return (
-      <GatedMessage
-        title={t("events.list.events_disabled_heading")}
-        message={t("events.list.events_disabled_message", {
-          cityName: city?.name ?? "",
-        })}
-      />
-    )
-  }
-  if (!canCreate) {
-    return (
-      <GatedMessage
-        title={t("events.form.creation_restricted_heading")}
-        message={t("events.form.creation_restricted_message")}
-      />
-    )
-  }
-
   const canSubmit =
     !!title.trim() &&
     !!startIso &&
@@ -338,14 +382,10 @@ export default function NewPortalEventPage() {
           {t("events.form.create_heading")}
         </h1>
         <p className="text-sm text-muted-foreground mt-1">
-          {timezone
-            ? t("events.form.create_subheading_with_tz", {
-                cityName: city?.name ?? "",
-                timezone,
-              })
-            : t("events.form.create_subheading", {
-                cityName: city?.name ?? "",
-              })}
+          {t("events.form.create_subheading_with_tz", {
+            cityName: city?.name ?? "",
+            timezone: displayTz,
+          })}
         </p>
       </div>
 

@@ -1,10 +1,8 @@
-import secrets
 import uuid
 
 from fastapi import APIRouter, HTTPException, status
 from sqlalchemy.exc import IntegrityError
 
-from app.api.api_key.crud import hash_key as hash_api_key
 from app.api.shared.enums import CredentialType, LandingMode, UserRole
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
 from app.api.tenant import crud
@@ -13,7 +11,6 @@ from app.api.tenant.schemas import (
     TenantCreate,
     TenantPublic,
     TenantUpdate,
-    ThirdPartyKeyRotated,
 )
 from app.core.config import settings
 from app.core.dependencies.users import (
@@ -26,18 +23,6 @@ from app.core.redis import domain_cache
 from app.core.tenant_db import get_tenant_credential, revoke_tenant_credentials
 
 router = APIRouter(prefix="/tenants", tags=["tenants"])
-
-
-_THIRD_PARTY_KEY_PREFIX_LEN = 8
-
-
-def _hash_third_party_key(raw_key: str) -> str:
-    """Peppered SHA-256 hash for tenant third-party API keys.
-
-    Uses the same `hash_key` primitive as `api_keys.key_hash` so all api-key
-    style secrets share one hashing convention.
-    """
-    return hash_api_key(raw_key)
 
 
 @router.get("/public/by-domain/{domain}", response_model=TenantPublic)
@@ -370,78 +355,3 @@ async def delete_credentials(
         )
 
 
-@router.post(
-    "/{tenant_id}/third-party-key/rotate",
-    response_model=ThirdPartyKeyRotated,
-)
-async def rotate_third_party_key(
-    tenant_id: uuid.UUID,
-    db: SessionDep,
-    current_user: CurrentAdmin,
-) -> ThirdPartyKeyRotated:
-    """Generate and store a new third-party API key for this tenant.
-
-    The raw key is returned ONCE and never stored; only its peppered SHA-256
-    hash is persisted. Rotation takes effect on the NEXT login attempt;
-    in-flight JWTs already issued remain valid until their own expiry.
-
-    Only ADMIN (for their own tenant) and SUPERADMIN (any tenant) may call this.
-    """
-    if current_user.role == UserRole.ADMIN and current_user.tenant_id != tenant_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Admin can only manage their own tenant third-party key",
-        )
-
-    tenant = crud.get(db, tenant_id)
-    if tenant is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Tenant not found",
-        )
-
-    raw_key = secrets.token_urlsafe(32)
-    key_hash = _hash_third_party_key(raw_key)
-    prefix = raw_key[:_THIRD_PARTY_KEY_PREFIX_LEN]
-
-    tenant.third_party_api_key_hash = key_hash
-    tenant.third_party_key_prefix = prefix
-    db.add(tenant)
-    db.commit()
-
-    return ThirdPartyKeyRotated(api_key=raw_key, prefix=prefix)
-
-
-@router.delete(
-    "/{tenant_id}/third-party-key",
-    status_code=status.HTTP_204_NO_CONTENT,
-)
-async def delete_third_party_key(
-    tenant_id: uuid.UUID,
-    db: SessionDep,
-    current_user: CurrentAdmin,
-) -> None:
-    """Disable third-party login for this tenant by clearing the key hash.
-
-    After this call, POST /auth/human/third-party/login returns 401 for this
-    tenant until a new key is rotated in.
-
-    Only ADMIN (for their own tenant) and SUPERADMIN (any tenant) may call this.
-    """
-    if current_user.role == UserRole.ADMIN and current_user.tenant_id != tenant_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Admin can only manage their own tenant third-party key",
-        )
-
-    tenant = crud.get(db, tenant_id)
-    if tenant is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Tenant not found",
-        )
-
-    tenant.third_party_api_key_hash = None
-    tenant.third_party_key_prefix = None
-    db.add(tenant)
-    db.commit()

@@ -89,7 +89,6 @@ def _make_app_attendee(
         human_id=human.id,
         name=name,
         category="main",
-        check_in_code=f"T{uuid.uuid4().hex[:5].upper()}",
     )
     db.add(attendee)
     db.commit()
@@ -114,7 +113,6 @@ def _make_direct_attendee(
         human_id=human.id,
         name=name,
         category="main",
-        check_in_code=f"D{uuid.uuid4().hex[:5].upper()}",
     )
     db.add(attendee)
     db.commit()

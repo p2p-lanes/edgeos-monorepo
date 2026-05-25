@@ -87,7 +87,7 @@ export const AdminApiKeyCreateSchema = {
         scopes: {
             items: {
                 type: 'string',
-                enum: ['events:read', 'events:write', 'rsvp:write', 'venues:write', 'applications:read', 'applications:write', 'attendees:read', 'attendees:write', 'humans:read', 'humans:write', 'groups:read', 'groups:write', 'products:read', 'products:write', 'coupons:read', 'coupons:write', 'forms:read', 'forms:write', 'payments:read', 'tracks:read', 'tracks:write', 'ticketing_steps:read', 'ticketing_steps:write', 'translations:read', 'translations:write']
+                enum: ['events:read', 'events:write', 'rsvp:write', 'venues:read', 'venues:write', 'applications:read', 'applications:write', 'attendees:read', 'attendees:write', 'humans:read', 'humans:write', 'groups:read', 'groups:write', 'products:read', 'products:write', 'coupons:read', 'coupons:write', 'forms:read', 'forms:write', 'payments:read', 'tracks:read', 'tracks:write', 'ticketing_steps:read', 'ticketing_steps:write', 'translations:read', 'translations:write']
             },
             type: 'array',
             minItems: 1,
@@ -130,7 +130,7 @@ export const AdminApiKeyCreatedSchema = {
         scopes: {
             items: {
                 type: 'string',
-                enum: ['events:read', 'events:write', 'rsvp:write', 'venues:write', 'applications:read', 'applications:write', 'attendees:read', 'attendees:write', 'humans:read', 'humans:write', 'groups:read', 'groups:write', 'products:read', 'products:write', 'coupons:read', 'coupons:write', 'forms:read', 'forms:write', 'payments:read', 'tracks:read', 'tracks:write', 'ticketing_steps:read', 'ticketing_steps:write', 'translations:read', 'translations:write']
+                enum: ['events:read', 'events:write', 'rsvp:write', 'venues:read', 'venues:write', 'applications:read', 'applications:write', 'attendees:read', 'attendees:write', 'humans:read', 'humans:write', 'groups:read', 'groups:write', 'products:read', 'products:write', 'coupons:read', 'coupons:write', 'forms:read', 'forms:write', 'payments:read', 'tracks:read', 'tracks:write', 'ticketing_steps:read', 'ticketing_steps:write', 'translations:read', 'translations:write']
             },
             type: 'array',
             title: 'Scopes'
@@ -207,7 +207,7 @@ export const AdminApiKeyPublicSchema = {
         scopes: {
             items: {
                 type: 'string',
-                enum: ['events:read', 'events:write', 'rsvp:write', 'venues:write', 'applications:read', 'applications:write', 'attendees:read', 'attendees:write', 'humans:read', 'humans:write', 'groups:read', 'groups:write', 'products:read', 'products:write', 'coupons:read', 'coupons:write', 'forms:read', 'forms:write', 'payments:read', 'tracks:read', 'tracks:write', 'ticketing_steps:read', 'ticketing_steps:write', 'translations:read', 'translations:write']
+                enum: ['events:read', 'events:write', 'rsvp:write', 'venues:read', 'venues:write', 'applications:read', 'applications:write', 'attendees:read', 'attendees:write', 'humans:read', 'humans:write', 'groups:read', 'groups:write', 'products:read', 'products:write', 'coupons:read', 'coupons:write', 'forms:read', 'forms:write', 'payments:read', 'tracks:read', 'tracks:write', 'ticketing_steps:read', 'ticketing_steps:write', 'translations:read', 'translations:write']
             },
             type: 'array',
             title: 'Scopes'
@@ -283,7 +283,7 @@ export const ApiKeyCreateSchema = {
         scopes: {
             items: {
                 type: 'string',
-                enum: ['events:read', 'events:write', 'rsvp:write', 'venues:write', 'applications:read', 'applications:write', 'attendees:read', 'attendees:write', 'humans:read', 'humans:write', 'groups:read', 'groups:write', 'products:read', 'products:write', 'coupons:read', 'coupons:write', 'forms:read', 'forms:write', 'payments:read', 'tracks:read', 'tracks:write', 'ticketing_steps:read', 'ticketing_steps:write', 'translations:read', 'translations:write']
+                enum: ['events:read', 'events:write', 'rsvp:write', 'venues:read', 'venues:write', 'applications:read', 'applications:write', 'attendees:read', 'attendees:write', 'humans:read', 'humans:write', 'groups:read', 'groups:write', 'products:read', 'products:write', 'coupons:read', 'coupons:write', 'forms:read', 'forms:write', 'payments:read', 'tracks:read', 'tracks:write', 'ticketing_steps:read', 'ticketing_steps:write', 'translations:read', 'translations:write']
             },
             type: 'array',
             title: 'Scopes'
@@ -313,7 +313,7 @@ export const ApiKeyCreatedSchema = {
         scopes: {
             items: {
                 type: 'string',
-                enum: ['events:read', 'events:write', 'rsvp:write', 'venues:write', 'applications:read', 'applications:write', 'attendees:read', 'attendees:write', 'humans:read', 'humans:write', 'groups:read', 'groups:write', 'products:read', 'products:write', 'coupons:read', 'coupons:write', 'forms:read', 'forms:write', 'payments:read', 'tracks:read', 'tracks:write', 'ticketing_steps:read', 'ticketing_steps:write', 'translations:read', 'translations:write']
+                enum: ['events:read', 'events:write', 'rsvp:write', 'venues:read', 'venues:write', 'applications:read', 'applications:write', 'attendees:read', 'attendees:write', 'humans:read', 'humans:write', 'groups:read', 'groups:write', 'products:read', 'products:write', 'coupons:read', 'coupons:write', 'forms:read', 'forms:write', 'payments:read', 'tracks:read', 'tracks:write', 'ticketing_steps:read', 'ticketing_steps:write', 'translations:read', 'translations:write']
             },
             type: 'array',
             title: 'Scopes'
@@ -389,7 +389,7 @@ export const ApiKeyPublicSchema = {
         scopes: {
             items: {
                 type: 'string',
-                enum: ['events:read', 'events:write', 'rsvp:write', 'venues:write', 'applications:read', 'applications:write', 'attendees:read', 'attendees:write', 'humans:read', 'humans:write', 'groups:read', 'groups:write', 'products:read', 'products:write', 'coupons:read', 'coupons:write', 'forms:read', 'forms:write', 'payments:read', 'tracks:read', 'tracks:write', 'ticketing_steps:read', 'ticketing_steps:write', 'translations:read', 'translations:write']
+                enum: ['events:read', 'events:write', 'rsvp:write', 'venues:read', 'venues:write', 'applications:read', 'applications:write', 'attendees:read', 'attendees:write', 'humans:read', 'humans:write', 'groups:read', 'groups:write', 'products:read', 'products:write', 'coupons:read', 'coupons:write', 'forms:read', 'forms:write', 'payments:read', 'tracks:read', 'tracks:write', 'ticketing_steps:read', 'ticketing_steps:write', 'translations:read', 'translations:write']
             },
             type: 'array',
             title: 'Scopes'
@@ -2021,17 +2021,6 @@ export const AttendeeInfoSchema = {
             ],
             title: 'Category'
         },
-        check_in_code: {
-            anyOf: [
-                {
-                    type: 'string'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Check In Code'
-        },
         tickets: {
             items: {
                 '$ref': '#/components/schemas/AttendeeTicketInfo'
@@ -2121,17 +2110,6 @@ export const AttendeeListItemSchema = {
             ],
             title: 'Gender'
         },
-        check_in_code: {
-            anyOf: [
-                {
-                    type: 'string'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Check In Code'
-        },
         poap_url: {
             anyOf: [
                 {
@@ -2199,7 +2177,7 @@ export const AttendeeListItemSchema = {
 
 Uses ProductWithQuantity for the products field to preserve the legacy
 shape returned by the list endpoint. Use AttendeePublic for detail views
-where AttendeeProductPublic (with check_in_code) is needed.`
+where AttendeeProductPublic (with per-ticket check_in_code) is needed.`
 } as const;
 
 export const AttendeeProductPublicSchema = {
@@ -2284,6 +2262,18 @@ export const AttendeeProductPublicSchema = {
                 }
             ],
             title: 'Last Scan At'
+        },
+        purchase_metadata: {
+            anyOf: [
+                {
+                    additionalProperties: true,
+                    type: 'object'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Purchase Metadata'
         }
     },
     additionalProperties: false,
@@ -2379,17 +2369,6 @@ export const AttendeePublicSchema = {
             ],
             title: 'Gender'
         },
-        check_in_code: {
-            anyOf: [
-                {
-                    type: 'string'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Check In Code'
-        },
         poap_url: {
             anyOf: [
                 {
@@ -2456,7 +2435,8 @@ export const AttendeePublicSchema = {
     description: `Attendee schema for API responses (detail view).
 
 products is typed as list[AttendeeProductPublic] so each entry carries
-check_in_code, payment_id, and requires_check_in. The list endpoint
+its own check_in_code, payment_id, and requires_check_in. Check-in codes
+belong to purchased tickets, not to the attendee itself. The list endpoint
 (GET /attendees) uses the separate AttendeeListItem schema which keeps
 the legacy ProductWithQuantity shape for backwards compatibility.
 
@@ -2532,6 +2512,45 @@ export const AttendeeTicketInfoSchema = {
         check_in_code: {
             type: 'string',
             title: 'Check In Code'
+        },
+        product_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Product Name'
+        },
+        product_category: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Product Category'
+        },
+        requires_check_in: {
+            type: 'boolean',
+            title: 'Requires Check In',
+            default: false
+        },
+        last_scan_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Last Scan At'
         }
     },
     type: 'object',
@@ -2539,9 +2558,16 @@ export const AttendeeTicketInfoSchema = {
     title: 'AttendeeTicketInfo',
     description: `Per-ticket info exposed on companion participation responses.
 
-\`check_in_code\` is the per-ticket code from \`attendee_products\` — the
-source of truth post-\`ticket-as-first-class-entity\`. New clients MUST read
-from this list rather than the legacy \`AttendeeInfo.check_in_code\`.`
+\`check_in_code\` is the per-ticket code from \`attendee_products\`. Check-in
+codes belong to purchased tickets, not to attendees.
+
+\`product_name\`, \`product_category\`, and \`requires_check_in\` are
+denormalized from the related Product so the portal can render the same
+per-ticket QR list the main applicant sees without an extra round-trip.
+
+\`last_scan_at\` is the most recent occurred_at from check_ins for this
+ticket (None when never scanned). The portal uses it to flag already-used
+QR codes — same behavior as the main applicant's pass view.`
 } as const;
 
 export const AttendeeUpdateSchema = {
@@ -2659,17 +2685,6 @@ export const AttendeeWithOriginPublicSchema = {
             ],
             title: 'Gender'
         },
-        check_in_code: {
-            anyOf: [
-                {
-                    type: 'string'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Check In Code'
-        },
         poap_url: {
             anyOf: [
                 {
@@ -2780,17 +2795,6 @@ export const AttendeeWithTicketsSchema = {
                 }
             ],
             title: 'Category'
-        },
-        check_in_code: {
-            anyOf: [
-                {
-                    type: 'string'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Check In Code'
         },
         popup_id: {
             type: 'string',
@@ -2986,6 +2990,32 @@ export const AuthCodeSentResponseSchema = {
     required: ['message', 'email'],
     title: 'AuthCodeSentResponse',
     description: 'Response after successfully sending auth code.'
+} as const;
+
+export const AvailableScopesSchema = {
+    properties: {
+        token_scopes: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Token Scopes'
+        },
+        api_key_scopes: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Api Key Scopes'
+        }
+    },
+    type: 'object',
+    required: ['token_scopes', 'api_key_scopes'],
+    title: 'AvailableScopes',
+    description: `Static response for GET /third-party-apps/available-scopes.
+
+Returns the platform MAX constants so the frontend create modal can
+populate its multi-select options without hardcoding scope strings.`
 } as const;
 
 export const BaseFieldConfigPublicSchema = {
@@ -3283,6 +3313,67 @@ export const CartItemHousingSchema = {
     description: 'Housing selection in cart.'
 } as const;
 
+export const CartItemMealPlanSchema = {
+    properties: {
+        attendee_id: {
+            type: 'string',
+            title: 'Attendee Id'
+        },
+        product_id: {
+            type: 'string',
+            title: 'Product Id'
+        },
+        daily_choices: {
+            anyOf: [
+                {
+                    additionalProperties: {
+                        type: 'string'
+                    },
+                    type: 'object'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Daily Choices'
+        },
+        dietary_restriction: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Dietary Restriction'
+        },
+        special_request: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Special Request'
+        }
+    },
+    type: 'object',
+    required: ['attendee_id', 'product_id'],
+    title: 'CartItemMealPlan',
+    description: `Meal-plan selection in cart (one row per attendee × weekly product).
+
+All metadata fields are nullable in cart because the buyer fills them
+incrementally — completeness is enforced only at checkout submission.
+
+\`daily_choices\` maps ISO weekday dates (YYYY-MM-DD) to menu_option keys
+(or the literal "chef" for chef's choice). \`dietary_restriction\` and
+\`special_request\` apply at the attendee level — the frontend / reducer
+keeps them in sync across every meal_plans entry for that attendee.`
+} as const;
+
 export const CartItemMerchSchema = {
     properties: {
         product_id: {
@@ -3493,6 +3584,14 @@ export const CartStateSchema = {
                     type: 'null'
                 }
             ]
+        },
+        meal_plans: {
+            items: {
+                '$ref': '#/components/schemas/CartItemMealPlan'
+            },
+            type: 'array',
+            title: 'Meal Plans',
+            default: []
         },
         promo_code: {
             anyOf: [
@@ -9767,6 +9866,24 @@ export const ListModel_TenantPublic_Schema = {
     title: 'ListModel[TenantPublic]'
 } as const;
 
+export const ListModel_ThirdPartyAppPublic_Schema = {
+    properties: {
+        results: {
+            items: {
+                '$ref': '#/components/schemas/ThirdPartyAppPublic'
+            },
+            type: 'array',
+            title: 'Results'
+        },
+        paging: {
+            '$ref': '#/components/schemas/Paging'
+        }
+    },
+    type: 'object',
+    required: ['results', 'paging'],
+    title: 'ListModel[ThirdPartyAppPublic]'
+} as const;
+
 export const ListModel_TicketingStepPublic_Schema = {
     properties: {
         results: {
@@ -9819,6 +9936,33 @@ export const ListModel_UserPublic_Schema = {
     type: 'object',
     required: ['results', 'paging'],
     title: 'ListModel[UserPublic]'
+} as const;
+
+export const MeAccessSchema = {
+    properties: {
+        app_name: {
+            type: 'string',
+            title: 'App Name'
+        },
+        scopes: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Scopes'
+        },
+        api_key_scopes: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Api Key Scopes'
+        }
+    },
+    type: 'object',
+    required: ['app_name', 'scopes', 'api_key_scopes'],
+    title: 'MeAccess',
+    description: 'Response shape for GET /me/access.'
 } as const;
 
 export const NoParticipationSchema = {
@@ -10226,6 +10370,18 @@ export const PaymentProductRequest_InputSchema = {
                 }
             ],
             title: 'Unit Price Override'
+        },
+        purchase_metadata: {
+            anyOf: [
+                {
+                    additionalProperties: true,
+                    type: 'object'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Purchase Metadata'
         }
     },
     type: 'object',
@@ -10262,6 +10418,18 @@ export const PaymentProductRequest_OutputSchema = {
                 }
             ],
             title: 'Unit Price Override'
+        },
+        purchase_metadata: {
+            anyOf: [
+                {
+                    additionalProperties: true,
+                    type: 'object'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Purchase Metadata'
         }
     },
     type: 'object',
@@ -12985,6 +13153,11 @@ export const ProductBatchItemSchema = {
             type: 'boolean',
             title: 'Requires Check In',
             default: false
+        },
+        discountable: {
+            type: 'boolean',
+            title: 'Discountable',
+            default: true
         }
     },
     type: 'object',
@@ -13162,6 +13335,11 @@ export const ProductBatchResultSchema = {
             type: 'boolean',
             title: 'Requires Check In',
             default: false
+        },
+        discountable: {
+            type: 'boolean',
+            title: 'Discountable',
+            default: true
         },
         id: {
             type: 'string',
@@ -13400,6 +13578,11 @@ export const ProductCreateSchema = {
             type: 'boolean',
             title: 'Requires Check In',
             default: false
+        },
+        discountable: {
+            type: 'boolean',
+            title: 'Discountable',
+            default: true
         }
     },
     type: 'object',
@@ -13597,6 +13780,11 @@ export const ProductPublicSchema = {
             type: 'boolean',
             title: 'Requires Check In',
             default: false
+        },
+        discountable: {
+            type: 'boolean',
+            title: 'Discountable',
+            default: true
         },
         id: {
             type: 'string',
@@ -13831,6 +14019,17 @@ export const ProductUpdateSchema = {
                 }
             ],
             title: 'Requires Check In'
+        },
+        discountable: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Discountable'
         }
     },
     type: 'object',
@@ -14007,6 +14206,11 @@ export const ProductWithQuantitySchema = {
             type: 'boolean',
             title: 'Requires Check In',
             default: false
+        },
+        discountable: {
+            type: 'boolean',
+            title: 'Discountable',
+            default: true
         },
         id: {
             type: 'string',
@@ -14853,17 +15057,6 @@ export const TenantPublicSchema = {
                 }
             ],
             title: 'Active Popup Slug'
-        },
-        third_party_key_prefix: {
-            anyOf: [
-                {
-                    type: 'string'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Third Party Key Prefix'
         }
     },
     type: 'object',
@@ -14977,6 +15170,257 @@ export const TenantUpdateSchema = {
     title: 'TenantUpdate'
 } as const;
 
+export const ThirdPartyAppCreateSchema = {
+    properties: {
+        name: {
+            type: 'string',
+            maxLength: 100,
+            minLength: 1,
+            title: 'Name'
+        },
+        allowed_token_scopes: {
+            items: {
+                type: 'string',
+                enum: ['portal:*', 'portal:profile:read', 'portal:profile:write', 'portal:applications:read', 'portal:applications:write', 'portal:attendees:write', 'portal:payments:read', 'portal:directory:read', 'portal:api_keys:manage']
+            },
+            type: 'array',
+            title: 'Allowed Token Scopes'
+        },
+        allowed_api_key_scopes: {
+            items: {
+                type: 'string',
+                enum: ['events:read', 'events:write', 'rsvp:write', 'venues:read', 'venues:write', 'applications:read', 'applications:write', 'attendees:read', 'attendees:write', 'humans:read', 'humans:write', 'groups:read', 'groups:write', 'products:read', 'products:write', 'coupons:read', 'coupons:write', 'forms:read', 'forms:write', 'payments:read', 'tracks:read', 'tracks:write', 'ticketing_steps:read', 'ticketing_steps:write', 'translations:read', 'translations:write']
+            },
+            type: 'array',
+            title: 'Allowed Api Key Scopes'
+        }
+    },
+    type: 'object',
+    required: ['name'],
+    title: 'ThirdPartyAppCreate',
+    description: 'Request body for creating a third-party app.'
+} as const;
+
+export const ThirdPartyAppCreatedSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        tenant_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Tenant Id'
+        },
+        name: {
+            type: 'string',
+            title: 'Name'
+        },
+        prefix: {
+            type: 'string',
+            title: 'Prefix'
+        },
+        allowed_token_scopes: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Allowed Token Scopes'
+        },
+        allowed_api_key_scopes: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Allowed Api Key Scopes'
+        },
+        active: {
+            type: 'boolean',
+            title: 'Active'
+        },
+        last_used_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Last Used At'
+        },
+        revoked_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Revoked At'
+        },
+        created_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Created At'
+        },
+        updated_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Updated At'
+        },
+        raw_key: {
+            type: 'string',
+            title: 'Raw Key'
+        }
+    },
+    type: 'object',
+    required: ['id', 'tenant_id', 'name', 'prefix', 'allowed_token_scopes', 'allowed_api_key_scopes', 'active', 'last_used_at', 'revoked_at', 'created_at', 'updated_at', 'raw_key'],
+    title: 'ThirdPartyAppCreated',
+    description: `Response returned ONCE at app creation (and at key rotation).
+
+\`\`raw_key\`\` is the cleartext token; never stored, shown once only.`
+} as const;
+
+export const ThirdPartyAppPublicSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        tenant_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Tenant Id'
+        },
+        name: {
+            type: 'string',
+            title: 'Name'
+        },
+        prefix: {
+            type: 'string',
+            title: 'Prefix'
+        },
+        allowed_token_scopes: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Allowed Token Scopes'
+        },
+        allowed_api_key_scopes: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Allowed Api Key Scopes'
+        },
+        active: {
+            type: 'boolean',
+            title: 'Active'
+        },
+        last_used_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Last Used At'
+        },
+        revoked_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Revoked At'
+        },
+        created_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Created At'
+        },
+        updated_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Updated At'
+        }
+    },
+    type: 'object',
+    required: ['id', 'tenant_id', 'name', 'prefix', 'allowed_token_scopes', 'allowed_api_key_scopes', 'active', 'last_used_at', 'revoked_at', 'created_at', 'updated_at'],
+    title: 'ThirdPartyAppPublic',
+    description: `Safe public representation of a ThirdPartyApps row.
+
+NEVER includes key_hash or any raw key material.`
+} as const;
+
+export const ThirdPartyAppUpdateSchema = {
+    properties: {
+        name: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 100,
+                    minLength: 1
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Name'
+        },
+        allowed_token_scopes: {
+            anyOf: [
+                {
+                    items: {
+                        type: 'string',
+                        enum: ['portal:*', 'portal:profile:read', 'portal:profile:write', 'portal:applications:read', 'portal:applications:write', 'portal:attendees:write', 'portal:payments:read', 'portal:directory:read', 'portal:api_keys:manage']
+                    },
+                    type: 'array'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Allowed Token Scopes'
+        },
+        allowed_api_key_scopes: {
+            anyOf: [
+                {
+                    items: {
+                        type: 'string',
+                        enum: ['events:read', 'events:write', 'rsvp:write', 'venues:read', 'venues:write', 'applications:read', 'applications:write', 'attendees:read', 'attendees:write', 'humans:read', 'humans:write', 'groups:read', 'groups:write', 'products:read', 'products:write', 'coupons:read', 'coupons:write', 'forms:read', 'forms:write', 'payments:read', 'tracks:read', 'tracks:write', 'ticketing_steps:read', 'ticketing_steps:write', 'translations:read', 'translations:write']
+                    },
+                    type: 'array'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Allowed Api Key Scopes'
+        }
+    },
+    type: 'object',
+    title: 'ThirdPartyAppUpdate',
+    description: `Request body for PATCH /third-party-apps/{id}.
+
+All fields are optional. Scope validators only fire when the field is
+provided (not-None).`
+} as const;
+
 export const ThirdPartyHumanLoginSchema = {
     properties: {
         email: {
@@ -15016,23 +15460,6 @@ export const ThirdPartyHumanVerifySchema = {
 
 The API key comes from the X-Third-Party-Api-Key header; the tenant is
 resolved server-side from the key.`
-} as const;
-
-export const ThirdPartyKeyRotatedSchema = {
-    properties: {
-        api_key: {
-            type: 'string',
-            title: 'Api Key'
-        },
-        prefix: {
-            type: 'string',
-            title: 'Prefix'
-        }
-    },
-    type: 'object',
-    required: ['api_key', 'prefix'],
-    title: 'ThirdPartyKeyRotated',
-    description: 'Returned by the rotate endpoint. The raw api_key is shown ONCE and never stored.'
 } as const;
 
 export const TicketAttendeeSnapshotSchema = {

@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Optional
 
 from sqlalchemy import Index, text
@@ -66,7 +66,7 @@ class EventInvitations(SQLModel, table=True):
     human_id: uuid.UUID = Field(foreign_key="humans.id", index=True)
     invited_by: uuid.UUID | None = Field(default=None)
     created_at: datetime = Field(
-        default_factory=datetime.utcnow, sa_type=DateTime(timezone=True)
+        default_factory=lambda: datetime.now(UTC), sa_type=DateTime(timezone=True)
     )
 
     event: "Events" = Relationship(back_populates="invitations")
@@ -93,5 +93,5 @@ class EventHiddenByHuman(SQLModel, table=True):
     human_id: uuid.UUID = Field(foreign_key="humans.id", index=True)
     event_id: uuid.UUID = Field(foreign_key="events.id", index=True)
     created_at: datetime = Field(
-        default_factory=datetime.utcnow, sa_type=DateTime(timezone=True)
+        default_factory=lambda: datetime.now(UTC), sa_type=DateTime(timezone=True)
     )

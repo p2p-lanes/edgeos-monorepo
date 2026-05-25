@@ -58,7 +58,6 @@ def _make_ticket_chain(
         human_id=human.id,
         name="CRUD Test Attendee",
         category="main",
-        check_in_code=None,
     )
     db.add(attendee)
     db.commit()

@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 from enum import Enum
 
 from pydantic import BaseModel, ConfigDict
@@ -35,15 +35,15 @@ class EventParticipantBase(SQLModel):
     check_time: datetime | None = Field(default=None, sa_type=DateTime(timezone=True))
     message: str | None = Field(default=None, sa_type=Text())
     registered_at: datetime = Field(
-        default_factory=datetime.utcnow,
+        default_factory=lambda: datetime.now(UTC),
         sa_type=DateTime(timezone=True),
     )
     created_at: datetime = Field(
-        default_factory=datetime.utcnow,
+        default_factory=lambda: datetime.now(UTC),
         sa_type=DateTime(timezone=True),
     )
     updated_at: datetime = Field(
-        default_factory=datetime.utcnow,
+        default_factory=lambda: datetime.now(UTC),
         sa_type=DateTime(timezone=True),
     )
 

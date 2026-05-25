@@ -12,6 +12,7 @@ import { queryKeys } from "@/lib/query-keys"
 import type {
   CheckoutStep,
   SelectedHousingItem,
+  SelectedMealPlanItem,
   SelectedMerchItem,
   SelectedPassItem,
   SelectedPatronItem,
@@ -23,6 +24,7 @@ export interface CartSelectionState {
   housing: SelectedHousingItem | null
   merch: SelectedMerchItem[]
   patron: SelectedPatronItem | null
+  selectedMealPlans: SelectedMealPlanItem[]
   promoCode: string
   promoCodeValid: boolean
   insurance: boolean
@@ -33,6 +35,7 @@ interface RestorationSetters {
   setHousing: (item: SelectedHousingItem | null) => void
   setMerch: (items: SelectedMerchItem[]) => void
   setPatron: (item: SelectedPatronItem | null) => void
+  setMealPlans: (items: SelectedMealPlanItem[]) => void
   setInsurance: (value: boolean) => void
 }
 
@@ -97,6 +100,13 @@ export function useCartPersistence({
             is_custom_amount: s.patron.isCustomAmount,
           }
         : null,
+      meal_plans: s.selectedMealPlans.map((m) => ({
+        attendee_id: m.attendeeId,
+        product_id: m.productId,
+        daily_choices: m.dailyChoices,
+        dietary_restriction: m.dietaryRestriction,
+        special_request: m.specialRequest,
+      })),
       promo_code: s.promoCodeValid ? s.promoCode : null,
       insurance: s.insurance,
       current_step: s.currentStep !== "success" ? s.currentStep : null,
@@ -165,15 +175,19 @@ export function useCartPersistence({
       cancelPendingSave()
       clearCartMutation.mutate(undefined, {
         onSettled: () => {
-          queryClient.setQueryData(queryKeys.cart.byPopup(cityId ?? ""), {
-            passes: [],
-            housing: null,
-            merch: [],
-            patron: null,
-            promo_code: null,
-            insurance: false,
-            current_step: null,
-          })
+          queryClient.setQueryData<CartState>(
+            queryKeys.cart.byPopup(cityId ?? ""),
+            {
+              passes: [],
+              housing: null,
+              merch: [],
+              patron: null,
+              meal_plans: [],
+              promo_code: null,
+              insurance: false,
+              current_step: null,
+            },
+          )
         },
       })
       queryClient.invalidateQueries({
@@ -190,7 +204,8 @@ export function useCartPersistence({
       return
     }
 
-    const { setHousing, setMerch, setPatron, setInsurance } = restorationSetters
+    const { setHousing, setMerch, setPatron, setMealPlans, setInsurance } =
+      restorationSetters
 
     // Restore housing — skip products that are sold_out / ended / upcoming.
     if (savedCart.housing) {
@@ -274,6 +289,27 @@ export function useCartPersistence({
           isCustomAmount: savedCart.patron.is_custom_amount,
         })
       }
+    }
+
+    // Restore meal plans — match each saved entry against the products list
+    // so we can resolve the ProductsPass reference the UI needs.
+    if (savedCart.meal_plans?.length) {
+      const restoredMealPlans = savedCart.meal_plans.reduce<
+        SelectedMealPlanItem[]
+      >((acc, saved) => {
+        const product = products.find((p) => p.id === saved.product_id)
+        if (!product) return acc
+        acc.push({
+          productId: product.id,
+          product,
+          attendeeId: saved.attendee_id,
+          dailyChoices: saved.daily_choices ?? null,
+          dietaryRestriction: saved.dietary_restriction ?? null,
+          specialRequest: saved.special_request ?? null,
+        })
+        return acc
+      }, [])
+      if (restoredMealPlans.length > 0) setMealPlans(restoredMealPlans)
     }
 
     // Restore insurance

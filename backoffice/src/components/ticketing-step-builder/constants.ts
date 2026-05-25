@@ -12,6 +12,7 @@ import {
   Shield,
   ShoppingBag,
   Ticket,
+  Utensils,
   Video,
 } from "lucide-react"
 
@@ -83,6 +84,12 @@ export const TEMPLATE_DEFINITIONS: TemplateDefinition[] = [
     description: "Sanitized HTML for marketing banners and custom copy",
     icon: FileText,
   },
+  {
+    key: "meal-plan-select",
+    label: "Meal Plan Select",
+    description: "Weekly meal plans with per-day dish picker",
+    icon: Utensils,
+  },
 ]
 
 /** Templates that don't display products and therefore don't need a product category. */
@@ -98,6 +105,7 @@ export const STEP_TYPE_DEFINITIONS: StepTypeDefinition[] = [
   { step_type: "housing", defaultTitle: "Housing", icon: Home },
   { step_type: "merch", defaultTitle: "Merchandise", icon: ShoppingBag },
   { step_type: "patron", defaultTitle: "Patron", icon: Heart },
+  { step_type: "meal_plan", defaultTitle: "Meal Plan", icon: Utensils },
   { step_type: "insurance_checkout", defaultTitle: "Insurance", icon: Shield },
   { step_type: "confirm", defaultTitle: "Review & Confirm", icon: CheckCircle },
 ]

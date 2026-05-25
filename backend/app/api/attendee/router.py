@@ -31,9 +31,8 @@ from app.core.dependencies.users import (
     CurrentCheckInOperator,
     CurrentHuman,
     HumanTenantSession,
-    RequireHumanScopeDirectoryRead,
-    RequireHumanScopeSelfRead,
     TenantSession,
+    needs,
 )
 
 router = APIRouter(prefix="/attendees", tags=["attendees"])
@@ -81,8 +80,15 @@ def _build_attendee_with_origin(
             else None
         )
         if snapshot is not None:
-            product_name = snapshot.product_name
-            product_category = snapshot.product_category
+            product_name = snapshot.product_name or (
+                ap.product.name if ap.product else None
+            )
+            # "" snapshots are a backend artifact (crud writes product.category
+            # or "") and break portal icon resolution — treat them like a
+            # missing snapshot and fall back to the live product category.
+            product_category = snapshot.product_category or (
+                ap.product.category if ap.product else None
+            )
         else:
             product_name = ap.product.name if ap.product else None
             product_category = ap.product.category if ap.product else None
@@ -103,6 +109,7 @@ def _build_attendee_with_origin(
                 last_scan_at=(
                     last_scan_by_ticket.get(ap.id) if last_scan_by_ticket else None
                 ),
+                purchase_metadata=ap.purchase_metadata,
             )
         )
     origin = "application" if attendee.application_id is not None else "direct_sale"
@@ -121,7 +128,6 @@ def _build_attendee_with_origin(
         "category": attendee.category,
         "email": attendee.email,
         "gender": attendee.gender,
-        "check_in_code": attendee.check_in_code,
         "poap_url": attendee.poap_url,
         "created_at": getattr(attendee, "created_at", None),
         "updated_at": getattr(attendee, "updated_at", None),
@@ -138,12 +144,13 @@ def _build_attendee_with_origin(
     "/my/popup/{popup_id}",
     response_model=ListModel[AttendeeWithOriginPublic],
     tags=["portal"],
+    summary="List your attendees for a popup",
+    dependencies=[needs("portal:applications:read")],
 )
 async def list_my_attendees_by_popup(
     popup_id: uuid.UUID,
     db: HumanTenantSession,
     current_human: CurrentHuman,
-    _scope: RequireHumanScopeDirectoryRead,
     skip: PaginationSkip = 0,
     limit: _AttendeeLimit = 50,
 ) -> ListModel[AttendeeWithOriginPublic]:
@@ -171,13 +178,14 @@ async def list_my_attendees_by_popup(
     "/my/popup/{popup_id}",
     response_model=AttendeeWithOriginPublic,
     tags=["portal"],
+    summary="Create a companion attendee",
+    dependencies=[needs("portal:attendees:write")],
 )
 async def create_my_attendee_for_popup(
     popup_id: uuid.UUID,
     attendee_in: AttendeeCreate,
     db: HumanTenantSession,
     current_human: CurrentHuman,
-    _scope: RequireHumanScopeSelfRead,
 ) -> AttendeeWithOriginPublic:
     """Create a companion attendee (spouse/child) for the current Human's application.
 
@@ -294,6 +302,8 @@ async def create_my_attendee_for_popup(
     "/my/popup/{popup_id}/{attendee_id}",
     response_model=AttendeeWithOriginPublic,
     tags=["portal"],
+    summary="Update your attendee",
+    dependencies=[needs("portal:attendees:write")],
 )
 async def update_my_attendee_for_popup(
     popup_id: uuid.UUID,
@@ -301,7 +311,6 @@ async def update_my_attendee_for_popup(
     attendee_in: AttendeeUpdate,
     db: HumanTenantSession,
     current_human: CurrentHuman,
-    _scope: RequireHumanScopeSelfRead,
 ) -> AttendeeWithOriginPublic:
     """Update a companion attendee using the dual-path auth predicate.
 
@@ -350,13 +359,14 @@ async def update_my_attendee_for_popup(
 @router.delete(
     "/my/popup/{popup_id}/{attendee_id}",
     tags=["portal"],
+    summary="Delete your attendee",
+    dependencies=[needs("portal:attendees:write")],
 )
 async def delete_my_attendee_for_popup(
     popup_id: uuid.UUID,
     attendee_id: uuid.UUID,
     db: HumanTenantSession,
     current_human: CurrentHuman,
-    _scope: RequireHumanScopeSelfRead,
 ) -> dict:
     """Delete a companion attendee using the dual-path auth predicate.
 
@@ -666,7 +676,6 @@ async def get_tickets_by_email(
                 name=attendee.name,
                 email=attendee.email,
                 category=attendee.category,
-                check_in_code=attendee.check_in_code,
                 popup_id=popup.id if popup else attendee.popup_id,
                 popup_name=popup_name,
                 popup_slug=popup.slug if popup else None,

@@ -105,10 +105,19 @@ function EditEventContent({ eventId }: { eventId: string }) {
     queryFn: () => EventsService.getEvent({ eventId }),
   })
 
+  // Saved events always carry their own timezone; the form should respect
+  // that as the source of truth (the calendar views render against it too).
+  // Fallback to "UTC" is a defensive safety net for legacy/malformed rows.
+  const popupTimezone = event.timezone || "UTC"
+
   return (
     <div className="space-y-4">
       <CreatedByCard event={event} />
-      <EventForm defaultValues={event} onSuccess={goBack} />
+      <EventForm
+        defaultValues={event}
+        popupTimezone={popupTimezone}
+        onSuccess={goBack}
+      />
     </div>
   )
 }

@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 
 from sqlalchemy import Index
 from sqlalchemy.dialects.postgresql import JSONB, UUID
@@ -52,5 +52,5 @@ class ApiKeys(SQLModel, table=True):
     revoked_at: datetime | None = Field(default=None, sa_type=DateTime(timezone=True))
     expires_at: datetime | None = Field(default=None, sa_type=DateTime(timezone=True))
     created_at: datetime = Field(
-        default_factory=datetime.utcnow, sa_type=DateTime(timezone=True)
+        default_factory=lambda: datetime.now(UTC), sa_type=DateTime(timezone=True)
     )

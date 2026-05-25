@@ -148,8 +148,15 @@ export default function EventDetailPage() {
 
   // Recurring events require occurrence_start so the RSVP targets a single
   // instance; one-off events must not send it (the backend rejects mixing
-  // the two semantics).
-  const rsvpBody = occParam ? { occurrence_start: occParam } : undefined
+  // the two semantics). Prefer the ?occ= param (set when the user came from
+  // an expanded occurrence); fall back to the event's own start_time when
+  // landing on a recurring master without ?occ=, since its start IS the
+  // first occurrence.
+  const rsvpBody = occParam
+    ? { occurrence_start: occParam }
+    : event?.rrule
+      ? { occurrence_start: event.start_time }
+      : undefined
   const invalidateRsvpQueries = () => {
     queryClient.invalidateQueries({
       queryKey: ["portal-event-participants", params.eventId],

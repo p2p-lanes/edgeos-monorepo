@@ -80,6 +80,8 @@ def _make_patreon_product(db: Session, popup: Popups) -> Products:
         price=Decimal("0"),
         category="patreon",
         is_active=True,
+        # Mirrors what the schema validator coerces for any patreon product.
+        discountable=False,
     )
     db.add(product)
     db.flush()
@@ -345,10 +347,11 @@ class TestPatronPaymentCreation:
                     unit_price_override=Decimal("5000"),
                 ),
             ]
-            standard, supporter, patreon = _calculate_amounts(db, requested)
+            standard, non_discountable = _calculate_amounts(db, requested)
             assert standard == Decimal("3000")
-            assert supporter == Decimal("0")
-            assert patreon == Decimal("5000")
+            # Patreon donation rides on the non-discountable bucket alongside
+            # any other `discountable=false` products.
+            assert non_discountable == Decimal("5000")
         finally:
             db.delete(attendee)
             db.delete(application)
@@ -384,7 +387,6 @@ class TestPatronPaymentCreation:
             assert exc_info.value.status_code == 422
             assert "patron" in exc_info.value.detail.lower()
         finally:
-            db.delete(attendee)
             db.delete(application)
             db.delete(product)
             db.delete(popup)
@@ -416,7 +418,6 @@ class TestPatronPaymentCreation:
                 payments_crud.create_payment(db, obj)
             assert exc_info.value.status_code == 422
         finally:
-            db.delete(attendee)
             db.delete(application)
             db.delete(step)
             db.delete(product)
@@ -447,7 +448,6 @@ class TestPatronPaymentCreation:
                 payments_crud.create_payment(db, obj)
             assert exc_info.value.status_code == 422
         finally:
-            db.delete(attendee)
             db.delete(application)
             db.delete(product)
             db.commit()
@@ -478,7 +478,6 @@ class TestPatronPaymentCreation:
                 payments_crud.create_payment(db, obj)
             assert exc_info.value.status_code == 422
         finally:
-            db.delete(attendee)
             db.delete(application)
             db.delete(step)
             db.delete(product)
