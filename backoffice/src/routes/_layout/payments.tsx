@@ -290,9 +290,11 @@ function getColumns(hasInvoice: boolean): ColumnDef<PaymentPublic>[] {
         // Render the badge only once SimpleFi's installment_plan_activated
         // webhook has filled in installments_total. While the plan is still
         // PENDING (buyer hasn't picked a cycle count), we show em-dash to
-        // match the other "no value yet" columns.
+        // match the other "no value yet" columns. A single-installment plan
+        // is effectively pay-in-full, so we also show em-dash there — the
+        // badge is reserved for genuine multi-cycle plans (total >= 2).
         const total = row.original.installments_total
-        if (!row.original.is_installment_plan || total == null) {
+        if (!row.original.is_installment_plan || total == null || total < 2) {
           return <span className="text-muted-foreground">—</span>
         }
         const paid = row.original.installments_paid ?? 0
