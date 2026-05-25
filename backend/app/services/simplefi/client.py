@@ -18,11 +18,18 @@ from app.core.config import settings
 
 
 class SimpleFIPaymentResponse(BaseModel):
-    """Response from SimpleFI payment creation."""
+    """Response from SimpleFI payment creation.
+
+    `id` is the external identifier we store in ``payments.external_id`` —
+    a payment_request_id for one-shot requests, or an installment_plan_id
+    when ``is_installment_plan`` is True. Both kinds are looked up the same
+    way by webhook handlers.
+    """
 
     id: str
     status: str
     checkout_url: str
+    is_installment_plan: bool = False
 
 
 class SimpleFIPaymentRequestStatus(BaseModel):
@@ -99,9 +106,25 @@ class SimpleFIClient:
         portal_base_override: str | None = None,
         success_path: str | None = None,
         cancel_path: str | None = None,
+        max_installments: int | None = None,
+        installment_interval: str = "month",
+        installment_interval_count: int = 1,
+        user_email: str | None = None,
+        plan_name: str | None = None,
     ) -> SimpleFIPaymentResponse:
         """
-        Create a payment request in SimpleFI.
+        Create a payment request OR an installment plan in SimpleFI.
+
+        When ``max_installments`` is None or < 2 (the default), this hits
+        ``POST /payment_requests`` exactly as before. When ``max_installments``
+        is >= 2 this hits ``POST /installment_plans`` instead: the plan is
+        created in ``pending`` status and the buyer picks the actual number
+        of installments on SimpleFi's checkout UI; activation fires our
+        ``installment_plan_activated`` webhook.
+
+        Both modes return a uniform ``SimpleFIPaymentResponse`` — ``id`` is
+        either a payment_request_id (one-shot) or an installment_plan_id
+        (installments). ``is_installment_plan`` tells callers which path ran.
 
         Args:
             amount: The payment amount
@@ -118,9 +141,18 @@ class SimpleFIClient:
                 provided, overrides the default passes/buy?checkout=success path.
             cancel_path: Full URL override for the cancel redirect. When
                 provided, overrides the default passes/buy path.
+            max_installments: Ceiling of installments offered to the buyer.
+                If None or < 2, a one-shot payment_request is created instead.
+            installment_interval: One of "day" | "week" | "month" | "year".
+            installment_interval_count: Multiplier on the interval (e.g.
+                interval="week", interval_count=2 → bi-weekly).
+            user_email: Required when creating an installment plan.
+            plan_name: Optional display name for the installment plan
+                (shown to the buyer in SimpleFi's UI).
 
         Returns:
-            SimpleFIPaymentResponse with id, status, and checkout_url
+            SimpleFIPaymentResponse with id, status, checkout_url, and
+            is_installment_plan flag.
         """
         notification_url = urllib.parse.urljoin(
             settings.BACKEND_URL, "/api/v1/payments/webhook/simplefi"
@@ -132,6 +164,27 @@ class SimpleFIClient:
             or f"{portal_base}/portal/{popup_slug}/passes/buy?checkout=success"
         )
         cancel_url = cancel_path or f"{portal_base}/portal/{popup_slug}/passes/buy"
+        redirect_urls = {"success_url": success_url, "cancel_url": cancel_url}
+
+        if max_installments is not None and max_installments >= 2:
+            if not user_email:
+                raise ValueError(
+                    "user_email is required when creating an installment plan"
+                )
+            return self._create_installment_plan(
+                amount=amount,
+                currency=currency,
+                max_installments=max_installments,
+                interval=installment_interval,
+                interval_count=installment_interval_count,
+                user_email=user_email,
+                plan_name=plan_name,
+                reference=reference,
+                notification_url=notification_url,
+                redirect_urls=redirect_urls,
+                popup_slug=popup_slug,
+                tenant_slug=tenant_slug,
+            )
 
         body = {
             "amount": float(amount),
@@ -139,10 +192,7 @@ class SimpleFIClient:
             "reference": reference or {},
             "memo": memo,
             "notification_url": notification_url,
-            "redirect_urls": {
-                "success_url": success_url,
-                "cancel_url": cancel_url,
-            },
+            "redirect_urls": redirect_urls,
         }
 
         logger.info(
@@ -169,6 +219,71 @@ class SimpleFIClient:
             id=data["id"],
             status=data["status"],
             checkout_url=data["checkout_v2_url"],
+            is_installment_plan=False,
+        )
+
+    def _create_installment_plan(
+        self,
+        *,
+        amount: Decimal,
+        currency: str,
+        max_installments: int,
+        interval: str,
+        interval_count: int,
+        user_email: str,
+        plan_name: str | None,
+        reference: dict[str, Any] | None,
+        notification_url: str,
+        redirect_urls: dict[str, str],
+        popup_slug: str,
+        tenant_slug: str,
+    ) -> SimpleFIPaymentResponse:
+        """POST to /installment_plans with the buyer-pickable ceiling.
+
+        We send ``max_installments`` (not ``number_of_installments``) so SimpleFi
+        creates the plan in ``pending`` status and renders the per-cycle
+        selector to the buyer. Activation arrives later via the
+        ``installment_plan_activated`` webhook.
+        """
+        body: dict[str, Any] = {
+            "total_amount": float(amount),
+            "currency": currency,
+            "max_installments": max_installments,
+            "interval": interval,
+            "interval_count": interval_count,
+            "user_email": user_email,
+            "reference": reference or {},
+            "notification_url": notification_url,
+            "redirect_urls": redirect_urls,
+        }
+        if plan_name:
+            body["name"] = plan_name
+
+        logger.info(
+            "SimpleFI create installment plan: amount={} currency={} max_installments={} interval={}x{} popup_slug={} tenant_slug={} reference_keys={}",
+            amount,
+            currency,
+            max_installments,
+            interval_count,
+            interval,
+            popup_slug,
+            tenant_slug,
+            sorted(body["reference"].keys()),
+        )
+        data = self._make_request("POST", "/installment_plans", json=body)
+
+        logger.info(
+            "SimpleFI installment plan response: external_id={} status={} checkout_url={}",
+            data.get("id"),
+            data.get("status"),
+            data.get("checkout_url"),
+        )
+
+        return SimpleFIPaymentResponse(
+            id=data["id"],
+            status=data["status"],
+            checkout_url=data["checkout_url"],
+            is_installment_plan=True,
         )
 
     def get_payment_request_status(

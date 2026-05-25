@@ -1087,6 +1087,27 @@ async def _handle_installment_payment(
             detail="Payment not found",
         )
 
+    # Defence-in-depth dedupe: the redis-backed fingerprint above stops the
+    # common case (same webhook re-delivered), but it doesn't survive cache
+    # eviction or a deploy that clears state. If we already inserted an
+    # installment row for this payment_request_id, skip — don't double-count.
+    existing = next(
+        (
+            i
+            for i in payment.installments
+            if i.external_payment_id == payment_request_id
+        ),
+        None,
+    )
+    if existing is not None:
+        logger.info(
+            "Installment payment_request_id={} already recorded as installment #{} for payment {}; skipping",
+            payment_request_id,
+            existing.installment_number,
+            payment.id,
+        )
+        return {"message": "Installment payment already recorded"}
+
     # Extract payment details
     settlement_currency, settlement_rate, source = _extract_settlement_details(payload)
 
@@ -1224,7 +1245,29 @@ async def _handle_installment_plan_activated(
         )
 
     installment_plan = payload.data.installment_plan
-    payment.installments_total = installment_plan.number_of_installments
+    new_total = installment_plan.number_of_installments
+
+    # Idempotent. The fingerprint above catches the redis-cached case, but if
+    # SimpleFi re-delivers after a cache eviction we should still no-op
+    # cleanly. A *changed* number_of_installments would mean the buyer somehow
+    # re-picked after activation — surface that as a warning rather than
+    # silently overwriting, since downstream installment-counting depends on it.
+    if payment.installments_total is not None:
+        if payment.installments_total == new_total:
+            logger.info(
+                "Payment {}: installments_total already set to {}; skipping",
+                payment.id,
+                new_total,
+            )
+            return {"message": "Installment plan already activated"}
+        logger.warning(
+            "Payment {}: installments_total changing {} -> {} on re-activation",
+            payment.id,
+            payment.installments_total,
+            new_total,
+        )
+
+    payment.installments_total = new_total
     db.commit()
 
     logger.info(
@@ -1263,18 +1306,33 @@ async def _handle_installment_plan_cancelled(
             detail="Payment not found",
         )
 
-    # Idempotent: skip if already cancelled
-    if payment.status == "cancelled":
+    old_status = payment.status
+
+    # Idempotent: skip if already cancelled. The early return also keeps us
+    # from double-restoring stock (the LEAST clamp is a backstop, not the
+    # primary defence).
+    if old_status == "cancelled":
         logger.info("Payment {} already cancelled. Skipping...", payment.id)
         return {"message": "Payment already cancelled"}
 
-    # If payment was approved, revoke products
-    if payment.status == "approved":
+    # If the first installment had already approved the payment, attendee
+    # products were assigned — revoke them before flipping status.
+    if old_status == "approved":
         logger.info("Revoking products for cancelled payment {}", payment.id)
         payments_crud._remove_products_from_attendees(db, payment)
+
+    # Restore stock for any in-progress plan (PENDING or APPROVED-partial).
+    # The buyer abandoned mid-plan; we free inventory so other buyers can take
+    # those tickets. This intentionally diverges from the documented
+    # ``_restore_payment_stock`` contract (which limits APPROVED restores) —
+    # installment plans never represent a fully-paid purchase when cancelled
+    # by SimpleFi, so the refund-flow caveat doesn't apply. Duplicate webhook
+    # delivery is already short-circuited by the already-cancelled check
+    # above; the per-product LEAST clamp is the structural safety net.
+    payments_crud._restore_payment_stock(db, payment)
 
     payment.status = "cancelled"
     db.commit()
 
-    logger.info("Payment {} cancelled", payment.id)
+    logger.info("Payment {} cancelled (stock restored)", payment.id)
     return {"message": "Installment plan cancelled successfully"}

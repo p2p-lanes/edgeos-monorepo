@@ -295,6 +295,53 @@ def _calculate_price(
     return discounted_standard + supporter_amount + patreon_amount
 
 
+def _calculate_max_installments(
+    deadline: datetime,
+    ceiling: int,
+    interval: str,
+    interval_count: int,
+    now: datetime | None = None,
+) -> int:
+    """Return how many installment cycles fit before ``deadline``.
+
+    Iterates cycle-by-cycle using ``dateutil.relativedelta`` so month/year
+    calendar boundaries are computed identically to SimpleFi (cycle N of a
+    plan created on the 31st falls on the last day of the target month, etc).
+    A naive ``delta.days // 30`` would silently mismatch SimpleFi's schedule.
+
+    Cycle 1 is "today" (plan creation); subsequent cycles are spaced by
+    ``interval * interval_count``. Cycles past ``deadline`` are dropped.
+    The result is clamped to ``[1, ceiling]``.
+    """
+    from calendar import monthrange
+
+    from dateutil.relativedelta import relativedelta
+
+    now = now or datetime.now(UTC)
+    if deadline <= now or ceiling < 2:
+        return 1
+
+    interval_kwarg = {
+        "day": "days",
+        "week": "weeks",
+        "month": "months",
+        "year": "years",
+    }[interval]
+
+    count = 1  # cycle 1 is plan creation — always fits
+    while count < ceiling:
+        offset = relativedelta(**{interval_kwarg: count * interval_count})
+        candidate = now + offset
+        if interval in ("month", "year"):
+            # Mirror SimpleFi's billing_day clipping (Feb 30 -> Feb 28/29).
+            _, last_day = monthrange(candidate.year, candidate.month)
+            candidate = candidate.replace(day=min(now.day, last_day))
+        if candidate > deadline:
+            break
+        count += 1
+    return count
+
+
 class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
     """CRUD operations for Payments."""
 
@@ -306,6 +353,34 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
     def get_by_external_id(self, session: Session, external_id: str) -> Payments | None:
         """Get a payment by external ID."""
         statement = select(Payments).where(Payments.external_id == external_id)
+        return session.exec(statement).first()
+
+    def _get_in_progress_installment_plan(
+        self,
+        session: Session,
+        application_id: uuid.UUID,
+    ) -> Payments | None:
+        """Return the application's in-progress installment plan, or None.
+
+        "In-progress" covers two states:
+          - PENDING: SimpleFi plan exists, no installment paid yet.
+          - APPROVED with installments_paid < installments_total (or total NULL,
+            meaning the activated webhook hasn't filled it yet).
+
+        Completed (paid==total), cancelled, rejected, and expired plans are
+        treated as finalized and do NOT block subsequent payments.
+        """
+        statement = select(Payments).where(
+            Payments.application_id == application_id,
+            Payments.is_installment_plan == True,  # noqa: E712
+            Payments.status.in_(  # type: ignore[attr-defined]
+                [PaymentStatus.PENDING.value, PaymentStatus.APPROVED.value]
+            ),
+            or_(
+                Payments.installments_total.is_(None),  # type: ignore[attr-defined]
+                Payments.installments_paid < Payments.installments_total,  # type: ignore[operator]
+            ),
+        )
         return session.exec(statement).first()
 
     def _validate_open_ticketing_form_data(
@@ -1448,6 +1523,33 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 detail="Application not found",
             )
 
+        # Block edit_passes when an installment plan is in flight on this
+        # application. SimpleFi keeps charging the plan independent of our
+        # state, so swapping passes would leave attendee products inconsistent
+        # with money still being collected. Admin can manually cancel the
+        # plan (PATCH status=cancelled) to unblock; completed/cancelled plans
+        # don't trip this guard.
+        if obj.edit_passes:
+            active_plan = self._get_in_progress_installment_plan(
+                session, application.id
+            )
+            if active_plan:
+                logger.warning(
+                    "Blocked edit_passes for application_id={}: in-progress installment plan payment_id={} (paid={}/{})",
+                    application.id,
+                    active_plan.id,
+                    active_plan.installments_paid,
+                    active_plan.installments_total,
+                )
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=(
+                        "Cannot edit passes while an installment plan is in "
+                        "progress. Complete the plan or contact support to "
+                        "cancel it."
+                    ),
+                )
+
         # Handle zero or negative amount (credit covers cost)
         if preview.amount <= 0:
             if preview.amount < 0:
@@ -1586,11 +1688,32 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             ],
         }
 
+        # Compute installment-plan eligibility for this payment. Edit-passes
+        # deltas are always one-shot (see PR design — Option A); confirmed
+        # in-flight plans are blocked by the guard above so we only see fresh
+        # purchases here.
+        popup = application.popup
+        max_installments: int | None = None
+        if (
+            not obj.edit_passes
+            and popup.installments_enabled
+            and popup.installments_deadline is not None
+            and popup.installments_max is not None
+        ):
+            computed = _calculate_max_installments(
+                popup.installments_deadline,
+                popup.installments_max,
+                popup.installments_interval,
+                popup.installments_interval_count,
+            )
+            if computed >= 2:
+                max_installments = computed
+
         try:
             from app.api.tenant.utils import get_portal_url
 
             logger.info(
-                "Creating SimpleFI pass payment: application_id={} popup_id={} tenant_id={} amount={} currency={} product_count={} coupon_code={} edit_passes={} insurance={}",
+                "Creating SimpleFI pass payment: application_id={} popup_id={} tenant_id={} amount={} currency={} product_count={} coupon_code={} edit_passes={} insurance={} max_installments={}",
                 application.id,
                 application.popup_id,
                 application.tenant_id,
@@ -1600,6 +1723,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 obj.coupon_code,
                 obj.edit_passes,
                 obj.insurance,
+                max_installments,
             )
             simplefi_response = simplefi_client.create_payment(
                 amount=preview.amount,
@@ -1609,13 +1733,19 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 reference=reference,
                 memo=application.popup.tenant.name,
                 portal_base_override=get_portal_url(application.popup.tenant),
+                max_installments=max_installments,
+                installment_interval=popup.installments_interval,
+                installment_interval_count=popup.installments_interval_count,
+                user_email=application.human.email if application.human else None,
+                plan_name=popup.name,
             )
             logger.info(
-                "SimpleFI pass payment created: application_id={} external_id={} provider_status={} checkout_url={}",
+                "SimpleFI pass payment created: application_id={} external_id={} provider_status={} checkout_url={} is_installment_plan={}",
                 application.id,
                 simplefi_response.id,
                 simplefi_response.status,
                 simplefi_response.checkout_url,
+                simplefi_response.is_installment_plan,
             )
         except Exception as e:
             logger.error(f"Failed to create SimpleFI payment: {e}")
@@ -1624,7 +1754,10 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 detail="Failed to create payment with payment provider",
             ) from e
 
-        # Create payment record with SimpleFI data
+        # Create payment record with SimpleFI data. When the response signals
+        # an installment plan, external_id is the installment_plan_id (not a
+        # payment_request_id) and installments_total stays NULL until the
+        # `installment_plan_activated` webhook delivers the buyer's pick.
         payment = Payments(
             tenant_id=application.tenant_id,
             application_id=obj.application_id,
@@ -1642,6 +1775,8 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             external_id=simplefi_response.id,
             checkout_url=simplefi_response.checkout_url,
             source=PaymentSource.SIMPLEFI.value,
+            is_installment_plan=simplefi_response.is_installment_plan,
+            installments_paid=0 if simplefi_response.is_installment_plan else None,
         )
 
         session.add(payment)

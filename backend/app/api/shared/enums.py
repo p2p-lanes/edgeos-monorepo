@@ -54,6 +54,15 @@ class ApplicationLayout(StrEnum):
     multi_step = "multi_step"
 
 
+class InstallmentInterval(StrEnum):
+    """Billing interval for installment plans (mirrors SimpleFi's InstallmentInterval)."""
+
+    day = "day"
+    week = "week"
+    month = "month"
+    year = "year"
+
+
 def derive_checkout_mode(sale_type: SaleType) -> CheckoutMode:
     if sale_type == SaleType.direct:
         return CheckoutMode.simple_quantity

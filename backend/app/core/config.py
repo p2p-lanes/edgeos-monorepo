@@ -119,5 +119,9 @@ class Settings(BaseSettings):
             return "https://api.simplefi.tech"
         return "https://apidev.simplefi.tech"
 
+    # SimpleFi installment plans accept max_installments in [2, 12].
+    # This is a global safety net; per-popup `installments_max` may set a lower cap.
+    MAX_ALLOWED_INSTALLMENTS: int = 12
+
 
 settings = Settings()

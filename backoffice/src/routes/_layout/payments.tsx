@@ -284,6 +284,26 @@ function getColumns(hasInvoice: boolean): ColumnDef<PaymentPublic>[] {
       ),
     },
     {
+      id: "installments",
+      header: "Installments",
+      cell: ({ row }) => {
+        // Render the badge only once SimpleFi's installment_plan_activated
+        // webhook has filled in installments_total. While the plan is still
+        // PENDING (buyer hasn't picked a cycle count), we show em-dash to
+        // match the other "no value yet" columns.
+        const total = row.original.installments_total
+        if (!row.original.is_installment_plan || total == null) {
+          return <span className="text-muted-foreground">—</span>
+        }
+        const paid = row.original.installments_paid ?? 0
+        return (
+          <Badge variant="secondary" className="font-mono">
+            {paid}/{total}
+          </Badge>
+        )
+      },
+    },
+    {
       accessorKey: "insurance_amount",
       header: "Insurance",
       cell: ({ row }) => {
@@ -588,6 +608,7 @@ function PaymentsTableContent() {
       searchPlaceholder="Search by external ID, attendee email, or attendee name..."
       hiddenOnMobile={[
         "source",
+        "installments",
         "insurance_amount",
         "contribution_amount",
         "coupon_code",
@@ -652,6 +673,9 @@ function Payments() {
         { key: "currency", label: "Currency" },
         { key: "status", label: "Status" },
         { key: "source", label: "Source" },
+        { key: "is_installment_plan", label: "Installment Plan" },
+        { key: "installments_paid", label: "Installments Paid" },
+        { key: "installments_total", label: "Installments Total" },
         { key: "insurance_amount", label: "Insurance" },
         { key: "contribution_amount", label: "Contribution" },
         { key: "coupon_code", label: "Coupon" },

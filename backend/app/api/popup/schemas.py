@@ -5,16 +5,18 @@ from enum import StrEnum
 from typing import Self
 
 from pydantic import ConfigDict, field_validator, model_validator
-from sqlalchemy import Boolean, Column, Numeric, Text
+from sqlalchemy import Boolean, Column, Integer, Numeric, Text
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlmodel import Field, SQLModel, String
 
 from app.api.shared.enums import (
     ApplicationLayout,
     CheckoutMode,
+    InstallmentInterval,
     SaleType,
     derive_checkout_mode,
 )
+from app.core.config import settings
 from app.utils.utils import slugify
 
 
@@ -49,6 +51,37 @@ def validate_popup_contribution_config(enabled: bool, pct: "Decimal | None") -> 
     if pct > 100:
         raise ValueError(
             "contribution_percentage must be <= 100 (it represents a percentage)"
+        )
+
+
+def validate_popup_installments_config(
+    enabled: bool,
+    max_installments: int | None,
+    deadline: "datetime | None",
+    interval_count: int,
+) -> None:
+    """Validate installment-plan configuration bounds.
+
+    - When enabled, installments_max and installments_deadline must be set.
+    - installments_max must be within [2, MAX_ALLOWED_INSTALLMENTS] (SimpleFi accepts [2, 12]).
+    - installments_interval_count must be >= 1.
+    """
+    if interval_count < 1:
+        raise ValueError("installments_interval_count must be >= 1")
+    if not enabled:
+        return
+    if max_installments is None:
+        raise ValueError(
+            "installments_max is required when installments_enabled is True"
+        )
+    if max_installments < 2 or max_installments > settings.MAX_ALLOWED_INSTALLMENTS:
+        raise ValueError(
+            "installments_max must be between 2 and "
+            f"{settings.MAX_ALLOWED_INSTALLMENTS} (SimpleFi limits)"
+        )
+    if deadline is None:
+        raise ValueError(
+            "installments_deadline is required when installments_enabled is True"
         )
 
 
@@ -177,6 +210,20 @@ class PopupBase(SQLModel):
         default=False,
         sa_column=Column(Boolean, nullable=False, server_default="false"),
     )
+    installments_enabled: bool = Field(
+        default=False,
+        sa_column=Column(Boolean, nullable=False, server_default="false"),
+    )
+    installments_deadline: datetime | None = None
+    installments_max: int | None = Field(default=None, nullable=True)
+    installments_interval: InstallmentInterval = Field(
+        default=InstallmentInterval.month,
+        sa_column=Column(String, nullable=False, server_default="month"),
+    )
+    installments_interval_count: int = Field(
+        default=1,
+        sa_column=Column(Integer, nullable=False, server_default="1"),
+    )
 
     @field_validator("currency")
     @classmethod
@@ -227,6 +274,11 @@ class PopupCreate(SQLModel):
     self_check_in_enabled: bool = False
     show_attendee_directory: bool = False
     credits_enabled: bool = False
+    installments_enabled: bool = False
+    installments_deadline: datetime | None = None
+    installments_max: int | None = None
+    installments_interval: InstallmentInterval = InstallmentInterval.month
+    installments_interval_count: int = 1
 
     @field_validator("currency")
     @classmethod
@@ -248,6 +300,12 @@ class PopupCreate(SQLModel):
         )
         validate_popup_contribution_config(
             self.contribution_enabled, self.contribution_percentage
+        )
+        validate_popup_installments_config(
+            self.installments_enabled,
+            self.installments_max,
+            self.installments_deadline,
+            self.installments_interval_count,
         )
         return self
 
@@ -298,6 +356,11 @@ class PopupUpdate(SQLModel):
     self_check_in_enabled: bool | None = None
     show_attendee_directory: bool | None = None
     credits_enabled: bool | None = None
+    installments_enabled: bool | None = None
+    installments_deadline: datetime | None = None
+    installments_max: int | None = None
+    installments_interval: InstallmentInterval | None = None
+    installments_interval_count: int | None = None
 
     @field_validator("currency")
     @classmethod
@@ -327,6 +390,22 @@ class PopupUpdate(SQLModel):
         # Validate contribution only when contribution_enabled is explicitly set to True
         if self.contribution_enabled is True:
             validate_popup_contribution_config(True, self.contribution_percentage)
+        # Validate installments only when caller is explicitly enabling them. For
+        # partial updates that touch only sub-fields we can't cross-validate
+        # without loading the persisted row, so the router/CRUD layer is
+        # responsible for re-validating after merge.
+        if self.installments_enabled is True:
+            validate_popup_installments_config(
+                True,
+                self.installments_max,
+                self.installments_deadline,
+                self.installments_interval_count
+                if self.installments_interval_count is not None
+                else 1,
+            )
+        elif self.installments_interval_count is not None:
+            if self.installments_interval_count < 1:
+                raise ValueError("installments_interval_count must be >= 1")
         return self
 
 
@@ -370,6 +449,11 @@ class PopupPublic(SQLModel):
     events_enabled: bool = True
     show_attendee_directory: bool = False
     credits_enabled: bool = False
+    installments_enabled: bool = False
+    installments_deadline: datetime | None = None
+    installments_max: int | None = None
+    installments_interval: InstallmentInterval = InstallmentInterval.month
+    installments_interval_count: int = 1
 
 
 class PopupAdmin(PopupBase):
