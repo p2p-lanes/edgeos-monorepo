@@ -254,12 +254,18 @@ export function usePaymentSubmit({
             : Promise.resolve(),
         ])
         if (popupSlug) {
-          if (submitMode === "open-ticketing") {
+          // Approved-on-create only happens when the cart was zero-amount and
+          // SimpleFI was bypassed (paid flows return status=pending + a
+          // checkout_url and never hit this branch). Edits are adjustments,
+          // not ceremonies — keep those landing on /passes. For everything
+          // else, the thank-you page provides closure and confirms that the
+          // email was sent, matching the open-ticketing zero-amount path.
+          if (isEditing) {
+            router.replace(`/portal/${popupSlug}/passes`)
+          } else {
             const paymentId = data.id ?? data.payment_id
             const qs = paymentId ? `?payment_id=${paymentId}` : ""
             router.replace(`/checkout/${popupSlug}/thank-you${qs}`)
-          } else {
-            router.replace(`/portal/${popupSlug}/passes`)
           }
         } else {
           // Fallback when slug is unavailable: keep the legacy success step
