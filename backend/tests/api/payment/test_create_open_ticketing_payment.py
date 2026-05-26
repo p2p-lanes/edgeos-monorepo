@@ -271,14 +271,22 @@ def test_create_open_ticketing_payment_second_purchase_reuses_attendee(
         form_data={name_field.name: "Repeat"},
     )
 
-    sf_resp1 = SimpleNamespace(id="sf_reuse_1", status="pending", checkout_url="https://sf.test/1")
-    sf_resp2 = SimpleNamespace(id="sf_reuse_2", status="pending", checkout_url="https://sf.test/2")
+    sf_resp1 = SimpleNamespace(
+        id="sf_reuse_1", status="pending", checkout_url="https://sf.test/1"
+    )
+    sf_resp2 = SimpleNamespace(
+        id="sf_reuse_2", status="pending", checkout_url="https://sf.test/2"
+    )
 
     with patch("app.services.simplefi.get_simplefi_client") as mock_get_client:
         mock_get_client.return_value.create_payment.side_effect = [sf_resp1, sf_resp2]
 
-        payments_crud.create_open_ticketing_payment(db, obj=obj1, popup=popup, tenant=tenant_a)
-        payments_crud.create_open_ticketing_payment(db, obj=obj2, popup=popup, tenant=tenant_a)
+        payments_crud.create_open_ticketing_payment(
+            db, obj=obj1, popup=popup, tenant=tenant_a
+        )
+        payments_crud.create_open_ticketing_payment(
+            db, obj=obj2, popup=popup, tenant=tenant_a
+        )
 
     # Still exactly 1 attendee after two purchases
     attendees = list(
@@ -449,6 +457,53 @@ def test_create_open_ticketing_payment_applies_coupon_discount(
     assert coupon.current_uses == 1
 
 
+def test_create_open_ticketing_payment_100_percent_coupon_auto_approves(
+    db: Session,
+    tenant_a: Tenants,
+) -> None:
+    """A 100% coupon zeroes the cart: skip SimpleFI, mark APPROVED, materialize
+    AttendeeProducts so the router can fire the confirmation email."""
+    popup = _make_popup(db, tenant_a, slug_prefix="full-coupon")
+    product = _make_product(db, popup, name="GA", price="75.00")
+    coupon = _make_coupon(db, popup, code="FREEPASS", discount_value=100)
+    db.commit()
+
+    obj = _purchase_create(
+        email="buyer@test.com",
+        first_name="Matias",
+        last_name="Walter",
+        products=[(product, 2)],
+        form_data={},
+        coupon_code="FREEPASS",
+    )
+
+    with patch("app.services.simplefi.get_simplefi_client") as mock_get_client:
+        payment, checkout_url = payments_crud.create_open_ticketing_payment(
+            db,
+            obj=obj,
+            popup=popup,
+            tenant=tenant_a,
+        )
+
+    mock_get_client.assert_not_called()
+    assert payment.amount == Decimal("0.00")
+    assert payment.status == "approved"
+    assert payment.coupon_id == coupon.id
+    assert payment.discount_value == Decimal("100")
+    assert checkout_url == ""
+
+    attendee_products = list(
+        db.exec(
+            select(AttendeeProducts).where(AttendeeProducts.payment_id == payment.id)
+        ).all()
+    )
+    assert len(attendee_products) == 2
+
+    db.expire(coupon)
+    db.refresh(coupon)
+    assert coupon.current_uses == 1
+
+
 def test_create_open_ticketing_payment_rejects_invalid_coupon(
     db: Session,
     tenant_a: Tenants,
@@ -475,6 +530,5 @@ def test_create_open_ticketing_payment_rejects_invalid_coupon(
     assert exc_info.value.status_code == 404
     mock_get_client.assert_not_called()
     assert (
-        db.exec(select(Payments).where(Payments.popup_id == popup.id)).first()
-        is None
+        db.exec(select(Payments).where(Payments.popup_id == popup.id)).first() is None
     )
