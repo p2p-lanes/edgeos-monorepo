@@ -150,19 +150,24 @@ class EventsCRUD(BaseCRUD[Events, EventCreate, EventUpdate]):
         ``only_published_public=True`` matches the public-calendar visibility
         so anonymous users don't see tags that only exist in drafts.
         """
+        # ``status`` and ``visibility`` are stored as the Python ``Enum``
+        # NAMES (uppercase) via SQLAlchemy's native Enum, not the lowercase
+        # values exposed in the schema. Filter against the stored form.
         sql = """
             SELECT DISTINCT btrim(tag) AS tag
             FROM events,
                  jsonb_array_elements_text(events.tags) AS tag
             WHERE events.popup_id = :popup_id
-              AND events.status != 'cancelled'
+              AND events.status != 'CANCELLED'
         """
         if only_published_public:
-            sql += " AND events.status = 'published' AND events.visibility = 'public'"
+            sql += " AND events.status = 'PUBLISHED' AND events.visibility = 'PUBLIC'"
         rows = db.exec(text(sql).bindparams(popup_id=popup_id)).all()
         tags: list[str] = []
         for row in rows:
-            value = row[0] if isinstance(row, tuple) else row
+            # SQLAlchemy 2.x ``Row`` is tuple-like but not a ``tuple``
+            # subclass; index the first column directly.
+            value = row[0]
             if value is None:
                 continue
             cleaned = str(value).strip()
