@@ -26,6 +26,7 @@ rows in both cases without relying on arbitrary UUID ordering.
 """
 
 from alembic import op
+from sqlalchemy import text
 
 revision = "94d7d49c3c92"
 down_revision = "377c2c02fe74"
@@ -37,7 +38,7 @@ def upgrade() -> None:
     conn = op.get_bind()
 
     # Dry-run: count rows that will be deleted
-    to_delete = conn.execute(
+    to_delete = conn.execute(text(
         """
         SELECT COUNT(*)
         FROM attendee_products ap
@@ -47,7 +48,7 @@ def upgrade() -> None:
           AND p.status IN ('approved', 'expired')
           AND ap.check_in_code LIKE UPPER(LEFT(pu.slug, 3)) || '%'
         """
-    ).scalar()
+    )).scalar()
 
     print(f"\n[94d7d49c3c92] attendee_products cleanup — rows to delete: {to_delete}")
 
