@@ -155,7 +155,9 @@ function ApiKeysSection() {
       selectedScopes.includes("venues:write")
     const expiresAt = requiresExpiry
       ? new Date(
-          Date.now() + WRITE_SCOPE_LIFETIME_DAYS * 24 * 60 * 60 * 1000,
+          Date.now() +
+            WRITE_SCOPE_LIFETIME_DAYS * 24 * 60 * 60 * 1000 -
+            60_000,
         ).toISOString()
       : null
     try {
