@@ -526,19 +526,10 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                     discountable_amount += line_total
 
                 for _ in range(line.quantity):
-                    # One AttendeeProducts row per ticket — Design §2.2
-                    session.add(
-                        AttendeeProducts(
-                            id=uuid.uuid4(),
-                            tenant_id=tenant.id,
-                            attendee_id=attendee.id,
-                            product_id=product.id,
-                            check_in_code=generate_check_in_code(
-                                (popup.slug or "")[:3].upper()
-                            ),
-                            payment_id=payment.id,
-                        )
-                    )
+                    # PaymentProducts snapshot only — AttendeeProducts are created
+                    # by approve_payment via _add_products_to_attendees when the
+                    # webhook confirms the payment. Pre-creating them here caused
+                    # duplicates (double the tickets) on every approved checkout.
                     session.add(
                         PaymentProducts(
                             tenant_id=tenant.id,

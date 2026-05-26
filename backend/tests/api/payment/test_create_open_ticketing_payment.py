@@ -160,7 +160,7 @@ def test_create_open_ticketing_payment_one_attendee_n_tickets(
     db: Session,
     tenant_a: Tenants,
 ) -> None:
-    """quantity=3 → 1 attendee + 3 AttendeeProducts rows.  Design §2.1/§2.2."""
+    """quantity=3 → 1 attendee + 3 PaymentProducts (snapshot). AttendeeProducts are created only on approval. Design §2.1/§2.2."""
     popup = _make_popup(db, tenant_a, slug_prefix="main-comp")
     product = _make_product(db, popup, name="GA", price="120.00")
     section = _make_section(db, popup, label="Buyer Info")
@@ -219,16 +219,13 @@ def test_create_open_ticketing_payment_one_attendee_n_tickets(
     assert attendees[0].category == "main"
     assert attendees[0].email == "buyer@test.com"
 
-    # 3 AttendeeProducts rows, each with unique check_in_code
+    # AttendeeProducts are NOT created at checkout — only when payment is approved.
     attendee_products = list(
         db.exec(
             select(AttendeeProducts).where(AttendeeProducts.product_id == product.id)
         ).all()
     )
-    assert len(attendee_products) == 3
-    codes = {ap.check_in_code for ap in attendee_products}
-    assert len(codes) == 3, "Each ticket must have a distinct check_in_code"
-    assert all(ap.payment_id == payment.id for ap in attendee_products)
+    assert len(attendee_products) == 0
 
     payment_products = list(
         db.exec(
@@ -289,7 +286,7 @@ def test_create_open_ticketing_payment_second_purchase_reuses_attendee(
     )
     assert len(attendees) == 1
 
-    # 3 AttendeeProducts rows total (1 + 2)
+    # AttendeeProducts are NOT created at checkout — only when each payment is approved.
     tickets = list(
         db.exec(
             select(AttendeeProducts).where(
@@ -297,7 +294,7 @@ def test_create_open_ticketing_payment_second_purchase_reuses_attendee(
             )
         ).all()
     )
-    assert len(tickets) == 3
+    assert len(tickets) == 0
 
 
 def test_create_open_ticketing_payment_does_not_overwrite_existing_human(

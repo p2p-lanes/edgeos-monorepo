@@ -759,6 +759,9 @@ async def create_my_payment(
 
     payment, _preview = payments_crud.create_payment(db, payment_in)
 
+    if payment.status == PaymentStatus.APPROVED.value:
+        await _send_payment_confirmed_email(payment, db_session=db)
+
     return PaymentPublic.model_validate(payment)
 
 
