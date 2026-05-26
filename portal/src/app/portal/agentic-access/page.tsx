@@ -1,7 +1,7 @@
 "use client"
 
 import { format } from "date-fns"
-import { Check, Copy, Key, Loader2, Plus, Trash2 } from "lucide-react"
+import { Check, Copy, Info, Key, Loader2, Plus, Trash2 } from "lucide-react"
 import { useState } from "react"
 import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
@@ -371,8 +371,16 @@ function ApiKeysSection() {
               {SCOPE_OPTIONS.map((scope) => {
                 const checked = selectedScopes.includes(scope.value)
                 const checkboxId = `scope-${scope.value}`
+                const isComingSoon = scope.value === "events:write"
                 return (
-                  <div key={scope.value} className="flex items-start gap-3">
+                  <div
+                    key={scope.value}
+                    className={
+                      isComingSoon
+                        ? "flex items-start gap-3 rounded-md border border-green-300 bg-green-50 p-2"
+                        : "flex items-start gap-3"
+                    }
+                  >
                     <Checkbox
                       id={checkboxId}
                       checked={checked}
@@ -398,6 +406,14 @@ function ApiKeysSection() {
                           },
                         )}
                       </p>
+                      {isComingSoon && (
+                        <p className="flex items-center gap-1.5 text-xs font-medium text-green-900">
+                          <Info className="size-3.5 shrink-0" />
+                          {t("api_keys.scope.events_write.coming_soon", {
+                            defaultValue: "Coming to the village in week 2",
+                          })}
+                        </p>
+                      )}
                     </div>
                   </div>
                 )
