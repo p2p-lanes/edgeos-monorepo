@@ -1,11 +1,13 @@
 "use client"
 
 import { useParams } from "next/navigation"
+import { useEffect } from "react"
 import { PopupCheckoutContent } from "@/app/checkout/components/PopupCheckoutContent"
 import { CheckoutBackgroundVideo } from "@/components/CheckoutBackgroundVideo"
 import useGetPublicGroup from "@/hooks/useGetPublicGroup"
 import { getCheckoutBackground } from "@/lib/background-image"
 import { useCityProvider } from "@/providers/cityProvider"
+import { useDiscount } from "@/providers/discountProvider"
 
 const LoadingFallback = () => (
   <div className="flex items-center justify-center h-screen">
@@ -15,8 +17,55 @@ const LoadingFallback = () => (
 
 const GroupCheckoutPage = () => {
   const params = useParams<{ groupSlug: string }>()
-  const { getPopups, popupsLoaded } = useCityProvider()
+  const { getCity, getPopups, popupsLoaded, setCityPreselected } =
+    useCityProvider()
   const { group, loading, error } = useGetPublicGroup(params.groupSlug)
+  const { setDiscount, discountApplied } = useDiscount()
+
+  // Pre-select the popup as soon as we know it so the DiscountProvider's
+  // city-reset effect settles on this popup's id BEFORE we seed the discount.
+  useEffect(() => {
+    if (group?.popup_id) {
+      setCityPreselected(group.popup_id)
+    }
+  }, [group?.popup_id, setCityPreselected])
+
+  // The portal's DiscountProvider reads group discounts from /groups/my/groups,
+  // which only lists groups where the user is a leader (find_by_leader). Buyers
+  // arriving via /groups/{slug} are added as members, so that query returns
+  // empty and the cart skips the discount. Seed the discount directly from the
+  // public group payload we already fetched. This is intentionally narrow —
+  // the upcoming groups SDD reworks the membership/discount surfaces.
+  //
+  // We depend on BOTH `discountApplied.discount_value` and `.city_id` so the
+  // effect re-fires in the commit AFTER the DiscountProvider's city-reset
+  // (discountProvider.tsx:39-48) settles. That reset uses setDiscountApplied
+  // directly, bypassing our setDiscount's downgrade guard — if both fired in
+  // the same commit, the reset's "last write wins" wiped our value. Re-firing
+  // once city_id is stable lets our setDiscount land cleanly without further
+  // reset interference.
+  const currentCity = getCity()
+  useEffect(() => {
+    if (!group?.discount_percentage) return
+    if (currentCity?.id !== group.popup_id) return
+    if (discountApplied.city_id !== currentCity.id) return
+    const discountValue = Number(group.discount_percentage)
+    if (!Number.isFinite(discountValue) || discountValue <= 0) return
+    if (discountApplied.discount_value >= discountValue) return
+    setDiscount({
+      discount_value: discountValue,
+      discount_type: "percentage",
+      discount_code: null,
+      city_id: currentCity.id,
+    })
+  }, [
+    group?.discount_percentage,
+    group?.popup_id,
+    currentCity?.id,
+    discountApplied.discount_value,
+    discountApplied.city_id,
+    setDiscount,
+  ])
 
   if (loading || !popupsLoaded) {
     return <LoadingFallback />
