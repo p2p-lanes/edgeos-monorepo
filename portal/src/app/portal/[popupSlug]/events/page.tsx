@@ -40,6 +40,7 @@ import {
   useEventTimezone,
   usePortalEventSettings,
 } from "./lib/useEventTimezone"
+import { usePopupTags } from "./lib/usePopupTags"
 
 // useLayoutEffect on the client, useEffect on the server. Lets us restore
 // scroll synchronously before the browser paints (no flash of "first event"
@@ -282,6 +283,7 @@ export default function EventsPage() {
     useEventTimezone(city?.id)
 
   const { data: eventSettings } = usePortalEventSettings(city?.id)
+  const { data: popupTags } = usePopupTags(city?.id)
   // Popup-level kill switch hides the whole events module.
   const moduleEnabled = city?.events_enabled ?? true
   // event_settings.event_enabled gates creation only; existing events
@@ -732,7 +734,7 @@ export default function EventsPage() {
             showHidden={showHidden}
             onShowHiddenChange={setShowHidden}
             hiddenCount={hiddenCountData?.count}
-            allowedTags={eventSettings?.allowed_tags ?? []}
+            allowedTags={popupTags ?? []}
             selectedTags={selectedTags}
             onSelectedTagsChange={setSelectedTags}
             allowedTracks={allowedTracks}
@@ -812,7 +814,7 @@ export default function EventsPage() {
               showHidden={showHidden}
               onShowHiddenChange={setShowHidden}
               hiddenCount={hiddenCountData?.count}
-              allowedTags={eventSettings?.allowed_tags ?? []}
+              allowedTags={popupTags ?? []}
               selectedTags={selectedTags}
               onSelectedTagsChange={setSelectedTags}
               allowedTracks={allowedTracks}

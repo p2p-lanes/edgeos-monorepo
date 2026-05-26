@@ -2,7 +2,7 @@ import uuid
 from collections.abc import Iterable
 from datetime import datetime, timedelta
 
-from sqlalchemy import asc, or_
+from sqlalchemy import asc, or_, text
 from sqlmodel import Session, col, delete, func, select
 
 from app.api.event.models import EventHiddenByHuman, EventInvitations, Events
@@ -137,6 +137,40 @@ class EventsCRUD(BaseCRUD[Events, EventCreate, EventUpdate]):
             owner_id=owner_id,
             popup_id=popup_id,
         )
+
+    def list_distinct_tags(
+        self,
+        db: Session,
+        *,
+        popup_id: uuid.UUID,
+        only_published_public: bool = False,
+    ) -> list[str]:
+        """Distinct event tags within a popup, sorted case-insensitive.
+
+        ``only_published_public=True`` matches the public-calendar visibility
+        so anonymous users don't see tags that only exist in drafts.
+        """
+        sql = """
+            SELECT DISTINCT btrim(tag) AS tag
+            FROM events,
+                 jsonb_array_elements_text(events.tags) AS tag
+            WHERE events.popup_id = :popup_id
+              AND events.status != 'cancelled'
+        """
+        if only_published_public:
+            sql += " AND events.status = 'published' AND events.visibility = 'public'"
+        rows = db.exec(text(sql).bindparams(popup_id=popup_id)).all()
+        tags: list[str] = []
+        for row in rows:
+            value = row[0] if isinstance(row, tuple) else row
+            if value is None:
+                continue
+            cleaned = str(value).strip()
+            if cleaned:
+                tags.append(cleaned)
+        # Dedup again post-trim (DISTINCT didn't see the trim) and sort
+        # case-insensitively for stable, human-friendly ordering.
+        return sorted(set(tags), key=lambda s: s.casefold())
 
     def find_venue_conflicts(
         self,

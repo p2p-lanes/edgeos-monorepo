@@ -768,7 +768,12 @@ async def list_public_calendar(
 
     settings = event_settings_crud.get_by_popup_id(db, popup.id)
     timezone = settings.timezone if settings else "UTC"
-    allowed_tags = list(settings.allowed_tags or []) if settings else []
+    # Distinct tags actually present on the popup's published+public events,
+    # not the curated ``event_settings.allowed_tags`` list — creators can use
+    # tags outside that list, and the filter must surface them.
+    allowed_tags = crud.events_crud.list_distinct_tags(
+        db, popup_id=popup.id, only_published_public=True
+    )
 
     track_rows = list(db.exec(select(Tracks).where(Tracks.popup_id == popup.id)).all())
     allowed_tracks = [EventCalendarTrack(id=t.id, name=t.name) for t in track_rows]
@@ -2124,6 +2129,19 @@ async def list_portal_events(
     return ListModel[EventPublic](
         results=[_publicize(e) for e in visible],
         paging=Paging(offset=skip, limit=limit, total=len(visible)),
+    )
+
+
+@router.get("/portal/popup-tags/{popup_id}", response_model=list[str])
+async def list_portal_popup_tags(
+    popup_id: uuid.UUID,
+    db: HumanTenantSession,
+    _: CurrentHuman,
+) -> list[str]:
+    """Distinct event tags for the popup — used by the portal events
+    toolbar to populate the tag filter."""
+    return crud.events_crud.list_distinct_tags(
+        db, popup_id=popup_id, only_published_public=False
     )
 
 
