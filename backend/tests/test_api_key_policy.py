@@ -296,12 +296,13 @@ class TestApiKeyPolicy:
             resp.json()["detail"] == "Blocked humans cannot create or manage API keys."
         )
 
-    def test_write_scope_api_key_requires_expiry(
+    def test_write_scope_api_key_defaults_expiry_when_omitted(
         self,
         client: TestClient,
         db: Session,
         tenant_a: Tenants,
     ) -> None:
+        from app.api.api_key.schemas import MAX_WRITE_SCOPE_LIFETIME_DAYS
         from app.core.security import create_access_token
 
         human = _make_human(db, tenant_a)
@@ -313,7 +314,14 @@ class TestApiKeyPolicy:
             json={"name": "writer", "scopes": ["events:read", "events:write"]},
         )
 
-        assert resp.status_code == 422, resp.text
+        assert resp.status_code == 201, resp.text
+        body = resp.json()
+        assert body["expires_at"] is not None
+        # Server-owned lifetime: roughly ``now + MAX_WRITE_SCOPE_LIFETIME_DAYS``,
+        # with a small skew tolerance for the round-trip.
+        expires_at = datetime.fromisoformat(body["expires_at"])
+        expected = datetime.now(UTC) + timedelta(days=MAX_WRITE_SCOPE_LIFETIME_DAYS)
+        assert abs((expires_at - expected).total_seconds()) < 60
 
     def test_write_scope_api_key_rejects_long_expiry(
         self,
@@ -321,11 +329,16 @@ class TestApiKeyPolicy:
         db: Session,
         tenant_a: Tenants,
     ) -> None:
+        from app.api.api_key.schemas import MAX_WRITE_SCOPE_LIFETIME_DAYS
         from app.core.security import create_access_token
 
         human = _make_human(db, tenant_a)
         token = create_access_token(subject=human.id, token_type="human")
-        expires_at = (datetime.now(UTC) + timedelta(days=45)).isoformat()
+        # Just past the policy max — the field validator must still reject
+        # an explicit value beyond the server's lifetime ceiling.
+        expires_at = (
+            datetime.now(UTC) + timedelta(days=MAX_WRITE_SCOPE_LIFETIME_DAYS + 10)
+        ).isoformat()
 
         resp = client.post(
             "/api/v1/api-keys",

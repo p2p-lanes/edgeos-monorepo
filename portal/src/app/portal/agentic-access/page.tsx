@@ -33,7 +33,6 @@ import { CopyAgentBrief } from "./CopyAgentBrief"
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? ""
 
 const DEFAULT_SCOPES: ApiKeyScope[] = ["events:read"]
-const WRITE_SCOPE_LIFETIME_DAYS = 30
 
 const scopeKey = (scope: ApiKeyScope) => scope.replace(":", "_")
 
@@ -150,19 +149,14 @@ function ApiKeysSection() {
   const onCreate = async () => {
     const name = newKeyName.trim()
     if (!name) return
-    const requiresExpiry =
-      selectedScopes.includes("events:write") ||
-      selectedScopes.includes("venues:write")
-    const expiresAt = requiresExpiry
-      ? new Date(
-          Date.now() + WRITE_SCOPE_LIFETIME_DAYS * 24 * 60 * 60 * 1000 - 60_000,
-        ).toISOString()
-      : null
     try {
+      // The backend owns the write-scope lifetime: send ``expires_at: null``
+      // and let it fill in the policy default. The created key returned in
+      // the response already carries the final ``expires_at`` for display.
       const created = await createKey({
         name,
         scopes: selectedScopes,
-        expires_at: expiresAt,
+        expires_at: null,
       })
       setCreatedKey(created)
       setNewKeyName("")
