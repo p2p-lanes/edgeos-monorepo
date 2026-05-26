@@ -3,6 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime, timedelta
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session, select
 
@@ -15,6 +16,13 @@ from app.api.event_settings.schemas import PublishPermission
 from app.api.human.models import Humans
 from app.api.popup.models import Popups
 from app.api.tenant.models import Tenants
+
+# POST /api/v1/events/portal/events is temporarily disabled for API keys
+# (see ``_PAT_ROUTE_POLICIES`` in ``app/core/security.py``). When the route
+# is restored, remove this marker from the affected tests.
+_post_events_disabled = pytest.mark.skip(
+    reason="POST /events disabled for API keys until week 2 of Edge City rollout",
+)
 
 
 def _pat_auth(raw_key: str) -> dict[str, str]:
@@ -141,6 +149,7 @@ class TestApiKeyPolicy:
         assert resp.status_code == 403, resp.text
         assert "restricted to approved event automation routes" in resp.json()["detail"]
 
+    @_post_events_disabled
     def test_pat_event_respects_event_settings_approval(
         self,
         client: TestClient,
@@ -174,6 +183,7 @@ class TestApiKeyPolicy:
         assert row.status == EventStatus.PENDING_APPROVAL
         assert row.visibility == EventVisibility.UNLISTED
 
+    @_post_events_disabled
     def test_pat_event_does_not_require_approval_when_settings_disabled(
         self,
         client: TestClient,
@@ -207,6 +217,7 @@ class TestApiKeyPolicy:
         assert row.status == EventStatus.PUBLISHED
         assert row.visibility == EventVisibility.PUBLIC
 
+    @_post_events_disabled
     def test_pat_without_write_scope_cannot_create_event(
         self,
         client: TestClient,
@@ -281,7 +292,9 @@ class TestApiKeyPolicy:
         )
 
         assert resp.status_code == 403, resp.text
-        assert resp.json()["detail"] == "Blocked humans cannot create or manage API keys."
+        assert (
+            resp.json()["detail"] == "Blocked humans cannot create or manage API keys."
+        )
 
     def test_write_scope_api_key_requires_expiry(
         self,
@@ -295,9 +308,9 @@ class TestApiKeyPolicy:
         token = create_access_token(subject=human.id, token_type="human")
 
         resp = client.post(
-          "/api/v1/api-keys",
-          headers={"Authorization": f"Bearer {token}"},
-          json={"name": "writer", "scopes": ["events:read", "events:write"]},
+            "/api/v1/api-keys",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"name": "writer", "scopes": ["events:read", "events:write"]},
         )
 
         assert resp.status_code == 422, resp.text
@@ -344,9 +357,7 @@ class TestApiKeyPolicy:
         assert resp.status_code == 204, resp.text
 
         db.expire_all()
-        rows = list(
-            db.exec(select(ApiKeys).where(ApiKeys.human_id == human.id)).all()
-        )
+        rows = list(db.exec(select(ApiKeys).where(ApiKeys.human_id == human.id)).all())
         assert rows
         assert all(row.revoked_at is not None for row in rows)
 
@@ -766,9 +777,7 @@ class TestApiKeyPolicy:
         assert resp.json()["red_flag"] is True
 
         db.expire_all()
-        rows = list(
-            db.exec(select(ApiKeys).where(ApiKeys.human_id == human.id)).all()
-        )
+        rows = list(db.exec(select(ApiKeys).where(ApiKeys.human_id == human.id)).all())
         assert rows
         assert all(row.revoked_at is not None for row in rows)
 
