@@ -4410,6 +4410,12 @@ export type EventsCreatePortalEventData = {
 
 export type EventsCreatePortalEventResponse = (EventPublic);
 
+export type EventsListPortalPopupTagsData = {
+    popupId: string;
+};
+
+export type EventsListPortalPopupTagsResponse = (Array<(string)>);
+
 export type EventsPortalHiddenEventsCountData = {
     popupId?: (string | null);
 };

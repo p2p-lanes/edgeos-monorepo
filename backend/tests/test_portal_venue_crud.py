@@ -504,12 +504,13 @@ class TestPortalVenueCrudPat:
         assert resp.status_code == 403, resp.text
         assert "owner" in resp.json()["detail"].lower()
 
-    def test_venues_write_api_key_requires_expiry(
+    def test_venues_write_api_key_defaults_expiry_when_omitted(
         self,
         client: TestClient,
         db: Session,
         tenant_a: Tenants,
     ) -> None:
+        from app.api.api_key.schemas import MAX_WRITE_SCOPE_LIFETIME_DAYS
         from app.core.security import create_access_token
 
         human = _make_human(db, tenant_a)
@@ -521,7 +522,12 @@ class TestPortalVenueCrudPat:
             json={"name": "venue writer", "scopes": ["venues:write"]},
         )
 
-        assert resp.status_code == 422, resp.text
+        assert resp.status_code == 201, resp.text
+        body = resp.json()
+        assert body["expires_at"] is not None
+        expires_at = datetime.fromisoformat(body["expires_at"])
+        expected = datetime.now(UTC) + timedelta(days=MAX_WRITE_SCOPE_LIFETIME_DAYS)
+        assert abs((expires_at - expected).total_seconds()) < 60
 
     def test_venues_write_api_key_with_expiry_ok(
         self,

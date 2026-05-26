@@ -3,6 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime, timedelta
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session, select
 
@@ -15,6 +16,13 @@ from app.api.event_settings.schemas import PublishPermission
 from app.api.human.models import Humans
 from app.api.popup.models import Popups
 from app.api.tenant.models import Tenants
+
+# POST /api/v1/events/portal/events is temporarily disabled for API keys
+# (see ``_PAT_ROUTE_POLICIES`` in ``app/core/security.py``). When the route
+# is restored, remove this marker from the affected tests.
+_post_events_disabled = pytest.mark.skip(
+    reason="POST /events disabled for API keys until week 2 of Edge City rollout",
+)
 
 
 def _pat_auth(raw_key: str) -> dict[str, str]:
@@ -141,6 +149,7 @@ class TestApiKeyPolicy:
         assert resp.status_code == 403, resp.text
         assert "restricted to approved event automation routes" in resp.json()["detail"]
 
+    @_post_events_disabled
     def test_pat_event_respects_event_settings_approval(
         self,
         client: TestClient,
@@ -174,6 +183,7 @@ class TestApiKeyPolicy:
         assert row.status == EventStatus.PENDING_APPROVAL
         assert row.visibility == EventVisibility.UNLISTED
 
+    @_post_events_disabled
     def test_pat_event_does_not_require_approval_when_settings_disabled(
         self,
         client: TestClient,
@@ -207,6 +217,7 @@ class TestApiKeyPolicy:
         assert row.status == EventStatus.PUBLISHED
         assert row.visibility == EventVisibility.PUBLIC
 
+    @_post_events_disabled
     def test_pat_without_write_scope_cannot_create_event(
         self,
         client: TestClient,
@@ -281,26 +292,36 @@ class TestApiKeyPolicy:
         )
 
         assert resp.status_code == 403, resp.text
-        assert resp.json()["detail"] == "Blocked humans cannot create or manage API keys."
+        assert (
+            resp.json()["detail"] == "Blocked humans cannot create or manage API keys."
+        )
 
-    def test_write_scope_api_key_requires_expiry(
+    def test_write_scope_api_key_defaults_expiry_when_omitted(
         self,
         client: TestClient,
         db: Session,
         tenant_a: Tenants,
     ) -> None:
+        from app.api.api_key.schemas import MAX_WRITE_SCOPE_LIFETIME_DAYS
         from app.core.security import create_access_token
 
         human = _make_human(db, tenant_a)
         token = create_access_token(subject=human.id, token_type="human")
 
         resp = client.post(
-          "/api/v1/api-keys",
-          headers={"Authorization": f"Bearer {token}"},
-          json={"name": "writer", "scopes": ["events:read", "events:write"]},
+            "/api/v1/api-keys",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"name": "writer", "scopes": ["events:read", "events:write"]},
         )
 
-        assert resp.status_code == 422, resp.text
+        assert resp.status_code == 201, resp.text
+        body = resp.json()
+        assert body["expires_at"] is not None
+        # Server-owned lifetime: roughly ``now + MAX_WRITE_SCOPE_LIFETIME_DAYS``,
+        # with a small skew tolerance for the round-trip.
+        expires_at = datetime.fromisoformat(body["expires_at"])
+        expected = datetime.now(UTC) + timedelta(days=MAX_WRITE_SCOPE_LIFETIME_DAYS)
+        assert abs((expires_at - expected).total_seconds()) < 60
 
     def test_write_scope_api_key_rejects_long_expiry(
         self,
@@ -308,11 +329,16 @@ class TestApiKeyPolicy:
         db: Session,
         tenant_a: Tenants,
     ) -> None:
+        from app.api.api_key.schemas import MAX_WRITE_SCOPE_LIFETIME_DAYS
         from app.core.security import create_access_token
 
         human = _make_human(db, tenant_a)
         token = create_access_token(subject=human.id, token_type="human")
-        expires_at = (datetime.now(UTC) + timedelta(days=45)).isoformat()
+        # Just past the policy max — the field validator must still reject
+        # an explicit value beyond the server's lifetime ceiling.
+        expires_at = (
+            datetime.now(UTC) + timedelta(days=MAX_WRITE_SCOPE_LIFETIME_DAYS + 10)
+        ).isoformat()
 
         resp = client.post(
             "/api/v1/api-keys",
@@ -344,9 +370,7 @@ class TestApiKeyPolicy:
         assert resp.status_code == 204, resp.text
 
         db.expire_all()
-        rows = list(
-            db.exec(select(ApiKeys).where(ApiKeys.human_id == human.id)).all()
-        )
+        rows = list(db.exec(select(ApiKeys).where(ApiKeys.human_id == human.id)).all())
         assert rows
         assert all(row.revoked_at is not None for row in rows)
 
@@ -766,9 +790,7 @@ class TestApiKeyPolicy:
         assert resp.json()["red_flag"] is True
 
         db.expire_all()
-        rows = list(
-            db.exec(select(ApiKeys).where(ApiKeys.human_id == human.id)).all()
-        )
+        rows = list(db.exec(select(ApiKeys).where(ApiKeys.human_id == human.id)).all())
         assert rows
         assert all(row.revoked_at is not None for row in rows)
 
