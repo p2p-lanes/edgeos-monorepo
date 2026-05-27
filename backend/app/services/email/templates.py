@@ -184,20 +184,11 @@ class EditPassesConfirmedContext(BaseModel):
     portal_url: str | None = None
 
 
-class EventChangeRow(BaseModel):
-    """Before/after pair surfaced as an inline diff in update emails."""
-
-    before: str
-    after: str
-
-
 class EventInvitationContext(BaseModel):
     """Context for event/invitation.html template.
 
-    Re-used for four flows: organiser-side invitations (default),
-    self-RSVP confirmations (``is_self_rsvp``), event-update
-    notifications (``is_update`` + ``changes``), and cancellations
-    (``is_cancelled``).
+    Used for organiser-side invitations and self-RSVP confirmations.
+    Update/cancel flows have their own dedicated templates.
     """
 
     first_name: str = ""
@@ -208,13 +199,35 @@ class EventInvitationContext(BaseModel):
     event_when: str = ""
     venue_title: str = ""
     event_url: str = ""
-    is_self_rsvp: bool = False
-    is_update: bool = False
-    is_cancelled: bool = False
-    # Mapping from canonical row key ("event", "time", "location") to the
-    # before/after pair, populated only on update emails so the matching
-    # row in the metadata block renders the inline diff.
+
+
+class EventChangeRow(BaseModel):
+    """Before/after pair surfaced as an inline diff in update emails."""
+
+    before: str
+    after: str
+
+
+class EventUpdatedContext(BaseModel):
+    """Context for event/updated.html — change notification with before/after diff."""
+
+    first_name: str = ""
+    event_title: str
+    popup_name: str = ""
+    event_when: str = ""
+    venue_title: str = ""
+    event_url: str = ""
     changes: dict[str, EventChangeRow] = {}
+
+
+class EventCancelledContext(BaseModel):
+    """Context for event/cancelled.html — cancellation notice."""
+
+    first_name: str = ""
+    event_title: str
+    popup_name: str = ""
+    event_when: str = ""
+    venue_title: str = ""
 
 
 class EventApprovalApprovedContext(BaseModel):
@@ -268,6 +281,8 @@ class EmailTemplates:
 
     # Event
     EVENT_INVITATION = "event/invitation.html"
+    EVENT_UPDATED = "event/updated.html"
+    EVENT_CANCELLED = "event/cancelled.html"
     EVENT_APPROVAL_APPROVED = "event/approval_approved.html"
     EVENT_APPROVAL_REJECTED = "event/approval_rejected.html"
 
@@ -285,6 +300,8 @@ TEMPLATE_TYPE_TO_FILE: dict[EmailTemplateType, str] = {
     EmailTemplateType.ABANDONED_CART: "payment/abandoned_cart.html",
     EmailTemplateType.EDIT_PASSES_CONFIRMED: "payment/edit_passes_confirmed.html",
     EmailTemplateType.EVENT_INVITATION: "event/invitation.html",
+    EmailTemplateType.EVENT_UPDATED: "event/updated.html",
+    EmailTemplateType.EVENT_CANCELLED: "event/cancelled.html",
     EmailTemplateType.EVENT_APPROVAL_APPROVED: "event/approval_approved.html",
     EmailTemplateType.EVENT_APPROVAL_REJECTED: "event/approval_rejected.html",
 }
@@ -974,27 +991,53 @@ POPUP_TEMPLATE_METADATA: list[dict[str, Any]] = [
                 "required": False,
                 "group": "Event",
             },
+            *_POPUP_EVENT_VARIABLES,
+        ],
+    },
+    {
+        "type": EmailTemplateType.EVENT_UPDATED,
+        "label": "Event Updated",
+        "description": "Sent when an event the recipient is invited to or RSVPd to is updated.",
+        "category": "Event",
+        "default_subject": "The event has been updated: {{ event_title }}",
+        "variables": [
             {
-                "name": "is_self_rsvp",
-                "label": "Self-RSVP confirmation",
-                "type": "boolean",
-                "description": "True when this is the confirmation sent after the recipient RSVPed themselves (not an organiser invitation)",
+                "name": "first_name",
+                "label": "First Name",
+                "type": "string",
+                "description": "Recipient's first name",
+                "required": False,
+                "group": "Recipient",
+            },
+            {
+                "name": "event_title",
+                "label": "Event Title",
+                "type": "string",
+                "description": "Title of the event",
+                "required": True,
+                "group": "Event",
+            },
+            {
+                "name": "event_when",
+                "label": "When",
+                "type": "string",
+                "description": "Formatted start date/time",
                 "required": False,
                 "group": "Event",
             },
             {
-                "name": "is_update",
-                "label": "Event update notification",
-                "type": "boolean",
-                "description": "True when this email is announcing a change to an existing event",
+                "name": "venue_title",
+                "label": "Venue",
+                "type": "string",
+                "description": "Venue name (may be empty)",
                 "required": False,
                 "group": "Event",
             },
             {
-                "name": "is_cancelled",
-                "label": "Event cancellation notification",
-                "type": "boolean",
-                "description": "True when this email is announcing that the event was cancelled",
+                "name": "event_url",
+                "label": "Event URL",
+                "type": "string",
+                "description": "Deep link to the event page in the portal",
                 "required": False,
                 "group": "Event",
             },
@@ -1002,7 +1045,49 @@ POPUP_TEMPLATE_METADATA: list[dict[str, Any]] = [
                 "name": "changes",
                 "label": "Changes",
                 "type": "object",
-                "description": "Mapping from row key ('event', 'time', 'location') to {before, after} describing what changed (only set when is_update=true)",
+                "description": "Mapping from row key ('event', 'time', 'location') to {before, after} describing what changed",
+                "required": False,
+                "group": "Event",
+            },
+            *_POPUP_EVENT_VARIABLES,
+        ],
+    },
+    {
+        "type": EmailTemplateType.EVENT_CANCELLED,
+        "label": "Event Cancelled",
+        "description": "Sent when an event the recipient is invited to or RSVPd to is cancelled.",
+        "category": "Event",
+        "default_subject": "Event cancelled: {{ event_title }}",
+        "variables": [
+            {
+                "name": "first_name",
+                "label": "First Name",
+                "type": "string",
+                "description": "Recipient's first name",
+                "required": False,
+                "group": "Recipient",
+            },
+            {
+                "name": "event_title",
+                "label": "Event Title",
+                "type": "string",
+                "description": "Title of the event",
+                "required": True,
+                "group": "Event",
+            },
+            {
+                "name": "event_when",
+                "label": "When",
+                "type": "string",
+                "description": "Formatted start date/time",
+                "required": False,
+                "group": "Event",
+            },
+            {
+                "name": "venue_title",
+                "label": "Venue",
+                "type": "string",
+                "description": "Venue name (may be empty)",
                 "required": False,
                 "group": "Event",
             },

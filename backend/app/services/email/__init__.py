@@ -16,7 +16,9 @@ from app.services.email.templates import (
     EmailTemplates,
     EventApprovalApprovedContext,
     EventApprovalRejectedContext,
+    EventCancelledContext,
     EventInvitationContext,
+    EventUpdatedContext,
     LoginCodeHumanContext,
     LoginCodeUserContext,
     PaymentAttendeeItem,
@@ -47,6 +49,8 @@ __all__ = [
     "PaymentAttendeeItem",
     # Event contexts
     "EventInvitationContext",
+    "EventUpdatedContext",
+    "EventCancelledContext",
     "EventApprovalApprovedContext",
     "EventApprovalRejectedContext",
     # Helpers
