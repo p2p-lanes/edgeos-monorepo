@@ -28,6 +28,10 @@ class StorageServiceProtocol(Protocol):
         """Generate a presigned URL for downloading a file."""
         ...
 
+    def upload_bytes(self, key: str, content: bytes, content_type: str) -> None:
+        """Upload raw bytes server-side (not via a presigned URL)."""
+        ...
+
     def get_public_url(self, key: str) -> str:
         """Get the public URL for a file (if bucket is public)."""
         ...
@@ -84,6 +88,15 @@ class S3CompatibleStorage:
             "get_object",
             Params={"Bucket": self.bucket, "Key": key},
             ExpiresIn=expires_in,
+        )
+
+    def upload_bytes(self, key: str, content: bytes, content_type: str) -> None:
+        """Upload raw bytes directly to the bucket (server-side put_object)."""
+        self.client.put_object(
+            Bucket=self.bucket,
+            Key=key,
+            Body=content,
+            ContentType=content_type,
         )
 
     def get_public_url(self, key: str) -> str:

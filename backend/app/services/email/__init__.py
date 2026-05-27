@@ -12,6 +12,8 @@ from app.services.email.templates import (
     ApplicationAcceptedWithIncentiveContext,
     ApplicationReceivedContext,
     ApplicationRejectedContext,
+    CheckInPassContext,
+    CheckInQrItem,
     EditPassesConfirmedContext,
     EmailTemplates,
     EventApprovalApprovedContext,
@@ -49,6 +51,9 @@ __all__ = [
     "EventInvitationContext",
     "EventApprovalApprovedContext",
     "EventApprovalRejectedContext",
+    # Check-in contexts
+    "CheckInPassContext",
+    "CheckInQrItem",
     # Helpers
     "compute_order_summary",
     "EmailAttachment",

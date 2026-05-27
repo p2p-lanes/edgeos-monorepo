@@ -4881,7 +4881,7 @@ export const EmailTemplatePublicSchema = {
 
 export const EmailTemplateTypeSchema = {
     type: 'string',
-    enum: ['login_code_user', 'login_code_human', 'application_received', 'application_accepted', 'application_rejected', 'application_accepted_with_discount', 'application_accepted_with_incentive', 'application_accepted_scholarship_rejected', 'payment_confirmed', 'abandoned_cart', 'edit_passes_confirmed', 'event_invitation', 'event_approval_approved', 'event_approval_rejected'],
+    enum: ['login_code_user', 'login_code_human', 'application_received', 'application_accepted', 'application_rejected', 'application_accepted_with_discount', 'application_accepted_with_incentive', 'application_accepted_scholarship_rejected', 'payment_confirmed', 'abandoned_cart', 'edit_passes_confirmed', 'event_invitation', 'event_approval_approved', 'event_approval_rejected', 'check_in_pass'],
     title: 'EmailTemplateType'
 } as const;
 
@@ -11329,6 +11329,17 @@ export const PopupAdminSchema = {
             title: 'Self Check In Enabled',
             default: false
         },
+        checkin_pass_lead_days: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Checkin Pass Lead Days'
+        },
         show_attendee_directory: {
             type: 'boolean',
             title: 'Show Attendee Directory',
@@ -11743,6 +11754,17 @@ export const PopupCreateSchema = {
             type: 'boolean',
             title: 'Credits Enabled',
             default: false
+        },
+        checkin_pass_lead_days: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Checkin Pass Lead Days'
         }
     },
     type: 'object',
@@ -12666,6 +12688,17 @@ export const PopupUpdateSchema = {
                 }
             ],
             title: 'Credits Enabled'
+        },
+        checkin_pass_lead_days: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Checkin Pass Lead Days'
         }
     },
     additionalProperties: false,

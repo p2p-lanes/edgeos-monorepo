@@ -4,7 +4,7 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict, field_validator
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PgUUID
-from sqlmodel import Column, Field, SQLModel
+from sqlmodel import Column, DateTime, Field, SQLModel
 
 from app.api.product.schemas import ProductWithQuantity
 
@@ -134,6 +134,13 @@ class AttendeeProductsBase(SQLModel):
     purchase_metadata: dict | None = Field(
         default=None,
         sa_column=Column(JSONB, nullable=True),
+    )
+    # Timestamp the scheduled check-in pass email was sent for this ticket.
+    # NULL until sent; stamped by the check-in pass cron dispatcher (after a
+    # successful send) so repeated cron runs don't re-email the same ticket.
+    checkin_pass_sent_at: datetime | None = Field(
+        default=None,
+        sa_column=Column(DateTime(timezone=True), nullable=True),
     )
 
 

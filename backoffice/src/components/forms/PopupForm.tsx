@@ -229,6 +229,8 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
       events_enabled: defaultValues?.events_enabled ?? true,
       self_check_in_enabled: defaultValues?.self_check_in_enabled ?? false,
       show_attendee_directory: defaultValues?.show_attendee_directory ?? false,
+      checkin_pass_lead_days:
+        defaultValues?.checkin_pass_lead_days?.toString() ?? "",
     },
     onSubmit: ({ value }) => {
       if (readOnly) return
@@ -284,6 +286,9 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
         self_check_in_enabled: value.self_check_in_enabled,
         show_attendee_directory:
           value.sale_type === "application" && value.show_attendee_directory,
+        checkin_pass_lead_days: value.checkin_pass_lead_days
+          ? Number(value.checkin_pass_lead_days)
+          : null,
       }
       if (isEdit) {
         updateMutation.mutate(payload)
@@ -750,6 +755,28 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
               ) : null
             }
           </form.Subscribe>
+
+          <form.Field name="checkin_pass_lead_days">
+            {(field) => (
+              <InlineRow
+                icon={<QrCode className="h-4 w-4 text-muted-foreground" />}
+                label="Check-in Pass Email"
+                description="Days before the event start to email attendees their check-in QR code. Leave empty to disable."
+              >
+                <Input
+                  id="checkin_pass_lead_days"
+                  type="number"
+                  min="1"
+                  step="1"
+                  placeholder="e.g. 3"
+                  value={field.state.value}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                  disabled={readOnly}
+                  className="max-w-[120px] text-sm"
+                />
+              </InlineRow>
+            )}
+          </form.Field>
         </InlineSection>
 
         <Separator />

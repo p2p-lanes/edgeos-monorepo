@@ -56,7 +56,8 @@
       "attendee_category": "main",
       "duration_type": "full",
       "is_active": true,
-      "exclusive": false
+      "exclusive": false,
+      "requires_check_in": true
     },
     {
       "popup_key": "tech-summit",
