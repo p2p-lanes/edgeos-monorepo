@@ -26,6 +26,7 @@ class EmailTemplateType(StrEnum):
     EVENT_CANCELLED = "event_cancelled"
     EVENT_APPROVAL_APPROVED = "event_approval_approved"
     EVENT_APPROVAL_REJECTED = "event_approval_rejected"
+    CHECK_IN_PASS = "check_in_pass"
 
 
 class TemplateScope(StrEnum):

@@ -169,6 +169,10 @@ class PopupBase(SQLModel):
         default=False,
         sa_column=Column(Boolean, nullable=False, server_default="false"),
     )
+    # Days before start_date to send the scheduled check-in pass email.
+    # Null disables the check-in pass for this popup; a positive value enables
+    # it and sets the lead time. Read by the check-in pass cron dispatcher.
+    checkin_pass_lead_days: int | None = Field(default=None, nullable=True)
     show_attendee_directory: bool = Field(
         default=False,
         sa_column=Column(Boolean, nullable=False, server_default="false"),
@@ -227,11 +231,19 @@ class PopupCreate(SQLModel):
     self_check_in_enabled: bool = False
     show_attendee_directory: bool = False
     credits_enabled: bool = False
+    checkin_pass_lead_days: int | None = None
 
     @field_validator("currency")
     @classmethod
     def validate_currency(cls, value: str) -> str:
         return validate_currency_value(value) or "USD"
+
+    @field_validator("checkin_pass_lead_days")
+    @classmethod
+    def validate_checkin_pass_lead_days(cls, value: int | None) -> int | None:
+        if value is not None and value <= 0:
+            raise ValueError("checkin_pass_lead_days must be a positive number of days")
+        return value
 
     @model_validator(mode="after")
     def generate_slug(self) -> Self:
@@ -298,11 +310,19 @@ class PopupUpdate(SQLModel):
     self_check_in_enabled: bool | None = None
     show_attendee_directory: bool | None = None
     credits_enabled: bool | None = None
+    checkin_pass_lead_days: int | None = None
 
     @field_validator("currency")
     @classmethod
     def validate_currency(cls, value: str | None) -> str | None:
         return validate_currency_value(value)
+
+    @field_validator("checkin_pass_lead_days")
+    @classmethod
+    def validate_checkin_pass_lead_days(cls, value: int | None) -> int | None:
+        if value is not None and value <= 0:
+            raise ValueError("checkin_pass_lead_days must be a positive number of days")
+        return value
 
     @model_validator(mode="after")
     def validate_fee_config(self) -> Self:

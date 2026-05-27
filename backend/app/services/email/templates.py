@@ -1,8 +1,10 @@
 import datetime
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
 from jinja2 import Environment, FileSystemLoader, Undefined
+from jinja2.sandbox import SandboxedEnvironment
 from loguru import logger
 from pydantic import BaseModel
 
@@ -259,6 +261,36 @@ class EventApprovalRejectedContext(BaseModel):
     reason: str = ""
 
 
+class CheckInQrItem(BaseModel):
+    """A single check-in QR entry for the check-in pass email.
+
+    One per scannable ticket (``AttendeeProducts`` row where the product has
+    ``requires_check_in``). ``qr_url`` points at the hosted PNG; it may be
+    ``None`` if storage is unavailable when the email is built.
+    """
+
+    attendee_name: str
+    product_name: str
+    check_in_code: str
+    qr_url: str | None = None
+
+
+class CheckInPassContext(BaseModel):
+    """Context for check_in/pass.html template.
+
+    Sent on a schedule before the popup start_date to the buyer, carrying the
+    check-in QR codes for every scannable ticket they purchased.
+    """
+
+    first_name: str
+    popup_name: str = ""
+    # One entry per scannable ticket. Loop over this in the template.
+    checkin_qrs: list[CheckInQrItem] = []
+    # Convenience for the common single-ticket case: the first ticket's QR URL.
+    checkin_qr_url: str | None = None
+    portal_url: str | None = None
+
+
 class EmailTemplates:
     # Auth
     LOGIN_CODE_USER = "auth/login_code_user.html"
@@ -286,6 +318,9 @@ class EmailTemplates:
     EVENT_APPROVAL_APPROVED = "event/approval_approved.html"
     EVENT_APPROVAL_REJECTED = "event/approval_rejected.html"
 
+    # Check-in
+    CHECK_IN_PASS = "check_in/pass.html"
+
 
 TEMPLATE_TYPE_TO_FILE: dict[EmailTemplateType, str] = {
     EmailTemplateType.LOGIN_CODE_USER: "auth/login_code_user.html",
@@ -304,6 +339,7 @@ TEMPLATE_TYPE_TO_FILE: dict[EmailTemplateType, str] = {
     EmailTemplateType.EVENT_CANCELLED: "event/cancelled.html",
     EmailTemplateType.EVENT_APPROVAL_APPROVED: "event/approval_approved.html",
     EmailTemplateType.EVENT_APPROVAL_REJECTED: "event/approval_rejected.html",
+    EmailTemplateType.CHECK_IN_PASS: "check_in/pass.html",
 }
 
 
@@ -1202,6 +1238,58 @@ POPUP_TEMPLATE_METADATA: list[dict[str, Any]] = [
             *_POPUP_EVENT_VARIABLES,
         ],
     },
+    {
+        "type": EmailTemplateType.CHECK_IN_PASS,
+        "label": "Check-in Pass",
+        "description": (
+            "Sent on a schedule before the event with the attendee's check-in "
+            "QR code(s). Sent to the buyer with all the check-in codes they "
+            "purchased."
+        ),
+        "category": "Check-in",
+        "default_subject": "Your check-in pass for {{ popup_name }}",
+        "variables": [
+            {
+                "name": "first_name",
+                "label": "First Name",
+                "type": "string",
+                "description": "Buyer's first name",
+                "required": True,
+                "group": "Recipient",
+            },
+            {
+                "name": "checkin_qrs",
+                "label": "Check-in QR codes",
+                "type": "array",
+                "description": (
+                    "One entry per scannable ticket, each with attendee_name, "
+                    "product_name, check_in_code and qr_url. Loop over this."
+                ),
+                "required": False,
+                "group": "Check-in",
+            },
+            {
+                "name": "checkin_qr_url",
+                "label": "Check-in QR URL (first ticket)",
+                "type": "string",
+                "description": (
+                    "Convenience for the single-ticket case: the hosted QR "
+                    "image URL for the first ticket."
+                ),
+                "required": False,
+                "group": "Check-in",
+            },
+            {
+                "name": "portal_url",
+                "label": "Portal URL",
+                "type": "string",
+                "description": "Link to the attendee portal",
+                "required": False,
+                "group": "General",
+            },
+            *_POPUP_EVENT_VARIABLES,
+        ],
+    },
 ]
 
 
@@ -1345,11 +1433,20 @@ def flatten_template(template_type: EmailTemplateType) -> str:
 
     Resolves {% extends %} and {% include %} but preserves {{ variable }}
     placeholders so users can edit them in the Monaco editor.
+
+    Templates that are already self-contained (no inheritance) are returned
+    verbatim — rendering them would *execute* their control structures, e.g.
+    dropping a ``{% for %}`` loop over data that isn't present at flatten time
+    (the check-in pass QR loop). Returning the raw source keeps those loops.
     """
     from app.core.config import settings
 
     template_dir = Path("app/templates/emails")
     file_path = TEMPLATE_TYPE_TO_FILE[template_type]
+
+    source = (template_dir / file_path).read_text(encoding="utf-8")
+    if "{% extends" not in source and "{% include" not in source:
+        return source
 
     env = Environment(
         loader=FileSystemLoader(str(template_dir)),
@@ -1379,3 +1476,22 @@ CUSTOMIZABLE_TEMPLATE_TYPES = {meta["type"] for meta in TEMPLATE_TYPE_METADATA}
 
 def is_customizable_template_type(template_type: EmailTemplateType | str) -> bool:
     return coerce_email_template_type(template_type) in CUSTOMIZABLE_TEMPLATE_TYPES
+
+
+def render_default_subject(
+    template_type: EmailTemplateType | str,
+    context: Mapping[str, Any],
+) -> str:
+    """Render the metadata ``default_subject`` for *template_type* against *context*.
+
+    Single source of truth for the default subject used when a popup has no
+    custom template (or its custom template has no subject override). Keeps the
+    English default colocated with the rest of the template metadata instead of
+    hardcoded at each caller.
+    """
+    coerced = coerce_email_template_type(template_type)
+    meta = next((m for m in TEMPLATE_TYPE_METADATA if m["type"] == coerced), None)
+    if meta is None:
+        return ""
+    env = SandboxedEnvironment(undefined=SilentUndefined)
+    return env.from_string(meta["default_subject"]).render(**context)

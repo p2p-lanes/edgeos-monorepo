@@ -303,6 +303,77 @@ See the root `.env.example` for a complete list with defaults. Key variables:
 
 For local development with Docker, all defaults work out of the box. For production, see the main README.
 
+## Scheduled jobs
+
+Some features rely on a background job that runs on a recurring schedule.
+Jobs are exposed as plain Python module entrypoints (no HTTP endpoint, no
+auth surface) so any scheduler that can run a container or invoke a Python
+process on an interval is enough — the scheduler configuration lives in your
+deployment, not in this repository.
+
+### Available jobs
+
+| Job | Module | Recommended interval | Description |
+|-----|--------|----------------------|-------------|
+| Check-in pass dispatch | `app.jobs.checkin_pass_dispatch` | Hourly | Sends the check-in pass email (with QR codes) to buyers whose popup is within the send window (`start_date - checkin_pass_lead_days <= now < end_date`). Idempotent. |
+
+### Invoking a job
+
+```bash
+uv run python -m app.jobs.checkin_pass_dispatch
+```
+
+Exit code is `0` when the dispatch completes (possibly a no-op when nothing is
+due) and `1` when at least one buyer failed. A Postgres advisory lock protects
+against overlapping runs, so occasional schedule overlap is safe.
+
+### Scheduling examples
+
+These are reference snippets only — no infrastructure code ships in this repo.
+
+Plain crontab:
+
+```cron
+0 * * * * docker run --rm --env-file /etc/edgeos.env edgeos-backend \
+  uv run python -m app.jobs.checkin_pass_dispatch
+```
+
+Kubernetes CronJob:
+
+```yaml
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: checkin-pass-dispatch
+spec:
+  schedule: "0 * * * *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: dispatch
+              image: ghcr.io/your-org/edgeos-backend:latest
+              command: ["uv", "run", "python", "-m", "app.jobs.checkin_pass_dispatch"]
+              envFrom:
+                - secretRef:
+                    name: edgeos-env
+```
+
+AWS EventBridge Scheduler → ECS RunTask: target an ECS task definition that
+shares the backend image and uses the command override
+`["uv","run","python","-m","app.jobs.checkin_pass_dispatch"]`.
+
+### Adding a new job
+
+1. Create `app/jobs/<your_job>.py` with a `main() -> int` function and an
+   `if __name__ == "__main__": sys.exit(main())` block.
+2. Keep the heavy logic in `app/services/`. The job module should only
+   orchestrate: open a session, call the service, log the result, return an
+   exit code.
+3. Add a row to the table above.
+
 ## API Documentation
 
 When running, documentation is available at:

@@ -1123,7 +1123,7 @@ export type EmailTemplatePublic = {
     updated_at?: (string | null);
 };
 
-export type EmailTemplateType = 'login_code_user' | 'login_code_human' | 'application_received' | 'application_accepted' | 'application_rejected' | 'application_accepted_with_discount' | 'application_accepted_with_incentive' | 'application_accepted_scholarship_rejected' | 'payment_confirmed' | 'abandoned_cart' | 'edit_passes_confirmed' | 'event_invitation' | 'event_updated' | 'event_cancelled' | 'event_approval_approved' | 'event_approval_rejected';
+export type EmailTemplateType = 'login_code_user' | 'login_code_human' | 'application_received' | 'application_accepted' | 'application_rejected' | 'application_accepted_with_discount' | 'application_accepted_with_incentive' | 'application_accepted_scholarship_rejected' | 'payment_confirmed' | 'abandoned_cart' | 'edit_passes_confirmed' | 'event_invitation' | 'event_updated' | 'event_cancelled' | 'event_approval_approved' | 'event_approval_rejected' | 'check_in_pass';
 
 export type EmailTemplateUpdate = {
     subject?: (string | null);
@@ -2382,6 +2382,7 @@ export type PopupAdmin = {
     application_layout?: ApplicationLayout;
     events_enabled?: boolean;
     self_check_in_enabled?: boolean;
+    checkin_pass_lead_days?: (number | null);
     show_attendee_directory?: boolean;
     credits_enabled?: boolean;
     id: string;
@@ -2432,6 +2433,7 @@ export type PopupCreate = {
     self_check_in_enabled?: boolean;
     show_attendee_directory?: boolean;
     credits_enabled?: boolean;
+    checkin_pass_lead_days?: (number | null);
 };
 
 /**
@@ -2557,6 +2559,7 @@ export type PopupUpdate = {
     self_check_in_enabled?: (boolean | null);
     show_attendee_directory?: (boolean | null);
     credits_enabled?: (boolean | null);
+    checkin_pass_lead_days?: (number | null);
 };
 
 /**

@@ -175,6 +175,11 @@ async def preview_template(
 
         variables = _enrich_with_popup_data(variables, body.popup_id, db)
 
+    if body.template_type == EmailTemplateType.CHECK_IN_PASS.value:
+        from app.services.checkin_qr import sample_checkin_pass_preview_vars
+
+        variables.update(sample_checkin_pass_preview_vars())
+
     if body.preview_variables:
         variables.update(body.preview_variables)
 
@@ -244,6 +249,11 @@ async def send_test_email(
         from app.services.email.service import _enrich_with_popup_data
 
         variables = _enrich_with_popup_data(variables, body.popup_id, db)
+
+    if body.template_type == EmailTemplateType.CHECK_IN_PASS.value:
+        from app.services.checkin_qr import sample_checkin_pass_preview_vars
+
+        variables.update(sample_checkin_pass_preview_vars())
 
     if body.custom_variables:
         variables.update(body.custom_variables)

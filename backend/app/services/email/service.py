@@ -27,6 +27,7 @@ from app.services.email.templates import (
     ApplicationAcceptedWithIncentiveContext,
     ApplicationReceivedContext,
     ApplicationRejectedContext,
+    CheckInPassContext,
     EditPassesConfirmedContext,
     EmailTemplates,
     EventApprovalApprovedContext,
@@ -792,6 +793,29 @@ class EmailService:
             subject=subject,
             template_type=EmailTemplateType.EVENT_APPROVAL_REJECTED,
             template_name=EmailTemplates.EVENT_APPROVAL_REJECTED,
+            context=context.model_dump(exclude_none=True),
+            from_address=from_address,
+            from_name=from_name,
+            popup_id=popup_id,
+            db_session=db_session,
+        )
+
+    async def send_check_in_pass(
+        self,
+        to: str,
+        subject: str,
+        context: CheckInPassContext,
+        from_address: str | None = None,
+        from_name: str | None = None,
+        popup_id: uuid.UUID | None = None,
+        db_session: Session | None = None,
+    ) -> bool:
+        """Send the scheduled check-in pass email (with check-in QR codes)."""
+        return await self._send_with_fallback(
+            to=to,
+            subject=subject,
+            template_type=EmailTemplateType.CHECK_IN_PASS,
+            template_name=EmailTemplates.CHECK_IN_PASS,
             context=context.model_dump(exclude_none=True),
             from_address=from_address,
             from_name=from_name,
