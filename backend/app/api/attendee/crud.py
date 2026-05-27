@@ -77,7 +77,16 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
         count_statement = select(func.count()).select_from(statement.subquery())
         total = session.exec(count_statement).one()
 
-        statement = statement.offset(skip).limit(limit)
+        statement = (
+            statement.options(
+                selectinload(Attendees.attendee_products).selectinload(  # type: ignore[arg-type]
+                    AttendeeProducts.product  # ty: ignore[invalid-argument-type]
+                ),
+                selectinload(Attendees.category_ref),  # type: ignore[arg-type]
+            )
+            .offset(skip)
+            .limit(limit)
+        )
         results = list(session.exec(statement).all())
 
         return results, total
@@ -115,6 +124,7 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
                     AttendeeProducts.product  # ty: ignore[invalid-argument-type]
                 ),
                 selectinload(Attendees.application),  # type: ignore[arg-type]
+                selectinload(Attendees.category_ref),  # type: ignore[arg-type]
             )
             .offset(skip)
             .limit(limit)
@@ -339,6 +349,7 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
                     Applications.popup  # ty: ignore[invalid-argument-type]
                 ),
                 selectinload(Attendees.popup),  # type: ignore[arg-type]
+                selectinload(Attendees.category_ref),  # type: ignore[arg-type]
             )
             .offset(skip)
             .limit(limit)
@@ -376,6 +387,7 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
                 selectinload(Attendees.attendee_products).selectinload(  # type: ignore[arg-type]
                     AttendeeProducts.product  # ty: ignore[invalid-argument-type]
                 ),
+                selectinload(Attendees.category_ref),  # type: ignore[arg-type]
             )
             .limit(1)
         )
@@ -449,6 +461,7 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
                     AttendeeProducts.product  # ty: ignore[invalid-argument-type]
                 ),
                 selectinload(Attendees.payment_products),  # type: ignore[arg-type]
+                selectinload(Attendees.category_ref),  # type: ignore[arg-type]
             )
             .offset(skip)
             .limit(limit)
@@ -477,6 +490,7 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
                 selectinload(Attendees.attendee_products).selectinload(  # type: ignore[arg-type]
                     AttendeeProducts.product  # ty: ignore[invalid-argument-type]
                 ),
+                selectinload(Attendees.category_ref),  # type: ignore[arg-type]
             )
         )
         return list(session.exec(statement).all())

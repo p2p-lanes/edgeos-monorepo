@@ -1,7 +1,8 @@
 import uuid
 
 from fastapi import APIRouter, HTTPException, status
-from sqlmodel import Session
+from sqlalchemy import Column
+from sqlmodel import Session, select
 
 from app.api.popup_reviewer.crud import popup_reviewers_crud
 from app.api.popup_reviewer.models import PopupReviewers
@@ -12,6 +13,7 @@ from app.api.popup_reviewer.schemas import (
 )
 from app.api.shared.enums import UserRole
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
+from app.api.user.models import Users
 from app.core.dependencies.users import (
     CurrentAdmin,
     CurrentWriter,
@@ -23,14 +25,10 @@ router = APIRouter(prefix="/popups", tags=["popup-reviewers"])
 
 
 def _reviewer_to_public(
-    reviewer: PopupReviewers, session: Session
+    reviewer: PopupReviewers,
+    user: Users | None,
 ) -> PopupReviewerPublic:
-    """Convert reviewer to public schema with user details."""
-    from app.api.user.crud import users_crud
-
-    # Fetch user details from main session (not tenant session)
-    user = users_crud.get(session, reviewer.user_id)
-
+    """Convert reviewer to public schema with pre-fetched user details."""
     return PopupReviewerPublic(
         id=reviewer.id,
         popup_id=reviewer.popup_id,
@@ -42,6 +40,20 @@ def _reviewer_to_public(
         user_email=user.email if user else None,
         user_full_name=user.full_name if user else None,
     )
+
+
+def _fetch_users_by_ids(
+    session: Session, user_ids: list[uuid.UUID]
+) -> dict[uuid.UUID, Users]:
+    """Fetch users by id in a single query, returning a {user_id: user} map.
+
+    Users table is not tenant-scoped — use the main session.
+    """
+    if not user_ids:
+        return {}
+    id_col: Column = Users.id  # ty:ignore[invalid-assignment]
+    statement = select(Users).where(id_col.in_(user_ids))
+    return {u.id: u for u in session.exec(statement).all()}
 
 
 @router.get("/{popup_id}/reviewers", response_model=ListModel[PopupReviewerPublic])
@@ -66,8 +78,10 @@ async def list_reviewers(
 
     reviewers, total = popup_reviewers_crud.find_by_popup(db, popup_id, skip, limit)
 
+    users_by_id = _fetch_users_by_ids(session, [r.user_id for r in reviewers])
+
     return ListModel[PopupReviewerPublic](
-        results=[_reviewer_to_public(r, session) for r in reviewers],
+        results=[_reviewer_to_public(r, users_by_id.get(r.user_id)) for r in reviewers],
         paging=Paging(offset=skip, limit=limit, total=total),
     )
 
@@ -129,7 +143,7 @@ async def add_reviewer(
         db, popup_id, popup.tenant_id, reviewer_in
     )
 
-    return _reviewer_to_public(reviewer, session)
+    return _reviewer_to_public(reviewer, user)
 
 
 @router.patch("/{popup_id}/reviewers/{user_id}", response_model=PopupReviewerPublic)
@@ -143,6 +157,7 @@ async def update_reviewer(
 ) -> PopupReviewerPublic:
     """Update a reviewer's settings."""
     from app.api.popup.crud import popups_crud
+    from app.api.user.crud import users_crud
 
     # Verify popup exists
     popup = popups_crud.get(db, popup_id)
@@ -160,7 +175,8 @@ async def update_reviewer(
         )
 
     reviewer = popup_reviewers_crud.update(db, reviewer, reviewer_in)
-    return _reviewer_to_public(reviewer, session)
+    user = users_crud.get(session, reviewer.user_id)
+    return _reviewer_to_public(reviewer, user)
 
 
 @router.delete(

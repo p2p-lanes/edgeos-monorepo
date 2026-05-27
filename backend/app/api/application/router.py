@@ -491,7 +491,6 @@ async def get_my_application(
             ),
         },
     },
-
     dependencies=[needs("portal:applications:write")],
 )
 async def detach_companion(

@@ -24,7 +24,7 @@ from decimal import Decimal
 
 import pytest
 from fastapi import HTTPException
-from sqlmodel import Session, select
+from sqlmodel import Session
 
 from app.api.application.models import Applications
 from app.api.attendee.crud import attendees_crud
@@ -92,34 +92,34 @@ def _get_or_create_application(
     tenant: Tenants,
     popup: Popups,
 ) -> Applications:
-    """Get an existing application or create one for tests."""
-    app = db.exec(
-        select(Applications).where(
-            Applications.tenant_id == tenant.id,
-            Applications.popup_id == popup.id,
-        )
-    ).first()
-    if app is None:
-        from app.api.human.models import Humans
-        human = Humans(
-            tenant_id=tenant.id,
-            email=f"enf-human-{uuid.uuid4().hex[:8]}@test.com",
-            first_name="Enf",
-            last_name="Test",
-        )
-        db.add(human)
-        db.flush()
-        from app.api.application.schemas import ApplicationStatus
+    """Create a fresh ACCEPTED application for tests.
 
-        app = Applications(
-            tenant_id=tenant.id,
-            popup_id=popup.id,
-            human_id=human.id,
-            status=ApplicationStatus.ACCEPTED.value,
-        )
-        db.add(app)
-        db.commit()
-        db.refresh(app)
+    Always creates a new (human, application) pair so prior tests that mutate
+    application status (e.g. via the approval calculator) cannot leak into the
+    enforcement assertions. The Applications uniqueness constraint is on
+    (human_id, popup_id), which a fresh human per call satisfies.
+    """
+    from app.api.application.schemas import ApplicationStatus
+    from app.api.human.models import Humans
+
+    human = Humans(
+        tenant_id=tenant.id,
+        email=f"enf-human-{uuid.uuid4().hex[:8]}@test.com",
+        first_name="Enf",
+        last_name="Test",
+    )
+    db.add(human)
+    db.flush()
+
+    app = Applications(
+        tenant_id=tenant.id,
+        popup_id=popup.id,
+        human_id=human.id,
+        status=ApplicationStatus.ACCEPTED.value,
+    )
+    db.add(app)
+    db.commit()
+    db.refresh(app)
     return app
 
 
@@ -139,7 +139,9 @@ class TestAddProductEnforcement:
     ) -> None:
         """add_product on product with total_stock_remaining=0 → 409."""
         product = _make_product(
-            db, tenant_a, popup_tenant_a,
+            db,
+            tenant_a,
+            popup_tenant_a,
             total_stock_cap=1,
             total_stock_remaining=0,
         )
@@ -158,7 +160,9 @@ class TestAddProductEnforcement:
     ) -> None:
         """add_product call decrements 1 unit of total_stock_remaining."""
         product = _make_product(
-            db, tenant_a, popup_tenant_a,
+            db,
+            tenant_a,
+            popup_tenant_a,
             total_stock_cap=5,
             total_stock_remaining=5,
         )
@@ -183,7 +187,9 @@ class TestAddProductEnforcement:
     ) -> None:
         """add_product with NULL stock (unlimited) → succeeds without decrement."""
         product = _make_product(
-            db, tenant_a, popup_tenant_a,
+            db,
+            tenant_a,
+            popup_tenant_a,
             total_stock_cap=None,
             total_stock_remaining=None,
         )
@@ -247,7 +253,9 @@ class TestAddProductEnforcement:
         from sqlmodel import Session as SyncSession
 
         product = _make_product(
-            db, tenant_a, popup_tenant_a,
+            db,
+            tenant_a,
+            popup_tenant_a,
             total_stock_cap=1,
             total_stock_remaining=1,
         )
@@ -347,7 +355,6 @@ def _make_ot_product(
     max_per_order: int | None = None,
     price: str = "100.00",
 ) -> Products:
-
     product = Products(
         tenant_id=popup.tenant_id,
         popup_id=popup.id,
@@ -402,7 +409,8 @@ class TestOpenTicketingPaymentEnforcement:
 
         popup = _make_ot_popup(db, tenant_a)
         product = _make_ot_product(
-            db, popup,
+            db,
+            popup,
             total_stock_cap=1,
             total_stock_remaining=0,
         )
@@ -429,7 +437,8 @@ class TestOpenTicketingPaymentEnforcement:
 
         popup = _make_ot_popup(db, tenant_a)
         product = _make_ot_product(
-            db, popup,
+            db,
+            popup,
             total_stock_cap=10,
             total_stock_remaining=10,
         )
@@ -464,7 +473,8 @@ class TestOpenTicketingPaymentEnforcement:
 
         popup = _make_ot_popup(db, tenant_a)
         product = _make_ot_product(
-            db, popup,
+            db,
+            popup,
             total_stock_cap=None,
             total_stock_remaining=None,
         )
@@ -497,7 +507,8 @@ class TestOpenTicketingPaymentEnforcement:
 
         popup = _make_ot_popup(db, tenant_a)
         product = _make_ot_product(
-            db, popup,
+            db,
+            popup,
             total_stock_cap=100,
             total_stock_remaining=100,
             max_per_order=2,
@@ -525,7 +536,8 @@ class TestOpenTicketingPaymentEnforcement:
 
         popup = _make_ot_popup(db, tenant_a)
         product = _make_ot_product(
-            db, popup,
+            db,
+            popup,
             total_stock_cap=1,
             total_stock_remaining=1,
         )
@@ -542,8 +554,12 @@ class TestOpenTicketingPaymentEnforcement:
                 checkout_url="https://simplefi.test/checkout/conc",
             )
             with SyncSession(test_engine) as session:
-                with patch("app.services.simplefi.get_simplefi_client") as mock_get_client:
-                    mock_get_client.return_value.create_payment.return_value = simplefi_response
+                with patch(
+                    "app.services.simplefi.get_simplefi_client"
+                ) as mock_get_client:
+                    mock_get_client.return_value.create_payment.return_value = (
+                        simplefi_response
+                    )
                     try:
                         payments_crud.create_open_ticketing_payment(
                             session, obj=obj, popup=popup, tenant=tenant_a
@@ -590,7 +606,9 @@ class TestCreatePaymentEnforcement:
         from app.api.payment.schemas import PaymentCreate, PaymentProductRequest
 
         product = _make_product(
-            db, tenant_a, popup_tenant_a,
+            db,
+            tenant_a,
+            popup_tenant_a,
             total_stock_cap=1,
             total_stock_remaining=0,
         )
@@ -624,7 +642,9 @@ class TestCreatePaymentEnforcement:
         from app.api.payment.schemas import PaymentCreate, PaymentProductRequest
 
         product = _make_product(
-            db, tenant_a, popup_tenant_a,
+            db,
+            tenant_a,
+            popup_tenant_a,
             total_stock_cap=100,
             total_stock_remaining=100,
             max_per_order=2,
