@@ -1,10 +1,11 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query"
-import { createFileRoute } from "@tanstack/react-router"
+import { createFileRoute, Link } from "@tanstack/react-router"
 import type { ColumnDef } from "@tanstack/react-table"
 import {
   Download,
   EllipsisVertical,
   Eye,
+  Gift,
   Mail,
   QrCode,
   User,
@@ -42,6 +43,7 @@ import { InlineRow, InlineSection } from "@/components/ui/inline-form"
 import { Separator } from "@/components/ui/separator"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
+import useAuth from "@/hooks/useAuth"
 import {
   useTableSearchParams,
   validateTableSearch,
@@ -360,6 +362,7 @@ function AttendeesTableContent() {
 function Attendees() {
   const { isContextReady } = useWorkspace()
   const { selectedPopupId } = useWorkspace()
+  const { isOperatorOrAbove } = useAuth()
   const [isExporting, setIsExporting] = useState(false)
 
   const handleExport = async () => {
@@ -396,14 +399,27 @@ function Attendees() {
           </p>
         </div>
         {isContextReady && (
-          <Button
-            variant="outline"
-            onClick={handleExport}
-            disabled={isExporting}
-          >
-            <Download className="mr-2 h-4 w-4" />
-            {isExporting ? "Exporting..." : "Export CSV"}
-          </Button>
+          <div className="flex items-center gap-2">
+            {isOperatorOrAbove && selectedPopupId && (
+              <Button asChild>
+                <Link
+                  to="/popups/$id/bulk-grant"
+                  params={{ id: selectedPopupId }}
+                >
+                  <Gift className="mr-2 h-4 w-4" />
+                  Invite
+                </Link>
+              </Button>
+            )}
+            <Button
+              variant="outline"
+              onClick={handleExport}
+              disabled={isExporting}
+            >
+              <Download className="mr-2 h-4 w-4" />
+              {isExporting ? "Exporting..." : "Export CSV"}
+            </Button>
+          </div>
         )}
       </div>
       {!isContextReady ? (

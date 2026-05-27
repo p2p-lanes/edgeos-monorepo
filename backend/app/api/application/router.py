@@ -3,12 +3,16 @@ import io
 import uuid
 from collections import Counter
 from datetime import UTC, datetime
+from decimal import Decimal
 
 from fastapi import APIRouter, HTTPException, status
 from fastapi.responses import Response
+from loguru import logger
 
 from app.api.application import crud
 from app.api.application.schemas import (
+    AdminGrantTicketsRequest,
+    AdminGrantTicketsResponse,
     ApplicantParticipation,
     ApplicationAdminCreate,
     ApplicationCreate,
@@ -21,6 +25,7 @@ from app.api.application.schemas import (
     CompanionParticipation,
     DetachCompanionRequest,
     DirectoryProduct,
+    GrantedPaymentInfo,
     NoParticipation,
     ParticipationResponse,
     PopupAccessResponse,
@@ -235,6 +240,263 @@ async def create_application_admin(
         await send_application_status_email(application, application.human, db)
 
     return _build_application_public(application)
+
+
+@router.post(
+    "/admin/grant-tickets",
+    response_model=AdminGrantTicketsResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Admin bulk-grant of free tickets",
+)
+async def grant_tickets_admin(
+    payload: AdminGrantTicketsRequest,
+    db: AdminOrApiKeySession_ApplicationsWrite,
+    current_user: AdminOrApiKey_ApplicationsWrite,
+) -> AdminGrantTicketsResponse:
+    """Atomically grant free tickets to a batch of people for a popup.
+
+    For each person:
+      - Get-or-create the Human (fill-blanks on first_name/last_name; never
+        overwrites existing values).
+      - Get-or-create the Application; if it exists in a non-accepted state,
+        promote it to ACCEPTED.
+      - Create a $0 Payment (APPROVED, source=NULL, granted_by_user_id=admin)
+        with product snapshots, then materialize tickets via the shared
+        zero-amount finalizer.
+
+    The whole batch lives in one transaction — a sold-out failure mid-batch
+    rolls back every Human / Application / Attendee / Payment row created in
+    this run. Stock is decremented up-front for all (person × product) lines
+    via the atomic `products_crud.decrement_total_stock` UPDATE; a race-loss
+    surfaces as HTTP 409 with a structured `stock_exhausted` payload.
+
+    Confirmation emails are dispatched best-effort post-commit (one per
+    person); a mail failure is logged but does NOT undo the grant.
+    """
+    from sqlmodel import select
+
+    from app.api.attendee.crud import attendees_crud
+    from app.api.human.crud import humans_crud
+    from app.api.payment.crud import payments_crud
+    from app.api.payment.models import PaymentProducts, Payments
+    from app.api.payment.router import _send_payment_confirmed_email
+    from app.api.payment.schemas import (
+        PaymentProductRequest,
+        PaymentStatus,
+    )
+    from app.api.popup.crud import popups_crud
+    from app.api.product.crud import products_crud
+    from app.api.product.models import Products
+
+    popup = popups_crud.get(db, payload.popup_id)
+    if not popup:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Popup not found",
+        )
+    tenant_id = popup.tenant_id
+
+    # Dedupe people by email — the BO does this too but the backend is the
+    # last line of defence against accidental double-grants from CSV paste.
+    seen_emails: set[str] = set()
+    people = []
+    for person in payload.people:
+        if person.email in seen_emails:
+            continue
+        seen_emails.add(person.email)
+        people.append(person)
+
+    # Union of product IDs referenced by any person — each person now carries
+    # their own product list (may be different per person).
+    product_ids = {item.product_id for person in people for item in person.products}
+    products_stmt = select(Products).where(
+        Products.id.in_(product_ids),  # type: ignore[attr-defined]
+        Products.popup_id == payload.popup_id,
+        Products.is_active == True,  # noqa: E712
+        Products.deleted_at.is_(None),  # type: ignore[attr-defined]
+    )
+    valid_products = list(db.exec(products_stmt).all())
+    if {p.id for p in valid_products} != product_ids:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="One or more products are unavailable, inactive, or not in this popup",
+        )
+    products_map = {p.id: p for p in valid_products}
+
+    # Aggregate total requested quantity per product across ALL people for the
+    # up-front stock cap check. Each person may request a different mix, so
+    # this sum is what we compare against total_stock_remaining.
+    total_needed_per_product: dict[uuid.UUID, int] = {}
+    for person in people:
+        for item in person.products:
+            total_needed_per_product[item.product_id] = (
+                total_needed_per_product.get(item.product_id, 0) + item.quantity
+            )
+
+    # Up-front stock cap check — cheap, returns 409 immediately on a gross
+    # over-grant before we start writing anything. The per-decrement guard
+    # below still catches losing the race with a concurrent buyer.
+    for pid, total_needed in total_needed_per_product.items():
+        product = products_map[pid]
+        if (
+            product.total_stock_remaining is not None
+            and product.total_stock_remaining < total_needed
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "error": "stock_exhausted",
+                    "product_id": str(pid),
+                    "product_name": product.name,
+                    "requested": total_needed,
+                    "available": product.total_stock_remaining,
+                    "message": (
+                        f"Not enough stock for '{product.name}' — "
+                        f"need {total_needed}, have {product.total_stock_remaining}"
+                    ),
+                },
+            )
+
+    granted: list[GrantedPaymentInfo] = []
+    payment_ids: list[uuid.UUID] = []
+    try:
+        for person in people:
+            human = humans_crud.get_or_create_by_email(
+                db,
+                email=person.email,
+                tenant_id=tenant_id,
+                default_first_name=person.first_name,
+                default_last_name=person.last_name,
+            )
+            # Fill-blanks on an existing Human — never clobber a name the
+            # user has already provided themselves.
+            mutated = False
+            if person.first_name and not human.first_name:
+                human.first_name = person.first_name
+                mutated = True
+            if person.last_name and not human.last_name:
+                human.last_name = person.last_name
+                mutated = True
+            if mutated:
+                db.add(human)
+                db.flush()
+
+            application = crud.applications_crud.get_by_human_popup(
+                db, human_id=human.id, popup_id=payload.popup_id
+            )
+            if application is None:
+                application = crud.applications_crud.create_for_admin_grant(
+                    db,
+                    tenant_id=tenant_id,
+                    popup_id=payload.popup_id,
+                    human=human,
+                )
+            else:
+                crud.applications_crud.promote_to_accepted(db, application)
+
+            main_attendee = attendees_crud.get_main_attendee(db, application.id)
+            if main_attendee is None:
+                # Should be impossible — create_for_admin_grant always inserts
+                # one, and an existing application always has a main attendee.
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Main attendee not found for application",
+                )
+
+            # Per-product, per-quantity stock decrement. Raises 409 if a
+            # concurrent buyer drained the counter between our pre-check and
+            # now; the outer try/except rolls the entire batch back.
+            ticket_count = 0
+            for item in person.products:
+                products_crud.decrement_total_stock(db, item.product_id, item.quantity)
+                ticket_count += item.quantity
+
+            payment = Payments(
+                tenant_id=tenant_id,
+                application_id=application.id,
+                popup_id=payload.popup_id,
+                status=PaymentStatus.PENDING.value,
+                amount=Decimal("0"),
+                currency=popup.currency,
+                source=None,
+            )
+            db.add(payment)
+            db.flush()
+
+            finalize_lines: list[PaymentProductRequest] = []
+            for item in person.products:
+                product = products_map[item.product_id]
+                is_patreon = product.category == "patreon"
+                # Patron snapshot: product_price=0, effective_unit_price=0,
+                # qty honored as the admin requested it — donation amount is
+                # explicitly skipped for comps (locked decision §3.5 / §8.3).
+                snapshot = PaymentProducts(
+                    tenant_id=tenant_id,
+                    payment_id=payment.id,
+                    product_id=item.product_id,
+                    attendee_id=main_attendee.id,
+                    quantity=item.quantity,
+                    product_name=product.name,
+                    product_description=product.description,
+                    product_price=Decimal("0") if is_patreon else product.price,
+                    product_category=product.category or "",
+                    product_currency=popup.currency,
+                    effective_unit_price=Decimal("0") if is_patreon else None,
+                )
+                db.add(snapshot)
+                finalize_lines.append(
+                    PaymentProductRequest(
+                        product_id=item.product_id,
+                        attendee_id=main_attendee.id,
+                        quantity=item.quantity,
+                    )
+                )
+
+            payments_crud._finalize_zero_amount_payment(
+                db,
+                payment,
+                finalize_lines,
+                granted_by_user_id=current_user.id,
+            )
+
+            granted.append(
+                GrantedPaymentInfo(
+                    payment_id=payment.id,
+                    application_id=application.id,
+                    human_id=human.id,
+                    email=human.email,
+                    tickets_created=ticket_count,
+                )
+            )
+            payment_ids.append(payment.id)
+
+        db.commit()
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception:
+        db.rollback()
+        logger.exception("Admin grant-tickets batch failed")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to grant tickets",
+        )
+
+    # Best-effort post-commit confirmation emails. A mail failure here does
+    # NOT undo the grant — the rows are already persisted and the admin can
+    # resend manually if a recipient reports a missing email.
+    for payment_id in payment_ids:
+        try:
+            payment = payments_crud.get(db, payment_id)
+            if payment is not None:
+                await _send_payment_confirmed_email(payment, db_session=db)
+        except Exception:
+            logger.exception(
+                "Failed to send PAYMENT_CONFIRMED for granted payment {}",
+                payment_id,
+            )
+
+    return AdminGrantTicketsResponse(granted=granted)
 
 
 @router.get("/{application_id}", response_model=ApplicationPublic)
@@ -491,7 +753,6 @@ async def get_my_application(
             ),
         },
     },
-
     dependencies=[needs("portal:applications:write")],
 )
 async def detach_companion(
