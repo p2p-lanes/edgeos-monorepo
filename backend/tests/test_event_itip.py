@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime, timedelta
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
 from zoneinfo import ZoneInfo
 
 from fastapi.testclient import TestClient
@@ -155,6 +155,40 @@ def _patch_send_everywhere(mock: AsyncMock):
     stack.enter_context(patch(_PATCH_SEND_SERVICE, new=mock))
     stack.enter_context(patch(_PATCH_SEND_ROUTER, new=mock))
     return stack
+
+
+def _patch_email_service():
+    """Let ``send_event_itip`` run; capture the per-template method calls.
+
+    Returns ``(stack, service)`` — enter ``stack`` as a context manager and
+    inspect ``service.send_event_updated`` / ``service.send_event_cancelled``
+    / ``service.send_event_invitation`` afterwards.
+    """
+    from contextlib import ExitStack
+
+    from app.core.config import settings
+
+    service = MagicMock()
+    service.send_event_invitation = AsyncMock(return_value=True)
+    service.send_event_updated = AsyncMock(return_value=True)
+    service.send_event_cancelled = AsyncMock(return_value=True)
+
+    stack = ExitStack()
+    stack.enter_context(
+        patch("app.services.event_itip.get_email_service", return_value=service)
+    )
+    # ``emails_enabled`` is a computed @property on the Settings class — patch
+    # at the class level so the early-return guard in ``send_event_itip``
+    # passes during the test.
+    stack.enter_context(
+        patch.object(
+            type(settings),
+            "emails_enabled",
+            new_callable=PropertyMock,
+            return_value=True,
+        )
+    )
+    return stack, service
 
 
 # ---------------------------------------------------------------------------
@@ -653,6 +687,40 @@ class TestPatchBumpsSequenceAndDispatches:
             "rsvped@test.com",
         }
 
+    def test_patch_routes_to_send_event_updated(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+        admin_token_tenant_a: str,
+    ) -> None:
+        """PATCH → ``bump_and_dispatch_update`` → ``service.send_event_updated``.
+
+        Guards against the ``invitation.html`` regression where a title/time
+        change was rendered with the generic "You're invited" template.
+        """
+        popup = _make_popup(db, tenant_a)
+        event = _make_event(db, tenant_a, popup)
+        _invite(db, event, _make_human(db, tenant_a, email="updated@test.com"))
+
+        stack, service = _patch_email_service()
+        with stack:
+            resp = client.patch(
+                f"/api/v1/events/{event.id}",
+                headers=_auth(admin_token_tenant_a),
+                json={"title": "Renamed Event"},
+            )
+
+        assert resp.status_code == 200, resp.text
+        service.send_event_updated.assert_awaited_once()
+        service.send_event_invitation.assert_not_awaited()
+        service.send_event_cancelled.assert_not_awaited()
+        context = service.send_event_updated.await_args.kwargs["context"]
+        # Title change must surface in the diff so the template can highlight
+        # the "Event:" row.
+        assert "event" in context.changes
+        assert context.changes["event"].after == "Renamed Event"
+
 
 class TestCancelAndDeleteDispatchCancel:
     """/cancel endpoint and DELETE both emit iTIP CANCEL with SEQUENCE+1."""
@@ -683,6 +751,30 @@ class TestCancelAndDeleteDispatchCancel:
         assert refreshed.ical_sequence == before_sequence + 1
         assert send_mock.await_count == 1
         assert send_mock.await_args.kwargs["method"] == "CANCEL"
+
+    def test_cancel_endpoint_routes_to_send_event_cancelled(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+        admin_token_tenant_a: str,
+    ) -> None:
+        """/cancel → ``bump_and_dispatch_cancel`` → ``service.send_event_cancelled``."""
+        popup = _make_popup(db, tenant_a)
+        event = _make_event(db, tenant_a, popup)
+        _invite(db, event, _make_human(db, tenant_a, email="cancelled@test.com"))
+
+        stack, service = _patch_email_service()
+        with stack:
+            resp = client.post(
+                f"/api/v1/events/{event.id}/cancel",
+                headers=_auth(admin_token_tenant_a),
+            )
+
+        assert resp.status_code == 200, resp.text
+        service.send_event_cancelled.assert_awaited_once()
+        service.send_event_invitation.assert_not_awaited()
+        service.send_event_updated.assert_not_awaited()
 
     def test_double_cancel_returns_400(
         self,
