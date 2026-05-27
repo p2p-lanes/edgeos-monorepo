@@ -1,7 +1,7 @@
 import { useForm } from "@tanstack/react-form"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { useNavigate } from "@tanstack/react-router"
-import { Hash, Percent, Power } from "lucide-react"
+import { Calendar, Hash, Percent, Power } from "lucide-react"
 import {
   type CouponCreate,
   type CouponPublic,
@@ -12,6 +12,7 @@ import { DangerZone } from "@/components/Common/DangerZone"
 import { FieldError } from "@/components/Common/FieldError"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
 import { Button } from "@/components/ui/button"
+import { DatePicker } from "@/components/ui/date-picker"
 import {
   HeroInput,
   InlineRow,
@@ -86,11 +87,23 @@ export function CouponForm({ defaultValues, onSuccess }: CouponFormProps) {
     onError: createErrorHandler(showErrorToast),
   })
 
+  const formatDateForInput = (date: string | null | undefined) => {
+    if (!date) return ""
+    return date.slice(0, 10)
+  }
+
+  const toUTCDate = (dateStr: string) => {
+    if (!dateStr) return null
+    return `${dateStr.slice(0, 10)}T00:00:00.000Z`
+  }
+
   const form = useForm({
     defaultValues: {
       code: defaultValues?.code ?? "",
       discount_value: defaultValues?.discount_value?.toString() ?? "10",
       max_uses: defaultValues?.max_uses?.toString() ?? "",
+      start_date: formatDateForInput(defaultValues?.start_date),
+      end_date: formatDateForInput(defaultValues?.end_date),
       is_active: defaultValues?.is_active ?? true,
     },
     onSubmit: ({ value }) => {
@@ -100,6 +113,8 @@ export function CouponForm({ defaultValues, onSuccess }: CouponFormProps) {
           code: value.code.toUpperCase(),
           discount_value: Number(value.discount_value),
           max_uses: value.max_uses ? Number(value.max_uses) : null,
+          start_date: toUTCDate(value.start_date),
+          end_date: toUTCDate(value.end_date),
           is_active: value.is_active,
         })
       } else {
@@ -116,6 +131,8 @@ export function CouponForm({ defaultValues, onSuccess }: CouponFormProps) {
           code: value.code.toUpperCase(),
           discount_value: Number(value.discount_value),
           max_uses: value.max_uses ? Number(value.max_uses) : undefined,
+          start_date: toUTCDate(value.start_date),
+          end_date: toUTCDate(value.end_date),
           is_active: value.is_active,
         })
       }
@@ -255,6 +272,89 @@ export function CouponForm({ defaultValues, onSuccess }: CouponFormProps) {
               </InlineRow>
             )}
           </form.Field>
+        </InlineSection>
+
+        <Separator />
+
+        {/* Validity Period */}
+        <InlineSection title="Validity Period">
+          <form.Field name="start_date">
+            {(field) => (
+              <div>
+                <InlineRow
+                  icon={<Calendar className="h-4 w-4 text-muted-foreground" />}
+                  label="Start Date"
+                  description="Leave empty to allow immediate use"
+                >
+                  <DatePicker
+                    id="start_date"
+                    value={field.state.value}
+                    onChange={field.handleChange}
+                    disabled={readOnly}
+                    placeholder="Select date"
+                    className="w-auto"
+                  />
+                </InlineRow>
+                <FieldError errors={field.state.meta.errors} />
+              </div>
+            )}
+          </form.Field>
+
+          <form.Subscribe selector={(state) => state.values.start_date}>
+            {(startDate) => {
+              const startDateAsDate = startDate
+                ? (() => {
+                    const [y, m, d] = startDate
+                      .slice(0, 10)
+                      .split("-")
+                      .map(Number)
+                    return new Date(y, m - 1, d)
+                  })()
+                : undefined
+              return (
+                <form.Field
+                  name="end_date"
+                  validators={{
+                    onChange: ({ value, fieldApi }) => {
+                      if (readOnly || !value) return undefined
+                      const startDateValue =
+                        fieldApi.form.getFieldValue("start_date")
+                      if (!startDateValue) return undefined
+                      const sd = new Date(startDateValue)
+                      const endDate = new Date(value)
+                      if (endDate < sd) {
+                        return "End date cannot be before start date"
+                      }
+                      return undefined
+                    },
+                  }}
+                >
+                  {(field) => (
+                    <div>
+                      <InlineRow
+                        icon={
+                          <Calendar className="h-4 w-4 text-muted-foreground" />
+                        }
+                        label="End Date"
+                        description="Leave empty for no expiration"
+                      >
+                        <DatePicker
+                          id="end_date"
+                          value={field.state.value}
+                          onChange={field.handleChange}
+                          disabled={readOnly}
+                          placeholder="Select date"
+                          defaultMonth={startDateAsDate}
+                          className="w-auto"
+                        />
+                      </InlineRow>
+                      <FieldError errors={field.state.meta.errors} />
+                    </div>
+                  )}
+                </form.Field>
+              )
+            }}
+          </form.Subscribe>
         </InlineSection>
 
         <Separator />
