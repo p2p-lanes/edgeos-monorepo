@@ -1,6 +1,16 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { createFileRoute } from "@tanstack/react-router"
-import { Pencil, RotateCcw, Trash2, Upload, UserPlus } from "lucide-react"
+import {
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
+  Pencil,
+  RotateCcw,
+  Search,
+  Trash2,
+  Upload,
+  UserPlus,
+} from "lucide-react"
 import Papa from "papaparse"
 import { useMemo, useRef, useState } from "react"
 
@@ -26,6 +36,13 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { LoadingButton } from "@/components/ui/loading-button"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import {
   Table,
   TableBody,
@@ -1117,6 +1134,82 @@ interface OverdrawInfo {
   maxPerOrder: number | null
 }
 
+type ProductSortKey = "selected" | "name" | "stock"
+type SortDir = "asc" | "desc"
+
+// Radix Select disallows empty-string values, so use a sentinel for "any".
+const ALL_CATEGORIES = "__all__"
+
+function compareProducts(
+  a: ProductPublic,
+  b: ProductPublic,
+  key: ProductSortKey,
+  dir: SortDir,
+  productQty: Record<string, number>,
+): number {
+  const mult = dir === "asc" ? 1 : -1
+  switch (key) {
+    case "name":
+      return a.name.localeCompare(b.name) * mult
+    case "stock": {
+      // null stock means unlimited — sort it as +Infinity.
+      const av = a.total_stock_remaining ?? Number.POSITIVE_INFINITY
+      const bv = b.total_stock_remaining ?? Number.POSITIVE_INFINITY
+      return (av - bv) * mult || a.name.localeCompare(b.name)
+    }
+    case "selected": {
+      const av = a.id in productQty ? 1 : 0
+      const bv = b.id in productQty ? 1 : 0
+      // "asc" = selected first (more intuitive when toggling on).
+      return (bv - av) * mult || a.name.localeCompare(b.name)
+    }
+  }
+}
+
+function SortableHead({
+  label,
+  sortKey,
+  current,
+  onChange,
+  className,
+}: {
+  label: React.ReactNode
+  sortKey: ProductSortKey
+  current: { key: ProductSortKey; dir: SortDir }
+  onChange: (next: { key: ProductSortKey; dir: SortDir }) => void
+  className?: string
+}) {
+  const active = current.key === sortKey
+  const Icon = active
+    ? current.dir === "asc"
+      ? ArrowUp
+      : ArrowDown
+    : ArrowUpDown
+  return (
+    <TableHead className={className}>
+      <button
+        type="button"
+        onClick={() =>
+          onChange({
+            key: sortKey,
+            dir: active && current.dir === "asc" ? "desc" : "asc",
+          })
+        }
+        className={
+          "inline-flex items-center gap-1 -mx-1 rounded px-1 py-0.5 " +
+          "hover:bg-muted/60 focus:outline-none focus-visible:ring-2 " +
+          "focus-visible:ring-ring " +
+          (active ? "text-foreground" : "text-muted-foreground")
+        }
+        aria-label={`Sort by ${typeof label === "string" ? label : sortKey}`}
+      >
+        <span>{label}</span>
+        <Icon className="h-3.5 w-3.5" />
+      </button>
+    </TableHead>
+  )
+}
+
 function ProductsTable({
   products,
   productQty,
@@ -1132,89 +1225,203 @@ function ProductsTable({
   overdrawnInfo: Map<string, OverdrawInfo>
   stockErrorPid: string | null
 }) {
+  const [search, setSearch] = useState("")
+  const [categoryFilter, setCategoryFilter] = useState<string>(ALL_CATEGORIES)
+  const [sort, setSort] = useState<{ key: ProductSortKey; dir: SortDir }>({
+    key: "name",
+    dir: "asc",
+  })
+
+  const categories = useMemo(() => {
+    const set = new Set<string>()
+    for (const p of products) {
+      const c = p.category?.trim()
+      if (c) set.add(c)
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b))
+  }, [products])
+
+  // If the selected category disappears (e.g. products refetched), fall back.
+  if (
+    categoryFilter !== ALL_CATEGORIES &&
+    !categories.includes(categoryFilter)
+  ) {
+    setCategoryFilter(ALL_CATEGORIES)
+  }
+
+  const visibleProducts = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    const filtered = products.filter((p) => {
+      if (
+        categoryFilter !== ALL_CATEGORIES &&
+        (p.category ?? "") !== categoryFilter
+      ) {
+        return false
+      }
+      if (!q) return true
+      return (
+        p.name.toLowerCase().includes(q) ||
+        (p.category ?? "").toLowerCase().includes(q)
+      )
+    })
+    return [...filtered].sort((a, b) =>
+      compareProducts(a, b, sort.key, sort.dir, productQty),
+    )
+  }, [products, search, categoryFilter, sort, productQty])
+
   return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead className="w-10" />
-          <TableHead>Product</TableHead>
-          <TableHead className="w-24 text-right">Stock</TableHead>
-          <TableHead className="w-28">Qty / person</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {products.map((p) => {
-          const selected = p.id in productQty
-          const info = overdrawnInfo.get(p.id)
-          const overdrawn = info !== undefined
-          const error = overdrawn && selected
-          const highlighted = stockErrorPid === p.id || (overdrawn && selected)
-          const reasons: string[] = []
-          if (info && selected) {
-            if (info.overdrawn && info.available !== null) {
-              reasons.push(
-                `Needs ${info.needed} but only ${info.available} in stock.`,
-              )
-            }
-            if (info.overMaxPerOrder && info.maxPerOrder !== null) {
-              reasons.push(`Exceeds max per order (${info.maxPerOrder}/order).`)
-            }
-          }
-          return (
-            <TableRow
-              key={p.id}
-              className={highlighted ? "bg-destructive/10" : undefined}
+    <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-2 sm:flex-row">
+        <div className="relative flex-1">
+          <Search
+            className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+            aria-hidden="true"
+          />
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Filter by name or category"
+            className="pl-8"
+            aria-label="Filter products"
+          />
+        </div>
+        {categories.length > 0 && (
+          <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+            <SelectTrigger
+              className="w-full sm:w-56"
+              aria-label="Filter by category"
             >
-              <TableCell>
-                <Checkbox
-                  checked={selected}
-                  onCheckedChange={(c) => onToggle(p.id, !!c)}
-                  aria-label={`Select ${p.name}`}
-                />
-              </TableCell>
-              <TableCell>
-                <div className="flex flex-col">
-                  <span className="font-medium">{p.name}</span>
-                  {p.category && (
-                    <span className="text-xs text-muted-foreground">
-                      {p.category}
-                      {p.max_per_order != null
-                        ? ` · max ${p.max_per_order}/order`
-                        : ""}
-                    </span>
-                  )}
-                  {reasons.length > 0 && (
-                    <span className="mt-1 text-xs font-medium text-destructive">
-                      {reasons.join(" ")}
-                    </span>
-                  )}
-                </div>
-              </TableCell>
-              <TableCell className="text-right text-sm">
-                {p.total_stock_remaining == null ? (
-                  <Badge variant="outline">∞</Badge>
-                ) : (
-                  p.total_stock_remaining
-                )}
-              </TableCell>
-              <TableCell>
-                <Input
-                  type="number"
-                  min={1}
-                  disabled={!selected}
-                  value={selected ? (productQty[p.id] ?? 1) : ""}
-                  onChange={(e) => {
-                    const v = Number(e.target.value)
-                    onQty(p.id, Number.isFinite(v) && v > 0 ? Math.floor(v) : 1)
-                  }}
-                  className={error ? "border-destructive text-destructive" : ""}
-                  aria-invalid={!!error}
-                />
+              <SelectValue placeholder="All categories" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL_CATEGORIES}>All categories</SelectItem>
+              {categories.map((c) => (
+                <SelectItem key={c} value={c}>
+                  {c}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+      </div>
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <SortableHead
+              label={<span className="sr-only">Selected</span>}
+              sortKey="selected"
+              current={sort}
+              onChange={setSort}
+              className="w-10"
+            />
+            <SortableHead
+              label="Product"
+              sortKey="name"
+              current={sort}
+              onChange={setSort}
+            />
+            <SortableHead
+              label="Stock"
+              sortKey="stock"
+              current={sort}
+              onChange={setSort}
+              className="w-24 text-right"
+            />
+            <TableHead className="w-28">Qty / person</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {visibleProducts.length === 0 && (
+            <TableRow>
+              <TableCell
+                colSpan={4}
+                className="py-6 text-center text-sm text-muted-foreground"
+              >
+                No products match the current filters.
               </TableCell>
             </TableRow>
-          )
-        })}
-      </TableBody>
-    </Table>
+          )}
+          {visibleProducts.map((p) => {
+            const selected = p.id in productQty
+            const info = overdrawnInfo.get(p.id)
+            const overdrawn = info !== undefined
+            const error = overdrawn && selected
+            const highlighted =
+              stockErrorPid === p.id || (overdrawn && selected)
+            const reasons: string[] = []
+            if (info && selected) {
+              if (info.overdrawn && info.available !== null) {
+                reasons.push(
+                  `Needs ${info.needed} but only ${info.available} in stock.`,
+                )
+              }
+              if (info.overMaxPerOrder && info.maxPerOrder !== null) {
+                reasons.push(
+                  `Exceeds max per order (${info.maxPerOrder}/order).`,
+                )
+              }
+            }
+            return (
+              <TableRow
+                key={p.id}
+                className={highlighted ? "bg-destructive/10" : undefined}
+              >
+                <TableCell>
+                  <Checkbox
+                    checked={selected}
+                    onCheckedChange={(c) => onToggle(p.id, !!c)}
+                    aria-label={`Select ${p.name}`}
+                  />
+                </TableCell>
+                <TableCell>
+                  <div className="flex flex-col">
+                    <span className="font-medium">{p.name}</span>
+                    {p.category && (
+                      <span className="text-xs text-muted-foreground">
+                        {p.category}
+                        {p.max_per_order != null
+                          ? ` · max ${p.max_per_order}/order`
+                          : ""}
+                      </span>
+                    )}
+                    {reasons.length > 0 && (
+                      <span className="mt-1 text-xs font-medium text-destructive">
+                        {reasons.join(" ")}
+                      </span>
+                    )}
+                  </div>
+                </TableCell>
+                <TableCell className="text-right text-sm">
+                  {p.total_stock_remaining == null ? (
+                    <Badge variant="outline">∞</Badge>
+                  ) : (
+                    p.total_stock_remaining
+                  )}
+                </TableCell>
+                <TableCell>
+                  <Input
+                    type="number"
+                    min={1}
+                    disabled={!selected}
+                    value={selected ? (productQty[p.id] ?? 1) : ""}
+                    onChange={(e) => {
+                      const v = Number(e.target.value)
+                      onQty(
+                        p.id,
+                        Number.isFinite(v) && v > 0 ? Math.floor(v) : 1,
+                      )
+                    }}
+                    className={
+                      error ? "border-destructive text-destructive" : ""
+                    }
+                    aria-invalid={!!error}
+                  />
+                </TableCell>
+              </TableRow>
+            )
+          })}
+        </TableBody>
+      </Table>
+    </div>
   )
 }
