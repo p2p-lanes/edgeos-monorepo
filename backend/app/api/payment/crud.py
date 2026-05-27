@@ -405,20 +405,27 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         session: Session,
         payment: Payments,
         products: list[PaymentProductRequest],
+        *,
+        granted_by_user_id: uuid.UUID | None = None,
     ) -> Payments:
-        """Auto-approve a payment whose discounts zeroed the cart.
+        """Auto-approve a $0 payment and materialize tickets, flush-only.
 
-        Shared by the authenticated application flow and the anonymous
-        open-ticketing flow: there is no provider charge to confirm, so we
-        mark the payment APPROVED, materialize AttendeeProducts from the
-        request list, and commit. Callers handle flow-specific setup (cart
-        cleanup, edit_passes clearing, coupon usage, etc.) BEFORE invoking
-        this helper so the only shared concern lives here.
+        Used by three flows that all converge on the same write:
+        - authenticated application checkout when discounts zero the cart
+        - anonymous open-ticketing checkout when a 100% coupon zeroes it
+        - admin bulk grant ($0 comps).
+
+        Sets status=APPROVED, optionally records `granted_by_user_id` (admin
+        grant only), and INSERTs AttendeeProducts for the given line items.
+        Does NOT commit — callers own the transaction boundary so this helper
+        can participate in a larger atomic batch (admin grant) or be paired
+        with caller-side commit + email dispatch (self-service flows).
         """
         payment.status = PaymentStatus.APPROVED.value
+        if granted_by_user_id is not None:
+            payment.granted_by_user_id = granted_by_user_id
         self._add_products_to_attendees(session, products, payment_id=payment.id)
-        session.commit()
-        session.refresh(payment)
+        session.flush()
         return payment
 
     def create_open_ticketing_payment(
@@ -611,6 +618,10 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                         for pp in payment_products
                     ],
                 )
+                # Helper is flush-only — own the commit here so the router
+                # can fire the confirmation email against the persisted row.
+                session.commit()
+                session.refresh(payment)
                 return payment, ""
 
             if not popup.simplefi_api_key:
@@ -1676,10 +1687,12 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
 
             session.add(application)
 
-            # Shared finalizer: materializes AttendeeProducts, commits the
-            # session and refreshes the payment. Same code path as the
-            # anonymous open-ticketing flow so they can't drift again.
+            # Shared finalizer: materializes AttendeeProducts and flushes.
+            # Same code path as the anonymous open-ticketing flow and the
+            # admin bulk-grant flow so they can't drift again.
             self._finalize_zero_amount_payment(session, payment, obj.products)
+            session.commit()
+            session.refresh(payment)
 
             # Return payment with approved status
             preview.status = PaymentStatus.APPROVED.value
