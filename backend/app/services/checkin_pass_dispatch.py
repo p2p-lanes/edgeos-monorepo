@@ -1,15 +1,16 @@
-"""Scheduled dispatch of check-in pass emails.
+"""Scheduled dispatch of the check-in pass email.
 
 Invoked by an external scheduler via ``POST /internal/cron/checkin-passes``
 (see ``app/api/internal/router.py``). Runs as a cross-tenant system job on the
 superuser session — the same pattern as the SimpleFi webhook — so it sees rows
 across all tenants without per-tenant engine juggling.
 
-For every popup with ``checkin_pass_lead_days`` set whose start is within the
-send window, this emails the buyer one message containing the check-in QR code
-for each scannable ticket they purchased. The email content comes from the
-popup's custom ``CHECK_IN_PASS`` template, or the file-based default when none
-exists (handled by ``send_check_in_pass`` → ``render_with_fallback``).
+For every popup with ``checkin_pass_lead_days`` set, this emails the buyer one
+message containing the check-in QR code for each scannable ticket they
+purchased. The send window opens ``lead_days`` before ``start_date`` and stays
+open until ``end_date`` (or indefinitely when end_date is null), so the same
+mechanism also covers tickets purchased after the event has started — the run
+that follows the new purchase picks them up and ships their QRs.
 
 A per-ticket ``checkin_pass_sent_at`` stamp (set only after a successful send)
 makes repeated runs idempotent; a Postgres advisory lock makes overlapping runs
@@ -21,15 +22,18 @@ from datetime import UTC, datetime, timedelta
 
 from loguru import logger
 from sqlalchemy import text
-from sqlmodel import Session, select
+from sqlmodel import Session
 
-from app.api.attendee.models import AttendeeProducts, Attendees
+from app.api.attendee.crud import attendees_crud
+from app.api.attendee.models import AttendeeProducts
+from app.api.email_template.schemas import EmailTemplateType
 from app.api.human.models import Humans
+from app.api.popup.crud import popups_crud
 from app.api.popup.models import Popups
-from app.api.product.models import Products
 from app.api.tenant.utils import get_portal_url
 from app.services.checkin_qr import generate_checkin_qr_url
 from app.services.email import CheckInPassContext, CheckInQrItem, get_email_service
+from app.services.email.templates import render_default_subject
 
 # Arbitrary fixed key identifying the "check-in pass dispatch" advisory lock.
 # Every run contends on this same key so only one dispatch proceeds at a time.
@@ -58,23 +62,19 @@ def _resolve_buyer(ticket: AttendeeProducts) -> Humans | None:
 def _due_popups(db: Session, now: datetime) -> list[Popups]:
     """Popups with check-in passes enabled and within the send window.
 
-    Enablement + schedule live on the popup: ``checkin_pass_lead_days`` set to
-    a positive value enables it. Window: ``now >= start_date -
-    checkin_pass_lead_days`` and (no end_date or ``now < end_date``).
+    Window: ``start_date - lead_days <= now`` and (no end_date or
+    ``now < end_date``). The post-start tail is intentional — tickets bought
+    after the event begins are picked up by the next run without needing a
+    separate code path.
     """
-    popups = db.exec(
-        select(Popups).where(
-            Popups.checkin_pass_lead_days.is_not(None),  # type: ignore[union-attr]
-            Popups.start_date.is_not(None),  # type: ignore[union-attr]
-        )
-    ).all()
-
     due: list[Popups] = []
-    for popup in popups:
+    for popup in popups_crud.list_with_checkin_pass_enabled(db):
         lead = popup.checkin_pass_lead_days
         if not lead or lead <= 0:
             continue
         start = _as_utc(popup.start_date)
+        if start is None:
+            continue
         end = _as_utc(popup.end_date)
         send_from = start - timedelta(days=lead)
         if now < send_from:
@@ -85,25 +85,9 @@ def _due_popups(db: Session, now: datetime) -> list[Popups]:
     return due
 
 
-def _unsent_scannable_tickets(db: Session, popup: Popups) -> list[AttendeeProducts]:
-    """Tickets in *popup* that require check-in and have not been emailed yet."""
-    return list(
-        db.exec(
-            select(AttendeeProducts)
-            .join(Attendees, AttendeeProducts.attendee_id == Attendees.id)
-            .join(Products, AttendeeProducts.product_id == Products.id)
-            .where(
-                Attendees.popup_id == popup.id,
-                Products.requires_check_in == True,  # noqa: E712
-                AttendeeProducts.checkin_pass_sent_at.is_(None),  # type: ignore[union-attr]
-            )
-        ).all()
-    )
-
-
 async def _send_popup_passes(db: Session, popup: Popups, now: datetime) -> dict:
     """Send (and mark) all due check-in passes for a single popup."""
-    tickets = _unsent_scannable_tickets(db, popup)
+    tickets = attendees_crud.find_unsent_checkin_pass_tickets(db, popup.id)
     if not tickets:
         return {"emails_sent": 0, "tickets_marked": 0, "failures": 0}
 
@@ -123,6 +107,13 @@ async def _send_popup_passes(db: Session, popup: Popups, now: datetime) -> dict:
     portal_url = get_portal_url(popup.tenant)
     sender_email = popup.tenant.sender_email
     sender_name = popup.tenant.sender_name
+    # Render the default subject from the template metadata so it's not
+    # hardcoded here. Custom-template subjects (configured per popup) override
+    # this inside EmailService when present.
+    default_subject = render_default_subject(
+        EmailTemplateType.CHECK_IN_PASS,
+        {"popup_name": popup.name},
+    )
 
     emails_sent = tickets_marked = failures = 0
     for buyer, buyer_tickets in by_buyer.values():
@@ -145,7 +136,7 @@ async def _send_popup_passes(db: Session, popup: Popups, now: datetime) -> dict:
             )
             ok = await email_service.send_check_in_pass(
                 to=buyer.email,
-                subject=f"Your check-in pass for {popup.name}",
+                subject=default_subject,
                 context=context,
                 from_address=sender_email,
                 from_name=sender_name,
@@ -155,10 +146,7 @@ async def _send_popup_passes(db: Session, popup: Popups, now: datetime) -> dict:
             if ok:
                 # Mark after a successful send (at-least-once): a crash before
                 # this leaves tickets unsent -> retried next run.
-                for t in buyer_tickets:
-                    t.checkin_pass_sent_at = now
-                    db.add(t)
-                db.commit()
+                attendees_crud.mark_checkin_pass_sent(db, buyer_tickets, now)
                 emails_sent += 1
                 tickets_marked += len(buyer_tickets)
             else:
@@ -200,6 +188,12 @@ async def _run_dispatch(db: Session, now: datetime) -> dict:
         summary["emails_sent"] += result["emails_sent"]
         summary["tickets_marked"] += result["tickets_marked"]
         summary["failures"] += result["failures"]
+    if summary["failures"]:
+        logger.error(
+            "Check-in pass dispatch finished with {} failures across {} popups",
+            summary["failures"],
+            summary["popups_processed"],
+        )
     return summary
 
 
