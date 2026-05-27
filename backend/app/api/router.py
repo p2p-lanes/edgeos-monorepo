@@ -38,7 +38,6 @@ from app.api import (
 )
 from app.api.application.router import portal_router
 from app.api.check_in import router as check_in_router
-from app.api.internal import router as internal_router
 
 api_router = APIRouter()
 
@@ -103,4 +102,3 @@ api_router.include_router(dashboard.router)
 
 # Ticket events (scan history)
 api_router.include_router(check_in_router.router)
-api_router.include_router(internal_router.router)

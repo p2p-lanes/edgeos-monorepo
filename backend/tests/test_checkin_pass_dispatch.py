@@ -1,18 +1,23 @@
-"""Integration tests for the check-in pass cron dispatcher.
+"""Integration tests for the check-in pass dispatch job.
 
-Covers the endpoint POST /api/v1/internal/cron/checkin-passes:
+Invokes ``dispatch_checkin_passes`` directly — the job is meant to run as a
+standalone Python module from a scheduler (no HTTP endpoint, no auth surface),
+so the tests exercise the service entrypoint rather than going through FastAPI.
+
+Coverage:
 - happy path: one email to the buyer with all their QR codes, tickets stamped
 - idempotency: a second run sends nothing
-- window: popups outside the send window are skipped
-- auth: missing/invalid secret -> 401, unset secret -> 503
+- window: popups whose start is too far in the future are skipped
+- post-start tail: popups whose event has started but not ended still send
+  (covers tickets purchased after the event begins)
 """
 
+import asyncio
 import uuid
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from fastapi.testclient import TestClient
 from sqlmodel import Session
 
 from app.api.application.models import Applications
@@ -22,10 +27,8 @@ from app.api.human.models import Humans
 from app.api.popup.models import Popups
 from app.api.product.models import Products
 from app.api.tenant.models import Tenants
-from app.core.config import settings
+from app.services.checkin_pass_dispatch import dispatch_checkin_passes
 
-CRON_URL = "/api/v1/internal/cron/checkin-passes"
-TEST_SECRET = "test-cron-secret"
 QR_TARGET = "app.services.checkin_pass_dispatch.generate_checkin_qr_url"
 EMAIL_TARGET = "app.services.checkin_pass_dispatch.get_email_service"
 
@@ -158,30 +161,31 @@ def _mock_email_service() -> MagicMock:
     return service
 
 
+def _run(db: Session) -> dict:
+    return asyncio.run(dispatch_checkin_passes(db))
+
+
 # ---------------------------------------------------------------------------
 # Tests
 # ---------------------------------------------------------------------------
 
 
 def test_dispatch_sends_to_buyer_marks_tickets_and_is_idempotent(
-    client: TestClient, db: Session, tenant_a: Tenants
+    db: Session, tenant_a: Tenants
 ) -> None:
     popup, human, tickets = _make_due_popup_with_tickets(db, tenant_a, n_tickets=2)
     email_service = _mock_email_service()
 
     with (
-        patch.object(settings, "CRON_SECRET", TEST_SECRET),
         patch(QR_TARGET, return_value="https://cdn.test/qr.png"),
         patch(EMAIL_TARGET, return_value=email_service),
     ):
-        resp = client.post(CRON_URL, headers={"X-Cron-Secret": TEST_SECRET})
+        summary = _run(db)
 
-    assert resp.status_code == 200, resp.text
-    body = resp.json()
-    assert body["status"] == "ok"
-    assert body["emails_sent"] == 1
-    assert body["tickets_marked"] == 2
-    assert body["failures"] == 0
+    assert summary["status"] == "ok"
+    assert summary["emails_sent"] == 1
+    assert summary["tickets_marked"] == 2
+    assert summary["failures"] == 0
 
     # One email to the buyer, carrying both QR codes.
     email_service.send_check_in_pass.assert_awaited_once()
@@ -199,67 +203,42 @@ def test_dispatch_sends_to_buyer_marks_tickets_and_is_idempotent(
     # Second run sends nothing (idempotent).
     email_service2 = _mock_email_service()
     with (
-        patch.object(settings, "CRON_SECRET", TEST_SECRET),
         patch(QR_TARGET, return_value="https://cdn.test/qr.png"),
         patch(EMAIL_TARGET, return_value=email_service2),
     ):
-        resp2 = client.post(CRON_URL, headers={"X-Cron-Secret": TEST_SECRET})
+        summary2 = _run(db)
 
-    assert resp2.status_code == 200, resp2.text
-    assert resp2.json()["emails_sent"] == 0
+    assert summary2["emails_sent"] == 0
     email_service2.send_check_in_pass.assert_not_awaited()
 
 
-def test_dispatch_skips_popup_outside_window(
-    client: TestClient, db: Session, tenant_a: Tenants
-) -> None:
+def test_dispatch_skips_popup_outside_window(db: Session, tenant_a: Tenants) -> None:
     # start far in the future; with a 3-day lead it's not yet within the window.
     _make_due_popup_with_tickets(db, tenant_a, n_tickets=1, start_in_hours=24 * 100)
     email_service = _mock_email_service()
 
     with (
-        patch.object(settings, "CRON_SECRET", TEST_SECRET),
         patch(QR_TARGET, return_value="https://cdn.test/qr.png"),
         patch(EMAIL_TARGET, return_value=email_service),
     ):
-        resp = client.post(CRON_URL, headers={"X-Cron-Secret": TEST_SECRET})
+        summary = _run(db)
 
-    assert resp.status_code == 200, resp.text
-    assert resp.json()["emails_sent"] == 0
+    assert summary["emails_sent"] == 0
     email_service.send_check_in_pass.assert_not_awaited()
 
 
-def test_dispatch_sends_after_event_started(
-    client: TestClient, db: Session, tenant_a: Tenants
-) -> None:
+def test_dispatch_sends_after_event_started(db: Session, tenant_a: Tenants) -> None:
     # start in the past (event already started), end still in the future ->
-    # per the agreed behaviour, send immediately.
-    popup, human, tickets = _make_due_popup_with_tickets(
-        db, tenant_a, n_tickets=1, start_in_hours=-5
-    )
+    # the dispatcher keeps sending so tickets purchased after the event begins
+    # also get their QR. The window closes at end_date, not start_date.
+    _make_due_popup_with_tickets(db, tenant_a, n_tickets=1, start_in_hours=-5)
     email_service = _mock_email_service()
 
     with (
-        patch.object(settings, "CRON_SECRET", TEST_SECRET),
         patch(QR_TARGET, return_value="https://cdn.test/qr.png"),
         patch(EMAIL_TARGET, return_value=email_service),
     ):
-        resp = client.post(CRON_URL, headers={"X-Cron-Secret": TEST_SECRET})
+        summary = _run(db)
 
-    assert resp.status_code == 200, resp.text
-    assert resp.json()["emails_sent"] == 1
+    assert summary["emails_sent"] == 1
     email_service.send_check_in_pass.assert_awaited_once()
-
-
-def test_invalid_secret_is_rejected(client: TestClient) -> None:
-    with patch.object(settings, "CRON_SECRET", TEST_SECRET):
-        missing = client.post(CRON_URL)
-        wrong = client.post(CRON_URL, headers={"X-Cron-Secret": "nope"})
-    assert missing.status_code == 401
-    assert wrong.status_code == 401
-
-
-def test_disabled_when_secret_unset(client: TestClient) -> None:
-    with patch.object(settings, "CRON_SECRET", None):
-        resp = client.post(CRON_URL, headers={"X-Cron-Secret": "anything"})
-    assert resp.status_code == 503

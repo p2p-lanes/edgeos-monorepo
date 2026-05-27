@@ -30,9 +30,6 @@ class Settings(BaseSettings):
     )
     API_V1_STR: str = "/api/v1"
     SECRET_KEY: str = Field(...)
-    # Shared secret for internal cron endpoints (e.g. check-in pass dispatch).
-    # When unset, those endpoints are disabled (return 503).
-    CRON_SECRET: str | None = None
     # 60 minutes * 24 hours * 8 days = 8 days
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 8
     BACKOFFICE_URL: str = "http://localhost:5173"
