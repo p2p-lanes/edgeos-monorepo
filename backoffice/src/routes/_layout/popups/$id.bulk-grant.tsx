@@ -513,96 +513,95 @@ function BulkGrantContent({ popupId }: { popupId: string }) {
                   <TableRow>
                     <TableHead className="w-10 text-xs">#</TableHead>
                     <TableHead>Person</TableHead>
-                      <TableHead className="w-24 text-right">
-                        <span className="sr-only">Actions</span>
-                      </TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {people.map((p, idx) => {
-                      const fullName = [p.first_name, p.last_name]
-                        .filter(Boolean)
-                        .join(" ") || (
-                        <span className="italic text-muted-foreground">
-                          No name
-                        </span>
-                      )
-                      const emailClass = p.errors.email
-                        ? "text-xs text-destructive"
-                        : "text-xs text-muted-foreground"
-                      const eff = effectiveProducts(p, defaultProducts)
-                      const isCustom = p.productsOverride !== null
-                      const contributesToOverdraw = Object.entries(eff).some(
-                        ([pid, qty]) =>
-                          (qty ?? 0) > 0 && overdrawnInfo.has(pid),
-                      )
-                      return (
-                        <TableRow
-                          key={p.id}
-                          className={
-                            contributesToOverdraw
-                              ? "ring-1 ring-destructive/60"
-                              : undefined
-                          }
-                        >
-                          <TableCell className="text-xs text-muted-foreground align-top">
-                            {idx + 1}
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex flex-col gap-1.5">
-                              <div className="flex flex-col">
-                                <span className="font-medium">{fullName}</span>
-                                <span
-                                  className={emailClass}
-                                  title={p.errors.email ?? undefined}
-                                >
-                                  {p.email}
-                                  {p.errors.email ? ` · ${p.errors.email}` : ""}
-                                </span>
-                              </div>
-                              <PersonProductsStrip
-                                effective={eff}
-                                productsById={productsById}
-                                isCustom={isCustom}
-                                onOpen={() => setEditProductsIndex(idx)}
-                                onResetToDefault={
-                                  isCustom
-                                    ? () => setPersonOverride(idx, null)
-                                    : undefined
-                                }
-                              />
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-right align-top">
-                            <div className="flex justify-end gap-1">
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() =>
-                                  setPersonFormState({
-                                    mode: "edit",
-                                    index: idx,
-                                  })
-                                }
-                                aria-label={`Edit ${p.email}`}
+                    <TableHead className="w-24 text-right">
+                      <span className="sr-only">Actions</span>
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {people.map((p, idx) => {
+                    const fullName = [p.first_name, p.last_name]
+                      .filter(Boolean)
+                      .join(" ") || (
+                      <span className="italic text-muted-foreground">
+                        No name
+                      </span>
+                    )
+                    const emailClass = p.errors.email
+                      ? "text-xs text-destructive"
+                      : "text-xs text-muted-foreground"
+                    const eff = effectiveProducts(p, defaultProducts)
+                    const isCustom = p.productsOverride !== null
+                    const contributesToOverdraw = Object.entries(eff).some(
+                      ([pid, qty]) => (qty ?? 0) > 0 && overdrawnInfo.has(pid),
+                    )
+                    return (
+                      <TableRow
+                        key={p.id}
+                        className={
+                          contributesToOverdraw
+                            ? "ring-1 ring-destructive/60"
+                            : undefined
+                        }
+                      >
+                        <TableCell className="text-xs text-muted-foreground align-top">
+                          {idx + 1}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-col gap-1.5">
+                            <div className="flex flex-col">
+                              <span className="font-medium">{fullName}</span>
+                              <span
+                                className={emailClass}
+                                title={p.errors.email ?? undefined}
                               >
-                                <Pencil className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => setDeleteIndex(idx)}
-                                aria-label={`Delete ${p.email}`}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
+                                {p.email}
+                                {p.errors.email ? ` · ${p.errors.email}` : ""}
+                              </span>
                             </div>
-                          </TableCell>
-                        </TableRow>
-                      )
-                    })}
-                  </TableBody>
-                </Table>
+                            <PersonProductsStrip
+                              effective={eff}
+                              productsById={productsById}
+                              isCustom={isCustom}
+                              onOpen={() => setEditProductsIndex(idx)}
+                              onResetToDefault={
+                                isCustom
+                                  ? () => setPersonOverride(idx, null)
+                                  : undefined
+                              }
+                            />
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right align-top">
+                          <div className="flex justify-end gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() =>
+                                setPersonFormState({
+                                  mode: "edit",
+                                  index: idx,
+                                })
+                              }
+                              aria-label={`Edit ${p.email}`}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => setDeleteIndex(idx)}
+                              aria-label={`Delete ${p.email}`}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })}
+                </TableBody>
+              </Table>
             )}
             {peopleHaveErrors && (
               <div className="mt-3 text-xs text-destructive">
@@ -1143,87 +1142,79 @@ function ProductsTable({
           <TableHead className="w-28">Qty / person</TableHead>
         </TableRow>
       </TableHeader>
-        <TableBody>
-          {products.map((p) => {
-            const selected = p.id in productQty
-            const info = overdrawnInfo.get(p.id)
-            const overdrawn = info !== undefined
-            const error = overdrawn && selected
-            const highlighted =
-              stockErrorPid === p.id || (overdrawn && selected)
-            const reasons: string[] = []
-            if (info && selected) {
-              if (info.overdrawn && info.available !== null) {
-                reasons.push(
-                  `Needs ${info.needed} but only ${info.available} in stock.`,
-                )
-              }
-              if (info.overMaxPerOrder && info.maxPerOrder !== null) {
-                reasons.push(
-                  `Exceeds max per order (${info.maxPerOrder}/order).`,
-                )
-              }
+      <TableBody>
+        {products.map((p) => {
+          const selected = p.id in productQty
+          const info = overdrawnInfo.get(p.id)
+          const overdrawn = info !== undefined
+          const error = overdrawn && selected
+          const highlighted = stockErrorPid === p.id || (overdrawn && selected)
+          const reasons: string[] = []
+          if (info && selected) {
+            if (info.overdrawn && info.available !== null) {
+              reasons.push(
+                `Needs ${info.needed} but only ${info.available} in stock.`,
+              )
             }
-            return (
-              <TableRow
-                key={p.id}
-                className={highlighted ? "bg-destructive/10" : undefined}
-              >
-                <TableCell>
-                  <Checkbox
-                    checked={selected}
-                    onCheckedChange={(c) => onToggle(p.id, !!c)}
-                    aria-label={`Select ${p.name}`}
-                  />
-                </TableCell>
-                <TableCell>
-                  <div className="flex flex-col">
-                    <span className="font-medium">{p.name}</span>
-                    {p.category && (
-                      <span className="text-xs text-muted-foreground">
-                        {p.category}
-                        {p.max_per_order != null
-                          ? ` · max ${p.max_per_order}/order`
-                          : ""}
-                      </span>
-                    )}
-                    {reasons.length > 0 && (
-                      <span className="mt-1 text-xs font-medium text-destructive">
-                        {reasons.join(" ")}
-                      </span>
-                    )}
-                  </div>
-                </TableCell>
-                <TableCell className="text-right text-sm">
-                  {p.total_stock_remaining == null ? (
-                    <Badge variant="outline">∞</Badge>
-                  ) : (
-                    p.total_stock_remaining
+            if (info.overMaxPerOrder && info.maxPerOrder !== null) {
+              reasons.push(`Exceeds max per order (${info.maxPerOrder}/order).`)
+            }
+          }
+          return (
+            <TableRow
+              key={p.id}
+              className={highlighted ? "bg-destructive/10" : undefined}
+            >
+              <TableCell>
+                <Checkbox
+                  checked={selected}
+                  onCheckedChange={(c) => onToggle(p.id, !!c)}
+                  aria-label={`Select ${p.name}`}
+                />
+              </TableCell>
+              <TableCell>
+                <div className="flex flex-col">
+                  <span className="font-medium">{p.name}</span>
+                  {p.category && (
+                    <span className="text-xs text-muted-foreground">
+                      {p.category}
+                      {p.max_per_order != null
+                        ? ` · max ${p.max_per_order}/order`
+                        : ""}
+                    </span>
                   )}
-                </TableCell>
-                <TableCell>
-                  <Input
-                    type="number"
-                    min={1}
-                    disabled={!selected}
-                    value={selected ? (productQty[p.id] ?? 1) : ""}
-                    onChange={(e) => {
-                      const v = Number(e.target.value)
-                      onQty(
-                        p.id,
-                        Number.isFinite(v) && v > 0 ? Math.floor(v) : 1,
-                      )
-                    }}
-                    className={
-                      error ? "border-destructive text-destructive" : ""
-                    }
-                    aria-invalid={!!error}
-                  />
-                </TableCell>
-              </TableRow>
-            )
-          })}
-        </TableBody>
-      </Table>
+                  {reasons.length > 0 && (
+                    <span className="mt-1 text-xs font-medium text-destructive">
+                      {reasons.join(" ")}
+                    </span>
+                  )}
+                </div>
+              </TableCell>
+              <TableCell className="text-right text-sm">
+                {p.total_stock_remaining == null ? (
+                  <Badge variant="outline">∞</Badge>
+                ) : (
+                  p.total_stock_remaining
+                )}
+              </TableCell>
+              <TableCell>
+                <Input
+                  type="number"
+                  min={1}
+                  disabled={!selected}
+                  value={selected ? (productQty[p.id] ?? 1) : ""}
+                  onChange={(e) => {
+                    const v = Number(e.target.value)
+                    onQty(p.id, Number.isFinite(v) && v > 0 ? Math.floor(v) : 1)
+                  }}
+                  className={error ? "border-destructive text-destructive" : ""}
+                  aria-invalid={!!error}
+                />
+              </TableCell>
+            </TableRow>
+          )
+        })}
+      </TableBody>
+    </Table>
   )
 }
