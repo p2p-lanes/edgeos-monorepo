@@ -141,6 +141,13 @@ class PaymentBase(SQLModel):
     # Payment type
     payment_type: str = Field(default=PaymentType.PASS_PURCHASE.value)
 
+    # Admin-grant attribution. Non-null only for $0 payments created by an
+    # admin via the bulk-grant flow — distinguishes admin comps from organic
+    # free payments (100% coupon, credit, etc.) which leave this NULL.
+    granted_by_user_id: uuid.UUID | None = Field(
+        default=None, foreign_key="users.id", nullable=True, index=True
+    )
+
 
 class PaymentProductRequest(BaseModel):
     """Product selection for payment."""

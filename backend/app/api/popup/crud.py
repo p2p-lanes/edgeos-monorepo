@@ -1,7 +1,8 @@
 from typing import Any
 
 from sqlalchemy import case
-from sqlmodel import Session
+from sqlalchemy.orm import selectinload
+from sqlmodel import Session, select
 
 from app.api.popup.models import Popups
 from app.api.popup.schemas import PopupCreate, PopupStatus, PopupUpdate
@@ -46,6 +47,27 @@ class PopupsCRUD(BaseCRUD[Popups, PopupCreate, PopupUpdate]):
             active_first,
             Popups.start_date.desc().nulls_last(),  # type: ignore[attr-defined]
         )
+
+    def list_with_checkin_pass_enabled(self, session: Session) -> list[Popups]:
+        """Return popups that have the scheduled check-in pass email enabled.
+
+        Filters by ``checkin_pass_lead_days IS NOT NULL`` and ``start_date IS
+        NOT NULL`` — both are required for the dispatcher's window check.
+        Eager-loads ``tenant`` so callers can read sender_email / sender_name
+        per popup without a follow-up query.
+
+        Window logic (current vs. due) lives in the calling service so this
+        method stays a pure DB read.
+        """
+        statement = (
+            select(Popups)
+            .where(
+                Popups.checkin_pass_lead_days.is_not(None),  # type: ignore[union-attr]
+                Popups.start_date.is_not(None),  # type: ignore[union-attr]
+            )
+            .options(selectinload(Popups.tenant))  # type: ignore[arg-type]
+        )
+        return list(session.exec(statement).all())
 
 
 popups_crud = PopupsCRUD()

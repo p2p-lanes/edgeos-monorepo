@@ -82,6 +82,63 @@ class HumansCRUD(BaseCRUD[Humans, HumanCreate, HumanUpdate]):
                 ) from None
             return existing
 
+    def get_or_create_by_email(
+        self,
+        session: Session,
+        email: str,
+        tenant_id: uuid.UUID,
+        *,
+        default_first_name: str | None = None,
+        default_last_name: str | None = None,
+    ) -> Humans:
+        """Flush-only variant of `find_or_create` for atomic admin batch flows.
+
+        Identical lookup/insert semantics — NEVER overwrites existing fields —
+        but does NOT commit, so the caller owns the transaction boundary
+        (admin bulk grant rolls the entire batch back on any error).
+        """
+        existing = session.exec(
+            select(Humans).where(
+                Humans.email == email,
+                Humans.tenant_id == tenant_id,
+            )
+        ).first()
+        if existing is not None:
+            return existing
+
+        new_human = Humans(
+            id=uuid.uuid4(),
+            email=email,
+            tenant_id=tenant_id,
+            first_name=default_first_name,
+            last_name=default_last_name,
+        )
+        # SAVEPOINT so a concurrent unique-constraint race can be recovered
+        # from without poisoning the outer transaction (which holds prior
+        # Humans/Applications writes from the same batch).
+        nested = session.begin_nested()
+        try:
+            session.add(new_human)
+            session.flush()
+            nested.commit()
+        except IntegrityError:
+            nested.rollback()
+            logger.info(
+                "get_or_create_by_email: IntegrityError race on ({}, {}) — fetching winner",
+                email,
+                tenant_id,
+            )
+            existing = session.exec(
+                select(Humans).where(
+                    Humans.email == email,
+                    Humans.tenant_id == tenant_id,
+                )
+            ).first()
+            if existing is None:
+                raise
+            return existing
+        return new_human
+
     def get_by_email(
         self, session: Session, email: str, tenant_id: uuid.UUID | None = None
     ) -> Humans | None:

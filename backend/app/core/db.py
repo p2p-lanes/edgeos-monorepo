@@ -335,6 +335,7 @@ def _seed_products(
                 category=product_data.get("category", "ticket"),
                 attendee_category_id=attendee_category_id,
                 duration_type=product_data.get("duration_type"),
+                requires_check_in=product_data.get("requires_check_in", False),
                 start_date=(
                     parse_datetime(product_data["start_date"])
                     if product_data.get("start_date")

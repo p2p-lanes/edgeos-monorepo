@@ -522,7 +522,10 @@ async def create_my_application_fee(
     return PaymentPublic.model_validate(payment)
 
 
-@router.get("/my/popup/{popup_id}", response_model=ListModel[PaymentPublic], summary="List your payments for a popup",
+@router.get(
+    "/my/popup/{popup_id}",
+    response_model=ListModel[PaymentPublic],
+    summary="List your payments for a popup",
     dependencies=[needs("portal:payments:read")],
 )
 async def list_my_payments_by_popup(

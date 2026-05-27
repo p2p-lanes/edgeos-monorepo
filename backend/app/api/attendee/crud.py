@@ -1,6 +1,7 @@
 import random
 import string
 import uuid
+from datetime import datetime
 from typing import Any
 
 from fastapi import HTTPException, status
@@ -77,7 +78,16 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
         count_statement = select(func.count()).select_from(statement.subquery())
         total = session.exec(count_statement).one()
 
-        statement = statement.offset(skip).limit(limit)
+        statement = (
+            statement.options(
+                selectinload(Attendees.attendee_products).selectinload(  # type: ignore[arg-type]
+                    AttendeeProducts.product  # ty: ignore[invalid-argument-type]
+                ),
+                selectinload(Attendees.category_ref),  # type: ignore[arg-type]
+            )
+            .offset(skip)
+            .limit(limit)
+        )
         results = list(session.exec(statement).all())
 
         return results, total
@@ -115,6 +125,7 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
                     AttendeeProducts.product  # ty: ignore[invalid-argument-type]
                 ),
                 selectinload(Attendees.application),  # type: ignore[arg-type]
+                selectinload(Attendees.category_ref),  # type: ignore[arg-type]
             )
             .offset(skip)
             .limit(limit)
@@ -167,6 +178,41 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
         session.commit()
         session.refresh(attendee)
         return attendee
+
+    def get_main_attendee(
+        self,
+        session: Session,
+        application_id: uuid.UUID,
+    ) -> Attendees | None:
+        """Return the primary (is_primary=True) attendee for an application.
+
+        Joins through attendee_categories to pick the one whose category is
+        marked primary on the popup. Falls back to the first attendee row
+        when no category match is found (e.g. legacy data where category_id
+        is NULL on the only main row).
+        """
+        from app.api.attendee_category.models import AttendeeCategories
+
+        statement = (
+            select(Attendees)
+            .join(
+                AttendeeCategories,
+                Attendees.category_id == AttendeeCategories.id,  # type: ignore[arg-type]
+            )
+            .where(
+                Attendees.application_id == application_id,
+                AttendeeCategories.is_primary.is_(True),  # type: ignore[union-attr]
+            )
+            .limit(1)
+        )
+        primary = session.exec(statement).first()
+        if primary is not None:
+            return primary
+
+        fallback = session.exec(
+            select(Attendees).where(Attendees.application_id == application_id).limit(1)
+        ).first()
+        return fallback
 
     def find_direct_attendee(
         self,
@@ -339,6 +385,7 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
                     Applications.popup  # ty: ignore[invalid-argument-type]
                 ),
                 selectinload(Attendees.popup),  # type: ignore[arg-type]
+                selectinload(Attendees.category_ref),  # type: ignore[arg-type]
             )
             .offset(skip)
             .limit(limit)
@@ -376,6 +423,7 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
                 selectinload(Attendees.attendee_products).selectinload(  # type: ignore[arg-type]
                     AttendeeProducts.product  # ty: ignore[invalid-argument-type]
                 ),
+                selectinload(Attendees.category_ref),  # type: ignore[arg-type]
             )
             .limit(1)
         )
@@ -449,6 +497,7 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
                     AttendeeProducts.product  # ty: ignore[invalid-argument-type]
                 ),
                 selectinload(Attendees.payment_products),  # type: ignore[arg-type]
+                selectinload(Attendees.category_ref),  # type: ignore[arg-type]
             )
             .offset(skip)
             .limit(limit)
@@ -477,6 +526,7 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
                 selectinload(Attendees.attendee_products).selectinload(  # type: ignore[arg-type]
                     AttendeeProducts.product  # ty: ignore[invalid-argument-type]
                 ),
+                selectinload(Attendees.category_ref),  # type: ignore[arg-type]
             )
         )
         return list(session.exec(statement).all())
@@ -618,6 +668,62 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
         products = session.exec(statement).all()
         for ap in products:
             session.delete(ap)
+        session.commit()
+
+    def find_unsent_checkin_pass_tickets(
+        self,
+        session: Session,
+        popup_id: uuid.UUID,
+    ) -> list[AttendeeProducts]:
+        """Return scannable tickets in *popup_id* that have not been emailed yet.
+
+        Filters AttendeeProducts joined with Attendees and Products by:
+        - ``Attendees.popup_id == popup_id``
+        - ``Products.requires_check_in IS TRUE``
+        - ``AttendeeProducts.checkin_pass_sent_at IS NULL``
+
+        Eager-loads ``attendee → application → human`` and ``product`` so the
+        check-in pass dispatcher can build per-ticket QR items and resolve the
+        buyer (application owner) without N+1 queries. ``Attendees.human`` is
+        already ``lazy="selectin"`` on the model so the direct-sale fallback
+        path is also covered.
+        """
+        from app.api.application.models import Applications
+        from app.api.product.models import Products
+
+        statement = (
+            select(AttendeeProducts)
+            .join(Attendees, AttendeeProducts.attendee_id == Attendees.id)  # type: ignore[arg-type]
+            .join(Products, AttendeeProducts.product_id == Products.id)  # type: ignore[arg-type]
+            .where(
+                Attendees.popup_id == popup_id,
+                Products.requires_check_in.is_(True),  # type: ignore[union-attr]
+                AttendeeProducts.checkin_pass_sent_at.is_(None),  # type: ignore[union-attr]
+            )
+            .options(
+                selectinload(AttendeeProducts.product),  # type: ignore[arg-type]
+                selectinload(AttendeeProducts.attendee)  # type: ignore[arg-type]
+                .selectinload(Attendees.application)  # ty: ignore[invalid-argument-type]
+                .selectinload(Applications.human),  # ty: ignore[invalid-argument-type]
+            )
+        )
+        return list(session.exec(statement).all())
+
+    def mark_checkin_pass_sent(
+        self,
+        session: Session,
+        tickets: list[AttendeeProducts],
+        sent_at: datetime,
+    ) -> None:
+        """Stamp ``checkin_pass_sent_at`` on each ticket and commit.
+
+        Called after a successful send so repeated cron runs don't re-email the
+        same ticket. Caller controls failure isolation: if the send fails the
+        tickets should not be passed in.
+        """
+        for ticket in tickets:
+            ticket.checkin_pass_sent_at = sent_at
+            session.add(ticket)
         session.commit()
 
 
