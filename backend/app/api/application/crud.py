@@ -80,6 +80,9 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
                 selectinload(Applications.attendees)  # type: ignore[arg-type]
                 .selectinload(Attendees.attendee_products)  # type: ignore[arg-type]
                 .selectinload(AttendeeProducts.product),  # type: ignore[arg-type]
+                selectinload(Applications.attendees).selectinload(  # type: ignore[arg-type]
+                    Attendees.category_ref  # type: ignore[arg-type]
+                ),
                 selectinload(Applications.human),  # type: ignore[arg-type]
             )
             .order_by(desc(Applications.created_at))  # type: ignore[arg-type]
@@ -139,6 +142,9 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
                 selectinload(Applications.attendees)  # type: ignore[arg-type]
                 .selectinload(Attendees.attendee_products)  # type: ignore[arg-type]
                 .selectinload(AttendeeProducts.product),  # type: ignore[arg-type]
+                selectinload(Applications.attendees).selectinload(  # type: ignore[arg-type]
+                    Attendees.category_ref  # type: ignore[arg-type]
+                ),
                 selectinload(Applications.human),  # type: ignore[arg-type]
             )
             .order_by(desc(Applications.created_at))  # type: ignore[arg-type]
@@ -173,6 +179,9 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
                 selectinload(Applications.attendees)  # type: ignore[arg-type]
                 .selectinload(Attendees.attendee_products)  # type: ignore[arg-type]
                 .selectinload(AttendeeProducts.product),  # type: ignore[arg-type]
+                selectinload(Applications.attendees).selectinload(  # type: ignore[arg-type]
+                    Attendees.category_ref  # type: ignore[arg-type]
+                ),
                 selectinload(Applications.human),  # type: ignore[arg-type]
             )
             .order_by(desc(Applications.created_at))  # type: ignore[arg-type]
@@ -244,6 +253,9 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
                 selectinload(Applications.attendees)  # type: ignore[arg-type]
                 .selectinload(Attendees.attendee_products)  # type: ignore[arg-type]
                 .selectinload(AttendeeProducts.product),  # type: ignore[arg-type]
+                selectinload(Applications.attendees).selectinload(  # type: ignore[arg-type]
+                    Attendees.category_ref  # type: ignore[arg-type]
+                ),
                 selectinload(Applications.human),  # type: ignore[arg-type]
             )
             .order_by(desc(Applications.created_at))  # type: ignore[arg-type]

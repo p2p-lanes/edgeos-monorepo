@@ -1,10 +1,11 @@
 import secrets
 import uuid
+from typing import Any
 
 from fastapi import HTTPException, status
 from sqlalchemy import desc
 from sqlalchemy.orm import selectinload
-from sqlmodel import Session, col, func, select
+from sqlmodel import Session, col, func, or_, select
 
 from app.api.group.models import (
     GroupLeaders,
@@ -19,6 +20,15 @@ from app.api.shared.crud import BaseCRUD
 def generate_random_slug() -> str:
     """Generate a random hex string for slug (8 characters)."""
     return secrets.token_hex(4)
+
+
+def _list_eager_load() -> tuple:
+    """Relationships fetched alongside every Groups list query.
+
+    GroupPublic exposes whitelisted_emails — without eager loading each row in
+    the list triggers a SELECT against group_whitelisted_emails.
+    """
+    return (selectinload(Groups.whitelisted_emails),)  # type: ignore[arg-type]
 
 
 class GroupsCRUD(BaseCRUD[Groups, GroupCreate, GroupUpdate]):
@@ -82,8 +92,12 @@ class GroupsCRUD(BaseCRUD[Groups, GroupCreate, GroupUpdate]):
         total = session.exec(count_statement).one()
 
         # Apply pagination and ordering
-        statement = statement.order_by(desc(Groups.created_at))  # type: ignore[arg-type]
-        statement = statement.offset(skip).limit(limit)
+        statement = (
+            statement.options(*_list_eager_load())
+            .order_by(desc(Groups.created_at))  # type: ignore[arg-type]
+            .offset(skip)
+            .limit(limit)
+        )
         results = list(session.exec(statement).all())
 
         return results, total
@@ -107,8 +121,49 @@ class GroupsCRUD(BaseCRUD[Groups, GroupCreate, GroupUpdate]):
         count_statement = select(func.count()).select_from(statement.subquery())
         total = session.exec(count_statement).one()
 
-        statement = statement.order_by(desc(Groups.created_at))  # type: ignore[arg-type]
-        statement = statement.offset(skip).limit(limit)
+        statement = (
+            statement.options(*_list_eager_load())
+            .order_by(desc(Groups.created_at))  # type: ignore[arg-type]
+            .offset(skip)
+            .limit(limit)
+        )
+        results = list(session.exec(statement).all())
+
+        return results, total
+
+    def find(
+        self,
+        session: Session,
+        skip: int = 0,
+        limit: int = 100,
+        search: str | None = None,
+        search_fields: list[str] | None = None,
+        sort_by: str | None = None,
+        sort_order: str = "desc",
+        **filters: Any,
+    ) -> tuple[list[Groups], int]:
+        """Override BaseCRUD.find to eager-load whitelisted_emails."""
+        statement = select(Groups)
+
+        for field, value in filters.items():
+            if value is not None:
+                statement = statement.where(getattr(Groups, field) == value)
+
+        if search and search_fields:
+            term = f"%{search}%"
+            search_conditions = [
+                getattr(Groups, field).ilike(term)
+                for field in search_fields
+                if hasattr(Groups, field)
+            ]
+            if search_conditions:
+                statement = statement.where(or_(*search_conditions))
+
+        count_statement = select(func.count()).select_from(statement.subquery())
+        total = session.exec(count_statement).one()
+
+        statement = self._apply_sorting(statement, sort_by, sort_order)
+        statement = statement.options(*_list_eager_load()).offset(skip).limit(limit)
         results = list(session.exec(statement).all())
 
         return results, total
