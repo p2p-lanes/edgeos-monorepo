@@ -14,7 +14,6 @@ import { FormPageLayout } from "@/components/Common/FormPageLayout"
 import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
   Dialog,
@@ -452,9 +451,11 @@ function BulkGrantContent({ popupId }: { popupId: string }) {
     <>
       <div className="grid gap-6 lg:grid-cols-2">
         {/* ---- People panel ---- */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between gap-2">
-            <CardTitle>1. People</CardTitle>
+        <section className="flex flex-col gap-4">
+          <div className="flex flex-row items-center justify-between gap-2">
+            <h2 className="text-lg font-semibold leading-none tracking-tight">
+              1. People
+            </h2>
             <div className="flex flex-wrap items-center gap-2">
               <Button
                 size="sm"
@@ -496,8 +497,8 @@ function BulkGrantContent({ popupId }: { popupId: string }) {
                 onChange={onFile}
               />
             </div>
-          </CardHeader>
-          <CardContent>
+          </div>
+          <div>
             {!hasPeople && (
               <div className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
                 Add people one by one with <strong>Add person</strong>, or
@@ -507,12 +508,11 @@ function BulkGrantContent({ popupId }: { popupId: string }) {
               </div>
             )}
             {hasPeople && (
-              <div className="rounded-md border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-10 text-xs">#</TableHead>
-                      <TableHead>Person</TableHead>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-10 text-xs">#</TableHead>
+                    <TableHead>Person</TableHead>
                       <TableHead className="w-24 text-right">
                         <span className="sr-only">Actions</span>
                       </TableHead>
@@ -603,23 +603,24 @@ function BulkGrantContent({ popupId }: { popupId: string }) {
                     })}
                   </TableBody>
                 </Table>
-              </div>
             )}
             {peopleHaveErrors && (
               <div className="mt-3 text-xs text-destructive">
                 Fix the highlighted email errors before submitting.
               </div>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </section>
 
         {/* ---- Products panel ---- */}
-        <Card>
-          <CardHeader>
-            <CardTitle>2. Default tickets per person</CardTitle>
+        <section className="flex flex-col gap-4">
+          <div className="flex flex-col gap-1">
+            <h2 className="text-lg font-semibold leading-none tracking-tight">
+              2. Default tickets per person
+            </h2>
             <p className="text-sm text-muted-foreground">{panel2Subtitle}</p>
-          </CardHeader>
-          <CardContent>
+          </div>
+          <div>
             {isProductsLoading && (
               <div className="text-sm text-muted-foreground">
                 Loading products…
@@ -640,8 +641,8 @@ function BulkGrantContent({ popupId }: { popupId: string }) {
                 stockErrorPid={stockErrorPid}
               />
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </section>
       </div>
 
       {/* ---- Submit bar ---- */}
@@ -1133,16 +1134,15 @@ function ProductsTable({
   stockErrorPid: string | null
 }) {
   return (
-    <div className="rounded-md border">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead className="w-10" />
-            <TableHead>Product</TableHead>
-            <TableHead className="w-24 text-right">Stock</TableHead>
-            <TableHead className="w-28">Qty / person</TableHead>
-          </TableRow>
-        </TableHeader>
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead className="w-10" />
+          <TableHead>Product</TableHead>
+          <TableHead className="w-24 text-right">Stock</TableHead>
+          <TableHead className="w-28">Qty / person</TableHead>
+        </TableRow>
+      </TableHeader>
         <TableBody>
           {products.map((p) => {
             const selected = p.id in productQty
@@ -1225,6 +1225,5 @@ function ProductsTable({
           })}
         </TableBody>
       </Table>
-    </div>
   )
 }
