@@ -22,6 +22,8 @@ class EmailTemplateType(StrEnum):
     ABANDONED_CART = "abandoned_cart"
     EDIT_PASSES_CONFIRMED = "edit_passes_confirmed"
     EVENT_INVITATION = "event_invitation"
+    EVENT_UPDATED = "event_updated"
+    EVENT_CANCELLED = "event_cancelled"
     EVENT_APPROVAL_APPROVED = "event_approval_approved"
     EVENT_APPROVAL_REJECTED = "event_approval_rejected"
     CHECK_IN_PASS = "check_in_pass"

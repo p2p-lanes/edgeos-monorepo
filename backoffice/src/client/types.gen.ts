@@ -53,6 +53,21 @@ export type AdminApiKeyPublic = {
     revoked_at?: (string | null);
 };
 
+/**
+ * Admin bulk-grant request: assign N free tickets to M people for a popup.
+ */
+export type AdminGrantTicketsRequest = {
+    popup_id: string;
+    people: Array<PersonGrantItem>;
+};
+
+/**
+ * Response payload from POST /applications/admin/grant-tickets.
+ */
+export type AdminGrantTicketsResponse = {
+    granted: Array<GrantedPaymentInfo>;
+};
+
 export type AITranslateRequest = {
     entity_type: string;
     entity_id: string;
@@ -1108,7 +1123,7 @@ export type EmailTemplatePublic = {
     updated_at?: (string | null);
 };
 
-export type EmailTemplateType = 'login_code_user' | 'login_code_human' | 'application_received' | 'application_accepted' | 'application_rejected' | 'application_accepted_with_discount' | 'application_accepted_with_incentive' | 'application_accepted_scholarship_rejected' | 'payment_confirmed' | 'abandoned_cart' | 'edit_passes_confirmed' | 'event_invitation' | 'event_approval_approved' | 'event_approval_rejected' | 'check_in_pass';
+export type EmailTemplateType = 'login_code_user' | 'login_code_human' | 'application_received' | 'application_accepted' | 'application_rejected' | 'application_accepted_with_discount' | 'application_accepted_with_incentive' | 'application_accepted_scholarship_rejected' | 'payment_confirmed' | 'abandoned_cart' | 'edit_passes_confirmed' | 'event_invitation' | 'event_updated' | 'event_cancelled' | 'event_approval_approved' | 'event_approval_rejected' | 'check_in_pass';
 
 export type EmailTemplateUpdate = {
     subject?: (string | null);
@@ -1611,6 +1626,25 @@ export type FormSectionUpdate = {
     description?: (string | null);
     order?: (number | null);
     hidden?: (boolean | null);
+};
+
+/**
+ * One $0 payment created by the admin bulk-grant flow.
+ */
+export type GrantedPaymentInfo = {
+    payment_id: string;
+    application_id: string;
+    human_id: string;
+    email: string;
+    tickets_created: number;
+};
+
+/**
+ * One product line in the admin bulk-grant request.
+ */
+export type GrantProductItem = {
+    product_id: string;
+    quantity?: number;
 };
 
 /**
@@ -2223,6 +2257,7 @@ export type PaymentPublic = {
     installments_paid?: (number | null);
     group_id?: (string | null);
     payment_type?: string;
+    granted_by_user_id?: (string | null);
     id: string;
     products_snapshot?: Array<PaymentProductResponse>;
     created_at?: (string | null);
@@ -2273,6 +2308,16 @@ export type PaymentUpdate = {
     rate?: (number | string | null);
     currency?: (string | null);
     settlement_currency?: (string | null);
+};
+
+/**
+ * One row of the admin bulk-grant CSV: a person to grant tickets to.
+ */
+export type PersonGrantItem = {
+    email: string;
+    first_name?: (string | null);
+    last_name?: (string | null);
+    products: Array<GrantProductItem>;
 };
 
 /**
@@ -3550,6 +3595,13 @@ export type ApplicationsCreateApplicationAdminData = {
 
 export type ApplicationsCreateApplicationAdminResponse = (ApplicationPublic);
 
+export type ApplicationsGrantTicketsAdminData = {
+    requestBody: AdminGrantTicketsRequest;
+    xTenantId?: (string | null);
+};
+
+export type ApplicationsGrantTicketsAdminResponse = (AdminGrantTicketsResponse);
+
 export type ApplicationsGetApplicationData = {
     applicationId: string;
     xTenantId?: (string | null);
@@ -4412,6 +4464,12 @@ export type EventsCreatePortalEventData = {
 };
 
 export type EventsCreatePortalEventResponse = (EventPublic);
+
+export type EventsListPortalPopupTagsData = {
+    popupId: string;
+};
+
+export type EventsListPortalPopupTagsResponse = (Array<(string)>);
 
 export type EventsPortalHiddenEventsCountData = {
     popupId?: (string | null);

@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+
+{% block title %}Event cancelled: {{ event_title }}{% endblock %}
+
+{% block content %}
+<h1>This event was cancelled</h1>
+
+<p>Hi {{ first_name or "there" }},</p>
+
+<p>
+    The event below has been cancelled and the entry has been removed from your calendar.
+</p>
+
+<div style="background-color: #f8f9fa; border-radius: 8px; padding: 20px; margin: 20px 0;">
+    <table style="width: 100%; border-collapse: collapse;">
+        <tr>
+            <td style="padding: 8px 12px; color: #666; vertical-align: top; width: 110px;">Event:</td>
+            <td style="padding: 8px 12px; font-weight: 600;">{{ event_title }}</td>
+        </tr>
+        {% if event_when %}
+        <tr>
+            <td style="padding: 8px 12px; color: #666; vertical-align: top;">Time:</td>
+            <td style="padding: 8px 12px; font-weight: 600;">{{ event_when }}</td>
+        </tr>
+        {% endif %}
+        {% if venue_title %}
+        <tr>
+            <td style="padding: 8px 12px; color: #666; vertical-align: top;">Location:</td>
+            <td style="padding: 8px 12px; font-weight: 600;">{{ venue_title }}</td>
+        </tr>
+        {% endif %}
+    </table>
+</div>
+{% endblock %}

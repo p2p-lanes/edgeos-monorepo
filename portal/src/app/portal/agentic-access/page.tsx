@@ -1,7 +1,7 @@
 "use client"
 
 import { format } from "date-fns"
-import { Check, Copy, Key, Loader2, Plus, Trash2 } from "lucide-react"
+import { Check, Copy, Info, Key, Loader2, Plus, Trash2 } from "lucide-react"
 import { useState } from "react"
 import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
@@ -33,7 +33,6 @@ import { CopyAgentBrief } from "./CopyAgentBrief"
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? ""
 
 const DEFAULT_SCOPES: ApiKeyScope[] = ["events:read"]
-const WRITE_SCOPE_LIFETIME_DAYS = 30
 
 const scopeKey = (scope: ApiKeyScope) => scope.replace(":", "_")
 
@@ -150,19 +149,14 @@ function ApiKeysSection() {
   const onCreate = async () => {
     const name = newKeyName.trim()
     if (!name) return
-    const requiresExpiry =
-      selectedScopes.includes("events:write") ||
-      selectedScopes.includes("venues:write")
-    const expiresAt = requiresExpiry
-      ? new Date(
-          Date.now() + WRITE_SCOPE_LIFETIME_DAYS * 24 * 60 * 60 * 1000,
-        ).toISOString()
-      : null
     try {
+      // The backend owns the write-scope lifetime: send ``expires_at: null``
+      // and let it fill in the policy default. The created key returned in
+      // the response already carries the final ``expires_at`` for display.
       const created = await createKey({
         name,
         scopes: selectedScopes,
-        expires_at: expiresAt,
+        expires_at: null,
       })
       setCreatedKey(created)
       setNewKeyName("")
@@ -371,8 +365,16 @@ function ApiKeysSection() {
               {SCOPE_OPTIONS.map((scope) => {
                 const checked = selectedScopes.includes(scope.value)
                 const checkboxId = `scope-${scope.value}`
+                const isComingSoon = scope.value === "events:write"
                 return (
-                  <div key={scope.value} className="flex items-start gap-3">
+                  <div
+                    key={scope.value}
+                    className={
+                      isComingSoon
+                        ? "flex items-start gap-3 rounded-md border border-green-300 bg-green-50 p-2"
+                        : "flex items-start gap-3"
+                    }
+                  >
                     <Checkbox
                       id={checkboxId}
                       checked={checked}
@@ -398,6 +400,14 @@ function ApiKeysSection() {
                           },
                         )}
                       </p>
+                      {isComingSoon && (
+                        <p className="flex items-center gap-1.5 text-xs font-medium text-green-900">
+                          <Info className="size-3.5 shrink-0" />
+                          {t("api_keys.scope.events_write.coming_soon", {
+                            defaultValue: "Coming to the village in week 2",
+                          })}
+                        </p>
+                      )}
                     </div>
                   </div>
                 )

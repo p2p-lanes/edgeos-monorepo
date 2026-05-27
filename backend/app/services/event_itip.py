@@ -14,9 +14,12 @@ from loguru import logger
 
 from app.core.config import settings
 from app.services.email import (
+    EventCancelledContext,
     EventInvitationContext,
+    EventUpdatedContext,
     get_email_service,
 )
+from app.services.email.templates import EventChangeRow
 from app.services.ical import build_event_ics
 
 
@@ -198,18 +201,6 @@ async def send_event_itip(
             when = _format_when(recipient_occurrence)
         else:
             when = _format_time_range(event.start_time, event.end_time)
-        context = EventInvitationContext(
-            first_name=r["first_name"],
-            event_title=event.title or "",
-            popup_name=popup_name,
-            event_when=when,
-            venue_title=venue_title,
-            event_url=event_url,
-            is_self_rsvp=is_self_rsvp,
-            is_update=is_update,
-            is_cancelled=is_cancelled,
-            changes=changes or {},
-        )
         try:
             ics_body = build_event_ics(
                 event,
@@ -232,17 +223,63 @@ async def send_event_itip(
             ics_body = None
 
         try:
-            await service.send_event_invitation(
-                to=r["email"],
-                subject=subject,
-                context=context,
-                from_address=from_address,
-                from_name=from_name,
-                popup_id=event.popup_id,
-                db_session=db,
-                ical_body=ics_body,
-                ical_method=method,
-            )
+            if is_cancelled:
+                await service.send_event_cancelled(
+                    to=r["email"],
+                    subject=subject,
+                    context=EventCancelledContext(
+                        first_name=r["first_name"],
+                        event_title=event.title or "",
+                        popup_name=popup_name,
+                        event_when=when,
+                        venue_title=venue_title,
+                    ),
+                    from_address=from_address,
+                    from_name=from_name,
+                    popup_id=event.popup_id,
+                    db_session=db,
+                    ical_body=ics_body,
+                )
+            elif is_update:
+                await service.send_event_updated(
+                    to=r["email"],
+                    subject=subject,
+                    context=EventUpdatedContext(
+                        first_name=r["first_name"],
+                        event_title=event.title or "",
+                        popup_name=popup_name,
+                        event_when=when,
+                        venue_title=venue_title,
+                        event_url=event_url,
+                        changes={
+                            k: EventChangeRow(**v) for k, v in (changes or {}).items()
+                        },
+                    ),
+                    from_address=from_address,
+                    from_name=from_name,
+                    popup_id=event.popup_id,
+                    db_session=db,
+                    ical_body=ics_body,
+                )
+            else:
+                await service.send_event_invitation(
+                    to=r["email"],
+                    subject=subject,
+                    context=EventInvitationContext(
+                        first_name=r["first_name"],
+                        event_title=event.title or "",
+                        popup_name=popup_name,
+                        event_when=when,
+                        venue_title=venue_title,
+                        event_url=event_url,
+                    ),
+                    from_address=from_address,
+                    from_name=from_name,
+                    popup_id=event.popup_id,
+                    db_session=db,
+                    ical_body=ics_body,
+                    ical_method=method,
+                )
         except Exception as exc:  # pragma: no cover - defensive
             logger.warning("Failed to send iTIP {} to {}: {}", method, r["email"], exc)
 

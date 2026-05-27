@@ -10,7 +10,10 @@ from app.core.security import ApiKeyScope
 # Any new scope added to ApiKeyScope is immediately accepted here.
 ALLOWED_API_KEY_SCOPES: frozenset[str] = frozenset(get_args(ApiKeyScope))
 DEFAULT_API_KEY_SCOPES: list[ApiKeyScope] = ["events:read"]
-MAX_WRITE_SCOPE_LIFETIME_DAYS = 30
+# Single source of truth for the maximum (and default) lifetime of any
+# write-capable API key. ``admin_api_key.schemas`` re-uses this constant
+# so the limit lives in one place.
+MAX_WRITE_SCOPE_LIFETIME_DAYS = 90
 
 
 class ApiKeyCreate(BaseModel):
@@ -51,11 +54,17 @@ class ApiKeyCreate(BaseModel):
         return expires_at
 
     @model_validator(mode="after")
-    def require_expiry_for_write_scope(self) -> "ApiKeyCreate":
-        # Any scope ending in :write is considered a write scope.
+    def default_expiry_for_write_scope(self) -> "ApiKeyCreate":
+        # Any scope ending in :write is considered a write scope. The server
+        # is the source of truth for the lifetime: when the caller omits
+        # ``expires_at``, default to ``now + MAX_WRITE_SCOPE_LIFETIME_DAYS``
+        # so frontends don't need to duplicate the constant or fight clock
+        # drift against the field validator above.
         write_scopes = {s for s in self.scopes if s.endswith(":write")}
         if write_scopes and self.expires_at is None:
-            raise ValueError("Write-capable API keys require an expiry date")
+            self.expires_at = datetime.now(UTC) + timedelta(
+                days=MAX_WRITE_SCOPE_LIFETIME_DAYS
+            )
         return self
 
 

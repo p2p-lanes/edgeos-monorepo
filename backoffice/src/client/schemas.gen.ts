@@ -260,6 +260,43 @@ export const AdminApiKeyPublicSchema = {
     description: 'Safe representation of an admin API key — never includes the raw secret.'
 } as const;
 
+export const AdminGrantTicketsRequestSchema = {
+    properties: {
+        popup_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Popup Id'
+        },
+        people: {
+            items: {
+                '$ref': '#/components/schemas/PersonGrantItem'
+            },
+            type: 'array',
+            title: 'People'
+        }
+    },
+    type: 'object',
+    required: ['popup_id', 'people'],
+    title: 'AdminGrantTicketsRequest',
+    description: 'Admin bulk-grant request: assign N free tickets to M people for a popup.'
+} as const;
+
+export const AdminGrantTicketsResponseSchema = {
+    properties: {
+        granted: {
+            items: {
+                '$ref': '#/components/schemas/GrantedPaymentInfo'
+            },
+            type: 'array',
+            title: 'Granted'
+        }
+    },
+    type: 'object',
+    required: ['granted'],
+    title: 'AdminGrantTicketsResponse',
+    description: 'Response payload from POST /applications/admin/grant-tickets.'
+} as const;
+
 export const ApiKeyCreateSchema = {
     properties: {
         name: {
@@ -4881,7 +4918,7 @@ export const EmailTemplatePublicSchema = {
 
 export const EmailTemplateTypeSchema = {
     type: 'string',
-    enum: ['login_code_user', 'login_code_human', 'application_received', 'application_accepted', 'application_rejected', 'application_accepted_with_discount', 'application_accepted_with_incentive', 'application_accepted_scholarship_rejected', 'payment_confirmed', 'abandoned_cart', 'edit_passes_confirmed', 'event_invitation', 'event_approval_approved', 'event_approval_rejected', 'check_in_pass'],
+    enum: ['login_code_user', 'login_code_human', 'application_received', 'application_accepted', 'application_rejected', 'application_accepted_with_discount', 'application_accepted_with_incentive', 'application_accepted_scholarship_rejected', 'payment_confirmed', 'abandoned_cart', 'edit_passes_confirmed', 'event_invitation', 'event_updated', 'event_cancelled', 'event_approval_approved', 'event_approval_rejected', 'check_in_pass'],
     title: 'EmailTemplateType'
 } as const;
 
@@ -7901,6 +7938,57 @@ export const FormSectionUpdateSchema = {
     title: 'FormSectionUpdate'
 } as const;
 
+export const GrantProductItemSchema = {
+    properties: {
+        product_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Product Id'
+        },
+        quantity: {
+            type: 'integer',
+            title: 'Quantity',
+            default: 1
+        }
+    },
+    type: 'object',
+    required: ['product_id'],
+    title: 'GrantProductItem',
+    description: 'One product line in the admin bulk-grant request.'
+} as const;
+
+export const GrantedPaymentInfoSchema = {
+    properties: {
+        payment_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Payment Id'
+        },
+        application_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Application Id'
+        },
+        human_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Human Id'
+        },
+        email: {
+            type: 'string',
+            title: 'Email'
+        },
+        tickets_created: {
+            type: 'integer',
+            title: 'Tickets Created'
+        }
+    },
+    type: 'object',
+    required: ['payment_id', 'application_id', 'human_id', 'email', 'tickets_created'],
+    title: 'GrantedPaymentInfo',
+    description: 'One $0 payment created by the admin bulk-grant flow.'
+} as const;
+
 export const GroupAdminUpdateSchema = {
     properties: {
         name: {
@@ -10715,6 +10803,18 @@ export const PaymentPublicSchema = {
             title: 'Payment Type',
             default: 'pass_purchase'
         },
+        granted_by_user_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Granted By User Id'
+        },
         id: {
             type: 'string',
             format: 'uuid',
@@ -10926,6 +11026,48 @@ export const PaymentUpdateSchema = {
     type: 'object',
     title: 'PaymentUpdate',
     description: 'Schema for updating a payment (mainly status updates).'
+} as const;
+
+export const PersonGrantItemSchema = {
+    properties: {
+        email: {
+            type: 'string',
+            title: 'Email'
+        },
+        first_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'First Name'
+        },
+        last_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Last Name'
+        },
+        products: {
+            items: {
+                '$ref': '#/components/schemas/GrantProductItem'
+            },
+            type: 'array',
+            title: 'Products'
+        }
+    },
+    type: 'object',
+    required: ['email', 'products'],
+    title: 'PersonGrantItem',
+    description: 'One row of the admin bulk-grant CSV: a person to grant tickets to.'
 } as const;
 
 export const PopupAccessResponseSchema = {

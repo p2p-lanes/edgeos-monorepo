@@ -400,6 +400,34 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             "sections": sections_snapshot,
         }
 
+    def _finalize_zero_amount_payment(
+        self,
+        session: Session,
+        payment: Payments,
+        products: list[PaymentProductRequest],
+        *,
+        granted_by_user_id: uuid.UUID | None = None,
+    ) -> Payments:
+        """Auto-approve a $0 payment and materialize tickets, flush-only.
+
+        Used by three flows that all converge on the same write:
+        - authenticated application checkout when discounts zero the cart
+        - anonymous open-ticketing checkout when a 100% coupon zeroes it
+        - admin bulk grant ($0 comps).
+
+        Sets status=APPROVED, optionally records `granted_by_user_id` (admin
+        grant only), and INSERTs AttendeeProducts for the given line items.
+        Does NOT commit — callers own the transaction boundary so this helper
+        can participate in a larger atomic batch (admin grant) or be paired
+        with caller-side commit + email dispatch (self-service flows).
+        """
+        payment.status = PaymentStatus.APPROVED.value
+        if granted_by_user_id is not None:
+            payment.granted_by_user_id = granted_by_user_id
+        self._add_products_to_attendees(session, products, payment_id=payment.id)
+        session.flush()
+        return payment
+
     def create_open_ticketing_payment(
         self,
         session: Session,
@@ -517,6 +545,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             # don't appear in this flow today) bypass any coupon discount.
             discountable_amount = Decimal("0")
             non_discountable_amount = Decimal("0")
+            payment_products: list[PaymentProducts] = []
             for line in obj.products:
                 product = products_map[line.product_id]
                 line_total = product.price * line.quantity
@@ -530,20 +559,20 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                     # by approve_payment via _add_products_to_attendees when the
                     # webhook confirms the payment. Pre-creating them here caused
                     # duplicates (double the tickets) on every approved checkout.
-                    session.add(
-                        PaymentProducts(
-                            tenant_id=tenant.id,
-                            payment_id=payment.id,
-                            product_id=product.id,
-                            attendee_id=attendee.id,
-                            quantity=1,
-                            product_name=product.name,
-                            product_description=product.description,
-                            product_price=product.price,
-                            product_category=product.category or "",
-                            product_currency=popup.currency,
-                        )
+                    pp = PaymentProducts(
+                        tenant_id=tenant.id,
+                        payment_id=payment.id,
+                        product_id=product.id,
+                        attendee_id=attendee.id,
+                        quantity=1,
+                        product_name=product.name,
+                        product_description=product.description,
+                        product_price=product.price,
+                        product_category=product.category or "",
+                        product_currency=popup.currency,
                     )
+                    session.add(pp)
+                    payment_products.append(pp)
 
             discountable_amount = discountable_amount.quantize(
                 MONEY_PRECISION, rounding=ROUND_HALF_UP
@@ -569,6 +598,31 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 coupons_crud.use_coupon(session, coupon.id)
 
             payment.amount = discountable_amount + non_discountable_amount
+
+            # Zero-amount short-circuit: a 100% coupon zeroed the cart, so
+            # SimpleFI has nothing to charge and would either reject or auto-
+            # approve without firing the webhook. Share the auto-approval path
+            # with the authenticated flow so both stay in lock-step (without
+            # this, the open-ticketing buyer never received tickets nor the
+            # confirmation email).
+            if payment.amount == Decimal("0"):
+                self._finalize_zero_amount_payment(
+                    session,
+                    payment,
+                    [
+                        PaymentProductRequest(
+                            product_id=pp.product_id,
+                            attendee_id=pp.attendee_id,
+                            quantity=pp.quantity,
+                        )
+                        for pp in payment_products
+                    ],
+                )
+                # Helper is flush-only — own the commit here so the router
+                # can fire the confirmation email against the persisted row.
+                session.commit()
+                session.refresh(payment)
+                return payment, ""
 
             if not popup.simplefi_api_key:
                 raise HTTPException(
@@ -1589,12 +1643,8 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             session.add(payment)
             session.flush()
 
-            # Auto-approve and add products directly
-            self._add_products_to_attendees(
-                session, obj.products, payment_id=payment.id
-            )
-
-            # Get product details for snapshot
+            # Build product snapshots before approval so they're available
+            # when AttendeeProducts are materialized in the finalizer.
             product_ids = [p.product_id for p in obj.products]
             prod_statement = select(Products).where(
                 Products.id.in_(product_ids),  # type: ignore[attr-defined]
@@ -1602,7 +1652,6 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             )
             products_map = {p.id: p for p in session.exec(prod_statement).all()}
 
-            # Create product snapshots
             for req_prod in obj.products:
                 product = products_map.get(req_prod.product_id)
                 if product:
@@ -1637,6 +1686,11 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             )
 
             session.add(application)
+
+            # Shared finalizer: materializes AttendeeProducts and flushes.
+            # Same code path as the anonymous open-ticketing flow and the
+            # admin bulk-grant flow so they can't drift again.
+            self._finalize_zero_amount_payment(session, payment, obj.products)
             session.commit()
             session.refresh(payment)
 

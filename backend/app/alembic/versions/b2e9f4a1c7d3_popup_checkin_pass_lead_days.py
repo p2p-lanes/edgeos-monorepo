@@ -9,7 +9,7 @@ check-in pass cron dispatcher. Content comes from the popup's custom
 CHECK_IN_PASS email template, or the file-based default when none exists.
 
 Revision ID: b2e9f4a1c7d3
-Revises: 94d7d49c3c92
+Revises: a8c1f02e5d33
 Create Date: 2026-05-26 12:00:00.000000
 
 """
@@ -21,7 +21,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = "b2e9f4a1c7d3"
-down_revision: str = "94d7d49c3c92"
+down_revision: str = "a8c1f02e5d33"
 branch_labels: Sequence[str] | None = None
 depends_on: Sequence[str] | None = None
 

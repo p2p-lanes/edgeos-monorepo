@@ -78,7 +78,16 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
         count_statement = select(func.count()).select_from(statement.subquery())
         total = session.exec(count_statement).one()
 
-        statement = statement.offset(skip).limit(limit)
+        statement = (
+            statement.options(
+                selectinload(Attendees.attendee_products).selectinload(  # type: ignore[arg-type]
+                    AttendeeProducts.product  # ty: ignore[invalid-argument-type]
+                ),
+                selectinload(Attendees.category_ref),  # type: ignore[arg-type]
+            )
+            .offset(skip)
+            .limit(limit)
+        )
         results = list(session.exec(statement).all())
 
         return results, total
@@ -116,6 +125,7 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
                     AttendeeProducts.product  # ty: ignore[invalid-argument-type]
                 ),
                 selectinload(Attendees.application),  # type: ignore[arg-type]
+                selectinload(Attendees.category_ref),  # type: ignore[arg-type]
             )
             .offset(skip)
             .limit(limit)
@@ -168,6 +178,41 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
         session.commit()
         session.refresh(attendee)
         return attendee
+
+    def get_main_attendee(
+        self,
+        session: Session,
+        application_id: uuid.UUID,
+    ) -> Attendees | None:
+        """Return the primary (is_primary=True) attendee for an application.
+
+        Joins through attendee_categories to pick the one whose category is
+        marked primary on the popup. Falls back to the first attendee row
+        when no category match is found (e.g. legacy data where category_id
+        is NULL on the only main row).
+        """
+        from app.api.attendee_category.models import AttendeeCategories
+
+        statement = (
+            select(Attendees)
+            .join(
+                AttendeeCategories,
+                Attendees.category_id == AttendeeCategories.id,  # type: ignore[arg-type]
+            )
+            .where(
+                Attendees.application_id == application_id,
+                AttendeeCategories.is_primary.is_(True),  # type: ignore[union-attr]
+            )
+            .limit(1)
+        )
+        primary = session.exec(statement).first()
+        if primary is not None:
+            return primary
+
+        fallback = session.exec(
+            select(Attendees).where(Attendees.application_id == application_id).limit(1)
+        ).first()
+        return fallback
 
     def find_direct_attendee(
         self,
@@ -340,6 +385,7 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
                     Applications.popup  # ty: ignore[invalid-argument-type]
                 ),
                 selectinload(Attendees.popup),  # type: ignore[arg-type]
+                selectinload(Attendees.category_ref),  # type: ignore[arg-type]
             )
             .offset(skip)
             .limit(limit)
@@ -377,6 +423,7 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
                 selectinload(Attendees.attendee_products).selectinload(  # type: ignore[arg-type]
                     AttendeeProducts.product  # ty: ignore[invalid-argument-type]
                 ),
+                selectinload(Attendees.category_ref),  # type: ignore[arg-type]
             )
             .limit(1)
         )
@@ -450,6 +497,7 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
                     AttendeeProducts.product  # ty: ignore[invalid-argument-type]
                 ),
                 selectinload(Attendees.payment_products),  # type: ignore[arg-type]
+                selectinload(Attendees.category_ref),  # type: ignore[arg-type]
             )
             .offset(skip)
             .limit(limit)
@@ -478,6 +526,7 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
                 selectinload(Attendees.attendee_products).selectinload(  # type: ignore[arg-type]
                     AttendeeProducts.product  # ty: ignore[invalid-argument-type]
                 ),
+                selectinload(Attendees.category_ref),  # type: ignore[arg-type]
             )
         )
         return list(session.exec(statement).all())
