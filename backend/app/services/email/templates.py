@@ -1,8 +1,10 @@
 import datetime
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
 from jinja2 import Environment, FileSystemLoader, Undefined
+from jinja2.sandbox import SandboxedEnvironment
 from loguru import logger
 from pydantic import BaseModel
 
@@ -1389,3 +1391,22 @@ CUSTOMIZABLE_TEMPLATE_TYPES = {meta["type"] for meta in TEMPLATE_TYPE_METADATA}
 
 def is_customizable_template_type(template_type: EmailTemplateType | str) -> bool:
     return coerce_email_template_type(template_type) in CUSTOMIZABLE_TEMPLATE_TYPES
+
+
+def render_default_subject(
+    template_type: EmailTemplateType | str,
+    context: Mapping[str, Any],
+) -> str:
+    """Render the metadata ``default_subject`` for *template_type* against *context*.
+
+    Single source of truth for the default subject used when a popup has no
+    custom template (or its custom template has no subject override). Keeps the
+    English default colocated with the rest of the template metadata instead of
+    hardcoded at each caller.
+    """
+    coerced = coerce_email_template_type(template_type)
+    meta = next((m for m in TEMPLATE_TYPE_METADATA if m["type"] == coerced), None)
+    if meta is None:
+        return ""
+    env = SandboxedEnvironment(undefined=SilentUndefined)
+    return env.from_string(meta["default_subject"]).render(**context)
