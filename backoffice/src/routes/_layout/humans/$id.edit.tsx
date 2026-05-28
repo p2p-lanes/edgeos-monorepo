@@ -47,7 +47,7 @@ function EditHumanContent({ humanId }: { humanId: string }) {
       // Drop cached detail + api-keys subqueries first so the list invalidation
       // below doesn't refetch the now-deleted human and 404.
       queryClient.removeQueries({ queryKey: ["humans", humanId] })
-      queryClient.invalidateQueries({ queryKey: ["humans"], exact: true })
+      queryClient.invalidateQueries({ queryKey: ["humans"] })
       navigate(getHumansNavigationTarget())
     },
     onError: createErrorHandler(showErrorToast),
