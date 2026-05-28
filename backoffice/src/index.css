@@ -122,25 +122,31 @@
     cursor: pointer;
   }
 
-  [data-sidebar="content"] {
+  [data-sidebar="content"],
+  .thin-scrollbar {
     scrollbar-width: thin;
     scrollbar-color: var(--sidebar-border) transparent;
   }
 
-  [data-sidebar="content"]::-webkit-scrollbar {
+  [data-sidebar="content"]::-webkit-scrollbar,
+  .thin-scrollbar::-webkit-scrollbar {
     width: 6px;
+    height: 6px;
   }
 
-  [data-sidebar="content"]::-webkit-scrollbar-track {
+  [data-sidebar="content"]::-webkit-scrollbar-track,
+  .thin-scrollbar::-webkit-scrollbar-track {
     background: transparent;
   }
 
-  [data-sidebar="content"]::-webkit-scrollbar-thumb {
+  [data-sidebar="content"]::-webkit-scrollbar-thumb,
+  .thin-scrollbar::-webkit-scrollbar-thumb {
     background-color: var(--sidebar-border);
     border-radius: 9999px;
   }
 
-  [data-sidebar="content"]::-webkit-scrollbar-thumb:hover {
+  [data-sidebar="content"]::-webkit-scrollbar-thumb:hover,
+  .thin-scrollbar::-webkit-scrollbar-thumb:hover {
     background-color: var(--sidebar-ring);
   }
 }
