@@ -367,14 +367,7 @@ function ApiKeysSection() {
                 const checkboxId = `scope-${scope.value}`
                 const isComingSoon = scope.value === "events:write"
                 return (
-                  <div
-                    key={scope.value}
-                    className={
-                      isComingSoon
-                        ? "flex items-start gap-3 rounded-md border border-green-300 bg-green-50 p-2"
-                        : "flex items-start gap-3"
-                    }
-                  >
+                  <div key={scope.value} className="flex items-start gap-3">
                     <Checkbox
                       id={checkboxId}
                       checked={checked}
