@@ -8884,6 +8884,54 @@ export const HTTPValidationErrorSchema = {
     title: 'HTTPValidationError'
 } as const;
 
+export const HardDeleteSummarySchema = {
+    properties: {
+        applications: {
+            type: 'integer',
+            title: 'Applications'
+        },
+        attendees: {
+            type: 'integer',
+            title: 'Attendees'
+        },
+        payments: {
+            type: 'integer',
+            title: 'Payments'
+        },
+        attendee_products: {
+            type: 'integer',
+            title: 'Attendee Products'
+        },
+        payment_products: {
+            type: 'integer',
+            title: 'Payment Products'
+        },
+        payment_installments: {
+            type: 'integer',
+            title: 'Payment Installments'
+        },
+        application_snapshots: {
+            type: 'integer',
+            title: 'Application Snapshots'
+        },
+        carts: {
+            type: 'integer',
+            title: 'Carts'
+        },
+        group_memberships: {
+            type: 'integer',
+            title: 'Group Memberships'
+        },
+        ambassador_groups: {
+            type: 'integer',
+            title: 'Ambassador Groups'
+        }
+    },
+    type: 'object',
+    required: ['applications', 'attendees', 'payments', 'attendee_products', 'payment_products', 'payment_installments', 'application_snapshots', 'carts', 'group_memberships', 'ambassador_groups'],
+    title: 'HardDeleteSummary'
+} as const;
+
 export const HumanAuthSchema = {
     properties: {
         tenant_id: {

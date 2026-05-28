@@ -6,6 +6,7 @@ from fastapi import APIRouter, Header, HTTPException, status
 from app.api.api_key import crud as api_key_crud
 from app.api.api_key.schemas import ApiKeyPublic
 from app.api.human import crud
+from app.api.human.crud import HardDeleteSummary
 from app.api.human.schemas import (
     HumanCreate,
     HumanPortalPublic,
@@ -23,6 +24,7 @@ from app.core.dependencies.users import (
     CurrentHuman,
     CurrentSuperadmin,
     HumanTenantSession,
+    SessionDep,
     TenantSession,
     needs,
 )
@@ -272,6 +274,30 @@ async def revoke_human_api_keys(
         )
 
     api_key_crud.revoke_all_for_human(db, human_id)
+
+
+@router.delete(
+    "/{human_id}",
+    summary="Hard-delete a human and all related rows (superadmin only)",
+)
+async def delete_human(
+    human_id: uuid.UUID,
+    db: SessionDep,
+    _current_user: CurrentSuperadmin,
+) -> HardDeleteSummary:
+    """Permanently delete a Human with full cascade.
+
+    Removes applications, attendees, payments, products, carts, group
+    memberships, and ambassador-owned groups in a single transaction. Designed
+    for cleaning up test users — destructive and irreversible.
+    """
+    human = crud.get(db, human_id)
+    if not human:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Human not found",
+        )
+    return crud.hard_delete_cascade(db, human_id)
 
 
 @router.get("/{human_id}/api-keys", response_model=list[ApiKeyPublic])
