@@ -1176,11 +1176,15 @@ export class AttendeesService {
      * Returns AttendeeListItem (ProductWithQuantity shape) for compatibility with
      * the existing BO list view. Use GET /attendees/{id} for the full
      * AttendeePublic shape with typed AttendeeProductPublic tickets.
+     *
+     * has_tickets (only honored on the popup_id path) keeps attendees with at
+     * least one purchased/granted ticket when True, those without when False.
      * @param data The data for the request.
      * @param data.applicationId
      * @param data.popupId
      * @param data.email
      * @param data.search
+     * @param data.hasTickets
      * @param data.skip Number of items to skip
      * @param data.limit Maximum number of items to return
      * @param data.xTenantId
@@ -1199,6 +1203,7 @@ export class AttendeesService {
                 popup_id: data.popupId,
                 email: data.email,
                 search: data.search,
+                has_tickets: data.hasTickets,
                 skip: data.skip,
                 limit: data.limit
             },

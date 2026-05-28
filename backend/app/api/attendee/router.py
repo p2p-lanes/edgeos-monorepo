@@ -410,6 +410,7 @@ async def list_attendees(
     popup_id: uuid.UUID | None = None,
     email: str | None = None,
     search: str | None = None,
+    has_tickets: bool | None = None,
     skip: PaginationSkip = 0,
     limit: PaginationLimit = 100,
 ) -> ListModel[AttendeeListItem]:
@@ -418,6 +419,9 @@ async def list_attendees(
     Returns AttendeeListItem (ProductWithQuantity shape) for compatibility with
     the existing BO list view. Use GET /attendees/{id} for the full
     AttendeePublic shape with typed AttendeeProductPublic tickets.
+
+    has_tickets (only honored on the popup_id path) keeps attendees with at
+    least one purchased/granted ticket when True, those without when False.
     """
     if application_id:
         attendees = crud.attendees_crud.find_by_application(db, application_id)
@@ -425,7 +429,12 @@ async def list_attendees(
         attendees = attendees[skip : skip + limit]
     elif popup_id:
         attendees, total = crud.attendees_crud.find_by_popup(
-            db, popup_id=popup_id, skip=skip, limit=limit, search=search
+            db,
+            popup_id=popup_id,
+            skip=skip,
+            limit=limit,
+            search=search,
+            has_tickets=has_tickets,
         )
     elif email:
         attendees, total = crud.attendees_crud.find_by_email(

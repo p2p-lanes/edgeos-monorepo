@@ -99,12 +99,18 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
         skip: int = 0,
         limit: int = 100,
         search: str | None = None,
+        has_tickets: bool | None = None,
     ) -> tuple[list[Attendees], int]:
         """Find attendees by popup_id with eager loading.
 
         Queries directly on Attendees.popup_id (denormalized). Covers both
         application-based attendees (popup_id backfilled from application)
         and direct-sale attendees (popup_id set at creation, no application).
+
+        has_tickets filters by whether the attendee owns at least one
+        AttendeeProducts row (a purchased/granted ticket): True keeps only
+        attendees with tickets, False only those without, None disables the
+        filter. Uses a correlated EXISTS so it does not multiply rows.
         """
         base_statement = select(Attendees).where(Attendees.popup_id == popup_id)
 
@@ -112,6 +118,16 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
             search_term = f"%{search}%"
             base_statement = base_statement.where(
                 Attendees.name.ilike(search_term) | Attendees.email.ilike(search_term)  # type: ignore[union-attr]
+            )
+
+        if has_tickets is not None:
+            ticket_exists = (
+                select(AttendeeProducts.id)
+                .where(AttendeeProducts.attendee_id == Attendees.id)
+                .exists()
+            )
+            base_statement = base_statement.where(
+                ticket_exists if has_tickets else ~ticket_exists
             )
 
         # Use proper count query instead of fetching all rows
