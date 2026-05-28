@@ -47,6 +47,7 @@ from app.core.dependencies.users import (
     SessionDep,
 )
 from app.core.rate_limit import RateLimit
+from app.services.event_datetime import format_event_when
 from app.services.event_itip import (
     bump_and_dispatch_cancel as _bump_and_dispatch_itip_cancel,
 )
@@ -1751,7 +1752,9 @@ async def _send_event_approval_email(
         portal_base = get_portal_url(popup.tenant)
         event_url = f"{portal_base.rstrip('/')}/portal/{popup_slug}/events/{event.id}"
 
-    when = event.start_time.strftime("%b %d, %Y at %H:%M") if event.start_time else ""
+    when = (
+        format_event_when(event.start_time, event.timezone) if event.start_time else ""
+    )
 
     service = get_email_service()
     from_address = popup.tenant.sender_email if popup and popup.tenant else None

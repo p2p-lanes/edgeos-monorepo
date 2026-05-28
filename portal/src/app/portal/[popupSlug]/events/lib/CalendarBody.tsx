@@ -130,10 +130,12 @@ export function CalendarBody({
     setCurrentMonth(defaultDate)
     setSelectedDate(defaultDate)
   }, [defaultDate])
-  const { formatTime, formatDayKey, formatGridDayKey } = useEventTimezone(
-    popupId,
-    timezoneOverride,
-  )
+  const {
+    formatTime,
+    formatDayKey,
+    formatGridDayKey,
+    isLoading: tzLoading,
+  } = useEventTimezone(popupId, timezoneOverride)
 
   const { data: currentHuman } = useQuery({
     queryKey: ["current-human"],
@@ -269,6 +271,18 @@ export function CalendarBody({
     onEventLinkClick("calendar", selectedDayKey, {
       outer: main?.scrollTop ?? 0,
     })
+  }
+
+  // Defer rendering until the popup timezone resolves. Times *and* which
+  // day-cell an event lands in (``formatDayKey``) depend on it, so painting
+  // with the browser-tz fallback would briefly show events at the wrong
+  // hour/day before snapping to the popup tz once settings load.
+  if (tzLoading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="h-6 w-6 animate-spin text-primary" />
+      </div>
+    )
   }
 
   return (
