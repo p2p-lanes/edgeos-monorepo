@@ -53,6 +53,7 @@ import {
 } from "@/components/ui/table"
 import useAuth from "@/hooks/useAuth"
 import useCustomToast from "@/hooks/useCustomToast"
+import { cn } from "@/lib/utils"
 import { createErrorHandler } from "@/utils"
 
 export const Route = createFileRoute("/_layout/popups/$id/bulk-grant")({
@@ -1071,7 +1072,7 @@ function PersonProductsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="flex max-h-[90vh] flex-col sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>Tickets for {displayName}</DialogTitle>
           <DialogDescription>
@@ -1090,6 +1091,7 @@ function PersonProductsDialog({
             onQty={setQty}
             overdrawnInfo={new Map()}
             stockErrorPid={null}
+            scrollable
           />
         )}
         <DialogFooter className="sm:justify-between">
@@ -1217,6 +1219,7 @@ function ProductsTable({
   onQty,
   overdrawnInfo,
   stockErrorPid,
+  scrollable = false,
 }: {
   products: ProductPublic[]
   productQty: Record<string, number>
@@ -1224,6 +1227,7 @@ function ProductsTable({
   onQty: (id: string, qty: number) => void
   overdrawnInfo: Map<string, OverdrawInfo>
   stockErrorPid: string | null
+  scrollable?: boolean
 }) {
   const [search, setSearch] = useState("")
   const [categoryFilter, setCategoryFilter] = useState<string>(ALL_CATEGORIES)
@@ -1270,7 +1274,7 @@ function ProductsTable({
   }, [products, search, categoryFilter, sort, productQty])
 
   return (
-    <div className="flex flex-col gap-2">
+    <div className={cn("flex flex-col gap-2", scrollable && "min-h-0 flex-1")}>
       <div className="flex flex-col gap-2 sm:flex-row">
         <div className="relative flex-1">
           <Search
@@ -1304,8 +1308,14 @@ function ProductsTable({
           </Select>
         )}
       </div>
-      <Table>
-        <TableHeader>
+      <Table
+        containerClassName={
+          scrollable ? "min-h-0 flex-1 overflow-y-auto" : undefined
+        }
+      >
+        <TableHeader
+          className={scrollable ? "sticky top-0 z-10 bg-muted" : undefined}
+        >
           <TableRow>
             <SortableHead
               label={<span className="sr-only">Selected</span>}
