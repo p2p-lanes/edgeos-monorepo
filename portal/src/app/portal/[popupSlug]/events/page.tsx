@@ -279,8 +279,13 @@ export default function EventsPage() {
     queryFn: () => HumansService.getCurrentHumanInfo(),
     staleTime: 5 * 60 * 1000,
   })
-  const { timezone, formatTime, formatDateShort, formatDayKey } =
-    useEventTimezone(city?.id)
+  const {
+    timezone,
+    formatTime,
+    formatDateShort,
+    formatDayKey,
+    isLoading: tzLoading,
+  } = useEventTimezone(city?.id)
 
   const { data: eventSettings } = usePortalEventSettings(city?.id)
   const { data: popupTags } = usePopupTags(city?.id)
@@ -777,7 +782,7 @@ export default function EventsPage() {
           <ListBody
             events={events}
             slug={city?.slug}
-            isLoading={isLoading}
+            isLoading={isLoading || tzLoading}
             formatTime={formatTime}
             formatDateShort={formatDateShort}
             formatDayKey={formatDayKey}
