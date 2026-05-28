@@ -44,7 +44,10 @@ function EditHumanContent({ humanId }: { humanId: string }) {
     mutationFn: () => HumansService.deleteHuman({ humanId }),
     onSuccess: () => {
       showSuccessToast("Human deleted")
-      queryClient.invalidateQueries({ queryKey: ["humans"] })
+      // Drop cached detail + api-keys subqueries first so the list invalidation
+      // below doesn't refetch the now-deleted human and 404.
+      queryClient.removeQueries({ queryKey: ["humans", humanId] })
+      queryClient.invalidateQueries({ queryKey: ["humans"], exact: true })
       navigate(getHumansNavigationTarget())
     },
     onError: createErrorHandler(showErrorToast),
