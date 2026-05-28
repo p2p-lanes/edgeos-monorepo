@@ -1,7 +1,8 @@
 import uuid
+from typing import TypedDict
 
 from loguru import logger
-from sqlalchemy import exists, or_
+from sqlalchemy import delete, exists, or_, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import selectinload
 from sqlmodel import Session, col, func, select
@@ -15,6 +16,19 @@ from app.api.human.schemas import (
 )
 from app.api.product.schemas import CATEGORY_TICKET, TicketDuration
 from app.api.shared.crud import BaseCRUD
+
+
+class HardDeleteSummary(TypedDict):
+    applications: int
+    attendees: int
+    payments: int
+    attendee_products: int
+    payment_products: int
+    payment_installments: int
+    application_snapshots: int
+    carts: int
+    group_memberships: int
+    ambassador_groups: int
 
 
 class HumansCRUD(BaseCRUD[Humans, HumanCreate, HumanUpdate]):
@@ -269,6 +283,189 @@ class HumansCRUD(BaseCRUD[Humans, HumanCreate, HumanUpdate]):
         popups = list(per_popup.values())
         total_days = sum(p.total_days for p in popups)
         return HumanProfileStats(popups=popups, total_days=total_days)
+
+    def hard_delete_cascade(
+        self, session: Session, human_id: uuid.UUID
+    ) -> HardDeleteSummary:
+        """Permanently delete a Human and every row reachable from them.
+
+        Runs as a single transaction. Iterates from leaves up to roots so each
+        DELETE leaves no dangling RESTRICT FKs. Ambassador-owned groups are
+        deleted along with the human; foreign references from other humans'
+        applications/payments to those groups are nulled (group_id is
+        nullable).
+        """
+        from app.api.application.models import Applications, ApplicationSnapshots
+        from app.api.attendee.models import AttendeeProducts, Attendees
+        from app.api.cart.models import Carts
+        from app.api.group.models import (
+            GroupLeaders,
+            GroupMembers,
+            GroupProducts,
+            Groups,
+            GroupWhitelistedEmails,
+        )
+        from app.api.payment.models import (
+            PaymentInstallments,
+            PaymentProducts,
+            Payments,
+        )
+
+        application_ids = list(
+            session.exec(
+                select(Applications.id).where(Applications.human_id == human_id)
+            ).all()
+        )
+        attendee_conds = [Attendees.human_id == human_id]
+        if application_ids:
+            attendee_conds.append(col(Attendees.application_id).in_(application_ids))
+        attendee_ids = list(
+            session.exec(select(Attendees.id).where(or_(*attendee_conds))).all()
+        )
+        payment_ids = (
+            list(
+                session.exec(
+                    select(Payments.id).where(
+                        col(Payments.application_id).in_(application_ids)
+                    )
+                ).all()
+            )
+            if application_ids
+            else []
+        )
+        ambassador_group_ids = list(
+            session.exec(
+                select(Groups.id).where(Groups.ambassador_id == human_id)
+            ).all()
+        )
+
+        summary: HardDeleteSummary = {
+            "applications": len(application_ids),
+            "attendees": len(attendee_ids),
+            "payments": len(payment_ids),
+            "attendee_products": 0,
+            "payment_products": 0,
+            "payment_installments": 0,
+            "application_snapshots": 0,
+            "carts": 0,
+            "group_memberships": 0,
+            "ambassador_groups": len(ambassador_group_ids),
+        }
+
+        try:
+            if attendee_ids or payment_ids:
+                conds = []
+                if attendee_ids:
+                    conds.append(col(AttendeeProducts.attendee_id).in_(attendee_ids))
+                if payment_ids:
+                    conds.append(col(AttendeeProducts.payment_id).in_(payment_ids))
+                result = session.execute(delete(AttendeeProducts).where(or_(*conds)))
+                summary["attendee_products"] = result.rowcount or 0
+
+            if payment_ids or attendee_ids:
+                conds = []
+                if payment_ids:
+                    conds.append(col(PaymentProducts.payment_id).in_(payment_ids))
+                if attendee_ids:
+                    conds.append(col(PaymentProducts.attendee_id).in_(attendee_ids))
+                result = session.execute(delete(PaymentProducts).where(or_(*conds)))
+                summary["payment_products"] = result.rowcount or 0
+
+            if payment_ids:
+                result = session.execute(
+                    delete(PaymentInstallments).where(
+                        col(PaymentInstallments.payment_id).in_(payment_ids)
+                    )
+                )
+                summary["payment_installments"] = result.rowcount or 0
+
+            # check_ins.attendee_product_id has ON DELETE CASCADE in the DB,
+            # so they are removed automatically when attendee_products go away.
+
+            if payment_ids:
+                session.execute(
+                    delete(Payments).where(col(Payments.id).in_(payment_ids))
+                )
+
+            if attendee_ids:
+                session.execute(
+                    delete(Attendees).where(col(Attendees.id).in_(attendee_ids))
+                )
+
+            if application_ids:
+                result = session.execute(
+                    delete(ApplicationSnapshots).where(
+                        col(ApplicationSnapshots.application_id).in_(application_ids)
+                    )
+                )
+                summary["application_snapshots"] = result.rowcount or 0
+                # application_reviews cascades via ON DELETE CASCADE
+                session.execute(
+                    delete(Applications).where(
+                        col(Applications.id).in_(application_ids)
+                    )
+                )
+
+            gm_result = session.execute(
+                delete(GroupMembers).where(GroupMembers.human_id == human_id)
+            )
+            gl_result = session.execute(
+                delete(GroupLeaders).where(GroupLeaders.human_id == human_id)
+            )
+            summary["group_memberships"] = (gm_result.rowcount or 0) + (
+                gl_result.rowcount or 0
+            )
+
+            if ambassador_group_ids:
+                # Null group_id on rows owned by other humans before dropping
+                # the groups (groups.id is RESTRICT-referenced by applications
+                # and payments via nullable group_id columns).
+                session.execute(
+                    update(Applications)
+                    .where(col(Applications.group_id).in_(ambassador_group_ids))
+                    .values(group_id=None)
+                )
+                session.execute(
+                    update(Payments)
+                    .where(col(Payments.group_id).in_(ambassador_group_ids))
+                    .values(group_id=None)
+                )
+                session.execute(
+                    delete(GroupMembers).where(
+                        col(GroupMembers.group_id).in_(ambassador_group_ids)
+                    )
+                )
+                session.execute(
+                    delete(GroupLeaders).where(
+                        col(GroupLeaders.group_id).in_(ambassador_group_ids)
+                    )
+                )
+                session.execute(
+                    delete(GroupProducts).where(
+                        col(GroupProducts.group_id).in_(ambassador_group_ids)
+                    )
+                )
+                session.execute(
+                    delete(GroupWhitelistedEmails).where(
+                        col(GroupWhitelistedEmails.group_id).in_(ambassador_group_ids)
+                    )
+                )
+                session.execute(
+                    delete(Groups).where(col(Groups.id).in_(ambassador_group_ids))
+                )
+
+            result = session.execute(delete(Carts).where(Carts.human_id == human_id))
+            summary["carts"] = result.rowcount or 0
+
+            # api_keys, event_invitations, event_hidden_by_human cascade via DB
+            session.execute(delete(Humans).where(Humans.id == human_id))
+            session.commit()
+        except Exception:
+            session.rollback()
+            raise
+
+        logger.info("hard_delete_cascade: human {} purged — {}", human_id, summary)
+        return summary
 
 
 def _popup_duration_days(popup) -> int | None:  # noqa: ANN001

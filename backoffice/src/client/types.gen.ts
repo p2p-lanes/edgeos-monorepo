@@ -1805,6 +1805,19 @@ export type GroupWithMembers = {
     members?: Array<GroupMemberPublic>;
 };
 
+export type HardDeleteSummary = {
+    applications: number;
+    attendees: number;
+    payments: number;
+    attendee_products: number;
+    payment_products: number;
+    payment_installments: number;
+    application_snapshots: number;
+    carts: number;
+    group_memberships: number;
+    ambassador_groups: number;
+};
+
 export type HTTPValidationError = {
     detail?: Array<ValidationError>;
 };
@@ -5015,6 +5028,12 @@ export type HumansUpdateHumanData = {
 };
 
 export type HumansUpdateHumanResponse = (HumanPublic);
+
+export type HumansDeleteHumanData = {
+    humanId: string;
+};
+
+export type HumansDeleteHumanResponse = (HardDeleteSummary);
 
 export type HumansRevokeHumanApiKeysData = {
     humanId: string;
