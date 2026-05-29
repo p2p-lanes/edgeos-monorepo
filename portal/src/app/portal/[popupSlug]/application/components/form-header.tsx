@@ -2,7 +2,14 @@
 
 import { CalendarDays, MapPin } from "lucide-react"
 import Image from "next/image"
+import { formatDate } from "@/helpers/dates"
 import { useCityProvider } from "@/providers/cityProvider"
+
+const POPUP_DATE_FORMAT: Intl.DateTimeFormatOptions = {
+  day: "numeric",
+  month: "long",
+  year: "numeric",
+}
 
 export function FormHeader() {
   const { getCity } = useCityProvider()
@@ -10,20 +17,8 @@ export function FormHeader() {
 
   if (!city) return null
 
-  const startDate = city.start_date
-    ? new Date(city.start_date).toLocaleDateString("en-EN", {
-        day: "numeric",
-        month: "long",
-        year: "numeric",
-      })
-    : null
-  const endDate = city.end_date
-    ? new Date(city.end_date).toLocaleDateString("en-EN", {
-        day: "numeric",
-        month: "long",
-        year: "numeric",
-      })
-    : null
+  const startDate = formatDate(city.start_date ?? undefined, POPUP_DATE_FORMAT)
+  const endDate = formatDate(city.end_date ?? undefined, POPUP_DATE_FORMAT)
 
   return (
     <div className="flex flex-col md:flex-row gap-6">
