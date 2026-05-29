@@ -1,9 +1,10 @@
 """Integration tests for the opacity chokepoint — T-gr-010 through T-gr-014.
 
 Tests:
-  - Per-endpoint leakage tests (7 endpoints): assert non-members cannot see
+  - Per-endpoint leakage tests (8 endpoints): assert non-members cannot see
     metadata (title, description, host_display_name, meeting_url, tags) on
     group-scoped PRIVATE events via portal listing, single GET, and admin GET.
+    The 8th endpoint is portal venue availability (day-by-venue, T-gr-012b).
   - Regression tests for legacy invitation-based PRIVATE events:
     * Listing: non-invitee humans still see the event as ABSENT (unchanged)
     * Availability: non-invitee humans now see EventOpaque (security fix)
@@ -689,3 +690,122 @@ class TestRecurringPrivateOpacity:
         assert resp.status_code == 200
         event_ids = [e["id"] for e in resp.json()["results"]]
         assert str(self.master.id) in event_ids
+
+
+# ---------------------------------------------------------------------------
+# T-gr-012b: Leakage test — portal venue availability (day-by-venue, 8th endpoint)
+# ---------------------------------------------------------------------------
+
+
+class TestPortalVenueAvailabilityLeakage:
+    """GET /event-venues/portal/venues/{id}/availability must not leak
+    event metadata (title) for PRIVATE group-scoped events to non-members.
+
+    The busy slot for such an event should have label=None (masked); the slot
+    itself (timing) must still appear so the calendar shows the venue as busy.
+    Members and admins must still see the full label.
+    """
+
+    @pytest.fixture(autouse=True)
+    def _setup(self, db: Session, tenant_a: Tenants) -> None:
+        self.db = db
+        self.popup = _make_popup(db, tenant_a)
+        self.owner = _make_human(db, tenant_a)
+        self.member = _make_human(db, tenant_a)
+        self.non_member = _make_human(db, tenant_a)
+        self.venue = _make_venue(db, tenant_a, self.popup)
+        self.group = _make_group(db, tenant_a, self.popup)
+        _make_member(db, self.group, self.member)
+        self.event = _make_private_group_event(
+            db, tenant_a, self.popup, self.group, self.owner, self.venue,
+            start=datetime(2030, 10, 1, 14, 0, 0, tzinfo=UTC),
+            end=datetime(2030, 10, 1, 15, 0, 0, tzinfo=UTC),
+        )
+
+    def _get_portal_venue_availability(
+        self, client: TestClient, token: str
+    ) -> tuple[int, dict]:
+        resp = client.get(
+            f"/api/v1/event-venues/portal/venues/{self.venue.id}/availability",
+            headers=_auth(token),
+            params={
+                "start": "2030-10-01T00:00:00Z",
+                "end": "2030-10-02T00:00:00Z",
+            },
+        )
+        try:
+            body = resp.json()
+        except Exception:
+            body = {}
+        return resp.status_code, body
+
+    def _find_event_busy_slot(self, busy: list[dict]) -> dict | None:
+        """Return the busy slot whose event_id matches self.event.id, or None."""
+        for slot in busy:
+            if slot.get("event_id") == str(self.event.id):
+                return slot
+        return None
+
+    def test_non_member_busy_slot_has_no_label(self, client: TestClient) -> None:
+        """Non-member: venue is busy but event label (title) must not be exposed."""
+        token = _human_token(self.non_member)
+        status_code, body = self._get_portal_venue_availability(client, token)
+        assert status_code == 200
+        busy = body.get("busy", [])
+        slot = self._find_event_busy_slot(busy)
+        # The slot must exist (venue IS busy) but the label must be masked.
+        assert slot is not None, "Busy slot for the PRIVATE event was not returned"
+        assert slot["label"] is None, (
+            f"Label leaked for non-member: {slot['label']!r}"
+        )
+
+    def test_member_busy_slot_shows_full_label(self, client: TestClient) -> None:
+        """Member: venue is busy and full event title is visible."""
+        token = _human_token(self.member)
+        status_code, body = self._get_portal_venue_availability(client, token)
+        assert status_code == 200
+        busy = body.get("busy", [])
+        slot = self._find_event_busy_slot(busy)
+        assert slot is not None, "Busy slot for the PRIVATE event was not returned"
+        assert slot["label"] == "Secret Group Event"
+
+    def test_owner_busy_slot_shows_full_label(self, client: TestClient) -> None:
+        """Owner: sees full label for their own PRIVATE group event."""
+        token = _human_token(self.owner)
+        status_code, body = self._get_portal_venue_availability(client, token)
+        assert status_code == 200
+        busy = body.get("busy", [])
+        slot = self._find_event_busy_slot(busy)
+        assert slot is not None
+        assert slot["label"] == "Secret Group Event"
+
+    def test_admin_sees_full_label_on_admin_endpoint(
+        self, client: TestClient, admin_token_tenant_a: str
+    ) -> None:
+        """Admin endpoint (backoffice) always shows full event title."""
+        resp = client.get(
+            f"/api/v1/event-venues/{self.venue.id}/availability",
+            headers=_auth(admin_token_tenant_a),
+            params={
+                "start": "2030-10-01T00:00:00Z",
+                "end": "2030-10-02T00:00:00Z",
+            },
+        )
+        assert resp.status_code == 200
+        busy = resp.json().get("busy", [])
+        slot = self._find_event_busy_slot(busy)
+        assert slot is not None
+        # Admin endpoint is NOT filtered — full title exposed
+        assert slot["label"] == "Secret Group Event"
+
+    def test_non_member_slot_timing_still_present(self, client: TestClient) -> None:
+        """Even when label is masked, start/end times must be present so the
+        calendar can render the venue as busy at that slot."""
+        token = _human_token(self.non_member)
+        status_code, body = self._get_portal_venue_availability(client, token)
+        assert status_code == 200
+        busy = body.get("busy", [])
+        slot = self._find_event_busy_slot(busy)
+        assert slot is not None
+        assert slot["event_start"] is not None
+        assert slot["event_end"] is not None
