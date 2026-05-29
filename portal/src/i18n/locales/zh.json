@@ -625,7 +625,8 @@
       "cancel_event_error": "无法取消活动",
       "pending_approval_banner_title": "等待审批",
       "pending_approval_banner_message": "你的活动正在等待审批,其他人暂时无法查看。",
-      "open_in_maps": "在 Google 地图中打开"
+      "open_in_maps": "在 Google 地图中打开",
+      "view_on_geobrowser": "在 Geobrowser 中查看"
     },
     "form": {
       "create_heading": "创建活动",

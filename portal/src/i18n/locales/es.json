@@ -625,7 +625,8 @@
       "cancel_event_error": "No se pudo cancelar el evento",
       "pending_approval_banner_title": "Pendiente de aprobación",
       "pending_approval_banner_message": "Tu evento está pendiente de aprobación y aún no es visible para otros.",
-      "open_in_maps": "Abrir en Google Maps"
+      "open_in_maps": "Abrir en Google Maps",
+      "view_on_geobrowser": "Ver en Geobrowser"
     },
     "form": {
       "create_heading": "Crear evento",
