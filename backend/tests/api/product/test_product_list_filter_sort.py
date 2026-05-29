@@ -8,17 +8,34 @@ endpoint; this locks two behaviours the backoffice UI relies on:
   CRUD ``SORT_FIELDS`` allowlist previously listed a non-existent
   ``attendee_category`` field, so category sorts silently fell back to
   ``created_at``.)
+
+Each test creates its own popup so the assertions stay exact regardless of
+products created by other tests (the suite runs in parallel).
 """
 
 import uuid
 
 from fastapi.testclient import TestClient
+from sqlmodel import Session
 
 from app.api.popup.models import Popups
+from app.api.tenant.models import Tenants
 
 
 def _admin_headers(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
+
+
+def _make_popup(db: Session, tenant: Tenants) -> Popups:
+    popup = Popups(
+        name=f"ProductFilter {uuid.uuid4().hex[:6]}",
+        slug=f"product-filter-{uuid.uuid4().hex[:10]}",
+        tenant_id=tenant.id,
+    )
+    db.add(popup)
+    db.commit()
+    db.refresh(popup)
+    return popup
 
 
 def _create_product(
@@ -45,28 +62,22 @@ def _create_product(
 
 def test_category_filter_returns_only_that_category(
     client: TestClient,
+    db: Session,
+    tenant_a: Tenants,
     admin_token_tenant_a: str,
-    popup_tenant_a: Popups,
 ) -> None:
+    popup = _make_popup(db, tenant_a)
     suffix = uuid.uuid4().hex[:8]
     house = _create_product(
-        client,
-        admin_token_tenant_a,
-        popup_tenant_a.id,
-        name=f"House {suffix}",
-        category="housing",
+        client, admin_token_tenant_a, popup.id, name=f"House {suffix}", category="housing"
     )
     _create_product(
-        client,
-        admin_token_tenant_a,
-        popup_tenant_a.id,
-        name=f"Ticket {suffix}",
-        category="ticket",
+        client, admin_token_tenant_a, popup.id, name=f"Ticket {suffix}", category="ticket"
     )
 
     resp = client.get(
         "/api/v1/products",
-        params={"popup_id": str(popup_tenant_a.id), "category": "housing"},
+        params={"popup_id": str(popup.id), "category": "housing"},
         headers=_admin_headers(admin_token_tenant_a),
     )
     assert resp.status_code == 200, resp.text
@@ -77,41 +88,31 @@ def test_category_filter_returns_only_that_category(
 
 def test_sort_by_category_orders_by_category_column(
     client: TestClient,
+    db: Session,
+    tenant_a: Tenants,
     admin_token_tenant_a: str,
-    popup_tenant_a: Popups,
 ) -> None:
+    popup = _make_popup(db, tenant_a)
     suffix = uuid.uuid4().hex[:8]
     # Create in non-alphabetical category order so a created_at fallback would
     # produce a different ordering than a real category sort.
     ticket = _create_product(
-        client,
-        admin_token_tenant_a,
-        popup_tenant_a.id,
-        name=f"T {suffix}",
-        category="ticket",
+        client, admin_token_tenant_a, popup.id, name=f"T {suffix}", category="ticket"
     )
     housing = _create_product(
-        client,
-        admin_token_tenant_a,
-        popup_tenant_a.id,
-        name=f"H {suffix}",
-        category="housing",
+        client, admin_token_tenant_a, popup.id, name=f"H {suffix}", category="housing"
     )
 
     resp = client.get(
         "/api/v1/products",
         params={
-            "popup_id": str(popup_tenant_a.id),
+            "popup_id": str(popup.id),
             "sort_by": "category",
             "sort_order": "asc",
         },
         headers=_admin_headers(admin_token_tenant_a),
     )
     assert resp.status_code == 200, resp.text
-    ordered = [
-        (p["id"], p["category"])
-        for p in resp.json()["results"]
-        if p["id"] in {ticket, housing}
-    ]
+    ordered = [(p["id"], p["category"]) for p in resp.json()["results"]]
     # "housing" < "ticket" alphabetically → housing first under asc category sort.
     assert ordered == [(housing, "housing"), (ticket, "ticket")]
