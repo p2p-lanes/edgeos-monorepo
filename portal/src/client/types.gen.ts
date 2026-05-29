@@ -1145,6 +1145,17 @@ export type EnrichedDashboardStats = {
     payments: PaymentStats;
 };
 
+/**
+ * Staff-only free-text notes for an event.
+ *
+ * Returned/accepted exclusively by the dedicated admin-notes endpoints — kept
+ * out of EventBase/EventPublic so it never leaks into event payloads served to
+ * portal humans or the public calendar.
+ */
+export type EventAdminNotes = {
+    notes?: (string | null);
+};
+
 export type EventApprovalPayload = {
     reason?: (string | null);
 };
@@ -1208,6 +1219,18 @@ export type EventCreate = {
     status?: EventStatus;
     highlighted?: boolean;
     recurrence?: (RecurrenceRule | null);
+};
+
+/**
+ * A distinct event host for the backoffice "filter events by creator" picker.
+ *
+ * Resolved from ``Events.owner_id`` joined to ``Humans``. ``name`` is the
+ * human's full name when set, otherwise null (the UI falls back to email).
+ */
+export type EventHostOption = {
+    id: string;
+    name?: (string | null);
+    email: string;
 };
 
 /**
@@ -1805,6 +1828,19 @@ export type GroupWithMembers = {
     members?: Array<GroupMemberPublic>;
 };
 
+export type HardDeleteSummary = {
+    applications: number;
+    attendees: number;
+    payments: number;
+    attendee_products: number;
+    payment_products: number;
+    payment_installments: number;
+    application_snapshots: number;
+    carts: number;
+    group_memberships: number;
+    ambassador_groups: number;
+};
+
 export type HTTPValidationError = {
     detail?: Array<ValidationError>;
 };
@@ -2260,6 +2296,8 @@ export type PaymentPublic = {
     granted_by_user_id?: (string | null);
     id: string;
     products_snapshot?: Array<PaymentProductResponse>;
+    buyer_email?: (string | null);
+    buyer_name?: (string | null);
     created_at?: (string | null);
     updated_at?: (string | null);
 };
@@ -4268,6 +4306,7 @@ export type EventsListEventsData = {
      */
     limit?: number;
     locationKind?: (string | null);
+    ownerId?: (string | null);
     popupId?: (string | null);
     search?: (string | null);
     /**
@@ -4290,6 +4329,13 @@ export type EventsCreateEventData = {
 
 export type EventsCreateEventResponse = (EventPublic);
 
+export type EventsListEventHostsData = {
+    popupId: string;
+    xTenantId?: (string | null);
+};
+
+export type EventsListEventHostsResponse = (Array<EventHostOption>);
+
 export type EventsGetEventData = {
     eventId: string;
     xTenantId?: (string | null);
@@ -4311,6 +4357,21 @@ export type EventsDeleteEventData = {
 };
 
 export type EventsDeleteEventResponse = (void);
+
+export type EventsGetEventAdminNotesData = {
+    eventId: string;
+    xTenantId?: (string | null);
+};
+
+export type EventsGetEventAdminNotesResponse = (EventAdminNotes);
+
+export type EventsUpdateEventAdminNotesData = {
+    eventId: string;
+    requestBody: EventAdminNotes;
+    xTenantId?: (string | null);
+};
+
+export type EventsUpdateEventAdminNotesResponse = (EventAdminNotes);
 
 export type EventsCancelEventData = {
     eventId: string;
@@ -4493,6 +4554,19 @@ export type EventsUpdatePortalEventData = {
 };
 
 export type EventsUpdatePortalEventResponse = (EventPublic);
+
+export type EventsGetPortalEventAdminNotesData = {
+    eventId: string;
+};
+
+export type EventsGetPortalEventAdminNotesResponse = (EventAdminNotes);
+
+export type EventsUpdatePortalEventAdminNotesData = {
+    eventId: string;
+    requestBody: EventAdminNotes;
+};
+
+export type EventsUpdatePortalEventAdminNotesResponse = (EventAdminNotes);
 
 export type EventsHidePortalEventData = {
     eventId: string;
@@ -5016,6 +5090,12 @@ export type HumansUpdateHumanData = {
 };
 
 export type HumansUpdateHumanResponse = (HumanPublic);
+
+export type HumansDeleteHumanData = {
+    humanId: string;
+};
+
+export type HumansDeleteHumanResponse = (HardDeleteSummary);
 
 export type HumansRevokeHumanApiKeysData = {
     humanId: string;

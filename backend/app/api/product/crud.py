@@ -13,7 +13,7 @@ from app.api.product.schemas import (
 )
 from app.api.shared.crud import BaseCRUD
 
-SORT_FIELDS = {"name", "price", "attendee_category", "is_active"}
+SORT_FIELDS = {"name", "price", "category", "is_active"}
 
 
 def sale_dates_to_persistence(data: dict[str, object]) -> dict[str, object]:

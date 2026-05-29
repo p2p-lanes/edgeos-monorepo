@@ -393,6 +393,61 @@ class TestPaymentListSearch:
         assert payload["paging"]["total"] == 1
         assert payload["results"][0]["id"] == str(payment.id)
 
+    def test_response_exposes_buyer_email_and_name(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+        admin_token_tenant_a: str,
+    ) -> None:
+        popup = _create_popup(db, tenant_a, suffix="buyer-fields")
+        base_time = datetime.now(UTC)
+
+        # Direct-sale payment whose buyer attendee is linked to a human: the
+        # buyer email/name resolve via the human, not the attendee snapshot.
+        with_human = _create_payment(
+            db,
+            tenant_a,
+            popup,
+            external_id="BUYER-WITH-HUMAN",
+            created_at=base_time + timedelta(minutes=1),
+            attendee_specs=[
+                {
+                    "name": "Snapshot Name",
+                    "email": "snapshot@test.com",
+                    "human_email": "buyer-human@test.com",
+                },
+            ],
+        )
+        # Buyer attendee without a linked human falls back to the attendee row.
+        without_human = _create_payment(
+            db,
+            tenant_a,
+            popup,
+            external_id="BUYER-NO-HUMAN",
+            created_at=base_time,
+            attendee_specs=[
+                {"name": "Walk In Buyer", "email": "walkin@test.com"},
+            ],
+        )
+
+        response = client.get(
+            "/api/v1/payments",
+            params={"popup_id": str(popup.id)},
+            headers=_admin_headers(admin_token_tenant_a),
+        )
+
+        assert response.status_code == 200
+        by_id = {item["id"]: item for item in response.json()["results"]}
+
+        linked = by_id[str(with_human.id)]
+        assert linked["buyer_email"] == "buyer-human@test.com"
+        assert linked["buyer_name"] == "Search Human"
+
+        fallback = by_id[str(without_human.id)]
+        assert fallback["buyer_email"] == "walkin@test.com"
+        assert fallback["buyer_name"] == "Walk In Buyer"
+
     def test_no_search_preserves_popup_listing_pagination_and_order(
         self,
         client: TestClient,

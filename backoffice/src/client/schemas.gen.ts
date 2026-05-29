@@ -4995,6 +4995,29 @@ export const EnrichedDashboardStatsSchema = {
     description: 'Full enriched dashboard response.'
 } as const;
 
+export const EventAdminNotesSchema = {
+    properties: {
+        notes: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Notes'
+        }
+    },
+    type: 'object',
+    title: 'EventAdminNotes',
+    description: `Staff-only free-text notes for an event.
+
+Returned/accepted exclusively by the dedicated admin-notes endpoints — kept
+out of EventBase/EventPublic so it never leaks into event payloads served to
+portal humans or the public calendar.`
+} as const;
+
 export const EventApprovalPayloadSchema = {
     properties: {
         reason: {
@@ -5331,6 +5354,38 @@ export const EventCreateSchema = {
     required: ['popup_id', 'title', 'start_time', 'end_time'],
     title: 'EventCreate',
     description: 'Event schema for creation.'
+} as const;
+
+export const EventHostOptionSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Name'
+        },
+        email: {
+            type: 'string',
+            title: 'Email'
+        }
+    },
+    type: 'object',
+    required: ['id', 'email'],
+    title: 'EventHostOption',
+    description: `A distinct event host for the backoffice "filter events by creator" picker.
+
+Resolved from \`\`Events.owner_id\`\` joined to \`\`Humans\`\`. \`\`name\`\` is the
+human's full name when set, otherwise null (the UI falls back to email).`
 } as const;
 
 export const EventInvitationBulkCreateSchema = {
@@ -10875,6 +10930,28 @@ export const PaymentPublicSchema = {
             type: 'array',
             title: 'Products Snapshot',
             default: []
+        },
+        buyer_email: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Buyer Email'
+        },
+        buyer_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Buyer Name'
         },
         created_at: {
             anyOf: [

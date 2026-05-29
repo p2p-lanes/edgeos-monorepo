@@ -66,17 +66,13 @@ export const Route = createFileRoute("/_layout/popups/$id/bulk-grant")({
 interface PersonRow {
   id: string
   email: string
-  first_name: string
-  last_name: string
-  errors: { email?: string; first_name?: string; last_name?: string }
+  errors: { email?: string }
   productsOverride: Record<string, number> | null
 }
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
-function validatePerson(
-  p: Pick<PersonRow, "email" | "first_name" | "last_name">,
-): PersonRow["errors"] {
+function validatePerson(p: Pick<PersonRow, "email">): PersonRow["errors"] {
   const errors: PersonRow["errors"] = {}
   if (!p.email.trim()) errors.email = "Email is required"
   else if (!EMAIL_RE.test(p.email.trim())) errors.email = "Invalid email"
@@ -84,7 +80,7 @@ function validatePerson(
 }
 
 function downloadPeopleTemplate() {
-  const blob = new Blob(["first_name,last_name,email\n"], { type: "text/csv" })
+  const blob = new Blob(["email\n"], { type: "text/csv" })
   const url = URL.createObjectURL(blob)
   const a = document.createElement("a")
   a.href = url
@@ -168,25 +164,18 @@ function BulkGrantContent({ popupId }: { popupId: string }) {
 
   const fileRef = useRef<HTMLInputElement>(null)
 
-  const addPerson = (
-    person: Pick<PersonRow, "email" | "first_name" | "last_name">,
-  ): boolean => {
+  const addPerson = (person: Pick<PersonRow, "email">): boolean => {
     const email = person.email.trim().toLowerCase()
     if (people.some((p) => p.email === email)) {
       showErrorToast(`"${email}" is already in the list`)
       return false
     }
-    const draft = {
-      email,
-      first_name: person.first_name.trim(),
-      last_name: person.last_name.trim(),
-    }
     setPeople((prev) => [
       ...prev,
       {
         id: crypto.randomUUID(),
-        ...draft,
-        errors: validatePerson(draft),
+        email,
+        errors: validatePerson({ email }),
         productsOverride: null,
       },
     ])
@@ -195,25 +184,20 @@ function BulkGrantContent({ popupId }: { popupId: string }) {
 
   const editPerson = (
     idx: number,
-    person: Pick<PersonRow, "email" | "first_name" | "last_name">,
+    person: Pick<PersonRow, "email">,
   ): boolean => {
     const email = person.email.trim().toLowerCase()
     if (people.some((p, i) => i !== idx && p.email === email)) {
       showErrorToast(`"${email}" is already in the list`)
       return false
     }
-    const draft = {
-      email,
-      first_name: person.first_name.trim(),
-      last_name: person.last_name.trim(),
-    }
     setPeople((prev) =>
       prev.map((p, i) =>
         i === idx
           ? {
               ...p,
-              ...draft,
-              errors: validatePerson(draft),
+              email,
+              errors: validatePerson({ email }),
             }
           : p,
       ),
@@ -266,15 +250,10 @@ function BulkGrantContent({ popupId }: { popupId: string }) {
           if (!email) continue
           if (seenEmails.has(email)) continue
           seenEmails.add(email)
-          const draft = {
-            email,
-            first_name: (raw.first_name ?? "").trim(),
-            last_name: (raw.last_name ?? "").trim(),
-          }
           rows.push({
             id: crypto.randomUUID(),
-            ...draft,
-            errors: validatePerson(draft),
+            email,
+            errors: validatePerson({ email }),
             productsOverride: null,
           })
         }
@@ -397,8 +376,6 @@ function BulkGrantContent({ popupId }: { popupId: string }) {
         const eff = effectiveProducts(p, defaultProducts)
         return {
           email: p.email,
-          first_name: p.first_name || null,
-          last_name: p.last_name || null,
           products: Object.entries(eff)
             .filter(([, qty]) => qty >= 1)
             .map(([product_id, quantity]) => ({ product_id, quantity })),
@@ -520,9 +497,9 @@ function BulkGrantContent({ popupId }: { popupId: string }) {
             {!hasPeople && (
               <div className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
                 Add people one by one with <strong>Add person</strong>, or
-                upload a CSV with columns:{" "}
-                <code className="font-mono">first_name, last_name, email</code>.
-                Duplicate emails are skipped automatically.
+                upload a CSV with a single{" "}
+                <code className="font-mono">email</code> column. Duplicate
+                emails are skipped automatically.
               </div>
             )}
             {hasPeople && (
@@ -538,16 +515,9 @@ function BulkGrantContent({ popupId }: { popupId: string }) {
                 </TableHeader>
                 <TableBody>
                   {people.map((p, idx) => {
-                    const fullName = [p.first_name, p.last_name]
-                      .filter(Boolean)
-                      .join(" ") || (
-                      <span className="italic text-muted-foreground">
-                        No name
-                      </span>
-                    )
                     const emailClass = p.errors.email
-                      ? "text-xs text-destructive"
-                      : "text-xs text-muted-foreground"
+                      ? "font-medium text-destructive"
+                      : "font-medium"
                     const eff = effectiveProducts(p, defaultProducts)
                     const isCustom = p.productsOverride !== null
                     const contributesToOverdraw = Object.entries(eff).some(
@@ -567,16 +537,13 @@ function BulkGrantContent({ popupId }: { popupId: string }) {
                         </TableCell>
                         <TableCell>
                           <div className="flex flex-col gap-1.5">
-                            <div className="flex flex-col">
-                              <span className="font-medium">{fullName}</span>
-                              <span
-                                className={emailClass}
-                                title={p.errors.email ?? undefined}
-                              >
-                                {p.email}
-                                {p.errors.email ? ` · ${p.errors.email}` : ""}
-                              </span>
-                            </div>
+                            <span
+                              className={emailClass}
+                              title={p.errors.email ?? undefined}
+                            >
+                              {p.email}
+                              {p.errors.email ? ` · ${p.errors.email}` : ""}
+                            </span>
                             <PersonProductsStrip
                               effective={eff}
                               productsById={productsById}
@@ -710,11 +677,7 @@ function BulkGrantContent({ popupId }: { popupId: string }) {
           }}
           initialValue={
             personFormState.mode === "edit"
-              ? {
-                  first_name: people[personFormState.index].first_name,
-                  last_name: people[personFormState.index].last_name,
-                  email: people[personFormState.index].email,
-                }
+              ? { email: people[personFormState.index].email }
               : undefined
           }
           onSubmit={(person) =>
@@ -853,36 +816,22 @@ function PersonFormDialog({
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onSubmit: (person: {
-    email: string
-    first_name: string
-    last_name: string
-  }) => boolean
-  initialValue?: { first_name: string; last_name: string; email: string }
+  onSubmit: (person: { email: string }) => boolean
+  initialValue?: { email: string }
 }) {
   const isEdit = initialValue !== undefined
-  const [firstName, setFirstName] = useState(initialValue?.first_name ?? "")
-  const [lastName, setLastName] = useState(initialValue?.last_name ?? "")
   const [email, setEmail] = useState(initialValue?.email ?? "")
   const [emailError, setEmailError] = useState<string | undefined>(undefined)
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    const errors = validatePerson({
-      first_name: firstName,
-      last_name: lastName,
-      email,
-    })
+    const errors = validatePerson({ email })
     if (errors.email) {
       setEmailError(errors.email)
       return
     }
     setEmailError(undefined)
-    const ok = onSubmit({
-      first_name: firstName,
-      last_name: lastName,
-      email,
-    })
+    const ok = onSubmit({ email })
     if (ok) onOpenChange(false)
   }
 
@@ -893,30 +842,11 @@ function PersonFormDialog({
           <DialogTitle>{isEdit ? "Edit person" : "Add person"}</DialogTitle>
           <DialogDescription>
             {isEdit
-              ? "Update this person's details."
-              : "Add a single person to the grant list. Email is required."}
+              ? "Update this person's email."
+              : "Add a single person to the grant list by email."}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label htmlFor="person-first-name">First name</Label>
-              <Input
-                id="person-first-name"
-                value={firstName}
-                onChange={(e) => setFirstName(e.target.value)}
-                autoFocus
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="person-last-name">Last name</Label>
-              <Input
-                id="person-last-name"
-                value={lastName}
-                onChange={(e) => setLastName(e.target.value)}
-              />
-            </div>
-          </div>
           <div className="space-y-1.5">
             <Label htmlFor="person-email">Email</Label>
             <Input
@@ -931,6 +861,7 @@ function PersonFormDialog({
                 emailError ? "border-destructive text-destructive" : ""
               }
               aria-invalid={!!emailError}
+              autoFocus
               required
             />
             {emailError && (
@@ -1066,15 +997,11 @@ function PersonProductsDialog({
   const hasAny = Object.values(selection).some((q) => q >= 1)
   const isAlreadyDefault = person.productsOverride === null
 
-  const displayName =
-    [person.first_name, person.last_name].filter(Boolean).join(" ") ||
-    person.email
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="flex max-h-[90vh] flex-col sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Tickets for {displayName}</DialogTitle>
+          <DialogTitle>Tickets for {person.email}</DialogTitle>
           <DialogDescription>
             Defaults applied unless you customize here.
           </DialogDescription>

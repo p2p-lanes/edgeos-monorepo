@@ -1077,8 +1077,11 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         statement = self._apply_sorting(statement, validated_sort, sort_order)
         statement = statement.offset(skip).limit(limit)
         statement = statement.options(
-            selectinload(Payments.products_snapshot).selectinload(  # ty: ignore[invalid-argument-type]
-                PaymentProducts.attendee  # ty: ignore[invalid-argument-type]
+            selectinload(Payments.products_snapshot)  # ty: ignore[invalid-argument-type]
+            .selectinload(PaymentProducts.attendee)  # ty: ignore[invalid-argument-type]
+            .selectinload(Attendees.human),  # ty: ignore[invalid-argument-type]
+            selectinload(Payments.application).selectinload(  # ty: ignore[invalid-argument-type]
+                Applications.human  # ty: ignore[invalid-argument-type]
             ),
         )
         results = list(session.exec(statement).all())
@@ -1113,8 +1116,11 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         statement = self._apply_sorting(statement, validated_sort, sort_order)
         statement = statement.offset(skip).limit(limit)
         statement = statement.options(
-            selectinload(Payments.products_snapshot).selectinload(  # ty: ignore[invalid-argument-type]
-                PaymentProducts.attendee  # ty: ignore[invalid-argument-type]
+            selectinload(Payments.products_snapshot)  # ty: ignore[invalid-argument-type]
+            .selectinload(PaymentProducts.attendee)  # ty: ignore[invalid-argument-type]
+            .selectinload(Attendees.human),  # ty: ignore[invalid-argument-type]
+            selectinload(Payments.application).selectinload(  # ty: ignore[invalid-argument-type]
+                Applications.human  # ty: ignore[invalid-argument-type]
             ),
         )
         results = list(session.exec(statement).all())

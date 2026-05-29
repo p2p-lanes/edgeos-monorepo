@@ -36,6 +36,7 @@ class EventsCRUD(BaseCRUD[Events, EventCreate, EventUpdate]):
         venue_id: uuid.UUID | None = None,
         location_kind: str | None = None,
         track_ids: list[uuid.UUID] | None = None,
+        owner_id: uuid.UUID | None = None,
         tags: list[str] | None = None,
         search: str | None = None,
         visibility: EventVisibility | None = None,
@@ -71,6 +72,8 @@ class EventsCRUD(BaseCRUD[Events, EventCreate, EventUpdate]):
             statement = statement.where(Events.custom_location_name.is_(None))  # type: ignore[union-attr]
         if track_ids:
             statement = statement.where(col(Events.track_id).in_(track_ids))
+        if owner_id is not None:
+            statement = statement.where(Events.owner_id == owner_id)
         if tags:
             # Postgres JSONB ?| operator: any of the provided tags present.
             # The right operand must be text[] — wrapping with array() makes
@@ -176,6 +179,35 @@ class EventsCRUD(BaseCRUD[Events, EventCreate, EventUpdate]):
         # Dedup again post-trim (DISTINCT didn't see the trim) and sort
         # case-insensitively for stable, human-friendly ordering.
         return sorted(set(tags), key=lambda s: s.casefold())
+
+    def list_distinct_hosts(
+        self,
+        session: Session,
+        *,
+        popup_id: uuid.UUID,
+    ) -> list[Humans]:
+        """Distinct hosts (Humans referenced by ``Events.owner_id``) within a popup.
+
+        Joins ``Events.owner_id`` to ``Humans.id`` so events whose owner is not
+        a human (e.g. backoffice-created events owned by a staff User) are
+        naturally excluded — those have no host to filter by. Sorted by name
+        then email for a stable, human-friendly picker.
+        """
+        statement = (
+            select(Humans)
+            .join(Events, Events.owner_id == Humans.id)  # type: ignore[arg-type]
+            .where(Events.popup_id == popup_id)
+            .distinct()
+        )
+        humans = list(session.exec(statement).all())
+        return sorted(
+            humans,
+            key=lambda h: (
+                f"{h.first_name or ''} {h.last_name or ''}".strip().casefold()
+                or h.email.casefold(),
+                h.email.casefold(),
+            ),
+        )
 
     def find_venue_conflicts(
         self,

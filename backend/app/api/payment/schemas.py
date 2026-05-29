@@ -250,6 +250,8 @@ class PaymentPublic(PaymentBase):
 
     id: uuid.UUID
     products_snapshot: list[PaymentProductResponse] = []
+    buyer_email: str | None = None
+    buyer_name: str | None = None
     created_at: datetime | None = None
     updated_at: datetime | None = None
 
