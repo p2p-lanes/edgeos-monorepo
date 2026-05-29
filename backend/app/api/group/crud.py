@@ -322,6 +322,29 @@ class GroupsCRUD(BaseCRUD[Groups, GroupCreate, GroupUpdate]):
 
         return group
 
+    def get_human_group_ids(
+        self,
+        session: Session,
+        human_id: uuid.UUID,
+        popup_id: uuid.UUID,
+    ) -> set[uuid.UUID]:
+        """Return the set of group IDs the human belongs to within a popup.
+
+        Used by the opacity chokepoint (project_event_for) to determine
+        visibility for group-scoped PRIVATE events. Fetches from GroupMembers
+        joined to Groups so the result is scoped to the correct popup.
+
+        One query per request — callers cache the result before iterating events.
+        """
+        statement = (
+            select(GroupMembers.group_id)
+            .join(Groups, Groups.id == GroupMembers.group_id)  # type: ignore[arg-type]
+            .where(GroupMembers.human_id == human_id)
+            .where(Groups.popup_id == popup_id)
+        )
+        rows = session.exec(statement).all()
+        return set(rows)
+
     def get_ambassador_group(
         self,
         session: Session,
