@@ -156,6 +156,27 @@ def test_portal_staff_human_can_read_and_write_notes(
     assert read.json()["notes"] == "note from portal"
 
 
+def test_portal_superadmin_human_can_edit_notes_cross_tenant(
+    client: TestClient,
+    db: Session,
+    tenant_a: Tenants,
+    superadmin_user: Users,
+) -> None:
+    # A superadmin's User has no tenant_id, so the email match must grant staff
+    # access in any tenant (the original same-tenant-only check 403'd them).
+    popup = _make_popup(db, tenant_a)
+    ev = _make_event(db, tenant_a, popup)
+    staff = _make_human(db, tenant_a, email=superadmin_user.email)
+
+    wrote = client.put(
+        f"/api/v1/events/portal/events/{ev.id}/admin-notes",
+        headers=_human_auth(staff),
+        json={"notes": "superadmin via portal"},
+    )
+    assert wrote.status_code == 200, wrote.text
+    assert wrote.json()["notes"] == "superadmin via portal"
+
+
 def test_portal_regular_human_is_forbidden(
     client: TestClient,
     db: Session,
