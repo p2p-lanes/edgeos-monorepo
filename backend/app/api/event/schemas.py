@@ -182,6 +182,29 @@ class EventPublic(EventBase):
     model_config = ConfigDict(from_attributes=True)
 
 
+class EventHostOption(BaseModel):
+    """A distinct event host for the backoffice "filter events by creator" picker.
+
+    Resolved from ``Events.owner_id`` joined to ``Humans``. ``name`` is the
+    human's full name when set, otherwise null (the UI falls back to email).
+    """
+
+    id: uuid.UUID
+    name: str | None = None
+    email: str
+
+
+class EventAdminNotes(BaseModel):
+    """Staff-only free-text notes for an event.
+
+    Returned/accepted exclusively by the dedicated admin-notes endpoints — kept
+    out of EventBase/EventPublic so it never leaks into event payloads served to
+    portal humans or the public calendar.
+    """
+
+    notes: str | None = None
+
+
 class EventPublicCalendarItem(BaseModel):
     """Minimal, read-only event projection for the public calendar.
 
