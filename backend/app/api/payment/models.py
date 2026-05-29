@@ -111,6 +111,48 @@ class Payments(PaymentBase, table=True):
         """Get products for a specific attendee."""
         return [pp for pp in self.products_snapshot if pp.attendee_id == attendee_id]
 
+    def _buyer_attendee(self) -> Optional["Attendees"]:
+        """Resolve the attendee that represents the buyer for direct-sale payments.
+
+        Direct sales create a single buyer attendee (human, popup); we take the
+        first product's attendee as the purchaser. Returns None when no product
+        snapshot carries an attendee.
+        """
+        for pp in self.products_snapshot:
+            if pp.attendee is not None:
+                return pp.attendee
+        return None
+
+    @property
+    def buyer_email(self) -> str | None:
+        """Email of the person who paid.
+
+        Application-based payments resolve via application.human; direct-sale
+        payments resolve via the buyer attendee's human (falling back to the
+        attendee email). Requires the application.human and
+        products_snapshot.attendee.human relationships to be loaded.
+        """
+        if self.application is not None and self.application.human is not None:
+            return self.application.human.email
+        attendee = self._buyer_attendee()
+        if attendee is not None:
+            if attendee.human is not None:
+                return attendee.human.email
+            return attendee.email
+        return None
+
+    @property
+    def buyer_name(self) -> str | None:
+        """Display name of the person who paid (see buyer_email for resolution)."""
+        if self.application is not None and self.application.human is not None:
+            return self.application.human.display_name
+        attendee = self._buyer_attendee()
+        if attendee is not None:
+            if attendee.human is not None:
+                return attendee.human.display_name
+            return attendee.name
+        return None
+
 
 class PaymentInstallments(SQLModel, table=True):
     """Individual installment records for installment plan payments."""
