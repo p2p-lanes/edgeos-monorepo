@@ -8,7 +8,7 @@ no ALTER on the visibility column. The EventVisibility Python enum stays at exac
 {PUBLIC, UNLISTED, PRIVATE}.
 
 Revision ID: bfaabd563367
-Revises: 84513cbb2260
+Revises: d4b1e7a9c2f5
 """
 
 from collections.abc import Sequence
@@ -23,7 +23,7 @@ from app.alembic.utils import (
 )
 
 revision: str = "bfaabd563367"
-down_revision: str | Sequence[str] | None = "84513cbb2260"
+down_revision: str | Sequence[str] | None = "d4b1e7a9c2f5"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
