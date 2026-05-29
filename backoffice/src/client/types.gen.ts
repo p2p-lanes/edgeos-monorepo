@@ -3832,6 +3832,7 @@ export type AttendeesDeleteMyAttendeeForPopupResponse = ({
 export type AttendeesListAttendeesData = {
     applicationId?: (string | null);
     email?: (string | null);
+    hasTickets?: (boolean | null);
     /**
      * Maximum number of items to return
      */

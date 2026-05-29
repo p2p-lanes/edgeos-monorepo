@@ -1,5 +1,5 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query"
-import { createFileRoute, Link } from "@tanstack/react-router"
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router"
 import type { ColumnDef } from "@tanstack/react-table"
 import {
   Download,
@@ -40,11 +40,14 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { InlineRow, InlineSection } from "@/components/ui/inline-form"
+import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { Skeleton } from "@/components/ui/skeleton"
+import { Switch } from "@/components/ui/switch"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
 import useAuth from "@/hooks/useAuth"
 import {
+  type TableSearchParams,
   useTableSearchParams,
   validateTableSearch,
 } from "@/hooks/useTableSearchParams"
@@ -98,6 +101,7 @@ function getAttendeesQueryOptions(
   page: number,
   pageSize: number,
   search?: string,
+  hasTickets?: boolean,
 ) {
   return {
     queryFn: () =>
@@ -106,14 +110,26 @@ function getAttendeesQueryOptions(
         limit: pageSize,
         popupId: popupId || undefined,
         search: search || undefined,
+        hasTickets: hasTickets || undefined,
       }),
-    queryKey: ["attendees", popupId, { page, pageSize, search }],
+    queryKey: ["attendees", popupId, { page, pageSize, search, hasTickets }],
   }
+}
+
+type AttendeesSearchParams = TableSearchParams & {
+  hasTickets?: boolean
 }
 
 export const Route = createFileRoute("/_layout/attendees")({
   component: Attendees,
-  validateSearch: validateTableSearch,
+  validateSearch: (raw: Record<string, unknown>): AttendeesSearchParams => ({
+    ...validateTableSearch(raw),
+    // Accept both the boolean (default JSON search serialization) and the
+    // "true" string so the param round-trips regardless of how it was encoded.
+    ...(raw.hasTickets === true || raw.hasTickets === "true"
+      ? { hasTickets: true }
+      : {}),
+  }),
   head: () => ({
     meta: [{ title: "Attendees - EdgeOS" }],
   }),
@@ -315,11 +331,25 @@ const columns: ColumnDef<AttendeeListItem>[] = [
 
 function AttendeesTableContent() {
   const { selectedPopupId } = useWorkspace()
+  const navigate = useNavigate()
   const searchParams = Route.useSearch()
   const { search, pagination, setSearch, setPagination } = useTableSearchParams(
     searchParams,
     "/attendees",
   )
+  const hasTickets = searchParams.hasTickets ?? false
+
+  const setHasTickets = (value: boolean) => {
+    navigate({
+      to: "/attendees",
+      search: (prev: Record<string, unknown>) => ({
+        ...prev,
+        hasTickets: value || undefined,
+        page: 0,
+      }),
+      replace: true,
+    })
+  }
 
   const { data: attendees } = useQuery({
     ...getAttendeesQueryOptions(
@@ -327,6 +357,7 @@ function AttendeesTableContent() {
       pagination.pageIndex,
       pagination.pageSize,
       search,
+      hasTickets,
     ),
     placeholderData: keepPreviousData,
   })
@@ -341,13 +372,28 @@ function AttendeesTableContent() {
       hiddenOnMobile={["gender", "category"]}
       searchValue={search}
       onSearchChange={setSearch}
+      filterBar={
+        <div className="flex items-center gap-2">
+          <Switch
+            id="attendees-has-tickets"
+            checked={hasTickets}
+            onCheckedChange={(checked) => setHasTickets(checked === true)}
+          />
+          <Label
+            htmlFor="attendees-has-tickets"
+            className="whitespace-nowrap text-sm font-normal text-muted-foreground"
+          >
+            With tickets only
+          </Label>
+        </div>
+      }
       serverPagination={{
         total: attendees.paging.total,
         pagination,
         onPaginationChange: setPagination,
       }}
       emptyState={
-        !search ? (
+        !search && !hasTickets ? (
           <EmptyState
             icon={Users}
             title="No attendees yet"

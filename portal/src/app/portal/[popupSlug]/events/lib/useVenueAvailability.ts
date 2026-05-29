@@ -225,8 +225,10 @@ export function useVenueAvailability(
   )
 
   // Snap timeStr to the first available slot once availability has loaded
-  // for a newly-selected venue.
-  const lastVenueSnapRef = useRef("")
+  // for a newly-selected venue. Seed the ref with the initial venueId so
+  // the edit form (which mounts with the saved venue already populated)
+  // doesn't get its loaded start time clobbered by the venue's open hour.
+  const lastVenueSnapRef = useRef(venueId)
   useEffect(() => {
     if (!setTimeStr) return
     if (!venueId) {

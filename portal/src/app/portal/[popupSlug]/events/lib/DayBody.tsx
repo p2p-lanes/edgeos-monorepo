@@ -166,10 +166,12 @@ export function DayBody({
     const resolved = typeof next === "function" ? next(selectedDate) : next
     onSelectedDateChange(resolved)
   }
-  const { timezone, formatTime, formatDayKey } = useEventTimezone(
-    popupId,
-    timezoneOverride,
-  )
+  const {
+    timezone,
+    formatTime,
+    formatDayKey,
+    isLoading: tzLoading,
+  } = useEventTimezone(popupId, timezoneOverride)
   const scrollRef = useRef<HTMLDivElement>(null)
   const mobileScrollRef = useRef<HTMLDivElement>(null)
 
@@ -235,7 +237,11 @@ export function DayBody({
       }),
     enabled: isAuthed && !useOverride && !!popupId,
   })
-  const isLoading = useOverride ? false : eventsLoading
+  // Fold the settings-timezone load into the loading state: rendering the
+  // day grid before the popup tz resolves would place events at the wrong
+  // hour (browser-tz fallback) until settings arrive. With an override
+  // (public calendar) the tz is known synchronously, so this stays false.
+  const isLoading = useOverride ? false : eventsLoading || tzLoading
 
   // Recurring events require occurrence_start so the RSVP targets a single
   // instance. That includes both expanded pseudo-rows (have occurrence_id)

@@ -91,7 +91,12 @@ export default function EventDetailPage() {
     ? `/portal/${city?.slug}/events?${fromSearch}&${focusQs}`
     : `/portal/${city?.slug}/events?${focusQs}`
   const queryClient = useQueryClient()
-  const { timezone, formatTime, formatDateFull } = useEventTimezone(city?.id)
+  const {
+    timezone,
+    formatTime,
+    formatDateFull,
+    isLoading: tzLoading,
+  } = useEventTimezone(city?.id)
 
   const {
     data: event,
@@ -290,7 +295,7 @@ export default function EventDetailPage() {
     },
   })
 
-  if (isLoading) {
+  if (isLoading || tzLoading) {
     return (
       <div className="flex items-center justify-center py-20">
         <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />

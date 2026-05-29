@@ -20,6 +20,7 @@ from app.services.email import (
     get_email_service,
 )
 from app.services.email.templates import EventChangeRow
+from app.services.event_datetime import format_event_when, format_event_when_range
 from app.services.ical import build_event_ics
 
 
@@ -193,14 +194,19 @@ async def send_event_itip(
         if recipient_occurrence and event.start_time and event.end_time:
             # For one occurrence of a recurring series, mirror what the ICS
             # does: shift the master duration onto the occurrence start.
+            # The occurrence instant is UTC; the master's tz localizes it.
             duration = event.end_time - event.start_time
-            when = _format_time_range(
-                recipient_occurrence, recipient_occurrence + duration
+            when = format_event_when_range(
+                recipient_occurrence,
+                recipient_occurrence + duration,
+                event.timezone,
             )
         elif recipient_occurrence:
-            when = _format_when(recipient_occurrence)
+            when = format_event_when(recipient_occurrence, event.timezone)
         else:
-            when = _format_time_range(event.start_time, event.end_time)
+            when = format_event_when_range(
+                event.start_time, event.end_time, event.timezone
+            )
         try:
             ics_body = build_event_ics(
                 event,
@@ -312,27 +318,6 @@ async def bump_and_dispatch_update(
     )
 
 
-def _format_when(dt: datetime | None) -> str:
-    return dt.strftime("%b %d, %Y at %H:%M") if dt else "—"
-
-
-def _format_time_range(start: datetime | None, end: datetime | None) -> str:
-    """Render a "Mon, May 5, 2026 at 14:00 – 15:00" style time range.
-
-    Falls back to start-only when end is missing or equal to start, and
-    expands to a full "<start> – <end-date end-time>" form when the event
-    spans multiple days.
-    """
-    if not start:
-        return "—"
-    start_str = _format_when(start)
-    if not end or end == start:
-        return start_str
-    if end.date() == start.date():
-        return f"{start_str} – {end.strftime('%H:%M')}"
-    return f"{start_str} – {_format_when(end)}"
-
-
 def _venue_name(db, venue_id) -> str:
     if venue_id is None:
         return "—"
@@ -371,9 +356,10 @@ def summarize_event_changes(db, before: dict, after) -> dict[str, dict[str, str]
         new_start = getattr(after, "start_time", None)
         new_end = getattr(after, "end_time", None)
         if old_start != new_start or old_end != new_end:
+            tz = getattr(after, "timezone", None)
             changes["time"] = {
-                "before": _format_time_range(old_start, old_end),
-                "after": _format_time_range(new_start, new_end),
+                "before": format_event_when_range(old_start, old_end, tz),
+                "after": format_event_when_range(new_start, new_end, tz),
             }
 
     if "venue_id" in before:
