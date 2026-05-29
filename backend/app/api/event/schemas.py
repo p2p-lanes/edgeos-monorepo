@@ -188,6 +188,26 @@ class EventPublic(EventBase):
     model_config = ConfigDict(from_attributes=True)
 
 
+class EventOpaque(BaseModel):
+    """Opaque event projection for non-privileged viewers on availability endpoints.
+
+    Contains ONLY the fields needed to communicate a booking conflict without
+    leaking any event metadata. Used as the non-full-detail branch of the
+    ``EventPublic | EventOpaque`` discriminated union.
+
+    Fields MUST match the design's Decision 1d contract:
+      id, start_time, end_time, venue_id, is_opaque: Literal[True]
+    """
+
+    id: uuid.UUID
+    start_time: datetime
+    end_time: datetime
+    venue_id: uuid.UUID | None = None
+    is_opaque: Literal[True] = True
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class EventHostOption(BaseModel):
     """A distinct event host for the backoffice "filter events by creator" picker.
 
