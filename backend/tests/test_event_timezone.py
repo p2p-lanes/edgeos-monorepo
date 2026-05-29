@@ -480,3 +480,109 @@ class TestPortalCreateEvent:
         assert row is not None
         assert row.timezone == "America/Los_Angeles"
         assert row.start_time.astimezone(UTC) == start
+
+
+# ---------------------------------------------------------------------------
+# 5. Naive datetime inputs are rejected (fix E)
+#
+# Pydantic accepts ISO strings without an offset and parses them as naive,
+# which Postgres' TIMESTAMPTZ column would then interpret as server-local
+# and silently corrupt. The EventCreate/EventUpdate schemas now reject
+# naive inputs with a 422.
+# ---------------------------------------------------------------------------
+
+
+class TestNaiveDatetimeRejected:
+    def test_create_event_rejects_naive_start_time(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+        admin_token_tenant_a: str,
+    ) -> None:
+        popup = _make_popup(db, tenant_a, tz="America/Los_Angeles")
+        resp = client.post(
+            "/api/v1/events",
+            headers=_auth(admin_token_tenant_a),
+            json={
+                "popup_id": str(popup.id),
+                "title": "Naive Test",
+                # No 'Z' and no offset — Pydantic parses this as naive.
+                "start_time": "2026-06-04T20:00:00",
+                "end_time": "2026-06-04T23:00:00Z",
+                "timezone": "America/Los_Angeles",
+                "visibility": "public",
+                "status": "published",
+            },
+        )
+        assert resp.status_code == 422, resp.text
+        detail = resp.json()["detail"]
+        # The validator's message should mention "timezone offset".
+        assert any(
+            "timezone offset" in str(err.get("msg", "")) for err in detail
+        ), detail
+
+    def test_update_event_rejects_naive_end_time(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+        admin_token_tenant_a: str,
+    ) -> None:
+        from zoneinfo import ZoneInfo
+
+        la = ZoneInfo("America/Los_Angeles")
+        popup = _make_popup(db, tenant_a, tz="America/Los_Angeles")
+        start = datetime(2026, 6, 4, 13, 0, tzinfo=la).astimezone(UTC)
+        end = datetime(2026, 6, 4, 14, 0, tzinfo=la).astimezone(UTC)
+
+        create_resp = client.post(
+            "/api/v1/events",
+            headers=_auth(admin_token_tenant_a),
+            json={
+                "popup_id": str(popup.id),
+                "title": "Update Naive Test",
+                "start_time": start.isoformat(),
+                "end_time": end.isoformat(),
+                "timezone": "America/Los_Angeles",
+                "visibility": "public",
+                "status": "published",
+            },
+        )
+        assert create_resp.status_code == 201, create_resp.text
+        event_id = create_resp.json()["id"]
+
+        patch_resp = client.patch(
+            f"/api/v1/events/{event_id}",
+            headers=_auth(admin_token_tenant_a),
+            json={"end_time": "2026-06-04T15:00:00"},
+        )
+        assert patch_resp.status_code == 422, patch_resp.text
+
+    def test_offset_input_normalized_to_utc(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+        admin_token_tenant_a: str,
+    ) -> None:
+        """Non-UTC offset is accepted and normalized — round-trips as UTC."""
+        popup = _make_popup(db, tenant_a, tz="America/Los_Angeles")
+        # 13:00-07:00 == 20:00Z. Sent with explicit LA offset, not 'Z'.
+        resp = client.post(
+            "/api/v1/events",
+            headers=_auth(admin_token_tenant_a),
+            json={
+                "popup_id": str(popup.id),
+                "title": "Offset Test",
+                "start_time": "2026-06-04T13:00:00-07:00",
+                "end_time": "2026-06-04T14:00:00-07:00",
+                "timezone": "America/Los_Angeles",
+                "visibility": "public",
+                "status": "published",
+            },
+        )
+        assert resp.status_code == 201, resp.text
+        body = resp.json()
+        # Backend serializes UTC instants with '+00:00' or 'Z'.
+        assert body["start_time"].startswith("2026-06-04T20:00:00")
