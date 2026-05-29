@@ -436,6 +436,10 @@ class EventAvailabilityResult(BaseModel):
     # into account so the portal can show a precise warning ("this time
     # requires approval") instead of a venue-wide hint.
     effective_booking_mode: str | None = None
+    # Opaque conflict shapes for PRIVATE events the viewer cannot fully see.
+    # Only populated by portal-authenticated endpoints (check_availability_portal).
+    # Backoffice/admin callers always have full visibility and this list stays empty.
+    opaque_conflicts: list[EventOpaque] = []
 
 
 class EventRecurringAvailabilityCheck(BaseModel):

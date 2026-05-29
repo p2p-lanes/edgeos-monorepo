@@ -21,8 +21,6 @@ from __future__ import annotations
 import uuid
 from unittest.mock import MagicMock
 
-import pytest
-
 from app.api.event.schemas import EventOpaque, EventPublic, EventVisibility
 from app.services.event_visibility import project_event_for
 
@@ -36,18 +34,49 @@ def _make_event(
 ) -> MagicMock:
     from datetime import UTC, datetime
 
-    event = MagicMock(spec=[
-        "id", "visibility", "group_id", "owner_id", "start_time", "end_time",
-        "venue_id", "title", "content", "tenant_id", "popup_id", "meeting_url",
-        "host_display_name", "max_participant", "tags", "cover_url",
-        "custom_location_name", "custom_location_url", "track_id",
-        "require_approval", "kind", "status", "highlighted", "rejection_reason",
-        "rrule", "recurrence_master_id", "recurrence_exdates", "ical_sequence",
-        "timezone", "created_at", "updated_at",
-        # EventPublic-only (must be explicit None/value, NOT MagicMock)
-        "occurrence_id", "venue_title", "venue_location", "venue_image_url",
-        "track_title", "hidden", "my_rsvp_status",
-    ])
+    event = MagicMock(
+        spec=[
+            "id",
+            "visibility",
+            "group_id",
+            "owner_id",
+            "start_time",
+            "end_time",
+            "venue_id",
+            "title",
+            "content",
+            "tenant_id",
+            "popup_id",
+            "meeting_url",
+            "host_display_name",
+            "max_participant",
+            "tags",
+            "cover_url",
+            "custom_location_name",
+            "custom_location_url",
+            "track_id",
+            "require_approval",
+            "kind",
+            "status",
+            "highlighted",
+            "rejection_reason",
+            "rrule",
+            "recurrence_master_id",
+            "recurrence_exdates",
+            "ical_sequence",
+            "timezone",
+            "created_at",
+            "updated_at",
+            # EventPublic-only (must be explicit None/value, NOT MagicMock)
+            "occurrence_id",
+            "venue_title",
+            "venue_location",
+            "venue_image_url",
+            "track_title",
+            "hidden",
+            "my_rsvp_status",
+        ]
+    )
     event.id = uuid.uuid4()
     event.visibility = visibility
     event.group_id = group_id

@@ -874,9 +874,7 @@ async def list_event_hosts(
     omitted (they have no host to filter by).
     """
     hosts = crud.events_crud.list_distinct_hosts(db, popup_id=popup_id)
-    return [
-        EventHostOption(id=h.id, name=h.full_name, email=h.email) for h in hosts
-    ]
+    return [EventHostOption(id=h.id, name=h.full_name, email=h.email) for h in hosts]
 
 
 @router.get("/{event_id}", response_model=EventPublic)
@@ -1408,10 +1406,121 @@ async def check_availability(
 async def check_availability_portal(
     payload: EventAvailabilityCheck,
     db: HumanTenantSession,
-    _: CurrentHuman,
+    current_human: CurrentHuman,
 ) -> EventAvailabilityResult:
-    """Portal-facing variant of /check-availability authenticated as a human."""
-    return _run_availability_check(db, payload)
+    """Portal-facing variant of /check-availability authenticated as a human.
+
+    For PRIVATE events that the viewer cannot fully see, the conflict is
+    returned as an opaque entry in ``opaque_conflicts`` (EventOpaque) instead
+    of a raw UUID in ``conflicts``. This lets the portal render a "Busy" block
+    without leaking the event's metadata.
+    """
+    from sqlmodel import select as _select
+
+    from app.api.event.models import EventInvitations as _EventInvitations
+    from app.api.event_venue.models import EventVenues as _EventVenues
+    from app.api.event_venue.schemas import VenueBookingMode as _VenueBookingMode
+    from app.api.group.crud import groups_crud
+    from app.services.event_visibility import project_event_for
+
+    # Base availability check (open hours, booking mode gate).
+    venue = db.get(_EventVenues, payload.venue_id)
+    if not venue:
+        raise HTTPException(status_code=404, detail="Venue not found")
+    effective_mode = _resolve_effective_booking_mode(
+        db, venue, payload.start_time, payload.end_time
+    )
+    if effective_mode == _VenueBookingMode.UNBOOKABLE.value:
+        return EventAvailabilityResult(
+            available=False,
+            conflicts=[],
+            reason="Venue is not bookable at the selected time",
+            effective_booking_mode=effective_mode,
+        )
+
+    window_start, window_end = crud.compute_booking_window(
+        payload.start_time,
+        payload.end_time,
+        venue.setup_time_minutes,
+        venue.teardown_time_minutes,
+    )
+    conflict_events = crud.events_crud.find_venue_conflicts(
+        db,
+        venue_id=payload.venue_id,
+        window_start=window_start,
+        window_end=window_end,
+        exclude_event_id=payload.exclude_event_id,
+    )
+
+    if not conflict_events:
+        return EventAvailabilityResult(
+            available=True,
+            effective_booking_mode=effective_mode,
+        )
+
+    # Pre-compute viewer's group membership once for this popup.
+    # Use the venue's popup_id as the scope for group lookup.
+    viewer_group_ids = groups_crud.get_human_group_ids(
+        db, current_human.id, venue.popup_id
+    )
+
+    # Build invitee sets for invitation-based PRIVATE events (group_id IS NULL).
+    private_invitation_event_ids = [
+        ev.id
+        for ev in conflict_events
+        if ev.visibility == EventVisibility.PRIVATE and ev.group_id is None
+    ]
+    invited_map: dict[uuid.UUID, set[uuid.UUID]] = {}
+    if private_invitation_event_ids:
+        invs = list(
+            db.exec(
+                _select(_EventInvitations).where(
+                    _EventInvitations.event_id.in_(private_invitation_event_ids),
+                    _EventInvitations.human_id == current_human.id,
+                )
+            ).all()
+        )
+        for inv in invs:
+            invited_map.setdefault(inv.event_id, set()).add(inv.human_id)
+
+    class _Viewer:
+        id = current_human.id
+
+    viewer = _Viewer()
+
+    full_conflict_ids: list[uuid.UUID] = []
+    opaque_conflicts: list = []
+
+    for ev in conflict_events:
+        result = project_event_for(
+            viewer=viewer,
+            event=ev,
+            viewer_group_ids=viewer_group_ids,
+            is_admin_in_popup=False,
+            mode="availability",
+            invitee_ids=invited_map.get(ev.id, set()),
+        )
+        if result is None:
+            # listing-mode None: should not happen in availability mode, but guard
+            continue
+        from app.api.event.schemas import EventOpaque as _EventOpaque
+
+        if isinstance(result, _EventOpaque):
+            opaque_conflicts.append(result)
+        else:
+            full_conflict_ids.append(ev.id)
+
+    return EventAvailabilityResult(
+        available=len(full_conflict_ids) == 0 and len(opaque_conflicts) == 0,
+        conflicts=full_conflict_ids,
+        reason=(
+            None
+            if not full_conflict_ids and not opaque_conflicts
+            else "Conflicts with existing events"
+        ),
+        effective_booking_mode=effective_mode,
+        opaque_conflicts=opaque_conflicts,
+    )
 
 
 # Cap on how many conflicting occurrences we report up-front to the
@@ -1995,34 +2104,62 @@ async def export_event_ics(
 # ---------------------------------------------------------------------------
 
 
-def _portal_visibility_filter(db, events: list, human_id: uuid.UUID) -> list:
+def _portal_visibility_filter(
+    db,
+    events: list,
+    human_id: uuid.UUID,
+    popup_id: uuid.UUID | None = None,
+) -> list:
     """Apply visibility rules to a portal event list.
 
     Rules:
     - public: visible to all.
-    - private: only owner + invited humans.
+    - private (group-scoped, group_id IS NOT NULL): visible to owner + group members.
+    - private (invitation-based, group_id IS NULL): visible to owner + invited humans.
     - unlisted: hidden from public listings, but the owner still sees their
       own unlisted events (e.g. pending_approval requests they created).
       Detail is reachable via direct link for non-owners.
+
+    The opacity chokepoint (project_event_for with mode='listing') is used for
+    all PRIVATE events. It returns None for non-visible events, which are
+    then filtered out.
     """
     from sqlmodel import select
 
     from app.api.event.models import EventInvitations
+    from app.api.group.crud import groups_crud
+    from app.services.event_visibility import project_event_for
 
-    private_event_ids = [
-        e.id for e in events if e.visibility == EventVisibility.PRIVATE
+    # Pre-compute viewer's group membership once per request (one query).
+    # If popup_id is not known (legacy callers), fall back to empty set — safe
+    # because group membership without popup scope never grants access.
+    viewer_group_ids: set[uuid.UUID] = set()
+    if popup_id is not None:
+        viewer_group_ids = groups_crud.get_human_group_ids(db, human_id, popup_id)
+
+    # Build invitee map for invitation-based PRIVATE events (group_id IS NULL).
+    private_invitation_event_ids = [
+        e.id
+        for e in events
+        if e.visibility == EventVisibility.PRIVATE and e.group_id is None
     ]
     invited_map: dict[uuid.UUID, set[uuid.UUID]] = {}
-    if private_event_ids:
+    if private_invitation_event_ids:
         invs = list(
             db.exec(
                 select(EventInvitations).where(
-                    EventInvitations.event_id.in_(private_event_ids)
+                    EventInvitations.event_id.in_(private_invitation_event_ids)
                 )
             ).all()
         )
         for inv in invs:
             invited_map.setdefault(inv.event_id, set()).add(inv.human_id)
+
+    # Fake viewer object with .id for the chokepoint.
+    class _Viewer:
+        id = human_id
+
+    viewer = _Viewer()
 
     visible = []
     for e in events:
@@ -2032,7 +2169,15 @@ def _portal_visibility_filter(db, events: list, human_id: uuid.UUID) -> list:
             if e.owner_id == human_id:
                 visible.append(e)
         elif e.visibility == EventVisibility.PRIVATE:
-            if _invitation_visible_to_human(e, human_id, invited_map.get(e.id, set())):
+            result = project_event_for(
+                viewer=viewer,
+                event=e,
+                viewer_group_ids=viewer_group_ids,
+                is_admin_in_popup=False,
+                mode="listing",
+                invitee_ids=invited_map.get(e.id, set()),
+            )
+            if result is not None:
                 visible.append(e)
     return visible
 
@@ -2079,7 +2224,7 @@ async def list_portal_events(
             search_fields=["title"],
         )
 
-    visible = _portal_visibility_filter(db, events, current_human.id)
+    visible = _portal_visibility_filter(db, events, current_human.id, popup_id=popup_id)
     # Cancelled events are removed from every portal listing — owners who want
     # to see them after the fact can still hit the detail URL directly. The
     # ``event_status`` query param can't express "exclude cancelled" alongside
@@ -2276,12 +2421,37 @@ async def get_portal_event(
         )
 
     if event.visibility == EventVisibility.PRIVATE:
-        invited = db.exec(
-            select(EventInvitations)
-            .where(EventInvitations.event_id == event_id)
-            .where(EventInvitations.human_id == current_human.id)
-        ).first()
-        if not invited and event.owner_id != current_human.id:
+        from app.api.group.crud import groups_crud
+        from app.services.event_visibility import project_event_for
+
+        # Pre-compute group membership for this viewer.
+        viewer_group_ids = groups_crud.get_human_group_ids(
+            db, current_human.id, event.popup_id
+        )
+
+        # Build invitee set for invitation-based PRIVATE events.
+        invitee_ids: set[uuid.UUID] = set()
+        if event.group_id is None:
+            inv = db.exec(
+                select(EventInvitations)
+                .where(EventInvitations.event_id == event_id)
+                .where(EventInvitations.human_id == current_human.id)
+            ).first()
+            if inv:
+                invitee_ids = {current_human.id}
+
+        class _Viewer:
+            id = current_human.id
+
+        result = project_event_for(
+            viewer=_Viewer(),
+            event=event,
+            viewer_group_ids=viewer_group_ids,
+            is_admin_in_popup=False,
+            mode="listing",
+            invitee_ids=invitee_ids,
+        )
+        if result is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail="Event not found"
             )
@@ -2324,9 +2494,7 @@ async def get_portal_event(
 # ---------------------------------------------------------------------------
 
 
-@router.get(
-    "/portal/events/{event_id}/admin-notes", response_model=EventAdminNotes
-)
+@router.get("/portal/events/{event_id}/admin-notes", response_model=EventAdminNotes)
 async def get_portal_event_admin_notes(
     event_id: uuid.UUID,
     db: HumanTenantSession,
@@ -2341,9 +2509,7 @@ async def get_portal_event_admin_notes(
     return EventAdminNotes(notes=event.admin_notes)
 
 
-@router.put(
-    "/portal/events/{event_id}/admin-notes", response_model=EventAdminNotes
-)
+@router.put("/portal/events/{event_id}/admin-notes", response_model=EventAdminNotes)
 async def update_portal_event_admin_notes(
     event_id: uuid.UUID,
     payload: EventAdminNotes,
