@@ -89,6 +89,8 @@ interface CalendarBodyProps {
   /** Timezone forwarded to ``useEventTimezone`` when settings aren't
    * available (public mode has no authenticated settings endpoint). */
   timezoneOverride?: string
+  /** Popup-scoped fallback image when an event has no cover/venue image. */
+  placeholderUrl?: string | null
 }
 
 /**
@@ -109,6 +111,7 @@ export function CalendarBody({
   eventsOverride,
   onEventClick,
   timezoneOverride,
+  placeholderUrl,
 }: CalendarBodyProps) {
   const isAuthed = mode === "authed"
   const useOverride = eventsOverride !== undefined
@@ -433,18 +436,26 @@ export function CalendarBody({
                         className="block p-3"
                       >
                         <div className="flex items-start gap-3">
-                          {event.venue_image_url && (
-                            <div className="h-12 w-12 rounded-md overflow-hidden shrink-0">
-                              <CoverImage
-                                src={event.venue_image_url}
-                                alt={event.venue_title ?? ""}
-                                className="h-full w-full object-cover"
-                                fallback={
-                                  <MapPin className="h-5 w-5 text-muted-foreground/40" />
-                                }
-                              />
-                            </div>
-                          )}
+                          {(() => {
+                            const thumbUrl =
+                              event.cover_url ||
+                              event.venue_image_url ||
+                              placeholderUrl ||
+                              null
+                            if (!thumbUrl) return null
+                            return (
+                              <div className="h-12 w-12 rounded-md overflow-hidden shrink-0">
+                                <CoverImage
+                                  src={thumbUrl}
+                                  alt={event.venue_title ?? ""}
+                                  className="h-full w-full object-cover"
+                                  fallback={
+                                    <MapPin className="h-5 w-5 text-muted-foreground/40" />
+                                  }
+                                />
+                              </div>
+                            )
+                          })()}
                           <div className="min-w-0 flex-1">
                             <h4 className="text-sm font-medium truncate flex items-center gap-1.5">
                               {isOwner && (

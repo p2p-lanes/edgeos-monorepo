@@ -5149,6 +5149,17 @@ export const EventCalendarMetaSchema = {
         popup_name: {
             type: 'string',
             title: 'Popup Name'
+        },
+        placeholder_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Placeholder Url'
         }
     },
     type: 'object',
@@ -6382,6 +6393,17 @@ export const EventSettingsCreateSchema = {
             type: 'array',
             title: 'Approval Notification Emails',
             default: []
+        },
+        placeholder_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Placeholder Url'
         }
     },
     type: 'object',
@@ -6452,6 +6474,17 @@ export const EventSettingsPublicSchema = {
             },
             type: 'array',
             title: 'Approval Notification Emails'
+        },
+        placeholder_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Placeholder Url'
         },
         created_at: {
             type: 'string',
@@ -6583,6 +6616,17 @@ export const EventSettingsUpdateSchema = {
                 }
             ],
             title: 'Approval Notification Emails'
+        },
+        placeholder_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Placeholder Url'
         }
     },
     type: 'object',

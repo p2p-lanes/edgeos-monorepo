@@ -8,6 +8,7 @@ import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
 import { ChipInput } from "@/components/forms/EventForm/ChipInput"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { ImageUpload } from "@/components/ui/image-upload"
 import { Label } from "@/components/ui/label"
 import {
   Select,
@@ -107,6 +108,7 @@ function EventSettingsForm() {
     allowed_tags: [] as string[],
     allowed_kinds: [] as string[],
     approval_notification_emails: [] as string[],
+    placeholder_url: null as string | null,
   }
 
   return (
@@ -227,6 +229,25 @@ function EventSettingsForm() {
             })}
           </SelectContent>
         </Select>
+      </div>
+
+      <div className="space-y-2">
+        <Label>Image placeholder</Label>
+        <ImageUpload
+          value={currentSettings.placeholder_url ?? null}
+          disabled={readOnly}
+          onChange={(url) =>
+            upsertMutation.mutate({
+              ...currentSettings,
+              popup_id: selectedPopupId!,
+              placeholder_url: url,
+            })
+          }
+        />
+        <p className="text-sm text-muted-foreground">
+          Shown in the portal as the event cover when an individual event has no
+          image. If left empty, the portal falls back to a generic icon.
+        </p>
       </div>
 
       <div className="space-y-2">

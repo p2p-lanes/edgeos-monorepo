@@ -61,7 +61,10 @@ import { AddToCalendarModal } from "../lib/AddToCalendarModal"
 import { CoverImage } from "../lib/CoverImage"
 import { summarizeRrule } from "../lib/summarizeRrule"
 import { useCalendarAddedFlag } from "../lib/useCalendarAddedFlag"
-import { useEventTimezone } from "../lib/useEventTimezone"
+import {
+  useEventTimezone,
+  usePortalEventSettings,
+} from "../lib/useEventTimezone"
 
 function AdminNotesSection({ eventId }: { eventId: string }) {
   const queryClient = useQueryClient()
@@ -163,6 +166,7 @@ export default function EventDetailPage() {
     formatDateFull,
     isLoading: tzLoading,
   } = useEventTimezone(city?.id)
+  const { data: eventSettings } = usePortalEventSettings(city?.id)
 
   const {
     data: event,
@@ -415,7 +419,11 @@ export default function EventDetailPage() {
   })()
   const eventStarted = new Date(effectiveStartTime) <= new Date()
 
-  const coverUrl = event.cover_url || event.venue_image_url || null
+  const coverUrl =
+    event.cover_url ||
+    event.venue_image_url ||
+    eventSettings?.placeholder_url ||
+    null
   const coverCredit =
     !event.cover_url && event.venue_image_url ? event.venue_title : null
 

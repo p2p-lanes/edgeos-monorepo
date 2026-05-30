@@ -760,6 +760,7 @@ export default function EventsPage() {
             trackIds={selectedTrackIds}
             defaultDate={selectedDate}
             onEventLinkClick={handleEventLinkClick}
+            placeholderUrl={eventSettings?.placeholder_url}
           />
         ) : view === "day" ? (
           isDayFullscreen ? null : (
@@ -794,6 +795,7 @@ export default function EventsPage() {
             pendingRsvpKey={pendingRsvpKey}
             onHide={(id) => hideMutation.mutate(id)}
             onUnhide={(id) => unhideMutation.mutate(id)}
+            placeholderUrl={eventSettings?.placeholder_url}
           />
         )}
       </div>

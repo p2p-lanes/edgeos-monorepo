@@ -255,6 +255,7 @@ export function PublicCalendarClient({ popupSlug }: PublicCalendarClientProps) {
             eventsOverride={events}
             onEventClick={handleEventClick}
             timezoneOverride={timezone}
+            placeholderUrl={meta?.placeholder_url}
           />
         ) : view === "day" ? (
           <DayBody
@@ -288,6 +289,7 @@ export function PublicCalendarClient({ popupSlug }: PublicCalendarClientProps) {
             formatDayKey={formatDayKey}
             mode="public"
             onEventClick={handleEventClick}
+            placeholderUrl={meta?.placeholder_url}
           />
         )}
       </div>

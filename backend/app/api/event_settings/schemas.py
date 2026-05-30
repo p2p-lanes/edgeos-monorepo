@@ -3,7 +3,7 @@ from datetime import UTC, datetime
 from enum import Enum
 
 from pydantic import BaseModel, ConfigDict
-from sqlalchemy import Column
+from sqlalchemy import Column, Text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlmodel import DateTime, Field, SQLModel
 
@@ -47,6 +47,10 @@ class EventSettingsBase(SQLModel):
         default_factory=list,
         sa_column=Column(JSONB, nullable=False, server_default="[]"),
     )
+    # Popup-scoped fallback image used by the portal when an individual event
+    # has no cover image. When this is also empty, the portal falls back to a
+    # generic icon placeholder.
+    placeholder_url: str | None = Field(default=None, sa_type=Text())
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(UTC), sa_type=DateTime(timezone=True)
     )
@@ -76,6 +80,7 @@ class EventSettingsCreate(BaseModel):
     allowed_tags: list[str] = []
     allowed_kinds: list[str] = []
     approval_notification_emails: list[str] = []
+    placeholder_url: str | None = None
 
 
 class EventSettingsUpdate(BaseModel):
@@ -90,3 +95,4 @@ class EventSettingsUpdate(BaseModel):
     allowed_tags: list[str] | None = None
     allowed_kinds: list[str] | None = None
     approval_notification_emails: list[str] | None = None
+    placeholder_url: str | None = None
