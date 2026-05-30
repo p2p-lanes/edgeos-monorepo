@@ -7,12 +7,16 @@ from fastapi.routing import APIRoute
 from loguru import logger
 from pydantic import ValidationError
 from sqlalchemy.exc import IntegrityError, ProgrammingError
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.cors import CORSMiddleware
 
 import app.models  # noqa: F401 - Register all models with SQLAlchemy
 from app.api.router import api_router
 from app.core.config import Environment, settings
+from app.core.logging import RequestContextMiddleware, configure_logging
 from app.core.rate_limit import RateLimitExceeded
+
+configure_logging()
 
 
 def custom_generate_unique_id(route: APIRoute) -> str:
@@ -101,6 +105,33 @@ def handle_integrity_error(_: Request, exc: IntegrityError) -> JSONResponse:
     )
 
 
+@application.exception_handler(StarletteHTTPException)
+def handle_http_exception(
+    request: Request, exc: StarletteHTTPException
+) -> JSONResponse:
+    """Log the detail returned to the client for every raised HTTPException.
+
+    Without this, a raised ``HTTPException`` (e.g. 403 "Application must be
+    accepted before purchasing products") leaves only a bare status code in the
+    access log, so a real user report cannot be traced. 4xx are logged at
+    WARNING, 5xx at ERROR. The response shape matches Starlette's default
+    handler so clients see no change.
+    """
+    log = logger.warning if exc.status_code < 500 else logger.error
+    log(
+        "{} {} -> {}: {}",
+        request.method,
+        request.url.path,
+        exc.status_code,
+        exc.detail,
+    )
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail},
+        headers=getattr(exc, "headers", None),
+    )
+
+
 application.add_middleware(
     CORSMiddleware,  # type: ignore[arg-type]
     allow_origins=["*"],
@@ -108,6 +139,10 @@ application.add_middleware(
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "X-Tenant-Id", "Accept-Language"],
 )
+
+# Outermost middleware: assigns a request_id, binds it to all logs in the
+# request, and emits one structured access line per request.
+application.add_middleware(RequestContextMiddleware)  # type: ignore[arg-type]
 
 
 @application.get("/health-check", tags=["utils"], include_in_schema=False)
