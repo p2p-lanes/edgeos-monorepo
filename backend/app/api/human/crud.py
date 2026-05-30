@@ -533,9 +533,10 @@ def resolve_whitelist_memberships(session: Session, human: Humans) -> None:
     - For each matching group, insert into group_members if not already present
     - Never touches applications — M:N membership only
     """
-    from app.api.group.models import GroupMembers, GroupWhitelistedEmails
     from sqlalchemy import func
     from sqlmodel import select as _select
+
+    from app.api.group.models import GroupMembers, GroupWhitelistedEmails
 
     email_lower = human.email.lower()
 

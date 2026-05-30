@@ -598,10 +598,11 @@ def _add_member_by_application_logic(
 
     Raises HTTPException on validation failures.
     """
+    from sqlmodel import select
+
     from app.api.application.models import Applications
     from app.api.application.schemas import ApplicationStatus
     from app.api.human.models import Humans
-    from sqlmodel import select
 
     # Fetch the application
     application = db.exec(
@@ -639,6 +640,7 @@ def _add_member_by_application_logic(
     already_member = crud.groups_crud.is_member(db, group.id, human_id)
     if not already_member:
         from app.api.group.models import GroupMembers
+
         member_row = GroupMembers(
             tenant_id=group.tenant_id,
             group_id=group.id,
@@ -697,6 +699,7 @@ async def add_member_by_application_admin(
     # Override FastAPI's default 201 with 200 when not created (already member)
     if not created:
         from fastapi.responses import JSONResponse
+
         return JSONResponse(
             status_code=status.HTTP_200_OK,
             content=member_public.model_dump(mode="json"),
@@ -734,6 +737,7 @@ async def add_member_by_application_leader(
     member_public, created = _add_member_by_application_logic(db, group, request)
     if not created:
         from fastapi.responses import JSONResponse
+
         return JSONResponse(
             status_code=status.HTTP_200_OK,
             content=member_public.model_dump(mode="json"),
