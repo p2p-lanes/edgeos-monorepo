@@ -201,6 +201,12 @@ class GroupMembersBase(SQLModel):
     human_id: uuid.UUID = Field(foreign_key="humans.id", primary_key=True, index=True)
 
 
+class AddMemberByApplicationRequest(BaseModel):
+    """Request body for POST /groups/{id}/members/by-application."""
+
+    application_id: uuid.UUID
+
+
 class GroupProductsBase(SQLModel):
     """Base schema for group products link table."""
 

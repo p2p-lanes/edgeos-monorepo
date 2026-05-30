@@ -1,10 +1,15 @@
 import uuid
+from typing import TYPE_CHECKING
 
 from fastapi import APIRouter, HTTPException, status
+
+if TYPE_CHECKING:
+    from sqlmodel import Session
 
 from app.api.group import crud
 from app.api.group.models import Groups
 from app.api.group.schemas import (
+    AddMemberByApplicationRequest,
     GroupAdminUpdate,
     GroupCreate,
     GroupMemberBatch,
@@ -579,6 +584,161 @@ async def remove_group_member(
     # historical record of where this application originated.
     crud.groups_crud.remove_member(db, group.id, human_id)
     db.commit()
+
+
+def _add_member_by_application_logic(
+    db: "Session",
+    group: "Groups",
+    request: "AddMemberByApplicationRequest",
+) -> tuple["GroupMemberPublic", bool]:
+    """Core logic for POST .../members/by-application.
+
+    Returns (GroupMemberPublic, created) where created=True means the row was
+    inserted (201), created=False means the human was already a member (200).
+
+    Raises HTTPException on validation failures.
+    """
+    from app.api.application.models import Applications
+    from app.api.application.schemas import ApplicationStatus
+    from app.api.human.models import Humans
+    from sqlmodel import select
+
+    # Fetch the application
+    application = db.exec(
+        select(Applications).where(Applications.id == request.application_id)
+    ).first()
+    if not application:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Application not found",
+        )
+
+    # Application must belong to the same popup as the group
+    if application.popup_id != group.popup_id:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Application does not belong to the same popup as this group",
+        )
+
+    # Application must be ACCEPTED
+    if application.status != ApplicationStatus.ACCEPTED.value:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Application must be in ACCEPTED status to add human as group member",
+        )
+
+    human_id = application.human_id
+    human = db.exec(select(Humans).where(Humans.id == human_id)).first()
+    if not human:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Human not found",
+        )
+
+    # Idempotency: if already a member, return current state (200)
+    already_member = crud.groups_crud.is_member(db, group.id, human_id)
+    if not already_member:
+        from app.api.group.models import GroupMembers
+        member_row = GroupMembers(
+            tenant_id=group.tenant_id,
+            group_id=group.id,
+            human_id=human_id,
+        )
+        db.add(member_row)
+        db.commit()
+
+    # Build response
+    custom = (application.custom_fields or {}) if application.custom_fields else {}
+    products: list = []
+    for attendee in application.attendees:
+        products.extend(attendee.products)
+
+    member_public = GroupMemberPublic(
+        id=human.id,
+        first_name=human.first_name or "",
+        last_name=human.last_name or "",
+        email=human.email,
+        telegram=human.telegram,
+        organization=custom.get("organization"),
+        role=custom.get("role"),
+        gender=human.gender,
+        local_resident=None,
+        products=products,
+    )
+    return member_public, not already_member
+
+
+@router.post(
+    "/{group_id}/members/by-application",
+    response_model=GroupMemberPublic,
+    status_code=status.HTTP_201_CREATED,
+    summary="Add an approved human to a group by application (admin)",
+)
+async def add_member_by_application_admin(
+    group_id: uuid.UUID,
+    request: AddMemberByApplicationRequest,
+    db: AdminOrApiKeySession_GroupsWrite,
+    _: AdminOrApiKey_GroupsWrite,
+) -> GroupMemberPublic:
+    """Add an existing approved human to a group without creating a duplicate application.
+
+    Guard: admin token (backoffice). For portal leaders, use /my/{group_id}/members/by-application.
+    The application must belong to the same popup as the group and have ACCEPTED status.
+    Idempotent: returns 200 if the human is already a member.
+    """
+    group = crud.groups_crud.get(db, group_id)
+    if not group:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Group not found",
+        )
+
+    member_public, created = _add_member_by_application_logic(db, group, request)
+    # Override FastAPI's default 201 with 200 when not created (already member)
+    if not created:
+        from fastapi.responses import JSONResponse
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content=member_public.model_dump(mode="json"),
+        )  # type: ignore[return-value]
+    return member_public
+
+
+@router.post(
+    "/my/{group_id}/members/by-application",
+    response_model=GroupMemberPublic,
+    status_code=status.HTTP_201_CREATED,
+    summary="Add an approved human to a group by application (leader)",
+)
+async def add_member_by_application_leader(
+    group_id: uuid.UUID,
+    request: AddMemberByApplicationRequest,
+    db: SessionDep,
+    current_human: CurrentHuman,
+) -> GroupMemberPublic:
+    """Add an existing approved human to a group without creating a duplicate application.
+
+    Guard: portal leader token. For admin, use /{group_id}/members/by-application.
+    The application must belong to the same popup as the group and have ACCEPTED status.
+    Idempotent: returns 200 if the human is already a member.
+    """
+    group = crud.groups_crud.get(db, group_id)
+    if not group:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Group not found",
+        )
+
+    _check_leader_permission(group, current_human.id)
+
+    member_public, created = _add_member_by_application_logic(db, group, request)
+    if not created:
+        from fastapi.responses import JSONResponse
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content=member_public.model_dump(mode="json"),
+        )  # type: ignore[return-value]
+    return member_public
 
 
 @router.get("/public/{group_slug}", response_model=GroupPublic)
