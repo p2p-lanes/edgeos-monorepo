@@ -294,11 +294,20 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         # still validate types/constraints on any values the user did provide.
         is_draft = _is_draft_status(getattr(app_data, "status", None))
 
+        # Resolve group early so we can read explicit flags. The whitelist
+        # validation below re-uses this same object (no second DB hit).
+        _group_id = getattr(app_data, "group_id", None)
+        _group = None
+        if _group_id:
+            from app.api.group.crud import groups_crud as _groups_crud
+
+            _group = _groups_crud.get(session, _group_id)
+
         # Applications submitted through a group come from the portal's
-        # Express Checkout, which renders a reduced personal-info form. Scope
-        # required validation to that subset so users aren't blocked on fields
-        # the form never asked for.
-        is_express_checkout = bool(getattr(app_data, "group_id", None))
+        # Express Checkout ONLY when the group explicitly opts in via the
+        # express_checkout flag. Previously this was implicit (bool(group_id));
+        # now it requires the flag to be True. Design Decision 1f.
+        is_express_checkout = bool(_group and _group.express_checkout)
 
         # Validate custom_fields against form field definitions
         if validate_custom_fields and app_data.custom_fields:
@@ -338,26 +347,24 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
                     detail={"message": "Invalid base fields", "errors": errors},
                 )
 
-        # Validate group whitelist if group_id provided
-        if hasattr(app_data, "group_id") and app_data.group_id:
-            from app.api.group.crud import groups_crud
-
-            group = groups_crud.get(session, app_data.group_id)
-            if not group:
+        # Validate group whitelist if group_id provided.
+        # Reuses _group already fetched above (avoid duplicate DB hit).
+        if _group_id:
+            if not _group:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail="Group not found",
                 )
 
             # Check if group belongs to same popup
-            if group.popup_id != app_data.popup_id:
+            if _group.popup_id != app_data.popup_id:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="Group does not belong to this popup",
                 )
 
             # Check whitelist (skip if group is open - has no whitelisted emails)
-            if not group.is_open and not group.has_whitelisted_email(human.email):
+            if not _group.is_open and not _group.has_whitelisted_email(human.email):
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail="Your email is not whitelisted for this group",
@@ -402,8 +409,13 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         data["tenant_id"] = tenant_id
         data["human_id"] = human_id
 
-        # Auto-accept applications that come through a group (checkout/referral)
-        if data.get("group_id"):
+        # Auto-accept only when the group explicitly enables it via the
+        # auto_approve_applications flag. Previously this triggered for any
+        # application with a group_id (implicit); now the flag must be True.
+        # Design Decision 1f: NO retroactive changes — existing ACCEPTED
+        # applications are never touched here; only NEW applications branch.
+        should_auto_accept = bool(_group and _group.auto_approve_applications)
+        if should_auto_accept:
             if human.red_flag:
                 data["status"] = ApplicationStatus.REJECTED.value
             else:
