@@ -774,6 +774,7 @@ async def list_public_calendar(
 
     settings = event_settings_crud.get_by_popup_id(db, popup.id)
     timezone = settings.timezone if settings else "UTC"
+    placeholder_url = settings.placeholder_url if settings else None
     # Distinct tags actually present on the popup's published+public events,
     # not the curated ``event_settings.allowed_tags`` list — creators can use
     # tags outside that list, and the filter must surface them.
@@ -793,6 +794,7 @@ async def list_public_calendar(
             popup_id=popup.id,
             popup_slug=popup.slug,
             popup_name=popup.name,
+            placeholder_url=placeholder_url,
         ),
     )
 

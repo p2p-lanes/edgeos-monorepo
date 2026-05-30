@@ -257,6 +257,10 @@ class EventCalendarMeta(BaseModel):
     popup_id: uuid.UUID
     popup_slug: str
     popup_name: str
+    # Popup-scoped fallback image used by the portal when an event has no
+    # cover/venue image. Surfaced here so the anonymous calendar can apply
+    # the same fallback without calling the authenticated settings endpoint.
+    placeholder_url: str | None = None
 
 
 class EventPublicCalendarResponse(BaseModel):

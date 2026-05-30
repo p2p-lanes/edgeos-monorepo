@@ -1184,6 +1184,7 @@ export type EventCalendarMeta = {
     popup_id: string;
     popup_slug: string;
     popup_name: string;
+    placeholder_url?: (string | null);
 };
 
 /**
@@ -1418,6 +1419,7 @@ export type EventSettingsCreate = {
     allowed_tags?: Array<(string)>;
     allowed_kinds?: Array<(string)>;
     approval_notification_emails?: Array<(string)>;
+    placeholder_url?: (string | null);
 };
 
 /**
@@ -1435,6 +1437,7 @@ export type EventSettingsPublic = {
     allowed_tags?: Array<(string)>;
     allowed_kinds?: Array<(string)>;
     approval_notification_emails?: Array<(string)>;
+    placeholder_url?: (string | null);
     created_at?: string;
     updated_at?: string;
     id: string;
@@ -1453,6 +1456,7 @@ export type EventSettingsUpdate = {
     allowed_tags?: (Array<(string)> | null);
     allowed_kinds?: (Array<(string)> | null);
     approval_notification_emails?: (Array<(string)> | null);
+    placeholder_url?: (string | null);
 };
 
 export type EventStatus = 'draft' | 'published' | 'cancelled' | 'pending_approval' | 'rejected';

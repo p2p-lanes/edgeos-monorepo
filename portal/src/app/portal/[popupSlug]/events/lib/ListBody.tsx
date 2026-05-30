@@ -79,6 +79,8 @@ interface ListBodyProps {
   pendingRsvpKey?: string | null
   onHide?: (eventId: string) => void
   onUnhide?: (eventId: string) => void
+  /** Popup-scoped fallback image when an event has no cover/venue image. */
+  placeholderUrl?: string | null
 }
 
 /**
@@ -104,6 +106,7 @@ export function ListBody({
   pendingRsvpKey,
   onHide,
   onUnhide,
+  placeholderUrl,
 }: ListBodyProps) {
   const { t } = useTranslation()
   const isAuthed = mode === "authed"
@@ -172,7 +175,11 @@ export function ListBody({
                   })
                 }
               }
-              const thumbUrl = event.cover_url || event.venue_image_url || null
+              const thumbUrl =
+                event.cover_url ||
+                event.venue_image_url ||
+                placeholderUrl ||
+                null
               return (
                 <div
                   key={event.id}
