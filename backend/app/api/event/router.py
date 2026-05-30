@@ -15,11 +15,13 @@ from app.api.event.recurrence import (
     parse_rrule,
 )
 from app.api.event.schemas import (
+    EventAdminNotes,
     EventAvailabilityCheck,
     EventAvailabilityResult,
     EventCalendarMeta,
     EventCalendarTrack,
     EventCreate,
+    EventHostOption,
     EventInvitationBulkCreate,
     EventInvitationBulkResult,
     EventInvitationPublic,
@@ -43,8 +45,11 @@ from app.core.dependencies.users import (
     AdminOrApiKeySession_EventsRead,
     AdminOrApiKeySession_EventsWrite,
     CurrentHuman,
+    CurrentPortalStaff,
+    CurrentUser,
     HumanTenantSession,
     SessionDep,
+    TenantSession,
 )
 from app.core.rate_limit import RateLimit
 from app.services.event_datetime import format_event_when
@@ -594,11 +599,23 @@ def _check_recurrence_conflicts(
         )
 
 
+def _ics_utc_stamp(dt: datetime) -> str:
+    """Format a datetime as an RFC-5545 UTC stamp ('...Z').
+
+    Treats naive values as already-UTC for defense-in-depth, but the schema
+    validator now rejects naive inputs so this branch should only trigger for
+    legacy rows.
+    """
+    if dt.tzinfo is None:
+        return dt.strftime("%Y%m%dT%H%M%SZ")
+    return dt.astimezone(UTC).strftime("%Y%m%dT%H%M%SZ")
+
+
 def _render_ics(event) -> str:
     """Render a minimal, RFC-5545-compliant VCALENDAR string for one event."""
     dtstamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
-    dtstart = event.start_time.strftime("%Y%m%dT%H%M%SZ")
-    dtend = event.end_time.strftime("%Y%m%dT%H%M%SZ")
+    dtstart = _ics_utc_stamp(event.start_time)
+    dtend = _ics_utc_stamp(event.end_time)
     summary = (event.title or "").replace("\n", " ").replace(",", r"\,")
     description = (event.content or "").replace("\n", r"\n").replace(",", r"\,")
     location = event.meeting_url or ""
@@ -769,6 +786,7 @@ async def list_public_calendar(
 
     settings = event_settings_crud.get_by_popup_id(db, popup.id)
     timezone = settings.timezone if settings else "UTC"
+    placeholder_url = settings.placeholder_url if settings else None
     # Distinct tags actually present on the popup's published+public events,
     # not the curated ``event_settings.allowed_tags`` list — creators can use
     # tags outside that list, and the filter must surface them.
@@ -788,6 +806,7 @@ async def list_public_calendar(
             popup_id=popup.id,
             popup_slug=popup.slug,
             popup_name=popup.name,
+            placeholder_url=placeholder_url,
         ),
     )
 
@@ -807,6 +826,7 @@ async def list_events(
     venue_id: uuid.UUID | None = None,
     location_kind: str | None = None,
     track_ids: list[uuid.UUID] | None = Query(default=None),
+    owner_id: uuid.UUID | None = None,
     start_after: datetime | None = None,
     start_before: datetime | None = None,
     search: str | None = None,
@@ -818,6 +838,9 @@ async def list_events(
     ``location_kind`` narrows results to events without a ``venue_id``:
     - ``"custom"``  → events with a ``custom_location_name`` set.
     - ``"meeting"`` → online-only events (no venue, no custom location).
+
+    ``owner_id`` filters to events created by a specific host (the Human
+    referenced by ``Events.owner_id``).
     """
     if popup_id:
         events, total = crud.events_crud.find_by_popup(
@@ -830,6 +853,7 @@ async def list_events(
             venue_id=venue_id,
             location_kind=location_kind,
             track_ids=track_ids,
+            owner_id=owner_id,
             start_after=start_after,
             start_before=start_before,
             search=search,
@@ -851,6 +875,24 @@ async def list_events(
     )
 
 
+@router.get("/hosts", response_model=list[EventHostOption])
+async def list_event_hosts(
+    db: AdminOrApiKeySession_EventsRead,
+    _: AdminOrApiKey_EventsRead,
+    popup_id: uuid.UUID,
+) -> list[EventHostOption]:
+    """List distinct event hosts for a popup (backoffice creator filter).
+
+    Returns the Humans referenced by ``Events.owner_id`` so the events list can
+    offer a "filter by creator" picker. Events whose owner is not a human are
+    omitted (they have no host to filter by).
+    """
+    hosts = crud.events_crud.list_distinct_hosts(db, popup_id=popup_id)
+    return [
+        EventHostOption(id=h.id, name=h.full_name, email=h.email) for h in hosts
+    ]
+
+
 @router.get("/{event_id}", response_model=EventPublic)
 async def get_event(
     event_id: uuid.UUID,
@@ -863,6 +905,48 @@ async def get_event(
             status_code=status.HTTP_404_NOT_FOUND, detail="Event not found"
         )
     return _to_public(event)
+
+
+# ---------------------------------------------------------------------------
+# Admin notes — staff-only free-text notes, isolated from the event payload so
+# they never leak to portal humans or the public calendar. Open to ANY
+# backoffice user (all roles), unlike the admin-gated event write endpoints.
+# ---------------------------------------------------------------------------
+
+
+@router.get("/{event_id}/admin-notes", response_model=EventAdminNotes)
+async def get_event_admin_notes(
+    event_id: uuid.UUID,
+    db: TenantSession,
+    _: CurrentUser,
+) -> EventAdminNotes:
+    """Read an event's staff-only notes (any backoffice user)."""
+    event = crud.events_crud.get(db, event_id)
+    if not event:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Event not found"
+        )
+    return EventAdminNotes(notes=event.admin_notes)
+
+
+@router.put("/{event_id}/admin-notes", response_model=EventAdminNotes)
+async def update_event_admin_notes(
+    event_id: uuid.UUID,
+    payload: EventAdminNotes,
+    db: TenantSession,
+    _: CurrentUser,
+) -> EventAdminNotes:
+    """Set an event's staff-only notes (any backoffice user)."""
+    event = crud.events_crud.get(db, event_id)
+    if not event:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Event not found"
+        )
+    event.admin_notes = payload.notes
+    db.add(event)
+    db.commit()
+    db.refresh(event)
+    return EventAdminNotes(notes=event.admin_notes)
 
 
 @router.post("", response_model=EventPublic, status_code=status.HTTP_201_CREATED)
@@ -2243,6 +2327,54 @@ async def get_portal_event(
     if rsvp:
         pub = pub.model_copy(update={"my_rsvp_status": rsvp})
     return pub
+
+
+# ---------------------------------------------------------------------------
+# Portal admin notes — same staff-only notes as the backoffice endpoints,
+# reachable from the portal. Gated by CurrentPortalStaff (the logged-in human's
+# email must match a backoffice User in the tenant), so regular hosts/community
+# members get 403 and never see the notes. Not ownership-scoped: staff may
+# annotate any event in the popup.
+# ---------------------------------------------------------------------------
+
+
+@router.get(
+    "/portal/events/{event_id}/admin-notes", response_model=EventAdminNotes
+)
+async def get_portal_event_admin_notes(
+    event_id: uuid.UUID,
+    db: HumanTenantSession,
+    _: CurrentPortalStaff,
+) -> EventAdminNotes:
+    """Read an event's staff-only notes from the portal (staff humans only)."""
+    event = crud.events_crud.get(db, event_id)
+    if not event:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Event not found"
+        )
+    return EventAdminNotes(notes=event.admin_notes)
+
+
+@router.put(
+    "/portal/events/{event_id}/admin-notes", response_model=EventAdminNotes
+)
+async def update_portal_event_admin_notes(
+    event_id: uuid.UUID,
+    payload: EventAdminNotes,
+    db: HumanTenantSession,
+    _: CurrentPortalStaff,
+) -> EventAdminNotes:
+    """Set an event's staff-only notes from the portal (staff humans only)."""
+    event = crud.events_crud.get(db, event_id)
+    if not event:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Event not found"
+        )
+    event.admin_notes = payload.notes
+    db.add(event)
+    db.commit()
+    db.refresh(event)
+    return EventAdminNotes(notes=event.admin_notes)
 
 
 @router.post("/portal/events/{event_id}/hide", status_code=status.HTTP_204_NO_CONTENT)

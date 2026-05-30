@@ -12,6 +12,7 @@ import {
   Clock,
   Home,
   Layers,
+  Lock,
   Mail,
   Map as MapIcon,
   MapPin,
@@ -28,7 +29,7 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { useParams, useRouter, useSearchParams } from "next/navigation"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 import {
@@ -60,7 +61,75 @@ import { AddToCalendarModal } from "../lib/AddToCalendarModal"
 import { CoverImage } from "../lib/CoverImage"
 import { summarizeRrule } from "../lib/summarizeRrule"
 import { useCalendarAddedFlag } from "../lib/useCalendarAddedFlag"
-import { useEventTimezone } from "../lib/useEventTimezone"
+import {
+  useEventTimezone,
+  usePortalEventSettings,
+} from "../lib/useEventTimezone"
+
+function AdminNotesSection({ eventId }: { eventId: string }) {
+  const queryClient = useQueryClient()
+  const [value, setValue] = useState("")
+  const [dirty, setDirty] = useState(false)
+
+  // Staff-only: this endpoint 403s for regular humans, so a non-staff user
+  // never reaches isSuccess and the section stays hidden. retry:false keeps the
+  // expected 403 from being retried.
+  const { data, isSuccess } = useQuery({
+    queryKey: ["portal-event-admin-notes", eventId],
+    queryFn: () => EventsService.getPortalEventAdminNotes({ eventId }),
+    retry: false,
+  })
+
+  useEffect(() => {
+    if (data && !dirty) setValue(data.notes ?? "")
+  }, [data, dirty])
+
+  const saveMutation = useMutation({
+    mutationFn: () =>
+      EventsService.updatePortalEventAdminNotes({
+        eventId,
+        requestBody: { notes: value.trim() ? value : null },
+      }),
+    onSuccess: (res) => {
+      setDirty(false)
+      queryClient.setQueryData(["portal-event-admin-notes", eventId], res)
+      toast.success("Notes saved")
+    },
+    onError: () => toast.error("Could not save notes"),
+  })
+
+  if (!isSuccess) return null
+
+  return (
+    <div className="rounded-xl border bg-card p-4 space-y-3">
+      <div className="flex items-center gap-2">
+        <Lock className="h-4 w-4 text-muted-foreground" />
+        <h3 className="text-sm font-semibold">Admin notes</h3>
+        <span className="text-xs text-muted-foreground">
+          Internal — staff only
+        </span>
+      </div>
+      <Textarea
+        value={value}
+        rows={4}
+        placeholder="Notes about this event, visible only to backoffice staff…"
+        onChange={(e) => {
+          setValue(e.target.value)
+          setDirty(true)
+        }}
+      />
+      <div className="flex justify-end">
+        <Button
+          size="sm"
+          disabled={!dirty || saveMutation.isPending}
+          onClick={() => saveMutation.mutate()}
+        >
+          {saveMutation.isPending ? "Saving…" : "Save notes"}
+        </Button>
+      </div>
+    </div>
+  )
+}
 
 export default function EventDetailPage() {
   const { t } = useTranslation()
@@ -97,6 +166,7 @@ export default function EventDetailPage() {
     formatDateFull,
     isLoading: tzLoading,
   } = useEventTimezone(city?.id)
+  const { data: eventSettings } = usePortalEventSettings(city?.id)
 
   const {
     data: event,
@@ -349,7 +419,11 @@ export default function EventDetailPage() {
   })()
   const eventStarted = new Date(effectiveStartTime) <= new Date()
 
-  const coverUrl = event.cover_url || event.venue_image_url || null
+  const coverUrl =
+    event.cover_url ||
+    event.venue_image_url ||
+    eventSettings?.placeholder_url ||
+    null
   const coverCredit =
     !event.cover_url && event.venue_image_url ? event.venue_title : null
 
@@ -870,6 +944,8 @@ export default function EventDetailPage() {
           )}
         </div>
       )}
+
+      <AdminNotesSection eventId={event.id} />
 
       {/* Participants */}
       <div className="rounded-xl border bg-card p-4">

@@ -3,7 +3,7 @@ from datetime import UTC, datetime
 from enum import Enum
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, model_validator
+from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 from sqlalchemy import Text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlmodel import Column, DateTime, Field, SQLModel
@@ -128,6 +128,24 @@ class EventBase(SQLModel):
     )
 
 
+def _require_utc_aware(value: datetime | None) -> datetime | None:
+    """Reject naive datetimes and normalize to UTC.
+
+    The ``events.start_time`` / ``events.end_time`` columns are TIMESTAMPTZ, so
+    a naive value would be interpreted as the database server's local time and
+    silently corrupted on the way in. Pydantic accepts ISO strings without an
+    offset as naive, so the schema must enforce this explicitly.
+    """
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        raise ValueError(
+            "Date must include a timezone offset (e.g. '2026-06-04T13:00:00Z' "
+            "or '2026-06-04T13:00:00-07:00')."
+        )
+    return value.astimezone(UTC)
+
+
 def _enforce_custom_location_xor(
     *,
     venue_id: uuid.UUID | None,
@@ -182,6 +200,29 @@ class EventPublic(EventBase):
     model_config = ConfigDict(from_attributes=True)
 
 
+class EventHostOption(BaseModel):
+    """A distinct event host for the backoffice "filter events by creator" picker.
+
+    Resolved from ``Events.owner_id`` joined to ``Humans``. ``name`` is the
+    human's full name when set, otherwise null (the UI falls back to email).
+    """
+
+    id: uuid.UUID
+    name: str | None = None
+    email: str
+
+
+class EventAdminNotes(BaseModel):
+    """Staff-only free-text notes for an event.
+
+    Returned/accepted exclusively by the dedicated admin-notes endpoints — kept
+    out of EventBase/EventPublic so it never leaks into event payloads served to
+    portal humans or the public calendar.
+    """
+
+    notes: str | None = None
+
+
 class EventPublicCalendarItem(BaseModel):
     """Minimal, read-only event projection for the public calendar.
 
@@ -234,6 +275,10 @@ class EventCalendarMeta(BaseModel):
     popup_id: uuid.UUID
     popup_slug: str
     popup_name: str
+    # Popup-scoped fallback image used by the portal when an event has no
+    # cover/venue image. Surfaced here so the anonymous calendar can apply
+    # the same fallback without calling the authenticated settings endpoint.
+    placeholder_url: str | None = None
 
 
 class EventPublicCalendarResponse(BaseModel):
@@ -270,6 +315,8 @@ class EventCreate(BaseModel):
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
+    _normalize_datetimes = field_validator("start_time", "end_time")(_require_utc_aware)
+
     @model_validator(mode="after")
     def _validate_custom_location(self) -> "EventCreate":
         _enforce_custom_location_xor(
@@ -302,6 +349,8 @@ class EventUpdate(BaseModel):
     host_display_name: str | None = None
     status: EventStatus | None = None
     highlighted: bool | None = None
+
+    _normalize_datetimes = field_validator("start_time", "end_time")(_require_utc_aware)
 
     @model_validator(mode="after")
     def _validate_custom_location(self) -> "EventUpdate":

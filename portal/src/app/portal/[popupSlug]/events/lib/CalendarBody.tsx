@@ -1,5 +1,6 @@
 "use client"
 
+import { monthBoundsInTz } from "@edgeos/shared-events"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import {
   addDays,
@@ -88,6 +89,8 @@ interface CalendarBodyProps {
   /** Timezone forwarded to ``useEventTimezone`` when settings aren't
    * available (public mode has no authenticated settings endpoint). */
   timezoneOverride?: string
+  /** Popup-scoped fallback image when an event has no cover/venue image. */
+  placeholderUrl?: string | null
 }
 
 /**
@@ -108,6 +111,7 @@ export function CalendarBody({
   eventsOverride,
   onEventClick,
   timezoneOverride,
+  placeholderUrl,
 }: CalendarBodyProps) {
   const isAuthed = mode === "authed"
   const useOverride = eventsOverride !== undefined
@@ -134,8 +138,19 @@ export function CalendarBody({
     formatTime,
     formatDayKey,
     formatGridDayKey,
+    formatMonthHeader,
+    weekdayShortLabels,
+    locale,
+    timezone,
     isLoading: tzLoading,
   } = useEventTimezone(popupId, timezoneOverride)
+
+  const formatSelectedDateHeader = (d: Date) =>
+    new Intl.DateTimeFormat(locale, {
+      weekday: "long",
+      month: "long",
+      day: "numeric",
+    }).format(d)
 
   const { data: currentHuman } = useQuery({
     queryKey: ["current-human"],
@@ -144,11 +159,17 @@ export function CalendarBody({
     enabled: isAuthed,
   })
 
+  // Month bounds anchored to the popup's timezone — otherwise events near
+  // the first/last day of the month (in popup TZ) get clipped from the
+  // query window when the viewer's browser TZ differs.
+  const monthBounds = monthBoundsInTz(currentMonth, timezone)
+
   const { data } = useQuery({
     queryKey: [
       "portal-events-calendar",
       popupId,
       format(currentMonth, "yyyy-MM"),
+      timezone,
       rsvpedOnly,
       search,
       tags,
@@ -158,15 +179,15 @@ export function CalendarBody({
       EventsService.listPortalEvents({
         popupId: popupId!,
         eventStatus: "published",
-        startAfter: startOfMonth(currentMonth).toISOString(),
-        startBefore: endOfMonth(currentMonth).toISOString(),
+        startAfter: monthBounds.start.toISOString(),
+        startBefore: monthBounds.end.toISOString(),
         rsvpedOnly: rsvpedOnly || undefined,
         search: search || undefined,
         tags: tags?.length ? tags : undefined,
         trackIds: trackIds?.length ? trackIds : undefined,
         limit: 200,
       }),
-    enabled: isAuthed && !useOverride && !!popupId,
+    enabled: isAuthed && !useOverride && !!popupId && !tzLoading,
   })
 
   // Recurring events require occurrence_start so the RSVP targets a single
@@ -236,7 +257,6 @@ export function CalendarBody({
   }
 
   const selectedEvents = selectedDate ? getEventsForDate(selectedDate) : []
-  const dayLabels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 
   // `from` rebuilds the events-page URL state (view + selected day) so
   // the detail page's "Back to events" link returns the user here.
@@ -305,7 +325,7 @@ export function CalendarBody({
             <ChevronLeft className="h-4 w-4" />
           </Button>
           <h2 className="text-sm font-semibold capitalize">
-            {format(currentMonth, "MMMM yyyy")}
+            {formatMonthHeader(currentMonth)}
           </h2>
           <Button
             variant="ghost"
@@ -318,10 +338,10 @@ export function CalendarBody({
         </div>
 
         <div className="grid grid-cols-7 mb-1">
-          {dayLabels.map((d) => (
+          {weekdayShortLabels.map((d) => (
             <div
               key={d}
-              className="text-center text-[10px] font-medium text-muted-foreground py-1"
+              className="text-center text-[10px] font-medium text-muted-foreground py-1 capitalize"
             >
               {d}
             </div>
@@ -369,8 +389,8 @@ export function CalendarBody({
         {selectedDate ? (
           <>
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-semibold">
-                {format(selectedDate, "EEEE, MMMM d")}
+              <h3 className="text-sm font-semibold capitalize">
+                {formatSelectedDateHeader(selectedDate)}
               </h3>
               <span className="text-xs text-muted-foreground">
                 {t("events.calendar.selected_events", {
@@ -416,18 +436,26 @@ export function CalendarBody({
                         className="block p-3"
                       >
                         <div className="flex items-start gap-3">
-                          {event.venue_image_url && (
-                            <div className="h-12 w-12 rounded-md overflow-hidden shrink-0">
-                              <CoverImage
-                                src={event.venue_image_url}
-                                alt={event.venue_title ?? ""}
-                                className="h-full w-full object-cover"
-                                fallback={
-                                  <MapPin className="h-5 w-5 text-muted-foreground/40" />
-                                }
-                              />
-                            </div>
-                          )}
+                          {(() => {
+                            const thumbUrl =
+                              event.cover_url ||
+                              event.venue_image_url ||
+                              placeholderUrl ||
+                              null
+                            if (!thumbUrl) return null
+                            return (
+                              <div className="h-12 w-12 rounded-md overflow-hidden shrink-0">
+                                <CoverImage
+                                  src={thumbUrl}
+                                  alt={event.venue_title ?? ""}
+                                  className="h-full w-full object-cover"
+                                  fallback={
+                                    <MapPin className="h-5 w-5 text-muted-foreground/40" />
+                                  }
+                                />
+                              </div>
+                            )
+                          })()}
                           <div className="min-w-0 flex-1">
                             <h4 className="text-sm font-medium truncate flex items-center gap-1.5">
                               {isOwner && (

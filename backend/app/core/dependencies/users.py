@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Annotated
 
 from cachetools import TTLCache
 from fastapi import Depends, Header, HTTPException, status
-from sqlmodel import Session, select
+from sqlmodel import Session, func, select
 
 from app.api.shared.enums import UserRole
 from app.core.db import engine
@@ -374,6 +374,48 @@ def get_human_tenant_session(
 
 
 HumanTenantSession = Annotated[Session, Depends(get_human_tenant_session)]
+
+
+def get_current_portal_staff(
+    current_human: CurrentHuman,
+    db: SessionDep,
+) -> "HumanPublic":
+    """Authorize a portal human as backoffice staff, by email match.
+
+    Some features (e.g. event admin notes) are staff-only but must be reachable
+    from the portal, which authenticates Humans (no roles). We bridge the two
+    identity systems by email: a logged-in human whose email matches a
+    non-deleted backoffice User is treated as staff. The human already proved
+    control of that email via OTP login, so the match is as trustworthy as the
+    human session itself.
+
+    A SUPERADMIN spans all tenants (their ``tenant_id`` is typically NULL), so a
+    matching superadmin grants staff access in any tenant. Other roles are
+    tenant-scoped: the User must belong to the human's tenant. Raises 403 when
+    no matching User qualifies.
+    """
+    from app.api.user.models import Users
+
+    candidates = db.exec(
+        select(Users).where(
+            func.lower(Users.email) == current_human.email.lower(),
+            Users.deleted == False,  # noqa: E712
+        )
+    ).all()
+    is_staff = any(
+        user.role == UserRole.SUPERADMIN
+        or user.tenant_id == current_human.tenant_id
+        for user in candidates
+    )
+    if not is_staff:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="This action is restricted to backoffice staff.",
+        )
+    return current_human
+
+
+CurrentPortalStaff = Annotated["HumanPublic", Depends(get_current_portal_staff)]
 
 
 # ---------------------------------------------------------------------------

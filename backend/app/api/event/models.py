@@ -2,7 +2,7 @@ import uuid
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Optional
 
-from sqlalchemy import Index, text
+from sqlalchemy import Index, Text, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlmodel import Column, DateTime, Field, Relationship, SQLModel
 
@@ -38,6 +38,13 @@ class Events(EventBase, table=True):
         default_factory=uuid.uuid4,
         sa_column=Column(UUID(as_uuid=True), primary_key=True),
     )
+
+    # Free-text internal notes, visible/editable only by backoffice staff (and
+    # portal users whose email matches a backoffice account). Declared on the
+    # table model and deliberately NOT on EventBase, so it never serializes into
+    # EventPublic and cannot leak to portal humans or the public calendar.
+    # Read/written exclusively via the dedicated admin-notes endpoints.
+    admin_notes: str | None = Field(default=None, sa_type=Text())
 
     tenant: "Tenants" = Relationship(back_populates="events")
     popup: "Popups" = Relationship(back_populates="events")
