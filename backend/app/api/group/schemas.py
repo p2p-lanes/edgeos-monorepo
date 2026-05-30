@@ -86,6 +86,10 @@ class GroupAdminUpdate(BaseModel):
     is_ambassador_group: bool | None = None
     ambassador_id: uuid.UUID | None = None
     whitelisted_emails: list[str] | None = None  # List of email strings to whitelist
+    # Groups-rework: explicit behaviour flags (T-gr-020)
+    auto_approve_applications: bool | None = None
+    express_checkout: bool | None = None
+    enable_private_events: bool | None = None
 
 
 class GroupWhitelistedEmailPublic(BaseModel):

@@ -290,6 +290,20 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
                 detail="Popup not found",
             )
 
+        # Popup feature-flag guards for invite/referral paths (T-gr-017).
+        # These flags gate whether the invite/referral modules are active for
+        # this popup. Checked early so we fail fast before any DB lookups.
+        if getattr(app_data, "invite_id", None) and not popup.invites_enabled:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Invite-based applications are not enabled for this popup",
+            )
+        if getattr(app_data, "referral_id", None) and not popup.referrals_enabled:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Referral-based applications are not enabled for this popup",
+            )
+
         # Drafts are partial saves: skip "required field is missing" checks but
         # still validate types/constraints on any values the user did provide.
         is_draft = _is_draft_status(getattr(app_data, "status", None))

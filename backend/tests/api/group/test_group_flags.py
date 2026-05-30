@@ -346,3 +346,159 @@ class TestExpressCheckoutFlag:
         body = resp.json()
         # No group_id → DRAFT by default (no auto-accept)
         assert body["status"] == ApplicationStatus.DRAFT.value
+
+
+# ---------------------------------------------------------------------------
+# T-gr-020: GroupAdminUpdate accepts new flag fields
+# ---------------------------------------------------------------------------
+
+
+class TestGroupAdminUpdateFlags:
+    """PATCH /groups/{id} accepts auto_approve_applications, express_checkout,
+    enable_private_events (T-gr-020)."""
+
+    def test_patch_auto_approve_applications(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+        admin_user_tenant_a,
+        admin_token_tenant_a: str,
+    ) -> None:
+        """Admin can toggle auto_approve_applications via PATCH."""
+        popup = _make_popup(db, tenant_a)
+        group = _make_group(db, tenant_a, popup, auto_approve_applications=False)
+
+        resp = client.patch(
+            f"/api/v1/groups/{group.id}",
+            json={"auto_approve_applications": True},
+            headers={**_auth(admin_token_tenant_a), "X-Tenant-Id": str(tenant_a.id)},
+        )
+        assert resp.status_code == 200, resp.json()
+        assert resp.json()["auto_approve_applications"] is True
+
+    def test_patch_express_checkout(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+        admin_token_tenant_a: str,
+    ) -> None:
+        """Admin can toggle express_checkout via PATCH.
+
+        Triangulation: different flag.
+        """
+        popup = _make_popup(db, tenant_a)
+        group = _make_group(db, tenant_a, popup, express_checkout=False)
+
+        resp = client.patch(
+            f"/api/v1/groups/{group.id}",
+            json={"express_checkout": True},
+            headers={**_auth(admin_token_tenant_a), "X-Tenant-Id": str(tenant_a.id)},
+        )
+        assert resp.status_code == 200, resp.json()
+        assert resp.json()["express_checkout"] is True
+
+
+# ---------------------------------------------------------------------------
+# T-gr-017: Popup feature-flag guards for invite/referral paths
+# ---------------------------------------------------------------------------
+
+
+class TestPopupFlagGuards:
+    """Popup flags block invite/referral applications when disabled (T-gr-017).
+
+    The guard uses getattr(app_data, 'invite_id', None) so it is forward-
+    compatible: fires when invite_id is set on the schema (PR-4/5), no-op
+    otherwise. Here we test the guard logic directly via create_internal with
+    a mock data object that has invite_id set.
+    """
+
+    def test_invite_id_blocked_when_invites_disabled(
+        self, db: Session, tenant_a: Tenants
+    ) -> None:
+        """create_internal raises 403 when invite_id is set and invites_enabled=False.
+
+        Uses a mock app_data object (not the portal route) because the portal
+        ApplicationCreate schema doesn't expose invite_id yet (PR-4 will add it).
+        """
+        from fastapi import HTTPException
+        from unittest.mock import MagicMock
+        from app.api.application.crud import ApplicationsCRUD
+
+        popup = _make_popup(db, tenant_a)
+        human = _make_human(db, tenant_a)
+
+        # invites_enabled defaults to False on new popups
+        assert not popup.invites_enabled
+
+        # Build a mock app_data that looks like ApplicationCreate + invite_id
+        app_data = MagicMock()
+        app_data.popup_id = popup.id
+        app_data.invite_id = uuid.uuid4()
+        app_data.referral_id = None
+        app_data.group_id = None
+        app_data.status = None
+        app_data.custom_fields = None
+
+        crud_instance = ApplicationsCRUD()
+        with pytest.raises(HTTPException) as exc_info:
+            crud_instance.create_internal(
+                db, app_data=app_data, tenant_id=tenant_a.id, human_id=human.id
+            )
+        assert exc_info.value.status_code == 403
+        assert "invite" in exc_info.value.detail.lower()
+
+    def test_application_without_invite_allowed_when_invites_disabled(
+        self, client: TestClient, db: Session, tenant_a: Tenants
+    ) -> None:
+        """Application without invite_id is allowed even when invites_enabled=False.
+
+        Triangulation: flag only blocks when invite_id is present.
+        """
+        popup = _make_popup(db, tenant_a)
+        human = _make_human(db, tenant_a)
+        token = _human_token(human)
+
+        resp = client.post(
+            "/api/v1/applications/my",
+            json={
+                "popup_id": str(popup.id),
+                "first_name": "Flag",
+                "last_name": "Tester",
+            },
+            headers=_auth(token),
+        )
+        assert resp.status_code in (200, 201), resp.json()
+
+    def test_referral_id_blocked_when_referrals_disabled(
+        self, db: Session, tenant_a: Tenants
+    ) -> None:
+        """create_internal raises 403 when referral_id is set and referrals_enabled=False.
+
+        Triangulation: same shape test for referral flag.
+        """
+        from fastapi import HTTPException
+        from unittest.mock import MagicMock
+        from app.api.application.crud import ApplicationsCRUD
+
+        popup = _make_popup(db, tenant_a)
+        human = _make_human(db, tenant_a)
+
+        assert not popup.referrals_enabled
+
+        app_data = MagicMock()
+        app_data.popup_id = popup.id
+        app_data.invite_id = None
+        app_data.referral_id = uuid.uuid4()
+        app_data.group_id = None
+        app_data.status = None
+        app_data.custom_fields = None
+
+        crud_instance = ApplicationsCRUD()
+        with pytest.raises(HTTPException) as exc_info:
+            crud_instance.create_internal(
+                db, app_data=app_data, tenant_id=tenant_a.id, human_id=human.id
+            )
+        assert exc_info.value.status_code == 403
+        assert "referral" in exc_info.value.detail.lower()
