@@ -2,6 +2,7 @@ const LOCALE_MAP: Record<string, string> = {
   en: "en-US",
   es: "es-ES",
   zh: "zh-CN",
+  is: "is-IS",
 }
 
 function getLocale(): string {

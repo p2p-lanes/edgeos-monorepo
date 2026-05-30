@@ -599,11 +599,23 @@ def _check_recurrence_conflicts(
         )
 
 
+def _ics_utc_stamp(dt: datetime) -> str:
+    """Format a datetime as an RFC-5545 UTC stamp ('...Z').
+
+    Treats naive values as already-UTC for defense-in-depth, but the schema
+    validator now rejects naive inputs so this branch should only trigger for
+    legacy rows.
+    """
+    if dt.tzinfo is None:
+        return dt.strftime("%Y%m%dT%H%M%SZ")
+    return dt.astimezone(UTC).strftime("%Y%m%dT%H%M%SZ")
+
+
 def _render_ics(event) -> str:
     """Render a minimal, RFC-5545-compliant VCALENDAR string for one event."""
     dtstamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
-    dtstart = event.start_time.strftime("%Y%m%dT%H%M%SZ")
-    dtend = event.end_time.strftime("%Y%m%dT%H%M%SZ")
+    dtstart = _ics_utc_stamp(event.start_time)
+    dtend = _ics_utc_stamp(event.end_time)
     summary = (event.title or "").replace("\n", " ").replace(",", r"\,")
     description = (event.content or "").replace("\n", r"\n").replace(",", r"\,")
     location = event.meeting_url or ""

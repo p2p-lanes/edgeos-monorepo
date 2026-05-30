@@ -1,3 +1,4 @@
+import { monthBoundsInTz } from "@edgeos/shared-events"
 import { useQuery } from "@tanstack/react-query"
 import {
   addDays,
@@ -121,7 +122,17 @@ export function EventsCalendarView({
     currentMonth.getFullYear() === maxDate.getFullYear() &&
     currentMonth.getMonth() === maxDate.getMonth()
 
-  const { formatTime, formatDayKey } = useEventTimezone(popupId)
+  const {
+    formatTime,
+    formatDayKey,
+    timezone,
+    isLoading: tzLoading,
+  } = useEventTimezone(popupId)
+
+  // Month bounds anchored to the popup's timezone — otherwise events near
+  // the first/last day of the month (in popup TZ) get clipped from the
+  // query window when the browser TZ differs.
+  const monthBounds = monthBoundsInTz(currentMonth, timezone)
 
   const { data } = useQuery({
     queryKey: [
@@ -129,6 +140,7 @@ export function EventsCalendarView({
       "calendar",
       popupId,
       format(currentMonth, "yyyy-MM"),
+      timezone,
       status,
       venueId,
       search,
@@ -144,11 +156,11 @@ export function EventsCalendarView({
         locationKind:
           venueId === "custom" || venueId === "meeting" ? venueId : undefined,
         search: search || undefined,
-        startAfter: startOfMonth(currentMonth).toISOString(),
-        startBefore: endOfMonth(currentMonth).toISOString(),
+        startAfter: monthBounds.start.toISOString(),
+        startBefore: monthBounds.end.toISOString(),
         limit: 200,
       }),
-    enabled: !!popupId,
+    enabled: !!popupId && !tzLoading,
   })
 
   const events = data?.results ?? []

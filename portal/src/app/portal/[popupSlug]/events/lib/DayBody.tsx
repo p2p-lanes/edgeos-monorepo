@@ -1,7 +1,7 @@
 "use client"
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { addDays, format, startOfDay, subDays } from "date-fns"
+import { addDays, startOfDay, subDays } from "date-fns"
 import {
   CalendarClock,
   CalendarIcon,
@@ -168,10 +168,22 @@ export function DayBody({
   }
   const {
     timezone,
+    locale,
     formatTime,
     formatDayKey,
     isLoading: tzLoading,
   } = useEventTimezone(popupId, timezoneOverride)
+
+  // Localized "Monday, June 4, 2026" for the date picker trigger. Uses the
+  // selected day's nominal local date (no TZ conversion needed — selectedDate
+  // is already the user-picked wall-clock day).
+  const formatDatePickerLabel = (d: Date) =>
+    new Intl.DateTimeFormat(locale, {
+      weekday: "long",
+      month: "long",
+      day: "numeric",
+      year: "numeric",
+    }).format(d)
   const scrollRef = useRef<HTMLDivElement>(null)
   const mobileScrollRef = useRef<HTMLDivElement>(null)
 
@@ -544,7 +556,7 @@ export function DayBody({
                   title={t("events.day.pick_date")}
                 >
                   <span className="truncate">
-                    {format(selectedDate, "EEEE, MMMM d, yyyy")}
+                    {formatDatePickerLabel(selectedDate)}
                   </span>
                   <CalendarIcon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                 </button>

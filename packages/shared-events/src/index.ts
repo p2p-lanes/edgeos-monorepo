@@ -5,6 +5,7 @@ export {
   durationFits,
   freeIntervalsForDay,
   localTzNaiveToUtc,
+  monthBoundsInTz,
   tzOffsetMinutes,
   utcToLocalTzNaive,
 } from "./venue-slots"

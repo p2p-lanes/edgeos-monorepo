@@ -1,3 +1,4 @@
+import { dayBoundsInTz } from "@edgeos/shared-events"
 import {
   keepPreviousData,
   useMutation,
@@ -929,6 +930,42 @@ function EventsTableContent({
 
   const hasFilters = !!(status || venueId || creatorId || startDate || endDate)
 
+  // Popup timezone drives display of every start_time in the table so the
+  // "Events" list matches the calendar views. We render a skeleton until
+  // settings resolve to avoid a browser-tz flash on first paint, and we use
+  // popup-tz day boundaries for the date filter so events near midnight in
+  // popup TZ aren't clipped.
+  const { data: popupSettings, isLoading: popupSettingsLoading } = useQuery({
+    queryKey: ["event-settings", selectedPopupId],
+    queryFn: async () => {
+      if (!selectedPopupId) return null
+      try {
+        return await EventSettingsService.getEventSettings({
+          popupId: selectedPopupId,
+        })
+      } catch {
+        return null
+      }
+    },
+    enabled: !!selectedPopupId,
+  })
+  // Fall back to UTC (the backend default for EventSettings.timezone) when
+  // settings haven't been created yet. Never fall back to browser tz — that
+  // would make the list display drift from the calendar/day views and emails.
+  const popupTz = popupSettings?.timezone ?? "UTC"
+
+  const filterStartAfter = useMemo(() => {
+    if (!startDate) return undefined
+    if (popupTz) return dayBoundsInTz(startDate, popupTz).start.toISOString()
+    return `${startDate}T00:00:00Z`
+  }, [startDate, popupTz])
+
+  const filterStartBefore = useMemo(() => {
+    if (!endDate) return undefined
+    if (popupTz) return dayBoundsInTz(endDate, popupTz).end.toISOString()
+    return `${endDate}T23:59:59Z`
+  }, [endDate, popupTz])
+
   const { data: events } = useQuery({
     queryKey: [
       "events",
@@ -942,6 +979,7 @@ function EventsTableContent({
         creatorId,
         startDate,
         endDate,
+        popupTz,
       },
     ],
     queryFn: () =>
@@ -958,10 +996,10 @@ function EventsTableContent({
         locationKind:
           venueId === "custom" || venueId === "meeting" ? venueId : undefined,
         ownerId: creatorId || undefined,
-        startAfter: startDate ? `${startDate}T00:00:00Z` : undefined,
-        startBefore: endDate ? `${endDate}T23:59:59Z` : undefined,
+        startAfter: filterStartAfter,
+        startBefore: filterStartBefore,
       }),
-    enabled: !!selectedPopupId,
+    enabled: !!selectedPopupId && !popupSettingsLoading,
     placeholderData: keepPreviousData,
   })
 
@@ -993,31 +1031,13 @@ function EventsTableContent({
     return map
   }, [venues])
 
-  // Popup timezone drives display of every start_time in the table so the
-  // "Events" list matches the calendar views. Falls back to browser tz if
-  // settings haven't loaded or aren't configured for this popup.
-  const { data: popupSettings } = useQuery({
-    queryKey: ["event-settings", selectedPopupId],
-    queryFn: async () => {
-      if (!selectedPopupId) return null
-      try {
-        return await EventSettingsService.getEventSettings({
-          popupId: selectedPopupId,
-        })
-      } catch {
-        return null
-      }
-    },
-    enabled: !!selectedPopupId,
-  })
-  const popupTz = popupSettings?.timezone ?? undefined
-
   const columns = useMemo(
     () => buildEventColumns(venueNameById, popupTz),
     [venueNameById, popupTz],
   )
 
-  if (!events) return <Skeleton className="h-64 w-full" />
+  if (!events || popupSettingsLoading)
+    return <Skeleton className="h-64 w-full" />
 
   return (
     <div className="space-y-3">
