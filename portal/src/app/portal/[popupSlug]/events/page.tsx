@@ -1,5 +1,6 @@
 "use client"
 
+import { dayBoundsInTz } from "@edgeos/shared-events"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { CalendarDays, Plus } from "lucide-react"
 import Link from "next/link"
@@ -15,7 +16,6 @@ import {
 import { createPortal } from "react-dom"
 import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
-
 import {
   ApiError,
   EventParticipantsService,
@@ -315,29 +315,27 @@ export default function EventsPage() {
   // empty. Falls back to a 180-day window from today before the popup
   // record loads.
   //
-  // Bounds use UTC midnight of the popup's first day and UTC midnight of
-  // the day *after* end_date — independent of the browser's timezone — so
-  // the filter always covers the whole calendar day starting at 00:00Z and
-  // doesn't drift if the user opens the portal from a different region.
+  // Bounds are anchored to the popup's timezone, not the browser's and not
+  // UTC: the booking dates name calendar days *in the popup's timezone*, so
+  // a UTC-midnight bound would leak the prior local evening and clip the
+  // last local evening (e.g. for a UTC-7 popup, the night of the last day
+  // falls after 00:00Z of the next day and would be dropped).
   const listWindow = useMemo(() => {
-    const parseUtcMidnight = (s: string | null | undefined) => {
-      if (!s) return null
-      const m = s.slice(0, 10).match(/^(\d{4})-(\d{2})-(\d{2})$/)
-      if (!m) return null
-      return new Date(
-        Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 0, 0, 0, 0),
-      )
+    const dayStr = (s: string | null | undefined) => {
+      const m = s?.slice(0, 10).match(/^\d{4}-\d{2}-\d{2}$/)
+      return m ? m[0] : null
     }
-    const startUtc = parseUtcMidnight(city?.start_date)
-    const endUtc = parseUtcMidnight(city?.end_date)
-    // For end, advance by one UTC day so events on the last day are included.
-    const endExclusive = endUtc
-      ? new Date(endUtc.getTime() + 24 * 60 * 60 * 1000)
-      : null
-    if (startUtc && endExclusive) {
+    const startDay = dayStr(city?.start_date)
+    const endDay = dayStr(city?.end_date)
+    if (startDay && endDay) {
+      // dayBoundsInTz returns [dayStart, dayEnd): the end of ``endDay`` is
+      // midnight of the following local day — exactly the exclusive upper
+      // bound that keeps the last day's events in.
+      const { start } = dayBoundsInTz(startDay, timezone)
+      const { end } = dayBoundsInTz(endDay, timezone)
       return {
-        startAfter: startUtc.toISOString(),
-        startBefore: endExclusive.toISOString(),
+        startAfter: start.toISOString(),
+        startBefore: end.toISOString(),
       }
     }
     const start = new Date()
@@ -345,10 +343,10 @@ export default function EventsPage() {
     const end = new Date(start)
     end.setUTCDate(end.getUTCDate() + 180)
     return {
-      startAfter: (startUtc ?? start).toISOString(),
-      startBefore: (endExclusive ?? end).toISOString(),
+      startAfter: start.toISOString(),
+      startBefore: end.toISOString(),
     }
-  }, [city?.start_date, city?.end_date])
+  }, [city?.start_date, city?.end_date, timezone])
 
   // The list is built from up to three independent "channels" — picking
   // events with OR semantics across the active filters so that toggling
