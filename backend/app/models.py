@@ -54,6 +54,7 @@ from app.api.email_template.schemas import (
 # Events module
 from app.api.event.models import EventHiddenByHuman, EventInvitations, Events
 from app.api.event.schemas import EventCreate, EventPublic, EventUpdate
+from app.api.event_audit.models import EventAuditLog
 from app.api.event_participant.models import EventParticipants
 from app.api.event_participant.schemas import (
     EventParticipantCreate,
@@ -244,6 +245,7 @@ __all__ = [
     "ReviewDecision",
     # Events module
     "Events",
+    "EventAuditLog",
     "EventHiddenByHuman",
     "EventInvitations",
     "EventCreate",

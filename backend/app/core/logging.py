@@ -25,11 +25,21 @@ because it is our own message rather than user-submitted content.
 import sys
 import time
 import uuid
+from contextvars import ContextVar
 
 from loguru import logger
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from app.core.config import settings
+
+# Per-request id, mirrored from the loguru context so non-logging code (e.g. the
+# event audit log) can correlate a persisted row with the stdout request line.
+_request_id_var: ContextVar[str | None] = ContextVar("request_id", default=None)
+
+
+def get_request_id() -> str | None:
+    """Return the current request's id, or ``None`` outside a request."""
+    return _request_id_var.get()
 
 _LOG_FORMAT = (
     "{time:YYYY-MM-DD HH:mm:ss.SSS} | "
@@ -128,10 +138,12 @@ class RequestContextMiddleware:
             await send(message)
 
         start = time.perf_counter()
+        token = _request_id_var.set(request_id)
         with logger.contextualize(request_id=request_id, principal=principal):
             try:
                 await self.app(scope, receive, send_wrapper)
             finally:
+                _request_id_var.reset(token)
                 duration_ms = round((time.perf_counter() - start) * 1000, 1)
                 code = status_code["code"]
                 level = "ERROR" if code >= 500 else "WARNING" if code >= 400 else "INFO"
