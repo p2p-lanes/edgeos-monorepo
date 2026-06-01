@@ -53,6 +53,15 @@ export const taskColumns: ColumnDef<TaskPublic>[] = [
     ),
   },
   {
+    accessorKey: "created_by_name",
+    header: "Created by",
+    cell: ({ row }) => (
+      <span className="text-sm text-muted-foreground">
+        {row.original.created_by_name ?? "—"}
+      </span>
+    ),
+  },
+  {
     accessorKey: "release",
     header: "Release",
     cell: ({ row }) => (
