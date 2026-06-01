@@ -672,6 +672,98 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
             session.delete(ticket)
             session.commit()
 
+    def swap_ticket_product(
+        self,
+        session: Session,
+        attendee_id: uuid.UUID,
+        ticket_id: uuid.UUID,
+        new_product_id: uuid.UUID,
+    ) -> AttendeeProducts:
+        """Change the product of a single ticket (admin, no payment).
+
+        Operates only on the ticket layer (AttendeeProducts) plus inventory.
+        The payment_products financial snapshot is intentionally left intact as
+        the historical record of the original payment — _build_attendee_with_origin
+        falls back to the live product when no snapshot matches the new
+        (payment_id, product_id) pair, so the UI still reflects the new product.
+
+        Steps:
+          1. Resolve the ticket and assert it belongs to *attendee_id* (404).
+          2. No-op when the product is unchanged.
+          3. Resolve the new product (404 if missing/deleted) and reject
+             cross-popup swaps (422).
+          4. Atomic stock decrement of the new product (409 if sold out) then
+             restore one unit of the old product. The check_in_code is preserved
+             so the ticket keeps its QR identity.
+        """
+        from app.api.product.crud import products_crud
+
+        ticket = session.get(AttendeeProducts, ticket_id)
+        if ticket is None or ticket.attendee_id != attendee_id:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Ticket not found",
+            )
+
+        old_product_id = ticket.product_id
+        if old_product_id == new_product_id:
+            return ticket
+
+        attendee = session.get(Attendees, attendee_id)
+        if attendee is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Attendee not found",
+            )
+
+        new_product = products_crud.get(session, new_product_id)
+        if new_product is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Product not found",
+            )
+        if new_product.popup_id != attendee.popup_id:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Product belongs to a different popup",
+            )
+
+        # Decrement the new product first so a sold-out 409 aborts before any
+        # mutation. Restore the old product only once the new one is secured.
+        products_crud.decrement_total_stock(session, new_product_id, 1)
+        products_crud.restore_total_stock(session, old_product_id, 1)
+
+        ticket.product_id = new_product_id
+        session.add(ticket)
+        session.commit()
+        session.refresh(ticket)
+        return ticket
+
+    def remove_product(
+        self,
+        session: Session,
+        attendee_id: uuid.UUID,
+        ticket_id: uuid.UUID,
+    ) -> None:
+        """Remove a single ticket from an attendee and restore its stock (admin).
+
+        Unlike the lower-level remove_ticket helper, this asserts ownership and
+        restores one unit of the product's inventory — the admin panel frees the
+        ticket back to the pool, mirroring the cancel/refund flow.
+        """
+        from app.api.product.crud import products_crud
+
+        ticket = session.get(AttendeeProducts, ticket_id)
+        if ticket is None or ticket.attendee_id != attendee_id:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Ticket not found",
+            )
+
+        products_crud.restore_total_stock(session, ticket.product_id, 1)
+        session.delete(ticket)
+        session.commit()
+
     def clear_products(
         self,
         session: Session,

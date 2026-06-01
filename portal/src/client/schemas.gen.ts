@@ -2539,6 +2539,20 @@ export const AttendeeStatsSchema = {
     description: 'Statistics for attendees.'
 } as const;
 
+export const AttendeeTicketAddSchema = {
+    properties: {
+        product_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Product Id'
+        }
+    },
+    type: 'object',
+    required: ['product_id'],
+    title: 'AttendeeTicketAdd',
+    description: 'Request body to add a single ticket to an attendee (admin panel).'
+} as const;
+
 export const AttendeeTicketInfoSchema = {
     properties: {
         id: {
@@ -2605,6 +2619,20 @@ per-ticket QR list the main applicant sees without an extra round-trip.
 \`last_scan_at\` is the most recent occurred_at from check_ins for this
 ticket (None when never scanned). The portal uses it to flag already-used
 QR codes — same behavior as the main applicant's pass view.`
+} as const;
+
+export const AttendeeTicketProductSwapSchema = {
+    properties: {
+        product_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Product Id'
+        }
+    },
+    type: 'object',
+    required: ['product_id'],
+    title: 'AttendeeTicketProductSwap',
+    description: "Request body to change the product of an attendee's ticket (admin panel)."
 } as const;
 
 export const AttendeeUpdateSchema = {

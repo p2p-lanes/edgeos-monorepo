@@ -581,6 +581,13 @@ export type AttendeeStats = {
 };
 
 /**
+ * Request body to add a single ticket to an attendee (admin panel).
+ */
+export type AttendeeTicketAdd = {
+    product_id: string;
+};
+
+/**
  * Per-ticket info exposed on companion participation responses.
  *
  * `check_in_code` is the per-ticket code from `attendee_products`. Check-in
@@ -601,6 +608,13 @@ export type AttendeeTicketInfo = {
     product_category?: (string | null);
     requires_check_in?: boolean;
     last_scan_at?: (string | null);
+};
+
+/**
+ * Request body to change the product of an attendee's ticket (admin panel).
+ */
+export type AttendeeTicketProductSwap = {
+    product_id: string;
 };
 
 /**
@@ -3898,6 +3912,31 @@ export type AttendeesDeleteAttendeeData = {
 };
 
 export type AttendeesDeleteAttendeeResponse = (void);
+
+export type AttendeesAddAttendeeTicketData = {
+    attendeeId: string;
+    requestBody: AttendeeTicketAdd;
+    xTenantId?: (string | null);
+};
+
+export type AttendeesAddAttendeeTicketResponse = (AttendeeWithOriginPublic);
+
+export type AttendeesSwapAttendeeTicketProductData = {
+    attendeeId: string;
+    requestBody: AttendeeTicketProductSwap;
+    ticketId: string;
+    xTenantId?: (string | null);
+};
+
+export type AttendeesSwapAttendeeTicketProductResponse = (AttendeeWithOriginPublic);
+
+export type AttendeesRemoveAttendeeTicketData = {
+    attendeeId: string;
+    ticketId: string;
+    xTenantId?: (string | null);
+};
+
+export type AttendeesRemoveAttendeeTicketResponse = (AttendeeWithOriginPublic);
 
 export type AttendeesPostCheckInData = {
     code: string;

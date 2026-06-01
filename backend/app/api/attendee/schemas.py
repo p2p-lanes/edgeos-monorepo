@@ -175,6 +175,18 @@ class AttendeeProductPublic(BaseModel):
     model_config = ConfigDict(from_attributes=True, extra="forbid")
 
 
+class AttendeeTicketAdd(BaseModel):
+    """Request body to add a single ticket to an attendee (admin panel)."""
+
+    product_id: uuid.UUID
+
+
+class AttendeeTicketProductSwap(BaseModel):
+    """Request body to change the product of an attendee's ticket (admin panel)."""
+
+    product_id: uuid.UUID
+
+
 class TicketAttendeeSnapshot(BaseModel):
     """Minimal attendee data embedded in a TicketPublic response."""
 

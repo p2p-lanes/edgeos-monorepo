@@ -7,7 +7,6 @@ import {
   Eye,
   Gift,
   Mail,
-  QrCode,
   User,
   Users,
 } from "lucide-react"
@@ -18,6 +17,7 @@ import {
   AttendeesService,
   type AttendeeWithOriginPublic,
 } from "@/client"
+import { ManageAttendeeProducts } from "@/components/Attendees/ManageAttendeeProducts"
 import { ProductsCell } from "@/components/Attendees/ProductsCell"
 import { DataTable, SortableHeader } from "@/components/Common/DataTable"
 import { EmptyState } from "@/components/Common/EmptyState"
@@ -148,8 +148,6 @@ export function AttendeeDetailsContent({
 }: {
   attendee: AttendeeWithOriginPublic
 }) {
-  const products = attendee.products ?? []
-
   return (
     <>
       {/* Hero */}
@@ -184,26 +182,10 @@ export function AttendeeDetailsContent({
         )}
       </InlineSection>
 
-      {/* Check-in — only render when the attendee actually purchased tickets.
-          Codes belong to purchased products, not to attendees. */}
-      {products.length > 0 && (
-        <>
-          <Separator />
-          <InlineSection title="Check-in" className="px-6 py-4">
-            {products.map((p) => (
-              <InlineRow
-                key={p.id}
-                icon={<QrCode className="h-4 w-4 text-muted-foreground" />}
-                label="Ticket code"
-              >
-                <span className="font-mono text-sm font-medium">
-                  {p.check_in_code}
-                </span>
-              </InlineRow>
-            ))}
-          </InlineSection>
-        </>
-      )}
+      {/* Tickets — admin product management (change / remove / add). Each
+          ticket shows its check-in code; changing a ticket keeps that code. */}
+      <Separator />
+      <ManageAttendeeProducts attendee={attendee} />
 
       {/* Footer */}
       <Separator />

@@ -8,6 +8,8 @@ from app.api.attendee.schemas import (
     AttendeeCreate,
     AttendeeListItem,
     AttendeeProductPublic,
+    AttendeeTicketAdd,
+    AttendeeTicketProductSwap,
     AttendeeUpdate,
     AttendeeWithOriginPublic,
     AttendeeWithTickets,
@@ -133,6 +135,24 @@ def _build_attendee_with_origin(
         "updated_at": getattr(attendee, "updated_at", None),
     }
     return AttendeeWithOriginPublic(**base, products=ticket_products, origin=origin)
+
+
+def _attendee_response(db, attendee_id: uuid.UUID) -> AttendeeWithOriginPublic:
+    """Re-fetch an attendee and build its full response after a mutation.
+
+    Used by the admin ticket-management routes so the panel receives the
+    refreshed attendee (with up-to-date tickets) in a single round-trip.
+    """
+    attendee = crud.attendees_crud.get(db, attendee_id)
+    if not attendee:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Attendee not found",
+        )
+    last_scan_by_ticket = get_last_scan_by_tickets(
+        db, [ap.id for ap in attendee.attendee_products]
+    )
+    return _build_attendee_with_origin(attendee, last_scan_by_ticket)
 
 
 # ---------------------------------------------------------------------------
@@ -543,6 +563,108 @@ async def delete_attendee(
         )
 
     crud.attendees_crud.delete_attendee(db, attendee)
+
+
+@router.post(
+    "/{attendee_id}/tickets",
+    response_model=AttendeeWithOriginPublic,
+    status_code=status.HTTP_201_CREATED,
+    summary="Add a ticket to an attendee",
+)
+async def add_attendee_ticket(
+    attendee_id: uuid.UUID,
+    body: AttendeeTicketAdd,
+    db: AdminOrApiKeySession_AttendeesWrite,
+    _current_user: AdminOrApiKey_AttendeesWrite,
+) -> AttendeeWithOriginPublic:
+    """Add a single product/ticket to an existing attendee (BO only).
+
+    Admin grant with no payment: the ticket is materialized with payment_id NULL
+    (manual emission) and stock is decremented like any other purchase path. The
+    product must belong to the attendee's popup.
+    """
+    from app.api.product.crud import products_crud
+
+    attendee = crud.attendees_crud.get(db, attendee_id)
+    if not attendee:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Attendee not found",
+        )
+
+    product = products_crud.get(db, body.product_id)
+    if product is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Product not found",
+        )
+    if product.popup_id != attendee.popup_id:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Product belongs to a different popup",
+        )
+
+    crud.attendees_crud.add_product(
+        db,
+        attendee_id=attendee_id,
+        product_id=body.product_id,
+        tenant_id=attendee.tenant_id,
+    )
+
+    return _attendee_response(db, attendee_id)
+
+
+@router.patch(
+    "/{attendee_id}/tickets/{ticket_id}/product",
+    response_model=AttendeeWithOriginPublic,
+    summary="Change the product of an attendee's ticket",
+)
+async def swap_attendee_ticket_product(
+    attendee_id: uuid.UUID,
+    ticket_id: uuid.UUID,
+    body: AttendeeTicketProductSwap,
+    db: AdminOrApiKeySession_AttendeesWrite,
+    _current_user: AdminOrApiKey_AttendeesWrite,
+) -> AttendeeWithOriginPublic:
+    """Swap the product of a single ticket (BO only, no payment).
+
+    Restores one unit of the old product's stock and decrements the new one
+    (409 if sold out). The ticket keeps its check_in_code. Cross-popup swaps are
+    rejected with 422.
+    """
+    crud.attendees_crud.swap_ticket_product(
+        db,
+        attendee_id=attendee_id,
+        ticket_id=ticket_id,
+        new_product_id=body.product_id,
+    )
+
+    return _attendee_response(db, attendee_id)
+
+
+@router.delete(
+    "/{attendee_id}/tickets/{ticket_id}",
+    response_model=AttendeeWithOriginPublic,
+    summary="Remove a ticket from an attendee",
+)
+async def remove_attendee_ticket(
+    attendee_id: uuid.UUID,
+    ticket_id: uuid.UUID,
+    db: AdminOrApiKeySession_AttendeesWrite,
+    _current_user: AdminOrApiKey_AttendeesWrite,
+) -> AttendeeWithOriginPublic:
+    """Remove a single ticket from an attendee (BO only).
+
+    Restores one unit of the product's stock to the pool. Returns the updated
+    attendee so the panel can refresh.
+    """
+    crud.attendees_crud.remove_product(
+        db,
+        attendee_id=attendee_id,
+        ticket_id=ticket_id,
+    )
+
+    return _attendee_response(db, attendee_id)
 
 
 @router.post("/check-in/{code}", response_model=TicketPublic)
