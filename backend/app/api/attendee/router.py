@@ -578,14 +578,13 @@ async def add_attendee_ticket(
     db: AdminOrApiKeySession_AttendeesWrite,
     current_user: AdminOrApiKey_AttendeesWrite,
 ) -> AttendeeWithOriginPublic:
-    """Add a single product/ticket to an existing attendee (BO only).
+    """Add tickets (N products × quantity) to an existing attendee (BO only).
 
-    Admin grant with no payment: the ticket is materialized with payment_id NULL
-    (manual emission) and stock is decremented like any other purchase path. The
-    product must belong to the attendee's popup.
+    Admin grant with no payment: tickets are materialized with payment_id NULL
+    (manual emission) and stock is decremented like any other purchase path.
+    Each product must be active and belong to the attendee's popup; the batch is
+    applied atomically (a sold-out product rolls the whole add back with 409).
     """
-    from app.api.product.crud import products_crud
-
     attendee = crud.attendees_crud.get(db, attendee_id)
     if not attendee:
         raise HTTPException(
@@ -593,22 +592,10 @@ async def add_attendee_ticket(
             detail="Attendee not found",
         )
 
-    product = products_crud.get(db, body.product_id)
-    if product is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Product not found",
-        )
-    if product.popup_id != attendee.popup_id:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Product belongs to a different popup",
-        )
-
-    crud.attendees_crud.add_product(
+    crud.attendees_crud.add_products(
         db,
         attendee_id=attendee_id,
-        product_id=body.product_id,
+        items=[(line.product_id, line.quantity) for line in body.items],
         tenant_id=attendee.tenant_id,
         actor=actor_from_user(current_user),
     )

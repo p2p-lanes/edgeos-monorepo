@@ -581,10 +581,13 @@ export type AttendeeStats = {
 };
 
 /**
- * Request body to add a single ticket to an attendee (admin panel).
+ * Request body to add tickets to an attendee (admin panel, bulk).
+ *
+ * Mirrors the bulk-grant shape: N products, each with a quantity. Stock is
+ * validated per product and the whole batch is applied atomically.
  */
 export type AttendeeTicketAdd = {
-    product_id: string;
+    items: Array<AttendeeTicketLine>;
 };
 
 /**
@@ -608,6 +611,14 @@ export type AttendeeTicketInfo = {
     product_category?: (string | null);
     requires_check_in?: boolean;
     last_scan_at?: (string | null);
+};
+
+/**
+ * One product + quantity line in a bulk ticket add.
+ */
+export type AttendeeTicketLine = {
+    product_id: string;
+    quantity?: number;
 };
 
 /**

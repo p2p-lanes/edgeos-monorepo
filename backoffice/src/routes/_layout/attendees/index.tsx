@@ -228,6 +228,12 @@ function AttendeesTableContent() {
       hiddenOnMobile={["gender", "category"]}
       searchValue={search}
       onSearchChange={setSearch}
+      onRowClick={(row) =>
+        navigate({
+          to: "/attendees/$attendeeId",
+          params: { attendeeId: row.id },
+        })
+      }
       filterBar={
         <div className="flex items-center gap-2">
           <Switch

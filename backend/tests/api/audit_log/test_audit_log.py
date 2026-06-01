@@ -198,7 +198,7 @@ class TestTicketEventWiring:
         assert total == 1
         assert logs[0].action == AuditAction.TICKET_ADD
         assert logs[0].details is not None
-        assert logs[0].details["product_id"] == str(product.id)
+        assert logs[0].details["products"][0]["product_id"] == str(product.id)
 
     def test_remove_emits_log_that_survives_ticket_deletion(
         self, db: Session, tenant_a: Tenants, popup_tenant_a: Popups

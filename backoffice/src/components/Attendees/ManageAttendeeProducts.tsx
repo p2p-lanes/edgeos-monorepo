@@ -6,10 +6,14 @@ import {
   type ApiError,
   AttendeesService,
   type AttendeeWithOriginPublic,
+  type ProductPublic,
   ProductsService,
 } from "@/client"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
 import { InlineSection } from "@/components/ui/inline-form"
+import { Input } from "@/components/ui/input"
 import {
   Select,
   SelectContent,
@@ -18,17 +22,28 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
 import useCustomToast from "@/hooks/useCustomToast"
 import { createErrorHandler } from "@/utils"
 
 /**
- * Admin product management for a single attendee: change, remove, or add a
- * ticket directly, without going through the purchase flow.
+ * Admin product management for a single attendee: change a ticket's product,
+ * remove a ticket, or add N products at once (bulk-grant style) with per-product
+ * quantity and stock validation.
  *
  * The ticket layer (attendee_products) is the source of truth here — grants and
  * refunds already decouple it from the original payment, so admins edit it
- * independently. Changing a ticket keeps its check-in code (the QR stays valid),
- * which is what week swaps and upgrades need. Removing a ticket frees its stock.
+ * independently. Changing a ticket keeps its check-in code (week swaps/upgrades);
+ * removing one frees its stock. Only active products can be assigned (matching
+ * what is sellable at checkout); the current product of an existing ticket stays
+ * selectable even if it is no longer active.
  */
 export function ManageAttendeeProducts({
   attendee,
@@ -38,14 +53,19 @@ export function ManageAttendeeProducts({
   const queryClient = useQueryClient()
   const { showSuccessToast, showErrorToast } = useCustomToast()
   const [confirmRemoveId, setConfirmRemoveId] = useState<string | null>(null)
-  const [addProductId, setAddProductId] = useState<string>("")
+  const [qty, setQty] = useState<Record<string, number>>({})
 
   const tickets = attendee.products ?? []
 
+  const productsKey = ["products", attendee.popup_id, { active: true }]
   const { data: productList, isLoading: productsLoading } = useQuery({
-    queryKey: ["products", attendee.popup_id],
+    queryKey: productsKey,
     queryFn: () =>
-      ProductsService.listProducts({ popupId: attendee.popup_id, limit: 200 }),
+      ProductsService.listProducts({
+        popupId: attendee.popup_id,
+        isActive: true,
+        limit: 200,
+      }),
   })
   const products = productList?.results ?? []
 
@@ -91,21 +111,44 @@ export function ManageAttendeeProducts({
   })
 
   const addMutation = useMutation({
-    mutationFn: (productId: string) =>
+    mutationFn: (items: { product_id: string; quantity: number }[]) =>
       AttendeesService.addAttendeeTicket({
         attendeeId: attendee.id,
-        requestBody: { product_id: productId },
+        requestBody: { items },
       }),
     onSuccess: (updated) => {
-      setAddProductId("")
+      setQty({})
       onMutationSuccess(updated)
-      showSuccessToast("Ticket added")
+      showSuccessToast("Tickets added")
     },
     onError: onMutationError,
   })
 
   const isBusy =
     swapMutation.isPending || removeMutation.isPending || addMutation.isPending
+
+  // ── Add-table selection helpers ──────────────────────────────────────────
+  const toggle = (id: string, checked: boolean) =>
+    setQty((prev) => {
+      const next = { ...prev }
+      if (checked) next[id] = prev[id] ?? 1
+      else delete next[id]
+      return next
+    })
+  const setQuantity = (id: string, value: number) =>
+    setQty((prev) => ({ ...prev, [id]: value }))
+
+  const isOverdrawn = (p: ProductPublic) =>
+    p.id in qty &&
+    p.total_stock_remaining != null &&
+    qty[p.id] > p.total_stock_remaining
+
+  const selectedItems = Object.entries(qty).map(([product_id, quantity]) => ({
+    product_id,
+    quantity,
+  }))
+  const anyOverdrawn = products.some(isOverdrawn)
+  const canAdd = selectedItems.length > 0 && !anyOverdrawn && !isBusy
 
   if (productsLoading) {
     return (
@@ -117,109 +160,180 @@ export function ManageAttendeeProducts({
 
   return (
     <InlineSection title="Tickets" className="px-6 py-4">
-      <div className="space-y-3">
-        {tickets.length === 0 && (
-          <p className="text-sm text-muted-foreground">No tickets yet.</p>
-        )}
-
-        {tickets.map((ticket) => (
-          <div key={ticket.id} className="flex items-center gap-2">
-            <div className="min-w-0 flex-1">
-              <Select
-                value={ticket.product_id}
-                disabled={isBusy}
-                onValueChange={(productId) => {
-                  if (productId !== ticket.product_id) {
-                    swapMutation.mutate({ ticketId: ticket.id, productId })
-                  }
-                }}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder={ticket.product_name ?? "Product"} />
-                </SelectTrigger>
-                <SelectContent>
-                  {/* Keep the current product selectable even if it is no
-                      longer in the active list (e.g. soft-deleted), so the
-                      trigger never renders blank. */}
-                  {!products.some((p) => p.id === ticket.product_id) && (
-                    <SelectItem value={ticket.product_id}>
-                      {ticket.product_name ?? "Current product"} (inactive)
-                    </SelectItem>
-                  )}
-                  {products.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <span className="mt-1 block font-mono text-xs text-muted-foreground">
-                {ticket.check_in_code}
-              </span>
-            </div>
-
-            {confirmRemoveId === ticket.id ? (
-              <div className="flex items-center gap-1">
-                <Button
-                  variant="destructive"
-                  size="sm"
+      <div className="space-y-5">
+        {/* Current tickets — change product or remove */}
+        <div className="space-y-3">
+          {tickets.length === 0 && (
+            <p className="text-sm text-muted-foreground">No tickets yet.</p>
+          )}
+          {tickets.map((ticket) => (
+            <div key={ticket.id} className="flex items-center gap-2">
+              <div className="min-w-0 flex-1">
+                <Select
+                  value={ticket.product_id}
                   disabled={isBusy}
-                  onClick={() => removeMutation.mutate(ticket.id)}
+                  onValueChange={(productId) => {
+                    if (productId !== ticket.product_id) {
+                      swapMutation.mutate({ ticketId: ticket.id, productId })
+                    }
+                  }}
                 >
-                  Confirm
-                </Button>
+                  <SelectTrigger className="w-full">
+                    <SelectValue
+                      placeholder={ticket.product_name ?? "Product"}
+                    />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {/* Keep the current product selectable even if it is no
+                        longer active, so the trigger never renders blank. */}
+                    {!products.some((p) => p.id === ticket.product_id) && (
+                      <SelectItem value={ticket.product_id}>
+                        {ticket.product_name ?? "Current product"} (inactive)
+                      </SelectItem>
+                    )}
+                    {products.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <span className="mt-1 block font-mono text-xs text-muted-foreground">
+                  {ticket.check_in_code}
+                </span>
+              </div>
+
+              {confirmRemoveId === ticket.id ? (
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    disabled={isBusy}
+                    onClick={() => removeMutation.mutate(ticket.id)}
+                  >
+                    Confirm
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={isBusy}
+                    onClick={() => setConfirmRemoveId(null)}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              ) : (
                 <Button
                   variant="ghost"
-                  size="sm"
+                  size="icon"
+                  aria-label="Remove ticket"
                   disabled={isBusy}
-                  onClick={() => setConfirmRemoveId(null)}
+                  onClick={() => setConfirmRemoveId(ticket.id)}
                 >
-                  Cancel
+                  <Trash2 className="h-4 w-4 text-muted-foreground" />
+                </Button>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {/* Add tickets — pick N active products with quantities (stock-validated) */}
+        <div className="space-y-2">
+          <p className="text-sm font-medium">Add tickets</p>
+          {products.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              No active products in this pop-up.
+            </p>
+          ) : (
+            <>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-10">
+                      <span className="sr-only">Selected</span>
+                    </TableHead>
+                    <TableHead>Product</TableHead>
+                    <TableHead className="w-20 text-right">Stock</TableHead>
+                    <TableHead className="w-24">Qty</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {products.map((p) => {
+                    const selected = p.id in qty
+                    const over = isOverdrawn(p)
+                    return (
+                      <TableRow
+                        key={p.id}
+                        className={over ? "bg-destructive/10" : undefined}
+                      >
+                        <TableCell>
+                          <Checkbox
+                            checked={selected}
+                            disabled={isBusy}
+                            onCheckedChange={(c) => toggle(p.id, !!c)}
+                            aria-label={`Select ${p.name}`}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-col">
+                            <span className="font-medium">{p.name}</span>
+                            {over && p.total_stock_remaining != null && (
+                              <span className="mt-0.5 text-xs font-medium text-destructive">
+                                Only {p.total_stock_remaining} in stock.
+                              </span>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right text-sm">
+                          {p.total_stock_remaining == null ? (
+                            <Badge variant="outline">∞</Badge>
+                          ) : (
+                            p.total_stock_remaining
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            type="number"
+                            min={1}
+                            disabled={!selected || isBusy}
+                            value={selected ? (qty[p.id] ?? 1) : ""}
+                            onChange={(e) => {
+                              const v = Number(e.target.value)
+                              setQuantity(
+                                p.id,
+                                Number.isFinite(v) && v > 0 ? Math.floor(v) : 1,
+                              )
+                            }}
+                            className={
+                              over ? "border-destructive text-destructive" : ""
+                            }
+                            aria-invalid={over}
+                          />
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })}
+                </TableBody>
+              </Table>
+              <div className="flex justify-end">
+                <Button
+                  size="sm"
+                  disabled={!canAdd}
+                  onClick={() => addMutation.mutate(selectedItems)}
+                >
+                  <Plus className="mr-1 h-4 w-4" />
+                  Add{" "}
+                  {selectedItems.length > 0
+                    ? `${selectedItems.reduce((n, i) => n + i.quantity, 0)} `
+                    : ""}
+                  ticket
+                  {selectedItems.reduce((n, i) => n + i.quantity, 0) === 1
+                    ? ""
+                    : "s"}
                 </Button>
               </div>
-            ) : (
-              <Button
-                variant="ghost"
-                size="icon"
-                aria-label="Remove ticket"
-                disabled={isBusy}
-                onClick={() => setConfirmRemoveId(ticket.id)}
-              >
-                <Trash2 className="h-4 w-4 text-muted-foreground" />
-              </Button>
-            )}
-          </div>
-        ))}
-
-        {/* Add a ticket */}
-        <div className="flex items-center gap-2 pt-1">
-          <div className="min-w-0 flex-1">
-            <Select
-              value={addProductId}
-              disabled={isBusy}
-              onValueChange={setAddProductId}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Add a ticket..." />
-              </SelectTrigger>
-              <SelectContent>
-                {products.map((p) => (
-                  <SelectItem key={p.id} value={p.id}>
-                    {p.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={isBusy || !addProductId}
-            onClick={() => addProductId && addMutation.mutate(addProductId)}
-          >
-            <Plus className="mr-1 h-4 w-4" />
-            Add
-          </Button>
+            </>
+          )}
         </div>
       </div>
     </InlineSection>

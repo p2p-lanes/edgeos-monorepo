@@ -2541,16 +2541,21 @@ export const AttendeeStatsSchema = {
 
 export const AttendeeTicketAddSchema = {
     properties: {
-        product_id: {
-            type: 'string',
-            format: 'uuid',
-            title: 'Product Id'
+        items: {
+            items: {
+                '$ref': '#/components/schemas/AttendeeTicketLine'
+            },
+            type: 'array',
+            title: 'Items'
         }
     },
     type: 'object',
-    required: ['product_id'],
+    required: ['items'],
     title: 'AttendeeTicketAdd',
-    description: 'Request body to add a single ticket to an attendee (admin panel).'
+    description: `Request body to add tickets to an attendee (admin panel, bulk).
+
+Mirrors the bulk-grant shape: N products, each with a quantity. Stock is
+validated per product and the whole batch is applied atomically.`
 } as const;
 
 export const AttendeeTicketInfoSchema = {
@@ -2619,6 +2624,26 @@ per-ticket QR list the main applicant sees without an extra round-trip.
 \`last_scan_at\` is the most recent occurred_at from check_ins for this
 ticket (None when never scanned). The portal uses it to flag already-used
 QR codes — same behavior as the main applicant's pass view.`
+} as const;
+
+export const AttendeeTicketLineSchema = {
+    properties: {
+        product_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Product Id'
+        },
+        quantity: {
+            type: 'integer',
+            minimum: 1,
+            title: 'Quantity',
+            default: 1
+        }
+    },
+    type: 'object',
+    required: ['product_id'],
+    title: 'AttendeeTicketLine',
+    description: 'One product + quantity line in a bulk ticket add.'
 } as const;
 
 export const AttendeeTicketProductSwapSchema = {

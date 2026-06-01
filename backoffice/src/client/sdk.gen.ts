@@ -1298,11 +1298,12 @@ export class AttendeesService {
     
     /**
      * Add a ticket to an attendee
-     * Add a single product/ticket to an existing attendee (BO only).
+     * Add tickets (N products × quantity) to an existing attendee (BO only).
      *
-     * Admin grant with no payment: the ticket is materialized with payment_id NULL
-     * (manual emission) and stock is decremented like any other purchase path. The
-     * product must belong to the attendee's popup.
+     * Admin grant with no payment: tickets are materialized with payment_id NULL
+     * (manual emission) and stock is decremented like any other purchase path.
+     * Each product must be active and belong to the attendee's popup; the batch is
+     * applied atomically (a sold-out product rolls the whole add back with 409).
      * @param data The data for the request.
      * @param data.attendeeId
      * @param data.requestBody

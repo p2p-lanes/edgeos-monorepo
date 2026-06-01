@@ -666,15 +666,93 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
                     actor=actor,
                     action=AuditAction.TICKET_ADD,
                     details={
-                        "ticket_id": str(ticket.id),
-                        "product_id": str(product_id),
-                        "product_name": product.name,
+                        "products": [
+                            {
+                                "product_id": str(product_id),
+                                "product_name": product.name,
+                                "quantity": 1,
+                            }
+                        ],
                     },
                 )
 
         session.commit()
         session.refresh(ticket)
         return ticket
+
+    def add_products(
+        self,
+        session: Session,
+        attendee_id: uuid.UUID,
+        items: list[tuple[uuid.UUID, int]],
+        tenant_id: uuid.UUID | None = None,
+        actor: AuditActor | None = None,
+    ) -> None:
+        """Add multiple tickets (product × quantity) to an attendee atomically.
+
+        Mirrors the bulk-grant contract for a single attendee: each product must
+        be active and in the attendee's popup; stock is decremented per product
+        (409 if insufficient). All tickets are created in one transaction so a
+        sold-out failure mid-batch rolls everything back. Records a single
+        TICKET_ADD audit event listing every product/quantity added.
+        """
+        from app.api.product.crud import products_crud
+
+        attendee = session.get(Attendees, attendee_id)
+        if attendee is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Attendee not found",
+            )
+        if tenant_id is None:
+            tenant_id = attendee.tenant_id
+
+        added: list[dict] = []
+        for product_id, quantity in items:
+            product = products_crud.get(session, product_id)
+            if product is None or product.popup_id != attendee.popup_id:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Product not found",
+                )
+            if not product.is_active:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=f"'{product.name}' is not available",
+                )
+
+            # Atomic decrement of the whole quantity (409 if insufficient).
+            products_crud.decrement_total_stock(session, product_id, quantity)
+
+            for _ in range(quantity):
+                session.add(
+                    AttendeeProducts(
+                        id=uuid.uuid4(),
+                        tenant_id=tenant_id,
+                        attendee_id=attendee_id,
+                        product_id=product_id,
+                        check_in_code=generate_check_in_code(),
+                        payment_id=None,
+                    )
+                )
+            added.append(
+                {
+                    "product_id": str(product_id),
+                    "product_name": product.name,
+                    "quantity": quantity,
+                }
+            )
+
+        if actor is not None and added:
+            self._record_ticket_event(
+                session,
+                attendee=attendee,
+                actor=actor,
+                action=AuditAction.TICKET_ADD,
+                details={"products": added},
+            )
+
+        session.commit()
 
     def remove_ticket(
         self,

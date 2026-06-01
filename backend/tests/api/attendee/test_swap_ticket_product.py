@@ -11,7 +11,7 @@ from decimal import Decimal
 
 import pytest
 from fastapi import HTTPException
-from sqlmodel import Session
+from sqlmodel import Session, func, select
 
 from app.api.attendee import crud as attendee_crud
 from app.api.attendee.models import AttendeeProducts, Attendees
@@ -286,3 +286,84 @@ class TestRemoveProduct:
         assert exc.value.status_code == 404
         # Ticket must survive the rejected removal.
         assert db.get(AttendeeProducts, ticket.id) is not None
+
+
+# ---------------------------------------------------------------------------
+# add_products (bulk)
+# ---------------------------------------------------------------------------
+
+
+def _ticket_count(db: Session, attendee_id: uuid.UUID) -> int:
+    return db.exec(
+        select(func.count())
+        .select_from(AttendeeProducts)
+        .where(AttendeeProducts.attendee_id == attendee_id)
+    ).one()
+
+
+class TestAddProducts:
+    def test_adds_quantities_and_decrements_stock(
+        self,
+        db: Session,
+        tenant_a: Tenants,
+        popup_tenant_a: Popups,
+    ) -> None:
+        prod_a = _make_product(db, tenant_a, popup_tenant_a, stock=10)
+        prod_b = _make_product(db, tenant_a, popup_tenant_a, stock=10)
+        attendee = _make_attendee(db, tenant_a, popup_tenant_a)
+
+        attendee_crud.attendees_crud.add_products(
+            db,
+            attendee_id=attendee.id,
+            items=[(prod_a.id, 2), (prod_b.id, 3)],
+        )
+
+        assert _ticket_count(db, attendee.id) == 5
+        db.refresh(prod_a)
+        db.refresh(prod_b)
+        assert prod_a.total_stock_remaining == 8
+        assert prod_b.total_stock_remaining == 7
+
+    def test_sold_out_rolls_back_whole_batch(
+        self,
+        db: Session,
+        tenant_a: Tenants,
+        popup_tenant_a: Popups,
+    ) -> None:
+        prod_ok = _make_product(db, tenant_a, popup_tenant_a, stock=10)
+        prod_short = _make_product(db, tenant_a, popup_tenant_a, stock=1)
+        attendee = _make_attendee(db, tenant_a, popup_tenant_a)
+
+        with pytest.raises(HTTPException) as exc:
+            attendee_crud.attendees_crud.add_products(
+                db,
+                attendee_id=attendee.id,
+                items=[(prod_ok.id, 2), (prod_short.id, 5)],
+            )
+        assert exc.value.status_code == 409
+
+        # FastAPI rolls back on HTTPException — mirror that and assert nothing stuck.
+        db.rollback()
+        assert _ticket_count(db, attendee.id) == 0
+        db.refresh(prod_ok)
+        assert prod_ok.total_stock_remaining == 10
+
+    def test_inactive_product_rejected_422(
+        self,
+        db: Session,
+        tenant_a: Tenants,
+        popup_tenant_a: Popups,
+    ) -> None:
+        product = _make_product(db, tenant_a, popup_tenant_a, stock=10)
+        product.is_active = False
+        db.add(product)
+        db.commit()
+        attendee = _make_attendee(db, tenant_a, popup_tenant_a)
+
+        with pytest.raises(HTTPException) as exc:
+            attendee_crud.attendees_crud.add_products(
+                db,
+                attendee_id=attendee.id,
+                items=[(product.id, 1)],
+            )
+        assert exc.value.status_code == 422

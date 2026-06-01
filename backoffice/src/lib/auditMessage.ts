@@ -4,6 +4,18 @@ function asString(value: unknown): string | undefined {
   return typeof value === "string" ? value : undefined
 }
 
+/** Render a `[{product_name, quantity}]` details list as "2x A, 1x B". */
+function formatProductList(value: unknown): string {
+  const products = Array.isArray(value) ? value : []
+  return products
+    .map((p) => {
+      const item = p as Record<string, unknown>
+      const qty = typeof item.quantity === "number" ? item.quantity : 1
+      return `${qty}x ${asString(item.product_name) ?? "ticket"}`
+    })
+    .join(", ")
+}
+
 /** Display name for whoever performed the action. */
 export function actorLabel(log: AuditLogPublic): string {
   return log.actor_name ?? log.actor_email ?? "Unknown"
@@ -36,19 +48,14 @@ export function describeAuditAction(log: AuditLogPublic): string {
   switch (log.action) {
     case "ticket.swap":
       return `Changed ticket from "${asString(d.old_product_name) ?? "unknown"}" to "${asString(d.new_product_name) ?? "unknown"}"`
-    case "ticket.add":
-      return `Added ticket "${asString(d.product_name) ?? "unknown"}"`
+    case "ticket.add": {
+      const names = formatProductList(d.products)
+      return names ? `Added ${names}` : "Added tickets"
+    }
     case "ticket.remove":
       return `Removed ticket "${asString(d.product_name) ?? "unknown"}"`
     case "ticket.grant": {
-      const products = Array.isArray(d.products) ? d.products : []
-      const names = products
-        .map((p) => {
-          const item = p as Record<string, unknown>
-          const qty = typeof item.quantity === "number" ? item.quantity : 1
-          return `${qty}x ${asString(item.product_name) ?? "ticket"}`
-        })
-        .join(", ")
+      const names = formatProductList(d.products)
       return names ? `Granted ${names}` : "Granted tickets"
     }
     default: {
