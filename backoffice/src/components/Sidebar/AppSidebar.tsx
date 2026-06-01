@@ -10,6 +10,7 @@ import {
   Home,
   KeyRound,
   LayoutList,
+  ListChecks,
   ListTree,
   Mail,
   MapPin,
@@ -28,6 +29,7 @@ import { useMemo } from "react"
 import { ApplicationReviewsService, PaymentsService } from "@/client"
 import { SidebarAppearance } from "@/components/Common/Appearance"
 import { Logo } from "@/components/Common/Logo"
+import { ReportBugButton } from "@/components/Tasks/ReportBugButton"
 import { Separator } from "@/components/ui/separator"
 import {
   Sidebar,
@@ -94,9 +96,10 @@ const thirdPartyAppsItem: Item = {
 // it to users.
 const SHOW_AGENTIC_ACCESS = false
 
-// Superadmin only items - organizations list view
+// Superadmin only items - organizations list view + product task board
 const superadminItems: Item[] = [
   { icon: Building2, title: "Organizations", path: "/organizations" },
+  { icon: ListChecks, title: "Tasks", path: "/tasks" },
 ]
 
 export function AppSidebar() {
@@ -222,6 +225,9 @@ export function AppSidebar() {
         )}
       </SidebarContent>
       <SidebarFooter>
+        <div className="px-2 group-data-[collapsible=icon]:px-0">
+          <ReportBugButton />
+        </div>
         <SidebarAppearance />
         <UserComponent user={currentUser} />
       </SidebarFooter>

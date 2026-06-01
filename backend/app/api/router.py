@@ -28,6 +28,7 @@ from app.api import (
     popup,
     popup_reviewer,
     product,
+    task,
     tenant,
     third_party_app,
     ticketing_step,
@@ -96,6 +97,9 @@ api_router.include_router(event_venue.utils_router)
 api_router.include_router(event_venue.property_types_router)
 api_router.include_router(event_settings.router)
 api_router.include_router(track.router)
+
+# Task tracker (in-app product task board)
+api_router.include_router(task.router)
 
 # Dashboard
 api_router.include_router(dashboard.router)
