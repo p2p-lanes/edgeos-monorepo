@@ -52,9 +52,10 @@ function Tasks() {
     enabled: isSuperadmin,
   })
 
+  // Only superadmins can be assigned, so the filter lists superadmins only.
   const { data: usersData } = useQuery({
-    queryKey: ["tasks-users"],
-    queryFn: () => UsersService.listUsers({ limit: 1000 }),
+    queryKey: ["tasks-superadmins"],
+    queryFn: () => UsersService.listUsers({ limit: 1000, role: "superadmin" }),
     enabled: isSuperadmin,
   })
   const users = usersData?.results ?? []

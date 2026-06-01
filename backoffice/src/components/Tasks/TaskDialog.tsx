@@ -87,9 +87,10 @@ export function TaskDialog({ open, onOpenChange, taskId }: TaskDialogProps) {
     enabled: open && isEdit,
   })
 
+  // Tasks may only be assigned to superadmins (phase 1 policy).
   const { data: usersData } = useQuery({
-    queryKey: ["tasks-users"],
-    queryFn: () => UsersService.listUsers({ limit: 1000 }),
+    queryKey: ["tasks-superadmins"],
+    queryFn: () => UsersService.listUsers({ limit: 1000, role: "superadmin" }),
     enabled: open,
   })
 
