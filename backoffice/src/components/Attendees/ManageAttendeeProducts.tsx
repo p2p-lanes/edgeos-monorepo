@@ -218,7 +218,7 @@ export function ManageAttendeeProducts({
                           }
                         }}
                       >
-                        <SelectTrigger className="w-full border-0 px-0 font-medium shadow-none focus:ring-0">
+                        <SelectTrigger className="w-full border-0 px-2 font-medium shadow-none focus:ring-0">
                           <SelectValue
                             placeholder={ticket.product_name ?? "Product"}
                           />
@@ -274,7 +274,7 @@ export function ManageAttendeeProducts({
                       </Button>
                     )}
                   </div>
-                  <p className="mt-1 pl-6 text-xs text-muted-foreground">
+                  <p className="mt-1 pl-8 pr-2 text-xs text-muted-foreground">
                     Code:{" "}
                     <span className="font-mono">{ticket.check_in_code}</span>
                     <span className="ml-2 italic">
