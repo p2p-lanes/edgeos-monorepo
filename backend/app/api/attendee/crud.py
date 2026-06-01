@@ -11,6 +11,7 @@ from sqlmodel import Session, func, select
 
 from app.api.attendee.models import AttendeeProducts, Attendees
 from app.api.attendee.schemas import AttendeeCreate, AttendeeUpdate
+from app.api.audit_log.actor import AuditActor
 from app.api.audit_log.constants import AuditAction, AuditEntityType
 from app.api.shared.crud import BaseCRUD
 
@@ -594,8 +595,7 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
         tenant_id: uuid.UUID | None = None,
         payment_id: uuid.UUID | None = None,
         check_in_code_prefix: str = "",
-        actor_user_id: uuid.UUID | None = None,
-        actor_label: str | None = None,
+        actor: AuditActor | None = None,
     ) -> AttendeeProducts:
         """Add one ticket (AttendeeProducts row) for an attendee.
 
@@ -657,14 +657,13 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
 
         # Audit only when an actor is supplied (admin manual add). The purchase
         # and grant paths pass no actor here and log through their own flows.
-        if actor_user_id is not None and actor_label is not None:
+        if actor is not None:
             attendee = session.get(Attendees, attendee_id)
             if attendee is not None:
                 self._record_ticket_event(
                     session,
                     attendee=attendee,
-                    actor_user_id=actor_user_id,
-                    actor_label=actor_label,
+                    actor=actor,
                     action=AuditAction.TICKET_ADD,
                     details={
                         "ticket_id": str(ticket.id),
@@ -699,8 +698,7 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
         session: Session,
         *,
         attendee: Attendees,
-        actor_user_id: uuid.UUID,
-        actor_label: str,
+        actor: AuditActor,
         action: str,
         details: dict,
     ) -> None:
@@ -715,8 +713,7 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
         audit_logs_crud.record(
             session,
             tenant_id=attendee.tenant_id,
-            actor_user_id=actor_user_id,
-            actor_label=actor_label,
+            actor=actor,
             action=action,
             entity_type=AuditEntityType.ATTENDEE,
             entity_id=attendee.id,
@@ -731,8 +728,7 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
         attendee_id: uuid.UUID,
         ticket_id: uuid.UUID,
         new_product_id: uuid.UUID,
-        actor_user_id: uuid.UUID | None = None,
-        actor_label: str | None = None,
+        actor: AuditActor | None = None,
     ) -> AttendeeProducts:
         """Change the product of a single ticket (admin, no payment).
 
@@ -791,15 +787,14 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
         ticket.product_id = new_product_id
         session.add(ticket)
 
-        if actor_user_id is not None and actor_label is not None:
+        if actor is not None:
             from app.api.product.models import Products
 
             old_product = session.get(Products, old_product_id)
             self._record_ticket_event(
                 session,
                 attendee=attendee,
-                actor_user_id=actor_user_id,
-                actor_label=actor_label,
+                actor=actor,
                 action=AuditAction.TICKET_SWAP,
                 details={
                     "ticket_id": str(ticket.id),
@@ -819,8 +814,7 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
         session: Session,
         attendee_id: uuid.UUID,
         ticket_id: uuid.UUID,
-        actor_user_id: uuid.UUID | None = None,
-        actor_label: str | None = None,
+        actor: AuditActor | None = None,
     ) -> None:
         """Remove a single ticket from an attendee and restore its stock (admin).
 
@@ -840,15 +834,14 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
 
         products_crud.restore_total_stock(session, ticket.product_id, 1)
 
-        if actor_user_id is not None and actor_label is not None:
+        if actor is not None:
             attendee = session.get(Attendees, attendee_id)
             product = session.get(Products, ticket.product_id)
             if attendee is not None:
                 self._record_ticket_event(
                     session,
                     attendee=attendee,
-                    actor_user_id=actor_user_id,
-                    actor_label=actor_label,
+                    actor=actor,
                     action=AuditAction.TICKET_REMOVE,
                     details={
                         "ticket_id": str(ticket.id),

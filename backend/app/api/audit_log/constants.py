@@ -19,5 +19,6 @@ class AuditEntityType:
     """Type of the primary entity an event is grouped under."""
 
     ATTENDEE = "attendee"
+    EVENT = "event"
     HUMAN = "human"
     PRODUCT = "product"

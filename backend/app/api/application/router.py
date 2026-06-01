@@ -276,6 +276,7 @@ async def grant_tickets_admin(
     from sqlmodel import select
 
     from app.api.attendee.crud import attendees_crud
+    from app.api.audit_log.actor import actor_from_user
     from app.api.audit_log.constants import AuditAction, AuditEntityType
     from app.api.audit_log.crud import audit_logs_crud
     from app.api.human.crud import humans_crud
@@ -465,8 +466,7 @@ async def grant_tickets_admin(
             audit_logs_crud.record(
                 db,
                 tenant_id=tenant_id,
-                actor_user_id=current_user.id,
-                actor_label=current_user.full_name or current_user.email,
+                actor=actor_from_user(current_user),
                 action=AuditAction.TICKET_GRANT,
                 entity_type=AuditEntityType.ATTENDEE,
                 entity_id=main_attendee.id,

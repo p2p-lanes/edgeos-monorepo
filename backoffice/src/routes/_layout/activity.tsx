@@ -22,7 +22,11 @@ import {
   useTableSearchParams,
   validateTableSearch,
 } from "@/hooks/useTableSearchParams"
-import { AUDIT_ACTION_OPTIONS, describeAuditAction } from "@/lib/auditMessage"
+import {
+  AUDIT_ACTION_OPTIONS,
+  actorLabel,
+  describeAuditAction,
+} from "@/lib/auditMessage"
 
 const ALL_ACTIONS = "all"
 
@@ -48,10 +52,10 @@ const columns: ColumnDef<AuditLogPublic>[] = [
     ),
   },
   {
-    accessorKey: "actor_label",
+    id: "actor",
     header: "Actor",
     cell: ({ row }) => (
-      <span className="font-medium">{row.original.actor_label}</span>
+      <span className="font-medium">{actorLabel(row.original)}</span>
     ),
   },
   {
@@ -61,7 +65,7 @@ const columns: ColumnDef<AuditLogPublic>[] = [
   },
   {
     accessorKey: "entity_label",
-    header: "Attendee",
+    header: "Item",
     cell: ({ row }) => (
       <span className="text-muted-foreground">
         {row.original.entity_label ?? "—"}

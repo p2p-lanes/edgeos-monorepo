@@ -1477,12 +1477,12 @@ export class AuditLogsService {
      * List audit log entries (newest first), filterable for both surfaces.
      *
      * The per-attendee history passes `entity_id`; the global feed uses
-     * `popup_id` / `action` / `actor_user_id`. Tenant scoping is enforced by RLS
+     * `popup_id` / `action` / `actor_id`. Tenant scoping is enforced by RLS
      * on the audit_logs table, so cross-tenant rows are never returned.
      * @param data The data for the request.
      * @param data.popupId
      * @param data.action
-     * @param data.actorUserId
+     * @param data.actorId
      * @param data.entityType
      * @param data.entityId
      * @param data.skip Number of items to skip
@@ -1501,7 +1501,7 @@ export class AuditLogsService {
             query: {
                 popup_id: data.popupId,
                 action: data.action,
-                actor_user_id: data.actorUserId,
+                actor_id: data.actorId,
                 entity_type: data.entityType,
                 entity_id: data.entityId,
                 skip: data.skip,

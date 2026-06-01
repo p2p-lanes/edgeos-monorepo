@@ -18,6 +18,7 @@ from app.api.attendee.schemas import (
     TicketProductSnapshot,
     TicketPublic,
 )
+from app.api.audit_log.actor import actor_from_user
 from app.api.check_in.crud import (
     get_check_in_summary,
     get_last_scan_by_tickets,
@@ -609,8 +610,7 @@ async def add_attendee_ticket(
         attendee_id=attendee_id,
         product_id=body.product_id,
         tenant_id=attendee.tenant_id,
-        actor_user_id=current_user.id,
-        actor_label=current_user.full_name or current_user.email,
+        actor=actor_from_user(current_user),
     )
 
     return _attendee_response(db, attendee_id)
@@ -639,8 +639,7 @@ async def swap_attendee_ticket_product(
         attendee_id=attendee_id,
         ticket_id=ticket_id,
         new_product_id=body.product_id,
-        actor_user_id=current_user.id,
-        actor_label=current_user.full_name or current_user.email,
+        actor=actor_from_user(current_user),
     )
 
     return _attendee_response(db, attendee_id)
@@ -666,8 +665,7 @@ async def remove_attendee_ticket(
         db,
         attendee_id=attendee_id,
         ticket_id=ticket_id,
-        actor_user_id=current_user.id,
-        actor_label=current_user.full_name or current_user.email,
+        actor=actor_from_user(current_user),
     )
 
     return _attendee_response(db, attendee_id)

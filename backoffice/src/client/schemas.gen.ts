@@ -3042,7 +3042,15 @@ export const AuditLogPublicSchema = {
             format: 'uuid',
             title: 'Id'
         },
-        actor_user_id: {
+        source: {
+            type: 'string',
+            title: 'Source'
+        },
+        actor_type: {
+            type: 'string',
+            title: 'Actor Type'
+        },
+        actor_id: {
             anyOf: [
                 {
                     type: 'string',
@@ -3052,11 +3060,40 @@ export const AuditLogPublicSchema = {
                     type: 'null'
                 }
             ],
-            title: 'Actor User Id'
+            title: 'Actor Id'
         },
-        actor_label: {
-            type: 'string',
-            title: 'Actor Label'
+        actor_email: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Actor Email'
+        },
+        actor_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Actor Name'
+        },
+        request_id: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Request Id'
         },
         action: {
             type: 'string',
@@ -3120,7 +3157,7 @@ export const AuditLogPublicSchema = {
         }
     },
     type: 'object',
-    required: ['id', 'actor_label', 'action', 'entity_type', 'created_at'],
+    required: ['id', 'source', 'actor_type', 'action', 'entity_type', 'created_at'],
     title: 'AuditLogPublic',
     description: 'A single audit log entry returned to the backoffice.'
 } as const;

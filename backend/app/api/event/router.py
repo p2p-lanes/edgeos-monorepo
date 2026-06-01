@@ -7,6 +7,7 @@ from loguru import logger
 from pydantic import BaseModel
 from sqlmodel import Session
 
+from app.api.audit_log.actor import actor_from_human, actor_from_user
 from app.api.event import crud
 from app.api.event.recurrence import (
     DEFAULT_MAX_OCCURRENCES,
@@ -37,6 +38,12 @@ from app.api.event.schemas import (
     OccurrenceRef,
     RecurrenceUpdate,
 )
+from app.api.event_audit.crud import (
+    build_event_snapshot,
+    compute_changes,
+    record_event_audit,
+)
+from app.api.event_audit.schemas import EventAuditAction
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
 from app.core.dependencies.tenants import PublicTenant
 from app.core.dependencies.users import (
@@ -1011,6 +1018,13 @@ async def create_event(
     db.commit()
     db.refresh(event)
 
+    record_event_audit(
+        db,
+        event=event,
+        action=EventAuditAction.CREATED,
+        actor=actor_from_user(current_user),
+    )
+
     return _to_public(event)
 
 
@@ -1019,13 +1033,15 @@ async def update_event(
     event_id: uuid.UUID,
     event_in: EventUpdate,
     db: AdminOrApiKeySession_EventsWrite,
-    _: AdminOrApiKey_EventsWrite,
+    current_user: AdminOrApiKey_EventsWrite,
 ) -> EventPublic:
     event = crud.events_crud.get(db, event_id)
     if not event:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Event not found"
         )
+
+    audit_before = build_event_snapshot(db, event)
 
     new_venue_id = (
         event_in.venue_id if event_in.venue_id is not None else event.venue_id
@@ -1076,6 +1092,16 @@ async def update_event(
     if _event_calendar_fields_changed(before, updated):
         await _bump_and_dispatch_itip_update(db, updated, before=before)
 
+    audit_after = build_event_snapshot(db, updated)
+    record_event_audit(
+        db,
+        event=updated,
+        action=EventAuditAction.UPDATED,
+        actor=actor_from_user(current_user),
+        snapshot=audit_after,
+        changes=compute_changes(audit_before, audit_after),
+    )
+
     return _to_public(updated)
 
 
@@ -1083,7 +1109,7 @@ async def update_event(
 async def cancel_event(
     event_id: uuid.UUID,
     db: AdminOrApiKeySession_EventsWrite,
-    _: AdminOrApiKey_EventsWrite,
+    current_user: AdminOrApiKey_EventsWrite,
 ) -> EventPublic:
     event = crud.events_crud.get(db, event_id)
     if not event:
@@ -1098,6 +1124,12 @@ async def cancel_event(
     cancel_update = EventUpdate(status=EventStatus.CANCELLED)
     updated = crud.events_crud.update(db, event, cancel_update)
     await _bump_and_dispatch_itip_cancel(db, updated)
+    record_event_audit(
+        db,
+        event=updated,
+        action=EventAuditAction.CANCELLED,
+        actor=actor_from_user(current_user),
+    )
     return _to_public(updated)
 
 
@@ -1105,7 +1137,7 @@ async def cancel_event(
 async def delete_event(
     event_id: uuid.UUID,
     db: AdminOrApiKeySession_EventsWrite,
-    _: AdminOrApiKey_EventsWrite,
+    current_user: AdminOrApiKey_EventsWrite,
 ) -> None:
     event = crud.events_crud.get(db, event_id)
     if not event:
@@ -1118,6 +1150,16 @@ async def delete_event(
         await _bump_and_dispatch_itip_cancel(db, event)
     except Exception as exc:  # pragma: no cover - defensive
         logger.warning("iTIP CANCEL on event delete {} failed: {}", event_id, exc)
+    # Stage the audit row *before* dropping the row, while the event (and its
+    # tenant/popup/title) is still readable, but atomically (commit=False): the
+    # delete's commit flushes both, so a failed delete leaves no orphan log.
+    record_event_audit(
+        db,
+        event=event,
+        action=EventAuditAction.DELETED,
+        actor=actor_from_user(current_user),
+        commit=False,
+    )
     crud.events_crud.delete(db, event)
 
 
@@ -1131,7 +1173,7 @@ async def set_recurrence(
     event_id: uuid.UUID,
     payload: RecurrenceUpdate,
     db: AdminOrApiKeySession_EventsWrite,
-    _: AdminOrApiKey_EventsWrite,
+    current_user: AdminOrApiKey_EventsWrite,
 ) -> EventPublic:
     """Set/replace/clear the RRULE on a series master.
 
@@ -1178,6 +1220,15 @@ async def set_recurrence(
     # series.
     if old_rrule != new_rrule:
         await _bump_and_dispatch_itip_update(db, event)
+    record_event_audit(
+        db,
+        event=event,
+        action=EventAuditAction.RECURRENCE_SET,
+        actor=actor_from_user(current_user),
+        changes={"rrule": {"old": old_rrule, "new": new_rrule}}
+        if old_rrule != new_rrule
+        else None,
+    )
     return _to_public(event)
 
 
@@ -1214,7 +1265,7 @@ async def detach_occurrence(
     event_id: uuid.UUID,
     payload: OccurrenceRef,
     db: AdminOrApiKeySession_EventsWrite,
-    _: AdminOrApiKey_EventsWrite,
+    current_user: AdminOrApiKey_EventsWrite,
 ) -> EventPublic:
     """Materialize a single occurrence of a recurring series as its own row.
 
@@ -1303,6 +1354,16 @@ async def detach_occurrence(
             child.id,
             exc,
         )
+    detach_snapshot = build_event_snapshot(db, master)
+    detach_snapshot["occurrence_start"] = occ_start.isoformat()
+    detach_snapshot["detached_child_id"] = str(child.id)
+    record_event_audit(
+        db,
+        event=master,
+        action=EventAuditAction.OCCURRENCE_DETACHED,
+        actor=actor_from_user(current_user),
+        snapshot=detach_snapshot,
+    )
     return _to_public(child)
 
 
@@ -1311,7 +1372,7 @@ async def delete_occurrence(
     event_id: uuid.UUID,
     payload: OccurrenceRef,
     db: AdminOrApiKeySession_EventsWrite,
-    _: AdminOrApiKey_EventsWrite,
+    current_user: AdminOrApiKey_EventsWrite,
 ) -> None:
     """Skip a single occurrence by appending it to the master's EXDATEs.
 
@@ -1347,6 +1408,15 @@ async def delete_occurrence(
             payload.occurrence_start,
             exc,
         )
+    skip_snapshot = build_event_snapshot(db, master)
+    skip_snapshot["occurrence_start"] = payload.occurrence_start.isoformat()
+    record_event_audit(
+        db,
+        event=master,
+        action=EventAuditAction.OCCURRENCE_SKIPPED,
+        actor=actor_from_user(current_user),
+        snapshot=skip_snapshot,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -1728,6 +1798,15 @@ async def bulk_invite(
         raise HTTPException(status_code=404, detail="Event not found")
     result = _run_bulk_invite(db, event, payload.emails, current_user.id)
     await _send_event_invitation_emails(db, event, result.invited)
+    invite_snapshot = build_event_snapshot(db, event)
+    invite_snapshot["invited_emails"] = list(payload.emails)
+    record_event_audit(
+        db,
+        event=event,
+        action=EventAuditAction.INVITATION_ADDED,
+        actor=actor_from_user(current_user),
+        snapshot=invite_snapshot,
+    )
     return result
 
 
@@ -1738,12 +1817,26 @@ async def delete_invitation(
     event_id: uuid.UUID,
     invitation_id: uuid.UUID,
     db: AdminOrApiKeySession_EventsWrite,
-    _: AdminOrApiKey_EventsWrite,
+    current_user: AdminOrApiKey_EventsWrite,
 ) -> None:
     inv = crud.invitations_crud.get(db, invitation_id)
     if not inv or inv.event_id != event_id:
         raise HTTPException(status_code=404, detail="Invitation not found")
+    removed_human_id = getattr(inv, "human_id", None)
     crud.invitations_crud.delete(db, inv)
+    event = crud.events_crud.get(db, event_id)
+    if event is not None:
+        inv_snapshot = build_event_snapshot(db, event)
+        inv_snapshot["removed_invitation_id"] = str(invitation_id)
+        if removed_human_id is not None:
+            inv_snapshot["removed_human_id"] = str(removed_human_id)
+        record_event_audit(
+            db,
+            event=event,
+            action=EventAuditAction.INVITATION_REMOVED,
+            actor=actor_from_user(current_user),
+            snapshot=inv_snapshot,
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -1889,7 +1982,7 @@ async def approve_event(
     event_id: uuid.UUID,
     payload: EventApprovalPayload,
     db: AdminOrApiKeySession_EventsWrite,
-    _: AdminOrApiKey_EventsWrite,
+    current_user: AdminOrApiKey_EventsWrite,
 ) -> EventPublic:
     event = crud.events_crud.get(db, event_id)
     if not event:
@@ -1921,6 +2014,13 @@ async def approve_event(
             exc,
         )
 
+    record_event_audit(
+        db,
+        event=event,
+        action=EventAuditAction.APPROVED,
+        actor=actor_from_user(current_user),
+    )
+
     return _to_public(event)
 
 
@@ -1929,7 +2029,7 @@ async def reject_event(
     event_id: uuid.UUID,
     payload: EventApprovalPayload,
     db: AdminOrApiKeySession_EventsWrite,
-    _: AdminOrApiKey_EventsWrite,
+    current_user: AdminOrApiKey_EventsWrite,
 ) -> EventPublic:
     event = crud.events_crud.get(db, event_id)
     if not event:
@@ -1945,6 +2045,15 @@ async def reject_event(
     db.commit()
     db.refresh(event)
     await _send_event_approval_email(db, event, approved=False, reason=payload.reason)
+    reject_snapshot = build_event_snapshot(db, event)
+    reject_snapshot["rejection_reason"] = payload.reason
+    record_event_audit(
+        db,
+        event=event,
+        action=EventAuditAction.REJECTED,
+        actor=actor_from_user(current_user),
+        snapshot=reject_snapshot,
+    )
     return _to_public(event)
 
 
@@ -1962,6 +2071,15 @@ async def bulk_invite_portal(
     event = _ensure_portal_event_owner(db, event_id, current_human)
     result = _run_bulk_invite(db, event, payload.emails, current_human.id)
     await _send_event_invitation_emails(db, event, result.invited)
+    invite_snapshot = build_event_snapshot(db, event)
+    invite_snapshot["invited_emails"] = list(payload.emails)
+    record_event_audit(
+        db,
+        event=event,
+        action=EventAuditAction.INVITATION_ADDED,
+        actor=actor_from_human(current_human),
+        snapshot=invite_snapshot,
+    )
     return result
 
 
@@ -1975,11 +2093,23 @@ async def delete_portal_invitation(
     db: HumanTenantSession,
     current_human: CurrentHuman,
 ) -> None:
-    _ensure_portal_event_owner(db, event_id, current_human)
+    event = _ensure_portal_event_owner(db, event_id, current_human)
     inv = crud.invitations_crud.get(db, invitation_id)
     if not inv or inv.event_id != event_id:
         raise HTTPException(status_code=404, detail="Invitation not found")
+    removed_human_id = getattr(inv, "human_id", None)
     crud.invitations_crud.delete(db, inv)
+    inv_snapshot = build_event_snapshot(db, event)
+    inv_snapshot["removed_invitation_id"] = str(invitation_id)
+    if removed_human_id is not None:
+        inv_snapshot["removed_human_id"] = str(removed_human_id)
+    record_event_audit(
+        db,
+        event=event,
+        action=EventAuditAction.INVITATION_REMOVED,
+        actor=actor_from_human(current_human),
+        snapshot=inv_snapshot,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -2403,6 +2533,13 @@ async def hide_portal_event(
         human_id=current_human.id,
         event_id=target_id,
     )
+    record_event_audit(
+        db,
+        event=event,
+        action=EventAuditAction.HIDDEN,
+        actor=actor_from_human(current_human),
+        event_id=target_id,
+    )
 
 
 @router.delete("/portal/events/{event_id}/hide", status_code=status.HTTP_204_NO_CONTENT)
@@ -2419,6 +2556,14 @@ async def unhide_portal_event(
         human_id=current_human.id,
         event_id=target_id,
     )
+    if event is not None:
+        record_event_audit(
+            db,
+            event=event,
+            action=EventAuditAction.UNHIDDEN,
+            actor=actor_from_human(current_human),
+            event_id=target_id,
+        )
 
 
 @router.post(
@@ -2532,6 +2677,13 @@ async def create_portal_event(
             event, popup, settings, reason=approval_reason
         )
 
+    record_event_audit(
+        db,
+        event=event,
+        action=EventAuditAction.CREATED,
+        actor=actor_from_human(current_human),
+    )
+
     return _to_public(event)
 
 
@@ -2552,6 +2704,8 @@ async def update_portal_event(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only the event owner can edit",
         )
+
+    audit_before = build_event_snapshot(db, event)
 
     new_venue_id = (
         event_in.venue_id if event_in.venue_id is not None else event.venue_id
@@ -2603,6 +2757,15 @@ async def update_portal_event(
     updated = crud.events_crud.update(db, event, event_in)
     if _event_calendar_fields_changed(before, updated):
         await _bump_and_dispatch_itip_update(db, updated, before=before)
+    audit_after = build_event_snapshot(db, updated)
+    record_event_audit(
+        db,
+        event=updated,
+        action=EventAuditAction.UPDATED,
+        actor=actor_from_human(current_human),
+        snapshot=audit_after,
+        changes=compute_changes(audit_before, audit_after),
+    )
     return _to_public(updated)
 
 
@@ -2631,6 +2794,12 @@ async def cancel_portal_event(
     cancel_update = EventUpdate(status=EventStatus.CANCELLED)
     updated = crud.events_crud.update(db, event, cancel_update)
     await _bump_and_dispatch_itip_cancel(db, updated)
+    record_event_audit(
+        db,
+        event=updated,
+        action=EventAuditAction.CANCELLED,
+        actor=actor_from_human(current_human),
+    )
     return _to_public(updated)
 
 

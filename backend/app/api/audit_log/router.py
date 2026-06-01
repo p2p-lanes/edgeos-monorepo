@@ -18,7 +18,7 @@ async def list_audit_logs(
     _current_user: CurrentAdmin,
     popup_id: uuid.UUID | None = None,
     action: str | None = None,
-    actor_user_id: uuid.UUID | None = None,
+    actor_id: uuid.UUID | None = None,
     entity_type: str | None = None,
     entity_id: uuid.UUID | None = None,
     skip: PaginationSkip = 0,
@@ -27,14 +27,14 @@ async def list_audit_logs(
     """List audit log entries (newest first), filterable for both surfaces.
 
     The per-attendee history passes `entity_id`; the global feed uses
-    `popup_id` / `action` / `actor_user_id`. Tenant scoping is enforced by RLS
+    `popup_id` / `action` / `actor_id`. Tenant scoping is enforced by RLS
     on the audit_logs table, so cross-tenant rows are never returned.
     """
     rows, total = audit_logs_crud.find(
         db,
         popup_id=popup_id,
         action=action,
-        actor_user_id=actor_user_id,
+        actor_id=actor_id,
         entity_type=entity_type,
         entity_id=entity_id,
         skip=skip,

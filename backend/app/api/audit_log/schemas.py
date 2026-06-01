@@ -11,8 +11,12 @@ class AuditLogPublic(BaseModel):
     """A single audit log entry returned to the backoffice."""
 
     id: uuid.UUID
-    actor_user_id: uuid.UUID | None = None
-    actor_label: str
+    source: str
+    actor_type: str
+    actor_id: uuid.UUID | None = None
+    actor_email: str | None = None
+    actor_name: str | None = None
+    request_id: str | None = None
     action: str
     entity_type: str
     entity_id: uuid.UUID | None = None

@@ -4,17 +4,20 @@ A generic, append-only event history: one row per auditable admin action
 (who did what to which entity, when, with structured before/after details).
 
 Design notes:
-- `actor_user_id`, `entity_id`, and `popup_id` are plain indexed UUID columns
-  with NO hard foreign keys. Audit logs must outlive the entities they
-  reference (a deleted user/attendee/popup must not cascade away its history),
-  so references are denormalized rather than constrained. `tenant_id` keeps its
-  FK because it drives Row-Level Security.
-- `actor_label` and `entity_label` snapshot a human-readable name at write time
-  so the history stays readable even after the referenced row is gone. The
-  tenant DB role also lacks SELECT on `users`, so the actor cannot be joined at
-  read time — the label is the only way to show who acted.
+- `actor_id`, `entity_id`, and `popup_id` are plain indexed UUID columns with
+  NO hard foreign keys. Audit logs must outlive the entities they reference (a
+  deleted user/attendee/popup must not cascade away its history), so references
+  are denormalized rather than constrained. `tenant_id` keeps its FK because it
+  drives Row-Level Security.
+- The actor may be a backoffice `User` or a portal `Human`, so it is stored as
+  flat snapshot columns (`source`, `actor_type`, `actor_id`, `actor_email`,
+  `actor_name`) rather than a single FK. `actor_name`/`actor_email` and
+  `entity_label` snapshot human-readable names at write time so the history
+  stays readable after the referenced row is gone (the tenant DB role also
+  lacks SELECT on `users`, so the actor cannot be joined at read time).
 - `details` (JSONB) holds the structured payload (e.g. old/new product ids and
-  names). The frontend renders the readable sentence from action + details.
+  names, or {snapshot, changes} for events). The frontend renders the readable
+  sentence from action + details.
 """
 
 import uuid
@@ -37,12 +40,23 @@ class AuditLog(SQLModel, table=True):
 
     tenant_id: uuid.UUID = Field(foreign_key="tenants.id", index=True)
 
-    # Who acted. Denormalized — no FK so the log survives user deletion.
-    actor_user_id: uuid.UUID | None = Field(
+    # Where the request came from: "portal" | "backoffice" | "system".
+    source: str = Field(index=True)
+
+    # Who acted. Denormalized — no FK so the log survives actor deletion, and the
+    # actor may be a backoffice User or a portal Human (so a single FK won't do).
+    # actor_type ∈ {user, human, api_key, system}; email/name snapshot the actor
+    # at action time (the tenant DB role also cannot SELECT users to join later).
+    actor_type: str = Field()
+    actor_id: uuid.UUID | None = Field(
         default=None,
         sa_column=Column(UUID(as_uuid=True), nullable=True, index=True),
     )
-    actor_label: str = Field()
+    actor_email: str | None = Field(default=None, nullable=True)
+    actor_name: str | None = Field(default=None, nullable=True)
+
+    # X-Request-ID of the originating request, to correlate with stdout logs.
+    request_id: str | None = Field(default=None, nullable=True)
 
     # What happened — namespaced "<entity>.<verb>" (see AuditAction).
     action: str = Field(index=True)

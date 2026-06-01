@@ -673,8 +673,12 @@ export type AttendeeWithTickets = {
  */
 export type AuditLogPublic = {
     id: string;
-    actor_user_id?: (string | null);
-    actor_label: string;
+    source: string;
+    actor_type: string;
+    actor_id?: (string | null);
+    actor_email?: (string | null);
+    actor_name?: (string | null);
+    request_id?: (string | null);
     action: string;
     entity_type: string;
     entity_id?: (string | null);
@@ -3982,7 +3986,7 @@ export type AttendeesGetTicketsByEmailResponse = (Array<AttendeeWithTickets>);
 
 export type AuditLogsListAuditLogsData = {
     action?: (string | null);
-    actorUserId?: (string | null);
+    actorId?: (string | null);
     entityId?: (string | null);
     entityType?: (string | null);
     /**

@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query"
 import { AuditLogsService } from "@/client"
 import { InlineSection } from "@/components/ui/inline-form"
 import { Skeleton } from "@/components/ui/skeleton"
-import { describeAuditAction } from "@/lib/auditMessage"
+import { actorLabel, describeAuditAction } from "@/lib/auditMessage"
 
 /**
  * History of audited admin actions for a single attendee (newest first).
@@ -31,7 +31,7 @@ export function AttendeeActivity({ attendeeId }: { attendeeId: string }) {
             <li key={entry.id} className="text-sm">
               <p>{describeAuditAction(entry)}</p>
               <p className="text-xs text-muted-foreground">
-                {entry.actor_label} ·{" "}
+                {actorLabel(entry)} ·{" "}
                 {new Date(entry.created_at).toLocaleString()}
               </p>
             </li>

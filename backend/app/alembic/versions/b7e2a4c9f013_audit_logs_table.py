@@ -8,9 +8,11 @@ new event types add a row, never a column.
 
 WHAT (upgrade):
 1. CREATE TABLE audit_logs (RLS via add_tenant_table_permissions).
-   actor_user_id / entity_id / popup_id are plain indexed UUIDs with NO foreign
-   keys — audit logs must outlive the entities they reference, so references are
-   denormalized (with *_label snapshots) rather than constrained.
+   actor_id / entity_id / popup_id are plain indexed UUIDs with NO foreign keys
+   — audit logs must outlive the entities they reference, so references are
+   denormalized (with actor_name/actor_email/entity_label snapshots) rather than
+   constrained. The actor may be a backoffice user or a portal human, hence flat
+   actor columns (source/actor_type/actor_id/actor_email/actor_name).
 
 Downgrade drops the table.
 
@@ -46,9 +48,16 @@ def upgrade() -> None:
             nullable=False,
             index=True,
         ),
-        # Actor — denormalized, no FK so the log survives user deletion.
-        sa.Column("actor_user_id", UUID(as_uuid=True), nullable=True, index=True),
-        sa.Column("actor_label", sa.String(), nullable=False),
+        # Where the request came from: portal | backoffice | system.
+        sa.Column("source", sa.String(), nullable=False, index=True),
+        # Actor — denormalized, no FK so the log survives actor deletion. May be
+        # a backoffice user or a portal human, hence flat columns not a FK.
+        sa.Column("actor_type", sa.String(), nullable=False),
+        sa.Column("actor_id", UUID(as_uuid=True), nullable=True, index=True),
+        sa.Column("actor_email", sa.String(), nullable=True),
+        sa.Column("actor_name", sa.String(), nullable=True),
+        # X-Request-ID for correlation with stdout logs.
+        sa.Column("request_id", sa.String(), nullable=True),
         # Action — namespaced "<entity>.<verb>".
         sa.Column("action", sa.String(), nullable=False, index=True),
         # Primary entity the event groups under (entity_id is polymorphic, no FK).

@@ -12,12 +12,23 @@ from sqlmodel import Session
 
 from app.api.attendee import crud as attendee_crud
 from app.api.attendee.models import AttendeeProducts, Attendees
+from app.api.audit_log.actor import AuditActor, AuditActorType, AuditSource
 from app.api.audit_log.constants import AuditAction, AuditEntityType
 from app.api.audit_log.crud import audit_logs_crud
 from app.api.human.models import Humans
 from app.api.popup.models import Popups
 from app.api.product.models import Products
 from app.api.tenant.models import Tenants
+
+
+def _actor(actor_id: uuid.UUID | None = None) -> AuditActor:
+    return AuditActor(
+        type=AuditActorType.USER,
+        source=AuditSource.BACKOFFICE,
+        id=actor_id or uuid.uuid4(),
+        email="admin@test.com",
+        name="Admin Tester",
+    )
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -93,13 +104,12 @@ class TestRecordAndFind:
     ) -> None:
         entity_a = uuid.uuid4()
         entity_b = uuid.uuid4()
-        actor = uuid.uuid4()
+        actor = _actor()
 
         audit_logs_crud.record(
             db,
             tenant_id=tenant_a.id,
-            actor_user_id=actor,
-            actor_label="admin@test.com",
+            actor=actor,
             action=AuditAction.TICKET_SWAP,
             entity_type=AuditEntityType.ATTENDEE,
             entity_id=entity_a,
@@ -110,8 +120,7 @@ class TestRecordAndFind:
         audit_logs_crud.record(
             db,
             tenant_id=tenant_a.id,
-            actor_user_id=actor,
-            actor_label="admin@test.com",
+            actor=actor,
             action=AuditAction.TICKET_REMOVE,
             entity_type=AuditEntityType.ATTENDEE,
             entity_id=entity_b,
@@ -148,22 +157,23 @@ class TestTicketEventWiring:
         new_product = _make_product(db, tenant_a, popup_tenant_a)
         attendee = _make_attendee(db, tenant_a, popup_tenant_a)
         ticket = _make_ticket(db, tenant_a, attendee, old_product)
-        actor = uuid.uuid4()
+        actor = _actor()
 
         attendee_crud.attendees_crud.swap_ticket_product(
             db,
             attendee_id=attendee.id,
             ticket_id=ticket.id,
             new_product_id=new_product.id,
-            actor_user_id=actor,
-            actor_label="admin@test.com",
+            actor=actor,
         )
 
         logs, total = audit_logs_crud.find(db, entity_id=attendee.id)
         assert total == 1
         log = logs[0]
         assert log.action == AuditAction.TICKET_SWAP
-        assert log.actor_user_id == actor
+        assert log.actor_id == actor.id
+        assert log.actor_type == "user"
+        assert log.source == "backoffice"
         assert log.entity_label == attendee.name
         assert log.popup_id == attendee.popup_id
         assert log.details is not None
@@ -175,15 +185,13 @@ class TestTicketEventWiring:
     ) -> None:
         product = _make_product(db, tenant_a, popup_tenant_a)
         attendee = _make_attendee(db, tenant_a, popup_tenant_a)
-        actor = uuid.uuid4()
 
         attendee_crud.attendees_crud.add_product(
             db,
             attendee_id=attendee.id,
             product_id=product.id,
             tenant_id=tenant_a.id,
-            actor_user_id=actor,
-            actor_label="admin@test.com",
+            actor=_actor(),
         )
 
         logs, total = audit_logs_crud.find(db, entity_id=attendee.id)
@@ -198,14 +206,12 @@ class TestTicketEventWiring:
         product = _make_product(db, tenant_a, popup_tenant_a)
         attendee = _make_attendee(db, tenant_a, popup_tenant_a)
         ticket = _make_ticket(db, tenant_a, attendee, product)
-        actor = uuid.uuid4()
 
         attendee_crud.attendees_crud.remove_product(
             db,
             attendee_id=attendee.id,
             ticket_id=ticket.id,
-            actor_user_id=actor,
-            actor_label="admin@test.com",
+            actor=_actor(),
         )
 
         assert db.get(AttendeeProducts, ticket.id) is None
