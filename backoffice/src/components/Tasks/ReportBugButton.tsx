@@ -92,7 +92,7 @@ export function ReportBugButton() {
           </span>
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-h-[90vh] max-w-lg overflow-y-auto">
+      <DialogContent className="thin-scrollbar max-h-[90vh] max-w-lg overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Report a bug</DialogTitle>
           <DialogDescription>

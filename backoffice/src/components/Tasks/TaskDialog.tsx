@@ -87,9 +87,10 @@ export function TaskDialog({ open, onOpenChange, taskId }: TaskDialogProps) {
     enabled: open && isEdit,
   })
 
+  // Tasks may only be assigned to superadmins (phase 1 policy).
   const { data: usersData } = useQuery({
-    queryKey: ["tasks-users"],
-    queryFn: () => UsersService.listUsers({ limit: 1000 }),
+    queryKey: ["tasks-superadmins"],
+    queryFn: () => UsersService.listUsers({ limit: 1000, role: "superadmin" }),
     enabled: open,
   })
 
@@ -187,7 +188,7 @@ export function TaskDialog({ open, onOpenChange, taskId }: TaskDialogProps) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
+      <DialogContent className="thin-scrollbar max-h-[90vh] max-w-2xl overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{isEdit ? "Edit task" : "New task"}</DialogTitle>
           <DialogDescription>
@@ -196,6 +197,16 @@ export function TaskDialog({ open, onOpenChange, taskId }: TaskDialogProps) {
               : "Track a bug or feature for the EdgeOS product."}
           </DialogDescription>
         </DialogHeader>
+
+        {isEdit && task && (
+          <p className="-mt-2 text-xs text-muted-foreground">
+            Created by{" "}
+            <span className="font-medium text-foreground/80">
+              {task.created_by_name ?? "Unknown"}
+            </span>{" "}
+            · {new Date(task.created_at).toLocaleString()}
+          </p>
+        )}
 
         <div className="space-y-4">
           <div className="space-y-2">

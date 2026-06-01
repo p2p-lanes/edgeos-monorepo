@@ -3,7 +3,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router"
 import { ListChecks, Plus } from "lucide-react"
 import { useEffect, useMemo, useState } from "react"
 
-import { TasksService, type TaskType } from "@/client"
+import { TasksService, type TaskType, UsersService } from "@/client"
 import { DataTable } from "@/components/Common/DataTable"
 import { EmptyState } from "@/components/Common/EmptyState"
 import { taskColumns } from "@/components/Tasks/columns"
@@ -35,6 +35,7 @@ function Tasks() {
   const { isSuperadmin, isUserLoading } = useAuth()
   const [search, setSearch] = useState("")
   const [typeFilter, setTypeFilter] = useState<TaskType | "all">("all")
+  const [responsibleFilter, setResponsibleFilter] = useState<string>("all")
   const [dialogOpen, setDialogOpen] = useState(false)
   const [activeTaskId, setActiveTaskId] = useState<string | null>(null)
 
@@ -51,18 +52,34 @@ function Tasks() {
     enabled: isSuperadmin,
   })
 
+  // Only superadmins can be assigned, so the filter lists superadmins only.
+  const { data: usersData } = useQuery({
+    queryKey: ["tasks-superadmins"],
+    queryFn: () => UsersService.listUsers({ limit: 1000, role: "superadmin" }),
+    enabled: isSuperadmin,
+  })
+  const users = usersData?.results ?? []
+
   const filtered = useMemo(() => {
     const all = data?.results ?? []
     const q = search.trim().toLowerCase()
     return all.filter((task) => {
       if (typeFilter !== "all" && task.type !== typeFilter) return false
+      if (responsibleFilter === "unassigned") {
+        if (task.responsible_user_id) return false
+      } else if (
+        responsibleFilter !== "all" &&
+        task.responsible_user_id !== responsibleFilter
+      ) {
+        return false
+      }
       if (!q) return true
       return (
         task.title.toLowerCase().includes(q) ||
         (task.detail ?? "").toLowerCase().includes(q)
       )
     })
-  }, [data, typeFilter, search])
+  }, [data, typeFilter, responsibleFilter, search])
 
   if (isUserLoading || !isSuperadmin) return null
 
@@ -109,6 +126,20 @@ function Tasks() {
             {TASK_TYPES.map((t) => (
               <SelectItem key={t} value={t}>
                 {TYPE_LABELS[t]}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={responsibleFilter} onValueChange={setResponsibleFilter}>
+          <SelectTrigger className="w-52">
+            <SelectValue placeholder="Responsible" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All responsibles</SelectItem>
+            <SelectItem value="unassigned">Unassigned</SelectItem>
+            {users.map((u) => (
+              <SelectItem key={u.id} value={u.id}>
+                {u.full_name || u.email}
               </SelectItem>
             ))}
           </SelectContent>

@@ -54,6 +54,23 @@ def _validate_visibility(visibility: str, target_tenant_id: uuid.UUID | None) ->
         )
 
 
+def _validate_responsible(
+    db: SessionDep, responsible_user_id: uuid.UUID | None
+) -> None:
+    """Tasks may only be assigned to a superadmin (phase 1 policy)."""
+    if responsible_user_id is None:
+        return
+    from app.api.shared.enums import UserRole
+    from app.api.user.models import Users
+
+    user = db.get(Users, responsible_user_id)
+    if not user or user.deleted or user.role != UserRole.SUPERADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Tasks can only be assigned to a superadmin",
+        )
+
+
 def _get_task_or_404(db: SessionDep, task_id: uuid.UUID) -> Task:
     task = crud.tasks_crud.get(db, task_id)
     if not task:
@@ -150,6 +167,7 @@ async def create_task(
 ) -> TaskDetailPublic:
     """Create a task (superadmin only)."""
     _validate_visibility(task_in.visibility, task_in.target_tenant_id)
+    _validate_responsible(db, task_in.responsible_user_id)
 
     data = task_in.model_dump()
     if data["visibility"] != TaskVisibility.TENANT.value:
@@ -193,6 +211,9 @@ async def update_task(
     _validate_visibility(new_visibility, new_target)
     if new_visibility != TaskVisibility.TENANT.value:
         update_data["target_tenant_id"] = None
+
+    if "responsible_user_id" in update_data:
+        _validate_responsible(db, update_data["responsible_user_id"])
 
     if (
         update_data.get("status") == TaskStatus.PUBLISHED.value
