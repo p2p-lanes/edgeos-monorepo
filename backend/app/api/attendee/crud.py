@@ -11,6 +11,7 @@ from sqlmodel import Session, func, select
 
 from app.api.attendee.models import AttendeeProducts, Attendees
 from app.api.attendee.schemas import AttendeeCreate, AttendeeUpdate
+from app.api.audit_log.constants import AuditAction, AuditEntityType
 from app.api.shared.crud import BaseCRUD
 
 
@@ -593,6 +594,8 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
         tenant_id: uuid.UUID | None = None,
         payment_id: uuid.UUID | None = None,
         check_in_code_prefix: str = "",
+        actor_user_id: uuid.UUID | None = None,
+        actor_label: str | None = None,
     ) -> AttendeeProducts:
         """Add one ticket (AttendeeProducts row) for an attendee.
 
@@ -651,6 +654,25 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
             payment_id=payment_id,
         )
         session.add(ticket)
+
+        # Audit only when an actor is supplied (admin manual add). The purchase
+        # and grant paths pass no actor here and log through their own flows.
+        if actor_user_id is not None and actor_label is not None:
+            attendee = session.get(Attendees, attendee_id)
+            if attendee is not None:
+                self._record_ticket_event(
+                    session,
+                    attendee=attendee,
+                    actor_user_id=actor_user_id,
+                    actor_label=actor_label,
+                    action=AuditAction.TICKET_ADD,
+                    details={
+                        "ticket_id": str(ticket.id),
+                        "product_id": str(product_id),
+                        "product_name": product.name,
+                    },
+                )
+
         session.commit()
         session.refresh(ticket)
         return ticket
@@ -672,12 +694,45 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
             session.delete(ticket)
             session.commit()
 
+    def _record_ticket_event(
+        self,
+        session: Session,
+        *,
+        attendee: Attendees,
+        actor_user_id: uuid.UUID,
+        actor_label: str,
+        action: str,
+        details: dict,
+    ) -> None:
+        """Stage an audit entry for a ticket action in the current transaction.
+
+        Grouped under the attendee (entity_type=attendee, entity_id=attendee.id)
+        so the per-attendee history is a single entity_id filter. The audit row
+        is committed together with the mutation by the caller.
+        """
+        from app.api.audit_log.crud import audit_logs_crud
+
+        audit_logs_crud.record(
+            session,
+            tenant_id=attendee.tenant_id,
+            actor_user_id=actor_user_id,
+            actor_label=actor_label,
+            action=action,
+            entity_type=AuditEntityType.ATTENDEE,
+            entity_id=attendee.id,
+            entity_label=attendee.name,
+            popup_id=attendee.popup_id,
+            details=details,
+        )
+
     def swap_ticket_product(
         self,
         session: Session,
         attendee_id: uuid.UUID,
         ticket_id: uuid.UUID,
         new_product_id: uuid.UUID,
+        actor_user_id: uuid.UUID | None = None,
+        actor_label: str | None = None,
     ) -> AttendeeProducts:
         """Change the product of a single ticket (admin, no payment).
 
@@ -735,6 +790,26 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
 
         ticket.product_id = new_product_id
         session.add(ticket)
+
+        if actor_user_id is not None and actor_label is not None:
+            from app.api.product.models import Products
+
+            old_product = session.get(Products, old_product_id)
+            self._record_ticket_event(
+                session,
+                attendee=attendee,
+                actor_user_id=actor_user_id,
+                actor_label=actor_label,
+                action=AuditAction.TICKET_SWAP,
+                details={
+                    "ticket_id": str(ticket.id),
+                    "old_product_id": str(old_product_id),
+                    "old_product_name": old_product.name if old_product else None,
+                    "new_product_id": str(new_product_id),
+                    "new_product_name": new_product.name,
+                },
+            )
+
         session.commit()
         session.refresh(ticket)
         return ticket
@@ -744,6 +819,8 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
         session: Session,
         attendee_id: uuid.UUID,
         ticket_id: uuid.UUID,
+        actor_user_id: uuid.UUID | None = None,
+        actor_label: str | None = None,
     ) -> None:
         """Remove a single ticket from an attendee and restore its stock (admin).
 
@@ -752,6 +829,7 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
         ticket back to the pool, mirroring the cancel/refund flow.
         """
         from app.api.product.crud import products_crud
+        from app.api.product.models import Products
 
         ticket = session.get(AttendeeProducts, ticket_id)
         if ticket is None or ticket.attendee_id != attendee_id:
@@ -761,6 +839,24 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
             )
 
         products_crud.restore_total_stock(session, ticket.product_id, 1)
+
+        if actor_user_id is not None and actor_label is not None:
+            attendee = session.get(Attendees, attendee_id)
+            product = session.get(Products, ticket.product_id)
+            if attendee is not None:
+                self._record_ticket_event(
+                    session,
+                    attendee=attendee,
+                    actor_user_id=actor_user_id,
+                    actor_label=actor_label,
+                    action=AuditAction.TICKET_REMOVE,
+                    details={
+                        "ticket_id": str(ticket.id),
+                        "product_id": str(ticket.product_id),
+                        "product_name": product.name if product else None,
+                    },
+                )
+
         session.delete(ticket)
         session.commit()
 

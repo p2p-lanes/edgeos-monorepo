@@ -7,6 +7,7 @@ import {
   CreditCard,
   FileText,
   FormInput,
+  History,
   Home,
   KeyRound,
   LayoutList,
@@ -153,6 +154,7 @@ export function AppSidebar() {
         title: "Abandoned Carts",
         path: "/abandoned-carts",
       },
+      { icon: History, title: "Activity", path: "/activity" },
     ],
     [pendingReviewCount, pendingPaymentCount],
   )

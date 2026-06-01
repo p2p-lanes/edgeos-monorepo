@@ -17,6 +17,7 @@ import {
   AttendeesService,
   type AttendeeWithOriginPublic,
 } from "@/client"
+import { AttendeeActivity } from "@/components/Attendees/AttendeeActivity"
 import { ManageAttendeeProducts } from "@/components/Attendees/ManageAttendeeProducts"
 import { ProductsCell } from "@/components/Attendees/ProductsCell"
 import { DataTable, SortableHeader } from "@/components/Common/DataTable"
@@ -186,6 +187,10 @@ export function AttendeeDetailsContent({
           ticket shows its check-in code; changing a ticket keeps that code. */}
       <Separator />
       <ManageAttendeeProducts attendee={attendee} />
+
+      {/* Activity — audited history of admin actions on this attendee. */}
+      <Separator />
+      <AttendeeActivity attendeeId={attendee.id} />
 
       {/* Footer */}
       <Separator />

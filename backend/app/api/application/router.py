@@ -276,6 +276,8 @@ async def grant_tickets_admin(
     from sqlmodel import select
 
     from app.api.attendee.crud import attendees_crud
+    from app.api.audit_log.constants import AuditAction, AuditEntityType
+    from app.api.audit_log.crud import audit_logs_crud
     from app.api.human.crud import humans_crud
     from app.api.payment.crud import payments_crud
     from app.api.payment.models import PaymentProducts, Payments
@@ -457,6 +459,31 @@ async def grant_tickets_admin(
                 payment,
                 finalize_lines,
                 granted_by_user_id=current_user.id,
+            )
+
+            # Audit the grant under the attendee, inside the batch transaction.
+            audit_logs_crud.record(
+                db,
+                tenant_id=tenant_id,
+                actor_user_id=current_user.id,
+                actor_label=current_user.full_name or current_user.email,
+                action=AuditAction.TICKET_GRANT,
+                entity_type=AuditEntityType.ATTENDEE,
+                entity_id=main_attendee.id,
+                entity_label=main_attendee.name,
+                popup_id=payload.popup_id,
+                details={
+                    "payment_id": str(payment.id),
+                    "tickets_created": ticket_count,
+                    "products": [
+                        {
+                            "product_id": str(item.product_id),
+                            "product_name": products_map[item.product_id].name,
+                            "quantity": item.quantity,
+                        }
+                        for item in person.products
+                    ],
+                },
             )
 
             granted.append(

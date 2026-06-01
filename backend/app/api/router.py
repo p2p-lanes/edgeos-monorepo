@@ -9,6 +9,7 @@ from app.api import (
     approval_strategy,
     attendee,
     attendee_category,
+    audit_log,
     auth,
     base_field_config,
     cart,
@@ -76,6 +77,7 @@ api_router.include_router(application_review.router)
 api_router.include_router(application.router)
 api_router.include_router(portal_router)
 api_router.include_router(attendee.router)
+api_router.include_router(audit_log.router)
 api_router.include_router(payment.router)
 api_router.include_router(cart.router)
 

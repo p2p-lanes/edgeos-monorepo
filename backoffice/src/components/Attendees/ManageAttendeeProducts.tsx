@@ -53,6 +53,10 @@ export function ManageAttendeeProducts({
     queryClient.setQueryData(["attendees", attendee.id], updated)
     queryClient.invalidateQueries({ queryKey: ["attendees"] })
     queryClient.invalidateQueries({ queryKey: ["products", attendee.popup_id] })
+    // Refresh the attendee's activity timeline so the new event shows up.
+    queryClient.invalidateQueries({
+      queryKey: ["audit-logs", { entityId: attendee.id }],
+    })
   }
 
   const onMutationError = (err: ApiError) =>

@@ -575,7 +575,7 @@ async def add_attendee_ticket(
     attendee_id: uuid.UUID,
     body: AttendeeTicketAdd,
     db: AdminOrApiKeySession_AttendeesWrite,
-    _current_user: AdminOrApiKey_AttendeesWrite,
+    current_user: AdminOrApiKey_AttendeesWrite,
 ) -> AttendeeWithOriginPublic:
     """Add a single product/ticket to an existing attendee (BO only).
 
@@ -609,6 +609,8 @@ async def add_attendee_ticket(
         attendee_id=attendee_id,
         product_id=body.product_id,
         tenant_id=attendee.tenant_id,
+        actor_user_id=current_user.id,
+        actor_label=current_user.full_name or current_user.email,
     )
 
     return _attendee_response(db, attendee_id)
@@ -624,7 +626,7 @@ async def swap_attendee_ticket_product(
     ticket_id: uuid.UUID,
     body: AttendeeTicketProductSwap,
     db: AdminOrApiKeySession_AttendeesWrite,
-    _current_user: AdminOrApiKey_AttendeesWrite,
+    current_user: AdminOrApiKey_AttendeesWrite,
 ) -> AttendeeWithOriginPublic:
     """Swap the product of a single ticket (BO only, no payment).
 
@@ -637,6 +639,8 @@ async def swap_attendee_ticket_product(
         attendee_id=attendee_id,
         ticket_id=ticket_id,
         new_product_id=body.product_id,
+        actor_user_id=current_user.id,
+        actor_label=current_user.full_name or current_user.email,
     )
 
     return _attendee_response(db, attendee_id)
@@ -651,7 +655,7 @@ async def remove_attendee_ticket(
     attendee_id: uuid.UUID,
     ticket_id: uuid.UUID,
     db: AdminOrApiKeySession_AttendeesWrite,
-    _current_user: AdminOrApiKey_AttendeesWrite,
+    current_user: AdminOrApiKey_AttendeesWrite,
 ) -> AttendeeWithOriginPublic:
     """Remove a single ticket from an attendee (BO only).
 
@@ -662,6 +666,8 @@ async def remove_attendee_ticket(
         db,
         attendee_id=attendee_id,
         ticket_id=ticket_id,
+        actor_user_id=current_user.id,
+        actor_label=current_user.full_name or current_user.email,
     )
 
     return _attendee_response(db, attendee_id)

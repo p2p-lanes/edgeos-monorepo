@@ -3035,6 +3035,96 @@ export const AttendeesDirectoryEntrySchema = {
     description: 'Single entry in the attendees directory.'
 } as const;
 
+export const AuditLogPublicSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        actor_user_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Actor User Id'
+        },
+        actor_label: {
+            type: 'string',
+            title: 'Actor Label'
+        },
+        action: {
+            type: 'string',
+            title: 'Action'
+        },
+        entity_type: {
+            type: 'string',
+            title: 'Entity Type'
+        },
+        entity_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Entity Id'
+        },
+        entity_label: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Entity Label'
+        },
+        popup_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Popup Id'
+        },
+        details: {
+            anyOf: [
+                {
+                    additionalProperties: true,
+                    type: 'object'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Details'
+        },
+        created_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Created At'
+        }
+    },
+    type: 'object',
+    required: ['id', 'actor_label', 'action', 'entity_type', 'created_at'],
+    title: 'AuditLogPublic',
+    description: 'A single audit log entry returned to the backoffice.'
+} as const;
+
 export const AuthCodeSentResponseSchema = {
     properties: {
         message: {
@@ -9832,6 +9922,24 @@ export const ListModel_AttendeesDirectoryEntry_Schema = {
     type: 'object',
     required: ['results', 'paging'],
     title: 'ListModel[AttendeesDirectoryEntry]'
+} as const;
+
+export const ListModel_AuditLogPublic_Schema = {
+    properties: {
+        results: {
+            items: {
+                '$ref': '#/components/schemas/AuditLogPublic'
+            },
+            type: 'array',
+            title: 'Results'
+        },
+        paging: {
+            '$ref': '#/components/schemas/Paging'
+        }
+    },
+    type: 'object',
+    required: ['results', 'paging'],
+    title: 'ListModel[AuditLogPublic]'
 } as const;
 
 export const ListModel_CheckInListItem_Schema = {

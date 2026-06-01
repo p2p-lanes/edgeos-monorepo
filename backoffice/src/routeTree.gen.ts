@@ -18,6 +18,7 @@ import { Route as LayoutPaymentsRouteImport } from './routes/_layout/payments'
 import { Route as LayoutCheckInRouteImport } from './routes/_layout/check-in'
 import { Route as LayoutAttendeesRouteImport } from './routes/_layout/attendees'
 import { Route as LayoutApiKeysRouteImport } from './routes/_layout/api-keys'
+import { Route as LayoutActivityRouteImport } from './routes/_layout/activity'
 import { Route as LayoutAbandonedCartsRouteImport } from './routes/_layout/abandoned-carts'
 import { Route as LayoutTicketingStepsIndexRouteImport } from './routes/_layout/ticketing-steps/index'
 import { Route as LayoutThemeIndexRouteImport } from './routes/_layout/theme/index'
@@ -111,6 +112,11 @@ const LayoutAttendeesRoute = LayoutAttendeesRouteImport.update({
 const LayoutApiKeysRoute = LayoutApiKeysRouteImport.update({
   id: '/api-keys',
   path: '/api-keys',
+  getParentRoute: () => LayoutRoute,
+} as any)
+const LayoutActivityRoute = LayoutActivityRouteImport.update({
+  id: '/activity',
+  path: '/activity',
   getParentRoute: () => LayoutRoute,
 } as any)
 const LayoutAbandonedCartsRoute = LayoutAbandonedCartsRouteImport.update({
@@ -380,6 +386,7 @@ export interface FileRoutesByFullPath {
   '/': typeof LayoutIndexRoute
   '/login': typeof LoginRoute
   '/abandoned-carts': typeof LayoutAbandonedCartsRoute
+  '/activity': typeof LayoutActivityRoute
   '/api-keys': typeof LayoutApiKeysRoute
   '/attendees': typeof LayoutAttendeesRoute
   '/check-in': typeof LayoutCheckInRoute
@@ -439,6 +446,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/abandoned-carts': typeof LayoutAbandonedCartsRoute
+  '/activity': typeof LayoutActivityRoute
   '/api-keys': typeof LayoutApiKeysRoute
   '/attendees': typeof LayoutAttendeesRoute
   '/check-in': typeof LayoutCheckInRoute
@@ -501,6 +509,7 @@ export interface FileRoutesById {
   '/_layout': typeof LayoutRouteWithChildren
   '/login': typeof LoginRoute
   '/_layout/abandoned-carts': typeof LayoutAbandonedCartsRoute
+  '/_layout/activity': typeof LayoutActivityRoute
   '/_layout/api-keys': typeof LayoutApiKeysRoute
   '/_layout/attendees': typeof LayoutAttendeesRoute
   '/_layout/check-in': typeof LayoutCheckInRoute
@@ -564,6 +573,7 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/abandoned-carts'
+    | '/activity'
     | '/api-keys'
     | '/attendees'
     | '/check-in'
@@ -623,6 +633,7 @@ export interface FileRouteTypes {
   to:
     | '/login'
     | '/abandoned-carts'
+    | '/activity'
     | '/api-keys'
     | '/attendees'
     | '/check-in'
@@ -684,6 +695,7 @@ export interface FileRouteTypes {
     | '/_layout'
     | '/login'
     | '/_layout/abandoned-carts'
+    | '/_layout/activity'
     | '/_layout/api-keys'
     | '/_layout/attendees'
     | '/_layout/check-in'
@@ -810,6 +822,13 @@ declare module '@tanstack/react-router' {
       path: '/api-keys'
       fullPath: '/api-keys'
       preLoaderRoute: typeof LayoutApiKeysRouteImport
+      parentRoute: typeof LayoutRoute
+    }
+    '/_layout/activity': {
+      id: '/_layout/activity'
+      path: '/activity'
+      fullPath: '/activity'
+      preLoaderRoute: typeof LayoutActivityRouteImport
       parentRoute: typeof LayoutRoute
     }
     '/_layout/abandoned-carts': {
@@ -1167,6 +1186,7 @@ declare module '@tanstack/react-router' {
 
 interface LayoutRouteChildren {
   LayoutAbandonedCartsRoute: typeof LayoutAbandonedCartsRoute
+  LayoutActivityRoute: typeof LayoutActivityRoute
   LayoutApiKeysRoute: typeof LayoutApiKeysRoute
   LayoutAttendeesRoute: typeof LayoutAttendeesRoute
   LayoutCheckInRoute: typeof LayoutCheckInRoute
@@ -1227,6 +1247,7 @@ interface LayoutRouteChildren {
 
 const LayoutRouteChildren: LayoutRouteChildren = {
   LayoutAbandonedCartsRoute: LayoutAbandonedCartsRoute,
+  LayoutActivityRoute: LayoutActivityRoute,
   LayoutApiKeysRoute: LayoutApiKeysRoute,
   LayoutAttendeesRoute: LayoutAttendeesRoute,
   LayoutCheckInRoute: LayoutCheckInRoute,

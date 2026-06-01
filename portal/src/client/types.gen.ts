@@ -669,6 +669,24 @@ export type AttendeeWithTickets = {
 };
 
 /**
+ * A single audit log entry returned to the backoffice.
+ */
+export type AuditLogPublic = {
+    id: string;
+    actor_user_id?: (string | null);
+    actor_label: string;
+    action: string;
+    entity_type: string;
+    entity_id?: (string | null);
+    entity_label?: (string | null);
+    popup_id?: (string | null);
+    details?: ({
+    [key: string]: unknown;
+} | null);
+    created_at: string;
+};
+
+/**
  * Response after successfully sending auth code.
  */
 export type AuthCodeSentResponse = {
@@ -2034,6 +2052,11 @@ export type ListModel_AttendeesDirectoryEntry_ = {
 
 export type ListModel_AttendeeWithOriginPublic_ = {
     results: Array<AttendeeWithOriginPublic>;
+    paging: Paging;
+};
+
+export type ListModel_AuditLogPublic_ = {
+    results: Array<AuditLogPublic>;
     paging: Paging;
 };
 
@@ -3956,6 +3979,25 @@ export type AttendeesGetTicketsByEmailData = {
 };
 
 export type AttendeesGetTicketsByEmailResponse = (Array<AttendeeWithTickets>);
+
+export type AuditLogsListAuditLogsData = {
+    action?: (string | null);
+    actorUserId?: (string | null);
+    entityId?: (string | null);
+    entityType?: (string | null);
+    /**
+     * Maximum number of items to return
+     */
+    limit?: number;
+    popupId?: (string | null);
+    /**
+     * Number of items to skip
+     */
+    skip?: number;
+    xTenantId?: (string | null);
+};
+
+export type AuditLogsListAuditLogsResponse = (ListModel_AuditLogPublic_);
 
 export type AuthUserLoginData = {
     requestBody: UserAuth;
