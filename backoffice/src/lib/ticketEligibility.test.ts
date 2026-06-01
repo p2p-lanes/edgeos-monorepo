@@ -13,7 +13,7 @@ function step(partial: Partial<TicketingStepPublic>): TicketingStepPublic {
     popup_id: "p",
     step_type: "tickets",
     title: "Tickets",
-    template: "ticket_select",
+    template: "ticket-select",
     product_category: "ticket",
     ...partial,
   } as TicketingStepPublic
@@ -77,7 +77,7 @@ describe("computeTicketEligibility + isProductAssignable", () => {
     expect(isProductAssignable(product("h1", "housing"), elig)).toBe(true)
   })
 
-  it("disabled steps and non-ticket_select templates are ignored (no filtering)", () => {
+  it("disabled steps and non-ticket-select templates are ignored (no filtering)", () => {
     const steps = [
       step({
         is_enabled: false,
@@ -88,7 +88,7 @@ describe("computeTicketEligibility + isProductAssignable", () => {
       step({ template: "merch-image", product_category: "merch" }),
     ]
     const elig = computeTicketEligibility(steps, CAT_B)
-    // No active ticket_select step → "ticket" is not segmented → passes through.
+    // No active ticket-select step → "ticket" is not segmented → passes through.
     expect(isProductAssignable(product("p1"), elig)).toBe(true)
   })
 })
