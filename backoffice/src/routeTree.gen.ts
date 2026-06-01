@@ -21,6 +21,7 @@ import { Route as LayoutApiKeysRouteImport } from './routes/_layout/api-keys'
 import { Route as LayoutAbandonedCartsRouteImport } from './routes/_layout/abandoned-carts'
 import { Route as LayoutTicketingStepsIndexRouteImport } from './routes/_layout/ticketing-steps/index'
 import { Route as LayoutThemeIndexRouteImport } from './routes/_layout/theme/index'
+import { Route as LayoutTasksIndexRouteImport } from './routes/_layout/tasks/index'
 import { Route as LayoutProductsIndexRouteImport } from './routes/_layout/products/index'
 import { Route as LayoutPopupsIndexRouteImport } from './routes/_layout/popups/index'
 import { Route as LayoutOrganizationsIndexRouteImport } from './routes/_layout/organizations/index'
@@ -127,6 +128,11 @@ const LayoutTicketingStepsIndexRoute =
 const LayoutThemeIndexRoute = LayoutThemeIndexRouteImport.update({
   id: '/theme/',
   path: '/theme/',
+  getParentRoute: () => LayoutRoute,
+} as any)
+const LayoutTasksIndexRoute = LayoutTasksIndexRouteImport.update({
+  id: '/tasks/',
+  path: '/tasks/',
   getParentRoute: () => LayoutRoute,
 } as any)
 const LayoutProductsIndexRoute = LayoutProductsIndexRouteImport.update({
@@ -413,6 +419,7 @@ export interface FileRoutesByFullPath {
   '/organizations/': typeof LayoutOrganizationsIndexRoute
   '/popups/': typeof LayoutPopupsIndexRoute
   '/products/': typeof LayoutProductsIndexRoute
+  '/tasks/': typeof LayoutTasksIndexRoute
   '/theme/': typeof LayoutThemeIndexRoute
   '/ticketing-steps/': typeof LayoutTicketingStepsIndexRoute
   '/admin/$id/edit': typeof LayoutAdminIdEditRoute
@@ -473,6 +480,7 @@ export interface FileRoutesByTo {
   '/organizations': typeof LayoutOrganizationsIndexRoute
   '/popups': typeof LayoutPopupsIndexRoute
   '/products': typeof LayoutProductsIndexRoute
+  '/tasks': typeof LayoutTasksIndexRoute
   '/theme': typeof LayoutThemeIndexRoute
   '/ticketing-steps': typeof LayoutTicketingStepsIndexRoute
   '/admin/$id/edit': typeof LayoutAdminIdEditRoute
@@ -535,6 +543,7 @@ export interface FileRoutesById {
   '/_layout/organizations/': typeof LayoutOrganizationsIndexRoute
   '/_layout/popups/': typeof LayoutPopupsIndexRoute
   '/_layout/products/': typeof LayoutProductsIndexRoute
+  '/_layout/tasks/': typeof LayoutTasksIndexRoute
   '/_layout/theme/': typeof LayoutThemeIndexRoute
   '/_layout/ticketing-steps/': typeof LayoutTicketingStepsIndexRoute
   '/_layout/admin/$id/edit': typeof LayoutAdminIdEditRoute
@@ -597,6 +606,7 @@ export interface FileRouteTypes {
     | '/organizations/'
     | '/popups/'
     | '/products/'
+    | '/tasks/'
     | '/theme/'
     | '/ticketing-steps/'
     | '/admin/$id/edit'
@@ -657,6 +667,7 @@ export interface FileRouteTypes {
     | '/organizations'
     | '/popups'
     | '/products'
+    | '/tasks'
     | '/theme'
     | '/ticketing-steps'
     | '/admin/$id/edit'
@@ -718,6 +729,7 @@ export interface FileRouteTypes {
     | '/_layout/organizations/'
     | '/_layout/popups/'
     | '/_layout/products/'
+    | '/_layout/tasks/'
     | '/_layout/theme/'
     | '/_layout/ticketing-steps/'
     | '/_layout/admin/$id/edit'
@@ -831,6 +843,13 @@ declare module '@tanstack/react-router' {
       path: '/theme'
       fullPath: '/theme/'
       preLoaderRoute: typeof LayoutThemeIndexRouteImport
+      parentRoute: typeof LayoutRoute
+    }
+    '/_layout/tasks/': {
+      id: '/_layout/tasks/'
+      path: '/tasks'
+      fullPath: '/tasks/'
+      preLoaderRoute: typeof LayoutTasksIndexRouteImport
       parentRoute: typeof LayoutRoute
     }
     '/_layout/products/': {
@@ -1201,6 +1220,7 @@ interface LayoutRouteChildren {
   LayoutOrganizationsIndexRoute: typeof LayoutOrganizationsIndexRoute
   LayoutPopupsIndexRoute: typeof LayoutPopupsIndexRoute
   LayoutProductsIndexRoute: typeof LayoutProductsIndexRoute
+  LayoutTasksIndexRoute: typeof LayoutTasksIndexRoute
   LayoutThemeIndexRoute: typeof LayoutThemeIndexRoute
   LayoutTicketingStepsIndexRoute: typeof LayoutTicketingStepsIndexRoute
   LayoutAdminIdEditRoute: typeof LayoutAdminIdEditRoute
@@ -1261,6 +1281,7 @@ const LayoutRouteChildren: LayoutRouteChildren = {
   LayoutOrganizationsIndexRoute: LayoutOrganizationsIndexRoute,
   LayoutPopupsIndexRoute: LayoutPopupsIndexRoute,
   LayoutProductsIndexRoute: LayoutProductsIndexRoute,
+  LayoutTasksIndexRoute: LayoutTasksIndexRoute,
   LayoutThemeIndexRoute: LayoutThemeIndexRoute,
   LayoutTicketingStepsIndexRoute: LayoutTicketingStepsIndexRoute,
   LayoutAdminIdEditRoute: LayoutAdminIdEditRoute,
