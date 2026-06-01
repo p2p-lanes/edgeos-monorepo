@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Plus, Ticket, Trash2 } from "lucide-react"
-import { useState } from "react"
+import { useMemo, useState } from "react"
 
 import {
   type ApiError,
@@ -8,6 +8,7 @@ import {
   type AttendeeWithOriginPublic,
   type ProductPublic,
   ProductsService,
+  TicketingStepsService,
 } from "@/client"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -31,6 +32,10 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import useCustomToast from "@/hooks/useCustomToast"
+import {
+  computeTicketEligibility,
+  isProductAssignable,
+} from "@/lib/ticketEligibility"
 import { createErrorHandler } from "@/utils"
 
 /**
@@ -67,7 +72,31 @@ export function ManageAttendeeProducts({
         limit: 200,
       }),
   })
-  const products = productList?.results ?? []
+  const allProducts = productList?.results ?? []
+
+  // Ticketing-step segmentation: only show ticket products this attendee's
+  // category may buy (mirrors the portal checkout). Products in non-segmented
+  // categories (housing, merch, …) pass through unchanged.
+  const { data: stepsList } = useQuery({
+    queryKey: ["ticketing-steps", attendee.popup_id],
+    queryFn: () =>
+      TicketingStepsService.listTicketingSteps({
+        popupId: attendee.popup_id,
+        limit: 100,
+      }),
+  })
+  const eligibility = useMemo(
+    () =>
+      computeTicketEligibility(
+        stepsList?.results ?? [],
+        attendee.category_id ?? null,
+      ),
+    [stepsList, attendee.category_id],
+  )
+  const products = useMemo(
+    () => allProducts.filter((p) => isProductAssignable(p, eligibility)),
+    [allProducts, eligibility],
+  )
 
   const onMutationSuccess = (updated: AttendeeWithOriginPublic) => {
     queryClient.setQueryData(["attendees", attendee.id], updated)
@@ -263,7 +292,7 @@ export function ManageAttendeeProducts({
           <p className="text-sm font-medium">Add tickets</p>
           {products.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              No active products in this pop-up.
+              No products available for this attendee's category.
             </p>
           ) : (
             <>
