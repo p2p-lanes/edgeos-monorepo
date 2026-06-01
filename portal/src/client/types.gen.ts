@@ -4005,10 +4005,14 @@ export type AuditLogsListAuditLogsData = {
      */
     limit?: number;
     popupId?: (string | null);
+    search?: (string | null);
     /**
      * Number of items to skip
      */
     skip?: number;
+    sortBy?: (string | null);
+    sortOrder?: string;
+    source?: (string | null);
     xTenantId?: (string | null);
 };
 

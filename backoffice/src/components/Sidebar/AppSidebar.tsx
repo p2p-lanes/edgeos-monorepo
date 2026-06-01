@@ -101,7 +101,12 @@ const superadminItems: Item[] = [
 ]
 
 export function AppSidebar() {
-  const { user: currentUser, isOperatorOrAbove, isSuperadmin } = useAuth()
+  const {
+    user: currentUser,
+    isAdmin,
+    isOperatorOrAbove,
+    isSuperadmin,
+  } = useAuth()
   const { isContextReady, selectedPopupId } = useWorkspace()
 
   const { data: pendingReviews } = useQuery({
@@ -154,16 +159,20 @@ export function AppSidebar() {
         title: "Abandoned Carts",
         path: "/abandoned-carts",
       },
-      { icon: History, title: "Activity", path: "/activity" },
     ],
     [pendingReviewCount, pendingPaymentCount],
   )
 
-  // For admins (non-superadmin), get their tenant-specific items
-  const adminNavigationItems =
-    isOperatorOrAbove && !isSuperadmin
+  // For admins (non-superadmin), get their tenant-specific items.
+  // Activity (audit log) is admin-only — it lives under Administration.
+  const adminNavigationItems: Item[] = [
+    ...(isOperatorOrAbove && !isSuperadmin
       ? getAdminItems(currentUser?.tenant_id)
-      : adminItems
+      : adminItems),
+    ...(isAdmin
+      ? [{ icon: History, title: "Activity", path: "/activity" }]
+      : []),
+  ]
 
   return (
     <Sidebar collapsible="icon">

@@ -21,14 +21,19 @@ async def list_audit_logs(
     actor_id: uuid.UUID | None = None,
     entity_type: str | None = None,
     entity_id: uuid.UUID | None = None,
+    source: str | None = None,
+    search: str | None = None,
+    sort_by: str | None = None,
+    sort_order: str = "desc",
     skip: PaginationSkip = 0,
     limit: PaginationLimit = 50,
 ) -> ListModel[AuditLogPublic]:
-    """List audit log entries (newest first), filterable for both surfaces.
+    """List audit log entries, filterable/sortable for both surfaces.
 
     The per-attendee history passes `entity_id`; the global feed uses
-    `popup_id` / `action` / `actor_id`. Tenant scoping is enforced by RLS
-    on the audit_logs table, so cross-tenant rows are never returned.
+    `popup_id` / `action` / `source` / `search` and sorts by `sort_by` +
+    `sort_order`. Tenant scoping is enforced by RLS on the audit_logs table,
+    so cross-tenant rows are never returned.
     """
     rows, total = audit_logs_crud.find(
         db,
@@ -37,6 +42,10 @@ async def list_audit_logs(
         actor_id=actor_id,
         entity_type=entity_type,
         entity_id=entity_id,
+        source=source,
+        search=search,
+        sort_by=sort_by,
+        sort_order=sort_order,
         skip=skip,
         limit=limit,
     )

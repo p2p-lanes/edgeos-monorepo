@@ -1475,17 +1475,22 @@ export class AttendeesService {
 export class AuditLogsService {
     /**
      * List Audit Logs
-     * List audit log entries (newest first), filterable for both surfaces.
+     * List audit log entries, filterable/sortable for both surfaces.
      *
      * The per-attendee history passes `entity_id`; the global feed uses
-     * `popup_id` / `action` / `actor_id`. Tenant scoping is enforced by RLS
-     * on the audit_logs table, so cross-tenant rows are never returned.
+     * `popup_id` / `action` / `source` / `search` and sorts by `sort_by` +
+     * `sort_order`. Tenant scoping is enforced by RLS on the audit_logs table,
+     * so cross-tenant rows are never returned.
      * @param data The data for the request.
      * @param data.popupId
      * @param data.action
      * @param data.actorId
      * @param data.entityType
      * @param data.entityId
+     * @param data.source
+     * @param data.search
+     * @param data.sortBy
+     * @param data.sortOrder
      * @param data.skip Number of items to skip
      * @param data.limit Maximum number of items to return
      * @param data.xTenantId
@@ -1505,6 +1510,10 @@ export class AuditLogsService {
                 actor_id: data.actorId,
                 entity_type: data.entityType,
                 entity_id: data.entityId,
+                source: data.source,
+                search: data.search,
+                sort_by: data.sortBy,
+                sort_order: data.sortOrder,
                 skip: data.skip,
                 limit: data.limit
             },

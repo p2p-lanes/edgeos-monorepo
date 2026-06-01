@@ -9,7 +9,7 @@ import uuid
 from typing import Any
 
 from loguru import logger
-from sqlmodel import Session, col, func, select
+from sqlmodel import Session, col, func, or_, select
 
 from app.api.audit_log.actor import AuditActor
 from app.api.audit_log.models import AuditLog
@@ -107,6 +107,13 @@ class AuditLogsCRUD:
             )
             return None
 
+    # Columns the global feed may sort by (maps the API sort_by key → column).
+    _SORTABLE = {
+        "created_at": "created_at",
+        "actor": "actor_name",
+        "action": "action",
+    }
+
     def find(
         self,
         session: Session,
@@ -116,10 +123,19 @@ class AuditLogsCRUD:
         actor_id: uuid.UUID | None = None,
         entity_type: str | None = None,
         entity_id: uuid.UUID | None = None,
+        source: str | None = None,
+        search: str | None = None,
+        sort_by: str | None = None,
+        sort_order: str = "desc",
         skip: int = 0,
         limit: int = 50,
     ) -> tuple[list[AuditLog], int]:
-        """Return a page of audit entries (newest first) plus the total count."""
+        """Return a page of audit entries plus the total count.
+
+        Filterable by popup/action/actor/entity/source and a free-text `search`
+        over actor name/email and the entity label. Sortable by created_at
+        (default), actor, or action; newest-first by default.
+        """
         conditions = []
         if popup_id is not None:
             conditions.append(AuditLog.popup_id == popup_id)
@@ -131,15 +147,31 @@ class AuditLogsCRUD:
             conditions.append(AuditLog.entity_type == entity_type)
         if entity_id is not None:
             conditions.append(AuditLog.entity_id == entity_id)
+        if source is not None:
+            conditions.append(AuditLog.source == source)
+        if search:
+            like = f"%{search.strip()}%"
+            conditions.append(
+                or_(
+                    col(AuditLog.actor_name).ilike(like),
+                    col(AuditLog.actor_email).ilike(like),
+                    col(AuditLog.entity_label).ilike(like),
+                    col(AuditLog.action).ilike(like),
+                )
+            )
 
         total = session.exec(
             select(func.count()).select_from(AuditLog).where(*conditions)
         ).one()
 
+        sort_column = self._SORTABLE.get(sort_by or "created_at", "created_at")
+        order_col = col(getattr(AuditLog, sort_column))
+        order_by = order_col.asc() if sort_order == "asc" else order_col.desc()
+
         rows = session.exec(
             select(AuditLog)
             .where(*conditions)
-            .order_by(col(AuditLog.created_at).desc())
+            .order_by(order_by)
             .offset(skip)
             .limit(limit)
         ).all()

@@ -5,7 +5,7 @@ import { History } from "lucide-react"
 import { Suspense, useState } from "react"
 
 import { type AuditLogPublic, AuditLogsService } from "@/client"
-import { DataTable } from "@/components/Common/DataTable"
+import { DataTable, SortableHeader } from "@/components/Common/DataTable"
 import { EmptyState } from "@/components/Common/EmptyState"
 import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
@@ -28,7 +28,13 @@ import {
   describeAuditAction,
 } from "@/lib/auditMessage"
 
-const ALL_ACTIONS = "all"
+const ALL = "all"
+
+const SOURCE_OPTIONS = [
+  { value: "backoffice", label: "Backoffice" },
+  { value: "portal", label: "Portal" },
+  { value: "system", label: "System" },
+]
 
 export const Route = createFileRoute("/_layout/activity")({
   component: Activity,
@@ -41,7 +47,7 @@ export const Route = createFileRoute("/_layout/activity")({
 const columns: ColumnDef<AuditLogPublic>[] = [
   {
     accessorKey: "created_at",
-    header: "When",
+    header: ({ column }) => <SortableHeader label="When" column={column} />,
     cell: ({ row }) => (
       <span className="whitespace-nowrap text-muted-foreground">
         {new Intl.DateTimeFormat("en-US", {
@@ -53,19 +59,20 @@ const columns: ColumnDef<AuditLogPublic>[] = [
   },
   {
     id: "actor",
-    header: "Actor",
+    header: ({ column }) => <SortableHeader label="Actor" column={column} />,
     cell: ({ row }) => (
       <span className="font-medium">{actorLabel(row.original)}</span>
     ),
   },
   {
     id: "action",
-    header: "Action",
+    header: ({ column }) => <SortableHeader label="Action" column={column} />,
     cell: ({ row }) => <span>{describeAuditAction(row.original)}</span>,
   },
   {
     accessorKey: "entity_label",
     header: "Item",
+    enableSorting: false,
     cell: ({ row }) => (
       <span className="text-muted-foreground">
         {row.original.entity_label ?? "—"}
@@ -74,13 +81,17 @@ const columns: ColumnDef<AuditLogPublic>[] = [
   },
 ]
 
-function ActivityContent({ action }: { action: string }) {
+function ActivityContent() {
   const { selectedPopupId } = useWorkspace()
   const searchParams = Route.useSearch()
-  const { pagination, setPagination } = useTableSearchParams(
-    searchParams,
-    "/activity",
-  )
+  const { search, pagination, sorting, setSearch, setPagination, setSorting } =
+    useTableSearchParams(searchParams, "/activity")
+
+  const [action, setAction] = useState<string>(ALL)
+  const [source, setSource] = useState<string>(ALL)
+
+  const resetPage = () =>
+    setPagination({ pageIndex: 0, pageSize: pagination.pageSize })
 
   const { data } = useQuery({
     queryKey: [
@@ -88,6 +99,10 @@ function ActivityContent({ action }: { action: string }) {
       {
         popupId: selectedPopupId,
         action,
+        source,
+        search,
+        sortBy: sorting[0]?.id,
+        sortOrder: sorting[0]?.desc ? "desc" : "asc",
         page: pagination.pageIndex,
         pageSize: pagination.pageSize,
       },
@@ -95,7 +110,15 @@ function ActivityContent({ action }: { action: string }) {
     queryFn: () =>
       AuditLogsService.listAuditLogs({
         popupId: selectedPopupId || undefined,
-        action: action === ALL_ACTIONS ? undefined : action,
+        action: action === ALL ? undefined : action,
+        source: source === ALL ? undefined : source,
+        search: search || undefined,
+        sortBy: sorting[0]?.id,
+        sortOrder: sorting.length
+          ? sorting[0].desc
+            ? "desc"
+            : "asc"
+          : undefined,
         skip: pagination.pageIndex * pagination.pageSize,
         limit: pagination.pageSize,
       }),
@@ -108,11 +131,57 @@ function ActivityContent({ action }: { action: string }) {
     <DataTable
       columns={columns}
       data={data.results}
+      searchPlaceholder="Search by actor or item..."
+      searchValue={search}
+      onSearchChange={setSearch}
+      serverSorting={{ sorting, onSortingChange: setSorting }}
       serverPagination={{
         total: data.paging.total,
         pagination,
         onPaginationChange: setPagination,
       }}
+      filterBar={
+        <div className="flex flex-wrap items-center gap-2">
+          <Select
+            value={action}
+            onValueChange={(v) => {
+              setAction(v)
+              resetPage()
+            }}
+          >
+            <SelectTrigger className="w-44">
+              <SelectValue placeholder="All actions" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL}>All actions</SelectItem>
+              {AUDIT_ACTION_OPTIONS.map((o) => (
+                <SelectItem key={o.value} value={o.value}>
+                  {o.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select
+            value={source}
+            onValueChange={(v) => {
+              setSource(v)
+              resetPage()
+            }}
+          >
+            <SelectTrigger className="w-40">
+              <SelectValue placeholder="All sources" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL}>All sources</SelectItem>
+              {SOURCE_OPTIONS.map((o) => (
+                <SelectItem key={o.value} value={o.value}>
+                  {o.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      }
       emptyState={
         <EmptyState
           icon={History}
@@ -126,37 +195,21 @@ function ActivityContent({ action }: { action: string }) {
 
 function Activity() {
   const { isContextReady } = useWorkspace()
-  const [action, setAction] = useState<string>(ALL_ACTIONS)
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Activity</h1>
-          <p className="text-muted-foreground">
-            Audit history of admin actions for the selected pop-up
-          </p>
-        </div>
-        <Select value={action} onValueChange={setAction}>
-          <SelectTrigger className="w-48">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={ALL_ACTIONS}>All actions</SelectItem>
-            {AUDIT_ACTION_OPTIONS.map((o) => (
-              <SelectItem key={o.value} value={o.value}>
-                {o.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight">Activity</h1>
+        <p className="text-muted-foreground">
+          Audit history of admin actions for the selected pop-up
+        </p>
       </div>
       {!isContextReady ? (
         <WorkspaceAlert resource="activity" />
       ) : (
         <QueryErrorBoundary>
           <Suspense fallback={<Skeleton className="h-64 w-full" />}>
-            <ActivityContent action={action} />
+            <ActivityContent />
           </Suspense>
         </QueryErrorBoundary>
       )}
