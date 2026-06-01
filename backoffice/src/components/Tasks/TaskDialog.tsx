@@ -197,6 +197,16 @@ export function TaskDialog({ open, onOpenChange, taskId }: TaskDialogProps) {
           </DialogDescription>
         </DialogHeader>
 
+        {isEdit && task && (
+          <p className="-mt-2 text-xs text-muted-foreground">
+            Created by{" "}
+            <span className="font-medium text-foreground/80">
+              {task.created_by_name ?? "Unknown"}
+            </span>{" "}
+            · {new Date(task.created_at).toLocaleString()}
+          </p>
+        )}
+
         <div className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="task-title">Title</Label>
