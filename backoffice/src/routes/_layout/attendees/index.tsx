@@ -1,24 +1,10 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query"
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router"
 import type { ColumnDef } from "@tanstack/react-table"
-import {
-  Download,
-  EllipsisVertical,
-  Eye,
-  Gift,
-  Mail,
-  User,
-  Users,
-} from "lucide-react"
+import { Download, EllipsisVertical, Gift, Pencil, Users } from "lucide-react"
 import { Suspense, useState } from "react"
 
-import {
-  type AttendeeListItem,
-  AttendeesService,
-  type AttendeeWithOriginPublic,
-} from "@/client"
-import { AttendeeActivity } from "@/components/Attendees/AttendeeActivity"
-import { ManageAttendeeProducts } from "@/components/Attendees/ManageAttendeeProducts"
+import { type AttendeeListItem, AttendeesService } from "@/client"
 import { ProductsCell } from "@/components/Attendees/ProductsCell"
 import { DataTable, SortableHeader } from "@/components/Common/DataTable"
 import { EmptyState } from "@/components/Common/EmptyState"
@@ -27,22 +13,12 @@ import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
-import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { InlineRow, InlineSection } from "@/components/ui/inline-form"
 import { Label } from "@/components/ui/label"
-import { Separator } from "@/components/ui/separator"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Switch } from "@/components/ui/switch"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
@@ -69,7 +45,7 @@ type FlatAttendeeRow = {
  * Attendees with no products emit a single row with an empty product_id so
  * they still appear in the CSV. Per-ticket check_in_codes are not exported
  * here — the list endpoint does not carry them; staff can read them from
- * the attendee detail dialog.
+ * the attendee edit page.
  */
 export function flattenAttendeesForCsv(
   attendees: AttendeeListItem[],
@@ -121,7 +97,7 @@ type AttendeesSearchParams = TableSearchParams & {
   hasTickets?: boolean
 }
 
-export const Route = createFileRoute("/_layout/attendees")({
+export const Route = createFileRoute("/_layout/attendees/")({
   component: Attendees,
   validateSearch: (raw: Record<string, unknown>): AttendeesSearchParams => ({
     ...validateTableSearch(raw),
@@ -136,135 +112,28 @@ export const Route = createFileRoute("/_layout/attendees")({
   }),
 })
 
-/**
- * Renders the inner content of the attendee details dialog.
- * Exported for unit-test isolation — rendered without Dialog wrapper so callers
- * can assert on the content without needing modal open/close machinery.
- *
- * Accepts AttendeeWithOriginPublic so products[] is typed as
- * AttendeeProductPublic[] and check_in_code is always populated.
- */
-export function AttendeeDetailsContent({
-  attendee,
-}: {
-  attendee: AttendeeWithOriginPublic
-}) {
-  return (
-    <>
-      {/* Hero */}
-      <div className="space-y-1 px-6 pt-6 pb-4">
-        <p className="text-2xl font-semibold">{attendee.name}</p>
-        <Badge variant="secondary" className="capitalize">
-          {attendee.category}
-        </Badge>
-      </div>
-
-      <Separator />
-
-      {/* Contact */}
-      <InlineSection title="Contact" className="px-6 py-4">
-        <InlineRow
-          icon={<Mail className="h-4 w-4 text-muted-foreground" />}
-          label="Email"
-        >
-          <span className="text-sm text-muted-foreground">
-            {attendee.email || "N/A"}
-          </span>
-        </InlineRow>
-        {attendee.gender && (
-          <InlineRow
-            icon={<User className="h-4 w-4 text-muted-foreground" />}
-            label="Gender"
-          >
-            <span className="text-sm text-muted-foreground">
-              {attendee.gender}
-            </span>
-          </InlineRow>
-        )}
-      </InlineSection>
-
-      {/* Tickets — admin product management (change / remove / add). Each
-          ticket shows its check-in code; changing a ticket keeps that code. */}
-      <Separator />
-      <ManageAttendeeProducts attendee={attendee} />
-
-      {/* Activity — audited history of admin actions on this attendee. */}
-      <Separator />
-      <AttendeeActivity attendeeId={attendee.id} />
-
-      {/* Footer */}
-      <Separator />
-      <div className="flex items-center justify-between px-6 py-4">
-        <div className="flex gap-4 text-xs text-muted-foreground">
-          {attendee.created_at && (
-            <span>{new Date(attendee.created_at).toLocaleDateString()}</span>
-          )}
-          {attendee.updated_at && (
-            <span>
-              Updated {new Date(attendee.updated_at).toLocaleDateString()}
-            </span>
-          )}
-        </div>
-        <DialogClose asChild>
-          <Button variant="outline" size="sm">
-            Close
-          </Button>
-        </DialogClose>
-      </div>
-    </>
-  )
-}
-
-function ViewAttendee({ attendee }: { attendee: AttendeeListItem }) {
-  const [isOpen, setIsOpen] = useState(false)
-
-  // Fetch full detail (AttendeeWithOriginPublic with typed products[]) only
-  // when the dialog is open so check_in_code is populated per ticket.
-  const { data: detail } = useQuery({
-    queryKey: ["attendees", attendee.id],
-    queryFn: () => AttendeesService.getAttendee({ attendeeId: attendee.id }),
-    enabled: isOpen,
-    staleTime: 30_000,
-  })
-
-  return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DropdownMenuItem
-        onSelect={(e) => e.preventDefault()}
-        onClick={() => setIsOpen(true)}
-      >
-        <Eye className="mr-2 h-4 w-4" />
-        View Details
-      </DropdownMenuItem>
-      <DialogContent className="max-w-md gap-0 p-0">
-        <DialogHeader className="sr-only">
-          <DialogTitle>Attendee Details</DialogTitle>
-          <DialogDescription>{attendee.name}</DialogDescription>
-        </DialogHeader>
-        {detail ? (
-          <AttendeeDetailsContent attendee={detail} />
-        ) : (
-          <div className="px-6 py-8">
-            <Skeleton className="h-32 w-full" />
-          </div>
-        )}
-      </DialogContent>
-    </Dialog>
-  )
-}
-
 function AttendeeActionsMenu({ attendee }: { attendee: AttendeeListItem }) {
-  const [open, setOpen] = useState(false)
+  const navigate = useNavigate()
 
   return (
-    <DropdownMenu open={open} onOpenChange={setOpen}>
+    <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" size="icon" aria-label="Attendee actions">
           <EllipsisVertical className="h-4 w-4" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <ViewAttendee attendee={attendee} />
+        <DropdownMenuItem
+          onClick={() =>
+            navigate({
+              to: "/attendees/$attendeeId",
+              params: { attendeeId: attendee.id },
+            })
+          }
+        >
+          <Pencil className="mr-2 h-4 w-4" />
+          Edit
+        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   )
