@@ -117,6 +117,15 @@ from app.api.popup_reviewer.schemas import (
 )
 from app.api.product.models import Products
 from app.api.product.schemas import ProductCreate, ProductPublic, ProductUpdate
+
+# Task tracker
+from app.api.task.models import Task, TaskAttachment, TaskComment
+from app.api.task.schemas import (
+    TaskCreate,
+    TaskDetailPublic,
+    TaskPublic,
+    TaskUpdate,
+)
 from app.api.tenant.credential_models import TenantCredentials
 from app.api.tenant.models import Tenants
 from app.api.tenant.schemas import TenantCreate, TenantPublic, TenantUpdate
@@ -177,6 +186,14 @@ __all__ = [
     "CouponCreate",
     "CouponPublic",
     "CouponUpdate",
+    # Task tracker
+    "Task",
+    "TaskAttachment",
+    "TaskComment",
+    "TaskCreate",
+    "TaskUpdate",
+    "TaskPublic",
+    "TaskDetailPublic",
     # Email templates
     "EmailTemplates",
     "EmailTemplateCreate",
