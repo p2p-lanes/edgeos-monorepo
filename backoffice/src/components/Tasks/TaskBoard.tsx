@@ -85,7 +85,7 @@ export function TaskBoard({ tasks, onOpen }: TaskBoardProps) {
 
   return (
     <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
-      <div className="flex gap-4 overflow-x-auto pb-4">
+      <div className="thin-scrollbar flex gap-4 overflow-x-auto pb-4">
         {TASK_STATUSES.map((status) => (
           <Column
             key={status}
