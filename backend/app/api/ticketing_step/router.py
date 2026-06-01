@@ -85,7 +85,7 @@ def _validate_template_config_fk(
     Pattern B (locked decision #1268): Pydantic validates UUID structure,
     router validates FK existence. This keeps schemas pure.
     """
-    if template != "ticket_select" or not template_config:
+    if template != "ticket-select" or not template_config:
         return
     sections = template_config.get("sections") or []
     from app.api.attendee_category.crud import attendee_categories_crud
