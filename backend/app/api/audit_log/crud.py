@@ -13,6 +13,7 @@ from sqlmodel import Session, col, func, or_, select
 
 from app.api.audit_log.actor import AuditActor
 from app.api.audit_log.models import AuditLog
+from app.api.audit_log.snapshot import change_details
 from app.core.logging import get_request_id
 
 
@@ -106,6 +107,55 @@ class AuditLogsCRUD:
                 exc,
             )
             return None
+
+    def record_change(
+        self,
+        session: Session,
+        *,
+        tenant_id: uuid.UUID,
+        actor: AuditActor,
+        action: str,
+        entity_type: str,
+        entity_id: uuid.UUID | None = None,
+        entity_label: str | None = None,
+        popup_id: uuid.UUID | None = None,
+        snapshot: dict[str, Any] | None = None,
+        changes: dict[str, Any] | None = None,
+        commit: bool = True,
+    ) -> AuditLog | None:
+        """Record a resource create/update/delete with a {snapshot, changes} detail.
+
+        The generic recorder every resource-specific audit layer delegates to:
+        builds the standard `details` shape and chooses atomic vs best-effort.
+        commit=True → best-effort (own commit, failures swallowed; use after the
+        mutation already committed). commit=False → stage atomically in the
+        caller's transaction (e.g. deletes, where the audit must not survive a
+        failed delete).
+        """
+        details = change_details(snapshot, changes)
+        if commit:
+            return self.record_best_effort(
+                session,
+                tenant_id=tenant_id,
+                actor=actor,
+                action=action,
+                entity_type=entity_type,
+                entity_id=entity_id,
+                entity_label=entity_label,
+                popup_id=popup_id,
+                details=details,
+            )
+        return self.record(
+            session,
+            tenant_id=tenant_id,
+            actor=actor,
+            action=action,
+            entity_type=entity_type,
+            entity_id=entity_id,
+            entity_label=entity_label,
+            popup_id=popup_id,
+            details=details,
+        )
 
     # Columns the global feed may sort by (maps the API sort_by key → column).
     _SORTABLE = {

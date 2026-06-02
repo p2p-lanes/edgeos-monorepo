@@ -8,6 +8,7 @@ from pydantic import BaseModel
 from sqlmodel import Session
 
 from app.api.audit_log.actor import actor_from_human, actor_from_user
+from app.api.audit_log.snapshot import compute_changes
 from app.api.event import crud
 from app.api.event.recurrence import (
     DEFAULT_MAX_OCCURRENCES,
@@ -38,11 +39,7 @@ from app.api.event.schemas import (
     OccurrenceRef,
     RecurrenceUpdate,
 )
-from app.api.event_audit.crud import (
-    build_event_snapshot,
-    compute_changes,
-    record_event_audit,
-)
+from app.api.event_audit.crud import build_event_snapshot, record_event_audit
 from app.api.event_audit.schemas import EventAuditAction
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
 from app.core.dependencies.tenants import PublicTenant
