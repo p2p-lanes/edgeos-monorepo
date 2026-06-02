@@ -1,33 +1,19 @@
-"""Sale window conversion helpers — date ↔ datetime translation.
+"""Sale window conversion helper.
 
-Public field semantics: `date` (inclusive day).
-DB / ORM field semantics: `datetime` (UTC, exclusive instant).
-
-This module is the single canonical conversion point between the two so the
-inclusive-day convention lives in exactly one place.
+The sale window (``sale_starts_at`` / ``sale_ends_at``) is a precise ``datetime``
+instant, both in the API and in the DB. Datetimes pass through untouched; a bare
+``date`` (e.g. from a CSV import) is anchored to UTC midnight.
 """
 
 from datetime import UTC, date, datetime, time, timedelta
 
 
-def datetime_to_inclusive_date(v: object, *, day_offset: int = 0) -> object:
-    """Convert a stored datetime instant to the public inclusive date.
-
-    `day_offset = -1` is the canonical setting for `sale_ends_at`, which is
-    persisted as the exclusive next-day instant. Non-datetime inputs pass
-    through unchanged (idempotent under repeated validation).
-    """
-    if isinstance(v, datetime):
-        return (v + timedelta(days=day_offset)).date()
-    return v
-
-
 def date_to_utc_instant(v: object, *, day_offset: int = 0) -> object:
-    """Convert a public inclusive date to a UTC midnight instant.
+    """Anchor a bare ``date`` to a UTC midnight instant; pass datetimes through.
 
-    `day_offset = 1` is the canonical setting for `sale_ends_at`, producing
-    the exclusive next-day instant the DB stores. Datetime inputs pass
-    through unchanged (so already-converted values stay stable).
+    The sale window is a precise instant, so datetime inputs are returned
+    unchanged. A bare ``date`` (e.g. from a CSV import) is anchored to UTC
+    midnight, optionally shifted by ``day_offset`` days.
     """
     if isinstance(v, datetime):
         return v

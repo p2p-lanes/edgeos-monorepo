@@ -15,7 +15,7 @@ import uuid
 from datetime import UTC, datetime
 
 from fastapi.testclient import TestClient
-from sqlmodel import Session
+from sqlmodel import Session, select
 
 from app.api.event.models import Events
 from app.api.event.schemas import EventStatus, EventVisibility
@@ -69,6 +69,15 @@ def _make_event(db: Session, tenant: Tenants, popup: Popups) -> Events:
 
 
 def _make_human(db: Session, tenant: Tenants, *, email: str) -> Humans:
+    # Reuse the (email, tenant) Human if it already exists. Backoffice event
+    # creation now maps the owner to a Human sharing the admin's email, so a
+    # prior test may have committed this exact Human; a raw insert would trip
+    # the uq_human_email_tenant_id constraint.
+    existing = db.exec(
+        select(Humans).where(Humans.email == email, Humans.tenant_id == tenant.id)
+    ).first()
+    if existing:
+        return existing
     h = Humans(tenant_id=tenant.id, email=email, first_name="N", last_name="H")
     db.add(h)
     db.commit()
@@ -121,9 +130,7 @@ def test_admin_notes_never_appear_in_event_payload(
         json={"notes": "TOP-SECRET-NOTE"},
     )
 
-    detail = client.get(
-        f"/api/v1/events/{ev.id}", headers=_auth(admin_token_tenant_a)
-    )
+    detail = client.get(f"/api/v1/events/{ev.id}", headers=_auth(admin_token_tenant_a))
     assert detail.status_code == 200, detail.text
     assert "admin_notes" not in detail.json()
     assert "TOP-SECRET-NOTE" not in detail.text

@@ -20,6 +20,7 @@ Spec references:
 
 import threading
 import uuid
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 import pytest
@@ -48,6 +49,8 @@ def _make_product(
     total_stock_remaining: int | None = None,
     max_per_order: int | None = None,
     price: int = 0,
+    sale_starts_at: datetime | None = None,
+    sale_ends_at: datetime | None = None,
 ) -> Products:
     suffix = uuid.uuid4().hex[:8]
     product = Products(
@@ -60,6 +63,8 @@ def _make_product(
         total_stock_cap=total_stock_cap,
         total_stock_remaining=total_stock_remaining,
         max_per_order=max_per_order,
+        sale_starts_at=sale_starts_at,
+        sale_ends_at=sale_ends_at,
         is_active=True,
     )
     db.add(product)
@@ -631,6 +636,82 @@ class TestCreatePaymentEnforcement:
         with pytest.raises(HTTPException) as exc_info:
             payments_crud.create_payment(db, pay_obj)
         assert exc_info.value.status_code == 409
+
+    def test_order_after_sale_ends_raises_422(
+        self,
+        db: Session,
+        tenant_a: Tenants,
+        popup_tenant_a: Popups,
+    ) -> None:
+        """A product whose sale_ends_at has passed → 422 via create_payment.
+
+        This is the meal-plan cutoff: ``sale_ends_at`` carries a precise instant
+        (e.g. Friday 11:59 PM), and the portal purchase path is the authoritative
+        gate. An order placed one second past the cutoff is rejected.
+        """
+        from app.api.payment.schemas import PaymentCreate, PaymentProductRequest
+
+        product = _make_product(
+            db,
+            tenant_a,
+            popup_tenant_a,
+            sale_ends_at=datetime.now(UTC) - timedelta(seconds=1),
+        )
+
+        app = _get_or_create_application(db, tenant_a, popup_tenant_a)
+        attendee = _make_attendee(db, app)
+
+        pay_obj = PaymentCreate(
+            application_id=app.id,
+            products=[
+                PaymentProductRequest(
+                    product_id=product.id,
+                    attendee_id=attendee.id,
+                    quantity=1,
+                )
+            ],
+        )
+
+        with pytest.raises(HTTPException) as exc_info:
+            payments_crud.create_payment(db, pay_obj)
+        assert exc_info.value.status_code == 422
+        assert "not on sale" in str(exc_info.value.detail).lower()
+
+    def test_order_before_sale_ends_succeeds(
+        self,
+        db: Session,
+        tenant_a: Tenants,
+        popup_tenant_a: Popups,
+    ) -> None:
+        """A product still within its sale window is purchasable (sanity guard
+        that the cutoff check doesn't reject legitimate, on-time orders)."""
+        from app.api.payment.schemas import PaymentCreate, PaymentProductRequest
+
+        product = _make_product(
+            db,
+            tenant_a,
+            popup_tenant_a,
+            sale_ends_at=datetime.now(UTC) + timedelta(days=1),
+        )
+
+        app = _get_or_create_application(db, tenant_a, popup_tenant_a)
+        attendee = _make_attendee(db, app)
+
+        pay_obj = PaymentCreate(
+            application_id=app.id,
+            products=[
+                PaymentProductRequest(
+                    product_id=product.id,
+                    attendee_id=attendee.id,
+                    quantity=1,
+                )
+            ],
+        )
+
+        # Free product (price=0) auto-approves; no exception means the window
+        # check let it through.
+        payment, _preview = payments_crud.create_payment(db, pay_obj)
+        assert payment is not None
 
     def test_max_per_order_exceeded_raises_422(
         self,
