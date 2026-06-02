@@ -581,6 +581,16 @@ export type AttendeeStats = {
 };
 
 /**
+ * Request body to add tickets to an attendee (admin panel, bulk).
+ *
+ * Mirrors the bulk-grant shape: N products, each with a quantity. Stock is
+ * validated per product and the whole batch is applied atomically.
+ */
+export type AttendeeTicketAdd = {
+    items: Array<AttendeeTicketLine>;
+};
+
+/**
  * Per-ticket info exposed on companion participation responses.
  *
  * `check_in_code` is the per-ticket code from `attendee_products`. Check-in
@@ -601,6 +611,21 @@ export type AttendeeTicketInfo = {
     product_category?: (string | null);
     requires_check_in?: boolean;
     last_scan_at?: (string | null);
+};
+
+/**
+ * One product + quantity line in a bulk ticket add.
+ */
+export type AttendeeTicketLine = {
+    product_id: string;
+    quantity?: number;
+};
+
+/**
+ * Request body to change the product of an attendee's ticket (admin panel).
+ */
+export type AttendeeTicketProductSwap = {
+    product_id: string;
 };
 
 /**
@@ -652,6 +677,28 @@ export type AttendeeWithTickets = {
     popup_name: string;
     popup_slug?: (string | null);
     products: Array<TicketProduct>;
+};
+
+/**
+ * A single audit log entry returned to the backoffice.
+ */
+export type AuditLogPublic = {
+    id: string;
+    source: string;
+    actor_type: string;
+    actor_id?: (string | null);
+    actor_email?: (string | null);
+    actor_name?: (string | null);
+    request_id?: (string | null);
+    action: string;
+    entity_type: string;
+    entity_id?: (string | null);
+    entity_label?: (string | null);
+    popup_id?: (string | null);
+    details?: ({
+    [key: string]: unknown;
+} | null);
+    created_at: string;
 };
 
 /**
@@ -2032,6 +2079,11 @@ export type ListModel_AttendeesDirectoryEntry_ = {
 
 export type ListModel_AttendeeWithOriginPublic_ = {
     results: Array<AttendeeWithOriginPublic>;
+    paging: Paging;
+};
+
+export type ListModel_AuditLogPublic_ = {
+    results: Array<AuditLogPublic>;
     paging: Paging;
 };
 
@@ -4040,6 +4092,31 @@ export type AttendeesDeleteAttendeeData = {
 
 export type AttendeesDeleteAttendeeResponse = (void);
 
+export type AttendeesAddAttendeeTicketData = {
+    attendeeId: string;
+    requestBody: AttendeeTicketAdd;
+    xTenantId?: (string | null);
+};
+
+export type AttendeesAddAttendeeTicketResponse = (AttendeeWithOriginPublic);
+
+export type AttendeesSwapAttendeeTicketProductData = {
+    attendeeId: string;
+    requestBody: AttendeeTicketProductSwap;
+    ticketId: string;
+    xTenantId?: (string | null);
+};
+
+export type AttendeesSwapAttendeeTicketProductResponse = (AttendeeWithOriginPublic);
+
+export type AttendeesRemoveAttendeeTicketData = {
+    attendeeId: string;
+    ticketId: string;
+    xTenantId?: (string | null);
+};
+
+export type AttendeesRemoveAttendeeTicketResponse = (AttendeeWithOriginPublic);
+
 export type AttendeesPostCheckInData = {
     code: string;
     /**
@@ -4058,6 +4135,29 @@ export type AttendeesGetTicketsByEmailData = {
 };
 
 export type AttendeesGetTicketsByEmailResponse = (Array<AttendeeWithTickets>);
+
+export type AuditLogsListAuditLogsData = {
+    action?: (string | null);
+    actorId?: (string | null);
+    entityId?: (string | null);
+    entityType?: (string | null);
+    /**
+     * Maximum number of items to return
+     */
+    limit?: number;
+    popupId?: (string | null);
+    search?: (string | null);
+    /**
+     * Number of items to skip
+     */
+    skip?: number;
+    sortBy?: (string | null);
+    sortOrder?: string;
+    source?: (string | null);
+    xTenantId?: (string | null);
+};
+
+export type AuditLogsListAuditLogsResponse = (ListModel_AuditLogPublic_);
 
 export type AuthUserLoginData = {
     requestBody: UserAuth;

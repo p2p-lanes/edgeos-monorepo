@@ -227,10 +227,12 @@ function BulkGrantContent({ popupId }: { popupId: string }) {
   }
 
   const { data: productsResp, isLoading: isProductsLoading } = useQuery({
-    queryKey: ["products", popupId],
+    // Only active products can be granted/assigned (matches the attendee panel).
+    queryKey: ["products", popupId, { active: true }],
     queryFn: () =>
       ProductsService.listProducts({
         popupId,
+        isActive: true,
         limit: 200,
       }),
   })

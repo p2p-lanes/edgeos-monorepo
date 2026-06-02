@@ -581,6 +581,16 @@ export type AttendeeStats = {
 };
 
 /**
+ * Request body to add tickets to an attendee (admin panel, bulk).
+ *
+ * Mirrors the bulk-grant shape: N products, each with a quantity. Stock is
+ * validated per product and the whole batch is applied atomically.
+ */
+export type AttendeeTicketAdd = {
+    items: Array<AttendeeTicketLine>;
+};
+
+/**
  * Per-ticket info exposed on companion participation responses.
  *
  * `check_in_code` is the per-ticket code from `attendee_products`. Check-in
@@ -601,6 +611,21 @@ export type AttendeeTicketInfo = {
     product_category?: (string | null);
     requires_check_in?: boolean;
     last_scan_at?: (string | null);
+};
+
+/**
+ * One product + quantity line in a bulk ticket add.
+ */
+export type AttendeeTicketLine = {
+    product_id: string;
+    quantity?: number;
+};
+
+/**
+ * Request body to change the product of an attendee's ticket (admin panel).
+ */
+export type AttendeeTicketProductSwap = {
+    product_id: string;
 };
 
 /**
@@ -655,6 +680,28 @@ export type AttendeeWithTickets = {
 };
 
 /**
+ * A single audit log entry returned to the backoffice.
+ */
+export type AuditLogPublic = {
+    id: string;
+    source: string;
+    actor_type: string;
+    actor_id?: (string | null);
+    actor_email?: (string | null);
+    actor_name?: (string | null);
+    request_id?: (string | null);
+    action: string;
+    entity_type: string;
+    entity_id?: (string | null);
+    entity_label?: (string | null);
+    popup_id?: (string | null);
+    details?: ({
+    [key: string]: unknown;
+} | null);
+    created_at: string;
+};
+
+/**
  * Response after successfully sending auth code.
  */
 export type AuthCodeSentResponse = {
@@ -698,6 +745,18 @@ export type BaseFieldConfigUpdate = {
     help_text?: (string | null);
     options?: (Array<(string)> | null);
     field_type?: (string | null);
+};
+
+/**
+ * The 'report a bug' payload, open to every backoffice user.
+ *
+ * Always produces an internal bug in the to-do column. Attachments are
+ * optional screenshots / screen-recordings already uploaded to S3.
+ */
+export type BugReportCreate = {
+    title: string;
+    detail?: (string | null);
+    attachments?: Array<TaskAttachmentCreate>;
 };
 
 /**
@@ -2023,6 +2082,11 @@ export type ListModel_AttendeeWithOriginPublic_ = {
     paging: Paging;
 };
 
+export type ListModel_AuditLogPublic_ = {
+    results: Array<AuditLogPublic>;
+    paging: Paging;
+};
+
 export type ListModel_CheckInListItem_ = {
     results: Array<CheckInListItem>;
     paging: Paging;
@@ -2095,6 +2159,16 @@ export type ListModel_PopupReviewerPublic_ = {
 
 export type ListModel_ProductPublic_ = {
     results: Array<ProductPublic>;
+    paging: Paging;
+};
+
+export type ListModel_TaskCommentPublic_ = {
+    results: Array<TaskCommentPublic>;
+    paging: Paging;
+};
+
+export type ListModel_TaskPublic_ = {
+    results: Array<TaskPublic>;
     paging: Paging;
 };
 
@@ -2992,6 +3066,125 @@ export type SendTestRequest = {
 } | null);
     popup_id?: (string | null);
 };
+
+/**
+ * Register an already-uploaded S3 object as a task attachment.
+ *
+ * The file itself is uploaded directly to S3 via POST /uploads/presigned-url;
+ * this just records the resulting key/url against the task.
+ */
+export type TaskAttachmentCreate = {
+    storage_key: string;
+    url: string;
+    media_type: TaskMediaType;
+    filename?: (string | null);
+    size_bytes?: (number | null);
+};
+
+export type TaskAttachmentPublic = {
+    id: string;
+    task_id: string;
+    url: string;
+    media_type: TaskMediaType;
+    filename?: (string | null);
+    size_bytes?: (number | null);
+    created_at: string;
+};
+
+export type TaskCommentCreate = {
+    body: string;
+};
+
+export type TaskCommentPublic = {
+    id: string;
+    task_id: string;
+    author_user_id?: (string | null);
+    author_name?: (string | null);
+    author_email?: (string | null);
+    body: string;
+    created_at: string;
+    edited_at?: (string | null);
+};
+
+export type TaskCommentUpdate = {
+    body: string;
+};
+
+export type TaskCreate = {
+    title: string;
+    detail?: (string | null);
+    status?: TaskStatus;
+    type?: TaskType;
+    responsible_user_id?: (string | null);
+    release?: (string | null);
+    visibility?: TaskVisibility;
+    target_tenant_id?: (string | null);
+};
+
+export type TaskDetailPublic = {
+    id: string;
+    title: string;
+    detail?: (string | null);
+    status: TaskStatus;
+    type: TaskType;
+    responsible_user_id?: (string | null);
+    responsible_name?: (string | null);
+    responsible_email?: (string | null);
+    release?: (string | null);
+    visibility: TaskVisibility;
+    target_tenant_id?: (string | null);
+    published_at?: (string | null);
+    created_by?: (string | null);
+    created_by_name?: (string | null);
+    created_at: string;
+    updated_at: string;
+    attachments?: Array<TaskAttachmentPublic>;
+};
+
+export type TaskMediaType = 'image' | 'video';
+
+export type TaskPublic = {
+    id: string;
+    title: string;
+    detail?: (string | null);
+    status: TaskStatus;
+    type: TaskType;
+    responsible_user_id?: (string | null);
+    responsible_name?: (string | null);
+    responsible_email?: (string | null);
+    release?: (string | null);
+    visibility: TaskVisibility;
+    target_tenant_id?: (string | null);
+    published_at?: (string | null);
+    created_by?: (string | null);
+    created_by_name?: (string | null);
+    created_at: string;
+    updated_at: string;
+};
+
+export type TaskStatus = 'to_do' | 'testing' | 'next_release' | 'published' | 'blocked' | 'cancelled';
+
+/**
+ * Lightweight payload for moving a card between Kanban columns.
+ */
+export type TaskStatusUpdate = {
+    status: TaskStatus;
+};
+
+export type TaskType = 'bug' | 'feature';
+
+export type TaskUpdate = {
+    title?: (string | null);
+    detail?: (string | null);
+    status?: (TaskStatus | null);
+    type?: (TaskType | null);
+    responsible_user_id?: (string | null);
+    release?: (string | null);
+    visibility?: (TaskVisibility | null);
+    target_tenant_id?: (string | null);
+};
+
+export type TaskVisibility = 'universal' | 'tenant' | 'internal';
 
 export type TemplateScope = 'tenant' | 'popup';
 
@@ -3899,6 +4092,31 @@ export type AttendeesDeleteAttendeeData = {
 
 export type AttendeesDeleteAttendeeResponse = (void);
 
+export type AttendeesAddAttendeeTicketData = {
+    attendeeId: string;
+    requestBody: AttendeeTicketAdd;
+    xTenantId?: (string | null);
+};
+
+export type AttendeesAddAttendeeTicketResponse = (AttendeeWithOriginPublic);
+
+export type AttendeesSwapAttendeeTicketProductData = {
+    attendeeId: string;
+    requestBody: AttendeeTicketProductSwap;
+    ticketId: string;
+    xTenantId?: (string | null);
+};
+
+export type AttendeesSwapAttendeeTicketProductResponse = (AttendeeWithOriginPublic);
+
+export type AttendeesRemoveAttendeeTicketData = {
+    attendeeId: string;
+    ticketId: string;
+    xTenantId?: (string | null);
+};
+
+export type AttendeesRemoveAttendeeTicketResponse = (AttendeeWithOriginPublic);
+
 export type AttendeesPostCheckInData = {
     code: string;
     /**
@@ -3917,6 +4135,29 @@ export type AttendeesGetTicketsByEmailData = {
 };
 
 export type AttendeesGetTicketsByEmailResponse = (Array<AttendeeWithTickets>);
+
+export type AuditLogsListAuditLogsData = {
+    action?: (string | null);
+    actorId?: (string | null);
+    entityId?: (string | null);
+    entityType?: (string | null);
+    /**
+     * Maximum number of items to return
+     */
+    limit?: number;
+    popupId?: (string | null);
+    search?: (string | null);
+    /**
+     * Number of items to skip
+     */
+    skip?: number;
+    sortBy?: (string | null);
+    sortOrder?: string;
+    source?: (string | null);
+    xTenantId?: (string | null);
+};
+
+export type AuditLogsListAuditLogsResponse = (ListModel_AuditLogPublic_);
 
 export type AuthUserLoginData = {
     requestBody: UserAuth;
@@ -5413,6 +5654,105 @@ export type ProductsListPortalProductsData = {
 };
 
 export type ProductsListPortalProductsResponse = (ListModel_ProductPublic_);
+
+export type TasksReportBugData = {
+    requestBody: BugReportCreate;
+};
+
+export type TasksReportBugResponse = (TaskPublic);
+
+export type TasksListTasksData = {
+    /**
+     * Maximum number of items to return
+     */
+    limit?: number;
+    release?: (string | null);
+    responsibleUserId?: (string | null);
+    search?: (string | null);
+    /**
+     * Number of items to skip
+     */
+    skip?: number;
+    status?: (TaskStatus | null);
+    type?: (TaskType | null);
+    visibility?: (TaskVisibility | null);
+};
+
+export type TasksListTasksResponse = (ListModel_TaskPublic_);
+
+export type TasksCreateTaskData = {
+    requestBody: TaskCreate;
+};
+
+export type TasksCreateTaskResponse = (TaskDetailPublic);
+
+export type TasksGetTaskData = {
+    taskId: string;
+};
+
+export type TasksGetTaskResponse = (TaskDetailPublic);
+
+export type TasksUpdateTaskData = {
+    requestBody: TaskUpdate;
+    taskId: string;
+};
+
+export type TasksUpdateTaskResponse = (TaskDetailPublic);
+
+export type TasksDeleteTaskData = {
+    taskId: string;
+};
+
+export type TasksDeleteTaskResponse = (void);
+
+export type TasksUpdateTaskStatusData = {
+    requestBody: TaskStatusUpdate;
+    taskId: string;
+};
+
+export type TasksUpdateTaskStatusResponse = (TaskPublic);
+
+export type TasksAddAttachmentData = {
+    requestBody: TaskAttachmentCreate;
+    taskId: string;
+};
+
+export type TasksAddAttachmentResponse = (TaskAttachmentPublic);
+
+export type TasksDeleteAttachmentData = {
+    attachmentId: string;
+    taskId: string;
+};
+
+export type TasksDeleteAttachmentResponse = (void);
+
+export type TasksListTaskCommentsData = {
+    taskId: string;
+};
+
+export type TasksListTaskCommentsResponse = (ListModel_TaskCommentPublic_);
+
+export type TasksCreateTaskCommentData = {
+    requestBody: TaskCommentCreate;
+    taskId: string;
+};
+
+export type TasksCreateTaskCommentResponse = (TaskCommentPublic);
+
+export type TasksUpdateTaskCommentData = {
+    commentId: string;
+    requestBody: TaskCommentUpdate;
+    taskId: string;
+};
+
+export type TasksUpdateTaskCommentResponse = (TaskCommentPublic);
+
+export type TasksDeleteTaskCommentData = {
+    commentId: string;
+    taskId: string;
+};
+
+export type TasksDeleteTaskCommentResponse = (void);
 
 export type TenantsGetTenantByDomainData = {
     domain: string;

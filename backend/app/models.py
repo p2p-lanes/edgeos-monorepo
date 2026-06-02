@@ -35,6 +35,10 @@ from app.api.attendee_category.schemas import (
     AttendeeCategoryUpdate,
 )
 
+# Audit log (generic admin action history)
+from app.api.audit_log.models import AuditLog
+from app.api.audit_log.schemas import AuditLogPublic
+
 # Auth
 from app.api.auth.pending_human_models import PendingHumans
 from app.api.check_in.models import CheckIn
@@ -146,6 +150,9 @@ from app.api.user.schemas import UserCreate, UserPublic, UserUpdate
 
 __all__ = [
     "SQLModel",
+    # Audit log
+    "AuditLog",
+    "AuditLogPublic",
     # Attendee categories
     "AttendeeCategories",
     "AttendeeCategoryCreate",

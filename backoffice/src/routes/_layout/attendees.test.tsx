@@ -1,16 +1,9 @@
 /**
- * Tests for attendees route.
+ * Tests for the attendees route.
  *
- * Covers:
- * (a) flattenAttendeesForCsv: expands attendee + per-ticket rows for CSV export
- * (b) AttendeeDetailsContent: shows per-ticket check_in_codes from products[]
- *     and hides the Check-in section entirely when the attendee has no
- *     purchased products (codes belong to tickets, not attendees).
+ * Covers flattenAttendeesForCsv: expands an attendee into one row per purchased
+ * ticket (and a single empty-product row when the attendee has none).
  */
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
-import { render, screen } from "@testing-library/react"
-import type React from "react"
-import type { ReactNode } from "react"
 import { describe, expect, it, vi } from "vitest"
 
 vi.mock("@/client", () => ({
@@ -53,33 +46,7 @@ vi.mock("@/lib/export", () => ({
   exportToCsv: vi.fn(),
 }))
 
-// DialogClose requires a Dialog ancestor — stub it for unit tests
-vi.mock("@/components/ui/dialog", async () => {
-  const actual = await vi.importActual<object>("@/components/ui/dialog")
-  return {
-    ...actual,
-    DialogClose: ({ children }: { children: React.ReactNode }) => children,
-  }
-})
-
-import {
-  AttendeeDetailsContent,
-  flattenAttendeesForCsv,
-} from "@/routes/_layout/attendees"
-
-function makeWrapper() {
-  const queryClient = new QueryClient({
-    defaultOptions: {
-      queries: { retry: false },
-      mutations: { retry: false },
-    },
-  })
-  return ({ children }: { children: ReactNode }) => (
-    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
-  )
-}
-
-// ── (a) CSV flattening ────────────────────────────────────────────────────────
+import { flattenAttendeesForCsv } from "@/routes/_layout/attendees"
 
 describe("flattenAttendeesForCsv", () => {
   it("returns one row per ticket when attendee has multiple products", () => {
@@ -172,64 +139,5 @@ describe("flattenAttendeesForCsv", () => {
     expect(rows[0].name).toBe("Alice")
     expect(rows[1].name).toBe("Bob")
     expect(rows[1].product_id).toBe("")
-  })
-})
-
-// ── (b) AttendeeDetailsContent — per-ticket check_in_codes ──────────────────────
-// products[] is AttendeeProductPublic[] so each entry has check_in_code.
-
-describe("AttendeeDetailsContent", () => {
-  it("renders per-ticket check_in_codes from products array", async () => {
-    const attendee = {
-      id: "att-1",
-      tenant_id: "tenant-1",
-      popup_id: "popup-1",
-      name: "Alice",
-      email: "alice@example.com",
-      category: "main",
-      gender: null,
-      origin: "direct_sale",
-      products: [
-        {
-          id: "ap-1",
-          attendee_id: "att-1",
-          product_id: "prod-1",
-          check_in_code: "TICKET-CODE-A",
-        },
-        {
-          id: "ap-2",
-          attendee_id: "att-1",
-          product_id: "prod-2",
-          check_in_code: "TICKET-CODE-B",
-        },
-      ],
-    }
-
-    render(<AttendeeDetailsContent attendee={attendee as never} />, {
-      wrapper: makeWrapper(),
-    })
-
-    expect(screen.getByText("TICKET-CODE-A")).toBeInTheDocument()
-    expect(screen.getByText("TICKET-CODE-B")).toBeInTheDocument()
-  })
-
-  it("does not render check-in section when attendee has no purchased products", async () => {
-    const attendee = {
-      id: "att-1",
-      tenant_id: "tenant-1",
-      popup_id: "popup-1",
-      name: "Alice",
-      email: "alice@example.com",
-      category: "main",
-      gender: null,
-      origin: "direct_sale",
-      products: [],
-    }
-
-    render(<AttendeeDetailsContent attendee={attendee as never} />, {
-      wrapper: makeWrapper(),
-    })
-
-    expect(screen.queryByText("Check-in")).not.toBeInTheDocument()
   })
 })

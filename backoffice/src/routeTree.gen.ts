@@ -16,8 +16,8 @@ import { Route as LayoutThirdPartyAppsRouteImport } from './routes/_layout/third
 import { Route as LayoutSettingsRouteImport } from './routes/_layout/settings'
 import { Route as LayoutPaymentsRouteImport } from './routes/_layout/payments'
 import { Route as LayoutCheckInRouteImport } from './routes/_layout/check-in'
-import { Route as LayoutAttendeesRouteImport } from './routes/_layout/attendees'
 import { Route as LayoutApiKeysRouteImport } from './routes/_layout/api-keys'
+import { Route as LayoutActivityRouteImport } from './routes/_layout/activity'
 import { Route as LayoutAbandonedCartsRouteImport } from './routes/_layout/abandoned-carts'
 import { Route as LayoutTicketingStepsIndexRouteImport } from './routes/_layout/ticketing-steps/index'
 import { Route as LayoutThemeIndexRouteImport } from './routes/_layout/theme/index'
@@ -31,6 +31,7 @@ import { Route as LayoutFormBuilderIndexRouteImport } from './routes/_layout/for
 import { Route as LayoutEventsIndexRouteImport } from './routes/_layout/events/index'
 import { Route as LayoutEmailTemplatesIndexRouteImport } from './routes/_layout/email-templates/index'
 import { Route as LayoutCouponsIndexRouteImport } from './routes/_layout/coupons/index'
+import { Route as LayoutAttendeesIndexRouteImport } from './routes/_layout/attendees/index'
 import { Route as LayoutApplicationsIndexRouteImport } from './routes/_layout/applications/index'
 import { Route as LayoutAdminIndexRouteImport } from './routes/_layout/admin/index'
 import { Route as LayoutTicketingStepsStepIdRouteImport } from './routes/_layout/ticketing-steps/$stepId'
@@ -45,6 +46,7 @@ import { Route as LayoutEventsPropertiesRouteImport } from './routes/_layout/eve
 import { Route as LayoutEventsNewRouteImport } from './routes/_layout/events/new'
 import { Route as LayoutEventsDayByVenueRouteImport } from './routes/_layout/events/day-by-venue'
 import { Route as LayoutCouponsNewRouteImport } from './routes/_layout/coupons/new'
+import { Route as LayoutAttendeesAttendeeIdRouteImport } from './routes/_layout/attendees/$attendeeId'
 import { Route as LayoutApplicationsReviewQueueRouteImport } from './routes/_layout/applications/review-queue'
 import { Route as LayoutApplicationsNewRouteImport } from './routes/_layout/applications/new'
 import { Route as LayoutApplicationsIdRouteImport } from './routes/_layout/applications/$id'
@@ -104,14 +106,14 @@ const LayoutCheckInRoute = LayoutCheckInRouteImport.update({
   path: '/check-in',
   getParentRoute: () => LayoutRoute,
 } as any)
-const LayoutAttendeesRoute = LayoutAttendeesRouteImport.update({
-  id: '/attendees',
-  path: '/attendees',
-  getParentRoute: () => LayoutRoute,
-} as any)
 const LayoutApiKeysRoute = LayoutApiKeysRouteImport.update({
   id: '/api-keys',
   path: '/api-keys',
+  getParentRoute: () => LayoutRoute,
+} as any)
+const LayoutActivityRoute = LayoutActivityRouteImport.update({
+  id: '/activity',
+  path: '/activity',
   getParentRoute: () => LayoutRoute,
 } as any)
 const LayoutAbandonedCartsRoute = LayoutAbandonedCartsRouteImport.update({
@@ -180,6 +182,11 @@ const LayoutEmailTemplatesIndexRoute =
 const LayoutCouponsIndexRoute = LayoutCouponsIndexRouteImport.update({
   id: '/coupons/',
   path: '/coupons/',
+  getParentRoute: () => LayoutRoute,
+} as any)
+const LayoutAttendeesIndexRoute = LayoutAttendeesIndexRouteImport.update({
+  id: '/attendees/',
+  path: '/attendees/',
   getParentRoute: () => LayoutRoute,
 } as any)
 const LayoutApplicationsIndexRoute = LayoutApplicationsIndexRouteImport.update({
@@ -253,6 +260,12 @@ const LayoutCouponsNewRoute = LayoutCouponsNewRouteImport.update({
   path: '/coupons/new',
   getParentRoute: () => LayoutRoute,
 } as any)
+const LayoutAttendeesAttendeeIdRoute =
+  LayoutAttendeesAttendeeIdRouteImport.update({
+    id: '/attendees/$attendeeId',
+    path: '/attendees/$attendeeId',
+    getParentRoute: () => LayoutRoute,
+  } as any)
 const LayoutApplicationsReviewQueueRoute =
   LayoutApplicationsReviewQueueRouteImport.update({
     id: '/applications/review-queue',
@@ -386,8 +399,8 @@ export interface FileRoutesByFullPath {
   '/': typeof LayoutIndexRoute
   '/login': typeof LoginRoute
   '/abandoned-carts': typeof LayoutAbandonedCartsRoute
+  '/activity': typeof LayoutActivityRoute
   '/api-keys': typeof LayoutApiKeysRoute
-  '/attendees': typeof LayoutAttendeesRoute
   '/check-in': typeof LayoutCheckInRoute
   '/payments': typeof LayoutPaymentsRoute
   '/settings': typeof LayoutSettingsRoute
@@ -396,6 +409,7 @@ export interface FileRoutesByFullPath {
   '/applications/$id': typeof LayoutApplicationsIdRoute
   '/applications/new': typeof LayoutApplicationsNewRoute
   '/applications/review-queue': typeof LayoutApplicationsReviewQueueRoute
+  '/attendees/$attendeeId': typeof LayoutAttendeesAttendeeIdRoute
   '/coupons/new': typeof LayoutCouponsNewRoute
   '/events/day-by-venue': typeof LayoutEventsDayByVenueRoute
   '/events/new': typeof LayoutEventsNewRoute
@@ -410,6 +424,7 @@ export interface FileRoutesByFullPath {
   '/ticketing-steps/$stepId': typeof LayoutTicketingStepsStepIdRoute
   '/admin/': typeof LayoutAdminIndexRoute
   '/applications/': typeof LayoutApplicationsIndexRoute
+  '/attendees/': typeof LayoutAttendeesIndexRoute
   '/coupons/': typeof LayoutCouponsIndexRoute
   '/email-templates/': typeof LayoutEmailTemplatesIndexRoute
   '/events/': typeof LayoutEventsIndexRoute
@@ -446,8 +461,8 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/abandoned-carts': typeof LayoutAbandonedCartsRoute
+  '/activity': typeof LayoutActivityRoute
   '/api-keys': typeof LayoutApiKeysRoute
-  '/attendees': typeof LayoutAttendeesRoute
   '/check-in': typeof LayoutCheckInRoute
   '/payments': typeof LayoutPaymentsRoute
   '/settings': typeof LayoutSettingsRoute
@@ -457,6 +472,7 @@ export interface FileRoutesByTo {
   '/applications/$id': typeof LayoutApplicationsIdRoute
   '/applications/new': typeof LayoutApplicationsNewRoute
   '/applications/review-queue': typeof LayoutApplicationsReviewQueueRoute
+  '/attendees/$attendeeId': typeof LayoutAttendeesAttendeeIdRoute
   '/coupons/new': typeof LayoutCouponsNewRoute
   '/events/day-by-venue': typeof LayoutEventsDayByVenueRoute
   '/events/new': typeof LayoutEventsNewRoute
@@ -471,6 +487,7 @@ export interface FileRoutesByTo {
   '/ticketing-steps/$stepId': typeof LayoutTicketingStepsStepIdRoute
   '/admin': typeof LayoutAdminIndexRoute
   '/applications': typeof LayoutApplicationsIndexRoute
+  '/attendees': typeof LayoutAttendeesIndexRoute
   '/coupons': typeof LayoutCouponsIndexRoute
   '/email-templates': typeof LayoutEmailTemplatesIndexRoute
   '/events': typeof LayoutEventsIndexRoute
@@ -509,8 +526,8 @@ export interface FileRoutesById {
   '/_layout': typeof LayoutRouteWithChildren
   '/login': typeof LoginRoute
   '/_layout/abandoned-carts': typeof LayoutAbandonedCartsRoute
+  '/_layout/activity': typeof LayoutActivityRoute
   '/_layout/api-keys': typeof LayoutApiKeysRoute
-  '/_layout/attendees': typeof LayoutAttendeesRoute
   '/_layout/check-in': typeof LayoutCheckInRoute
   '/_layout/payments': typeof LayoutPaymentsRoute
   '/_layout/settings': typeof LayoutSettingsRoute
@@ -520,6 +537,7 @@ export interface FileRoutesById {
   '/_layout/applications/$id': typeof LayoutApplicationsIdRoute
   '/_layout/applications/new': typeof LayoutApplicationsNewRoute
   '/_layout/applications/review-queue': typeof LayoutApplicationsReviewQueueRoute
+  '/_layout/attendees/$attendeeId': typeof LayoutAttendeesAttendeeIdRoute
   '/_layout/coupons/new': typeof LayoutCouponsNewRoute
   '/_layout/events/day-by-venue': typeof LayoutEventsDayByVenueRoute
   '/_layout/events/new': typeof LayoutEventsNewRoute
@@ -534,6 +552,7 @@ export interface FileRoutesById {
   '/_layout/ticketing-steps/$stepId': typeof LayoutTicketingStepsStepIdRoute
   '/_layout/admin/': typeof LayoutAdminIndexRoute
   '/_layout/applications/': typeof LayoutApplicationsIndexRoute
+  '/_layout/attendees/': typeof LayoutAttendeesIndexRoute
   '/_layout/coupons/': typeof LayoutCouponsIndexRoute
   '/_layout/email-templates/': typeof LayoutEmailTemplatesIndexRoute
   '/_layout/events/': typeof LayoutEventsIndexRoute
@@ -573,8 +592,8 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/abandoned-carts'
+    | '/activity'
     | '/api-keys'
-    | '/attendees'
     | '/check-in'
     | '/payments'
     | '/settings'
@@ -583,6 +602,7 @@ export interface FileRouteTypes {
     | '/applications/$id'
     | '/applications/new'
     | '/applications/review-queue'
+    | '/attendees/$attendeeId'
     | '/coupons/new'
     | '/events/day-by-venue'
     | '/events/new'
@@ -597,6 +617,7 @@ export interface FileRouteTypes {
     | '/ticketing-steps/$stepId'
     | '/admin/'
     | '/applications/'
+    | '/attendees/'
     | '/coupons/'
     | '/email-templates/'
     | '/events/'
@@ -633,8 +654,8 @@ export interface FileRouteTypes {
   to:
     | '/login'
     | '/abandoned-carts'
+    | '/activity'
     | '/api-keys'
-    | '/attendees'
     | '/check-in'
     | '/payments'
     | '/settings'
@@ -644,6 +665,7 @@ export interface FileRouteTypes {
     | '/applications/$id'
     | '/applications/new'
     | '/applications/review-queue'
+    | '/attendees/$attendeeId'
     | '/coupons/new'
     | '/events/day-by-venue'
     | '/events/new'
@@ -658,6 +680,7 @@ export interface FileRouteTypes {
     | '/ticketing-steps/$stepId'
     | '/admin'
     | '/applications'
+    | '/attendees'
     | '/coupons'
     | '/email-templates'
     | '/events'
@@ -695,8 +718,8 @@ export interface FileRouteTypes {
     | '/_layout'
     | '/login'
     | '/_layout/abandoned-carts'
+    | '/_layout/activity'
     | '/_layout/api-keys'
-    | '/_layout/attendees'
     | '/_layout/check-in'
     | '/_layout/payments'
     | '/_layout/settings'
@@ -706,6 +729,7 @@ export interface FileRouteTypes {
     | '/_layout/applications/$id'
     | '/_layout/applications/new'
     | '/_layout/applications/review-queue'
+    | '/_layout/attendees/$attendeeId'
     | '/_layout/coupons/new'
     | '/_layout/events/day-by-venue'
     | '/_layout/events/new'
@@ -720,6 +744,7 @@ export interface FileRouteTypes {
     | '/_layout/ticketing-steps/$stepId'
     | '/_layout/admin/'
     | '/_layout/applications/'
+    | '/_layout/attendees/'
     | '/_layout/coupons/'
     | '/_layout/email-templates/'
     | '/_layout/events/'
@@ -810,18 +835,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LayoutCheckInRouteImport
       parentRoute: typeof LayoutRoute
     }
-    '/_layout/attendees': {
-      id: '/_layout/attendees'
-      path: '/attendees'
-      fullPath: '/attendees'
-      preLoaderRoute: typeof LayoutAttendeesRouteImport
-      parentRoute: typeof LayoutRoute
-    }
     '/_layout/api-keys': {
       id: '/_layout/api-keys'
       path: '/api-keys'
       fullPath: '/api-keys'
       preLoaderRoute: typeof LayoutApiKeysRouteImport
+      parentRoute: typeof LayoutRoute
+    }
+    '/_layout/activity': {
+      id: '/_layout/activity'
+      path: '/activity'
+      fullPath: '/activity'
+      preLoaderRoute: typeof LayoutActivityRouteImport
       parentRoute: typeof LayoutRoute
     }
     '/_layout/abandoned-carts': {
@@ -913,6 +938,13 @@ declare module '@tanstack/react-router' {
       path: '/coupons'
       fullPath: '/coupons/'
       preLoaderRoute: typeof LayoutCouponsIndexRouteImport
+      parentRoute: typeof LayoutRoute
+    }
+    '/_layout/attendees/': {
+      id: '/_layout/attendees/'
+      path: '/attendees'
+      fullPath: '/attendees/'
+      preLoaderRoute: typeof LayoutAttendeesIndexRouteImport
       parentRoute: typeof LayoutRoute
     }
     '/_layout/applications/': {
@@ -1011,6 +1043,13 @@ declare module '@tanstack/react-router' {
       path: '/coupons/new'
       fullPath: '/coupons/new'
       preLoaderRoute: typeof LayoutCouponsNewRouteImport
+      parentRoute: typeof LayoutRoute
+    }
+    '/_layout/attendees/$attendeeId': {
+      id: '/_layout/attendees/$attendeeId'
+      path: '/attendees/$attendeeId'
+      fullPath: '/attendees/$attendeeId'
+      preLoaderRoute: typeof LayoutAttendeesAttendeeIdRouteImport
       parentRoute: typeof LayoutRoute
     }
     '/_layout/applications/review-queue': {
@@ -1186,8 +1225,8 @@ declare module '@tanstack/react-router' {
 
 interface LayoutRouteChildren {
   LayoutAbandonedCartsRoute: typeof LayoutAbandonedCartsRoute
+  LayoutActivityRoute: typeof LayoutActivityRoute
   LayoutApiKeysRoute: typeof LayoutApiKeysRoute
-  LayoutAttendeesRoute: typeof LayoutAttendeesRoute
   LayoutCheckInRoute: typeof LayoutCheckInRoute
   LayoutPaymentsRoute: typeof LayoutPaymentsRoute
   LayoutSettingsRoute: typeof LayoutSettingsRoute
@@ -1197,6 +1236,7 @@ interface LayoutRouteChildren {
   LayoutApplicationsIdRoute: typeof LayoutApplicationsIdRoute
   LayoutApplicationsNewRoute: typeof LayoutApplicationsNewRoute
   LayoutApplicationsReviewQueueRoute: typeof LayoutApplicationsReviewQueueRoute
+  LayoutAttendeesAttendeeIdRoute: typeof LayoutAttendeesAttendeeIdRoute
   LayoutCouponsNewRoute: typeof LayoutCouponsNewRoute
   LayoutEventsDayByVenueRoute: typeof LayoutEventsDayByVenueRoute
   LayoutEventsNewRoute: typeof LayoutEventsNewRoute
@@ -1211,6 +1251,7 @@ interface LayoutRouteChildren {
   LayoutTicketingStepsStepIdRoute: typeof LayoutTicketingStepsStepIdRoute
   LayoutAdminIndexRoute: typeof LayoutAdminIndexRoute
   LayoutApplicationsIndexRoute: typeof LayoutApplicationsIndexRoute
+  LayoutAttendeesIndexRoute: typeof LayoutAttendeesIndexRoute
   LayoutCouponsIndexRoute: typeof LayoutCouponsIndexRoute
   LayoutEmailTemplatesIndexRoute: typeof LayoutEmailTemplatesIndexRoute
   LayoutEventsIndexRoute: typeof LayoutEventsIndexRoute
@@ -1247,8 +1288,8 @@ interface LayoutRouteChildren {
 
 const LayoutRouteChildren: LayoutRouteChildren = {
   LayoutAbandonedCartsRoute: LayoutAbandonedCartsRoute,
+  LayoutActivityRoute: LayoutActivityRoute,
   LayoutApiKeysRoute: LayoutApiKeysRoute,
-  LayoutAttendeesRoute: LayoutAttendeesRoute,
   LayoutCheckInRoute: LayoutCheckInRoute,
   LayoutPaymentsRoute: LayoutPaymentsRoute,
   LayoutSettingsRoute: LayoutSettingsRoute,
@@ -1258,6 +1299,7 @@ const LayoutRouteChildren: LayoutRouteChildren = {
   LayoutApplicationsIdRoute: LayoutApplicationsIdRoute,
   LayoutApplicationsNewRoute: LayoutApplicationsNewRoute,
   LayoutApplicationsReviewQueueRoute: LayoutApplicationsReviewQueueRoute,
+  LayoutAttendeesAttendeeIdRoute: LayoutAttendeesAttendeeIdRoute,
   LayoutCouponsNewRoute: LayoutCouponsNewRoute,
   LayoutEventsDayByVenueRoute: LayoutEventsDayByVenueRoute,
   LayoutEventsNewRoute: LayoutEventsNewRoute,
@@ -1272,6 +1314,7 @@ const LayoutRouteChildren: LayoutRouteChildren = {
   LayoutTicketingStepsStepIdRoute: LayoutTicketingStepsStepIdRoute,
   LayoutAdminIndexRoute: LayoutAdminIndexRoute,
   LayoutApplicationsIndexRoute: LayoutApplicationsIndexRoute,
+  LayoutAttendeesIndexRoute: LayoutAttendeesIndexRoute,
   LayoutCouponsIndexRoute: LayoutCouponsIndexRoute,
   LayoutEmailTemplatesIndexRoute: LayoutEmailTemplatesIndexRoute,
   LayoutEventsIndexRoute: LayoutEventsIndexRoute,
