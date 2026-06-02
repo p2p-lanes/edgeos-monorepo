@@ -1,6 +1,7 @@
 import { useForm } from "@tanstack/react-form"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useNavigate } from "@tanstack/react-router"
+import { ArrowUpRight, MapPin } from "lucide-react"
 
 import { useMemo, useState } from "react"
 
@@ -301,6 +302,25 @@ export function VenueForm({ defaultValues, onSuccess }: VenueFormProps) {
   const [resolving, setResolving] = useState(false)
   const parsedCoords = parseGoogleMapsUrl(mapsLink)
 
+  // Convenience "open in Maps" target: prefer the venue's coordinates,
+  // falling back to a name + address search query.
+  const mapsUrl = useMemo(() => {
+    const lat = parsedCoords?.lat ?? defaultValues?.geo_lat
+    const lng = parsedCoords?.lng ?? defaultValues?.geo_lng
+    if (lat != null && lng != null) {
+      return `https://www.google.com/maps/@${lat},${lng},17z`
+    }
+    const query = [
+      defaultValues?.title,
+      defaultValues?.formatted_address || defaultValues?.location,
+    ]
+      .filter(Boolean)
+      .join(", ")
+    return query
+      ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`
+      : null
+  }, [parsedCoords, defaultValues])
+
   const handleMapsLinkChange = async (
     url: string,
     fieldChange: (v: string) => void,
@@ -418,6 +438,18 @@ export function VenueForm({ defaultValues, onSuccess }: VenueFormProps) {
                       : "Could not extract coordinates from this link"}
                 </p>
               )}
+              {mapsUrl && (
+                <a
+                  href={mapsUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:underline"
+                >
+                  <MapPin className="h-3.5 w-3.5" />
+                  Open in Google Maps
+                  <ArrowUpRight className="h-3 w-3" />
+                </a>
+              )}
             </div>
           </InlineRow>
 
@@ -446,6 +478,7 @@ export function VenueForm({ defaultValues, onSuccess }: VenueFormProps) {
                   onChange={(url) => field.handleChange(url ?? "")}
                   disabled={readOnly}
                   cropAspect={16 / 9}
+                  displayAspect={16 / 9}
                 />
               )}
             </form.Field>

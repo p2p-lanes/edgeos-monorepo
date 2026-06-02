@@ -41,6 +41,7 @@ import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
 import { EventsCalendarView } from "@/components/events/EventsCalendarView"
 import { EventsDayView } from "@/components/events/EventsDayView"
+import { EventsListView } from "@/components/events/EventsListView"
 import {
   type EventsView,
   EventsViewSwitcher,
@@ -106,7 +107,23 @@ const EVENT_STATUS_OPTIONS: { value: EventStatus; label: string }[] = [
   { value: "rejected", label: "Rejected" },
 ]
 
-const VALID_EVENT_VIEWS: Set<string> = new Set(["table", "calendar", "day"])
+const VALID_EVENT_VIEWS: Set<string> = new Set([
+  "table",
+  "list",
+  "calendar",
+  "day",
+])
+
+// Remember the last view the user picked so returning to /events (or a fresh
+// session) lands on it. Defaults to the card "list" view when nothing is
+// stored yet.
+const EVENTS_VIEW_STORAGE_KEY = "edgeos:events-view"
+
+function readStoredEventsView(): EventsView | null {
+  if (typeof window === "undefined") return null
+  const v = window.localStorage.getItem(EVENTS_VIEW_STORAGE_KEY)
+  return v && VALID_EVENT_VIEWS.has(v) ? (v as EventsView) : null
+}
 
 type EventsSearchParams = TableSearchParams & {
   status?: EventStatus
@@ -1191,7 +1208,7 @@ function EventsPage() {
   const { selectedPopupId } = useWorkspace()
   const navigate = useNavigate()
   const searchParams = Route.useSearch()
-  const view: EventsView = searchParams.view ?? "table"
+  const view: EventsView = searchParams.view ?? readStoredEventsView() ?? "list"
   const selectedDate = parseSelectedDate(searchParams.date)
   // Picking an occurrence row pops a "series or this only" prompt; non-recurring
   // rows skip the dialog and navigate straight to /events/:id/edit.
@@ -1259,13 +1276,16 @@ function EventsPage() {
 
   const setView = useCallback(
     (next: EventsView) => {
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem(EVENTS_VIEW_STORAGE_KEY, next)
+      }
       navigate({
         to: "/events",
         search: (prev: Record<string, unknown>) => {
           const prevDate = typeof prev.date === "string" ? prev.date : undefined
           return {
             ...prev,
-            view: next === "table" ? undefined : next,
+            view: next,
             date: next === "day" ? prevDate : undefined,
           }
         },
@@ -1363,6 +1383,26 @@ function EventsPage() {
           <Suspense fallback={<Skeleton className="h-64 w-full" />}>
             {view === "table" && (
               <EventsTableContent onRowClick={handleRowClick} />
+            )}
+            {view === "list" && (
+              <div className="space-y-3">
+                <CalendarDayToolbar
+                  popupId={selectedPopupId}
+                  status={searchParams.status}
+                  venueId={searchParams.venueId}
+                  search={searchParams.search ?? ""}
+                  setStatus={setStatusGlobal}
+                  setVenueId={setVenueIdGlobal}
+                  setSearch={setSearchGlobal}
+                />
+                <EventsListView
+                  popupId={selectedPopupId}
+                  status={searchParams.status}
+                  venueId={searchParams.venueId}
+                  search={searchParams.search ?? ""}
+                  onEventClick={handleRowClick}
+                />
+              </div>
             )}
             {view === "calendar" && (
               <div className="space-y-3">
