@@ -208,6 +208,7 @@ function NewPortalEventForm({
   const [trackId, setTrackId] = useState<string>("")
   const [coverUrl, setCoverUrl] = useState("")
   const [hostDisplayName, setHostDisplayName] = useState("")
+  const [hostId, setHostId] = useState<string | null>(null)
 
   // ---- venue + availability ------------------------------------------
   const {
@@ -283,6 +284,7 @@ function NewPortalEventForm({
           cover_url: coverUrl || null,
           tags,
           host_display_name: hostDisplayName.trim() || null,
+          host_id: hostId,
           status: "published",
         },
       })
@@ -545,6 +547,7 @@ function NewPortalEventForm({
         <HostDisplayField
           value={hostDisplayName}
           onChange={setHostDisplayName}
+          onHostIdChange={setHostId}
           currentUserName={currentHumanName}
           popupName={city?.name}
           popupId={popupId}
