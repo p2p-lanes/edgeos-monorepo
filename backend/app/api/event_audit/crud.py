@@ -27,6 +27,13 @@ from app.api.event_audit.schemas import EventAuditAction
 if TYPE_CHECKING:
     from app.api.event.models import Events
 
+# Heavy fields kept OUT of the stored per-row snapshot (written on EVERY event
+# mutation) to avoid JSONB bloat. They still surface in `changes` (old→new) when
+# actually edited — built from the full snapshot by the router — so a content
+# change stays visible without copying the whole body onto every approve/cancel
+# /recurrence row.
+_HEAVY_SNAPSHOT_FIELDS = {"content"}
+
 
 def build_event_snapshot(session: Session, event: Events) -> dict[str, Any]:
     """Snapshot every editable event field (from EventUpdate) + readable FK names."""
@@ -75,6 +82,12 @@ def record_event_audit(
     """
     if snapshot is None and event is not None:
         snapshot = build_event_snapshot(session, event)
+
+    # Strip heavy fields from the stored snapshot (changes still carry them).
+    if snapshot is not None:
+        snapshot = {
+            k: v for k, v in snapshot.items() if k not in _HEAVY_SNAPSHOT_FIELDS
+        }
 
     return audit_logs_crud.record_change(
         session,
