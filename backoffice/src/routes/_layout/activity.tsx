@@ -202,7 +202,14 @@ const columns: ColumnDef<AuditLogPublic>[] = [
   {
     id: "action",
     header: ({ column }) => <SortableHeader label="Action" column={column} />,
-    cell: ({ row }) => <span>{describeAuditAction(row.original)}</span>,
+    cell: ({ row }) => {
+      const text = describeAuditAction(row.original)
+      return (
+        <span className="block max-w-[32rem] truncate" title={text}>
+          {text}
+        </span>
+      )
+    },
   },
   {
     accessorKey: "entity_label",

@@ -62,12 +62,21 @@ export function describeAuditAction(log: AuditLogPublic): string {
       const eventVerb = EVENT_ACTION_VERBS[log.action]
       if (eventVerb) {
         const title = log.entity_label ? ` "${log.entity_label}"` : ""
-        // For updates, append the changed field names when available.
+        // For updates, summarize how much changed (the full diff is in the
+        // expandable row) — one field by name, several as a bounded count so
+        // the column never grows unbounded.
         if (log.action === "event.updated") {
-          const changes = (d.changes ?? {}) as Record<string, unknown>
-          const fields = Object.keys(changes)
-          if (fields.length > 0) {
-            return `${eventVerb}${title} (${fields.join(", ")})`
+          const changes = (
+            d.changes && typeof d.changes === "object" ? d.changes : {}
+          ) as Record<string, unknown>
+          // Collapse a "*_id" change into its readable "*_name" twin.
+          const fields = Object.keys(changes).filter(
+            (k) =>
+              !(k.endsWith("_id") && k.replace(/_id$/, "_name") in changes),
+          )
+          if (fields.length === 1) return `${eventVerb}${title} (${fields[0]})`
+          if (fields.length > 1) {
+            return `${eventVerb}${title} (${fields.length} fields)`
           }
         }
         return `${eventVerb}${title}`
