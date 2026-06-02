@@ -489,7 +489,7 @@ class TestApiKeyPolicy:
         )
 
         assert resp.status_code == 403, resp.text
-        assert resp.json()["detail"] == "Only the event owner can edit"
+        assert resp.json()["detail"] == "Only the event owner or host can edit"
 
     def test_pat_patch_requires_events_write_scope(
         self,
@@ -758,7 +758,8 @@ class TestApiKeyPolicy:
         )
         assert post_resp.status_code == 403, post_resp.text
         assert (
-            post_resp.json()["detail"] == "Only the event owner can manage invitations"
+            post_resp.json()["detail"]
+            == "Only the event owner or host can manage invitations"
         )
 
         del_resp = client.delete(
@@ -767,7 +768,8 @@ class TestApiKeyPolicy:
         )
         assert del_resp.status_code == 403, del_resp.text
         assert (
-            del_resp.json()["detail"] == "Only the event owner can manage invitations"
+            del_resp.json()["detail"]
+            == "Only the event owner or host can manage invitations"
         )
 
     def test_flagging_human_revokes_existing_api_keys(
