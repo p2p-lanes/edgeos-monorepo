@@ -748,6 +748,18 @@ export type BaseFieldConfigUpdate = {
 };
 
 /**
+ * The 'report a bug' payload, open to every backoffice user.
+ *
+ * Always produces an internal bug in the to-do column. Attachments are
+ * optional screenshots / screen-recordings already uploaded to S3.
+ */
+export type BugReportCreate = {
+    title: string;
+    detail?: (string | null);
+    attachments?: Array<TaskAttachmentCreate>;
+};
+
+/**
  * Buyer identification and form data for open-ticketing purchase.
  */
 export type BuyerInfo = {
@@ -2150,6 +2162,16 @@ export type ListModel_ProductPublic_ = {
     paging: Paging;
 };
 
+export type ListModel_TaskCommentPublic_ = {
+    results: Array<TaskCommentPublic>;
+    paging: Paging;
+};
+
+export type ListModel_TaskPublic_ = {
+    results: Array<TaskPublic>;
+    paging: Paging;
+};
+
 export type ListModel_TenantPublic_ = {
     results: Array<TenantPublic>;
     paging: Paging;
@@ -3044,6 +3066,125 @@ export type SendTestRequest = {
 } | null);
     popup_id?: (string | null);
 };
+
+/**
+ * Register an already-uploaded S3 object as a task attachment.
+ *
+ * The file itself is uploaded directly to S3 via POST /uploads/presigned-url;
+ * this just records the resulting key/url against the task.
+ */
+export type TaskAttachmentCreate = {
+    storage_key: string;
+    url: string;
+    media_type: TaskMediaType;
+    filename?: (string | null);
+    size_bytes?: (number | null);
+};
+
+export type TaskAttachmentPublic = {
+    id: string;
+    task_id: string;
+    url: string;
+    media_type: TaskMediaType;
+    filename?: (string | null);
+    size_bytes?: (number | null);
+    created_at: string;
+};
+
+export type TaskCommentCreate = {
+    body: string;
+};
+
+export type TaskCommentPublic = {
+    id: string;
+    task_id: string;
+    author_user_id?: (string | null);
+    author_name?: (string | null);
+    author_email?: (string | null);
+    body: string;
+    created_at: string;
+    edited_at?: (string | null);
+};
+
+export type TaskCommentUpdate = {
+    body: string;
+};
+
+export type TaskCreate = {
+    title: string;
+    detail?: (string | null);
+    status?: TaskStatus;
+    type?: TaskType;
+    responsible_user_id?: (string | null);
+    release?: (string | null);
+    visibility?: TaskVisibility;
+    target_tenant_id?: (string | null);
+};
+
+export type TaskDetailPublic = {
+    id: string;
+    title: string;
+    detail?: (string | null);
+    status: TaskStatus;
+    type: TaskType;
+    responsible_user_id?: (string | null);
+    responsible_name?: (string | null);
+    responsible_email?: (string | null);
+    release?: (string | null);
+    visibility: TaskVisibility;
+    target_tenant_id?: (string | null);
+    published_at?: (string | null);
+    created_by?: (string | null);
+    created_by_name?: (string | null);
+    created_at: string;
+    updated_at: string;
+    attachments?: Array<TaskAttachmentPublic>;
+};
+
+export type TaskMediaType = 'image' | 'video';
+
+export type TaskPublic = {
+    id: string;
+    title: string;
+    detail?: (string | null);
+    status: TaskStatus;
+    type: TaskType;
+    responsible_user_id?: (string | null);
+    responsible_name?: (string | null);
+    responsible_email?: (string | null);
+    release?: (string | null);
+    visibility: TaskVisibility;
+    target_tenant_id?: (string | null);
+    published_at?: (string | null);
+    created_by?: (string | null);
+    created_by_name?: (string | null);
+    created_at: string;
+    updated_at: string;
+};
+
+export type TaskStatus = 'to_do' | 'testing' | 'next_release' | 'published' | 'blocked' | 'cancelled';
+
+/**
+ * Lightweight payload for moving a card between Kanban columns.
+ */
+export type TaskStatusUpdate = {
+    status: TaskStatus;
+};
+
+export type TaskType = 'bug' | 'feature';
+
+export type TaskUpdate = {
+    title?: (string | null);
+    detail?: (string | null);
+    status?: (TaskStatus | null);
+    type?: (TaskType | null);
+    responsible_user_id?: (string | null);
+    release?: (string | null);
+    visibility?: (TaskVisibility | null);
+    target_tenant_id?: (string | null);
+};
+
+export type TaskVisibility = 'universal' | 'tenant' | 'internal';
 
 export type TemplateScope = 'tenant' | 'popup';
 
@@ -5513,6 +5654,105 @@ export type ProductsListPortalProductsData = {
 };
 
 export type ProductsListPortalProductsResponse = (ListModel_ProductPublic_);
+
+export type TasksReportBugData = {
+    requestBody: BugReportCreate;
+};
+
+export type TasksReportBugResponse = (TaskPublic);
+
+export type TasksListTasksData = {
+    /**
+     * Maximum number of items to return
+     */
+    limit?: number;
+    release?: (string | null);
+    responsibleUserId?: (string | null);
+    search?: (string | null);
+    /**
+     * Number of items to skip
+     */
+    skip?: number;
+    status?: (TaskStatus | null);
+    type?: (TaskType | null);
+    visibility?: (TaskVisibility | null);
+};
+
+export type TasksListTasksResponse = (ListModel_TaskPublic_);
+
+export type TasksCreateTaskData = {
+    requestBody: TaskCreate;
+};
+
+export type TasksCreateTaskResponse = (TaskDetailPublic);
+
+export type TasksGetTaskData = {
+    taskId: string;
+};
+
+export type TasksGetTaskResponse = (TaskDetailPublic);
+
+export type TasksUpdateTaskData = {
+    requestBody: TaskUpdate;
+    taskId: string;
+};
+
+export type TasksUpdateTaskResponse = (TaskDetailPublic);
+
+export type TasksDeleteTaskData = {
+    taskId: string;
+};
+
+export type TasksDeleteTaskResponse = (void);
+
+export type TasksUpdateTaskStatusData = {
+    requestBody: TaskStatusUpdate;
+    taskId: string;
+};
+
+export type TasksUpdateTaskStatusResponse = (TaskPublic);
+
+export type TasksAddAttachmentData = {
+    requestBody: TaskAttachmentCreate;
+    taskId: string;
+};
+
+export type TasksAddAttachmentResponse = (TaskAttachmentPublic);
+
+export type TasksDeleteAttachmentData = {
+    attachmentId: string;
+    taskId: string;
+};
+
+export type TasksDeleteAttachmentResponse = (void);
+
+export type TasksListTaskCommentsData = {
+    taskId: string;
+};
+
+export type TasksListTaskCommentsResponse = (ListModel_TaskCommentPublic_);
+
+export type TasksCreateTaskCommentData = {
+    requestBody: TaskCommentCreate;
+    taskId: string;
+};
+
+export type TasksCreateTaskCommentResponse = (TaskCommentPublic);
+
+export type TasksUpdateTaskCommentData = {
+    commentId: string;
+    requestBody: TaskCommentUpdate;
+    taskId: string;
+};
+
+export type TasksUpdateTaskCommentResponse = (TaskCommentPublic);
+
+export type TasksDeleteTaskCommentData = {
+    commentId: string;
+    taskId: string;
+};
+
+export type TasksDeleteTaskCommentResponse = (void);
 
 export type TenantsGetTenantByDomainData = {
     domain: string;

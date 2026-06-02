@@ -1,6 +1,5 @@
 "use client"
 
-import { dayBoundsInTz } from "@edgeos/shared-events"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { CalendarDays, Plus } from "lucide-react"
 import Link from "next/link"
@@ -36,6 +35,7 @@ import {
   saveEventsViewState,
 } from "./lib/eventsViewState"
 import { ListBody } from "./lib/ListBody"
+import { eventListWindowForPopup } from "./lib/listWindow"
 import {
   useEventTimezone,
   usePortalEventSettings,
@@ -309,44 +309,22 @@ export default function EventsPage() {
   // events render only at their master's start (hiding the other instances
   // from the list while the calendar still showed them).
   //
-  // Anchored to the popup's booking window so the list view starts on the
-  // popup's first day rather than "today" — if the popup hasn't started or
-  // has already ended, the list still shows its events instead of being
-  // empty. Falls back to a 180-day window from today before the popup
-  // record loads.
+  // Anchored to the popup's booking window, but once the popup is in progress
+  // the list starts at the popup-timezone start of today. That hides prior
+  // days while still keeping same-day events that happened earlier today.
+  // If the popup hasn't started or has already ended, the list still shows
+  // its events instead of being empty. Falls back to a 180-day window from
+  // today before the popup record loads.
   //
   // Bounds are anchored to the popup's timezone, not the browser's and not
   // UTC: the booking dates name calendar days *in the popup's timezone*, so
   // a UTC-midnight bound would leak the prior local evening and clip the
   // last local evening (e.g. for a UTC-7 popup, the night of the last day
   // falls after 00:00Z of the next day and would be dropped).
-  const listWindow = useMemo(() => {
-    const dayStr = (s: string | null | undefined) => {
-      const m = s?.slice(0, 10).match(/^\d{4}-\d{2}-\d{2}$/)
-      return m ? m[0] : null
-    }
-    const startDay = dayStr(city?.start_date)
-    const endDay = dayStr(city?.end_date)
-    if (startDay && endDay) {
-      // dayBoundsInTz returns [dayStart, dayEnd): the end of ``endDay`` is
-      // midnight of the following local day — exactly the exclusive upper
-      // bound that keeps the last day's events in.
-      const { start } = dayBoundsInTz(startDay, timezone)
-      const { end } = dayBoundsInTz(endDay, timezone)
-      return {
-        startAfter: start.toISOString(),
-        startBefore: end.toISOString(),
-      }
-    }
-    const start = new Date()
-    start.setUTCHours(0, 0, 0, 0)
-    const end = new Date(start)
-    end.setUTCDate(end.getUTCDate() + 180)
-    return {
-      startAfter: start.toISOString(),
-      startBefore: end.toISOString(),
-    }
-  }, [city?.start_date, city?.end_date, timezone])
+  const listWindow = useMemo(
+    () => eventListWindowForPopup(city?.start_date, city?.end_date, timezone),
+    [city?.start_date, city?.end_date, timezone],
+  )
 
   // The list is built from up to three independent "channels" — picking
   // events with OR semantics across the active filters so that toggling

@@ -17,7 +17,7 @@ WHAT (upgrade):
 Downgrade drops the table.
 
 Revision ID: b7e2a4c9f013
-Revises: 7a3f9c1d8e2b
+Revises: f3a8c1d92e47
 Create Date: 2026-06-01
 """
 
@@ -32,7 +32,7 @@ from app.alembic.utils import (
 
 # revision identifiers, used by Alembic.
 revision = "b7e2a4c9f013"
-down_revision = "7a3f9c1d8e2b"
+down_revision = "f3a8c1d92e47"
 branch_labels = None
 depends_on = None
 
