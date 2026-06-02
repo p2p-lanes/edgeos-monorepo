@@ -122,29 +122,37 @@
     cursor: pointer;
   }
 
+  /* Thin scrollbars everywhere — consistent across the whole app. The
+     [data-sidebar="content"] / .thin-scrollbar selectors are kept for explicit
+     opt-in, but the universal selector makes every scroll container match. */
+  *,
   [data-sidebar="content"],
   .thin-scrollbar {
     scrollbar-width: thin;
     scrollbar-color: var(--sidebar-border) transparent;
   }
 
+  *::-webkit-scrollbar,
   [data-sidebar="content"]::-webkit-scrollbar,
   .thin-scrollbar::-webkit-scrollbar {
     width: 6px;
     height: 6px;
   }
 
+  *::-webkit-scrollbar-track,
   [data-sidebar="content"]::-webkit-scrollbar-track,
   .thin-scrollbar::-webkit-scrollbar-track {
     background: transparent;
   }
 
+  *::-webkit-scrollbar-thumb,
   [data-sidebar="content"]::-webkit-scrollbar-thumb,
   .thin-scrollbar::-webkit-scrollbar-thumb {
     background-color: var(--sidebar-border);
     border-radius: 9999px;
   }
 
+  *::-webkit-scrollbar-thumb:hover,
   [data-sidebar="content"]::-webkit-scrollbar-thumb:hover,
   .thin-scrollbar::-webkit-scrollbar-thumb:hover {
     background-color: var(--sidebar-ring);

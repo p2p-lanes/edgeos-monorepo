@@ -2539,6 +2539,25 @@ export const AttendeeStatsSchema = {
     description: 'Statistics for attendees.'
 } as const;
 
+export const AttendeeTicketAddSchema = {
+    properties: {
+        items: {
+            items: {
+                '$ref': '#/components/schemas/AttendeeTicketLine'
+            },
+            type: 'array',
+            title: 'Items'
+        }
+    },
+    type: 'object',
+    required: ['items'],
+    title: 'AttendeeTicketAdd',
+    description: `Request body to add tickets to an attendee (admin panel, bulk).
+
+Mirrors the bulk-grant shape: N products, each with a quantity. Stock is
+validated per product and the whole batch is applied atomically.`
+} as const;
+
 export const AttendeeTicketInfoSchema = {
     properties: {
         id: {
@@ -2605,6 +2624,40 @@ per-ticket QR list the main applicant sees without an extra round-trip.
 \`last_scan_at\` is the most recent occurred_at from check_ins for this
 ticket (None when never scanned). The portal uses it to flag already-used
 QR codes — same behavior as the main applicant's pass view.`
+} as const;
+
+export const AttendeeTicketLineSchema = {
+    properties: {
+        product_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Product Id'
+        },
+        quantity: {
+            type: 'integer',
+            minimum: 1,
+            title: 'Quantity',
+            default: 1
+        }
+    },
+    type: 'object',
+    required: ['product_id'],
+    title: 'AttendeeTicketLine',
+    description: 'One product + quantity line in a bulk ticket add.'
+} as const;
+
+export const AttendeeTicketProductSwapSchema = {
+    properties: {
+        product_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Product Id'
+        }
+    },
+    type: 'object',
+    required: ['product_id'],
+    title: 'AttendeeTicketProductSwap',
+    description: "Request body to change the product of an attendee's ticket (admin panel)."
 } as const;
 
 export const AttendeeUpdateSchema = {
@@ -3005,6 +3058,133 @@ export const AttendeesDirectoryEntrySchema = {
     required: ['id'],
     title: 'AttendeesDirectoryEntry',
     description: 'Single entry in the attendees directory.'
+} as const;
+
+export const AuditLogPublicSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        source: {
+            type: 'string',
+            title: 'Source'
+        },
+        actor_type: {
+            type: 'string',
+            title: 'Actor Type'
+        },
+        actor_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Actor Id'
+        },
+        actor_email: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Actor Email'
+        },
+        actor_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Actor Name'
+        },
+        request_id: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Request Id'
+        },
+        action: {
+            type: 'string',
+            title: 'Action'
+        },
+        entity_type: {
+            type: 'string',
+            title: 'Entity Type'
+        },
+        entity_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Entity Id'
+        },
+        entity_label: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Entity Label'
+        },
+        popup_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Popup Id'
+        },
+        details: {
+            anyOf: [
+                {
+                    additionalProperties: true,
+                    type: 'object'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Details'
+        },
+        created_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Created At'
+        }
+    },
+    type: 'object',
+    required: ['id', 'source', 'actor_type', 'action', 'entity_type', 'created_at'],
+    title: 'AuditLogPublic',
+    description: 'A single audit log entry returned to the backoffice.'
 } as const;
 
 export const AuthCodeSentResponseSchema = {
@@ -5377,6 +5557,18 @@ export const EventCreateSchema = {
             ],
             title: 'Host Display Name'
         },
+        host_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Host Id'
+        },
         status: {
             '$ref': '#/components/schemas/EventStatus',
             default: 'draft'
@@ -5899,6 +6091,18 @@ export const EventPublicSchema = {
                 }
             ],
             title: 'Host Display Name'
+        },
+        host_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Host Id'
         },
         status: {
             '$ref': '#/components/schemas/EventStatus',
@@ -6870,6 +7074,18 @@ export const EventUpdateSchema = {
                 }
             ],
             title: 'Host Display Name'
+        },
+        host_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Host Id'
         },
         status: {
             anyOf: [
@@ -9840,6 +10056,24 @@ export const ListModel_AttendeesDirectoryEntry_Schema = {
     type: 'object',
     required: ['results', 'paging'],
     title: 'ListModel[AttendeesDirectoryEntry]'
+} as const;
+
+export const ListModel_AuditLogPublic_Schema = {
+    properties: {
+        results: {
+            items: {
+                '$ref': '#/components/schemas/AuditLogPublic'
+            },
+            type: 'array',
+            title: 'Results'
+        },
+        paging: {
+            '$ref': '#/components/schemas/Paging'
+        }
+    },
+    type: 'object',
+    required: ['results', 'paging'],
+    title: 'ListModel[AuditLogPublic]'
 } as const;
 
 export const ListModel_CheckInListItem_Schema = {

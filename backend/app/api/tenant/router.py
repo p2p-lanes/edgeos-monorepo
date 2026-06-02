@@ -307,11 +307,25 @@ async def delete_tenant(
 async def get_credentials(
     tenant_id: uuid.UUID,
     db: SessionDep,
-    _: CurrentSuperadmin,
+    current_user: CurrentAdmin,
 ) -> TenantCredentialResponse:
+    # Admins are scoped to their own tenant; superadmins can read any tenant.
+    if current_user.role == UserRole.ADMIN and current_user.tenant_id != tenant_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can only view credentials for your own organization",
+        )
+
+    # Superadmins see CRUD and read-only credentials; admins only read-only.
+    allowed_types = (
+        list(CredentialType)
+        if current_user.role == UserRole.SUPERADMIN
+        else [CredentialType.READONLY]
+    )
+
     credential_infos: list[CredentialInfo] = []
 
-    for cred_type in CredentialType:
+    for cred_type in allowed_types:
         result = get_tenant_credential(db, tenant_id, cred_type)
         if result:
             username, password = result
@@ -353,5 +367,3 @@ async def delete_credentials(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Tenant has no credentials to revoke",
         )
-
-

@@ -285,6 +285,7 @@ export function EditEventForm({
         <HostDisplayField
           value={form.hostDisplayName}
           onChange={form.setHostDisplayName}
+          onHostIdChange={form.setHostId}
           currentUserName={currentHumanName}
           popupName={cityName}
           popupId={popupId}

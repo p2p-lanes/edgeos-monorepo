@@ -1,4 +1,18 @@
 {
+  "cartBadge": {
+    "title": "Your cart",
+    "aria_open": "Open cart",
+    "passes_one": "{{count}} pass",
+    "passes_other": "{{count}} passes",
+    "housing": "Housing",
+    "merch_one": "{{count}} merch item",
+    "merch_other": "{{count}} merch items",
+    "patron": "Patron contribution",
+    "go_to_checkout": "Go to checkout",
+    "clear": "Clear cart",
+    "clear_confirm": "Confirm",
+    "clearing": "Clearing..."
+  },
   "common": {
     "apply": "Apply",
     "back": "Back",
@@ -500,7 +514,9 @@
       "unhide_title": "Unhide",
       "highlighted_badge": "Featured",
       "highlighted_title": "Featured event",
-      "owned_title": "Created by you"
+      "owned_title": "Created by you",
+      "collapse_day_aria": "Collapse events for {{date}}",
+      "expand_day_aria": "Expand events for {{date}}"
     },
     "status": {
       "draft": "Draft",
@@ -626,7 +642,10 @@
       "cancel_event_error": "Couldn't cancel event",
       "pending_approval_banner_title": "Pending approval",
       "pending_approval_banner_message": "Your event is pending approval and not yet visible to others.",
-      "open_in_maps": "Open in Google Maps"
+      "open_in_maps": "Open in Google Maps",
+      "share_button": "Share event",
+      "share_link_copied": "Link copied",
+      "share_link_error": "Couldn't copy link"
     },
     "form": {
       "create_heading": "Create event",

@@ -366,19 +366,53 @@ class TestTenantEndpointsAccess:
 
         assert response.status_code == 403
 
-    def test_tenant_admin_cannot_get_tenant_credentials(
+    def test_tenant_admin_gets_only_readonly_credentials(
         self,
         client: TestClient,
         admin_token_tenant_a: str,
         tenant_a: Tenants,
     ) -> None:
-        """Tenant admin should NOT be able to get tenant credentials."""
+        """Tenant admin can read its own tenant credentials, read-only only."""
         response = client.get(
             f"/api/v1/tenants/{tenant_a.id}/credentials",
             headers={"Authorization": f"Bearer {admin_token_tenant_a}"},
         )
 
+        assert response.status_code == 200
+        data = response.json()
+        types = {c["credential_type"] for c in data["credentials"]}
+        assert types == {CredentialType.READONLY.value}
+
+    def test_tenant_admin_cannot_get_other_tenant_credentials(
+        self,
+        client: TestClient,
+        admin_token_tenant_a: str,
+        tenant_b: Tenants,
+    ) -> None:
+        """Tenant admin should NOT read another tenant's credentials."""
+        response = client.get(
+            f"/api/v1/tenants/{tenant_b.id}/credentials",
+            headers={"Authorization": f"Bearer {admin_token_tenant_a}"},
+        )
+
         assert response.status_code == 403
+
+    def test_superadmin_gets_crud_and_readonly_credentials(
+        self,
+        client: TestClient,
+        superadmin_token: str,
+        tenant_a: Tenants,
+    ) -> None:
+        """Superadmin reads both CRUD and read-only credentials."""
+        response = client.get(
+            f"/api/v1/tenants/{tenant_a.id}/credentials",
+            headers={"Authorization": f"Bearer {superadmin_token}"},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        types = {c["credential_type"] for c in data["credentials"]}
+        assert types == {CredentialType.CRUD.value, CredentialType.READONLY.value}
 
     def test_superadmin_can_list_tenants(
         self,
@@ -675,8 +709,7 @@ class TestSessionUserRLS:
         # Tenant B popup must not leak in
         with psycopg.connect(dsn, autocommit=True) as conn:
             ids = [
-                row[0]
-                for row in conn.execute("SELECT id::text FROM popups").fetchall()
+                row[0] for row in conn.execute("SELECT id::text FROM popups").fetchall()
             ]
         assert str(popup_tenant_b.id) not in ids
         assert str(popup_tenant_a.id) in ids
@@ -735,9 +768,7 @@ class TestSessionUserRLS:
 
         Covers SCENARIO-5 and REQ-2.
         """
-        dsn = _get_tenant_dsn(
-            db, postgres_container, tenant_a.id, CredentialType.CRUD
-        )
+        dsn = _get_tenant_dsn(db, postgres_container, tenant_a.id, CredentialType.CRUD)
         with psycopg.connect(dsn) as conn:
             with pytest.raises(psycopg.errors.InsufficientPrivilege):
                 conn.execute(

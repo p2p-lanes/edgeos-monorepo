@@ -52,6 +52,7 @@ import {
 } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
+import { VenueHoursSummary } from "@/components/VenueHoursSummary"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
 import useAuth from "@/hooks/useAuth"
 import useCustomToast from "@/hooks/useCustomToast"
@@ -346,6 +347,7 @@ export function EventForm({
       require_approval: false,
       highlighted: defaultValues?.highlighted ?? false,
       host_display_name: defaultValues?.host_display_name ?? "",
+      host_id: defaultValues?.host_id ?? null,
       tags: defaultValues?.tags ?? [],
     },
     onSubmit: ({ value }) => {
@@ -402,6 +404,7 @@ export function EventForm({
           content: value.content || null,
           kind: value.kind || null,
           host_display_name: hostDisplayName,
+          host_id: value.host_id,
           start_time: startDate.toISOString(),
           end_time: endDate.toISOString(),
           timezone: value.timezone,
@@ -428,6 +431,7 @@ export function EventForm({
           content: value.content || null,
           kind: value.kind || null,
           host_display_name: hostDisplayName,
+          host_id: value.host_id,
           start_time: startDate.toISOString(),
           end_time: endDate.toISOString(),
           timezone: value.timezone,
@@ -797,6 +801,23 @@ export function EventForm({
 
   const startFits = fitnessIssue === null
 
+  // When the typed slot doesn't fit, suggest the closest open slots so the
+  // user can fix it in one click instead of hunting for a valid time. Ranked
+  // by proximity to the typed start; capped at three.
+  const nearbyStartOptions = useMemo(() => {
+    if (startFits || startSlotOptions.length === 0) return []
+    const anchor = startUtc?.getTime() ?? null
+    const ranked =
+      anchor == null
+        ? startSlotOptions
+        : [...startSlotOptions].sort(
+            (a, b) =>
+              Math.abs(Date.parse(a.isoUtc) - anchor) -
+              Math.abs(Date.parse(b.isoUtc) - anchor),
+          )
+    return ranked.slice(0, 3)
+  }, [startFits, startSlotOptions, startUtc])
+
   // Combined availability: when the slot doesn't fit locally, surface the
   // precise reason — we'd otherwise show a stale "Slot available" from the
   // server check, which only validates conflicts (not open hours).
@@ -1143,19 +1164,40 @@ export function EventForm({
         )}
 
         {selectedVenue && (
-          <InlineRow
-            label="Venue details"
-            description="Capacity, booking mode and weekly hours"
-          >
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setVenueDialogOpen(true)}
-            >
-              View details
-            </Button>
-          </InlineRow>
+          <div className="space-y-3 px-1 py-2">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0 flex-1">
+                <p className="mb-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                  Open hours
+                </p>
+                <VenueHoursSummary hours={selectedVenue.weekly_hours} />
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setVenueDialogOpen(true)}
+              >
+                View details
+              </Button>
+            </div>
+
+            {selectedVenue.photos && selectedVenue.photos.length > 0 && (
+              <div className="flex gap-2 overflow-x-auto pb-1">
+                {[...selectedVenue.photos]
+                  .sort((a, b) => a.position - b.position)
+                  .slice(0, 6)
+                  .map((photo) => (
+                    <img
+                      key={photo.id}
+                      src={photo.image_url}
+                      alt=""
+                      className="h-16 w-16 shrink-0 rounded-md border object-cover"
+                    />
+                  ))}
+              </div>
+            )}
+          </div>
         )}
 
         {selectedVenue && isVenueUnbookable && (
@@ -1341,6 +1383,29 @@ export function EventForm({
               }
             />
             <AvailabilityIndicator availability={effectiveAvailability} />
+            {!readOnly && nearbyStartOptions.length > 0 && (
+              <div className="flex flex-col items-end gap-1">
+                <span className="text-xs text-muted-foreground">
+                  Nearby open times
+                </span>
+                <div className="flex flex-wrap justify-end gap-1.5">
+                  {nearbyStartOptions.map((opt) => (
+                    <button
+                      key={opt.isoUtc}
+                      type="button"
+                      onClick={() => {
+                        const date =
+                          dateStr || new Date().toISOString().slice(0, 10)
+                        form.setFieldValue("start_time", `${date}T${opt.label}`)
+                      }}
+                      className="inline-flex h-7 items-center rounded-md border bg-background px-2.5 text-xs font-medium shadow-sm transition-colors hover:bg-muted"
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </InlineRow>
 
@@ -1428,7 +1493,10 @@ export function EventForm({
               <div className="flex w-full max-w-[380px] flex-col gap-2">
                 <Input
                   value={field.state.value}
-                  onChange={(e) => field.handleChange(e.target.value)}
+                  onChange={(e) => {
+                    field.handleChange(e.target.value)
+                    form.setFieldValue("host_id", null)
+                  }}
                   placeholder={
                     popup?.name ? `${popup.name} (default)` : "Optional"
                   }
@@ -1443,7 +1511,10 @@ export function EventForm({
                         variant="ghost"
                         size="sm"
                         className="h-7 px-2 text-xs"
-                        onClick={() => field.handleChange(popup.name ?? "")}
+                        onClick={() => {
+                          field.handleChange(popup.name ?? "")
+                          form.setFieldValue("host_id", null)
+                        }}
                       >
                         Use {popup.name}
                       </Button>
@@ -1454,9 +1525,10 @@ export function EventForm({
                         variant="ghost"
                         size="sm"
                         className="h-7 px-2 text-xs"
-                        onClick={() =>
+                        onClick={() => {
                           field.handleChange(currentUserDisplayName)
-                        }
+                          form.setFieldValue("host_id", null)
+                        }}
                       >
                         Use my name
                       </Button>
@@ -1501,6 +1573,7 @@ export function EventForm({
                                   className="flex w-full flex-col items-start gap-0.5 px-3 py-2 text-left text-sm hover:bg-muted"
                                   onClick={() => {
                                     field.handleChange(name)
+                                    form.setFieldValue("host_id", h.id)
                                     setHostPickerOpen(false)
                                     setHostSearch("")
                                   }}
