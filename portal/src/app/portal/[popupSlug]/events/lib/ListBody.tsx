@@ -3,6 +3,7 @@
 import {
   CalendarDays,
   CheckCircle,
+  ChevronDown,
   Clock,
   Crown,
   Eye,
@@ -16,10 +17,17 @@ import {
   Tag,
 } from "lucide-react"
 import Link from "next/link"
+import { useState } from "react"
 import { useTranslation } from "react-i18next"
 
 import type { EventPublic } from "@/client"
 import { Badge } from "@/components/ui/badge"
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible"
+import { cn } from "@/lib/utils"
 import { CoverImage } from "./CoverImage"
 import type { EventsScrollSnapshot } from "./eventsViewState"
 import { summarizeRrule } from "./summarizeRrule"
@@ -110,6 +118,15 @@ export function ListBody({
 }: ListBodyProps) {
   const { t } = useTranslation()
   const isAuthed = mode === "authed"
+  const [collapsedDays, setCollapsedDays] = useState<Set<string>>(new Set())
+  const toggleDay = (date: string) => {
+    setCollapsedDays((prev) => {
+      const next = new Set(prev)
+      if (next.has(date)) next.delete(date)
+      else next.add(date)
+      return next
+    })
+  }
 
   if (isLoading) {
     return (
@@ -132,250 +149,281 @@ export function ListBody({
 
   return (
     <div className="space-y-6">
-      {grouped.map(([date, dayEvents]) => (
-        <div key={date}>
-          <div className="flex items-center gap-3 mb-3">
-            <div className="h-2 w-2 rounded-full bg-primary" />
-            <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              {formatDateShort(dayEvents[0].start_time)}
-            </h2>
-            <div className="flex-1 h-px bg-border" />
-          </div>
-          <div className="space-y-2 pl-5 border-l-2 border-border">
-            {dayEvents.map((event) => {
-              const isOwner =
-                isAuthed &&
-                currentHumanId != null &&
-                event.owner_id === currentHumanId
-              const isHidden = isAuthed && event.hidden === true
-              const isHighlighted = event.highlighted === true
-              const cardClass = isHidden
-                ? "relative rounded-xl border bg-card opacity-60 hover:opacity-100 transition-opacity"
-                : isHighlighted
-                  ? "relative rounded-xl border-2 border-amber-400 bg-amber-50 dark:bg-amber-950/30 hover:shadow-md transition-shadow"
-                  : "relative rounded-xl border bg-card hover:shadow-md transition-shadow"
-              const href = event.occurrence_id
-                ? `/portal/${slug}/events/${event.id}?occ=${encodeURIComponent(event.start_time)}`
-                : `/portal/${slug}/events/${event.id}`
-              const handleClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
-                if (onEventClick) {
-                  const handled = onEventClick(event)
-                  if (handled === true) {
-                    e.preventDefault()
-                    return
-                  }
-                }
-                if (onEventLinkClick) {
-                  const main =
-                    typeof document !== "undefined"
-                      ? document.querySelector("main")
-                      : null
-                  onEventLinkClick("list", null, {
-                    outer: main?.scrollTop ?? 0,
-                  })
-                }
-              }
-              const thumbUrl =
-                event.cover_url ||
-                event.venue_image_url ||
-                placeholderUrl ||
-                null
-              return (
-                <div
-                  key={event.id}
-                  id={
-                    event.occurrence_id
-                      ? `event-card-${event.id}__${event.start_time}`
-                      : `event-card-${event.id}`
-                  }
-                  className={cardClass}
-                >
-                  <Link
-                    href={href}
-                    onClick={handleClick}
-                    className={
-                      isAuthed ? "block p-3 sm:p-4 pb-11" : "block p-3 sm:p-4"
+      {grouped.map(([date, dayEvents]) => {
+        const isOpen = !collapsedDays.has(date)
+        const dayLabel = formatDateShort(dayEvents[0].start_time)
+        return (
+          <Collapsible
+            key={date}
+            open={isOpen}
+            onOpenChange={() => toggleDay(date)}
+          >
+            <CollapsibleTrigger asChild>
+              <button
+                type="button"
+                aria-label={t(
+                  isOpen
+                    ? "events.list.collapse_day_aria"
+                    : "events.list.expand_day_aria",
+                  { date: dayLabel },
+                )}
+                className="w-full flex items-center gap-3 mb-3 group cursor-pointer"
+              >
+                <div className="h-2 w-2 rounded-full bg-primary" />
+                <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  {dayLabel}
+                </h2>
+                <div className="flex-1 h-px bg-border" />
+                <ChevronDown
+                  className={cn(
+                    "w-4 h-4 text-muted-foreground shrink-0 transition-transform duration-200 group-hover:text-foreground",
+                    isOpen && "rotate-180",
+                  )}
+                />
+              </button>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <div className="space-y-2 pl-5 border-l-2 border-border">
+                {dayEvents.map((event) => {
+                  const isOwner =
+                    isAuthed &&
+                    currentHumanId != null &&
+                    event.owner_id === currentHumanId
+                  const isHidden = isAuthed && event.hidden === true
+                  const isHighlighted = event.highlighted === true
+                  const cardClass = isHidden
+                    ? "relative rounded-xl border bg-card opacity-60 hover:opacity-100 transition-opacity"
+                    : isHighlighted
+                      ? "relative rounded-xl border-2 border-amber-400 bg-amber-50 dark:bg-amber-950/30 hover:shadow-md transition-shadow"
+                      : "relative rounded-xl border bg-card hover:shadow-md transition-shadow"
+                  const href = event.occurrence_id
+                    ? `/portal/${slug}/events/${event.id}?occ=${encodeURIComponent(event.start_time)}`
+                    : `/portal/${slug}/events/${event.id}`
+                  const handleClick = (
+                    e: React.MouseEvent<HTMLAnchorElement>,
+                  ) => {
+                    if (onEventClick) {
+                      const handled = onEventClick(event)
+                      if (handled === true) {
+                        e.preventDefault()
+                        return
+                      }
                     }
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className="h-14 w-14 sm:h-16 sm:w-16 shrink-0 rounded-lg overflow-hidden">
-                        <CoverImage
-                          src={thumbUrl}
-                          alt={event.title}
-                          className="w-full h-full object-cover"
-                          fallback={
-                            <CalendarDays className="h-5 w-5 text-muted-foreground/40" />
-                          }
-                        />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-start justify-between gap-2 mb-1">
-                          <h3 className="font-medium text-sm sm:text-base flex items-center gap-1.5">
-                            {isOwner && (
-                              <Crown
-                                className="h-3.5 w-3.5 shrink-0 text-amber-500"
-                                aria-label={t("events.list.owned_title")}
-                              />
-                            )}
-                            <span>{event.title}</span>
-                          </h3>
-                          {isAuthed && (
-                            <Badge
-                              variant="secondary"
-                              className={
-                                statusColors[event.status as string] ?? ""
+                    if (onEventLinkClick) {
+                      const main =
+                        typeof document !== "undefined"
+                          ? document.querySelector("main")
+                          : null
+                      onEventLinkClick("list", null, {
+                        outer: main?.scrollTop ?? 0,
+                      })
+                    }
+                  }
+                  const thumbUrl =
+                    event.cover_url ||
+                    event.venue_image_url ||
+                    placeholderUrl ||
+                    null
+                  return (
+                    <div
+                      key={event.id}
+                      id={
+                        event.occurrence_id
+                          ? `event-card-${event.id}__${event.start_time}`
+                          : `event-card-${event.id}`
+                      }
+                      className={cardClass}
+                    >
+                      <Link
+                        href={href}
+                        onClick={handleClick}
+                        className={
+                          isAuthed
+                            ? "block p-3 sm:p-4 pb-11"
+                            : "block p-3 sm:p-4"
+                        }
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className="h-14 w-14 sm:h-16 sm:w-16 shrink-0 rounded-lg overflow-hidden">
+                            <CoverImage
+                              src={thumbUrl}
+                              alt={event.title}
+                              className="w-full h-full object-cover"
+                              fallback={
+                                <CalendarDays className="h-5 w-5 text-muted-foreground/40" />
                               }
+                            />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-start justify-between gap-2 mb-1">
+                              <h3 className="font-medium text-sm sm:text-base flex items-center gap-1.5">
+                                {isOwner && (
+                                  <Crown
+                                    className="h-3.5 w-3.5 shrink-0 text-amber-500"
+                                    aria-label={t("events.list.owned_title")}
+                                  />
+                                )}
+                                <span>{event.title}</span>
+                              </h3>
+                              {isAuthed && (
+                                <Badge
+                                  variant="secondary"
+                                  className={
+                                    statusColors[event.status as string] ?? ""
+                                  }
+                                >
+                                  {t(`events.status.${event.status}`)}
+                                </Badge>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                              <Clock className="h-3 w-3" />
+                              <span>
+                                {formatTime(event.start_time)} –{" "}
+                                {formatTime(event.end_time)}
+                              </span>
+                            </div>
+                            {event.venue_title && (
+                              <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5">
+                                <MapPin className="h-3 w-3" />
+                                <span className="truncate">
+                                  {event.venue_title}
+                                  {event.venue_location
+                                    ? ` · ${event.venue_location}`
+                                    : ""}
+                                </span>
+                              </div>
+                            )}
+                            {(event.rrule || event.recurrence_master_id) && (
+                              <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5">
+                                <Repeat className="h-3 w-3" />
+                                <span className="truncate">
+                                  {summarizeRrule(event.rrule) ??
+                                    t("events.list.part_of_recurring_series")}
+                                </span>
+                              </div>
+                            )}
+                            {event.track_title && (
+                              <div className="flex items-center gap-1.5 text-xs font-medium text-violet-700 dark:text-violet-300 mt-0.5">
+                                <Layers className="h-3 w-3" />
+                                <span className="truncate">
+                                  {event.track_title}
+                                </span>
+                              </div>
+                            )}
+                            {event.tags && event.tags.length > 0 && (
+                              <div className="flex items-center gap-1 mt-1.5 flex-wrap">
+                                {event.tags.slice(0, 3).map((tag: string) => (
+                                  <span
+                                    key={tag}
+                                    className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded border border-border bg-muted/60 text-muted-foreground"
+                                  >
+                                    <Tag className="h-2.5 w-2.5" />
+                                    {tag}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </Link>
+                      {isAuthed && (
+                        <div className="absolute bottom-2 right-2 flex items-center gap-1.5">
+                          {event.status === "published" &&
+                            (() => {
+                              const rsvpKey = `${event.id}:${event.start_time}`
+                              const isRsvpPending = pendingRsvpKey === rsvpKey
+                              const isRsvped =
+                                event.my_rsvp_status &&
+                                event.my_rsvp_status !== "cancelled"
+                              return isRsvped ? (
+                                <button
+                                  type="button"
+                                  disabled={isRsvpPending}
+                                  onClick={(e) => {
+                                    e.preventDefault()
+                                    e.stopPropagation()
+                                    onCancelRsvp?.(event)
+                                  }}
+                                  className="inline-flex h-7 items-center gap-1 rounded-md border border-emerald-300 bg-emerald-50 px-2 text-xs font-medium text-emerald-700 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-emerald-500/40 dark:bg-emerald-950/40 dark:text-emerald-300 dark:hover:bg-emerald-950/60"
+                                >
+                                  {isRsvpPending ? (
+                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                  ) : (
+                                    <CheckCircle className="h-3 w-3" />
+                                  )}
+                                  {t("events.rsvp.going")}
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  disabled={isRsvpPending}
+                                  onClick={(e) => {
+                                    e.preventDefault()
+                                    e.stopPropagation()
+                                    onRsvp?.(event)
+                                  }}
+                                  className="inline-flex h-7 items-center gap-1 rounded-md border bg-background px-2 text-xs font-medium shadow-sm hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+                                >
+                                  {isRsvpPending && (
+                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                  )}
+                                  {t("events.rsvp.rsvp")}
+                                </button>
+                              )
+                            })()}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault()
+                              e.stopPropagation()
+                              if (isHidden) onUnhide?.(event.id)
+                              else onHide?.(event.id)
+                            }}
+                            aria-label={
+                              isHidden
+                                ? t("events.list.unhide_event_aria", {
+                                    title: event.title,
+                                  })
+                                : t("events.list.hide_event_aria", {
+                                    title: event.title,
+                                  })
+                            }
+                            title={
+                              isHidden
+                                ? t("events.list.unhide_title")
+                                : t("events.list.hide_title")
+                            }
+                            className="inline-flex h-7 w-7 items-center justify-center rounded-md border bg-background text-muted-foreground shadow-sm transition-colors hover:text-foreground"
+                          >
+                            {isHidden ? (
+                              <EyeOff className="h-3.5 w-3.5" />
+                            ) : (
+                              <Eye className="h-3.5 w-3.5" />
+                            )}
+                          </button>
+                          {isOwner && (
+                            <Link
+                              href={`/portal/${slug}/events/${event.id}/edit`}
+                              onClick={(e) => e.stopPropagation()}
+                              aria-label={t("events.list.edit_event_aria", {
+                                title: event.title,
+                              })}
+                              className="inline-flex h-7 w-7 items-center justify-center rounded-md border bg-background text-muted-foreground shadow-sm transition-colors hover:text-foreground"
                             >
-                              {t(`events.status.${event.status}`)}
-                            </Badge>
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Link>
                           )}
                         </div>
-                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                          <Clock className="h-3 w-3" />
-                          <span>
-                            {formatTime(event.start_time)} –{" "}
-                            {formatTime(event.end_time)}
-                          </span>
-                        </div>
-                        {event.venue_title && (
-                          <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5">
-                            <MapPin className="h-3 w-3" />
-                            <span className="truncate">
-                              {event.venue_title}
-                              {event.venue_location
-                                ? ` · ${event.venue_location}`
-                                : ""}
-                            </span>
-                          </div>
-                        )}
-                        {(event.rrule || event.recurrence_master_id) && (
-                          <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5">
-                            <Repeat className="h-3 w-3" />
-                            <span className="truncate">
-                              {summarizeRrule(event.rrule) ??
-                                t("events.list.part_of_recurring_series")}
-                            </span>
-                          </div>
-                        )}
-                        {event.track_title && (
-                          <div className="flex items-center gap-1.5 text-xs font-medium text-violet-700 dark:text-violet-300 mt-0.5">
-                            <Layers className="h-3 w-3" />
-                            <span className="truncate">
-                              {event.track_title}
-                            </span>
-                          </div>
-                        )}
-                        {event.tags && event.tags.length > 0 && (
-                          <div className="flex items-center gap-1 mt-1.5 flex-wrap">
-                            {event.tags.slice(0, 3).map((tag: string) => (
-                              <span
-                                key={tag}
-                                className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded border border-border bg-muted/60 text-muted-foreground"
-                              >
-                                <Tag className="h-2.5 w-2.5" />
-                                {tag}
-                              </span>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </Link>
-                  {isAuthed && (
-                    <div className="absolute bottom-2 right-2 flex items-center gap-1.5">
-                      {event.status === "published" &&
-                        (() => {
-                          const rsvpKey = `${event.id}:${event.start_time}`
-                          const isRsvpPending = pendingRsvpKey === rsvpKey
-                          const isRsvped =
-                            event.my_rsvp_status &&
-                            event.my_rsvp_status !== "cancelled"
-                          return isRsvped ? (
-                            <button
-                              type="button"
-                              disabled={isRsvpPending}
-                              onClick={(e) => {
-                                e.preventDefault()
-                                e.stopPropagation()
-                                onCancelRsvp?.(event)
-                              }}
-                              className="inline-flex h-7 items-center gap-1 rounded-md border border-emerald-300 bg-emerald-50 px-2 text-xs font-medium text-emerald-700 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-emerald-500/40 dark:bg-emerald-950/40 dark:text-emerald-300 dark:hover:bg-emerald-950/60"
-                            >
-                              {isRsvpPending ? (
-                                <Loader2 className="h-3 w-3 animate-spin" />
-                              ) : (
-                                <CheckCircle className="h-3 w-3" />
-                              )}
-                              {t("events.rsvp.going")}
-                            </button>
-                          ) : (
-                            <button
-                              type="button"
-                              disabled={isRsvpPending}
-                              onClick={(e) => {
-                                e.preventDefault()
-                                e.stopPropagation()
-                                onRsvp?.(event)
-                              }}
-                              className="inline-flex h-7 items-center gap-1 rounded-md border bg-background px-2 text-xs font-medium shadow-sm hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
-                            >
-                              {isRsvpPending && (
-                                <Loader2 className="h-3 w-3 animate-spin" />
-                              )}
-                              {t("events.rsvp.rsvp")}
-                            </button>
-                          )
-                        })()}
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.preventDefault()
-                          e.stopPropagation()
-                          if (isHidden) onUnhide?.(event.id)
-                          else onHide?.(event.id)
-                        }}
-                        aria-label={
-                          isHidden
-                            ? t("events.list.unhide_event_aria", {
-                                title: event.title,
-                              })
-                            : t("events.list.hide_event_aria", {
-                                title: event.title,
-                              })
-                        }
-                        title={
-                          isHidden
-                            ? t("events.list.unhide_title")
-                            : t("events.list.hide_title")
-                        }
-                        className="inline-flex h-7 w-7 items-center justify-center rounded-md border bg-background text-muted-foreground shadow-sm transition-colors hover:text-foreground"
-                      >
-                        {isHidden ? (
-                          <EyeOff className="h-3.5 w-3.5" />
-                        ) : (
-                          <Eye className="h-3.5 w-3.5" />
-                        )}
-                      </button>
-                      {isOwner && (
-                        <Link
-                          href={`/portal/${slug}/events/${event.id}/edit`}
-                          onClick={(e) => e.stopPropagation()}
-                          aria-label={t("events.list.edit_event_aria", {
-                            title: event.title,
-                          })}
-                          className="inline-flex h-7 w-7 items-center justify-center rounded-md border bg-background text-muted-foreground shadow-sm transition-colors hover:text-foreground"
-                        >
-                          <Pencil className="h-3.5 w-3.5" />
-                        </Link>
                       )}
                     </div>
-                  )}
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      ))}
+                  )
+                })}
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
+        )
+      })}
     </div>
   )
 }

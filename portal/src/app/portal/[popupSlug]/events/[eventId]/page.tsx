@@ -8,6 +8,7 @@ import {
   CalendarCheck,
   CalendarDays,
   CalendarPlus,
+  Check,
   CheckCircle,
   Clock,
   Home,
@@ -19,6 +20,7 @@ import {
   Pencil,
   Repeat,
   Send,
+  Share2,
   Tag,
   Trash2,
   User,
@@ -261,6 +263,7 @@ export default function EventDetailPage() {
   })
 
   const [cancelEventOpen, setCancelEventOpen] = useState(false)
+  const [copied, setCopied] = useState(false)
   const cancelEventMutation = useMutation({
     mutationFn: () =>
       EventsService.cancelPortalEvent({ eventId: params.eventId }),
@@ -427,6 +430,33 @@ export default function EventDetailPage() {
   const coverCredit =
     !event.cover_url && event.venue_image_url ? event.venue_title : null
 
+  const sharePath = `/portal/${city?.slug}/events/${params.eventId}${
+    occParam ? `?occ=${encodeURIComponent(occParam)}` : ""
+  }`
+  const shareUrl =
+    typeof window !== "undefined"
+      ? `${window.location.origin}${sharePath}`
+      : sharePath
+
+  const handleShare = async () => {
+    if (typeof navigator !== "undefined" && navigator.share) {
+      try {
+        await navigator.share({ title: event.title, url: shareUrl })
+        return
+      } catch (err) {
+        if (err instanceof Error && err.name === "AbortError") return
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(shareUrl)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+      toast.success(t("events.detail.share_link_copied"))
+    } catch {
+      toast.error(t("events.detail.share_link_error"))
+    }
+  }
+
   return (
     <div className="max-w-2xl mx-auto p-4 sm:p-6 space-y-4">
       <div className="flex items-center justify-between gap-2">
@@ -587,7 +617,24 @@ export default function EventDetailPage() {
             </Badge>
           )}
         </div>
-        <h1 className="text-xl sm:text-2xl font-bold">{event.title}</h1>
+        <div className="flex items-start justify-between gap-3">
+          <h1 className="text-xl sm:text-2xl font-bold">{event.title}</h1>
+          {event.status === "published" && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleShare}
+              aria-label={t("events.detail.share_button")}
+              className="shrink-0"
+            >
+              {copied ? (
+                <Check className="h-4 w-4" />
+              ) : (
+                <Share2 className="h-4 w-4" />
+              )}
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Details card */}

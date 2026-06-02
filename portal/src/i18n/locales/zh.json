@@ -499,7 +499,9 @@
       "unhide_title": "取消隐藏",
       "highlighted_badge": "精选",
       "highlighted_title": "精选活动",
-      "owned_title": "由你创建"
+      "owned_title": "由你创建",
+      "collapse_day_aria": "折叠 {{date}} 的活动",
+      "expand_day_aria": "展开 {{date}} 的活动"
     },
     "status": {
       "draft": "草稿",
@@ -625,7 +627,10 @@
       "cancel_event_error": "无法取消活动",
       "pending_approval_banner_title": "等待审批",
       "pending_approval_banner_message": "你的活动正在等待审批,其他人暂时无法查看。",
-      "open_in_maps": "在 Google 地图中打开"
+      "open_in_maps": "在 Google 地图中打开",
+      "share_button": "分享活动",
+      "share_link_copied": "链接已复制",
+      "share_link_error": "无法复制链接"
     },
     "form": {
       "create_heading": "创建活动",
