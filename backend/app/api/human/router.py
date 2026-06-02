@@ -184,12 +184,11 @@ async def search_humans_portal(
     HumanTenantSession; the slim response schema omits email so this isn't
     a wider exposure than the participant lists portal users can already see.
     """
-    humans, total = crud.find(
+    humans, total = crud.search_named(
         db,
         skip=skip,
         limit=limit,
         search=search,
-        search_fields=["first_name", "last_name"],
     )
     return ListModel[HumanPortalPublic](
         results=[HumanPortalPublic.model_validate(h) for h in humans],
