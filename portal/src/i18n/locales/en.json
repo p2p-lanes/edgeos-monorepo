@@ -1,4 +1,18 @@
 {
+  "cartBadge": {
+    "title": "Your cart",
+    "aria_open": "Open cart",
+    "passes_one": "{{count}} pass",
+    "passes_other": "{{count}} passes",
+    "housing": "Housing",
+    "merch_one": "{{count}} merch item",
+    "merch_other": "{{count}} merch items",
+    "patron": "Patron contribution",
+    "go_to_checkout": "Go to checkout",
+    "clear": "Clear cart",
+    "clear_confirm": "Confirm",
+    "clearing": "Clearing..."
+  },
   "common": {
     "apply": "Apply",
     "back": "Back",
