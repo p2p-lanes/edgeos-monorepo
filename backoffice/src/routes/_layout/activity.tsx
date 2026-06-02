@@ -48,9 +48,14 @@ function labelize(key: string): string {
   return key.replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase())
 }
 
+function truncate(s: string, max = 140): string {
+  return s.length > max ? `${s.slice(0, max)}…` : s
+}
+
 function formatValue(value: unknown): string {
   if (value == null || value === "") return "—"
-  if (Array.isArray(value)) return value.map((v) => formatValue(v)).join(", ")
+  if (Array.isArray(value))
+    return value.length ? value.map((v) => formatValue(v)).join(", ") : "—"
   if (typeof value === "number") return String(value)
   if (typeof value === "boolean") return value ? "Yes" : "No"
   if (typeof value === "string") {
@@ -64,9 +69,9 @@ function formatValue(value: unknown): string {
         }).format(d)
       }
     }
-    return value
+    return truncate(value)
   }
-  return String(value)
+  return truncate(String(value))
 }
 
 /** Expandable per-row detail: what changed (old → new) plus the snapshot. */
@@ -113,7 +118,11 @@ function AuditLogDetail({ log }: { log: AuditLogPublic }) {
           </p>
           <ul className="space-y-1">
             {Object.entries(changes)
-              .filter(([k]) => !(k === "venue_id" && "venue_name" in changes))
+              // Hide a raw "*_id" change when its readable "*_name" also changed.
+              .filter(
+                ([k]) =>
+                  !(k.endsWith("_id") && k.replace(/_id$/, "_name") in changes),
+              )
               .map(([field, diff]) => (
                 <li key={field}>
                   <span className="font-medium">{labelize(field)}</span>:{" "}

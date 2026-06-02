@@ -25,19 +25,15 @@ from app.api.event_audit.schemas import EventAuditAction
 if TYPE_CHECKING:
     from app.api.event.models import Events
 
-# Event fields captured in the snapshot and compared for the diff. Kept small
-# and stable on purpose: identity + the "request data" the audit log promises
-# (date/time, venue, visibility) plus the lifecycle status.
-_SNAPSHOT_FIELDS = (
-    "title",
-    "start_time",
-    "end_time",
-    "timezone",
-    "venue_id",
-    "custom_location_name",
-    "visibility",
-    "status",
-)
+def _snapshot_fields() -> tuple[str, ...]:
+    """Fields captured in the snapshot and diffed — derived from the EventUpdate
+    schema so EVERY editable field is audited automatically (no hand-maintained
+    list to drift). Fields that don't map to an Events attribute resolve to None
+    via getattr and are dropped from the display, so they add no noise.
+    """
+    from app.api.event.schemas import EventUpdate
+
+    return tuple(EventUpdate.model_fields.keys())
 
 
 def _jsonable(value: Any) -> Any:
@@ -54,7 +50,7 @@ def _jsonable(value: Any) -> Any:
 def build_event_snapshot(session: Session, event: Events) -> dict[str, Any]:
     """Snapshot the audited fields of ``event``, resolving the venue name."""
     snapshot: dict[str, Any] = {
-        field: _jsonable(getattr(event, field, None)) for field in _SNAPSHOT_FIELDS
+        field: _jsonable(getattr(event, field, None)) for field in _snapshot_fields()
     }
 
     venue_id = getattr(event, "venue_id", None)
@@ -65,6 +61,15 @@ def build_event_snapshot(session: Session, event: Events) -> dict[str, Any]:
         venue = session.get(EventVenues, venue_id)
         venue_name = venue.title if venue is not None else None
     snapshot["venue_name"] = venue_name
+
+    track_id = getattr(event, "track_id", None)
+    track_name: str | None = None
+    if track_id is not None:
+        from app.api.track.models import Tracks
+
+        track = session.get(Tracks, track_id)
+        track_name = track.name if track is not None else None
+    snapshot["track_name"] = track_name
 
     return snapshot
 
