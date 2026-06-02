@@ -1,14 +1,13 @@
 """Schemas for the open-ticketing checkout API (CAP-A, CAP-B, CAP-C, CAP-D)."""
 
 import uuid
-from datetime import date
+from datetime import datetime
 from decimal import Decimal
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 from app.api.popup.schemas import PopupPublic
-from app.api.product.sale_window import datetime_to_inclusive_date
 from app.api.ticketing_step.schemas import TicketingStepPublic
 
 # ---------------------------------------------------------------------------
@@ -66,8 +65,10 @@ class CheckoutRuntimeProduct(BaseModel):
     duration_type: str | None = None
     start_date: Any | None = None
     end_date: Any | None = None
-    sale_starts_at: date | None = None
-    sale_ends_at: date | None = None
+    # Full datetime instants (UTC) — the sale window can carry a precise cutoff
+    # (e.g. "Friday 11:59 PM"). Clients render them in the popup's timezone.
+    sale_starts_at: datetime | None = None
+    sale_ends_at: datetime | None = None
     total_stock_cap: int | None = None
     total_stock_remaining: int | None = None
     max_per_order: int | None = None
@@ -76,16 +77,6 @@ class CheckoutRuntimeProduct(BaseModel):
     insurance_eligible: bool = False
 
     model_config = ConfigDict(from_attributes=True)
-
-    @field_validator("sale_starts_at", mode="before")
-    @classmethod
-    def _starts_to_date(cls, v: object) -> object:
-        return datetime_to_inclusive_date(v)
-
-    @field_validator("sale_ends_at", mode="before")
-    @classmethod
-    def _ends_to_date(cls, v: object) -> object:
-        return datetime_to_inclusive_date(v, day_offset=-1)
 
 
 class CheckoutRuntimeResponse(BaseModel):
