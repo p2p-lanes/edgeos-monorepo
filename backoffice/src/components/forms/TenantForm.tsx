@@ -63,7 +63,7 @@ const PORTAL_DOMAIN = import.meta.env.VITE_PORTAL_DOMAIN ?? ""
 export function TenantForm({ defaultValues, onSuccess }: TenantFormProps) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const { isSuperadmin } = useAuth()
+  const { isSuperadmin, isAdmin } = useAuth()
   const [copied, setCopied] = useState(false)
 
   const cnameTarget =
@@ -523,7 +523,7 @@ export function TenantForm({ defaultValues, onSuccess }: TenantFormProps) {
         </div>
       </form>
 
-      {isEdit && isSuperadmin && (
+      {isEdit && isAdmin && (
         <div className="mx-auto max-w-2xl">
           <TenantCredentialsSection tenantId={defaultValues.id} />
         </div>

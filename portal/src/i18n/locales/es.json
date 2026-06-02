@@ -1,4 +1,18 @@
 {
+  "cartBadge": {
+    "title": "Tu carrito",
+    "aria_open": "Abrir carrito",
+    "passes_one": "{{count}} pase",
+    "passes_other": "{{count}} pases",
+    "housing": "Alojamiento",
+    "merch_one": "{{count}} producto de merch",
+    "merch_other": "{{count}} productos de merch",
+    "patron": "Contribución patron",
+    "go_to_checkout": "Ir al checkout",
+    "clear": "Vaciar carrito",
+    "clear_confirm": "Confirmar",
+    "clearing": "Vaciando..."
+  },
   "common": {
     "apply": "Aplicar",
     "back": "Volver",
@@ -499,7 +513,9 @@
       "unhide_title": "Mostrar",
       "highlighted_badge": "Destacado",
       "highlighted_title": "Evento destacado",
-      "owned_title": "Creado por ti"
+      "owned_title": "Creado por ti",
+      "collapse_day_aria": "Colapsar eventos del {{date}}",
+      "expand_day_aria": "Expandir eventos del {{date}}"
     },
     "status": {
       "draft": "Borrador",
@@ -625,7 +641,10 @@
       "cancel_event_error": "No se pudo cancelar el evento",
       "pending_approval_banner_title": "Pendiente de aprobación",
       "pending_approval_banner_message": "Tu evento está pendiente de aprobación y aún no es visible para otros.",
-      "open_in_maps": "Abrir en Google Maps"
+      "open_in_maps": "Abrir en Google Maps",
+      "share_button": "Compartir evento",
+      "share_link_copied": "Link copiado",
+      "share_link_error": "No se pudo copiar el link"
     },
     "form": {
       "create_heading": "Crear evento",

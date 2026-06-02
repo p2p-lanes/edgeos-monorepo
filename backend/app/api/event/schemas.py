@@ -93,6 +93,12 @@ class EventBase(SQLModel):
     # event creators choose any of: tenant name, their own name, a participant's
     # name, or a custom value — all stored as plain text.
     host_display_name: str | None = Field(default=None, max_length=255)
+    # Optional human designated as the event's host. Unlike host_display_name
+    # (free text shown on the card), this is a real human id, set only when a
+    # participant is picked from the directory. Grants the host the same manage
+    # rights as the owner (edit / cancel / invitations). NULL when the host is
+    # free text or unset. Modeled like owner_id: indexed uuid, no hard FK.
+    host_id: uuid.UUID | None = Field(default=None, index=True)
     status: EventStatus = Field(default=EventStatus.DRAFT)
     # When true, portal clients render the event with a "special" treatment
     # (badge, accent border) so it stands out in the list/day/calendar views.
@@ -309,6 +315,7 @@ class EventCreate(BaseModel):
     require_approval: bool = False
     kind: str | None = None
     host_display_name: str | None = None
+    host_id: uuid.UUID | None = None
     status: EventStatus = EventStatus.DRAFT
     highlighted: bool = False
     recurrence: RecurrenceRule | None = None
@@ -347,6 +354,7 @@ class EventUpdate(BaseModel):
     require_approval: bool | None = None
     kind: str | None = None
     host_display_name: str | None = None
+    host_id: uuid.UUID | None = None
     status: EventStatus | None = None
     highlighted: bool | None = None
 

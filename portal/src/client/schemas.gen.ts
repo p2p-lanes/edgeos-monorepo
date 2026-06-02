@@ -2539,6 +2539,25 @@ export const AttendeeStatsSchema = {
     description: 'Statistics for attendees.'
 } as const;
 
+export const AttendeeTicketAddSchema = {
+    properties: {
+        items: {
+            items: {
+                '$ref': '#/components/schemas/AttendeeTicketLine'
+            },
+            type: 'array',
+            title: 'Items'
+        }
+    },
+    type: 'object',
+    required: ['items'],
+    title: 'AttendeeTicketAdd',
+    description: `Request body to add tickets to an attendee (admin panel, bulk).
+
+Mirrors the bulk-grant shape: N products, each with a quantity. Stock is
+validated per product and the whole batch is applied atomically.`
+} as const;
+
 export const AttendeeTicketInfoSchema = {
     properties: {
         id: {
@@ -2605,6 +2624,40 @@ per-ticket QR list the main applicant sees without an extra round-trip.
 \`last_scan_at\` is the most recent occurred_at from check_ins for this
 ticket (None when never scanned). The portal uses it to flag already-used
 QR codes — same behavior as the main applicant's pass view.`
+} as const;
+
+export const AttendeeTicketLineSchema = {
+    properties: {
+        product_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Product Id'
+        },
+        quantity: {
+            type: 'integer',
+            minimum: 1,
+            title: 'Quantity',
+            default: 1
+        }
+    },
+    type: 'object',
+    required: ['product_id'],
+    title: 'AttendeeTicketLine',
+    description: 'One product + quantity line in a bulk ticket add.'
+} as const;
+
+export const AttendeeTicketProductSwapSchema = {
+    properties: {
+        product_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Product Id'
+        }
+    },
+    type: 'object',
+    required: ['product_id'],
+    title: 'AttendeeTicketProductSwap',
+    description: "Request body to change the product of an attendee's ticket (admin panel)."
 } as const;
 
 export const AttendeeUpdateSchema = {
@@ -3007,6 +3060,133 @@ export const AttendeesDirectoryEntrySchema = {
     description: 'Single entry in the attendees directory.'
 } as const;
 
+export const AuditLogPublicSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        source: {
+            type: 'string',
+            title: 'Source'
+        },
+        actor_type: {
+            type: 'string',
+            title: 'Actor Type'
+        },
+        actor_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Actor Id'
+        },
+        actor_email: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Actor Email'
+        },
+        actor_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Actor Name'
+        },
+        request_id: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Request Id'
+        },
+        action: {
+            type: 'string',
+            title: 'Action'
+        },
+        entity_type: {
+            type: 'string',
+            title: 'Entity Type'
+        },
+        entity_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Entity Id'
+        },
+        entity_label: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Entity Label'
+        },
+        popup_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Popup Id'
+        },
+        details: {
+            anyOf: [
+                {
+                    additionalProperties: true,
+                    type: 'object'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Details'
+        },
+        created_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Created At'
+        }
+    },
+    type: 'object',
+    required: ['id', 'source', 'actor_type', 'action', 'entity_type', 'created_at'],
+    title: 'AuditLogPublic',
+    description: 'A single audit log entry returned to the backoffice.'
+} as const;
+
 export const AuthCodeSentResponseSchema = {
     properties: {
         message: {
@@ -3259,6 +3439,42 @@ export const BaseFieldConfigUpdateSchema = {
     },
     type: 'object',
     title: 'BaseFieldConfigUpdate'
+} as const;
+
+export const BugReportCreateSchema = {
+    properties: {
+        title: {
+            type: 'string',
+            maxLength: 200,
+            minLength: 1,
+            title: 'Title'
+        },
+        detail: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Detail'
+        },
+        attachments: {
+            items: {
+                '$ref': '#/components/schemas/TaskAttachmentCreate'
+            },
+            type: 'array',
+            title: 'Attachments'
+        }
+    },
+    type: 'object',
+    required: ['title'],
+    title: 'BugReportCreate',
+    description: `The 'report a bug' payload, open to every backoffice user.
+
+Always produces an internal bug in the to-do column. Attachments are
+optional screenshots / screen-recordings already uploaded to S3.`
 } as const;
 
 export const BuyerInfoSchema = {
@@ -5341,6 +5557,18 @@ export const EventCreateSchema = {
             ],
             title: 'Host Display Name'
         },
+        host_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Host Id'
+        },
         status: {
             '$ref': '#/components/schemas/EventStatus',
             default: 'draft'
@@ -5863,6 +6091,18 @@ export const EventPublicSchema = {
                 }
             ],
             title: 'Host Display Name'
+        },
+        host_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Host Id'
         },
         status: {
             '$ref': '#/components/schemas/EventStatus',
@@ -6834,6 +7074,18 @@ export const EventUpdateSchema = {
                 }
             ],
             title: 'Host Display Name'
+        },
+        host_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Host Id'
         },
         status: {
             anyOf: [
@@ -9806,6 +10058,24 @@ export const ListModel_AttendeesDirectoryEntry_Schema = {
     title: 'ListModel[AttendeesDirectoryEntry]'
 } as const;
 
+export const ListModel_AuditLogPublic_Schema = {
+    properties: {
+        results: {
+            items: {
+                '$ref': '#/components/schemas/AuditLogPublic'
+            },
+            type: 'array',
+            title: 'Results'
+        },
+        paging: {
+            '$ref': '#/components/schemas/Paging'
+        }
+    },
+    type: 'object',
+    required: ['results', 'paging'],
+    title: 'ListModel[AuditLogPublic]'
+} as const;
+
 export const ListModel_CheckInListItem_Schema = {
     properties: {
         results: {
@@ -10074,6 +10344,42 @@ export const ListModel_ProductPublic_Schema = {
     type: 'object',
     required: ['results', 'paging'],
     title: 'ListModel[ProductPublic]'
+} as const;
+
+export const ListModel_TaskCommentPublic_Schema = {
+    properties: {
+        results: {
+            items: {
+                '$ref': '#/components/schemas/TaskCommentPublic'
+            },
+            type: 'array',
+            title: 'Results'
+        },
+        paging: {
+            '$ref': '#/components/schemas/Paging'
+        }
+    },
+    type: 'object',
+    required: ['results', 'paging'],
+    title: 'ListModel[TaskCommentPublic]'
+} as const;
+
+export const ListModel_TaskPublic_Schema = {
+    properties: {
+        results: {
+            items: {
+                '$ref': '#/components/schemas/TaskPublic'
+            },
+            type: 'array',
+            title: 'Results'
+        },
+        paging: {
+            '$ref': '#/components/schemas/Paging'
+        }
+    },
+    type: 'object',
+    required: ['results', 'paging'],
+    title: 'ListModel[TaskPublic]'
 } as const;
 
 export const ListModel_TenantPublic_Schema = {
@@ -14924,6 +15230,693 @@ export const SendTestRequestSchema = {
     type: 'object',
     required: ['html_content', 'template_type', 'to_email'],
     title: 'SendTestRequest'
+} as const;
+
+export const TaskAttachmentCreateSchema = {
+    properties: {
+        storage_key: {
+            type: 'string',
+            title: 'Storage Key'
+        },
+        url: {
+            type: 'string',
+            title: 'Url'
+        },
+        media_type: {
+            '$ref': '#/components/schemas/TaskMediaType'
+        },
+        filename: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Filename'
+        },
+        size_bytes: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Size Bytes'
+        }
+    },
+    type: 'object',
+    required: ['storage_key', 'url', 'media_type'],
+    title: 'TaskAttachmentCreate',
+    description: `Register an already-uploaded S3 object as a task attachment.
+
+The file itself is uploaded directly to S3 via POST /uploads/presigned-url;
+this just records the resulting key/url against the task.`
+} as const;
+
+export const TaskAttachmentPublicSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        task_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Task Id'
+        },
+        url: {
+            type: 'string',
+            title: 'Url'
+        },
+        media_type: {
+            '$ref': '#/components/schemas/TaskMediaType'
+        },
+        filename: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Filename'
+        },
+        size_bytes: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Size Bytes'
+        },
+        created_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Created At'
+        }
+    },
+    type: 'object',
+    required: ['id', 'task_id', 'url', 'media_type', 'created_at'],
+    title: 'TaskAttachmentPublic'
+} as const;
+
+export const TaskCommentCreateSchema = {
+    properties: {
+        body: {
+            type: 'string',
+            minLength: 1,
+            title: 'Body'
+        }
+    },
+    type: 'object',
+    required: ['body'],
+    title: 'TaskCommentCreate'
+} as const;
+
+export const TaskCommentPublicSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        task_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Task Id'
+        },
+        author_user_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Author User Id'
+        },
+        author_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Author Name'
+        },
+        author_email: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Author Email'
+        },
+        body: {
+            type: 'string',
+            title: 'Body'
+        },
+        created_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Created At'
+        },
+        edited_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Edited At'
+        }
+    },
+    type: 'object',
+    required: ['id', 'task_id', 'body', 'created_at'],
+    title: 'TaskCommentPublic'
+} as const;
+
+export const TaskCommentUpdateSchema = {
+    properties: {
+        body: {
+            type: 'string',
+            minLength: 1,
+            title: 'Body'
+        }
+    },
+    type: 'object',
+    required: ['body'],
+    title: 'TaskCommentUpdate'
+} as const;
+
+export const TaskCreateSchema = {
+    properties: {
+        title: {
+            type: 'string',
+            maxLength: 200,
+            minLength: 1,
+            title: 'Title'
+        },
+        detail: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Detail'
+        },
+        status: {
+            '$ref': '#/components/schemas/TaskStatus',
+            default: 'to_do'
+        },
+        type: {
+            '$ref': '#/components/schemas/TaskType',
+            default: 'feature'
+        },
+        responsible_user_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Responsible User Id'
+        },
+        release: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 50
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Release'
+        },
+        visibility: {
+            '$ref': '#/components/schemas/TaskVisibility',
+            default: 'internal'
+        },
+        target_tenant_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Target Tenant Id'
+        }
+    },
+    type: 'object',
+    required: ['title'],
+    title: 'TaskCreate'
+} as const;
+
+export const TaskDetailPublicSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        title: {
+            type: 'string',
+            title: 'Title'
+        },
+        detail: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Detail'
+        },
+        status: {
+            '$ref': '#/components/schemas/TaskStatus'
+        },
+        type: {
+            '$ref': '#/components/schemas/TaskType'
+        },
+        responsible_user_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Responsible User Id'
+        },
+        responsible_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Responsible Name'
+        },
+        responsible_email: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Responsible Email'
+        },
+        release: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Release'
+        },
+        visibility: {
+            '$ref': '#/components/schemas/TaskVisibility'
+        },
+        target_tenant_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Target Tenant Id'
+        },
+        published_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Published At'
+        },
+        created_by: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Created By'
+        },
+        created_by_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Created By Name'
+        },
+        created_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Created At'
+        },
+        updated_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Updated At'
+        },
+        attachments: {
+            items: {
+                '$ref': '#/components/schemas/TaskAttachmentPublic'
+            },
+            type: 'array',
+            title: 'Attachments'
+        }
+    },
+    type: 'object',
+    required: ['id', 'title', 'status', 'type', 'visibility', 'created_at', 'updated_at'],
+    title: 'TaskDetailPublic'
+} as const;
+
+export const TaskMediaTypeSchema = {
+    type: 'string',
+    enum: ['image', 'video'],
+    title: 'TaskMediaType'
+} as const;
+
+export const TaskPublicSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        title: {
+            type: 'string',
+            title: 'Title'
+        },
+        detail: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Detail'
+        },
+        status: {
+            '$ref': '#/components/schemas/TaskStatus'
+        },
+        type: {
+            '$ref': '#/components/schemas/TaskType'
+        },
+        responsible_user_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Responsible User Id'
+        },
+        responsible_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Responsible Name'
+        },
+        responsible_email: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Responsible Email'
+        },
+        release: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Release'
+        },
+        visibility: {
+            '$ref': '#/components/schemas/TaskVisibility'
+        },
+        target_tenant_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Target Tenant Id'
+        },
+        published_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Published At'
+        },
+        created_by: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Created By'
+        },
+        created_by_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Created By Name'
+        },
+        created_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Created At'
+        },
+        updated_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Updated At'
+        }
+    },
+    type: 'object',
+    required: ['id', 'title', 'status', 'type', 'visibility', 'created_at', 'updated_at'],
+    title: 'TaskPublic'
+} as const;
+
+export const TaskStatusSchema = {
+    type: 'string',
+    enum: ['to_do', 'testing', 'next_release', 'published', 'blocked', 'cancelled'],
+    title: 'TaskStatus'
+} as const;
+
+export const TaskStatusUpdateSchema = {
+    properties: {
+        status: {
+            '$ref': '#/components/schemas/TaskStatus'
+        }
+    },
+    type: 'object',
+    required: ['status'],
+    title: 'TaskStatusUpdate',
+    description: 'Lightweight payload for moving a card between Kanban columns.'
+} as const;
+
+export const TaskTypeSchema = {
+    type: 'string',
+    enum: ['bug', 'feature'],
+    title: 'TaskType'
+} as const;
+
+export const TaskUpdateSchema = {
+    properties: {
+        title: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 200,
+                    minLength: 1
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Title'
+        },
+        detail: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Detail'
+        },
+        status: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/TaskStatus'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        type: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/TaskType'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        responsible_user_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Responsible User Id'
+        },
+        release: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 50
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Release'
+        },
+        visibility: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/TaskVisibility'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        target_tenant_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Target Tenant Id'
+        }
+    },
+    type: 'object',
+    title: 'TaskUpdate'
+} as const;
+
+export const TaskVisibilitySchema = {
+    type: 'string',
+    enum: ['universal', 'tenant', 'internal'],
+    title: 'TaskVisibility'
 } as const;
 
 export const TemplateScopeSchema = {

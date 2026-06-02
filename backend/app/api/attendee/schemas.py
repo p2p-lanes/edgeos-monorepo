@@ -175,6 +175,36 @@ class AttendeeProductPublic(BaseModel):
     model_config = ConfigDict(from_attributes=True, extra="forbid")
 
 
+class AttendeeTicketLine(BaseModel):
+    """One product + quantity line in a bulk ticket add."""
+
+    product_id: uuid.UUID
+    quantity: int = Field(default=1, ge=1)
+
+
+class AttendeeTicketAdd(BaseModel):
+    """Request body to add tickets to an attendee (admin panel, bulk).
+
+    Mirrors the bulk-grant shape: N products, each with a quantity. Stock is
+    validated per product and the whole batch is applied atomically.
+    """
+
+    items: list[AttendeeTicketLine]
+
+    @field_validator("items")
+    @classmethod
+    def _non_empty(cls, v: list[AttendeeTicketLine]) -> list[AttendeeTicketLine]:
+        if not v:
+            raise ValueError("items must not be empty")
+        return v
+
+
+class AttendeeTicketProductSwap(BaseModel):
+    """Request body to change the product of an attendee's ticket (admin panel)."""
+
+    product_id: uuid.UUID
+
+
 class TicketAttendeeSnapshot(BaseModel):
     """Minimal attendee data embedded in a TicketPublic response."""
 

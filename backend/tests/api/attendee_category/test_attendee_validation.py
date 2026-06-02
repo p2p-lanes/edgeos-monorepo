@@ -90,7 +90,7 @@ def test_ticketing_step_create_with_unknown_uuid_rejected(
             "popup_id": str(popup_tenant_a.id),
             "step_type": "product_selection",
             "title": "Test Step",
-            "template": "ticket_select",
+            "template": "ticket-select",
             "template_config": {
                 "sections": [
                     {
@@ -123,7 +123,7 @@ def test_ticketing_step_create_with_valid_uuid_accepted(
             "popup_id": popup_id,
             "step_type": "product_selection",
             "title": "Test Step Valid",
-            "template": "ticket_select",
+            "template": "ticket-select",
             "template_config": {
                 "sections": [
                     {
@@ -157,7 +157,7 @@ def test_ticketing_step_update_with_unknown_uuid_rejected(
             "popup_id": popup_id,
             "step_type": "product_selection",
             "title": "Update Test Step",
-            "template": "ticket_select",
+            "template": "ticket-select",
             "template_config": {
                 "sections": [
                     {
@@ -180,7 +180,7 @@ def test_ticketing_step_update_with_unknown_uuid_rejected(
         f"/api/v1/ticketing-steps/{step_id}",
         headers=_admin_headers(admin_token_tenant_a),
         json={
-            "template": "ticket_select",
+            "template": "ticket-select",
             "template_config": {
                 "sections": [
                     {

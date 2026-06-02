@@ -9,7 +9,7 @@ from sqlmodel import Field, SQLModel
 
 
 class TicketSelectSection(BaseModel):
-    """Typed representation of a single section inside ticket_select template_config.sections."""
+    """Typed representation of a single section inside ticket-select template_config.sections."""
 
     key: str
     label: str
@@ -107,12 +107,12 @@ def _validate_sections_in_template_config(
     template: str | None,
     template_config: dict[str, Any] | None,
 ) -> dict[str, Any] | None:
-    """Validate sections inside template_config when template == 'ticket_select'.
+    """Validate sections inside template_config when template == 'ticket-select'.
 
     No-ops for other templates or when template_config is absent/has no sections.
     Raises ValueError on invalid section data (FastAPI converts to HTTP 422).
     """
-    if template != "ticket_select" or not template_config:
+    if template != "ticket-select" or not template_config:
         return template_config
     sections = template_config.get("sections")
     if sections is None:
@@ -143,9 +143,7 @@ def _validate_meal_plan_select_template_config(
     sections = template_config.get("sections")
     if sections is not None:
         if not isinstance(sections, list):
-            raise ValueError(
-                "meal_plan_select template_config.sections must be a list"
-            )
+            raise ValueError("meal_plan_select template_config.sections must be a list")
         validated_sections = [MealPlanSection.model_validate(s) for s in sections]
         out["sections"] = [s.model_dump(mode="json") for s in validated_sections]
 
