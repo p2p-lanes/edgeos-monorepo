@@ -3,7 +3,6 @@
 import { usePathname } from "next/navigation"
 import type * as React from "react"
 import Authentication from "@/components/Authentication"
-import ResumeCheckoutBanner from "@/components/ResumeCheckoutBanner"
 import HeaderBar from "@/components/Sidebar/HeaderBar"
 import { BackofficeSidebar } from "@/components/Sidebar/Sidebar"
 import { SidebarInset } from "@/components/Sidebar/SidebarComponents"
@@ -32,7 +31,6 @@ export default function PortalLayout({
             id="portal-scroll"
             className="flex-1 overflow-y-auto bg-background"
           >
-            <ResumeCheckoutBanner />
             {children}
           </main>
         </SidebarInset>

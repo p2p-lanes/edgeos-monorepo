@@ -1,4 +1,18 @@
 {
+  "cartBadge": {
+    "title": "Tu carrito",
+    "aria_open": "Abrir carrito",
+    "passes_one": "{{count}} pase",
+    "passes_other": "{{count}} pases",
+    "housing": "Alojamiento",
+    "merch_one": "{{count}} producto de merch",
+    "merch_other": "{{count}} productos de merch",
+    "patron": "Contribución patron",
+    "go_to_checkout": "Ir al checkout",
+    "clear": "Vaciar carrito",
+    "clear_confirm": "Confirmar",
+    "clearing": "Vaciando..."
+  },
   "common": {
     "apply": "Aplicar",
     "back": "Volver",
