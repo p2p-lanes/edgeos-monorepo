@@ -36,7 +36,7 @@ function EditHumanContent({ humanId }: { humanId: string }) {
   const navigate = useNavigate()
   const goBack = useGoBack(() => navigate(getHumansNavigationTarget()))
   const { data: human } = useSuspenseQuery(getHumanQueryOptions(humanId))
-  const { isSuperadmin } = useAuth()
+  const { isAdmin } = useAuth()
   const queryClient = useQueryClient()
   const { showSuccessToast, showErrorToast } = useCustomToast()
 
@@ -61,7 +61,7 @@ function EditHumanContent({ humanId }: { humanId: string }) {
   return (
     <div className="space-y-8">
       <HumanForm defaultValues={human} onSuccess={goBack} />
-      {isSuperadmin && (
+      {isAdmin && (
         <div className="mx-auto max-w-2xl">
           <DangerZone
             description="Permanently delete this human and every related row — applications, attendees, payments, products, carts, group memberships, and any group this human owns as ambassador. Intended for cleaning up test users."

@@ -15,12 +15,14 @@ from app.api.human.schemas import (
     HumanPublic,
     HumanUpdate,
 )
+from app.api.shared.enums import UserRole
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
 from app.core.dependencies.users import (
     AdminOrApiKey_HumansRead,
     AdminOrApiKey_HumansWrite,
     AdminOrApiKeySession_HumansRead,
     AdminOrApiKeySession_HumansWrite,
+    CurrentAdmin,
     CurrentHuman,
     CurrentSuperadmin,
     HumanTenantSession,
@@ -278,21 +280,36 @@ async def revoke_human_api_keys(
 
 @router.delete(
     "/{human_id}",
-    summary="Hard-delete a human and all related rows (superadmin only)",
+    summary="Hard-delete a human and all related rows (admin or superadmin)",
 )
 async def delete_human(
     human_id: uuid.UUID,
     db: SessionDep,
-    _current_user: CurrentSuperadmin,
+    current_user: CurrentAdmin,
 ) -> HardDeleteSummary:
     """Permanently delete a Human with full cascade.
 
     Removes applications, attendees, payments, products, carts, group
     memberships, and ambassador-owned groups in a single transaction. Designed
     for cleaning up test users — destructive and irreversible.
+
+    Superadmins may delete any human; a tenant admin may only delete humans
+    within their own tenant. Both run on the control-plane session (which
+    bypasses RLS), so the tenant ownership check is enforced explicitly here.
     """
     human = crud.get(db, human_id)
     if not human:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Human not found",
+        )
+    # Tenant isolation: non-superadmins can only delete humans in their own
+    # tenant. Respond 404 (not 403) so the existence of other tenants' humans
+    # isn't revealed.
+    if (
+        current_user.role != UserRole.SUPERADMIN
+        and human.tenant_id != current_user.tenant_id
+    ):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Human not found",
