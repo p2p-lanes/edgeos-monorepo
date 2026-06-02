@@ -1172,6 +1172,24 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 detail="Some products are not available or inactive",
             )
 
+        # Reject products outside their sale window. The portal renders the
+        # cart client-side, so this is the authoritative gate that closes the
+        # stale-tab loophole — and it enforces precise cutoffs such as
+        # meal-plan order deadlines (``sale_ends_at`` carries a full datetime).
+        # Only the time window is checked here; ``sold_out`` is left to the
+        # atomic stock decrement downstream (which raises 409), preserving the
+        # existing out-of-stock contract.
+        for product in valid_products:
+            state = derive_product_state(product)
+            if state in (ProductSaleState.ended, ProductSaleState.upcoming):
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=(
+                        f"Product '{product.name}' is not on sale "
+                        f"(state: {state.value})"
+                    ),
+                )
+
         return valid_products
 
     def _validate_max_per_order(

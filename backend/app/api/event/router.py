@@ -958,6 +958,7 @@ async def create_event(
     current_user: AdminOrApiKey_EventsWrite,
 ) -> EventPublic:
     from app.api.event.models import Events
+    from app.api.human.crud import humans_crud
     from app.api.popup.crud import popups_crud
     from app.api.shared.enums import UserRole
 
@@ -999,7 +1000,20 @@ async def create_event(
         event_data["custom_location_url"] = None
     event_data["rrule"] = rrule_str
     event_data["tenant_id"] = tenant_id
-    event_data["owner_id"] = current_user.id
+    # Map the event owner to the Human sharing the admin's email in this tenant
+    # (creating one if absent) so it resolves a real creator and the host can
+    # edit it from the portal. Admin Users live in a separate table from Humans,
+    # so using ``current_user.id`` (a Users id) would leave the event ownerless
+    # ("Unknown" in the UI) and uneditable through the portal's owner check.
+    first_name, _, last_name = (current_user.full_name or "").strip().partition(" ")
+    owner = humans_crud.get_or_create_by_email(
+        db,
+        email=current_user.email,
+        tenant_id=tenant_id,
+        default_first_name=first_name or None,
+        default_last_name=last_name.strip() or None,
+    )
+    event_data["owner_id"] = owner.id
 
     # Admin-created events trust the requested status — picking "published"
     # in the backoffice publishes immediately, even when the venue is
