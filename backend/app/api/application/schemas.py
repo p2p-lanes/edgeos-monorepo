@@ -536,11 +536,15 @@ class PopupAccessResponse(BaseModel):
 
 
 class AttendeesDirectoryEntry(BaseModel):
-    """Single entry in the attendees directory."""
+    """Single entry in the attendees directory.
 
-    id: uuid.UUID  # application id
+    The directory is attendee-centric: one entry per ticket-holding attendee
+    (any category), sourced from that attendee's own human record.
+    """
 
-    # Human profile (from application.human)
+    id: uuid.UUID  # attendee id
+
+    # Human profile (from attendee.human)
     first_name: str | None = None
     last_name: str | None = None
     email: str | None = None
@@ -552,10 +556,14 @@ class AttendeesDirectoryEntry(BaseModel):
     gender: str | None = None
     picture_url: str | None = None
 
+    # Attendee category key (main/spouse/kid/...) so the UI can badge companions
+    category: str | None = None
+
     # Participation
     participation: list[DirectoryProduct] = []
 
-    # Associated attendees (spouse/kids)
+    # Deprecated: the directory is now attendee-centric, so each person is their
+    # own entry. Kept (always empty) for backward-compatible client typing.
     associated_attendees: list[AssociatedAttendee] = []
 
     model_config = ConfigDict(from_attributes=True)
