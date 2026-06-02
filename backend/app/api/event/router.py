@@ -892,9 +892,7 @@ async def list_event_hosts(
     omitted (they have no host to filter by).
     """
     hosts = crud.events_crud.list_distinct_hosts(db, popup_id=popup_id)
-    return [
-        EventHostOption(id=h.id, name=h.full_name, email=h.email) for h in hosts
-    ]
+    return [EventHostOption(id=h.id, name=h.full_name, email=h.email) for h in hosts]
 
 
 @router.get("/{event_id}", response_model=EventPublic)
@@ -1837,18 +1835,28 @@ async def delete_invitation(
 
 
 # ---------------------------------------------------------------------------
-# Portal invitations — event owner only
+# Portal invitations — event owner or host
 # ---------------------------------------------------------------------------
+
+
+def _human_manages_event(event, current_human) -> bool:
+    """Whether a human may manage an event (edit / cancel / invitations).
+
+    True for the event's owner (creator) or its designated host — the host
+    carries the same responsibility over the event even though they didn't
+    create it. ``host_id`` is NULL when no directory human was assigned.
+    """
+    return current_human.id in (event.owner_id, event.host_id)
 
 
 def _ensure_portal_event_owner(db, event_id: uuid.UUID, current_human):
     event = crud.events_crud.get(db, event_id)
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
-    if event.owner_id != current_human.id:
+    if not _human_manages_event(event, current_human):
         raise HTTPException(
             status_code=403,
-            detail="Only the event owner can manage invitations",
+            detail="Only the event owner or host can manage invitations",
         )
     return event
 
@@ -2422,7 +2430,7 @@ async def get_portal_event(
             .where(EventInvitations.event_id == event_id)
             .where(EventInvitations.human_id == current_human.id)
         ).first()
-        if not invited and event.owner_id != current_human.id:
+        if not invited and not _human_manages_event(event, current_human):
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail="Event not found"
             )
@@ -2465,9 +2473,7 @@ async def get_portal_event(
 # ---------------------------------------------------------------------------
 
 
-@router.get(
-    "/portal/events/{event_id}/admin-notes", response_model=EventAdminNotes
-)
+@router.get("/portal/events/{event_id}/admin-notes", response_model=EventAdminNotes)
 async def get_portal_event_admin_notes(
     event_id: uuid.UUID,
     db: HumanTenantSession,
@@ -2482,9 +2488,7 @@ async def get_portal_event_admin_notes(
     return EventAdminNotes(notes=event.admin_notes)
 
 
-@router.put(
-    "/portal/events/{event_id}/admin-notes", response_model=EventAdminNotes
-)
+@router.put("/portal/events/{event_id}/admin-notes", response_model=EventAdminNotes)
 async def update_portal_event_admin_notes(
     event_id: uuid.UUID,
     payload: EventAdminNotes,
@@ -2696,10 +2700,10 @@ async def update_portal_event(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Event not found"
         )
-    if event.owner_id != current_human.id:
+    if not _human_manages_event(event, current_human):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only the event owner can edit",
+            detail="Only the event owner or host can edit",
         )
 
     audit_before = build_event_snapshot(db, event)
@@ -2777,10 +2781,10 @@ async def cancel_portal_event(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Event not found"
         )
-    if event.owner_id != current_human.id:
+    if not _human_manages_event(event, current_human):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only the event owner can cancel",
+            detail="Only the event owner or host can cancel",
         )
     if event.status == EventStatus.CANCELLED:
         raise HTTPException(

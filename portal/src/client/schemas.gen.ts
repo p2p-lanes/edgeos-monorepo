@@ -5557,6 +5557,18 @@ export const EventCreateSchema = {
             ],
             title: 'Host Display Name'
         },
+        host_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Host Id'
+        },
         status: {
             '$ref': '#/components/schemas/EventStatus',
             default: 'draft'
@@ -6079,6 +6091,18 @@ export const EventPublicSchema = {
                 }
             ],
             title: 'Host Display Name'
+        },
+        host_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Host Id'
         },
         status: {
             '$ref': '#/components/schemas/EventStatus',
@@ -7050,6 +7074,18 @@ export const EventUpdateSchema = {
                 }
             ],
             title: 'Host Display Name'
+        },
+        host_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Host Id'
         },
         status: {
             anyOf: [

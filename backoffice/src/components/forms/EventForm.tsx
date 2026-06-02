@@ -347,6 +347,7 @@ export function EventForm({
       require_approval: false,
       highlighted: defaultValues?.highlighted ?? false,
       host_display_name: defaultValues?.host_display_name ?? "",
+      host_id: defaultValues?.host_id ?? null,
       tags: defaultValues?.tags ?? [],
     },
     onSubmit: ({ value }) => {
@@ -403,6 +404,7 @@ export function EventForm({
           content: value.content || null,
           kind: value.kind || null,
           host_display_name: hostDisplayName,
+          host_id: value.host_id,
           start_time: startDate.toISOString(),
           end_time: endDate.toISOString(),
           timezone: value.timezone,
@@ -429,6 +431,7 @@ export function EventForm({
           content: value.content || null,
           kind: value.kind || null,
           host_display_name: hostDisplayName,
+          host_id: value.host_id,
           start_time: startDate.toISOString(),
           end_time: endDate.toISOString(),
           timezone: value.timezone,
@@ -1490,7 +1493,10 @@ export function EventForm({
               <div className="flex w-full max-w-[380px] flex-col gap-2">
                 <Input
                   value={field.state.value}
-                  onChange={(e) => field.handleChange(e.target.value)}
+                  onChange={(e) => {
+                    field.handleChange(e.target.value)
+                    form.setFieldValue("host_id", null)
+                  }}
                   placeholder={
                     popup?.name ? `${popup.name} (default)` : "Optional"
                   }
@@ -1505,7 +1511,10 @@ export function EventForm({
                         variant="ghost"
                         size="sm"
                         className="h-7 px-2 text-xs"
-                        onClick={() => field.handleChange(popup.name ?? "")}
+                        onClick={() => {
+                          field.handleChange(popup.name ?? "")
+                          form.setFieldValue("host_id", null)
+                        }}
                       >
                         Use {popup.name}
                       </Button>
@@ -1516,9 +1525,10 @@ export function EventForm({
                         variant="ghost"
                         size="sm"
                         className="h-7 px-2 text-xs"
-                        onClick={() =>
+                        onClick={() => {
                           field.handleChange(currentUserDisplayName)
-                        }
+                          form.setFieldValue("host_id", null)
+                        }}
                       >
                         Use my name
                       </Button>
@@ -1563,6 +1573,7 @@ export function EventForm({
                                   className="flex w-full flex-col items-start gap-0.5 px-3 py-2 text-left text-sm hover:bg-muted"
                                   onClick={() => {
                                     field.handleChange(name)
+                                    form.setFieldValue("host_id", h.id)
                                     setHostPickerOpen(false)
                                     setHostSearch("")
                                   }}

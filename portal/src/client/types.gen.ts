@@ -1276,6 +1276,7 @@ export type EventCreate = {
     require_approval?: boolean;
     kind?: (string | null);
     host_display_name?: (string | null);
+    host_id?: (string | null);
     status?: EventStatus;
     highlighted?: boolean;
     recurrence?: (RecurrenceRule | null);
@@ -1380,6 +1381,7 @@ export type EventPublic = {
     require_approval?: boolean;
     kind?: (string | null);
     host_display_name?: (string | null);
+    host_id?: (string | null);
     status?: EventStatus;
     highlighted?: boolean;
     rejection_reason?: (string | null);
@@ -1541,6 +1543,7 @@ export type EventUpdate = {
     require_approval?: (boolean | null);
     kind?: (string | null);
     host_display_name?: (string | null);
+    host_id?: (string | null);
     status?: (EventStatus | null);
     highlighted?: (boolean | null);
 };

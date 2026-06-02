@@ -31,6 +31,8 @@ export interface UseEditEventFormResult {
   setTags: (next: string[]) => void
   hostDisplayName: string
   setHostDisplayName: (next: string) => void
+  hostId: string | null
+  setHostId: (next: string | null) => void
   buildPayload: (
     timezone: string,
     startIso: string,
@@ -65,6 +67,9 @@ export function useEditEventForm(event: EventPublic): UseEditEventFormResult {
   const [hostDisplayName, setHostDisplayName] = useState(
     () => event.host_display_name ?? "",
   )
+  const [hostId, setHostId] = useState<string | null>(
+    () => event.host_id ?? null,
+  )
 
   const buildPayload = (
     timezone: string,
@@ -90,6 +95,7 @@ export function useEditEventForm(event: EventPublic): UseEditEventFormResult {
       cover_url: coverUrl || null,
       tags,
       host_display_name: hostDisplayName.trim() || null,
+      host_id: hostId,
     }
   }
 
@@ -118,6 +124,8 @@ export function useEditEventForm(event: EventPublic): UseEditEventFormResult {
     setTags,
     hostDisplayName,
     setHostDisplayName,
+    hostId,
+    setHostId,
     buildPayload,
   }
 }
