@@ -21,7 +21,7 @@ Idempotent: once an event's owner is a Human, it no longer matches a Users row,
 so re-running is a no-op.
 
 Revision ID: c4e1a2f7b9d0
-Revises: f3a8c1d92e47
+Revises: f4a9c1e7b6d2
 Create Date: 2026-06-01
 """
 
@@ -30,7 +30,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "c4e1a2f7b9d0"
-down_revision = "f3a8c1d92e47"
+down_revision = "f4a9c1e7b6d2"
 branch_labels = None
 depends_on = None
 
