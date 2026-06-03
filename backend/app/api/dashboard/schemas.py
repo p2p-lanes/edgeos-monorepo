@@ -55,6 +55,7 @@ class KeyMetrics(BaseModel):
     """Top-level KPI cards with derived metrics."""
 
     people: int = 0
+    paying_people: int = 0
     total_revenue: Decimal = Decimal("0")
     currency: str = "USD"
     avg_ticket_price: Decimal = Decimal("0")
@@ -143,9 +144,10 @@ class ApplicationFunnel(BaseModel):
 
     draft: int = 0
     pending_fee: int = 0
+    paid: int = 0
     in_review: int = 0
     accepted: int = 0
-    paid: int = 0
+    fee_enabled: bool = False
 
 
 class DashboardStats(BaseModel):

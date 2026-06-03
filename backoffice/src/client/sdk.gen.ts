@@ -5231,12 +5231,16 @@ export class HumansService {
     }
     
     /**
-     * Hard-delete a human and all related rows (superadmin only)
+     * Hard-delete a human and all related rows (admin or superadmin)
      * Permanently delete a Human with full cascade.
      *
      * Removes applications, attendees, payments, products, carts, group
      * memberships, and ambassador-owned groups in a single transaction. Designed
      * for cleaning up test users — destructive and irreversible.
+     *
+     * Superadmins may delete any human; a tenant admin may only delete humans
+     * within their own tenant. Both run on the control-plane session (which
+     * bypasses RLS), so the tenant ownership check is enforced explicitly here.
      * @param data The data for the request.
      * @param data.humanId
      * @returns HardDeleteSummary Successful Response
