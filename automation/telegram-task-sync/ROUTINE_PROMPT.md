@@ -52,6 +52,13 @@ For each message, decide:
 - Is it a **bug** (something broken/not working), a **feature/change request** (asking for
   new behavior or a change), or **neither** (chit-chat, questions already answered, status
   updates, social)? Discard "neither".
+- **Also evaluate `reply_to`.** When a message has a `reply_to`, it is quoting an earlier
+  message (often one sent before the bot joined). If that quoted original describes a
+  bug/feature that is NOT already tracked, treat the QUOTED ORIGINAL as the candidate: build
+  the task from `reply_to.text`, attribute it to `reply_to.sender`, and use
+  `reply_to.message_id` for the `[tg:]` marker — even when the reply's own text is just an
+  acknowledgment like "i'll check". (Evaluate the reply's own text separately too; both can
+  yield items.)
 - Is it **already tracked**? Treat it as a duplicate if EITHER:
   - an existing task clearly covers the same issue/request (same subject), OR
   - an existing task's `detail` already contains the marker `[tg:<message_id>]` for that message.
