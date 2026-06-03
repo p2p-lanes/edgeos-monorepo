@@ -1075,9 +1075,7 @@ def run_import(
 
         missing_keys = needed_keys - set(category_key_to_id.keys())
         if missing_keys:
-            next_sort = (
-                max((c.sort_order for c in existing_categories), default=-1) + 1
-            )
+            next_sort = max((c.sort_order for c in existing_categories), default=-1) + 1
             created_cats: list[AttendeeCategories] = []
             for key in sorted(missing_keys):
                 cat = AttendeeCategories(

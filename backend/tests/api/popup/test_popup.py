@@ -99,7 +99,9 @@ def test_create_popup_race_condition_returns_409_not_500(
     integrity_error = IntegrityError(
         statement="INSERT INTO popups",
         params={},
-        orig=Exception('duplicate key value violates unique constraint "uq_popups_tenant_slug"'),
+        orig=Exception(
+            'duplicate key value violates unique constraint "uq_popups_tenant_slug"'
+        ),
     )
 
     with patch.object(popup_crud, "create", side_effect=integrity_error):
@@ -173,7 +175,9 @@ def test_update_popup_race_condition_returns_409_not_500(
     integrity_error = IntegrityError(
         statement="UPDATE popups",
         params={},
-        orig=Exception('duplicate key value violates unique constraint "uq_popups_tenant_slug"'),
+        orig=Exception(
+            'duplicate key value violates unique constraint "uq_popups_tenant_slug"'
+        ),
     )
 
     with patch.object(popup_crud, "update", side_effect=integrity_error):

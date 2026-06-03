@@ -151,7 +151,9 @@ class TestDeriveProductStateSoldOut:
 
     def test_null_stock_does_not_trigger_sold_out(self) -> None:
         """NULL total_stock_remaining → unlimited; no sold_out override."""
-        p = _product(sale_starts_at=PAST, sale_ends_at=FUTURE, total_stock_remaining=None)
+        p = _product(
+            sale_starts_at=PAST, sale_ends_at=FUTURE, total_stock_remaining=None
+        )
         assert derive_product_state(p, NOW) == ProductSaleState.on_sale
 
     def test_positive_stock_does_not_trigger_sold_out(self) -> None:

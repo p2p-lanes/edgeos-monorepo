@@ -41,6 +41,7 @@ def get_request_id() -> str | None:
     """Return the current request's id, or ``None`` outside a request."""
     return _request_id_var.get()
 
+
 _LOG_FORMAT = (
     "{time:YYYY-MM-DD HH:mm:ss.SSS} | "
     "{level: <8} | "

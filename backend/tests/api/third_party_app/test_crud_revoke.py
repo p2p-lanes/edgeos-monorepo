@@ -48,7 +48,9 @@ class TestRevokeThirdPartyApp:
     ) -> None:
         """DELETE returns 204."""
         app = _create_app(client, admin_token_tenant_a)
-        resp = client.delete(f"{BASE_URL}/{app['id']}", headers=_auth(admin_token_tenant_a))
+        resp = client.delete(
+            f"{BASE_URL}/{app['id']}", headers=_auth(admin_token_tenant_a)
+        )
         assert resp.status_code == 204, resp.text
 
     def test_revoked_app_has_revoked_at_set(
@@ -60,7 +62,9 @@ class TestRevokeThirdPartyApp:
         app = _create_app(client, admin_token_tenant_a)
         client.delete(f"{BASE_URL}/{app['id']}", headers=_auth(admin_token_tenant_a))
 
-        get_resp = client.get(f"{BASE_URL}/{app['id']}", headers=_auth(admin_token_tenant_a))
+        get_resp = client.get(
+            f"{BASE_URL}/{app['id']}", headers=_auth(admin_token_tenant_a)
+        )
         assert get_resp.status_code == 200, get_resp.text
         data = get_resp.json()
         assert data["revoked_at"] is not None
@@ -98,7 +102,9 @@ class TestRevokeThirdPartyApp:
 
         list_resp = client.get(BASE_URL, headers=_auth(admin_token_tenant_a))
         assert list_resp.status_code == 200
-        active_ids = [r["id"] for r in list_resp.json()["results"] if r["revoked_at"] is None]
+        active_ids = [
+            r["id"] for r in list_resp.json()["results"] if r["revoked_at"] is None
+        ]
         assert app["id"] not in active_ids
 
     def test_delete_missing_returns_404(
@@ -143,8 +149,12 @@ class TestRevokeThirdPartyApp:
     ) -> None:
         """Deleting an already-revoked app returns 204 (idempotent)."""
         app = _create_app(client, admin_token_tenant_a)
-        resp1 = client.delete(f"{BASE_URL}/{app['id']}", headers=_auth(admin_token_tenant_a))
+        resp1 = client.delete(
+            f"{BASE_URL}/{app['id']}", headers=_auth(admin_token_tenant_a)
+        )
         assert resp1.status_code == 204
-        resp2 = client.delete(f"{BASE_URL}/{app['id']}", headers=_auth(admin_token_tenant_a))
+        resp2 = client.delete(
+            f"{BASE_URL}/{app['id']}", headers=_auth(admin_token_tenant_a)
+        )
         # Should be 204 (idempotent) OR 409 — both acceptable; 404 is not
         assert resp2.status_code in (204, 409), resp2.text

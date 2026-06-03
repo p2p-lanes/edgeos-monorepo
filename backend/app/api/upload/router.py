@@ -14,9 +14,9 @@ router = APIRouter(prefix="/uploads", tags=["uploads"])
 
 ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/gif", "image/webp"}
 ALLOWED_VIDEO_TYPES = {"video/mp4"}
-ALLOWED_BACKOFFICE_TYPES = ALLOWED_IMAGE_TYPES | ALLOWED_VIDEO_TYPES | {
-    "application/pdf"
-}
+ALLOWED_BACKOFFICE_TYPES = (
+    ALLOWED_IMAGE_TYPES | ALLOWED_VIDEO_TYPES | {"application/pdf"}
+)
 ALLOWED_PORTAL_TYPES = ALLOWED_IMAGE_TYPES
 
 

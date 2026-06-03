@@ -45,9 +45,7 @@ def list_all(session: Session) -> list[ApiKeys]:
     return _base.list_all_admin_keys(session)
 
 
-def get_own(
-    session: Session, key_id: uuid.UUID, user_id: uuid.UUID
-) -> ApiKeys | None:
+def get_own(session: Session, key_id: uuid.UUID, user_id: uuid.UUID) -> ApiKeys | None:
     """Fetch a key by id, scoped to the given user. None if not found/not owned."""
     return _base.get_for_user(session, key_id, user_id)
 

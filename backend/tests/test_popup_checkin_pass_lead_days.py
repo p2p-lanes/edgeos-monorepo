@@ -33,9 +33,7 @@ def test_non_positive_lead_days_is_rejected() -> None:
         PopupUpdate(checkin_pass_lead_days=-5)
 
 
-def test_update_can_disable_an_enabled_popup(
-    db: Session, tenant_a: Tenants
-) -> None:
+def test_update_can_disable_an_enabled_popup(db: Session, tenant_a: Tenants) -> None:
     # Regression for "can the backoffice turn the feature off again?":
     # the form sends an explicit null when the user clears the input, and
     # BaseCRUD.update must persist that null so the dispatcher stops picking
