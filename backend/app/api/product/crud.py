@@ -199,9 +199,7 @@ class ProductsCRUD(BaseCRUD[Products, ProductCreate, ProductUpdate]):
         session.refresh(db_obj)
         return db_obj
 
-    def _count_active_sales(
-        self, session: Session, product_id: uuid.UUID
-    ) -> int:
+    def _count_active_sales(self, session: Session, product_id: uuid.UUID) -> int:
         """Sum quantities of units currently holding stock for this product.
 
         Counts payment_products rows whose payment is in a stock-holding

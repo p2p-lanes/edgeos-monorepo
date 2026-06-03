@@ -156,7 +156,10 @@ class TestMeAccessResponseShape:
         assert resp.status_code == 200, resp.text
         data = resp.json()
         assert data["app_name"] == "legacy"
-        assert set(data["scopes"]) == {"portal:applications:read", "portal:directory:read"}
+        assert set(data["scopes"]) == {
+            "portal:applications:read",
+            "portal:directory:read",
+        }
 
     def test_revoked_app_returns_401(
         self,

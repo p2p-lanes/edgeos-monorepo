@@ -16,7 +16,13 @@ from app.api.shared.enums import LandingMode
 from app.api.tenant.utils import get_portal_url
 
 
-def _make_tenant(*, slug: str, custom_domain: str | None = None, custom_domain_active: bool = False, landing_mode: LandingMode = LandingMode.portal) -> MagicMock:
+def _make_tenant(
+    *,
+    slug: str,
+    custom_domain: str | None = None,
+    custom_domain_active: bool = False,
+    landing_mode: LandingMode = LandingMode.portal,
+) -> MagicMock:
     t = MagicMock()
     t.slug = slug
     t.custom_domain = custom_domain
@@ -36,14 +42,19 @@ def _make_popup(*, slug: str, simplefi_api_key: str = "test-key") -> MagicMock:
 # Test the URL construction logic directly (extracted as a helper)
 # ---------------------------------------------------------------------------
 
-def _build_urls(tenant: MagicMock, popup: MagicMock, payment_id: str) -> tuple[str, str]:
+
+def _build_urls(
+    tenant: MagicMock, popup: MagicMock, payment_id: str
+) -> tuple[str, str]:
     """Mirror the URL construction logic from payment/crud.py lines 463-468."""
     portal_base = get_portal_url(tenant)
     if tenant.landing_mode == LandingMode.checkout:
         success_url = f"{portal_base}/thank-you?payment_id={payment_id}"
         cancel_url = f"{portal_base}/?cancelled=1"
     else:
-        success_url = f"{portal_base}/checkout/{popup.slug}/thank-you?payment_id={payment_id}"
+        success_url = (
+            f"{portal_base}/checkout/{popup.slug}/thank-you?payment_id={payment_id}"
+        )
         cancel_url = f"{portal_base}/checkout/{popup.slug}?cancelled=1"
     return success_url, cancel_url
 
@@ -97,7 +108,10 @@ def test_urls_portal_mode_unchanged() -> None:
 
     success_url, cancel_url = _build_urls(tenant, popup, payment_id)
 
-    assert success_url == "https://tickets.example.com/checkout/summer-fest/thank-you?payment_id=7"
+    assert (
+        success_url
+        == "https://tickets.example.com/checkout/summer-fest/thank-you?payment_id=7"
+    )
     assert cancel_url == "https://tickets.example.com/checkout/summer-fest?cancelled=1"
 
 
@@ -128,7 +142,10 @@ def test_application_fee_urls_use_portal_prefix() -> None:
     success_path = f"{portal_base}/portal/{popup.slug}/application?checkout=success"
     cancel_path = f"{portal_base}/portal/{popup.slug}/application"
 
-    assert success_path == "https://tickets.example.com/portal/summer-fest/application?checkout=success"
+    assert (
+        success_path
+        == "https://tickets.example.com/portal/summer-fest/application?checkout=success"
+    )
     assert cancel_path == "https://tickets.example.com/portal/summer-fest/application"
     # Confirms landing_mode plays no role here
     assert "landing_mode" not in success_path

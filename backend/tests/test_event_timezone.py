@@ -183,9 +183,9 @@ class TestEventTimezoneRoundtrip:
         assert datetime.fromisoformat(got_body["start_time"]).astimezone(
             UTC
         ) == datetime(2026, 6, 4, 20, 0, tzinfo=UTC)
-        assert datetime.fromisoformat(got_body["end_time"]).astimezone(
-            UTC
-        ) == datetime(2026, 6, 4, 23, 0, tzinfo=UTC)
+        assert datetime.fromisoformat(got_body["end_time"]).astimezone(UTC) == datetime(
+            2026, 6, 4, 23, 0, tzinfo=UTC
+        )
 
     def test_create_event_in_tokyo_persists_correctly(
         self,
@@ -231,7 +231,9 @@ class TestEventTimezoneRoundtrip:
 
         popup = _make_popup(db, tenant_a, tz="America/Los_Angeles")
         la = ZoneInfo("America/Los_Angeles")
-        local_start = datetime(2026, 6, 4, 23, 0, tzinfo=la)  # 23:00 LA = 06:00Z next day
+        local_start = datetime(
+            2026, 6, 4, 23, 0, tzinfo=la
+        )  # 23:00 LA = 06:00Z next day
         local_end = local_start + timedelta(hours=1)
 
         resp = client.post(
@@ -518,9 +520,9 @@ class TestNaiveDatetimeRejected:
         assert resp.status_code == 422, resp.text
         detail = resp.json()["detail"]
         # The validator's message should mention "timezone offset".
-        assert any(
-            "timezone offset" in str(err.get("msg", "")) for err in detail
-        ), detail
+        assert any("timezone offset" in str(err.get("msg", "")) for err in detail), (
+            detail
+        )
 
     def test_update_event_rejects_naive_end_time(
         self,

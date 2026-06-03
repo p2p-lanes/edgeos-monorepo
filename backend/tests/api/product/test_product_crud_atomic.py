@@ -68,7 +68,9 @@ class TestDecrementTotalStock:
     ) -> None:
         """Sufficient stock: counter decrements; product returned."""
         product = _make_product(
-            db, tenant_a, popup_tenant_a,
+            db,
+            tenant_a,
+            popup_tenant_a,
             total_stock_cap=10,
             total_stock_remaining=10,
         )
@@ -88,7 +90,9 @@ class TestDecrementTotalStock:
     ) -> None:
         """total_stock_remaining < qty → HTTP 409 'Sold out'."""
         product = _make_product(
-            db, tenant_a, popup_tenant_a,
+            db,
+            tenant_a,
+            popup_tenant_a,
             total_stock_cap=5,
             total_stock_remaining=1,
         )
@@ -106,7 +110,9 @@ class TestDecrementTotalStock:
     ) -> None:
         """total_stock_remaining IS NULL (unlimited) → no-op; product returned; no 409."""
         product = _make_product(
-            db, tenant_a, popup_tenant_a,
+            db,
+            tenant_a,
+            popup_tenant_a,
             total_stock_cap=None,
             total_stock_remaining=None,
         )
@@ -141,7 +147,9 @@ class TestDecrementTotalStock:
         from sqlmodel import Session as SyncSession
 
         product = _make_product(
-            db, tenant_a, popup_tenant_a,
+            db,
+            tenant_a,
+            popup_tenant_a,
             total_stock_cap=1,
             total_stock_remaining=1,
         )
@@ -197,7 +205,9 @@ class TestRestoreTotalStock:
     ) -> None:
         """Held stock restored: total_stock_remaining increases by qty."""
         product = _make_product(
-            db, tenant_a, popup_tenant_a,
+            db,
+            tenant_a,
+            popup_tenant_a,
             total_stock_cap=10,
             total_stock_remaining=7,  # 3 were held
         )
@@ -217,7 +227,9 @@ class TestRestoreTotalStock:
     ) -> None:
         """LEAST(cap, remaining + qty) prevents drift past cap on double-fire."""
         product = _make_product(
-            db, tenant_a, popup_tenant_a,
+            db,
+            tenant_a,
+            popup_tenant_a,
             total_stock_cap=5,
             total_stock_remaining=5,  # already at cap
         )
@@ -237,7 +249,9 @@ class TestRestoreTotalStock:
     ) -> None:
         """NULL total_stock_remaining / cap: restore is a silent no-op."""
         product = _make_product(
-            db, tenant_a, popup_tenant_a,
+            db,
+            tenant_a,
+            popup_tenant_a,
             total_stock_cap=None,
             total_stock_remaining=None,
         )
@@ -247,5 +261,3 @@ class TestRestoreTotalStock:
         db.expire_all()
         refreshed = db.get(Products, product.id)
         assert refreshed.total_stock_remaining is None
-
-

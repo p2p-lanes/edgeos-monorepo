@@ -21,9 +21,7 @@ from app.api.product.schemas import ProductUpdate
 from app.api.tenant.models import Tenants
 
 
-def _make_unlimited_product(
-    db: Session, tenant: Tenants, popup: Popups
-) -> Products:
+def _make_unlimited_product(db: Session, tenant: Tenants, popup: Popups) -> Products:
     suffix = uuid.uuid4().hex[:8]
     product = Products(
         tenant_id=tenant.id,

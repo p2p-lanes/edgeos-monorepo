@@ -64,10 +64,15 @@ class TestListThirdPartyApps:
         """REQ-6.2.a — ADMIN sees only own tenant's apps."""
         # Create one in tenant B (via superadmin)
         app_b = _create_app(
-            client, superadmin_token, name=f"tenant-b-only-{uuid.uuid4().hex[:6]}", tenant_id=tenant_b.id
+            client,
+            superadmin_token,
+            name=f"tenant-b-only-{uuid.uuid4().hex[:6]}",
+            tenant_id=tenant_b.id,
         )
         # Create one in tenant A
-        app_a = _create_app(client, admin_token_tenant_a, name=f"tenant-a-{uuid.uuid4().hex[:6]}")
+        app_a = _create_app(
+            client, admin_token_tenant_a, name=f"tenant-a-{uuid.uuid4().hex[:6]}"
+        )
 
         resp = client.get(BASE_URL, headers=_auth(admin_token_tenant_a))
         assert resp.status_code == 200, resp.text
@@ -85,9 +90,14 @@ class TestListThirdPartyApps:
         tenant_b: Tenants,
     ) -> None:
         """REQ-6.2.b — SUPERADMIN scoped to tenant B sees only B's apps."""
-        app_a = _create_app(client, admin_token_tenant_a, name=f"a-only-{uuid.uuid4().hex[:6]}")
+        app_a = _create_app(
+            client, admin_token_tenant_a, name=f"a-only-{uuid.uuid4().hex[:6]}"
+        )
         app_b = _create_app(
-            client, superadmin_token, name=f"b-only-{uuid.uuid4().hex[:6]}", tenant_id=tenant_b.id
+            client,
+            superadmin_token,
+            name=f"b-only-{uuid.uuid4().hex[:6]}",
+            tenant_id=tenant_b.id,
         )
 
         resp = client.get(BASE_URL, headers=_auth_tenant(superadmin_token, tenant_b.id))
@@ -134,7 +144,9 @@ class TestGetThirdPartyApp:
     ) -> None:
         """ADMIN can retrieve an app that belongs to their tenant."""
         app = _create_app(client, admin_token_tenant_a)
-        resp = client.get(f"{BASE_URL}/{app['id']}", headers=_auth(admin_token_tenant_a))
+        resp = client.get(
+            f"{BASE_URL}/{app['id']}", headers=_auth(admin_token_tenant_a)
+        )
         assert resp.status_code == 200, resp.text
         data = resp.json()
         assert data["id"] == app["id"]
@@ -148,9 +160,14 @@ class TestGetThirdPartyApp:
     ) -> None:
         """ADMIN cannot see an app from another tenant — 404 (no info leak)."""
         app_b = _create_app(
-            client, superadmin_token, name=f"b-secret-{uuid.uuid4().hex[:6]}", tenant_id=tenant_b.id
+            client,
+            superadmin_token,
+            name=f"b-secret-{uuid.uuid4().hex[:6]}",
+            tenant_id=tenant_b.id,
         )
-        resp = client.get(f"{BASE_URL}/{app_b['id']}", headers=_auth(admin_token_tenant_a))
+        resp = client.get(
+            f"{BASE_URL}/{app_b['id']}", headers=_auth(admin_token_tenant_a)
+        )
         assert resp.status_code == 404, resp.text
 
     def test_missing_id_returns_404(
@@ -173,12 +190,24 @@ class TestGetThirdPartyApp:
     ) -> None:
         """GET returns all ThirdPartyAppPublic fields."""
         app = _create_app(client, admin_token_tenant_a)
-        resp = client.get(f"{BASE_URL}/{app['id']}", headers=_auth(admin_token_tenant_a))
+        resp = client.get(
+            f"{BASE_URL}/{app['id']}", headers=_auth(admin_token_tenant_a)
+        )
         assert resp.status_code == 200
         data = resp.json()
-        for field in ("id", "tenant_id", "name", "prefix", "allowed_token_scopes",
-                      "allowed_api_key_scopes", "active", "last_used_at",
-                      "revoked_at", "created_at", "updated_at"):
+        for field in (
+            "id",
+            "tenant_id",
+            "name",
+            "prefix",
+            "allowed_token_scopes",
+            "allowed_api_key_scopes",
+            "active",
+            "last_used_at",
+            "revoked_at",
+            "created_at",
+            "updated_at",
+        ):
             assert field in data, f"Missing field: {field}"
         assert "key_hash" not in data
         assert "raw_key" not in data

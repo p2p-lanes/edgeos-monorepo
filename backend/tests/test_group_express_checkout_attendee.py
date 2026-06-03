@@ -29,9 +29,7 @@ def test_group_application_creates_main_attendee(
     db.add(popup)
     db.flush()
 
-    main_cat = attendee_categories_crud.seed_main_for_popup(
-        db, popup.id, tenant_a.id
-    )
+    main_cat = attendee_categories_crud.seed_main_for_popup(db, popup.id, tenant_a.id)
     assert main_cat is not None
 
     group = Groups(

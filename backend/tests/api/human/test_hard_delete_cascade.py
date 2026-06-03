@@ -230,12 +230,8 @@ def test_cascade_removes_group_memberships(
     )
     db.add(group)
     db.flush()
-    db.add(
-        GroupMembers(group_id=group.id, human_id=member.id, tenant_id=tenant_a.id)
-    )
-    db.add(
-        GroupLeaders(group_id=group.id, human_id=member.id, tenant_id=tenant_a.id)
-    )
+    db.add(GroupMembers(group_id=group.id, human_id=member.id, tenant_id=tenant_a.id))
+    db.add(GroupLeaders(group_id=group.id, human_id=member.id, tenant_id=tenant_a.id))
     db.commit()
     group_id = group.id
 
@@ -266,9 +262,7 @@ def test_cascade_drops_ambassador_owned_groups(
     db.add(group)
     db.flush()
     db.add(
-        GroupMembers(
-            group_id=group.id, human_id=other_member.id, tenant_id=tenant_a.id
-        )
+        GroupMembers(group_id=group.id, human_id=other_member.id, tenant_id=tenant_a.id)
     )
     db.commit()
     group_id = group.id
@@ -280,9 +274,7 @@ def test_cascade_drops_ambassador_owned_groups(
     # Other member's human row must survive — only their group_members link died.
     assert db.get(Humans, other_member.id) is not None
     assert (
-        db.exec(
-            select(GroupMembers).where(GroupMembers.group_id == group_id)
-        ).first()
+        db.exec(select(GroupMembers).where(GroupMembers.group_id == group_id)).first()
         is None
     )
 
@@ -357,7 +349,9 @@ def test_http_delete_unknown_returns_404(
     assert resp.status_code == 404
 
 
-def test_http_delete_anonymous_rejected(client: TestClient, db: Session, tenant_a: Tenants) -> None:
+def test_http_delete_anonymous_rejected(
+    client: TestClient, db: Session, tenant_a: Tenants
+) -> None:
     human = _make_human(db, tenant_a.id, "anon")
     resp = client.delete(f"/api/v1/humans/{human.id}")
     assert resp.status_code in (401, 403)
@@ -373,9 +367,7 @@ def test_http_delete_succeeds_for_superadmin(
     human = _make_human(db, tenant_a.id, "super")
     human_id = human.id
 
-    resp = client.delete(
-        f"/api/v1/humans/{human_id}", headers=_auth(superadmin_token)
-    )
+    resp = client.delete(f"/api/v1/humans/{human_id}", headers=_auth(superadmin_token))
 
     assert resp.status_code == 200, resp.text
     body = resp.json()

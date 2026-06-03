@@ -73,7 +73,9 @@ class TestRotateThirdPartyApp:
         )
         assert rotate_resp.status_code == 200
 
-        get_resp = client.get(f"{BASE_URL}/{app['id']}", headers=_auth(admin_token_tenant_a))
+        get_resp = client.get(
+            f"{BASE_URL}/{app['id']}", headers=_auth(admin_token_tenant_a)
+        )
         assert get_resp.status_code == 200
         new_prefix = get_resp.json()["prefix"]
         # prefix must reflect the new key (may differ from old)
@@ -105,6 +107,7 @@ class TestRotateThirdPartyApp:
 
         # Old key should now fail validation
         import pytest
+
         with pytest.raises(HTTPException) as exc_info:
             validate_third_party_key(db, original_raw)
         assert exc_info.value.status_code == 401
@@ -130,7 +133,9 @@ class TestRotateThirdPartyApp:
     ) -> None:
         """Rotating a revoked app → 409."""
         app = _create_app(client, admin_token_tenant_a)
-        del_resp = client.delete(f"{BASE_URL}/{app['id']}", headers=_auth(admin_token_tenant_a))
+        del_resp = client.delete(
+            f"{BASE_URL}/{app['id']}", headers=_auth(admin_token_tenant_a)
+        )
         assert del_resp.status_code == 204
 
         rotate_resp = client.post(

@@ -210,7 +210,10 @@ class TestCreateNameUniqueness:
             },
         )
         assert second.status_code == 409, second.text
-        assert "name" in second.json()["detail"].lower() or "already" in second.json()["detail"].lower()
+        assert (
+            "name" in second.json()["detail"].lower()
+            or "already" in second.json()["detail"].lower()
+        )
 
     def test_revoked_name_can_be_reused(
         self,
@@ -231,7 +234,9 @@ class TestCreateNameUniqueness:
         assert create_resp.status_code == 201, create_resp.text
         app_id = create_resp.json()["id"]
 
-        del_resp = client.delete(f"{BASE_URL}/{app_id}", headers=_auth(admin_token_tenant_a))
+        del_resp = client.delete(
+            f"{BASE_URL}/{app_id}", headers=_auth(admin_token_tenant_a)
+        )
         assert del_resp.status_code == 204
 
         reuse_resp = client.post(

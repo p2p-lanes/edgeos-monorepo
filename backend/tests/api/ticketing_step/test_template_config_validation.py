@@ -170,7 +170,10 @@ class TestTemplateConfigAttendeeCategories:
         step_id = post_resp.json()["id"]
 
         # PATCH with template + invalid category value
-        invalid_section = {**_base_section("patch-invalid"), "attendee_categories": ["baby"]}
+        invalid_section = {
+            **_base_section("patch-invalid"),
+            "attendee_categories": ["baby"],
+        }
         patch_resp = client.patch(
             f"/api/v1/ticketing-steps/{step_id}",
             headers=_admin_headers(admin_token_tenant_a),

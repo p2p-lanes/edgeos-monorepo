@@ -46,7 +46,9 @@ class TestAttendeesDualAuth:
         admin_token_tenant_a: str,
     ) -> None:
         """Existing JWT admin path still works after swap."""
-        resp = client.get("/api/v1/attendees", headers=_jwt_headers(admin_token_tenant_a))
+        resp = client.get(
+            "/api/v1/attendees", headers=_jwt_headers(admin_token_tenant_a)
+        )
         assert resp.status_code == 200, resp.text
 
     def test_api_key_attendees_read_list_succeeds(

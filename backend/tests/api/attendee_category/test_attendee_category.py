@@ -461,5 +461,7 @@ def test_main_category_created_on_popup_create(
     )
     assert cat_resp.status_code == 200, cat_resp.text
     categories = cat_resp.json()["results"]
-    main_cats = [c for c in categories if c.get("is_primary") and c.get("key") == "main"]
+    main_cats = [
+        c for c in categories if c.get("is_primary") and c.get("key") == "main"
+    ]
     assert len(main_cats) == 1, f"Expected 1 main category, got {categories}"
