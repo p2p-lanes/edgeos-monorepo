@@ -144,12 +144,14 @@ export function KeyMetricsCards({ data, isLoading }: KeyMetricsCardsProps) {
         title="Revenue / Person"
         value={formatCurrency(data.avg_revenue_per_person, currency)}
         icon={TrendingUp}
+        description={`${(data.paying_people ?? 0).toLocaleString()} paying`}
         accentClass="text-violet-500"
       />
       <MetricCard
         title="Conversion Rate"
         value={`${data.conversion_rate ?? 0}%`}
         icon={Percent}
+        description="accepted vs rejected"
         accentClass="text-emerald-500"
       />
       <MetricCard
