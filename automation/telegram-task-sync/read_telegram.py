@@ -1,46 +1,45 @@
 #!/usr/bin/env python3
-"""Read the last N hours of messages from a Telegram group and print them as JSON.
+"""Read recent messages from a Telegram group via the Bot API and print them as JSON.
 
-Used by the "telegram-task-sync" routine. This script ONLY reads messages and
-prints them to stdout — it never sends, edits, or deletes anything, and it does
-not talk to the backoffice. The reasoning ("is this a bug/request?", "does a task
-already exist?") and task creation are done by the routine agent, not here.
+Used by the "telegram-task-sync" routine. This script ONLY reads messages and prints
+them to stdout — it never sends, edits, or deletes anything, and it does not talk to the
+backoffice.
 
-Auth uses a Telethon StringSession (a logged-in *user* session, not a bot), which
-is the only way to read a group's message history. Generate it once locally with
-`generate_session.py`.
+Why the Bot API (and not Telethon/MTProto): the routine runs in Anthropic's cloud, whose
+egress proxy only allows HTTP(S) to allowlisted domains. MTProto (raw TCP to Telegram DC
+IPs) is impossible there. The Bot API is plain HTTPS to `api.telegram.org`, which works.
+
+Consequences of the Bot API:
+- The bot only sees messages while it is a member of the group AND privacy mode is OFF
+  (set via BotFather: /setprivacy -> Disable). It cannot read history from before it joined.
+- `getUpdates` retains updates for ~24h. This script advances the offset as it reads, so a
+  daily run yields roughly the last 24h of messages. Overlaps across runs are harmless
+  because tasks carry a [tg:<message_id>] dedupe marker.
+- The bot must NOT have a webhook set (getUpdates and webhooks are mutually exclusive).
 
 Required environment variables:
-  TELEGRAM_API_ID     int    from https://my.telegram.org
-  TELEGRAM_API_HASH   str    from https://my.telegram.org
-  TELEGRAM_SESSION    str    StringSession produced by generate_session.py
-  TELEGRAM_CHAT_ID    str    target chat id, e.g. -4643549576 (the id in the
-                             web.telegram.org/k/#<id> URL)
+  TELEGRAM_BOT_TOKEN   str   bot token from BotFather
 
 Optional:
-  TELEGRAM_WINDOW_HOURS  int  how far back to read (default 24)
+  TELEGRAM_CHAT_ID       str   only return messages from this chat id (e.g. -4643549576).
+                               If unset, returns messages from every chat the bot sees.
+  TELEGRAM_WINDOW_HOURS  int   how far back to keep messages (default 24)
 
 Output (stdout): a JSON object
-  {
-    "chat_id": <int>,
-    "chat_title": <str>,
-    "window_hours": <int>,
-    "since_utc": <iso8601>,
-    "count": <int>,
-    "messages": [
-      {"message_id", "date", "sender", "text", "permalink"}, ...
-    ]
-  }
+  {"chat_id", "window_hours", "since_utc", "count", "messages": [...], "chats_seen": {...}}
+where each message is {message_id, date, sender, text, permalink}.
 """
 
-import asyncio
 import json
 import os
 import sys
+import urllib.error
+import urllib.parse
+import urllib.request
 from datetime import UTC, datetime, timedelta
 
-from telethon import TelegramClient, utils
-from telethon.sessions import StringSession
+API_BASE = "https://api.telegram.org"
+MAX_PAGES = 20  # safety cap: up to 20 * 100 = 2000 messages per run
 
 
 def _require_env(name: str) -> str:
@@ -51,120 +50,120 @@ def _require_env(name: str) -> str:
     return value
 
 
-async def _resolve_entity(client: TelegramClient, target_id: int):
-    """Find the chat entity matching ``target_id``.
-
-    Telegram exposes a few id conventions (marked ids like -100... for channels
-    and -... for basic groups, vs. the raw positive id). We try the most direct
-    resolution first, then fall back to scanning dialogs and matching on either
-    the marked id or the absolute raw id, so the configured value from the
-    web URL works regardless of group type.
-    """
+def _call(token: str, method: str, params: dict) -> object:
+    url = f"{API_BASE}/bot{token}/{method}?" + urllib.parse.urlencode(params)
     try:
-        return await client.get_entity(target_id)
-    except Exception:
-        pass
-
-    abs_id = abs(target_id)
-    async for dialog in client.iter_dialogs():
-        entity = dialog.entity
-        try:
-            marked = utils.get_peer_id(entity)
-        except Exception:
-            marked = None
-        if marked == target_id or getattr(entity, "id", None) == abs_id:
-            return entity
-
-    sys.stderr.write(
-        f"Could not find a chat with id {target_id} in this account's dialogs.\n"
-        "Make sure the logged-in user is a member of the group.\n"
-    )
-    sys.exit(3)
+        with urllib.request.urlopen(url, timeout=30) as resp:
+            payload = json.loads(resp.read().decode())
+    except urllib.error.HTTPError as e:
+        body = e.read().decode(errors="replace")
+        sys.stderr.write(f"Telegram API HTTP {e.code} on {method}: {body}\n")
+        sys.exit(3)
+    except urllib.error.URLError as e:
+        sys.stderr.write(f"Cannot reach Telegram API ({method}): {e}\n")
+        sys.exit(3)
+    if not payload.get("ok"):
+        sys.stderr.write(f"Telegram API error on {method}: {payload}\n")
+        sys.exit(3)
+    return payload["result"]
 
 
-def _permalink(entity, message_id: int) -> str | None:
+def _permalink(chat: dict, message_id: int) -> str | None:
     """Best-effort t.me permalink for a message."""
-    username = getattr(entity, "username", None)
+    username = chat.get("username")
     if username:
         return f"https://t.me/{username}/{message_id}"
-    # Private supergroups/channels expose an internal id usable as t.me/c/<id>/<msg>.
-    internal = getattr(entity, "id", None)
-    is_channel = entity.__class__.__name__ == "Channel"
-    if is_channel and internal is not None:
-        return f"https://t.me/c/{internal}/{message_id}"
+    chat_id = chat.get("id")
+    if chat.get("type") == "supergroup" and isinstance(chat_id, int):
+        sid = str(chat_id)
+        if sid.startswith("-100"):
+            return f"https://t.me/c/{sid[4:]}/{message_id}"
     return None
 
 
-async def main() -> None:
-    api_id = int(_require_env("TELEGRAM_API_ID"))
-    api_hash = _require_env("TELEGRAM_API_HASH")
-    session = _require_env("TELEGRAM_SESSION")
-    target_id = int(_require_env("TELEGRAM_CHAT_ID"))
+def main() -> None:
+    token = _require_env("TELEGRAM_BOT_TOKEN")
+    raw_chat = os.environ.get("TELEGRAM_CHAT_ID")
+    chat_filter = int(raw_chat) if raw_chat else None
     window_hours = int(os.environ.get("TELEGRAM_WINDOW_HOURS", "24"))
 
     since = datetime.now(UTC) - timedelta(hours=window_hours)
+    since_ts = since.timestamp()
 
-    client = TelegramClient(StringSession(session), api_id, api_hash)
-    await client.connect()
-    try:
-        if not await client.is_user_authorized():
-            sys.stderr.write(
-                "TELEGRAM_SESSION is not authorized. Regenerate it with "
-                "generate_session.py.\n"
-            )
-            sys.exit(4)
+    messages: list[dict] = []
+    chats_seen: dict[int, str] = {}
+    offset: int | None = None
 
-        entity = await _resolve_entity(client, target_id)
-        chat_title = getattr(entity, "title", None) or utils.get_display_name(entity)
-
-        messages = []
-        async for msg in client.iter_messages(entity):
-            msg_date = msg.date  # tz-aware UTC
-            if msg_date is None or msg_date < since:
-                break  # iter_messages is newest-first; stop once we pass the window
-            text = (msg.message or "").strip()
+    for _ in range(MAX_PAGES):
+        params: dict = {
+            "timeout": 0,
+            "limit": 100,
+            "allowed_updates": json.dumps(["message", "channel_post"]),
+        }
+        if offset is not None:
+            params["offset"] = offset
+        updates = _call(token, "getUpdates", params)
+        if not updates:
+            break
+        for up in updates:
+            offset = up["update_id"] + 1
+            msg = up.get("message") or up.get("channel_post")
+            if not msg:
+                continue
+            chat = msg.get("chat", {})
+            cid = chat.get("id")
+            if cid is not None:
+                chats_seen[cid] = (
+                    chat.get("title") or chat.get("username") or chat.get("type") or ""
+                )
+            if chat_filter is not None and cid != chat_filter:
+                continue
+            if msg.get("date", 0) < since_ts:
+                continue
+            text = (msg.get("text") or msg.get("caption") or "").strip()
             if not text:
-                continue  # skip media-only / service messages without text
-
-            sender_name = None
-            try:
-                sender = await msg.get_sender()
-                if sender is not None:
-                    sender_name = utils.get_display_name(sender) or getattr(
-                        sender, "username", None
-                    )
-            except Exception:
-                sender_name = None
-
+                continue
+            frm = msg.get("from", {})
+            sender = (
+                " ".join(p for p in (frm.get("first_name"), frm.get("last_name")) if p)
+                or frm.get("username")
+                or None
+            )
             messages.append(
                 {
-                    "message_id": msg.id,
-                    "date": msg_date.isoformat(),
-                    "sender": sender_name,
+                    "message_id": msg["message_id"],
+                    "date": datetime.fromtimestamp(msg["date"], UTC).isoformat(),
+                    "sender": sender,
                     "text": text,
-                    "permalink": _permalink(entity, msg.id),
+                    "permalink": _permalink(chat, msg["message_id"]),
                 }
             )
 
-        messages.reverse()  # chronological order (oldest first) for readability
+    messages.sort(key=lambda m: m["message_id"])  # chronological (oldest first)
 
-        json.dump(
-            {
-                "chat_id": target_id,
-                "chat_title": chat_title,
-                "window_hours": window_hours,
-                "since_utc": since.isoformat(),
-                "count": len(messages),
-                "messages": messages,
-            },
-            sys.stdout,
-            ensure_ascii=False,
-            indent=2,
+    if chat_filter is not None and not messages and chats_seen:
+        sys.stderr.write(
+            f"No messages matched TELEGRAM_CHAT_ID={chat_filter}. "
+            f"Chats the bot currently sees: {chats_seen}. "
+            "If the target group is a supergroup, its id may differ (e.g. -100...); "
+            "update TELEGRAM_CHAT_ID accordingly.\n"
         )
-        sys.stdout.write("\n")
-    finally:
-        await client.disconnect()
+
+    json.dump(
+        {
+            "chat_id": chat_filter,
+            "window_hours": window_hours,
+            "since_utc": since.isoformat(),
+            "count": len(messages),
+            "messages": messages,
+            "chats_seen": chats_seen,
+        },
+        sys.stdout,
+        ensure_ascii=False,
+        indent=2,
+    )
+    sys.stdout.write("\n")
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()

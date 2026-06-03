@@ -10,7 +10,7 @@ A scheduled Claude Code **routine** that runs once a day and does two things, as
    or shipped on `main`), leaves a `[reconcile]` comment and advances the task status.
 
 ```
-Telegram group ──(read_telegram.py, MTProto user session)──► messages (JSON)
+Telegram group ──(read_telegram.py, Bot API getUpdates over HTTPS)──► messages (JSON)
                                                                    │
 routine agent ── OTP login as Claude (code read via Gmail) ───────┤
               ── GET existing /tasks ──────────────────────────────┤
@@ -19,9 +19,11 @@ routine agent ── OTP login as Claude (code read via Gmail) ─────�
 ```
 
 ## Why these choices
-- **MTProto user session (Telethon), not a bot:** a bot can't read a group's *history* — it
-  only sees new messages after it joins, with privacy limits. Reading "the last 24 h" requires
-  a logged-in user session.
+- **Bot API, not Telethon/MTProto:** the routine runs in Anthropic's cloud, whose egress
+  proxy only allows HTTP(S) to allowlisted domains — MTProto (raw TCP to Telegram DC IPs) is
+  impossible there. The Bot API is plain HTTPS to `api.telegram.org`, which works. Trade-off:
+  the bot only sees messages from *after* it joins (no pre-join history); `getUpdates` retains
+  ~24 h of updates, which matches the "last 24 h" daily window once the bot is in the group.
 - **"Claude" service user:** the tasks API stamps `created_by` (a `users.id` FK) and resolves
   the display name from `users.full_name`. A superadmin user named "Claude" makes tasks show
   "Created by: Claude" with no schema change.
@@ -34,10 +36,9 @@ routine agent ── OTP login as Claude (code read via Gmail) ─────�
 ## Files
 | File | Where it runs | Purpose |
 |------|---------------|---------|
-| `read_telegram.py` | in the routine | Print last-N-hours messages as JSON. Read-only. |
-| `generate_session.py` | **locally, once** | Interactive login → prints `TELEGRAM_SESSION`. |
-| `create_claude_user.py` | **once, against the DB** | Idempotently create the Claude superadmin. |
-| `ROUTINE_PROMPT.md` | — | The prompt to paste into the routine. |
+| `read_telegram.py` | in the routine | Fetch recent group messages via the Bot API (stdlib only, no deps) and print them as JSON. Read-only. |
+| `create_claude_user.py` | **once, against the DB** | Idempotently create the Claude superadmin (kept for reference; the user was created via `POST /api/v1/users`). |
+| `ROUTINE_PROMPT.md` | fetched by the routine | The detailed instructions the routine follows. |
 
 ---
 
@@ -64,65 +65,59 @@ curl -sX POST https://api.edgeos.world/api/v1/auth/user/authenticate \
 # → returns {"access_token": "...", "token_type":"bearer"}
 ```
 
-### 2. Get Telegram API credentials + session string
-1. Go to https://my.telegram.org → API development tools → create an app → copy `api_id`
-   and `api_hash`.
-2. Generate the session locally (interactive — needs your phone + the login code Telegram
-   sends you):
-   ```bash
-   pip install -r automation/telegram-task-sync/requirements.txt
-   export TELEGRAM_API_ID=...
-   export TELEGRAM_API_HASH=...
-   python automation/telegram-task-sync/generate_session.py
-   ```
-   Copy the printed `TELEGRAM_SESSION` string.
-3. The logged-in account **must be a member** of the target group.
+### 2. Create the Telegram bot
+1. In Telegram, message **@BotFather** → `/newbot` → follow prompts → copy the **bot token**.
+2. Disable privacy mode so the bot can read all group messages (not just @mentions):
+   `/setprivacy` → pick the bot → **Disable**.
+3. **Add the bot to the target group** (`web.telegram.org/k/#-4643549576`). It only sees
+   messages sent *after* it joins.
+4. Do NOT set a webhook on the bot — the reader uses `getUpdates`, which conflicts with webhooks.
 
 The target group id is in the web URL `web.telegram.org/k/#-4643549576` → `-4643549576`.
+(If the group is a supergroup, the Bot API id may be `-100…` instead — the reader logs the
+chat ids it sees in `chats_seen` so you can correct `TELEGRAM_CHAT_ID`.)
 
-### 3. Smoke-test the reader locally
+### 3. Smoke-test the reader locally (no deps — stdlib only)
 ```bash
-export TELEGRAM_API_ID=... TELEGRAM_API_HASH=... TELEGRAM_SESSION='...'
+export TELEGRAM_BOT_TOKEN='123456:ABC...'
 export TELEGRAM_CHAT_ID=-4643549576
-python automation/telegram-task-sync/read_telegram.py | head -40
+python3 automation/telegram-task-sync/read_telegram.py | head -40
 ```
-You should see recent messages as JSON.
+You should see recent messages as JSON (send a test message in the group first, since the
+bot only captures messages from after it joined).
 
 ---
 
 ## Configure the routine (claude.ai/code → Routines)
 
-- **Repository:** `edgeos-monorepo`
-- **Schedule:** daily, off-minute (e.g. cron `37 9 * * *`). Minimum interval is 1 h.
-- **Setup script:** `pip install -r automation/telegram-task-sync/requirements.txt`
+- **Repository:** `edgeos-monorepo`. The routine fetches the scripts from the
+  `feat/telegram-task-sync` branch at runtime (`git fetch origin feat/telegram-task-sync`),
+  so they don't need to be on `main`.
+- **Schedule:** daily, off-minute (e.g. cron `37 12 * * *` UTC). Minimum interval is 1 h.
+- **Setup script:** none needed — the reader is stdlib-only (no `pip install`).
 - **Connectors:** enable **Gmail** (to read the OTP).
-- **Network access:** set to **Custom** and allow the backend host (`api.edgeos.world`) plus
-  Telegram. ⚠️ See "MTProto egress" below — validate this before relying on it.
-- **Environment variables (secrets):**
+- **Network access:** **Custom** allowing `api.edgeos.world` and `api.telegram.org`
+  (`*.telegram.org` also covers it), with "include default package managers" checked.
+- **Environment variables:**
   ```
-  TELEGRAM_API_ID=...
-  TELEGRAM_API_HASH=...
-  TELEGRAM_SESSION=...
+  TELEGRAM_BOT_TOKEN=123456:ABC...
   TELEGRAM_CHAT_ID=-4643549576
   EDGEOS_API_BASE=https://api.edgeos.world
   CLAUDE_USER_EMAIL=ignacio+claude@muvinai.com
   ```
   Note: routine env vars are **not encrypted** and are visible to anyone who can edit the
-  environment. The session string and api_hash grant access to the Telegram account — treat
-  accordingly. No backend `SECRET_KEY` is stored here by design.
-- **Prompt:** paste the contents of `ROUTINE_PROMPT.md`.
+  environment. The bot token can post/read as the bot — treat it as a secret. No backend
+  `SECRET_KEY` is stored here by design.
+- **Prompt:** a short bootstrap that fetches this branch and tells the agent to follow
+  `ROUTINE_PROMPT.md` (see that file).
 
-## ⚠️ MTProto egress (validate first)
-Telethon connects to Telegram's data-center **IPs** on :443 — it does **not** use
-`api.telegram.org` (that's the Bot API). A domain/SNI-based egress allowlist may block these
-direct-IP connections. Before trusting the daily run, do a **one-off run** of the routine that
-only executes `read_telegram.py` and confirm it returns messages.
-
-If MTProto is blocked in the sandbox, fallbacks (in order of preference):
-1. Add Telegram's DC hosts/IP ranges to the allowlist if the config supports it.
-2. Run `read_telegram.py` **locally** on a schedule and have the routine consume its output.
-3. Switch to the Telegram **Bot API** — but it only sees messages *after* the bot joins (no
-   history), which degrades the "last 24 h" requirement.
+## Bot API notes & limitations
+- The bot only sees messages from **after it joined** the group, and only if **privacy mode
+  is OFF**. It cannot backfill older history.
+- `getUpdates` retains updates for ~24 h; the reader advances the offset as it reads, so each
+  daily run returns roughly the last 24 h. Boundary overlaps are harmless thanks to the
+  `[tg:<message_id>]` dedupe marker.
+- Only one `getUpdates` consumer can run, and no webhook may be set on the bot.
 
 ## How duplicates are avoided
 Each created task embeds a `[tg:<message_id>]` marker (and the permalink) in its `detail`.
@@ -145,7 +140,7 @@ comment (so re-runs don't spam). It never edits files or pushes — its only wri
 comments, and status changes via the API.
 
 ## Security notes
-- The `TELEGRAM_SESSION` is equivalent to being logged into that Telegram account. Never
-  commit it; rotate it (re-run `generate_session.py` and log out old sessions) if leaked.
+- The `TELEGRAM_BOT_TOKEN` lets anyone act as the bot. Never commit it; revoke/rotate it via
+  @BotFather (`/revoke`) if leaked.
 - The Claude user is a real superadmin. Its access is gated by OTP delivery to the operator's
   inbox, so whoever controls that inbox controls the account.
