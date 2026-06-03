@@ -134,6 +134,28 @@ def test_priority_defaults_to_medium_and_roundtrips(client, superadmin_token) ->
     assert high.json()["priority"] == "high"
 
 
+def test_priority_update_persists(client, superadmin_token) -> None:
+    created = client.post(
+        "/api/v1/tasks",
+        headers=_auth(superadmin_token),
+        json={"title": "prio-update"},
+    )
+    assert created.status_code == 201
+    tid = created.json()["id"]
+    assert created.json()["priority"] == "medium"
+
+    put = client.put(
+        f"/api/v1/tasks/{tid}",
+        headers=_auth(superadmin_token),
+        json={"priority": "high"},
+    )
+    assert put.status_code == 200
+    assert put.json()["priority"] == "high"
+
+    got = client.get(f"/api/v1/tasks/{tid}", headers=_auth(superadmin_token))
+    assert got.json()["priority"] == "high"
+
+
 def test_report_bug_is_scoped_to_reporter_tenant(
     client, admin_token_tenant_a, tenant_a: Tenants
 ) -> None:

@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { Copy } from "lucide-react"
+import { Copy, Trash2 } from "lucide-react"
 import { useEffect, useState } from "react"
 
 import {
@@ -11,7 +11,6 @@ import {
   TenantsService,
   UsersService,
 } from "@/client"
-import { DangerZone } from "@/components/Common/DangerZone"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -437,31 +436,32 @@ export function TaskDialog({ open, onOpenChange, taskId }: TaskDialogProps) {
             )}
             <Separator />
             <TaskCommentThread taskId={task.id} />
-            {!readOnly && (
-              <>
-                <Separator />
-                <DangerZone
-                  description="Permanently delete this task, its comments and attachments. To retire a task instead, set its status to Cancelled."
-                  onDelete={() => deleteMutation.mutate()}
-                  isDeleting={deleteMutation.isPending}
-                  confirmText="Delete Task"
-                  resourceName={task.title}
-                  variant="inline"
-                />
-              </>
-            )}
           </>
         )}
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            {readOnly ? "Close" : "Cancel"}
-          </Button>
-          {!readOnly && (
-            <LoadingButton loading={isPending} onClick={handleSave}>
-              {isEdit ? "Save changes" : "Create task"}
+        <DialogFooter className="sm:justify-between">
+          {isEdit && !readOnly ? (
+            <LoadingButton
+              variant="destructive"
+              loading={deleteMutation.isPending}
+              onClick={() => deleteMutation.mutate()}
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              Delete
             </LoadingButton>
+          ) : (
+            <span />
           )}
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => onOpenChange(false)}>
+              {readOnly ? "Close" : "Cancel"}
+            </Button>
+            {!readOnly && (
+              <LoadingButton loading={isPending} onClick={handleSave}>
+                {isEdit ? "Save changes" : "Create task"}
+              </LoadingButton>
+            )}
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>
