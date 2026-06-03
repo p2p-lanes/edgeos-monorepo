@@ -19,7 +19,6 @@ from app.api.application.schemas import (
     ApplicationPublic,
     ApplicationStatus,
     ApplicationUpdate,
-    AssociatedAttendee,
     AttendeeInfo,
     AttendeesDirectoryEntry,
     CompanionParticipation,
@@ -1066,56 +1065,52 @@ async def update_my_application(
     return _build_application_public(application)
 
 
-def _build_directory_entry(application) -> AttendeesDirectoryEntry:
-    """Build a single directory entry from an application."""
-    human = application.human
-    info_hidden = set(application.info_not_shared or [])
+def _build_directory_entry(attendee) -> AttendeesDirectoryEntry:
+    """Build a single directory entry from a ticket-holding attendee.
+
+    The entry is sourced from the attendee's OWN human record, so companions
+    (spouse/kid/...) appear as their own people. Field masking and the
+    role/organization form fields only apply to the main applicant, since
+    companions never filled an application form and have no privacy prefs.
+    """
+    human = attendee.human
+    application = attendee.application
+    is_main = attendee.category == "main"
+
+    # info_not_shared masking belongs to the main applicant's own application.
+    info_hidden = (
+        set(application.info_not_shared or []) if (is_main and application) else set()
+    )
 
     def mask(field: str, value: str | None) -> str | None:
         return "*" if field in info_hidden else value
 
-    # Find main attendee and their products — search loaded attendees relationship
-    main_attendee = next(
-        (a for a in application.attendees if a.category == "main"), None
-    )
+    # Each AttendeeProducts row is one ticket — dedupe by product_id so the
+    # directory shows each product once even if the attendee holds several
+    # tickets of it.
     products: list[DirectoryProduct] = []
-
-    if main_attendee:
-        # Each AttendeeProducts row is one ticket — dedupe by product_id so
-        # the directory shows each product once even if the attendee bought
-        # multiple tickets of it.
-        seen_pids: set[uuid.UUID] = set()
-        for ap in main_attendee.attendee_products:
-            if ap.product_id in seen_pids:
-                continue
-            seen_pids.add(ap.product_id)
-            p = ap.product
-            products.append(
-                DirectoryProduct(
-                    id=p.id,
-                    name=p.name,
-                    slug=p.slug,
-                    category=p.category,
-                    duration_type=p.duration_type,
-                )
+    seen_pids: set[uuid.UUID] = set()
+    for ap in attendee.attendee_products:
+        if ap.product_id in seen_pids:
+            continue
+        seen_pids.add(ap.product_id)
+        p = ap.product
+        products.append(
+            DirectoryProduct(
+                id=p.id,
+                name=p.name,
+                slug=p.slug,
+                category=p.category,
+                duration_type=p.duration_type,
             )
-
-    associated = [
-        AssociatedAttendee(
-            name=a.name,
-            category=a.category,
-            gender=a.gender,
-            email=a.email,
         )
-        for a in application.attendees
-        if a.category != "main"
-    ]
 
-    # Read organization/role from application custom_fields
-    custom = application.custom_fields or {}
+    # role/organization come from the application form — only meaningful for the
+    # main applicant. Companions get blank values.
+    custom = (application.custom_fields or {}) if (is_main and application) else {}
 
     return AttendeesDirectoryEntry(
-        id=application.id,
+        id=attendee.id,
         first_name=mask("first_name", human.first_name if human else None),
         last_name=mask("last_name", human.last_name if human else None),
         email=mask("email", human.email if human else None),
@@ -1127,7 +1122,8 @@ def _build_directory_entry(application) -> AttendeesDirectoryEntry:
         gender=mask("gender", human.gender if human else None),
         picture_url=human.picture_url if human else None,
         participation=products,
-        associated_attendees=associated,
+        category=attendee.category,
+        associated_attendees=[],
     )
 
 
@@ -1169,7 +1165,7 @@ async def list_attendees_directory(
     """
     _ensure_attendee_directory_enabled(db, popup_id)
 
-    applications, total = crud.applications_crud.find_directory(
+    attendees, total = crud.applications_crud.find_directory(
         db,
         popup_id=popup_id,
         skip=skip,
@@ -1177,7 +1173,7 @@ async def list_attendees_directory(
         q=q,
     )
 
-    results = [_build_directory_entry(a) for a in applications]
+    results = [_build_directory_entry(a) for a in attendees]
 
     return ListModel[AttendeesDirectoryEntry](
         results=results,
@@ -1202,7 +1198,7 @@ async def export_attendees_directory_csv(
     """
     _ensure_attendee_directory_enabled(db, popup_id)
 
-    applications, _ = crud.applications_crud.find_directory(
+    attendees, _ = crud.applications_crud.find_directory(
         db,
         popup_id=popup_id,
         skip=0,
@@ -1210,7 +1206,7 @@ async def export_attendees_directory_csv(
         q=q,
     )
 
-    entries = [_build_directory_entry(a) for a in applications]
+    entries = [_build_directory_entry(a) for a in attendees]
 
     output = io.StringIO()
     writer = csv.writer(output)
