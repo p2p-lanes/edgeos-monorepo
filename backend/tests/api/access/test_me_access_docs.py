@@ -230,7 +230,9 @@ class TestMeAccessDocsMarkdown:
         resp = client.get(BASE_URL + "?format=markdown", headers=_bearer(token))
         assert resp.status_code == 200, resp.text
         content_type = resp.headers.get("content-type", "")
-        assert "text/" in content_type, f"Expected text/* content-type, got: {content_type}"
+        assert "text/" in content_type, (
+            f"Expected text/* content-type, got: {content_type}"
+        )
 
     def test_markdown_body_non_empty(
         self,

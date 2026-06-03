@@ -169,7 +169,9 @@ class TestHandlePaymentRequestExpiredRestoration:
         popup_tenant_a: Popups,
     ) -> None:
         """Expired payment → total_stock_remaining restored to pre-payment value."""
-        product = _make_product(db, tenant_a, popup_tenant_a, total_stock_cap=10, total_stock_remaining=10)
+        product = _make_product(
+            db, tenant_a, popup_tenant_a, total_stock_cap=10, total_stock_remaining=10
+        )
         _decrement(db, product, 3)  # simulates purchase: remaining=7
 
         payment = _make_pending_payment(db, tenant_a, popup_tenant_a, [(product, 3)])
@@ -195,7 +197,13 @@ class TestHandlePaymentRequestExpiredRestoration:
         popup_tenant_a: Popups,
     ) -> None:
         """NULL-stock (unlimited) product in payment → handler completes without error."""
-        product = _make_product(db, tenant_a, popup_tenant_a, total_stock_cap=None, total_stock_remaining=None)
+        product = _make_product(
+            db,
+            tenant_a,
+            popup_tenant_a,
+            total_stock_cap=None,
+            total_stock_remaining=None,
+        )
         payment = _make_pending_payment(db, tenant_a, popup_tenant_a, [(product, 5)])
 
         # Should not raise; NULL counters are no-op
@@ -212,7 +220,9 @@ class TestHandlePaymentRequestExpiredRestoration:
         popup_tenant_a: Popups,
     ) -> None:
         """Double expiry (webhook fires twice): stock does not exceed cap."""
-        product = _make_product(db, tenant_a, popup_tenant_a, total_stock_cap=5, total_stock_remaining=5)
+        product = _make_product(
+            db, tenant_a, popup_tenant_a, total_stock_cap=5, total_stock_remaining=5
+        )
         _decrement(db, product, 2)  # remaining=3
 
         payment = _make_pending_payment(db, tenant_a, popup_tenant_a, [(product, 2)])
@@ -252,7 +262,9 @@ class TestHandlePaymentRequestExpiredRestoration:
         popup_tenant_a: Popups,
     ) -> None:
         """Payment already EXPIRED when expiry fires again → restoration is no-op."""
-        product = _make_product(db, tenant_a, popup_tenant_a, total_stock_cap=5, total_stock_remaining=5)
+        product = _make_product(
+            db, tenant_a, popup_tenant_a, total_stock_cap=5, total_stock_remaining=5
+        )
         _decrement(db, product, 1)  # remaining=4
 
         payment = _make_pending_payment(db, tenant_a, popup_tenant_a, [(product, 1)])
@@ -288,7 +300,9 @@ class TestUpdateStatusCancelledRejectedRestoration:
         popup_tenant_a: Popups,
     ) -> None:
         """update_status(CANCELLED) from PENDING → total_stock_remaining restored."""
-        product = _make_product(db, tenant_a, popup_tenant_a, total_stock_cap=8, total_stock_remaining=8)
+        product = _make_product(
+            db, tenant_a, popup_tenant_a, total_stock_cap=8, total_stock_remaining=8
+        )
         _decrement(db, product, 3)  # remaining=5
 
         payment = _make_pending_payment(db, tenant_a, popup_tenant_a, [(product, 3)])
@@ -308,7 +322,9 @@ class TestUpdateStatusCancelledRejectedRestoration:
         popup_tenant_a: Popups,
     ) -> None:
         """update_status(REJECTED) from PENDING → total_stock_remaining restored."""
-        product = _make_product(db, tenant_a, popup_tenant_a, total_stock_cap=6, total_stock_remaining=6)
+        product = _make_product(
+            db, tenant_a, popup_tenant_a, total_stock_cap=6, total_stock_remaining=6
+        )
         _decrement(db, product, 2)  # remaining=4
 
         payment = _make_pending_payment(db, tenant_a, popup_tenant_a, [(product, 2)])
@@ -333,7 +349,9 @@ class TestUpdateStatusCancelledRejectedRestoration:
         refund flow. Stock restoration is intentionally NOT wired for this path.
         This test documents the gap is intentional.
         """
-        product = _make_product(db, tenant_a, popup_tenant_a, total_stock_cap=10, total_stock_remaining=10)
+        product = _make_product(
+            db, tenant_a, popup_tenant_a, total_stock_cap=10, total_stock_remaining=10
+        )
         _decrement(db, product, 2)  # remaining=8
 
         # Build an APPROVED payment directly (skip SimpleFI).
@@ -415,7 +433,9 @@ class TestUpdateStatusCancelledRejectedRestoration:
         popup_tenant_a: Popups,
     ) -> None:
         """CANCELLED → CANCELLED (second call): stock not restored twice."""
-        product = _make_product(db, tenant_a, popup_tenant_a, total_stock_cap=10, total_stock_remaining=10)
+        product = _make_product(
+            db, tenant_a, popup_tenant_a, total_stock_cap=10, total_stock_remaining=10
+        )
         _decrement(db, product, 2)  # remaining=8
 
         payment = _make_pending_payment(db, tenant_a, popup_tenant_a, [(product, 2)])
@@ -443,7 +463,13 @@ class TestUpdateStatusCancelledRejectedRestoration:
         popup_tenant_a: Popups,
     ) -> None:
         """NULL-stock product cancelled → no error, NULL remains NULL."""
-        product = _make_product(db, tenant_a, popup_tenant_a, total_stock_cap=None, total_stock_remaining=None)
+        product = _make_product(
+            db,
+            tenant_a,
+            popup_tenant_a,
+            total_stock_cap=None,
+            total_stock_remaining=None,
+        )
         payment = _make_pending_payment(db, tenant_a, popup_tenant_a, [(product, 1)])
 
         payments_crud.update_status(db, payment.id, PaymentStatus.CANCELLED)

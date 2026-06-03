@@ -205,7 +205,9 @@ def test_runtime_only_enabled_ticketing_steps(
     assert [step["title"] for step in body["ticketing_steps"]] == ["Visible Step"]
 
 
-def test_runtime_unknown_slug_returns_404(client: TestClient, tenant_a: Tenants) -> None:
+def test_runtime_unknown_slug_returns_404(
+    client: TestClient, tenant_a: Tenants
+) -> None:
     """Unknown popup slug returns 404."""
     response = client.get(
         "/api/v1/checkout/does-not-exist-xyz/runtime",
@@ -324,9 +326,11 @@ def test_runtime_cross_tenant_slug_returns_404(
     # This test relies on a slug that tenant_a does NOT have.
     # We use a unique slug so it only exists under tenant_b.
     import uuid as _uuid
+
     unique_slug = f"only-b-{_uuid.uuid4().hex[:8]}"
     from app.api.popup.models import Popups as _Popups
     from app.api.shared.enums import SaleType as _SaleType
+
     tenant_b_only = _Popups(
         id=_uuid.uuid4(),
         tenant_id=popup_tenant_b_summer_fest.tenant_id,

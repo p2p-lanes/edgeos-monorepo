@@ -63,12 +63,26 @@ async def get_enriched_dashboard(
     attendee_stats = _get_attendee_stats(db, popup_id)
     payment_stats = _get_payment_stats(db, popup_id)
 
+    # Popup fetched once and shared (currency + application-fee flag)
+    popup = popups_crud.get(db, popup_id)
+    currency = popup.currency if popup else "USD"
+    fee_enabled = bool(popup and popup.requires_application_fee)
+
+    # Daily buckets follow the popup's local calendar, not UTC (matches the
+    # rest of the app's timezone handling).
+    from app.api.event_venue.router import _resolve_popup_timezone
+
+    popup_tz = _resolve_popup_timezone(db, popup_id)
+
     # Enriched data
-    key_metrics = _get_key_metrics(db, popup_id, attendee_stats, payment_stats)
-    cumulative_trends = _get_cumulative_trends(db, popup_id)
+    key_metrics = _get_key_metrics(
+        db, popup_id, app_stats, attendee_stats, payment_stats, currency
+    )
+    cumulative_trends = _get_cumulative_trends(db, popup_id, popup_tz)
     revenue_breakdown = _get_revenue_breakdown(db, popup_id)
     distribution = _get_distribution(db, popup_id)
-    application_funnel = _get_application_funnel(app_stats, payment_stats)
+    fee_paid = _get_fee_paid_count(db, popup_id) if fee_enabled else 0
+    application_funnel = _get_application_funnel(app_stats, fee_paid, fee_enabled)
 
     return EnrichedDashboardStats(
         key_metrics=key_metrics,
@@ -117,14 +131,16 @@ def _get_application_stats(db: TenantSession, popup_id: uuid.UUID) -> Applicatio
 def _get_attendee_stats(db: TenantSession, popup_id: uuid.UUID) -> AttendeeStats:
     """Get attendee statistics for a popup.
 
-    Groups by AttendeeCategories.key (via category_id FK) since the legacy
+    Scoped by the denormalized Attendees.popup_id so direct-sale attendees
+    (application_id IS NULL) are included in the headcount. Groups by
+    AttendeeCategories.key (via category_id FK) since the legacy
     attendees.category string column was dropped in PR 2.
     """
     category_counts = db.exec(
         select(AttendeeCategories.key, func.count(Attendees.id))
-        .join(Applications, Attendees.application_id == Applications.id)
+        .select_from(Attendees)
         .outerjoin(AttendeeCategories, Attendees.category_id == AttendeeCategories.id)
-        .where(Applications.popup_id == popup_id)
+        .where(Attendees.popup_id == popup_id)
         .group_by(AttendeeCategories.key)
     ).all()
 
@@ -150,9 +166,8 @@ def _get_payment_stats(db: TenantSession, popup_id: uuid.UUID) -> PaymentStats:
             func.coalesce(func.sum(Payments.amount), Decimal("0")),
             func.coalesce(func.sum(Payments.discount_value), Decimal("0")),
         )
-        .join(Applications, Payments.application_id == Applications.id)
         .where(
-            Applications.popup_id == popup_id,
+            Payments.popup_id == popup_id,
             Payments.payment_type == PaymentType.PASS_PURCHASE.value,
         )
         .group_by(Payments.status)
@@ -191,11 +206,16 @@ ONE_DECIMAL = Decimal("0.1")
 def _get_key_metrics(
     db: TenantSession,
     popup_id: uuid.UUID,
+    app_stats: ApplicationStats,
     attendee_stats: AttendeeStats,
     payment_stats: PaymentStats,
+    currency: str,
 ) -> KeyMetrics:
     """Compute high-level KPI cards."""
-    people = attendee_stats.main
+    # People = total headcount (all attendees, paid or not). Revenue-per-person
+    # uses only paying attendees so sponsors/guests/comps don't dilute it.
+    people = attendee_stats.total
+    paying_people = _get_paying_attendees_count(db, popup_id)
     revenue = payment_stats.approved_revenue
     approved_count = payment_stats.approved
 
@@ -205,31 +225,30 @@ def _get_key_metrics(
         else Decimal("0")
     )
     avg_per_person = (
-        (revenue / people).quantize(TWO_DECIMAL, ROUND_HALF_UP)
-        if people > 0
+        (revenue / paying_people).quantize(TWO_DECIMAL, ROUND_HALF_UP)
+        if paying_people > 0
         else Decimal("0")
     )
 
-    # Conversion: accepted applications / total non-draft applications
-    total_non_draft = (
-        payment_stats.approved + payment_stats.pending + payment_stats.rejected
-    )
+    # Conversion (acceptance rate): accepted / decided applications
+    # (accepted + rejected). In-review/pending-fee (undecided) and withdrawn
+    # (self-removed) are excluded so the rate reflects real accept/reject
+    # decisions, not in-flight queue depth.
+    decided = app_stats.accepted + app_stats.rejected
     conversion = (
-        (Decimal(payment_stats.approved) / Decimal(total_non_draft) * 100).quantize(
+        (Decimal(app_stats.accepted) / Decimal(decided) * 100).quantize(
             ONE_DECIMAL, ROUND_HALF_UP
         )
-        if total_non_draft > 0
+        if decided > 0
         else Decimal("0")
     )
 
-    # Accommodation percentage: attendees with housing product / total main attendees
+    # Accommodation percentage: attendees with housing product / total headcount
     accommodation_pct = _get_accommodation_percentage(db, popup_id, people)
-
-    popup = popups_crud.get(db, popup_id)
-    currency = popup.currency if popup else "USD"
 
     return KeyMetrics(
         people=people,
+        paying_people=paying_people,
         total_revenue=revenue,
         currency=currency,
         avg_ticket_price=avg_ticket,
@@ -250,9 +269,8 @@ def _get_accommodation_percentage(
     housing_attendees = db.exec(
         select(func.count(func.distinct(PaymentProducts.attendee_id)))
         .join(Payments, PaymentProducts.payment_id == Payments.id)
-        .join(Applications, Payments.application_id == Applications.id)
         .where(
-            Applications.popup_id == popup_id,
+            Payments.popup_id == popup_id,
             Payments.status == PaymentStatus.APPROVED.value,
             Payments.payment_type == PaymentType.PASS_PURCHASE.value,
             PaymentProducts.product_category == CATEGORY_HOUSING,
@@ -265,21 +283,47 @@ def _get_accommodation_percentage(
     )
 
 
-def _get_cumulative_trends(db: TenantSession, popup_id: uuid.UUID) -> CumulativeTrends:
-    """Daily cumulative trends for tickets (accepted apps) and revenue."""
-    # Tickets: applications that reached accepted, grouped by accepted_at date
-    ticket_rows = db.exec(
-        select(
-            func.date(Applications.accepted_at),
-            func.count(Applications.id),
-        )
+def _get_paying_attendees_count(db: TenantSession, popup_id: uuid.UUID) -> int:
+    """Count distinct attendees with at least one approved pass_purchase product.
+
+    Denominator for revenue-per-person: only people who actually paid, so
+    non-paying attendees (sponsors, guests, comps) don't dilute the average.
+    """
+    count = db.exec(
+        select(func.count(func.distinct(PaymentProducts.attendee_id)))
+        .join(Payments, PaymentProducts.payment_id == Payments.id)
         .where(
-            Applications.popup_id == popup_id,
-            Applications.status == ApplicationStatus.ACCEPTED.value,
-            Applications.accepted_at.is_not(None),  # type: ignore[union-attr]
+            Payments.popup_id == popup_id,
+            Payments.status == PaymentStatus.APPROVED.value,
+            Payments.payment_type == PaymentType.PASS_PURCHASE.value,
         )
-        .group_by(func.date(Applications.accepted_at))
-        .order_by(func.date(Applications.accepted_at))
+    ).one()
+    return count or 0
+
+
+def _get_cumulative_trends(
+    db: TenantSession, popup_id: uuid.UUID, tz_name: str
+) -> CumulativeTrends:
+    """Daily cumulative trends for tickets sold and revenue.
+
+    Both series are bucketed by payment date in the popup's timezone, so day
+    boundaries follow the event's local calendar (not UTC) and the two curves
+    share the same time axis.
+    """
+    bucket = func.date(func.timezone(tz_name, Payments.created_at))
+
+    # Tickets sold: ticket-category product quantity on approved purchases
+    ticket_rows = db.exec(
+        select(bucket, func.coalesce(func.sum(PaymentProducts.quantity), 0))
+        .join(Payments, PaymentProducts.payment_id == Payments.id)
+        .where(
+            Payments.popup_id == popup_id,
+            Payments.status == PaymentStatus.APPROVED.value,
+            Payments.payment_type == PaymentType.PASS_PURCHASE.value,
+            PaymentProducts.product_category == CATEGORY_TICKET,
+        )
+        .group_by(bucket)
+        .order_by(bucket)
     ).all()
 
     tickets: list[TimelinePoint] = []
@@ -294,20 +338,16 @@ def _get_cumulative_trends(db: TenantSession, popup_id: uuid.UUID) -> Cumulative
             )
         )
 
-    # Revenue: approved payments grouped by created_at date
+    # Revenue: approved pass_purchase amount on the same payment-date axis
     revenue_rows = db.exec(
-        select(
-            func.date(Payments.created_at),
-            func.coalesce(func.sum(Payments.amount), Decimal("0")),
-        )
-        .join(Applications, Payments.application_id == Applications.id)
+        select(bucket, func.coalesce(func.sum(Payments.amount), Decimal("0")))
         .where(
-            Applications.popup_id == popup_id,
+            Payments.popup_id == popup_id,
             Payments.status == PaymentStatus.APPROVED.value,
             Payments.payment_type == PaymentType.PASS_PURCHASE.value,
         )
-        .group_by(func.date(Payments.created_at))
-        .order_by(func.date(Payments.created_at))
+        .group_by(bucket)
+        .order_by(bucket)
     ).all()
 
     revenue: list[RevenueTimelinePoint] = []
@@ -336,9 +376,8 @@ def _get_revenue_breakdown(db: TenantSession, popup_id: uuid.UUID) -> RevenueBre
             func.sum(PaymentProducts.product_price * PaymentProducts.quantity),
         )
         .join(Payments, PaymentProducts.payment_id == Payments.id)
-        .join(Applications, Payments.application_id == Applications.id)
         .where(
-            Applications.popup_id == popup_id,
+            Payments.popup_id == popup_id,
             Payments.status == PaymentStatus.APPROVED.value,
             Payments.payment_type == PaymentType.PASS_PURCHASE.value,
         )
@@ -395,9 +434,8 @@ def _get_distribution(db: TenantSession, popup_id: uuid.UUID) -> Distribution:
         )
         .join(PaymentProducts, Products.id == PaymentProducts.product_id)
         .join(Payments, PaymentProducts.payment_id == Payments.id)
-        .join(Applications, Payments.application_id == Applications.id)
         .where(
-            Applications.popup_id == popup_id,
+            Payments.popup_id == popup_id,
             Payments.status == PaymentStatus.APPROVED.value,
             Payments.payment_type == PaymentType.PASS_PURCHASE.value,
             Products.category == CATEGORY_TICKET,
@@ -439,13 +477,12 @@ def _get_distribution(db: TenantSession, popup_id: uuid.UUID) -> Distribution:
         .select_from(Products)
         .join(PaymentProducts, Products.id == PaymentProducts.product_id)
         .join(Payments, PaymentProducts.payment_id == Payments.id)
-        .join(Applications, Payments.application_id == Applications.id)
         .outerjoin(
             AttendeeCategories,
             Products.attendee_category_id == AttendeeCategories.id,
         )
         .where(
-            Applications.popup_id == popup_id,
+            Payments.popup_id == popup_id,
             Payments.status == PaymentStatus.APPROVED.value,
             Payments.payment_type == PaymentType.PASS_PURCHASE.value,
             Products.category == CATEGORY_TICKET,
@@ -483,9 +520,8 @@ def _get_distribution(db: TenantSession, popup_id: uuid.UUID) -> Distribution:
             func.sum(PaymentProducts.quantity),
         )
         .join(Payments, PaymentProducts.payment_id == Payments.id)
-        .join(Applications, Payments.application_id == Applications.id)
         .where(
-            Applications.popup_id == popup_id,
+            Payments.popup_id == popup_id,
             Payments.status == PaymentStatus.APPROVED.value,
             Payments.payment_type == PaymentType.PASS_PURCHASE.value,
             PaymentProducts.product_category == CATEGORY_HOUSING,
@@ -530,9 +566,8 @@ def _get_attach_rate(db: TenantSession, popup_id: uuid.UUID) -> list[AttachRateI
         )
         .join(PaymentProducts, Products.id == PaymentProducts.product_id)
         .join(Payments, PaymentProducts.payment_id == Payments.id)
-        .join(Applications, Payments.application_id == Applications.id)
         .where(
-            Applications.popup_id == popup_id,
+            Payments.popup_id == popup_id,
             Payments.status == PaymentStatus.APPROVED.value,
             Payments.payment_type == PaymentType.PASS_PURCHASE.value,
             Products.category == CATEGORY_TICKET,
@@ -548,9 +583,8 @@ def _get_attach_rate(db: TenantSession, popup_id: uuid.UUID) -> list[AttachRateI
     housing_attendee_ids = (
         select(PaymentProducts.attendee_id)
         .join(Payments, PaymentProducts.payment_id == Payments.id)
-        .join(Applications, Payments.application_id == Applications.id)
         .where(
-            Applications.popup_id == popup_id,
+            Payments.popup_id == popup_id,
             Payments.status == PaymentStatus.APPROVED.value,
             Payments.payment_type == PaymentType.PASS_PURCHASE.value,
             PaymentProducts.product_category == CATEGORY_HOUSING,
@@ -564,9 +598,8 @@ def _get_attach_rate(db: TenantSession, popup_id: uuid.UUID) -> list[AttachRateI
         )
         .join(PaymentProducts, Products.id == PaymentProducts.product_id)
         .join(Payments, PaymentProducts.payment_id == Payments.id)
-        .join(Applications, Payments.application_id == Applications.id)
         .where(
-            Applications.popup_id == popup_id,
+            Payments.popup_id == popup_id,
             Payments.status == PaymentStatus.APPROVED.value,
             Payments.payment_type == PaymentType.PASS_PURCHASE.value,
             Products.category == CATEGORY_TICKET,
@@ -606,14 +639,34 @@ def _get_attach_rate(db: TenantSession, popup_id: uuid.UUID) -> list[AttachRateI
     return result
 
 
+def _get_fee_paid_count(db: TenantSession, popup_id: uuid.UUID) -> int:
+    """Count applications with an approved application_fee payment.
+
+    'Paid' in the funnel means the application fee was paid, an intermediate
+    stage between pending_fee and review. Counts distinct applications (not
+    payment rows) so multiple fee payments on one application don't inflate it.
+    """
+    count = db.exec(
+        select(func.count(func.distinct(Payments.application_id)))
+        .join(Applications, Payments.application_id == Applications.id)
+        .where(
+            Applications.popup_id == popup_id,
+            Payments.payment_type == PaymentType.APPLICATION_FEE.value,
+            Payments.status == PaymentStatus.APPROVED.value,
+        )
+    ).one()
+    return count or 0
+
+
 def _get_application_funnel(
-    app_stats: ApplicationStats, payment_stats: PaymentStats
+    app_stats: ApplicationStats, fee_paid: int, fee_enabled: bool
 ) -> ApplicationFunnel:
     """Build application funnel from existing stats."""
     return ApplicationFunnel(
         draft=app_stats.draft,
         pending_fee=app_stats.pending_fee,
+        paid=fee_paid,
         in_review=app_stats.in_review,
         accepted=app_stats.accepted,
-        paid=payment_stats.approved,
+        fee_enabled=fee_enabled,
     )

@@ -28,6 +28,12 @@ if TYPE_CHECKING:
     from app.api.human.models import Humans
 
 
+# Attendee categories shown in the Portal attendee directory. Kids (and any
+# other non-adult categories) are intentionally excluded — only the main
+# applicant and their spouse appear.
+DIRECTORY_VISIBLE_CATEGORY_KEYS = ("main", "spouse")
+
+
 def _is_draft_status(status_value: object) -> bool:
     """True when an application is being created/saved as a draft.
 
@@ -199,41 +205,40 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         skip: int = 0,
         limit: int = 100,
         q: str | None = None,
-    ) -> tuple[list[Applications], int]:
-        """Find applications for the attendees directory.
+    ) -> tuple[list[Attendees], int]:
+        """Find attendees for the attendees directory.
 
-        Returns accepted applications whose main attendee has at least one
-        product assigned. Supports text search across human fields.
+        Returns ticket-holding attendees whose parent application is accepted —
+        one entry per person, sourced from that attendee's own Human record.
+        Only the main applicant and spouse categories are listed; kids (and any
+        other categories) are excluded. Supports text search across the
+        attendee's own human fields.
         """
+        # Root on attendees so the spouse appears as their own row, not just
+        # nested under the main applicant. Gate on an accepted parent
+        # application, on the attendee holding at least one product, and on the
+        # category being directory-visible (main/spouse — kids are excluded).
+        has_products = exists().where(AttendeeProducts.attendee_id == Attendees.id)
         base_statement = (
-            select(Applications)
-            .where(Applications.popup_id == popup_id)
-            .where(
-                Applications.status.in_(  # type: ignore[union-attr]
-                    [
-                        ApplicationStatus.ACCEPTED.value,
-                    ]
-                )
+            select(Attendees)
+            .join(Applications, Attendees.application_id == Applications.id)  # type: ignore[arg-type]
+            .join(
+                AttendeeCategories,
+                Attendees.category_id == AttendeeCategories.id,  # type: ignore[arg-type]
             )
+            .where(Attendees.popup_id == popup_id)
+            .where(Applications.status == ApplicationStatus.ACCEPTED.value)
+            .where(has_products)
+            .where(col(AttendeeCategories.key).in_(DIRECTORY_VISIBLE_CATEGORY_KEYS))
         )
 
-        # Primary attendee must have at least one product
-        # Attendees.category column was dropped in PR 2 — filter via category_id FK
-        has_products = (
-            exists()
-            .where(Attendees.application_id == Applications.id)
-            .where(Attendees.category_id == AttendeeCategories.id)
-            .where(AttendeeCategories.is_primary.is_(True))  # type: ignore[union-attr]
-            .where(AttendeeProducts.attendee_id == Attendees.id)
-        )
-        base_statement = base_statement.where(has_products)
-
-        # Text search across human fields
+        # Text search across the attendee's OWN human fields, so companions are
+        # searchable by their own name/email — not the main applicant's.
         if q:
             search_term = f"%{q}%"
             base_statement = base_statement.join(
                 Humans,
-                Applications.human_id == Humans.id,  # type: ignore[arg-type]
+                Attendees.human_id == Humans.id,  # type: ignore[arg-type]
             ).where(
                 or_(
                     col(Humans.first_name).ilike(search_term),
@@ -247,18 +252,19 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         count_statement = select(func.count()).select_from(base_statement.subquery())
         total = session.exec(count_statement).one()
 
-        # Eager load
+        # Eager load: the attendee's tickets+products, its category, the parent
+        # application (for main-applicant masking/custom_fields). human is
+        # already selectin-loaded on the relationship.
         statement = (
             base_statement.options(
-                selectinload(Applications.attendees)  # type: ignore[arg-type]
-                .selectinload(Attendees.attendee_products)  # type: ignore[arg-type]
-                .selectinload(AttendeeProducts.product),  # type: ignore[arg-type]
-                selectinload(Applications.attendees).selectinload(  # type: ignore[arg-type]
-                    Attendees.category_ref  # type: ignore[arg-type]
+                selectinload(Attendees.attendee_products).selectinload(  # type: ignore[arg-type]
+                    AttendeeProducts.product  # type: ignore[arg-type]
                 ),
-                selectinload(Applications.human),  # type: ignore[arg-type]
+                selectinload(Attendees.category_ref),  # type: ignore[arg-type]
+                selectinload(Attendees.application),  # type: ignore[arg-type]
+                selectinload(Attendees.human),  # type: ignore[arg-type]
             )
-            .order_by(desc(Applications.created_at))  # type: ignore[arg-type]
+            .order_by(desc(Attendees.created_at))  # type: ignore[arg-type]
             .offset(skip)
             .limit(limit)
         )

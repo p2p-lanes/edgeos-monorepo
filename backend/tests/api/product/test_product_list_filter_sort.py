@@ -69,10 +69,18 @@ def test_category_filter_returns_only_that_category(
     popup = _make_popup(db, tenant_a)
     suffix = uuid.uuid4().hex[:8]
     house = _create_product(
-        client, admin_token_tenant_a, popup.id, name=f"House {suffix}", category="housing"
+        client,
+        admin_token_tenant_a,
+        popup.id,
+        name=f"House {suffix}",
+        category="housing",
     )
     _create_product(
-        client, admin_token_tenant_a, popup.id, name=f"Ticket {suffix}", category="ticket"
+        client,
+        admin_token_tenant_a,
+        popup.id,
+        name=f"Ticket {suffix}",
+        category="ticket",
     )
 
     resp = client.get(

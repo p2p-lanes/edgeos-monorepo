@@ -369,7 +369,11 @@ def get_human_tenant_session(
         cached_cred.password,
     )
 
-    with Session(tenant_engine) as tenant_session:
+    # expire_on_commit=False: portal write routes build their response from the
+    # in-memory object after commit. Re-reading expired attributes would issue a
+    # post-commit SELECT that races with concurrent deletes and, under RLS, fails
+    # with "Could not refresh instance".
+    with Session(tenant_engine, expire_on_commit=False) as tenant_session:
         yield tenant_session
 
 
@@ -403,8 +407,7 @@ def get_current_portal_staff(
         )
     ).all()
     is_staff = any(
-        user.role == UserRole.SUPERADMIN
-        or user.tenant_id == current_human.tenant_id
+        user.role == UserRole.SUPERADMIN or user.tenant_id == current_human.tenant_id
         for user in candidates
     )
     if not is_staff:
@@ -496,8 +499,14 @@ def CurrentAdminOrApiKey(scope: ApiKeyScope):
             # Path A: JWT-authenticated user — enforce role.
             # Matches the former CurrentOperator gate: SUPERADMIN, ADMIN, OPERATOR.
             # CHECK_IN_CONTROLLER and VIEWER are excluded.
-            user = fetch_authenticated_user(token_payload, db, require_token_type="user")
-            if user.role not in (UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.OPERATOR):
+            user = fetch_authenticated_user(
+                token_payload, db, require_token_type="user"
+            )
+            if user.role not in (
+                UserRole.SUPERADMIN,
+                UserRole.ADMIN,
+                UserRole.OPERATOR,
+            ):
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail="Admin access required.",
@@ -601,7 +610,9 @@ def CurrentCheckInOrApiKey(scope: ApiKeyScope):
             )
 
         if not token_payload.via_api_key:
-            user = fetch_authenticated_user(token_payload, db, require_token_type="user")
+            user = fetch_authenticated_user(
+                token_payload, db, require_token_type="user"
+            )
             if user.role not in (
                 UserRole.SUPERADMIN,
                 UserRole.ADMIN,
@@ -675,86 +686,191 @@ def get_check_in_or_api_key_tenant_session(scope: ApiKeyScope):
 # ---------------------------------------------------------------------------
 
 # events
-AdminOrApiKey_EventsRead = Annotated["UserPublic", Depends(CurrentAdminOrApiKey("events:read"))]
-AdminOrApiKey_EventsWrite = Annotated["UserPublic", Depends(CurrentAdminOrApiKey("events:write"))]
-AdminOrApiKeySession_EventsRead = Annotated[Session, Depends(get_admin_or_api_key_tenant_session("events:read"))]
-AdminOrApiKeySession_EventsWrite = Annotated[Session, Depends(get_admin_or_api_key_tenant_session("events:write"))]
+AdminOrApiKey_EventsRead = Annotated[
+    "UserPublic", Depends(CurrentAdminOrApiKey("events:read"))
+]
+AdminOrApiKey_EventsWrite = Annotated[
+    "UserPublic", Depends(CurrentAdminOrApiKey("events:write"))
+]
+AdminOrApiKeySession_EventsRead = Annotated[
+    Session, Depends(get_admin_or_api_key_tenant_session("events:read"))
+]
+AdminOrApiKeySession_EventsWrite = Annotated[
+    Session, Depends(get_admin_or_api_key_tenant_session("events:write"))
+]
 
 # rsvp
-AdminOrApiKey_RsvpWrite = Annotated["UserPublic", Depends(CurrentAdminOrApiKey("rsvp:write"))]
-AdminOrApiKeySession_RsvpWrite = Annotated[Session, Depends(get_admin_or_api_key_tenant_session("rsvp:write"))]
+AdminOrApiKey_RsvpWrite = Annotated[
+    "UserPublic", Depends(CurrentAdminOrApiKey("rsvp:write"))
+]
+AdminOrApiKeySession_RsvpWrite = Annotated[
+    Session, Depends(get_admin_or_api_key_tenant_session("rsvp:write"))
+]
 
 # venues
-AdminOrApiKey_VenuesWrite = Annotated["UserPublic", Depends(CurrentAdminOrApiKey("venues:write"))]
-AdminOrApiKeySession_VenuesWrite = Annotated[Session, Depends(get_admin_or_api_key_tenant_session("venues:write"))]
+AdminOrApiKey_VenuesWrite = Annotated[
+    "UserPublic", Depends(CurrentAdminOrApiKey("venues:write"))
+]
+AdminOrApiKeySession_VenuesWrite = Annotated[
+    Session, Depends(get_admin_or_api_key_tenant_session("venues:write"))
+]
 
 # applications
-AdminOrApiKey_ApplicationsRead = Annotated["UserPublic", Depends(CurrentAdminOrApiKey("applications:read"))]
-AdminOrApiKey_ApplicationsWrite = Annotated["UserPublic", Depends(CurrentAdminOrApiKey("applications:write"))]
-AdminOrApiKeySession_ApplicationsRead = Annotated[Session, Depends(get_admin_or_api_key_tenant_session("applications:read"))]
-AdminOrApiKeySession_ApplicationsWrite = Annotated[Session, Depends(get_admin_or_api_key_tenant_session("applications:write"))]
+AdminOrApiKey_ApplicationsRead = Annotated[
+    "UserPublic", Depends(CurrentAdminOrApiKey("applications:read"))
+]
+AdminOrApiKey_ApplicationsWrite = Annotated[
+    "UserPublic", Depends(CurrentAdminOrApiKey("applications:write"))
+]
+AdminOrApiKeySession_ApplicationsRead = Annotated[
+    Session, Depends(get_admin_or_api_key_tenant_session("applications:read"))
+]
+AdminOrApiKeySession_ApplicationsWrite = Annotated[
+    Session, Depends(get_admin_or_api_key_tenant_session("applications:write"))
+]
 
 # attendees
 # Write routes: admin JWT or scoped api-key.
-AdminOrApiKey_AttendeesRead = Annotated["UserPublic", Depends(CurrentAdminOrApiKey("attendees:read"))]
-AdminOrApiKey_AttendeesWrite = Annotated["UserPublic", Depends(CurrentAdminOrApiKey("attendees:write"))]
-AdminOrApiKeySession_AttendeesRead = Annotated[Session, Depends(get_admin_or_api_key_tenant_session("attendees:read"))]
-AdminOrApiKeySession_AttendeesWrite = Annotated[Session, Depends(get_admin_or_api_key_tenant_session("attendees:write"))]
+AdminOrApiKey_AttendeesRead = Annotated[
+    "UserPublic", Depends(CurrentAdminOrApiKey("attendees:read"))
+]
+AdminOrApiKey_AttendeesWrite = Annotated[
+    "UserPublic", Depends(CurrentAdminOrApiKey("attendees:write"))
+]
+AdminOrApiKeySession_AttendeesRead = Annotated[
+    Session, Depends(get_admin_or_api_key_tenant_session("attendees:read"))
+]
+AdminOrApiKeySession_AttendeesWrite = Annotated[
+    Session, Depends(get_admin_or_api_key_tenant_session("attendees:write"))
+]
 # Read routes with check-in controller access (scanners can list/get attendees).
-CheckInOrApiKey_AttendeesRead = Annotated["UserPublic", Depends(CurrentCheckInOrApiKey("attendees:read"))]
-CheckInOrApiKeySession_AttendeesRead = Annotated[Session, Depends(get_check_in_or_api_key_tenant_session("attendees:read"))]
+CheckInOrApiKey_AttendeesRead = Annotated[
+    "UserPublic", Depends(CurrentCheckInOrApiKey("attendees:read"))
+]
+CheckInOrApiKeySession_AttendeesRead = Annotated[
+    Session, Depends(get_check_in_or_api_key_tenant_session("attendees:read"))
+]
 
 # humans
-AdminOrApiKey_HumansRead = Annotated["UserPublic", Depends(CurrentAdminOrApiKey("humans:read"))]
-AdminOrApiKey_HumansWrite = Annotated["UserPublic", Depends(CurrentAdminOrApiKey("humans:write"))]
-AdminOrApiKeySession_HumansRead = Annotated[Session, Depends(get_admin_or_api_key_tenant_session("humans:read"))]
-AdminOrApiKeySession_HumansWrite = Annotated[Session, Depends(get_admin_or_api_key_tenant_session("humans:write"))]
+AdminOrApiKey_HumansRead = Annotated[
+    "UserPublic", Depends(CurrentAdminOrApiKey("humans:read"))
+]
+AdminOrApiKey_HumansWrite = Annotated[
+    "UserPublic", Depends(CurrentAdminOrApiKey("humans:write"))
+]
+AdminOrApiKeySession_HumansRead = Annotated[
+    Session, Depends(get_admin_or_api_key_tenant_session("humans:read"))
+]
+AdminOrApiKeySession_HumansWrite = Annotated[
+    Session, Depends(get_admin_or_api_key_tenant_session("humans:write"))
+]
 
 # groups
-AdminOrApiKey_GroupsRead = Annotated["UserPublic", Depends(CurrentAdminOrApiKey("groups:read"))]
-AdminOrApiKey_GroupsWrite = Annotated["UserPublic", Depends(CurrentAdminOrApiKey("groups:write"))]
-AdminOrApiKeySession_GroupsRead = Annotated[Session, Depends(get_admin_or_api_key_tenant_session("groups:read"))]
-AdminOrApiKeySession_GroupsWrite = Annotated[Session, Depends(get_admin_or_api_key_tenant_session("groups:write"))]
+AdminOrApiKey_GroupsRead = Annotated[
+    "UserPublic", Depends(CurrentAdminOrApiKey("groups:read"))
+]
+AdminOrApiKey_GroupsWrite = Annotated[
+    "UserPublic", Depends(CurrentAdminOrApiKey("groups:write"))
+]
+AdminOrApiKeySession_GroupsRead = Annotated[
+    Session, Depends(get_admin_or_api_key_tenant_session("groups:read"))
+]
+AdminOrApiKeySession_GroupsWrite = Annotated[
+    Session, Depends(get_admin_or_api_key_tenant_session("groups:write"))
+]
 
 # products
-AdminOrApiKey_ProductsRead = Annotated["UserPublic", Depends(CurrentAdminOrApiKey("products:read"))]
-AdminOrApiKey_ProductsWrite = Annotated["UserPublic", Depends(CurrentAdminOrApiKey("products:write"))]
-AdminOrApiKeySession_ProductsRead = Annotated[Session, Depends(get_admin_or_api_key_tenant_session("products:read"))]
-AdminOrApiKeySession_ProductsWrite = Annotated[Session, Depends(get_admin_or_api_key_tenant_session("products:write"))]
+AdminOrApiKey_ProductsRead = Annotated[
+    "UserPublic", Depends(CurrentAdminOrApiKey("products:read"))
+]
+AdminOrApiKey_ProductsWrite = Annotated[
+    "UserPublic", Depends(CurrentAdminOrApiKey("products:write"))
+]
+AdminOrApiKeySession_ProductsRead = Annotated[
+    Session, Depends(get_admin_or_api_key_tenant_session("products:read"))
+]
+AdminOrApiKeySession_ProductsWrite = Annotated[
+    Session, Depends(get_admin_or_api_key_tenant_session("products:write"))
+]
 
 # coupons
-AdminOrApiKey_CouponsRead = Annotated["UserPublic", Depends(CurrentAdminOrApiKey("coupons:read"))]
-AdminOrApiKey_CouponsWrite = Annotated["UserPublic", Depends(CurrentAdminOrApiKey("coupons:write"))]
-AdminOrApiKeySession_CouponsRead = Annotated[Session, Depends(get_admin_or_api_key_tenant_session("coupons:read"))]
-AdminOrApiKeySession_CouponsWrite = Annotated[Session, Depends(get_admin_or_api_key_tenant_session("coupons:write"))]
+AdminOrApiKey_CouponsRead = Annotated[
+    "UserPublic", Depends(CurrentAdminOrApiKey("coupons:read"))
+]
+AdminOrApiKey_CouponsWrite = Annotated[
+    "UserPublic", Depends(CurrentAdminOrApiKey("coupons:write"))
+]
+AdminOrApiKeySession_CouponsRead = Annotated[
+    Session, Depends(get_admin_or_api_key_tenant_session("coupons:read"))
+]
+AdminOrApiKeySession_CouponsWrite = Annotated[
+    Session, Depends(get_admin_or_api_key_tenant_session("coupons:write"))
+]
 
 # forms
-AdminOrApiKey_FormsRead = Annotated["UserPublic", Depends(CurrentAdminOrApiKey("forms:read"))]
-AdminOrApiKey_FormsWrite = Annotated["UserPublic", Depends(CurrentAdminOrApiKey("forms:write"))]
-AdminOrApiKeySession_FormsRead = Annotated[Session, Depends(get_admin_or_api_key_tenant_session("forms:read"))]
-AdminOrApiKeySession_FormsWrite = Annotated[Session, Depends(get_admin_or_api_key_tenant_session("forms:write"))]
+AdminOrApiKey_FormsRead = Annotated[
+    "UserPublic", Depends(CurrentAdminOrApiKey("forms:read"))
+]
+AdminOrApiKey_FormsWrite = Annotated[
+    "UserPublic", Depends(CurrentAdminOrApiKey("forms:write"))
+]
+AdminOrApiKeySession_FormsRead = Annotated[
+    Session, Depends(get_admin_or_api_key_tenant_session("forms:read"))
+]
+AdminOrApiKeySession_FormsWrite = Annotated[
+    Session, Depends(get_admin_or_api_key_tenant_session("forms:write"))
+]
 
 # payments (read-only; payments:write is intentionally excluded from the universe)
-AdminOrApiKey_PaymentsRead = Annotated["UserPublic", Depends(CurrentAdminOrApiKey("payments:read"))]
-AdminOrApiKeySession_PaymentsRead = Annotated[Session, Depends(get_admin_or_api_key_tenant_session("payments:read"))]
+AdminOrApiKey_PaymentsRead = Annotated[
+    "UserPublic", Depends(CurrentAdminOrApiKey("payments:read"))
+]
+AdminOrApiKeySession_PaymentsRead = Annotated[
+    Session, Depends(get_admin_or_api_key_tenant_session("payments:read"))
+]
 
 # tracks
-AdminOrApiKey_TracksRead = Annotated["UserPublic", Depends(CurrentAdminOrApiKey("tracks:read"))]
-AdminOrApiKey_TracksWrite = Annotated["UserPublic", Depends(CurrentAdminOrApiKey("tracks:write"))]
-AdminOrApiKeySession_TracksRead = Annotated[Session, Depends(get_admin_or_api_key_tenant_session("tracks:read"))]
-AdminOrApiKeySession_TracksWrite = Annotated[Session, Depends(get_admin_or_api_key_tenant_session("tracks:write"))]
+AdminOrApiKey_TracksRead = Annotated[
+    "UserPublic", Depends(CurrentAdminOrApiKey("tracks:read"))
+]
+AdminOrApiKey_TracksWrite = Annotated[
+    "UserPublic", Depends(CurrentAdminOrApiKey("tracks:write"))
+]
+AdminOrApiKeySession_TracksRead = Annotated[
+    Session, Depends(get_admin_or_api_key_tenant_session("tracks:read"))
+]
+AdminOrApiKeySession_TracksWrite = Annotated[
+    Session, Depends(get_admin_or_api_key_tenant_session("tracks:write"))
+]
 
 # ticketing_steps
-AdminOrApiKey_TicketingStepsRead = Annotated["UserPublic", Depends(CurrentAdminOrApiKey("ticketing_steps:read"))]
-AdminOrApiKey_TicketingStepsWrite = Annotated["UserPublic", Depends(CurrentAdminOrApiKey("ticketing_steps:write"))]
-AdminOrApiKeySession_TicketingStepsRead = Annotated[Session, Depends(get_admin_or_api_key_tenant_session("ticketing_steps:read"))]
-AdminOrApiKeySession_TicketingStepsWrite = Annotated[Session, Depends(get_admin_or_api_key_tenant_session("ticketing_steps:write"))]
+AdminOrApiKey_TicketingStepsRead = Annotated[
+    "UserPublic", Depends(CurrentAdminOrApiKey("ticketing_steps:read"))
+]
+AdminOrApiKey_TicketingStepsWrite = Annotated[
+    "UserPublic", Depends(CurrentAdminOrApiKey("ticketing_steps:write"))
+]
+AdminOrApiKeySession_TicketingStepsRead = Annotated[
+    Session, Depends(get_admin_or_api_key_tenant_session("ticketing_steps:read"))
+]
+AdminOrApiKeySession_TicketingStepsWrite = Annotated[
+    Session, Depends(get_admin_or_api_key_tenant_session("ticketing_steps:write"))
+]
 
 # translations
-AdminOrApiKey_TranslationsRead = Annotated["UserPublic", Depends(CurrentAdminOrApiKey("translations:read"))]
-AdminOrApiKey_TranslationsWrite = Annotated["UserPublic", Depends(CurrentAdminOrApiKey("translations:write"))]
-AdminOrApiKeySession_TranslationsRead = Annotated[Session, Depends(get_admin_or_api_key_tenant_session("translations:read"))]
-AdminOrApiKeySession_TranslationsWrite = Annotated[Session, Depends(get_admin_or_api_key_tenant_session("translations:write"))]
+AdminOrApiKey_TranslationsRead = Annotated[
+    "UserPublic", Depends(CurrentAdminOrApiKey("translations:read"))
+]
+AdminOrApiKey_TranslationsWrite = Annotated[
+    "UserPublic", Depends(CurrentAdminOrApiKey("translations:write"))
+]
+AdminOrApiKeySession_TranslationsRead = Annotated[
+    Session, Depends(get_admin_or_api_key_tenant_session("translations:read"))
+]
+AdminOrApiKeySession_TranslationsWrite = Annotated[
+    Session, Depends(get_admin_or_api_key_tenant_session("translations:write"))
+]
+
 
 # DRY helper for scope-gated routes. Use directly in the route decorator's
 # `dependencies=[...]` list instead of declaring a per-scope Annotated alias:

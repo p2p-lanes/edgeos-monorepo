@@ -151,7 +151,9 @@ def test_purchase_happy_path_creates_payment_and_attendees(
     assert len(attendees) == 1
 
 
-def test_purchase_unknown_slug_returns_404(client: TestClient, tenant_a: Tenants) -> None:
+def test_purchase_unknown_slug_returns_404(
+    client: TestClient, tenant_a: Tenants
+) -> None:
     response = client.post(
         "/api/v1/checkout/does-not-exist/purchase",
         json={

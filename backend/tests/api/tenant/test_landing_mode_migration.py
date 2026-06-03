@@ -12,7 +12,9 @@ from app.api.shared.enums import LandingMode
 from app.api.tenant.models import Tenants
 
 
-def test_existing_tenant_rows_have_portal_landing_mode(db: Session, tenant_a: Tenants, tenant_b: Tenants) -> None:
+def test_existing_tenant_rows_have_portal_landing_mode(
+    db: Session, tenant_a: Tenants, tenant_b: Tenants
+) -> None:
     """AC-T2: All existing tenant rows default to landing_mode='portal' after migration."""
     # tenant_a and tenant_b are created by the conftest without setting landing_mode.
     # After migration, their landing_mode must be 'portal'.

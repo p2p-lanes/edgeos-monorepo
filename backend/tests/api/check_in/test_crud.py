@@ -249,6 +249,7 @@ class TestListEventsForTicket:
         events = list_check_ins_for_ticket(db, ticket.id)
         assert events == [], f"Expected empty list for new ticket, got: {events}"
 
+
 class TestGetCheckInSummary:
     """get_check_in_summary returns total_scans + first_scan_at + last_scan_at."""
 

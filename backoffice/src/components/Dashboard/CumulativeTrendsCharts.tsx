@@ -97,8 +97,8 @@ export function CumulativeTrendsCharts({
           <CardTitle className="text-base">Cumulative Tickets</CardTitle>
           <CardDescription>
             {hasTickets
-              ? `${tickets[tickets.length - 1].cumulative} accepted total`
-              : "No accepted applications yet"}
+              ? `${tickets[tickets.length - 1].cumulative} tickets sold`
+              : "No tickets sold yet"}
           </CardDescription>
         </CardHeader>
         <CardContent>

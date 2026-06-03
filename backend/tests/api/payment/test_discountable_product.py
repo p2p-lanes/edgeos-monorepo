@@ -114,9 +114,7 @@ class TestCalculateAmounts:
         popup = _make_popup(db, tenant_a)
         standard_product = _make_product(db, popup, price="100", discountable=True)
         mandatory_product = _make_product(db, popup, price="50", discountable=False)
-        _, attendee = _make_application_and_attendee(
-            db, popup, human_for_discountable
-        )
+        _, attendee = _make_application_and_attendee(db, popup, human_for_discountable)
         db.commit()
         try:
             requested = [
@@ -147,9 +145,7 @@ class TestCalculateAmounts:
         patron = _make_product(
             db, popup, price="0", discountable=False, category="patreon"
         )
-        _, attendee = _make_application_and_attendee(
-            db, popup, human_for_discountable
-        )
+        _, attendee = _make_application_and_attendee(db, popup, human_for_discountable)
         db.commit()
         try:
             requested = [

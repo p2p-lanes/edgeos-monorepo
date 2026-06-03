@@ -188,9 +188,10 @@ export type ApplicationFeeCreate = {
 export type ApplicationFunnel = {
     draft?: number;
     pending_fee?: number;
+    paid?: number;
     in_review?: number;
     accepted?: number;
-    paid?: number;
+    fee_enabled?: boolean;
 };
 
 /**
@@ -2028,6 +2029,7 @@ export type HumanVerify = {
  */
 export type KeyMetrics = {
     people?: number;
+    paying_people?: number;
     total_revenue?: string;
     currency?: string;
     avg_ticket_price?: string;
@@ -2841,10 +2843,9 @@ export type ProductLine = {
 /**
  * Product schema for API responses.
  *
- * Sale window fields are exposed as `date` (inclusive day) even though they
- * are persisted as `datetime` UTC (exclusive instant). `sale_ends_at` is
- * de-bumped by 1 day so the response shows the last day the product is on
- * sale — the canonical "operator-friendly" representation.
+ * Sale window fields are exposed as full ``datetime`` instants (UTC), so the
+ * sale window can express a precise cutoff like "Friday 11:59 PM" rather than
+ * a whole calendar day. Clients render them in the popup's timezone.
  */
 export type ProductPublic = {
     tenant_id: string;

@@ -376,9 +376,7 @@ class TestCancelRejectRestoration:
             total_stock_remaining=6,  # 4 units sold
         )
 
-        payment = _make_payment_with_product(
-            db, tenant_a, popup, product, quantity=4
-        )
+        payment = _make_payment_with_product(db, tenant_a, popup, product, quantity=4)
 
         admin_token = create_access_token(
             subject=admin_user_tenant_a.id, token_type="user"
@@ -414,9 +412,7 @@ class TestCancelRejectRestoration:
             total_stock_remaining=3,  # 2 units sold
         )
 
-        payment = _make_payment_with_product(
-            db, tenant_a, popup, product, quantity=2
-        )
+        payment = _make_payment_with_product(db, tenant_a, popup, product, quantity=2)
 
         admin_token = create_access_token(
             subject=admin_user_tenant_a.id, token_type="user"
@@ -450,9 +446,7 @@ class TestCancelRejectRestoration:
             total_stock_remaining=6,  # 4 units sold
         )
 
-        payment = _make_payment_with_product(
-            db, tenant_a, popup, product, quantity=4
-        )
+        payment = _make_payment_with_product(db, tenant_a, popup, product, quantity=4)
         # Set to APPROVED first
         payment.status = PaymentStatus.APPROVED.value
         db.add(payment)
@@ -544,5 +538,3 @@ class TestApplicationFlowEnforcement:
             attendees_crud.add_product(db, attendee.id, product.id)
 
         assert exc_info.value.status_code == 409
-
-

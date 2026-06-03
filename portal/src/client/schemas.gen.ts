@@ -848,6 +848,11 @@ export const ApplicationFunnelSchema = {
             title: 'Pending Fee',
             default: 0
         },
+        paid: {
+            type: 'integer',
+            title: 'Paid',
+            default: 0
+        },
         in_review: {
             type: 'integer',
             title: 'In Review',
@@ -858,10 +863,10 @@ export const ApplicationFunnelSchema = {
             title: 'Accepted',
             default: 0
         },
-        paid: {
-            type: 'integer',
-            title: 'Paid',
-            default: 0
+        fee_enabled: {
+            type: 'boolean',
+            title: 'Fee Enabled',
+            default: false
         }
     },
     type: 'object',
@@ -4389,7 +4394,7 @@ export const CheckoutRuntimeProductSchema = {
             anyOf: [
                 {
                     type: 'string',
-                    format: 'date'
+                    format: 'date-time'
                 },
                 {
                     type: 'null'
@@ -4401,7 +4406,7 @@ export const CheckoutRuntimeProductSchema = {
             anyOf: [
                 {
                     type: 'string',
-                    format: 'date'
+                    format: 'date-time'
                 },
                 {
                     type: 'null'
@@ -9864,6 +9869,11 @@ export const KeyMetricsSchema = {
             title: 'People',
             default: 0
         },
+        paying_people: {
+            type: 'integer',
+            title: 'Paying People',
+            default: 0
+        },
         total_revenue: {
             type: 'string',
             pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$',
@@ -13555,7 +13565,7 @@ export const ProductBatchItemSchema = {
             anyOf: [
                 {
                     type: 'string',
-                    format: 'date'
+                    format: 'date-time'
                 },
                 {
                     type: 'null'
@@ -13567,7 +13577,7 @@ export const ProductBatchItemSchema = {
             anyOf: [
                 {
                     type: 'string',
-                    format: 'date'
+                    format: 'date-time'
                 },
                 {
                     type: 'null'
@@ -13740,7 +13750,7 @@ export const ProductBatchResultSchema = {
             anyOf: [
                 {
                     type: 'string',
-                    format: 'date'
+                    format: 'date-time'
                 },
                 {
                     type: 'null'
@@ -13752,7 +13762,7 @@ export const ProductBatchResultSchema = {
             anyOf: [
                 {
                     type: 'string',
-                    format: 'date'
+                    format: 'date-time'
                 },
                 {
                     type: 'null'
@@ -13980,7 +13990,7 @@ export const ProductCreateSchema = {
             anyOf: [
                 {
                     type: 'string',
-                    format: 'date'
+                    format: 'date-time'
                 },
                 {
                     type: 'null'
@@ -13992,7 +14002,7 @@ export const ProductCreateSchema = {
             anyOf: [
                 {
                     type: 'string',
-                    format: 'date'
+                    format: 'date-time'
                 },
                 {
                     type: 'null'
@@ -14185,7 +14195,7 @@ export const ProductPublicSchema = {
             anyOf: [
                 {
                     type: 'string',
-                    format: 'date'
+                    format: 'date-time'
                 },
                 {
                     type: 'null'
@@ -14197,7 +14207,7 @@ export const ProductPublicSchema = {
             anyOf: [
                 {
                     type: 'string',
-                    format: 'date'
+                    format: 'date-time'
                 },
                 {
                     type: 'null'
@@ -14274,10 +14284,9 @@ export const ProductPublicSchema = {
     title: 'ProductPublic',
     description: `Product schema for API responses.
 
-Sale window fields are exposed as \`date\` (inclusive day) even though they
-are persisted as \`datetime\` UTC (exclusive instant). \`sale_ends_at\` is
-de-bumped by 1 day so the response shows the last day the product is on
-sale — the canonical "operator-friendly" representation.`
+Sale window fields are exposed as full \`\`datetime\`\` instants (UTC), so the
+sale window can express a precise cutoff like "Friday 11:59 PM" rather than
+a whole calendar day. Clients render them in the popup's timezone.`
 } as const;
 
 export const ProductUpdateSchema = {
@@ -14397,7 +14406,7 @@ export const ProductUpdateSchema = {
             anyOf: [
                 {
                     type: 'string',
-                    format: 'date'
+                    format: 'date-time'
                 },
                 {
                     type: 'null'
@@ -14409,7 +14418,7 @@ export const ProductUpdateSchema = {
             anyOf: [
                 {
                     type: 'string',
-                    format: 'date'
+                    format: 'date-time'
                 },
                 {
                     type: 'null'
@@ -14611,7 +14620,7 @@ export const ProductWithQuantitySchema = {
             anyOf: [
                 {
                     type: 'string',
-                    format: 'date'
+                    format: 'date-time'
                 },
                 {
                     type: 'null'
@@ -14623,7 +14632,7 @@ export const ProductWithQuantitySchema = {
             anyOf: [
                 {
                     type: 'string',
-                    format: 'date'
+                    format: 'date-time'
                 },
                 {
                     type: 'null'

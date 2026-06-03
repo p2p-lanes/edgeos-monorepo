@@ -11,6 +11,7 @@ from app.api.tenant.schemas import TenantBase, TenantPublic, TenantUpdate
 
 # --- Task 1.2: TenantBase has landing_mode with default portal ---
 
+
 def test_tenant_base_landing_mode_default() -> None:
     """TenantBase.landing_mode defaults to LandingMode.portal."""
     tenant = TenantBase(name="Test", slug="test")
@@ -23,6 +24,7 @@ def test_tenant_base_landing_mode_explicit_checkout() -> None:
 
 
 # --- Task 1.3: TenantUpdate has landing_mode: LandingMode | None = None ---
+
 
 def test_tenant_update_landing_mode_default_none() -> None:
     """TenantUpdate.landing_mode defaults to None (PATCH partial)."""
@@ -47,8 +49,8 @@ def test_tenant_update_landing_mode_accepts_checkout_with_domain_active() -> Non
 
 # --- Task 1.4: model_validator rejects checkout when custom_domain_active=False ---
 
-def test_tenant_update_validator_rejects_checkout_when_domain_inactive(
-) -> None:
+
+def test_tenant_update_validator_rejects_checkout_when_domain_inactive() -> None:
     """Scenario T-2: landing_mode=checkout rejected when custom_domain_active=False."""
     with pytest.raises(ValidationError, match="custom_domain_active"):
         TenantUpdate(
@@ -57,8 +59,9 @@ def test_tenant_update_validator_rejects_checkout_when_domain_inactive(
         )
 
 
-def test_tenant_update_validator_schema_allows_checkout_when_domain_absent_in_payload(
-) -> None:
+def test_tenant_update_validator_schema_allows_checkout_when_domain_absent_in_payload() -> (
+    None
+):
     """Scenario T-3 (schema-level): custom_domain=None in payload = 'not changing'.
 
     When custom_domain is absent from the payload (None), the schema defers to the
@@ -73,8 +76,7 @@ def test_tenant_update_validator_schema_allows_checkout_when_domain_absent_in_pa
     assert update.landing_mode == LandingMode.checkout
 
 
-def test_tenant_update_validator_allows_checkout_with_domain_and_active(
-) -> None:
+def test_tenant_update_validator_allows_checkout_with_domain_and_active() -> None:
     """Scenario T-4: checkout accepted when domain is set and active in the same payload."""
     update = TenantUpdate(
         landing_mode=LandingMode.checkout,
@@ -84,8 +86,7 @@ def test_tenant_update_validator_allows_checkout_with_domain_and_active(
     assert update.landing_mode == LandingMode.checkout
 
 
-def test_tenant_update_validator_rejects_when_active_true_but_no_domain(
-) -> None:
+def test_tenant_update_validator_rejects_when_active_true_but_no_domain() -> None:
     """Payload has custom_domain_active=True but no custom_domain in payload.
 
     When custom_domain_active is explicitly True (meaning: this PATCH is also
@@ -99,8 +100,7 @@ def test_tenant_update_validator_rejects_when_active_true_but_no_domain(
         )
 
 
-def test_tenant_update_validator_allows_checkout_mode_only_in_payload(
-) -> None:
+def test_tenant_update_validator_allows_checkout_mode_only_in_payload() -> None:
     """PATCH {"landing_mode": "checkout"} alone is valid at schema level.
 
     The schema defers to the router for the merged-state check (ADR-1).
@@ -112,6 +112,7 @@ def test_tenant_update_validator_allows_checkout_mode_only_in_payload(
 
 
 # --- Task 1.5: TenantPublic has active_popup_slug ---
+
 
 def test_tenant_public_has_active_popup_slug_field() -> None:
     """TenantPublic exposes active_popup_slug, defaulting to None."""

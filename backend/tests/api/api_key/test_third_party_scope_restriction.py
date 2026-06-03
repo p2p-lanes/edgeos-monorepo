@@ -78,7 +78,11 @@ class TestThirdPartyJwtApiKeyMintingRestriction:
         resp = client.post(
             CREATE_URL,
             headers=_bearer(token),
-            json={"name": "tp-venues", "scopes": ["venues:write"], "expires_at": expiry},
+            json={
+                "name": "tp-venues",
+                "scopes": ["venues:write"],
+                "expires_at": expiry,
+            },
         )
         assert resp.status_code == 403, resp.text
 
@@ -105,7 +109,11 @@ class TestThirdPartyJwtApiKeyMintingRestriction:
         resp = client.post(
             CREATE_URL,
             headers=_bearer(token),
-            json={"name": "tp-mixed", "scopes": ["rsvp:write", "venues:write"], "expires_at": expiry},
+            json={
+                "name": "tp-mixed",
+                "scopes": ["rsvp:write", "venues:write"],
+                "expires_at": expiry,
+            },
         )
         assert resp.status_code == 403, resp.text
 

@@ -186,9 +186,7 @@ def get_for_user(
     ).first()
 
 
-def get_any_admin_key(
-    session: Session, key_id: uuid.UUID
-) -> ApiKeys | None:
+def get_any_admin_key(session: Session, key_id: uuid.UUID) -> ApiKeys | None:
     """Fetch an admin key by id on the current session (SUPERADMIN path).
 
     Relies on RLS to scope to the correct tenant. Returns None if the key
@@ -196,9 +194,7 @@ def get_any_admin_key(
     a human-owned key (user_id is None).
     """
     return session.exec(
-        select(ApiKeys)
-        .where(ApiKeys.id == key_id)
-        .where(ApiKeys.user_id.is_not(None))
+        select(ApiKeys).where(ApiKeys.id == key_id).where(ApiKeys.user_id.is_not(None))
     ).first()
 
 
