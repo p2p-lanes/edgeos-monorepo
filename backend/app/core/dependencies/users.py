@@ -369,7 +369,11 @@ def get_human_tenant_session(
         cached_cred.password,
     )
 
-    with Session(tenant_engine) as tenant_session:
+    # expire_on_commit=False: portal write routes build their response from the
+    # in-memory object after commit. Re-reading expired attributes would issue a
+    # post-commit SELECT that races with concurrent deletes and, under RLS, fails
+    # with "Could not refresh instance".
+    with Session(tenant_engine, expire_on_commit=False) as tenant_session:
         yield tenant_session
 
 
