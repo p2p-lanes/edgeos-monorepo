@@ -18,16 +18,20 @@ import { STATUS_CLASSES, STATUS_LABELS, TASK_STATUSES } from "./taskMeta"
 interface TaskBoardProps {
   tasks: TaskPublic[]
   onOpen: (taskId: string) => void
+  /** Whether the viewer can move cards (change status). Superadmin only. */
+  canManage?: boolean
 }
 
 function Column({
   status,
   tasks,
   onOpen,
+  canManage,
 }: {
   status: TaskStatus
   tasks: TaskPublic[]
   onOpen: (taskId: string) => void
+  canManage?: boolean
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: status })
   return (
@@ -51,14 +55,19 @@ function Column({
       </div>
       <div className="flex min-h-[40px] flex-col gap-2">
         {tasks.map((task) => (
-          <TaskCard key={task.id} task={task} onOpen={onOpen} />
+          <TaskCard
+            key={task.id}
+            task={task}
+            onOpen={onOpen}
+            draggable={canManage}
+          />
         ))}
       </div>
     </div>
   )
 }
 
-export function TaskBoard({ tasks, onOpen }: TaskBoardProps) {
+export function TaskBoard({ tasks, onOpen, canManage }: TaskBoardProps) {
   const queryClient = useQueryClient()
   const { showErrorToast } = useCustomToast()
   const sensors = useSensors(
@@ -77,6 +86,7 @@ export function TaskBoard({ tasks, onOpen }: TaskBoardProps) {
   ) as Record<TaskStatus, TaskPublic[]>
 
   const handleDragEnd = (event: DragEndEvent) => {
+    if (!canManage) return
     const overId = event.over?.id as TaskStatus | undefined
     const current = event.active.data.current?.status as TaskStatus | undefined
     if (!overId || overId === current) return
@@ -92,6 +102,7 @@ export function TaskBoard({ tasks, onOpen }: TaskBoardProps) {
             status={status}
             tasks={byStatus[status]}
             onOpen={onOpen}
+            canManage={canManage}
           />
         ))}
       </div>

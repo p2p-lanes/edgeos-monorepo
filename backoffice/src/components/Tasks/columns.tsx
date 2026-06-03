@@ -5,6 +5,8 @@ import { SortableHeader } from "@/components/Common/DataTable"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
 import {
+  PRIORITY_CLASSES,
+  PRIORITY_LABELS,
   STATUS_CLASSES,
   STATUS_LABELS,
   TYPE_CLASSES,
@@ -30,6 +32,21 @@ export const taskColumns: ColumnDef<TaskPublic>[] = [
         {TYPE_LABELS[row.original.type]}
       </Badge>
     ),
+  },
+  {
+    accessorKey: "priority",
+    header: "Priority",
+    cell: ({ row }) => {
+      const priority = row.original.priority ?? "medium"
+      return (
+        <Badge
+          variant="outline"
+          className={cn("font-normal", PRIORITY_CLASSES[priority])}
+        >
+          {PRIORITY_LABELS[priority]}
+        </Badge>
+      )
+    },
   },
   {
     accessorKey: "status",

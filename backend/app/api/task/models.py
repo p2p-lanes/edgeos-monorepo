@@ -42,9 +42,11 @@ class Task(SQLModel, table=True):
     title: str = Field(max_length=200)
     detail: str | None = Field(default=None, sa_column=Column(Text, nullable=True))
 
-    # See app.api.task.schemas: TaskStatus / TaskType / TaskVisibility.
+    # See app.api.task.schemas: TaskStatus / TaskType / TaskPriority / TaskVisibility.
     status: str = Field(max_length=16, index=True)
     type: str = Field(max_length=16, index=True)
+    # low | medium | high. Defaults to medium for existing/new rows.
+    priority: str = Field(default="medium", max_length=16, index=True)
 
     # Assignee — any backoffice user. Nullable (e.g. fresh bug reports).
     responsible_user_id: uuid.UUID | None = Field(
