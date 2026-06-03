@@ -25,7 +25,10 @@ Run:
 python automation/telegram-task-sync/read_telegram.py
 ```
 It prints JSON with a `messages` array (each: `message_id`, `date`, `sender`, `text`,
-`permalink`). If `count` is 0, write a short "nothing new" summary and stop.
+`permalink`, `reply_to`). `reply_to`, when present, is the quoted original a message is
+replying to (id/date/sender/text) — even if it predates the bot joining; use it as context
+when classifying (e.g. a reply confirming or triaging an older bug report). If `count` is 0,
+write a short "nothing new" summary and stop.
 If the script errors (e.g. cannot connect), STOP and report the error — do NOT create tasks.
 
 ### 2. Authenticate to the backoffice as Claude (OTP via Gmail)

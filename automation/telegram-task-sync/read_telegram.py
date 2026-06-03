@@ -27,7 +27,9 @@ Optional:
 
 Output (stdout): a JSON object
   {"chat_id", "window_hours", "since_utc", "count", "messages": [...], "chats_seen": {...}}
-where each message is {message_id, date, sender, text, permalink}.
+where each message is {message_id, date, sender, text, permalink, reply_to}.
+`reply_to` is the quoted original when the message is a reply (id/date/sender/text), even if
+that original was sent before the bot joined; it is null otherwise.
 """
 
 import json
@@ -81,6 +83,29 @@ def _permalink(chat: dict, message_id: int) -> str | None:
     return None
 
 
+def _sender_name(frm: dict) -> str | None:
+    return (
+        " ".join(p for p in (frm.get("first_name"), frm.get("last_name")) if p)
+        or frm.get("username")
+        or None
+    )
+
+
+def _msg_summary(m: dict | None) -> dict | None:
+    """Compact view of a (possibly replied-to) message: id, date, sender, text."""
+    if not m:
+        return None
+    text = (m.get("text") or m.get("caption") or "").strip()
+    return {
+        "message_id": m.get("message_id"),
+        "date": (
+            datetime.fromtimestamp(m["date"], UTC).isoformat() if m.get("date") else None
+        ),
+        "sender": _sender_name(m.get("from", {})),
+        "text": text or None,
+    }
+
+
 def main() -> None:
     token = _require_env("TELEGRAM_BOT_TOKEN")
     raw_chat = os.environ.get("TELEGRAM_CHAT_ID")
@@ -123,19 +148,17 @@ def main() -> None:
             text = (msg.get("text") or msg.get("caption") or "").strip()
             if not text:
                 continue
-            frm = msg.get("from", {})
-            sender = (
-                " ".join(p for p in (frm.get("first_name"), frm.get("last_name")) if p)
-                or frm.get("username")
-                or None
-            )
             messages.append(
                 {
                     "message_id": msg["message_id"],
                     "date": datetime.fromtimestamp(msg["date"], UTC).isoformat(),
-                    "sender": sender,
+                    "sender": _sender_name(msg.get("from", {})),
                     "text": text,
                     "permalink": _permalink(chat, msg["message_id"]),
+                    # When this message replies to another (even one sent before the
+                    # bot joined the group), Telegram includes the quoted original
+                    # here — useful context for triage. None if not a reply.
+                    "reply_to": _msg_summary(msg.get("reply_to_message")),
                 }
             )
 
