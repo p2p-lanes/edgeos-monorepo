@@ -19,12 +19,19 @@ from app.api.application.schemas import (
 from app.api.application_review.models import ApplicationReviews
 from app.api.attendee.crud import attendees_crud
 from app.api.attendee.models import AttendeeProducts, Attendees
+from app.api.attendee_category.models import AttendeeCategories
 from app.api.human.models import Humans
 from app.api.human.schemas import HumanCreate, HumanUpdate
 from app.api.shared.crud import BaseCRUD
 
 if TYPE_CHECKING:
     from app.api.human.models import Humans
+
+
+# Attendee categories shown in the Portal attendee directory. Kids (and any
+# other non-adult categories) are intentionally excluded — only the main
+# applicant and their spouse appear.
+DIRECTORY_VISIBLE_CATEGORY_KEYS = ("main", "spouse")
 
 
 def _is_draft_status(status_value: object) -> bool:
@@ -201,21 +208,28 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
     ) -> tuple[list[Attendees], int]:
         """Find attendees for the attendees directory.
 
-        Returns ticket-holding attendees (any category) whose parent
-        application is accepted — one entry per person, sourced from that
-        attendee's own Human record. Supports text search across the
+        Returns ticket-holding attendees whose parent application is accepted —
+        one entry per person, sourced from that attendee's own Human record.
+        Only the main applicant and spouse categories are listed; kids (and any
+        other categories) are excluded. Supports text search across the
         attendee's own human fields.
         """
-        # Root on attendees so companions (spouse/kid/...) appear as their own
-        # rows, not just nested under the main applicant. Gate on an accepted
-        # parent application and on the attendee holding at least one product.
+        # Root on attendees so the spouse appears as their own row, not just
+        # nested under the main applicant. Gate on an accepted parent
+        # application, on the attendee holding at least one product, and on the
+        # category being directory-visible (main/spouse — kids are excluded).
         has_products = exists().where(AttendeeProducts.attendee_id == Attendees.id)
         base_statement = (
             select(Attendees)
             .join(Applications, Attendees.application_id == Applications.id)  # type: ignore[arg-type]
+            .join(
+                AttendeeCategories,
+                Attendees.category_id == AttendeeCategories.id,  # type: ignore[arg-type]
+            )
             .where(Attendees.popup_id == popup_id)
             .where(Applications.status == ApplicationStatus.ACCEPTED.value)
             .where(has_products)
+            .where(col(AttendeeCategories.key).in_(DIRECTORY_VISIBLE_CATEGORY_KEYS))
         )
 
         # Text search across the attendee's OWN human fields, so companions are

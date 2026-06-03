@@ -8,7 +8,7 @@ ticket-holding attendee, sourced from that attendee's own human):
 - A companion is searchable by their OWN name, not the main applicant's.
 - A main applicant with 0 tickets whose spouse holds the ticket → the spouse
   appears, the 0-ticket main does not.
-- All categories are included (kids too).
+- Only main + spouse are listed; kids (and any other categories) are excluded.
 - info_not_shared masking + role/organization apply ONLY to the main applicant;
   companions show their own profile with blank role/org and no masking.
 """
@@ -220,19 +220,19 @@ def directory_world(db: Session, tenant_a: Tenants):
 # ---------------------------------------------------------------------------
 
 
-def test_directory_includes_ticket_holders_excludes_zero_ticket_main(
+def test_directory_lists_main_and_spouse_excludes_kids_and_zero_ticket_main(
     db: Session, directory_world
 ) -> None:
-    """One row per ticket-holding attendee, any category; 0-ticket main excluded."""
+    """One row per ticket-holding main/spouse; kids and 0-ticket main excluded."""
     results, total = applications_crud.find_directory(
         db, popup_id=directory_world["popup"].id, limit=100
     )
     got = {a.id for a in results}
-    assert total == 4
+    assert total == 3
     assert directory_world["andrea"].id in got  # main with ticket
     assert directory_world["scott"].id in got  # spouse with ticket
-    assert directory_world["kiddo"].id in got  # kid with ticket (all categories)
     assert directory_world["carol"].id in got  # spouse with ticket
+    assert directory_world["kiddo"].id not in got  # kid — excluded
     assert directory_world["bob"].id not in got  # main, 0 tickets
 
 
