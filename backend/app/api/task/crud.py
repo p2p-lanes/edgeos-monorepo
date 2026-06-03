@@ -6,10 +6,12 @@ single batched lookup to keep list responses free of N+1 queries.
 """
 
 import uuid
+from typing import TYPE_CHECKING
 
 from sqlmodel import Session, col, func, select
 
 from app.api.shared.crud import BaseCRUD
+from app.api.shared.enums import UserRole
 from app.api.task.models import Task, TaskComment
 from app.api.task.schemas import (
     TaskAttachmentPublic,
@@ -17,7 +19,28 @@ from app.api.task.schemas import (
     TaskDetailPublic,
     TaskPublic,
     TaskUpdate,
+    TaskVisibility,
 )
+
+if TYPE_CHECKING:
+    from app.api.user.schemas import UserPublic
+
+
+def can_view_task(user: "UserPublic", task: Task) -> bool:
+    """Whether ``user`` may view ``task`` under its visibility.
+
+    superadmin → everything; ``universal`` → everyone; ``tenant`` → users of the
+    target tenant; ``internal`` → superadmins only.
+    """
+    if user.role == UserRole.SUPERADMIN:
+        return True
+    if task.visibility == TaskVisibility.UNIVERSAL.value:
+        return True
+    return (
+        task.visibility == TaskVisibility.TENANT.value
+        and task.target_tenant_id is not None
+        and task.target_tenant_id == user.tenant_id
+    )
 
 
 class TasksCRUD(BaseCRUD[Task, TaskCreate, TaskUpdate]):
@@ -38,8 +61,21 @@ class TasksCRUD(BaseCRUD[Task, TaskCreate, TaskUpdate]):
         responsible_user_id: uuid.UUID | None = None,
         release: str | None = None,
         search: str | None = None,
+        viewer: "UserPublic | None" = None,
     ) -> tuple[list[Task], int]:
         statement = select(Task)
+
+        # Visibility gate for non-superadmin viewers: only universal tasks and
+        # tenant tasks targeting their own tenant. Superadmins (or no viewer)
+        # see everything. internal tasks never reach non-superadmins.
+        if viewer is not None and viewer.role != UserRole.SUPERADMIN:
+            statement = statement.where(
+                (col(Task.visibility) == TaskVisibility.UNIVERSAL.value)
+                | (
+                    (col(Task.visibility) == TaskVisibility.TENANT.value)
+                    & (col(Task.target_tenant_id) == viewer.tenant_id)
+                )
+            )
 
         if status is not None:
             statement = statement.where(Task.status == status)

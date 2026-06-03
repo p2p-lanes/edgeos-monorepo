@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query"
 import { createFileRoute, useNavigate } from "@tanstack/react-router"
 import { ListChecks, Plus } from "lucide-react"
-import { useEffect, useMemo, useState } from "react"
+import { useMemo, useState } from "react"
 
 import { TasksService, type TaskType, UsersService } from "@/client"
 import { DataTable } from "@/components/Common/DataTable"
@@ -25,6 +25,10 @@ import useAuth from "@/hooks/useAuth"
 
 export const Route = createFileRoute("/_layout/tasks/")({
   component: Tasks,
+  // `?task=<id>` deep-links straight into a task's modal (shareable link).
+  validateSearch: (search: Record<string, unknown>): { task?: string } => ({
+    task: typeof search.task === "string" ? search.task : undefined,
+  }),
   head: () => ({
     meta: [{ title: "Tasks - EdgeOS" }],
   }),
@@ -32,27 +36,21 @@ export const Route = createFileRoute("/_layout/tasks/")({
 
 function Tasks() {
   const navigate = useNavigate()
+  const { task: taskParam } = Route.useSearch()
   const { isSuperadmin, isUserLoading } = useAuth()
   const [search, setSearch] = useState("")
   const [typeFilter, setTypeFilter] = useState<TaskType | "all">("all")
   const [responsibleFilter, setResponsibleFilter] = useState<string>("all")
-  const [dialogOpen, setDialogOpen] = useState(false)
-  const [activeTaskId, setActiveTaskId] = useState<string | null>(null)
+  const [newOpen, setNewOpen] = useState(false)
 
-  // Superadmin-only board (phase 1). Redirect everyone else.
-  useEffect(() => {
-    if (!isUserLoading && !isSuperadmin) {
-      navigate({ to: "/" })
-    }
-  }, [isUserLoading, isSuperadmin, navigate])
-
+  // Open to every backoffice user; the backend filters by task visibility.
   const { data, isLoading } = useQuery({
     queryKey: ["tasks", "board"],
     queryFn: () => TasksService.listTasks({ limit: 1000 }),
-    enabled: isSuperadmin,
   })
 
-  // Only superadmins can be assigned, so the filter lists superadmins only.
+  // Only superadmins can be assigned, so the filter lists superadmins only
+  // (and only superadmins may list users).
   const { data: usersData } = useQuery({
     queryKey: ["tasks-superadmins"],
     queryFn: () => UsersService.listUsers({ limit: 1000, role: "superadmin" }),
@@ -81,16 +79,12 @@ function Tasks() {
     })
   }, [data, typeFilter, responsibleFilter, search])
 
-  if (isUserLoading || !isSuperadmin) return null
+  if (isUserLoading) return null
 
-  const openNewTask = () => {
-    setActiveTaskId(null)
-    setDialogOpen(true)
-  }
-  const openTask = (taskId: string) => {
-    setActiveTaskId(taskId)
-    setDialogOpen(true)
-  }
+  const openNewTask = () => setNewOpen(true)
+  const openTask = (taskId: string) =>
+    navigate({ to: "/tasks", search: { task: taskId } })
+  const closeTask = () => navigate({ to: "/tasks", search: {} })
 
   return (
     <div className="flex flex-col gap-6">
@@ -101,10 +95,12 @@ function Tasks() {
             Track bugs and features for the EdgeOS product
           </p>
         </div>
-        <Button onClick={openNewTask}>
-          <Plus className="mr-2 h-4 w-4" />
-          New task
-        </Button>
+        {isSuperadmin && (
+          <Button onClick={openNewTask}>
+            <Plus className="mr-2 h-4 w-4" />
+            New task
+          </Button>
+        )}
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
@@ -130,20 +126,25 @@ function Tasks() {
             ))}
           </SelectContent>
         </Select>
-        <Select value={responsibleFilter} onValueChange={setResponsibleFilter}>
-          <SelectTrigger className="w-52">
-            <SelectValue placeholder="Responsible" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All responsibles</SelectItem>
-            <SelectItem value="unassigned">Unassigned</SelectItem>
-            {users.map((u) => (
-              <SelectItem key={u.id} value={u.id}>
-                {u.full_name || u.email}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {isSuperadmin && (
+          <Select
+            value={responsibleFilter}
+            onValueChange={setResponsibleFilter}
+          >
+            <SelectTrigger className="w-52">
+              <SelectValue placeholder="Responsible" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All responsibles</SelectItem>
+              <SelectItem value="unassigned">Unassigned</SelectItem>
+              {users.map((u) => (
+                <SelectItem key={u.id} value={u.id}>
+                  {u.full_name || u.email}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
       </div>
 
       <Tabs defaultValue="kanban">
@@ -161,14 +162,20 @@ function Tasks() {
               title="No tasks yet"
               description="Create a task to start tracking bugs and features."
               action={
-                <Button onClick={openNewTask}>
-                  <Plus className="mr-2 h-4 w-4" />
-                  New task
-                </Button>
+                isSuperadmin ? (
+                  <Button onClick={openNewTask}>
+                    <Plus className="mr-2 h-4 w-4" />
+                    New task
+                  </Button>
+                ) : undefined
               }
             />
           ) : (
-            <TaskBoard tasks={filtered} onOpen={openTask} />
+            <TaskBoard
+              tasks={filtered}
+              onOpen={openTask}
+              canManage={isSuperadmin}
+            />
           )}
         </TabsContent>
 
@@ -192,10 +199,14 @@ function Tasks() {
         </TabsContent>
       </Tabs>
 
+      {/* Create dialog (superadmin) and the deep-linkable view/edit dialog. */}
+      <TaskDialog open={newOpen} onOpenChange={setNewOpen} taskId={null} />
       <TaskDialog
-        open={dialogOpen}
-        onOpenChange={setDialogOpen}
-        taskId={activeTaskId}
+        open={!!taskParam}
+        onOpenChange={(o) => {
+          if (!o) closeTask()
+        }}
+        taskId={taskParam ?? null}
       />
     </div>
   )

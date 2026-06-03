@@ -6367,9 +6367,11 @@ export class TasksService {
      * Report Bug
      * File a bug report (any authenticated backoffice user).
      *
-     * Always creates an internal bug in the to-do column, attributed to the
-     * reporter. Optional attachments are screenshots / screen-recordings already
-     * uploaded to S3 via POST /uploads/presigned-url.
+     * Creates a to-do bug attributed to the reporter, scoped to the reporter's
+     * tenant (``visibility='tenant'``) so that tenant's users can see it. A
+     * superadmin reporter (no tenant) falls back to an ``internal`` bug. Optional
+     * attachments are screenshots / screen-recordings already uploaded to S3 via
+     * POST /uploads/presigned-url.
      * @param data The data for the request.
      * @param data.requestBody
      * @returns TaskPublic Successful Response
@@ -6389,7 +6391,7 @@ export class TasksService {
     
     /**
      * List Tasks
-     * List tasks with optional filters (superadmin only).
+     * List tasks the current user may see (filtered by visibility).
      * @param data The data for the request.
      * @param data.status
      * @param data.type
@@ -6444,7 +6446,7 @@ export class TasksService {
     
     /**
      * Get Task
-     * Get a single task with its attachments (superadmin only).
+     * Get a single task with its attachments (visible to the user).
      * @param data The data for the request.
      * @param data.taskId
      * @returns TaskDetailPublic Successful Response
@@ -6583,7 +6585,7 @@ export class TasksService {
     
     /**
      * List Task Comments
-     * List a task's comments, oldest first (superadmin only).
+     * List a task's comments, oldest first (any user who can view the task).
      * @param data The data for the request.
      * @param data.taskId
      * @returns ListModel_TaskCommentPublic_ Successful Response
@@ -6604,7 +6606,7 @@ export class TasksService {
     
     /**
      * Create Task Comment
-     * Add a comment to a task (superadmin only).
+     * Add a comment to a task (any user who can view the task).
      * @param data The data for the request.
      * @param data.taskId
      * @param data.requestBody
@@ -6628,7 +6630,7 @@ export class TasksService {
     
     /**
      * Update Task Comment
-     * Edit your own comment (superadmin only).
+     * Edit your own comment (any user who can view the task).
      * @param data The data for the request.
      * @param data.taskId
      * @param data.commentId
@@ -6654,7 +6656,7 @@ export class TasksService {
     
     /**
      * Delete Task Comment
-     * Soft-delete a comment (superadmin only). The row is preserved.
+     * Soft-delete a comment: the author, or any superadmin. Row is preserved.
      * @param data The data for the request.
      * @param data.taskId
      * @param data.commentId

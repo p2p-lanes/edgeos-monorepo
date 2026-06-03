@@ -21,6 +21,12 @@ class TaskType(str, Enum):
     FEATURE = "feature"
 
 
+class TaskPriority(str, Enum):
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+
+
 class TaskVisibility(str, Enum):
     UNIVERSAL = "universal"  # all tenants (phase 2)
     TENANT = "tenant"  # a single target tenant (phase 2)
@@ -95,6 +101,7 @@ class TaskCreate(BaseModel):
     detail: str | None = None
     status: TaskStatus = TaskStatus.TO_DO
     type: TaskType = TaskType.FEATURE
+    priority: TaskPriority = TaskPriority.MEDIUM
     responsible_user_id: uuid.UUID | None = None
     release: str | None = Field(default=None, max_length=50)
     visibility: TaskVisibility = TaskVisibility.INTERNAL
@@ -108,6 +115,7 @@ class TaskUpdate(BaseModel):
     detail: str | None = None
     status: TaskStatus | None = None
     type: TaskType | None = None
+    priority: TaskPriority | None = None
     responsible_user_id: uuid.UUID | None = None
     release: str | None = Field(default=None, max_length=50)
     visibility: TaskVisibility | None = None
@@ -144,6 +152,7 @@ class TaskPublic(BaseModel):
     detail: str | None = None
     status: TaskStatus
     type: TaskType
+    priority: TaskPriority = TaskPriority.MEDIUM
     responsible_user_id: uuid.UUID | None = None
     responsible_name: str | None = None
     responsible_email: str | None = None

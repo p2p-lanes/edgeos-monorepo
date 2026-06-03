@@ -554,6 +554,9 @@ export type AttendeePurchases = {
 
 /**
  * Single entry in the attendees directory.
+ *
+ * The directory is attendee-centric: one entry per ticket-holding attendee
+ * (any category), sourced from that attendee's own human record.
  */
 export type AttendeesDirectoryEntry = {
     id: string;
@@ -567,6 +570,7 @@ export type AttendeesDirectoryEntry = {
     age?: (string | null);
     gender?: (string | null);
     picture_url?: (string | null);
+    category?: (string | null);
     participation?: Array<DirectoryProduct>;
     associated_attendees?: Array<AssociatedAttendee>;
 };
@@ -3119,6 +3123,7 @@ export type TaskCreate = {
     detail?: (string | null);
     status?: TaskStatus;
     type?: TaskType;
+    priority?: TaskPriority;
     responsible_user_id?: (string | null);
     release?: (string | null);
     visibility?: TaskVisibility;
@@ -3131,6 +3136,7 @@ export type TaskDetailPublic = {
     detail?: (string | null);
     status: TaskStatus;
     type: TaskType;
+    priority?: TaskPriority;
     responsible_user_id?: (string | null);
     responsible_name?: (string | null);
     responsible_email?: (string | null);
@@ -3147,12 +3153,15 @@ export type TaskDetailPublic = {
 
 export type TaskMediaType = 'image' | 'video';
 
+export type TaskPriority = 'low' | 'medium' | 'high';
+
 export type TaskPublic = {
     id: string;
     title: string;
     detail?: (string | null);
     status: TaskStatus;
     type: TaskType;
+    priority?: TaskPriority;
     responsible_user_id?: (string | null);
     responsible_name?: (string | null);
     responsible_email?: (string | null);
@@ -3182,6 +3191,7 @@ export type TaskUpdate = {
     detail?: (string | null);
     status?: (TaskStatus | null);
     type?: (TaskType | null);
+    priority?: (TaskPriority | null);
     responsible_user_id?: (string | null);
     release?: (string | null);
     visibility?: (TaskVisibility | null);
