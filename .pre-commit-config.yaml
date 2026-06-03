@@ -51,10 +51,3 @@ repos:
         require_serial: true
         language: python
         types: [python]
-
-      - id: generate-sdk
-        name: Generate SDK
-        entry: bash ./scripts/generate-client.sh
-        pass_filenames: false
-        language: system
-        files: ^backend/.*$|^scripts/generate-client\.sh$
