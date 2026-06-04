@@ -13,6 +13,7 @@ from datetime import UTC, datetime
 
 from fastapi import APIRouter, HTTPException, Query, status
 
+from app.api.shared.enums import UserRole
 from app.api.shared.response import (
     ListModel,
     PaginationLimit,
@@ -60,7 +61,6 @@ def _validate_responsible(
     """Tasks may only be assigned to a superadmin (phase 1 policy)."""
     if responsible_user_id is None:
         return
-    from app.api.shared.enums import UserRole
     from app.api.user.models import Users
 
     user = db.get(Users, responsible_user_id)
@@ -74,6 +74,16 @@ def _validate_responsible(
 def _get_task_or_404(db: SessionDep, task_id: uuid.UUID) -> Task:
     task = crud.tasks_crud.get(db, task_id)
     if not task:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Task not found"
+        )
+    return task
+
+
+def _get_viewable_task_or_404(db: SessionDep, task_id: uuid.UUID, user) -> Task:
+    """Like _get_task_or_404 but 404s when the user can't view it (no info leak)."""
+    task = _get_task_or_404(db, task_id)
+    if not crud.can_view_task(user, task):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Task not found"
         )
@@ -95,16 +105,26 @@ async def report_bug(
 ) -> TaskPublic:
     """File a bug report (any authenticated backoffice user).
 
-    Always creates an internal bug in the to-do column, attributed to the
-    reporter. Optional attachments are screenshots / screen-recordings already
-    uploaded to S3 via POST /uploads/presigned-url.
+    Creates a to-do bug attributed to the reporter, scoped to the reporter's
+    tenant (``visibility='tenant'``) so that tenant's users can see it. A
+    superadmin reporter (no tenant) falls back to an ``internal`` bug. Optional
+    attachments are screenshots / screen-recordings already uploaded to S3 via
+    POST /uploads/presigned-url.
     """
+    if current_user.tenant_id is not None:
+        visibility = TaskVisibility.TENANT.value
+        target_tenant_id = current_user.tenant_id
+    else:
+        visibility = TaskVisibility.INTERNAL.value
+        target_tenant_id = None
+
     task = Task(
         title=report_in.title,
         detail=report_in.detail,
         status=TaskStatus.TO_DO.value,
         type=TaskType.BUG.value,
-        visibility=TaskVisibility.INTERNAL.value,
+        visibility=visibility,
+        target_tenant_id=target_tenant_id,
         created_by=current_user.id,
     )
     db.add(task)
@@ -131,7 +151,7 @@ async def report_bug(
 @router.get("", response_model=ListModel[TaskPublic])
 async def list_tasks(
     db: SessionDep,
-    _: CurrentSuperadmin,
+    current_user: CurrentUser,
     task_status: TaskStatus | None = Query(default=None, alias="status"),
     task_type: TaskType | None = Query(default=None, alias="type"),
     visibility: TaskVisibility | None = None,
@@ -141,7 +161,7 @@ async def list_tasks(
     skip: PaginationSkip = 0,
     limit: PaginationLimit = 100,
 ) -> ListModel[TaskPublic]:
-    """List tasks with optional filters (superadmin only)."""
+    """List tasks the current user may see (filtered by visibility)."""
     tasks, total = crud.tasks_crud.find_tasks(
         db,
         skip=skip,
@@ -152,6 +172,7 @@ async def list_tasks(
         responsible_user_id=responsible_user_id,
         release=release,
         search=search,
+        viewer=current_user,
     )
     return ListModel[TaskPublic](
         results=crud.to_public_list(db, tasks),
@@ -187,10 +208,10 @@ async def create_task(
 async def get_task(
     task_id: uuid.UUID,
     db: SessionDep,
-    _: CurrentSuperadmin,
+    current_user: CurrentUser,
 ) -> TaskDetailPublic:
-    """Get a single task with its attachments (superadmin only)."""
-    task = _get_task_or_404(db, task_id)
+    """Get a single task with its attachments (visible to the user)."""
+    task = _get_viewable_task_or_404(db, task_id, current_user)
     return crud.to_detail(db, task)
 
 
@@ -318,10 +339,10 @@ async def delete_attachment(
 async def list_task_comments(
     task_id: uuid.UUID,
     db: SessionDep,
-    _: CurrentSuperadmin,
+    current_user: CurrentUser,
 ) -> ListModel[TaskCommentPublic]:
-    """List a task's comments, oldest first (superadmin only)."""
-    _get_task_or_404(db, task_id)
+    """List a task's comments, oldest first (any user who can view the task)."""
+    _get_viewable_task_or_404(db, task_id, current_user)
     comments = crud.list_comments(db, task_id)
     return ListModel[TaskCommentPublic](
         results=[TaskCommentPublic.model_validate(c) for c in comments],
@@ -338,10 +359,10 @@ async def create_task_comment(
     task_id: uuid.UUID,
     comment_in: TaskCommentCreate,
     db: SessionDep,
-    current_user: CurrentSuperadmin,
+    current_user: CurrentUser,
 ) -> TaskCommentPublic:
-    """Add a comment to a task (superadmin only)."""
-    _get_task_or_404(db, task_id)
+    """Add a comment to a task (any user who can view the task)."""
+    _get_viewable_task_or_404(db, task_id, current_user)
     comment = TaskComment(
         task_id=task_id,
         author_user_id=current_user.id,
@@ -361,9 +382,10 @@ async def update_task_comment(
     comment_id: uuid.UUID,
     comment_in: TaskCommentUpdate,
     db: SessionDep,
-    current_user: CurrentSuperadmin,
+    current_user: CurrentUser,
 ) -> TaskCommentPublic:
-    """Edit your own comment (superadmin only)."""
+    """Edit your own comment (any user who can view the task)."""
+    _get_viewable_task_or_404(db, task_id, current_user)
     comment = db.get(TaskComment, comment_id)
     if not comment or comment.task_id != task_id or comment.deleted_at is not None:
         raise HTTPException(
@@ -390,13 +412,22 @@ async def delete_task_comment(
     task_id: uuid.UUID,
     comment_id: uuid.UUID,
     db: SessionDep,
-    _: CurrentSuperadmin,
+    current_user: CurrentUser,
 ) -> None:
-    """Soft-delete a comment (superadmin only). The row is preserved."""
+    """Soft-delete a comment: the author, or any superadmin. Row is preserved."""
+    _get_viewable_task_or_404(db, task_id, current_user)
     comment = db.get(TaskComment, comment_id)
     if not comment or comment.task_id != task_id or comment.deleted_at is not None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Comment not found"
+        )
+    if (
+        current_user.role != UserRole.SUPERADMIN
+        and comment.author_user_id != current_user.id
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can only delete your own comments",
         )
     comment.deleted_at = datetime.now(UTC)
     db.add(comment)

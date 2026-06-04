@@ -1,4 +1,9 @@
-import type { TaskStatus, TaskType, TaskVisibility } from "@/client"
+import type {
+  TaskPriority,
+  TaskStatus,
+  TaskType,
+  TaskVisibility,
+} from "@/client"
 
 /** Kanban column order, left → right. */
 export const TASK_STATUSES: TaskStatus[] = [
@@ -39,6 +44,21 @@ export const TYPE_LABELS: Record<TaskType, string> = {
 export const TYPE_CLASSES: Record<TaskType, string> = {
   bug: "bg-rose-100 text-rose-700 border-rose-200",
   feature: "bg-violet-100 text-violet-700 border-violet-200",
+}
+
+/** Priority order, low → high. */
+export const TASK_PRIORITIES: TaskPriority[] = ["low", "medium", "high"]
+
+export const PRIORITY_LABELS: Record<TaskPriority, string> = {
+  low: "Low",
+  medium: "Medium",
+  high: "High",
+}
+
+export const PRIORITY_CLASSES: Record<TaskPriority, string> = {
+  low: "bg-slate-100 text-slate-600 border-slate-200",
+  medium: "bg-sky-100 text-sky-700 border-sky-200",
+  high: "bg-orange-100 text-orange-800 border-orange-200",
 }
 
 export const TASK_VISIBILITIES: TaskVisibility[] = [

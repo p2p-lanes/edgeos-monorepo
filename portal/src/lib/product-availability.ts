@@ -29,9 +29,9 @@ export interface ProductAvailability {
  */
 export function getProductAvailability(
   product: AvailabilityProduct,
-  today?: string,
+  now?: Date,
 ): ProductAvailability {
-  const state = deriveProductState(product, today)
+  const state = deriveProductState(product, now)
   const canSelect = state === "on_sale"
   const maxAllowedQuantity = canSelect ? resolveMaxQuantity(product) : 0
   return { state, canSelect, maxAllowedQuantity }

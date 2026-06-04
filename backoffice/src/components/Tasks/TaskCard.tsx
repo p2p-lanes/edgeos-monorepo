@@ -9,11 +9,17 @@ import { TYPE_CLASSES, TYPE_LABELS } from "./taskMeta"
 interface TaskCardProps {
   task: TaskPublic
   onOpen: (taskId: string) => void
+  /** When false the card can be opened but not dragged between columns. */
+  draggable?: boolean
 }
 
-export function TaskCard({ task, onOpen }: TaskCardProps) {
+export function TaskCard({ task, onOpen, draggable = true }: TaskCardProps) {
   const { attributes, listeners, setNodeRef, transform, isDragging } =
-    useDraggable({ id: task.id, data: { status: task.status } })
+    useDraggable({
+      id: task.id,
+      data: { status: task.status },
+      disabled: !draggable,
+    })
 
   return (
     <button
@@ -24,7 +30,8 @@ export function TaskCard({ task, onOpen }: TaskCardProps) {
       {...attributes}
       onClick={() => onOpen(task.id)}
       className={cn(
-        "w-full cursor-grab rounded-lg border bg-card p-3 text-left shadow-sm transition-shadow hover:shadow-md active:cursor-grabbing",
+        "w-full rounded-lg border bg-card p-3 text-left shadow-sm transition-shadow hover:shadow-md",
+        draggable && "cursor-grab active:cursor-grabbing",
         isDragging && "opacity-50",
       )}
     >

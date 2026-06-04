@@ -1,7 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { Copy, Trash2 } from "lucide-react"
 import { useEffect, useState } from "react"
 
 import {
+  type TaskPriority,
   type TaskStatus,
   TasksService,
   type TaskType,
@@ -9,7 +11,6 @@ import {
   TenantsService,
   UsersService,
 } from "@/client"
-import { DangerZone } from "@/components/Common/DangerZone"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -31,12 +32,16 @@ import {
 } from "@/components/ui/select"
 import { Separator } from "@/components/ui/separator"
 import { Textarea } from "@/components/ui/textarea"
+import { useWorkspace } from "@/contexts/WorkspaceContext"
+import useAuth from "@/hooks/useAuth"
 import useCustomToast from "@/hooks/useCustomToast"
 import { createErrorHandler } from "@/utils"
 import { TaskAttachments } from "./TaskAttachments"
 import { TaskCommentThread } from "./TaskCommentThread"
 import {
+  PRIORITY_LABELS,
   STATUS_LABELS,
+  TASK_PRIORITIES,
   TASK_STATUSES,
   TASK_TYPES,
   TASK_VISIBILITIES,
@@ -57,6 +62,7 @@ interface FormState {
   title: string
   detail: string
   type: TaskType
+  priority: TaskPriority
   status: TaskStatus
   visibility: TaskVisibility
   target_tenant_id: string
@@ -68,6 +74,7 @@ const DEFAULTS: FormState = {
   title: "",
   detail: "",
   type: "feature",
+  priority: "medium",
   status: "to_do",
   visibility: "internal",
   target_tenant_id: "",
@@ -79,6 +86,10 @@ export function TaskDialog({ open, onOpenChange, taskId }: TaskDialogProps) {
   const isEdit = !!taskId
   const queryClient = useQueryClient()
   const { showSuccessToast, showErrorToast } = useCustomToast()
+  const { isSuperadmin } = useAuth()
+  const { selectedTenantId } = useWorkspace()
+  // Non-superadmins can view + comment, but not edit the task fields.
+  const readOnly = !isSuperadmin
   const [form, setForm] = useState<FormState>(DEFAULTS)
 
   const { data: task } = useQuery({
@@ -87,17 +98,18 @@ export function TaskDialog({ open, onOpenChange, taskId }: TaskDialogProps) {
     enabled: open && isEdit,
   })
 
-  // Tasks may only be assigned to superadmins (phase 1 policy).
+  // Editing affordances (assignee picker, tenant picker) are superadmin-only;
+  // skip these lookups for read-only viewers (who also lack the permission).
   const { data: usersData } = useQuery({
     queryKey: ["tasks-superadmins"],
     queryFn: () => UsersService.listUsers({ limit: 1000, role: "superadmin" }),
-    enabled: open,
+    enabled: open && isSuperadmin,
   })
 
   const { data: tenantsData } = useQuery({
     queryKey: ["tasks-tenants"],
     queryFn: () => TenantsService.listTenants({ limit: 1000 }),
-    enabled: open && form.visibility === "tenant",
+    enabled: open && isSuperadmin && form.visibility === "tenant",
   })
 
   // Reset the form whenever the dialog opens or the loaded task changes.
@@ -108,6 +120,7 @@ export function TaskDialog({ open, onOpenChange, taskId }: TaskDialogProps) {
         title: task.title,
         detail: task.detail ?? "",
         type: task.type,
+        priority: task.priority ?? "medium",
         status: task.status,
         visibility: task.visibility,
         target_tenant_id: task.target_tenant_id ?? "",
@@ -126,6 +139,7 @@ export function TaskDialog({ open, onOpenChange, taskId }: TaskDialogProps) {
     title: form.title.trim(),
     detail: form.detail.trim() || null,
     type: form.type,
+    priority: form.priority,
     status: form.status,
     visibility: form.visibility,
     target_tenant_id:
@@ -169,6 +183,13 @@ export function TaskDialog({ open, onOpenChange, taskId }: TaskDialogProps) {
     onError: createErrorHandler(showErrorToast),
   })
 
+  const copyLink = () => {
+    navigator.clipboard.writeText(
+      `${window.location.origin}/tasks?task=${taskId}`,
+    )
+    showSuccessToast("Link copied to clipboard")
+  }
+
   const handleSave = () => {
     if (!form.title.trim()) {
       showErrorToast("Title is required")
@@ -190,10 +211,26 @@ export function TaskDialog({ open, onOpenChange, taskId }: TaskDialogProps) {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="thin-scrollbar max-h-[90vh] max-w-2xl overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{isEdit ? "Edit task" : "New task"}</DialogTitle>
+          <DialogTitle className="flex items-center gap-2">
+            {isEdit ? (readOnly ? "Task" : "Edit task") : "New task"}
+            {isEdit && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6 text-muted-foreground"
+                title="Copy link to this task"
+                onClick={copyLink}
+              >
+                <Copy className="h-3.5 w-3.5" />
+              </Button>
+            )}
+          </DialogTitle>
           <DialogDescription>
             {isEdit
-              ? "Update the task, manage attachments and discuss it below."
+              ? readOnly
+                ? "View this task and discuss it below."
+                : "Update the task, manage attachments and discuss it below."
               : "Track a bug or feature for the EdgeOS product."}
           </DialogDescription>
         </DialogHeader>
@@ -216,6 +253,7 @@ export function TaskDialog({ open, onOpenChange, taskId }: TaskDialogProps) {
               value={form.title}
               onChange={(e) => set("title", e.target.value)}
               placeholder="Short, specific summary"
+              disabled={readOnly}
             />
           </div>
 
@@ -227,6 +265,7 @@ export function TaskDialog({ open, onOpenChange, taskId }: TaskDialogProps) {
               value={form.detail}
               onChange={(e) => set("detail", e.target.value)}
               placeholder="What's the change / problem? Add context, steps, links."
+              disabled={readOnly}
             />
           </div>
 
@@ -236,6 +275,7 @@ export function TaskDialog({ open, onOpenChange, taskId }: TaskDialogProps) {
               <Select
                 value={form.type}
                 onValueChange={(v) => set("type", v as TaskType)}
+                disabled={readOnly}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -251,10 +291,31 @@ export function TaskDialog({ open, onOpenChange, taskId }: TaskDialogProps) {
             </div>
 
             <div className="space-y-2">
+              <Label>Priority</Label>
+              <Select
+                value={form.priority}
+                onValueChange={(v) => set("priority", v as TaskPriority)}
+                disabled={readOnly}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {TASK_PRIORITIES.map((p) => (
+                    <SelectItem key={p} value={p}>
+                      {PRIORITY_LABELS[p]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
               <Label>Status</Label>
               <Select
                 value={form.status}
                 onValueChange={(v) => set("status", v as TaskStatus)}
+                disabled={readOnly}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -276,6 +337,7 @@ export function TaskDialog({ open, onOpenChange, taskId }: TaskDialogProps) {
                 onValueChange={(v) =>
                   set("responsible_user_id", v === NONE ? "" : v)
                 }
+                disabled={readOnly}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Unassigned" />
@@ -298,6 +360,7 @@ export function TaskDialog({ open, onOpenChange, taskId }: TaskDialogProps) {
                 value={form.release}
                 onChange={(e) => set("release", e.target.value)}
                 placeholder="e.g. v1.2.0"
+                disabled={readOnly}
               />
             </div>
 
@@ -305,7 +368,21 @@ export function TaskDialog({ open, onOpenChange, taskId }: TaskDialogProps) {
               <Label>Visibility</Label>
               <Select
                 value={form.visibility}
-                onValueChange={(v) => set("visibility", v as TaskVisibility)}
+                onValueChange={(v) => {
+                  const vis = v as TaskVisibility
+                  // Default the target tenant to the one being worked in.
+                  setForm((prev) => ({
+                    ...prev,
+                    visibility: vis,
+                    target_tenant_id:
+                      vis === "tenant" &&
+                      !prev.target_tenant_id &&
+                      selectedTenantId
+                        ? selectedTenantId
+                        : prev.target_tenant_id,
+                  }))
+                }}
+                disabled={readOnly}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -328,6 +405,7 @@ export function TaskDialog({ open, onOpenChange, taskId }: TaskDialogProps) {
                   onValueChange={(v) =>
                     set("target_tenant_id", v === NONE ? "" : v)
                   }
+                  disabled={readOnly}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select a tenant" />
@@ -347,32 +425,43 @@ export function TaskDialog({ open, onOpenChange, taskId }: TaskDialogProps) {
 
         {isEdit && task && (
           <>
-            <Separator />
-            <TaskAttachments
-              taskId={task.id}
-              attachments={task.attachments ?? []}
-            />
+            {!readOnly && (
+              <>
+                <Separator />
+                <TaskAttachments
+                  taskId={task.id}
+                  attachments={task.attachments ?? []}
+                />
+              </>
+            )}
             <Separator />
             <TaskCommentThread taskId={task.id} />
-            <Separator />
-            <DangerZone
-              description="Permanently delete this task, its comments and attachments. To retire a task instead, set its status to Cancelled."
-              onDelete={() => deleteMutation.mutate()}
-              isDeleting={deleteMutation.isPending}
-              confirmText="Delete Task"
-              resourceName={task.title}
-              variant="inline"
-            />
           </>
         )}
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
-          </Button>
-          <LoadingButton loading={isPending} onClick={handleSave}>
-            {isEdit ? "Save changes" : "Create task"}
-          </LoadingButton>
+        <DialogFooter className="sm:justify-between">
+          {isEdit && !readOnly ? (
+            <LoadingButton
+              variant="destructive"
+              loading={deleteMutation.isPending}
+              onClick={() => deleteMutation.mutate()}
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              Delete
+            </LoadingButton>
+          ) : (
+            <span />
+          )}
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => onOpenChange(false)}>
+              {readOnly ? "Close" : "Cancel"}
+            </Button>
+            {!readOnly && (
+              <LoadingButton loading={isPending} onClick={handleSave}>
+                {isEdit ? "Save changes" : "Create task"}
+              </LoadingButton>
+            )}
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>
