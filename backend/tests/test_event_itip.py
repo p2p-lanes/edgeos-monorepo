@@ -320,6 +320,27 @@ class TestBuildEventIcs:
         assert "RECURRENCE-ID:" not in invite
         assert "RECURRENCE-ID:" not in update
 
+    def test_add_to_calendar_export_uid_matches_itip_uid(self) -> None:
+        """The "Add to calendar" .ics download and the emailed invite/cancel
+        must share the SAME UID. Calendars key entries on UID, so a mismatch
+        leaves the user with two separate entries for one event — and an
+        organiser CANCEL (which targets the iTIP UID) only removes the invited
+        copy, stranding the downloaded one. That divergence is what made
+        cancellations fail to "stick" on external calendars.
+        """
+        from app.api.event.router import _render_ics
+
+        start = datetime(2026, 5, 5, 14, 0, tzinfo=UTC)
+        event = self._minimal_event(start=start, end=start + timedelta(hours=1))
+
+        download = _render_ics(event)
+        itip = build_event_ics(event, recipient_email="alice@example.com")
+
+        assert f"UID:{event.id}@edgeos" in download
+        assert f"UID:{event.id}@edgeos" in itip
+        # Guard against the old, divergent ``event-``-prefixed UID.
+        assert f"UID:event-{event.id}@edgeos" not in download
+
     def test_recurring_rsvp_uses_recurrence_id(self) -> None:
         """When a participant RSVPs to one instance of a recurring series,
         the per-recipient ICS must keep the master UID and add a
