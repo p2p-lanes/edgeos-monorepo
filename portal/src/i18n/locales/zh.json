@@ -487,7 +487,7 @@
     "list": {
       "heading": "活动",
       "subheading": "{{cityName}} 即将举行的活动",
-      "subheading_with_tz": "{{cityName}} 即将举行的活动 — 时间显示为 {{timezone}}",
+      "subheading_with_tz": "{{cityName}} 即将举行的活动，时间显示为 {{timezone}}",
       "empty_state": "暂无活动",
       "events_disabled_heading": "活动已停用",
       "events_disabled_message": "组织者已关闭 {{cityName}} 的活动功能。",
@@ -587,7 +587,7 @@
       "page_title": "{{popupName}} - 日历",
       "page_title_fallback": "日历",
       "subheading": "{{popupName}} 的即将到来的活动",
-      "subheading_with_tz": "{{popupName}} 的即将到来的活动 — 时间显示为 {{timezone}}"
+      "subheading_with_tz": "{{popupName}} 的即将到来的活动，时间显示为 {{timezone}}"
     },
     "detail": {
       "event_not_found": "未找到活动",
@@ -635,10 +635,10 @@
     "form": {
       "create_heading": "创建活动",
       "create_subheading": "{{cityName}} 的新活动",
-      "create_subheading_with_tz": "{{cityName}} 的新活动 — 时间为 {{timezone}}",
+      "create_subheading_with_tz": "{{cityName}} 的新活动，时间为 {{timezone}}",
       "edit_heading": "编辑活动",
       "edit_subheading": "更新你在 {{cityName}} 的活动",
-      "edit_subheading_with_tz": "更新你在 {{cityName}} 的活动 — 时间为 {{timezone}}",
+      "edit_subheading_with_tz": "更新你在 {{cityName}} 的活动，时间为 {{timezone}}",
       "venue_label": "场地",
       "venue_placeholder": "无场地",
       "venue_not_bookable": "此场地不可预订。",
@@ -646,7 +646,7 @@
       "venue_setup_teardown": "开始前锁定 {{setupTime}} 分钟,结束后锁定 {{teardownTime}} 分钟用于布置/撤场。",
       "venue_closed_warning": "所选日期为场地不营业的日期。",
       "view_pictures_button": "查看图片",
-      "venue_pictures_heading": "{{venue}} — 图片",
+      "venue_pictures_heading": "{{venue}}：图片",
       "no_venue_pictures": "此场地尚未上传图片。",
       "title_label": "标题",
       "title_placeholder": "活动名称",
@@ -759,7 +759,7 @@
         "venue_not_available": "无法创建场地",
         "venue_not_available_message": "组织者尚未为 {{cityName}} 开启场地创建功能。",
         "back_to_venues": "返回场地列表",
-        "venue_submitted_success": "场地已提交 — 等待管理员审核",
+        "venue_submitted_success": "场地已提交，等待管理员审核",
         "venue_created_success": "场地已创建",
         "no_popup_error": "无 popup",
         "failed_to_create": "创建场地失败",
