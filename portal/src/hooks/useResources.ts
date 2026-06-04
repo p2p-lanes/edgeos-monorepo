@@ -1,4 +1,11 @@
-import { CalendarDays, FileText, MapPin, Ticket, Users } from "lucide-react"
+import {
+  CalendarDays,
+  FileText,
+  Layers,
+  MapPin,
+  Ticket,
+  Users,
+} from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { OpenClaw } from "@/components/Icons/OpenClaw"
 import useAuth from "@/hooks/useAuth"
@@ -79,6 +86,12 @@ const useResources = () => {
         path: `/portal/${city?.slug}/events`,
         children: [
           {
+            name: t("sidebar.tracks", { defaultValue: "Tracks" }),
+            icon: Layers,
+            status: companionEventsVisible ? "active" : "hidden",
+            path: `/portal/${city?.slug}/events/tracks`,
+          },
+          {
             name: t("sidebar.venues"),
             icon: MapPin,
             status: companionEventsVisible ? "active" : "hidden",
@@ -131,6 +144,12 @@ const useResources = () => {
       status: canSeeAttendees && eventsEnabled ? "active" : "hidden",
       path: `/portal/${city?.slug}/events`,
       children: [
+        {
+          name: t("sidebar.tracks", { defaultValue: "Tracks" }),
+          icon: Layers,
+          status: canSeeAttendees && eventsEnabled ? "active" : "hidden",
+          path: `/portal/${city?.slug}/events/tracks`,
+        },
         {
           name: t("sidebar.venues"),
           icon: MapPin,

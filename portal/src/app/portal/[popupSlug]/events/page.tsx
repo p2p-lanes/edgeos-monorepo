@@ -18,7 +18,6 @@ import {
   type EventPublic,
   EventsService,
   HumansService,
-  TracksService,
 } from "@/client"
 import { Button } from "@/components/ui/button"
 import { useCityProvider } from "@/providers/cityProvider"
@@ -39,6 +38,7 @@ import {
   usePortalEventSettings,
 } from "./lib/useEventTimezone"
 import { usePopupTags } from "./lib/usePopupTags"
+import { usePopupTracks } from "./lib/usePopupTracks"
 
 // useLayoutEffect on the client, useEffect on the server. Lets us restore
 // scroll synchronously before the browser paints (no flash of "first event"
@@ -139,10 +139,39 @@ export default function EventsPage() {
   const [selectedTags, setSelectedTags] = useState<string[]>(
     () => restoredFilters?.selectedTags ?? [],
   )
-  const [selectedTrackIds, setSelectedTrackIds] = useState<string[]>(
-    () => restoredFilters?.selectedTrackIds ?? [],
-  )
+  // The track filter is mirrored in the URL (`?tracks=id1,id2`) so a
+  // track-filtered calendar is shareable: the Tracks section links here
+  // with the param set, and toggling tracks keeps it in sync (see the
+  // effect below). On first render we seed from the URL — falling back to
+  // `window.location.search` if the router hook lags — and only then from
+  // the sessionStorage snapshot restored after an event-detail round-trip.
+  const [selectedTrackIds, setSelectedTrackIds] = useState<string[]>(() => {
+    let raw = searchParams.get("tracks")
+    if (raw == null && typeof window !== "undefined") {
+      raw = new URLSearchParams(window.location.search).get("tracks")
+    }
+    if (raw != null) return raw.split(",").filter(Boolean)
+    return restoredFilters?.selectedTrackIds ?? []
+  })
   const queryClient = useQueryClient()
+
+  // Keep `?tracks=` in lockstep with the filter state. Runs when the user
+  // toggles tracks in the toolbar (publish to URL → shareable) and when
+  // the filter is restored from sessionStorage after returning from a
+  // detail page (the back link only round-trips view/date, so we
+  // re-publish the tracks here). Bases the param edit off the live URL so
+  // it composes with the view/date/focus params other effects manage.
+  useEffect(() => {
+    const current = searchParams.get("tracks")
+    const desired = selectedTrackIds.length ? selectedTrackIds.join(",") : null
+    if ((current ?? null) === desired) return
+    if (typeof window === "undefined") return
+    const params = new URLSearchParams(window.location.search)
+    if (desired) params.set("tracks", desired)
+    else params.delete("tracks")
+    const qs = params.toString()
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false })
+  }, [selectedTrackIds, searchParams, router, pathname])
 
   // The view tab and the day-view/calendar-view selected day are both
   // persisted in the URL. `view` and `selectedDate` are derived from
@@ -293,14 +322,10 @@ export default function EventsPage() {
   // stay browsable so users can review what's already published.
   const creationEnabled = eventSettings?.event_enabled ?? true
 
-  const { data: tracksData } = useQuery({
-    queryKey: ["portal-tracks", city?.id],
-    queryFn: () =>
-      TracksService.listPortalTracks({ popupId: city!.id, limit: 200 }),
-    enabled: !!city?.id,
-    staleTime: 5 * 60 * 1000,
-  })
-  const allowedTracks = tracksData?.results ?? []
+  // Only surface tracks that actually have events in the window — the
+  // curated track list often contains tracks no published event uses yet,
+  // and those would resolve to an empty calendar if shown in the filter.
+  const { tracksWithEvents: allowedTracks } = usePopupTracks(city?.id)
 
   // Expansion window for recurring events. Passing start_after triggers the
   // backend to expand RRULEs into concrete occurrences; without it, recurring
