@@ -24,6 +24,7 @@ from app.api import (
     form_section,
     group,
     human,
+    invite,
     payment,
     popup,
     popup_reviewer,
@@ -60,6 +61,7 @@ api_router.include_router(attendee_category.router)
 api_router.include_router(product.router)
 api_router.include_router(coupon.router)
 api_router.include_router(group.router)
+api_router.include_router(invite.router)
 api_router.include_router(form_section.router)
 api_router.include_router(form_field.router)
 api_router.include_router(email_template.router)
