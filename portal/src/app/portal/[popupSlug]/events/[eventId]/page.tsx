@@ -228,6 +228,14 @@ export default function EventDetailPage() {
   const myRsvpStatus = event?.my_rsvp_status ?? null
   const isRsvped = !!myRsvpStatus && myRsvpStatus !== "cancelled"
 
+  // Capacity is enforced server-side against every active registration,
+  // including attendees who hid their name (and are therefore absent from
+  // the roster above). Prefer the backend count so the badge and the "full"
+  // state stay consistent with what registration actually allows.
+  const goingCount = event?.attendee_count ?? activeParticipants.length
+  const isFull =
+    event?.max_participant != null && goingCount >= event.max_participant
+
   // Recurring events require occurrence_start so the RSVP targets a single
   // instance; one-off events must not send it (the backend rejects mixing
   // the two semantics). Prefer the ?occ= param (set when the user came from
@@ -656,6 +664,15 @@ export default function EventDetailPage() {
                   </Button>
                 )}
               </>
+            ) : isFull ? (
+              <Button
+                disabled
+                variant="secondary"
+                className="inline-flex items-center gap-2"
+              >
+                <Users className="h-4 w-4" />
+                {t("events.rsvp.full")}
+              </Button>
             ) : (
               <Button
                 onClick={() => registerMutation.mutate()}
@@ -998,7 +1015,7 @@ export default function EventDetailPage() {
             {t("events.detail.participants_heading")}
           </h3>
           <span className="text-sm text-muted-foreground">
-            {activeParticipants.length}
+            {goingCount}
             {event.max_participant ? ` / ${event.max_participant}` : ""}
           </span>
         </div>

@@ -584,6 +584,7 @@
     "rsvp": {
       "going": "Going",
       "rsvp": "RSVP",
+      "full": "Full",
       "cancel": "Cancel RSVP",
       "check_in": "Check in",
       "check_in_opens_at_start": "Check-in opens at start time",
