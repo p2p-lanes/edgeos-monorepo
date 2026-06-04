@@ -40,6 +40,7 @@ class EventsCRUD(BaseCRUD[Events, EventCreate, EventUpdate]):
         tags: list[str] | None = None,
         search: str | None = None,
         visibility: EventVisibility | None = None,
+        exclude_visibility: list[EventVisibility] | None = None,
         exclude_statuses: list[EventStatus] | None = None,
         expand_occurrences: bool | None = None,
     ) -> tuple[list[Events], int]:
@@ -58,6 +59,10 @@ class EventsCRUD(BaseCRUD[Events, EventCreate, EventUpdate]):
             statement = statement.where(col(Events.status).not_in(exclude_statuses))
         if visibility is not None:
             statement = statement.where(Events.visibility == visibility)
+        if exclude_visibility:
+            statement = statement.where(
+                col(Events.visibility).not_in(exclude_visibility)
+            )
         if kind is not None:
             statement = statement.where(Events.kind == kind)
         if venue_id is not None:
