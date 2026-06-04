@@ -25,6 +25,7 @@ import { toast } from "sonner"
 
 import {
   ApiError,
+  type EventOpaque,
   EventParticipantsService,
   type EventPublic,
   EventsService,
@@ -117,7 +118,7 @@ interface VenueColumn {
 }
 
 interface PositionedEvent {
-  event: EventPublic
+  event: EventPublic | EventOpaque
   startMin: number
   endMin: number
   laneIndex: number
@@ -688,28 +689,51 @@ export function DayBody({
                         const widthPct = 100 / laneCount
                         const leftPct = laneIndex * widthPct
                         const isShort = endMin - startMin < 60
+                        const isOpaque =
+                          (event as EventOpaque).is_opaque === true
+                        if (isOpaque) {
+                          return (
+                            <div
+                              key={event.id}
+                              role="img"
+                              aria-label={t("events.opaque.busy_label")}
+                              className="absolute rounded-md border border-muted-foreground/20 bg-muted/60 p-1.5 overflow-hidden text-xs text-muted-foreground select-none cursor-not-allowed"
+                              style={{
+                                top: `${top}px`,
+                                height: `${height}px`,
+                                left: `calc(${leftPct}% + 2px)`,
+                                width: `calc(${widthPct}% - 4px)`,
+                              }}
+                            >
+                              <span className="font-medium truncate">
+                                {t("events.opaque.busy_label")}
+                              </span>
+                            </div>
+                          )
+                        }
+                        const fullEvent = event as EventPublic
                         const recurrenceLabel =
-                          summarizeRrule(event.rrule) ??
-                          (event.recurrence_master_id
+                          summarizeRrule(fullEvent.rrule) ??
+                          (fullEvent.recurrence_master_id
                             ? t("events.list.part_of_recurring_series")
                             : null)
                         const isRsvpd =
-                          !!event.my_rsvp_status &&
-                          event.my_rsvp_status !== "cancelled"
-                        const isHighlighted = event.highlighted === true
+                          !!fullEvent.my_rsvp_status &&
+                          fullEvent.my_rsvp_status !== "cancelled"
+                        const isHighlighted = fullEvent.highlighted === true
                         const isOwner =
                           currentHuman != null &&
-                          event.owner_id === currentHuman.id
+                          fullEvent.owner_id === currentHuman.id
                         return (
                           <Link
-                            key={event.id}
+                            key={fullEvent.id}
                             id={
-                              event.occurrence_id
-                                ? `event-card-${event.id}__${event.start_time}`
-                                : `event-card-${event.id}`
+                              fullEvent.occurrence_id
+                                ? `event-card-${fullEvent.id}__${fullEvent.start_time}`
+                                : `event-card-${fullEvent.id}`
                             }
-                            href={eventHref(event)}
-                            onClick={(e) => handleEventClick(event, e)}
+                            href={eventHref(fullEvent)}
+                            onClick={(e) => handleEventClick(fullEvent, e)}
                             className={cn(
                               "absolute rounded-md border transition-colors p-1.5 overflow-hidden text-xs",
                               isHighlighted
@@ -735,8 +759,8 @@ export function DayBody({
                                   aria-label={t("events.list.owned_title")}
                                 />
                               )}
-                              {!event.venue_id &&
-                                event.custom_location_name && (
+                              {!fullEvent.venue_id &&
+                                fullEvent.custom_location_name && (
                                   <Home
                                     className="h-3 w-3 shrink-0 text-muted-foreground"
                                     aria-hidden="true"
@@ -747,21 +771,21 @@ export function DayBody({
                                   isShort ? "truncate" : "line-clamp-2",
                                 )}
                               >
-                                {event.title}
+                                {fullEvent.title}
                               </span>
                             </div>
                             {!isShort &&
-                              !event.venue_id &&
-                              event.custom_location_name && (
+                              !fullEvent.venue_id &&
+                              fullEvent.custom_location_name && (
                                 <div className="text-[10px] text-muted-foreground/80 truncate">
-                                  {event.custom_location_name}
+                                  {fullEvent.custom_location_name}
                                 </div>
                               )}
                             <div className="flex items-center gap-1 text-[10px] text-muted-foreground mt-0.5">
                               <Clock className="h-2.5 w-2.5" />
                               <span className="truncate">
-                                {formatTime(event.start_time)} –{" "}
-                                {formatTime(event.end_time)}
+                                {formatTime(fullEvent.start_time)} –{" "}
+                                {formatTime(fullEvent.end_time)}
                               </span>
                             </div>
                             {!isShort && recurrenceLabel && (
@@ -772,19 +796,19 @@ export function DayBody({
                                 </span>
                               </div>
                             )}
-                            {!isShort && event.track_title && (
+                            {!isShort && fullEvent.track_title && (
                               <div className="flex items-center gap-1 text-[10px] font-medium text-violet-700 dark:text-violet-300 mt-0.5">
                                 <Layers className="h-2.5 w-2.5" />
                                 <span className="truncate">
-                                  {event.track_title}
+                                  {fullEvent.track_title}
                                 </span>
                               </div>
                             )}
                             {!isShort &&
-                              event.tags &&
-                              event.tags.length > 0 && (
+                              fullEvent.tags &&
+                              fullEvent.tags.length > 0 && (
                                 <div className="flex items-center gap-0.5 mt-1 flex-wrap">
-                                  {event.tags.slice(0, 2).map((tag) => (
+                                  {fullEvent.tags.slice(0, 2).map((tag) => (
                                     <span
                                       key={tag}
                                       className="inline-flex items-center gap-0.5 text-[9px] px-1 py-0.5 rounded border border-border bg-background/60 text-muted-foreground"
@@ -797,9 +821,9 @@ export function DayBody({
                               )}
                             {isAuthed &&
                               !isShort &&
-                              event.status === "published" &&
+                              fullEvent.status === "published" &&
                               (() => {
-                                const rsvpKey = `${event.id}:${event.start_time}`
+                                const rsvpKey = `${fullEvent.id}:${fullEvent.start_time}`
                                 const isRsvpPending = pendingRsvpKey === rsvpKey
                                 return (
                                   <div className="absolute bottom-1 right-1">
@@ -810,7 +834,7 @@ export function DayBody({
                                         onClick={(e) => {
                                           e.preventDefault()
                                           e.stopPropagation()
-                                          cancelRsvpMutation.mutate(event)
+                                          cancelRsvpMutation.mutate(fullEvent)
                                         }}
                                         className="inline-flex items-center gap-0.5 rounded border border-emerald-300 bg-emerald-50 px-1 py-0.5 text-[9px] font-medium text-emerald-700 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-emerald-500/40 dark:bg-emerald-950/40 dark:text-emerald-300 dark:hover:bg-emerald-950/60"
                                       >
@@ -828,7 +852,7 @@ export function DayBody({
                                         onClick={(e) => {
                                           e.preventDefault()
                                           e.stopPropagation()
-                                          rsvpMutation.mutate(event)
+                                          rsvpMutation.mutate(fullEvent)
                                         }}
                                         className="inline-flex items-center gap-0.5 rounded border bg-background px-1 py-0.5 text-[9px] font-medium hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
                                       >
@@ -947,23 +971,46 @@ export function DayBody({
                         const top = laneIndex * M_LANE_H + 2
                         const height = M_LANE_H - 4
                         const isShort = endMin - startMin < 60
+                        const isOpaqueM =
+                          (event as EventOpaque).is_opaque === true
+                        if (isOpaqueM) {
+                          return (
+                            <div
+                              key={event.id}
+                              role="img"
+                              aria-label={t("events.opaque.busy_label")}
+                              className="absolute rounded-md border border-muted-foreground/20 bg-muted/60 px-1.5 py-1 overflow-hidden text-[11px] text-muted-foreground select-none cursor-not-allowed"
+                              style={{
+                                left: `${left + 1}px`,
+                                width: `${width}px`,
+                                top: `${top}px`,
+                                height: `${height}px`,
+                              }}
+                            >
+                              <span className="font-medium truncate">
+                                {t("events.opaque.busy_label")}
+                              </span>
+                            </div>
+                          )
+                        }
+                        const mobileEvent = event as EventPublic
                         const isRsvpd =
-                          !!event.my_rsvp_status &&
-                          event.my_rsvp_status !== "cancelled"
-                        const isHighlighted = event.highlighted === true
+                          !!mobileEvent.my_rsvp_status &&
+                          mobileEvent.my_rsvp_status !== "cancelled"
+                        const isHighlighted = mobileEvent.highlighted === true
                         const isOwner =
                           currentHuman != null &&
-                          event.owner_id === currentHuman.id
+                          mobileEvent.owner_id === currentHuman.id
                         return (
                           <Link
-                            key={event.id}
+                            key={mobileEvent.id}
                             id={
-                              event.occurrence_id
-                                ? `event-card-${event.id}__${event.start_time}`
-                                : `event-card-${event.id}`
+                              mobileEvent.occurrence_id
+                                ? `event-card-${mobileEvent.id}__${mobileEvent.start_time}`
+                                : `event-card-${mobileEvent.id}`
                             }
-                            href={eventHref(event)}
-                            onClick={(e) => handleEventClick(event, e)}
+                            href={eventHref(mobileEvent)}
+                            onClick={(e) => handleEventClick(mobileEvent, e)}
                             className={cn(
                               "absolute rounded-md border transition-colors px-1.5 py-1 overflow-hidden",
                               isHighlighted
@@ -984,20 +1031,23 @@ export function DayBody({
                                   aria-hidden="true"
                                 />
                               )}
-                              {!event.venue_id &&
-                                event.custom_location_name && (
+                              {!mobileEvent.venue_id &&
+                                mobileEvent.custom_location_name && (
                                   <Home
                                     className="h-2.5 w-2.5 shrink-0 text-muted-foreground"
                                     aria-hidden="true"
                                   />
                                 )}
-                              <span className="truncate">{event.title}</span>
+                              <span className="truncate">
+                                {mobileEvent.title}
+                              </span>
                             </div>
                             <div className="flex items-center gap-1 text-[9px] text-muted-foreground mt-0.5">
                               <Clock className="h-2 w-2" />
                               <span className="truncate">
-                                {formatTime(event.start_time)}
-                                {!isShort && ` – ${formatTime(event.end_time)}`}
+                                {formatTime(mobileEvent.start_time)}
+                                {!isShort &&
+                                  ` – ${formatTime(mobileEvent.end_time)}`}
                               </span>
                               {isAuthed && isRsvpd && (
                                 <CheckCircle className="h-2.5 w-2.5 text-emerald-600 dark:text-emerald-400 ml-auto shrink-0" />
