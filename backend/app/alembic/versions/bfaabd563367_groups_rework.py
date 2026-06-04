@@ -2,7 +2,7 @@
 
 Adds new feature-flag columns to groups, popups, events, and applications.
 Creates the invites and referrals tables with RLS.
-Includes _backfill_legacy() to migrate ~16,913 EE26 rows into the new model.
+Includes _backfill_legacy() to migrate ~16,914 EE26 rows into the new model.
 
 EventVisibility enum unchanged — group-scoped privacy uses PRIVATE + group_id IS NOT NULL;
 no ALTER on the visibility column. The EventVisibility Python enum stays at exactly
@@ -11,28 +11,49 @@ no ALTER on the visibility column. The EventVisibility Python enum stays at exac
 Revision ID: bfaabd563367
 Revises: d4b1e7a9c2f5
 
---- Legacy data migration (PR-7) ---
+--- Legacy data migration (PR-7, revised) ---
 
 EE26 popup_id: 43746fd0-bce2-472b-93e4-a438177b2dff
+Validated against prod: 16,914 total groups.
 
-Three-bucket classification:
-  A. Bulk groups   — name ~* '^ee26-bulk-' AND max_members = 1
-                   → single-use Invite (max_uses=1). ~16,899 rows.
-  B. Masivos       — name ILIKE '%masivo%' AND max_members IS NULL
-                   → multi-use Invite (max_uses=NULL). ~9 rows.
-  C. Residencies   — max_members IS NOT NULL AND max_members > 1
-                     AND is_ambassador_group = false
-                     AND name NOT ILIKE '%masivo%'
-                   → mutate flags in place (auto_approve_applications=true,
-                     express_checkout=true). ~5 rows.
+Five-rule taxonomy (applied in PRIORITY ORDER — each rule is mutually exclusive):
 
-Idempotency: INSERT ... ON CONFLICT (legacy_migrated_from_group_id) DO NOTHING
+  1. REFERRAL  — is_ambassador_group = true
+                 → 1 row ("Bill Martin Invite List").
+                 → INSERT INTO referrals using ambassador_id as referrer_human_id.
+
+  2. INVITE (bulk) — is_ambassador_group = false
+                     AND name LIKE 'EE26 invite — %'  (em-dash U+2014)
+                     AND max_members = 10
+                 → 16,899 rows.
+                 → INSERT INTO invites with max_uses=10, batched 500/iter.
+
+  3. INVITE (named) — is_ambassador_group = false
+                      AND name NOT LIKE 'EE26 invite — %'
+                      AND (name ILIKE '%invite%' OR name ILIKE '%link%')
+                 → 6 rows (Dawn Invites, Direct Invites, Hanna Prelle Invites,
+                   Mariella Invites, Meditation Artifacts Link, Vibecode Invites).
+                 → INSERT INTO invites with max_uses=NULL.
+
+  4. GROUP (residency) — is_ambassador_group = false
+                         AND name NOT LIKE 'EE26 invite — %'
+                         AND name NOT ILIKE '%invite%'
+                         AND name NOT ILIKE '%link%'
+                         AND name ILIKE '%residency%'
+                 → 7 rows. STAY as groups — no conversion, no flag mutation.
+
+  5. GROUP (leftover) — everything else not matched above.
+                 → 1 row ("Supernuclear"). STAY as groups — no action.
+
+Totals: 1 referral + 16,905 invites + 8 groups left as-is = 16,914.
+
+Idempotency for invites: INSERT ... ON CONFLICT (legacy_migrated_from_group_id) DO NOTHING
 (partial unique index uq_invites_legacy_group_id created in schema block above).
+Idempotency for referrals: INSERT ... ON CONFLICT (popup_id, code) DO NOTHING.
 
-NOTE: Bucket A detection uses `max_members = 1` per design. The spec mentions
-max_members=10 which may reflect a different snapshot of the prod data. The
-slug regex pattern `name ~* '^ee26-bulk-'` is the definitive filter; confirm
-counts on staging before running on prod.
+NOTE: The prior implementation used `name ~* '^ee26-bulk-'` and `max_members=1` which
+matched 0 rows in prod. The corrected filter uses the literal em-dash separator and
+max_members=10, validated against prod snapshot (June 2026).
 """
 
 import uuid
@@ -51,18 +72,8 @@ from app.alembic.utils import (
 # EE26 popup constant — scoped to this migration only
 _EE26_POPUP_ID = "43746fd0-bce2-472b-93e4-a438177b2dff"
 
-# IMPORTANT: downgrade() needs to reverse Bucket C flags. These IDs are captured
-# at migration time via SELECT and stored below so downgrade can be deterministic.
-# In practice, downgrade on prod requires manual data cleanup; this reversal is
-# provided for CI correctness.
-_BUCKET_C_QUERY = """
-SELECT id FROM groups
-WHERE popup_id = :popup_id
-  AND max_members IS NOT NULL
-  AND max_members > 1
-  AND is_ambassador_group = false
-  AND name NOT ILIKE '%masivo%'
-"""
+# Em-dash literal used in the EE26 bulk invite name prefix (U+2014, NOT a hyphen).
+_EE26_INVITE_PREFIX = "EE26 invite — %"
 
 revision: str = "bfaabd563367"
 down_revision: str | Sequence[str] | None = "d4b1e7a9c2f5"
@@ -75,45 +86,124 @@ def _backfill_legacy(connection) -> None:  # noqa: ANN001
 
     Called at the end of upgrade(). Safe to call multiple times — all inserts
     use ON CONFLICT DO NOTHING (idempotent via the partial unique index
-    uq_invites_legacy_group_id WHERE legacy_migrated_from_group_id IS NOT NULL).
+    uq_invites_legacy_group_id on invites, and uq_referrals_popup_code on referrals).
 
-    Design: Migration Plan → _backfill_legacy helper (PR-7, T-gr-045).
-    Spec: REQ-GR-023 (three-bucket classification), REQ-GR-024 (idempotency).
+    Design: Migration Plan → _backfill_legacy helper (PR-7, T-gr-045, revised June 2026).
+    Spec: REQ-GR-023 (bucket classification), REQ-GR-024 (idempotency).
 
-    Bucket A — bulk single-use invites (~16,899 rows):
-      SELECT groups WHERE popup_id=EE26 AND name ~* '^ee26-bulk-' AND max_members=1
-      INSERT INTO invites with max_uses=1, token=group.slug, auto_approve=true,
-      express_checkout=true. If the group already has an application, set
-      used_at + redeemed_by_human_id + current_uses=1 and backfill
-      applications.invite_id.
+    Five-rule taxonomy applied in PRIORITY ORDER (mutually exclusive):
 
-    Bucket B — masivos multi-use invites (~9 rows):
-      SELECT groups WHERE popup_id=EE26 AND name ILIKE '%masivo%' AND max_members IS NULL
-      INSERT INTO invites with max_uses=NULL, current_uses=COUNT(applications).
+    Rule 1 — REFERRAL: is_ambassador_group = true (~1 row)
+      INSERT INTO referrals using ambassador_id as referrer_human_id.
+      Idempotent: ON CONFLICT (popup_id, code) DO NOTHING.
 
-    Bucket C — residencies in-place flag update (~5 rows):
-      UPDATE groups SET auto_approve_applications=true, express_checkout=true.
-      No row creation.
+    Rule 2 — INVITE bulk: is_ambassador_group = false
+                          AND name LIKE 'EE26 invite — %' (em-dash U+2014)
+                          AND max_members = 10  (~16,899 rows)
+      INSERT INTO invites with max_uses=10, token=group.slug, auto_approve=true,
+      express_checkout=true. Batched 500/iter for performance.
+      If the group has an existing application, set used_at + redeemed_by_human_id
+      + current_uses=1 and backfill applications.invite_id.
 
-    Each bucket runs in its own SAVEPOINT for partial-failure recovery.
-    Rows are inserted in batches of 500.
+    Rule 3 — INVITE named: is_ambassador_group = false
+                           AND name NOT LIKE 'EE26 invite — %'
+                           AND (name ILIKE '%invite%' OR name ILIKE '%link%')  (~6 rows)
+      INSERT INTO invites with max_uses=NULL (multi-use), current_uses=COUNT(applications).
+      Backfills all applications.invite_id for the group.
+
+    Rule 4 — GROUP residency: ... AND name ILIKE '%residency%'  (~7 rows)
+      STAY as groups — no conversion, no flag mutation.
+
+    Rule 5 — GROUP leftover: everything else (~1 row, "Supernuclear").
+      STAY as groups — no action.
+
+    Total expected: 1 referral + 16,905 invites + 8 groups = 16,914.
+
+    Each rule's data-write block runs in its own SAVEPOINT for partial-failure recovery.
+    The admin-user lookup (needed for invites.created_by) is done once before Rule 2.
+    If no admin user is found, Rules 2 and 3 are skipped gracefully (non-EE26 environment).
     """
     BATCH_SIZE = 500
 
-    # --- Bucket A: bulk → single-use invites ---
-    connection.execute(text("SAVEPOINT sp_bucket_a"))
+    # --- Rule 1: ambassador groups → referrals ---
+    connection.execute(text("SAVEPOINT sp_rule1_referral"))
     try:
-        bucket_a_rows = connection.execute(
+        referral_rows_r = connection.execute(
             text("""
                 SELECT
-                    g.id         AS group_id,
+                    g.id            AS group_id,
                     g.tenant_id,
                     g.popup_id,
-                    g.slug       AS token,
+                    g.slug          AS code,
                     g.discount_percentage,
-                    a.id         AS app_id,
-                    a.human_id   AS app_human_id,
-                    a.created_at AS app_created_at
+                    g.ambassador_id AS referrer_human_id
+                FROM groups g
+                WHERE g.popup_id = :popup_id
+                  AND g.is_ambassador_group = true
+            """),
+            {"popup_id": _EE26_POPUP_ID},
+        ).fetchall()
+
+        for row in referral_rows_r:
+            if row.referrer_human_id is None:
+                # Ambassador group without a linked human — cannot create referral row.
+                # Skip and leave as group (no-op for migration purposes).
+                continue
+            connection.execute(
+                text("""
+                    INSERT INTO referrals (
+                        id, tenant_id, popup_id, referrer_human_id, code,
+                        discount_percentage, auto_approve, max_uses, current_uses
+                    ) VALUES (
+                        :id, :tenant_id, :popup_id, :referrer_human_id, :code,
+                        :discount_percentage, false, NULL, 0
+                    )
+                    ON CONFLICT (popup_id, code) DO NOTHING
+                """),
+                {
+                    "id": str(uuid.uuid4()),
+                    "tenant_id": str(row.tenant_id),
+                    "popup_id": str(row.popup_id),
+                    "referrer_human_id": str(row.referrer_human_id),
+                    "code": row.code,
+                    "discount_percentage": row.discount_percentage,
+                },
+            )
+
+        connection.execute(text("RELEASE SAVEPOINT sp_rule1_referral"))
+
+    except Exception:
+        connection.execute(text("ROLLBACK TO SAVEPOINT sp_rule1_referral"))
+        raise
+
+    # Look up an admin user for created_by (needed by Rules 2 + 3).
+    # This is outside any SAVEPOINT so we read it once and reuse.
+    sys_created_by = connection.execute(
+        text("""
+            SELECT u.id FROM users u
+            JOIN tenants t ON t.id = u.tenant_id
+            JOIN popups p ON p.tenant_id = t.id
+            WHERE p.id = :popup_id
+              AND lower(u.role) IN ('admin', 'superadmin')
+            LIMIT 1
+        """),
+        {"popup_id": _EE26_POPUP_ID},
+    ).scalar()
+
+    # --- Rule 2: bulk invite groups → single-token multi-use invites (batched) ---
+    connection.execute(text("SAVEPOINT sp_rule2_bulk_invites"))
+    try:
+        bulk_rows = connection.execute(
+            text("""
+                SELECT
+                    g.id            AS group_id,
+                    g.tenant_id,
+                    g.popup_id,
+                    g.slug          AS token,
+                    g.discount_percentage,
+                    a.id            AS app_id,
+                    a.human_id      AS app_human_id,
+                    a.created_at    AS app_created_at
                 FROM groups g
                 LEFT JOIN LATERAL (
                     SELECT id, human_id, created_at
@@ -122,87 +212,67 @@ def _backfill_legacy(connection) -> None:  # noqa: ANN001
                     LIMIT 1
                 ) a ON true
                 WHERE g.popup_id = :popup_id
-                  AND g.name ~* '^ee26-bulk-'
-                  AND g.max_members = 1
+                  AND g.is_ambassador_group = false
+                  AND g.name LIKE :prefix
+                  AND g.max_members = 10
             """),
-            {"popup_id": _EE26_POPUP_ID},
+            {"popup_id": _EE26_POPUP_ID, "prefix": _EE26_INVITE_PREFIX},
         ).fetchall()
 
-        # We need a system user id for created_by. Query an admin user for this
-        # popup's tenant to use as migration author.
-        sys_created_by = connection.execute(
-            text("""
-                SELECT u.id FROM users u
-                JOIN tenants t ON t.id = u.tenant_id
-                JOIN popups p ON p.tenant_id = t.id
-                WHERE p.id = :popup_id
-                  AND lower(u.role) IN ('admin', 'superadmin')
-                LIMIT 1
-            """),
-            {"popup_id": _EE26_POPUP_ID},
-        ).scalar()
+        if bulk_rows and sys_created_by is not None:
+            for offset in range(0, len(bulk_rows), BATCH_SIZE):
+                batch = bulk_rows[offset : offset + BATCH_SIZE]
+                invite_rows = []
+                app_backfill_pairs = []
 
-        if sys_created_by is None:
-            # No admin user found — skip bucket A (dev/test environment without EE26)
-            connection.execute(text("RELEASE SAVEPOINT sp_bucket_a"))
-            return
+                for row in batch:
+                    new_invite_id = str(uuid.uuid4())
+                    invite_rows.append(
+                        {
+                            "id": new_invite_id,
+                            "tenant_id": str(row.tenant_id),
+                            "popup_id": str(row.popup_id),
+                            "token": row.token,
+                            "discount_percentage": row.discount_percentage,
+                            "auto_approve": True,
+                            "express_checkout": True,
+                            "max_uses": 10,
+                            "current_uses": 1 if row.app_id else 0,
+                            "used_at": row.app_created_at if row.app_id else None,
+                            "redeemed_by_human_id": (
+                                str(row.app_human_id) if row.app_human_id else None
+                            ),
+                            "legacy_migrated_from_group_id": str(row.group_id),
+                            "created_by": str(sys_created_by),
+                        }
+                    )
+                    if row.app_id:
+                        app_backfill_pairs.append(
+                            {"app_id": str(row.app_id), "invite_id": new_invite_id}
+                        )
 
-        for offset in range(0, len(bucket_a_rows), BATCH_SIZE):
-            batch = bucket_a_rows[offset : offset + BATCH_SIZE]
-            invite_rows = []
-            app_backfill_pairs = []  # (app_id, group_id) for applications.invite_id
-
-            for row in batch:
-                new_invite_id = str(uuid.uuid4())
-                invite_rows.append(
-                    {
-                        "id": new_invite_id,
-                        "tenant_id": str(row.tenant_id),
-                        "popup_id": str(row.popup_id),
-                        "token": row.token,
-                        "discount_percentage": row.discount_percentage,
-                        "auto_approve": True,
-                        "express_checkout": True,
-                        "max_uses": 1,
-                        "current_uses": 1 if row.app_id else 0,
-                        "used_at": row.app_created_at if row.app_id else None,
-                        "redeemed_by_human_id": (
-                            str(row.app_human_id) if row.app_human_id else None
-                        ),
-                        "legacy_migrated_from_group_id": str(row.group_id),
-                        "created_by": str(sys_created_by),
-                    }
-                )
-                if row.app_id:
-                    app_backfill_pairs.append(
-                        {"app_id": str(row.app_id), "invite_id": new_invite_id}
+                if invite_rows:
+                    connection.execute(
+                        text("""
+                            INSERT INTO invites (
+                                id, tenant_id, popup_id, token, discount_percentage,
+                                auto_approve, express_checkout, max_uses, current_uses,
+                                used_at, redeemed_by_human_id,
+                                legacy_migrated_from_group_id, created_by
+                            ) VALUES (
+                                :id, :tenant_id, :popup_id, :token, :discount_percentage,
+                                :auto_approve, :express_checkout, :max_uses, :current_uses,
+                                :used_at, :redeemed_by_human_id,
+                                :legacy_migrated_from_group_id, :created_by
+                            )
+                            ON CONFLICT (legacy_migrated_from_group_id)
+                            WHERE legacy_migrated_from_group_id IS NOT NULL
+                            DO NOTHING
+                        """),
+                        invite_rows,
                     )
 
-            if invite_rows:
-                connection.execute(
-                    text("""
-                        INSERT INTO invites (
-                            id, tenant_id, popup_id, token, discount_percentage,
-                            auto_approve, express_checkout, max_uses, current_uses,
-                            used_at, redeemed_by_human_id, legacy_migrated_from_group_id,
-                            created_by
-                        ) VALUES (
-                            :id, :tenant_id, :popup_id, :token, :discount_percentage,
-                            :auto_approve, :express_checkout, :max_uses, :current_uses,
-                            :used_at, :redeemed_by_human_id, :legacy_migrated_from_group_id,
-                            :created_by
-                        )
-                        ON CONFLICT (legacy_migrated_from_group_id)
-                        WHERE legacy_migrated_from_group_id IS NOT NULL
-                        DO NOTHING
-                    """),
-                    invite_rows,
-                )
-
-            # Backfill applications.invite_id for used invites
-            if app_backfill_pairs:
-                # Fetch the actual inserted invite ids keyed by group_id
-                # (ON CONFLICT DO NOTHING means we need the real ids)
+                # Backfill applications.invite_id for this batch
                 for pair in app_backfill_pairs:
                     connection.execute(
                         text("""
@@ -220,40 +290,40 @@ def _backfill_legacy(connection) -> None:  # noqa: ANN001
                         {"app_id": pair["app_id"]},
                     )
 
-        connection.execute(text("RELEASE SAVEPOINT sp_bucket_a"))
+        connection.execute(text("RELEASE SAVEPOINT sp_rule2_bulk_invites"))
 
     except Exception:
-        connection.execute(text("ROLLBACK TO SAVEPOINT sp_bucket_a"))
+        connection.execute(text("ROLLBACK TO SAVEPOINT sp_rule2_bulk_invites"))
         raise
 
-    # --- Bucket B: masivos → multi-use invites ---
-    connection.execute(text("SAVEPOINT sp_bucket_b"))
+    # --- Rule 3: named invite groups → multi-use invites ---
+    connection.execute(text("SAVEPOINT sp_rule3_named_invites"))
     try:
-        bucket_b_rows = connection.execute(
+        named_rows = connection.execute(
             text("""
                 SELECT
-                    g.id          AS group_id,
+                    g.id            AS group_id,
                     g.tenant_id,
                     g.popup_id,
-                    g.slug        AS token,
+                    g.slug          AS token,
                     g.discount_percentage,
                     (SELECT COUNT(*) FROM applications
                      WHERE group_id = g.id) AS app_count
                 FROM groups g
                 WHERE g.popup_id = :popup_id
-                  AND g.name ILIKE '%masivo%'
-                  AND g.max_members IS NULL
+                  AND g.is_ambassador_group = false
+                  AND g.name NOT LIKE :prefix
+                  AND (g.name ILIKE '%invite%' OR g.name ILIKE '%link%')
             """),
-            {"popup_id": _EE26_POPUP_ID},
+            {"popup_id": _EE26_POPUP_ID, "prefix": _EE26_INVITE_PREFIX},
         ).fetchall()
 
-        if bucket_b_rows and sys_created_by is not None:
-            invite_rows_b = []
-            for row in bucket_b_rows:
-                new_invite_id = str(uuid.uuid4())
-                invite_rows_b.append(
+        if named_rows and sys_created_by is not None:
+            invite_rows_named = []
+            for row in named_rows:
+                invite_rows_named.append(
                     {
-                        "id": new_invite_id,
+                        "id": str(uuid.uuid4()),
                         "tenant_id": str(row.tenant_id),
                         "popup_id": str(row.popup_id),
                         "token": row.token,
@@ -274,23 +344,23 @@ def _backfill_legacy(connection) -> None:  # noqa: ANN001
                     INSERT INTO invites (
                         id, tenant_id, popup_id, token, discount_percentage,
                         auto_approve, express_checkout, max_uses, current_uses,
-                        used_at, redeemed_by_human_id, legacy_migrated_from_group_id,
-                        created_by
+                        used_at, redeemed_by_human_id,
+                        legacy_migrated_from_group_id, created_by
                     ) VALUES (
                         :id, :tenant_id, :popup_id, :token, :discount_percentage,
                         :auto_approve, :express_checkout, :max_uses, :current_uses,
-                        :used_at, :redeemed_by_human_id, :legacy_migrated_from_group_id,
-                        :created_by
+                        :used_at, :redeemed_by_human_id,
+                        :legacy_migrated_from_group_id, :created_by
                     )
                     ON CONFLICT (legacy_migrated_from_group_id)
                     WHERE legacy_migrated_from_group_id IS NOT NULL
                     DO NOTHING
                 """),
-                invite_rows_b,
+                invite_rows_named,
             )
 
-            # Backfill applications.invite_id for masivos (all apps for that group)
-            for row in bucket_b_rows:
+            # Backfill applications.invite_id for all apps in each named-invite group
+            for row in named_rows:
                 connection.execute(
                     text("""
                         UPDATE applications
@@ -305,33 +375,14 @@ def _backfill_legacy(connection) -> None:  # noqa: ANN001
                     {"group_id": str(row.group_id)},
                 )
 
-        connection.execute(text("RELEASE SAVEPOINT sp_bucket_b"))
+        connection.execute(text("RELEASE SAVEPOINT sp_rule3_named_invites"))
 
     except Exception:
-        connection.execute(text("ROLLBACK TO SAVEPOINT sp_bucket_b"))
+        connection.execute(text("ROLLBACK TO SAVEPOINT sp_rule3_named_invites"))
         raise
 
-    # --- Bucket C: residencies → in-place flag update ---
-    connection.execute(text("SAVEPOINT sp_bucket_c"))
-    try:
-        connection.execute(
-            text("""
-                UPDATE groups
-                SET auto_approve_applications = true,
-                    express_checkout = true
-                WHERE popup_id = :popup_id
-                  AND max_members IS NOT NULL
-                  AND max_members > 1
-                  AND is_ambassador_group = false
-                  AND name NOT ILIKE '%masivo%'
-            """),
-            {"popup_id": _EE26_POPUP_ID},
-        )
-        connection.execute(text("RELEASE SAVEPOINT sp_bucket_c"))
-
-    except Exception:
-        connection.execute(text("ROLLBACK TO SAVEPOINT sp_bucket_c"))
-        raise
+    # Rules 4 and 5 (residency groups and leftover groups) are intentionally
+    # no-ops — they stay as groups with no conversion and no flag mutation.
 
 
 def upgrade() -> None:
@@ -620,13 +671,16 @@ def upgrade() -> None:
 def downgrade() -> None:
     """Reverse the groups-rework migration.
 
-    Data reversal (T-gr-046):
-      1. Null applications.invite_id for all migrated invites (FK cleanup).
-      2. Check for post-migration non-legacy invites — raise if any exist
-         (downgrade is unsafe if admin-created invites are present).
+    Data reversal (T-gr-046, revised June 2026):
+      1. Check for non-legacy invites — raise if any exist (unsafe to downgrade).
+      2. Null applications.invite_id for all migrated invites (FK cleanup).
       3. Delete invites created by this migration (legacy_migrated_from_group_id IS NOT NULL).
-      4. Reverse Bucket C flag changes on residency groups.
+      4. Delete referrals created by this migration (ambassador groups' slugs as codes
+         for the EE26 popup).
       5. Drop all new schema objects in reverse order.
+
+    NOTE: Rules 4 and 5 groups (residencies, leftover) were NEVER modified by upgrade(),
+    so there is nothing to reverse for them.
 
     WARNING: downgrade is only safe if no post-migration data was created
     (admin invites, referrals, group-scoped events). Clean up manually first.
@@ -634,7 +688,7 @@ def downgrade() -> None:
     bind = op.get_bind()
 
     # ------------------------------------------------------------------
-    # D-0. Data reversal: legacy invites cleanup (Spec: REQ-GR-025)
+    # D-0. Data reversal: legacy invites + referrals cleanup (Spec: REQ-GR-025)
     # ------------------------------------------------------------------
 
     # Check for non-legacy invites — downgrade is blocked if any exist
@@ -659,24 +713,23 @@ def downgrade() -> None:
         """)
     )
 
-    # Delete all legacy-migrated invites
+    # Delete all legacy-migrated invites (Rules 2 and 3)
     bind.execute(
-        text(
-            "DELETE FROM invites WHERE legacy_migrated_from_group_id IS NOT NULL"
-        )
+        text("DELETE FROM invites WHERE legacy_migrated_from_group_id IS NOT NULL")
     )
 
-    # Reverse Bucket C residency flag changes
+    # Delete referrals created from ambassador groups (Rule 1).
+    # Identified by: popup_id = EE26 AND code IN (slugs of ambassador groups).
+    # This is deterministic because code = group.slug was set at migration time.
     bind.execute(
         text("""
-            UPDATE groups
-            SET auto_approve_applications = false,
-                express_checkout = false
+            DELETE FROM referrals
             WHERE popup_id = :popup_id
-              AND max_members IS NOT NULL
-              AND max_members > 1
-              AND is_ambassador_group = false
-              AND name NOT ILIKE '%masivo%'
+              AND code IN (
+                  SELECT slug FROM groups
+                  WHERE popup_id = :popup_id
+                    AND is_ambassador_group = true
+              )
         """),
         {"popup_id": _EE26_POPUP_ID},
     )
