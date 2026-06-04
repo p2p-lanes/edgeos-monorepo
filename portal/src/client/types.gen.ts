@@ -5711,6 +5711,7 @@ export type TasksListTasksData = {
     status?: (TaskStatus | null);
     type?: (TaskType | null);
     visibility?: (TaskVisibility | null);
+    xTenantId?: (string | null);
 };
 
 export type TasksListTasksResponse = (ListModel_TaskPublic_);
