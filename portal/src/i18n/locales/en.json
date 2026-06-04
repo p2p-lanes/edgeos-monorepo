@@ -422,6 +422,7 @@
     "status": "Status",
     "groups": "Groups",
     "events": "Event Calendar",
+    "tracks": "Tracks",
     "venues": "Venues",
     "api_keys": "API Keys",
     "api_docs": "API Docs"
@@ -776,6 +777,20 @@
       "not_your_event_heading": "Not your event",
       "not_your_event_message": "Only the event creator can edit this event.",
       "back_to_event": "Back to event"
+    },
+    "tracks": {
+      "list": {
+        "heading": "Tracks",
+        "subheading": "Browse events at {{cityName}} grouped into topic-based tracks.",
+        "search_placeholder": "Search tracks...",
+        "event_count_one": "{{count}} event",
+        "event_count_other": "{{count}} events",
+        "empty_state": "No tracks with events yet",
+        "no_matches": "No tracks match your search",
+        "share_link": "Copy track link",
+        "link_copied": "Track link copied",
+        "link_error": "Couldn't copy the link"
+      }
     },
     "venues": {
       "list": {

@@ -4,7 +4,7 @@ import { EventsService, EventVenuesService } from "@/client"
 import useGroupMapping from "./useGroupMapping"
 
 // Static children of `/events` that must NOT be treated as event IDs.
-const STATIC_EVENT_CHILDREN = new Set(["calendar", "new", "venues"])
+const STATIC_EVENT_CHILDREN = new Set(["calendar", "new", "venues", "tracks"])
 const STATIC_VENUE_CHILDREN = new Set(["new"])
 
 interface DetectedIds {
