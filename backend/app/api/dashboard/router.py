@@ -2,7 +2,7 @@ import uuid
 from decimal import ROUND_HALF_UP, Decimal
 
 from fastapi import APIRouter, Query
-from sqlalchemy import func
+from sqlalchemy import case, func
 from sqlmodel import select
 
 from app.api.application.models import Applications
@@ -31,7 +31,7 @@ from app.api.payment.models import PaymentProducts, Payments
 from app.api.payment.schemas import PaymentStatus, PaymentType
 from app.api.popup.crud import popups_crud
 from app.api.product.models import Products
-from app.api.product.schemas import CATEGORY_HOUSING, CATEGORY_TICKET
+from app.api.product.schemas import CATEGORY_HOUSING, CATEGORY_PATREON, CATEGORY_TICKET
 from app.core.dependencies.users import CurrentOperator, TenantSession
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
@@ -366,16 +366,45 @@ def _get_cumulative_trends(
 
 
 def _get_revenue_breakdown(db: TenantSession, popup_id: uuid.UUID) -> RevenueBreakdown:
-    """Revenue and quantity breakdown by product and category."""
+    """Net revenue and quantity breakdown by product and category.
+
+    Revenue here is the money actually collected per line, so the categories
+    reconcile with the Total Revenue KPI (sum of Payments.amount) rather than
+    inflating it with pre-discount list prices. Per-line net revenue mirrors the
+    pricing logic in payment.crud._calculate_price:
+      - patreon donations carry their amount on effective_unit_price
+        (product_price is always 0 for patreon);
+      - discountable products are reduced by the payment's best-of-three
+        discount percentage (coupon / group / scholarship);
+      - non-discountable products are charged at full list price.
+    Insurance and contribution fees are excluded on purpose: they are not
+    product lines, so the category total equals Total Revenue minus those fees
+    (and minus edit-pass credits, which are not attributable per line).
+    """
+    discount_factor = 1 - func.coalesce(Payments.discount_value, Decimal("0")) / 100
+    net_line_revenue = case(
+        (
+            PaymentProducts.product_category == CATEGORY_PATREON,
+            func.coalesce(PaymentProducts.effective_unit_price, Decimal("0"))
+            * PaymentProducts.quantity,
+        ),
+        (
+            Products.discountable.is_(True),
+            PaymentProducts.product_price * PaymentProducts.quantity * discount_factor,
+        ),
+        else_=PaymentProducts.product_price * PaymentProducts.quantity,
+    )
+
     rows = db.exec(
         select(
             PaymentProducts.product_id,
             PaymentProducts.product_name,
             PaymentProducts.product_category,
             func.sum(PaymentProducts.quantity),
-            func.sum(PaymentProducts.product_price * PaymentProducts.quantity),
+            func.sum(net_line_revenue),
         )
         .join(Payments, PaymentProducts.payment_id == Payments.id)
+        .join(Products, PaymentProducts.product_id == Products.id, isouter=True)
         .where(
             Payments.popup_id == popup_id,
             Payments.status == PaymentStatus.APPROVED.value,
@@ -400,13 +429,14 @@ def _get_revenue_breakdown(db: TenantSession, popup_id: uuid.UUID) -> RevenueBre
     }
 
     for product_id, name, category, qty, rev in rows:
+        revenue = (rev or Decimal("0")).quantize(TWO_DECIMAL, ROUND_HALF_UP)
         by_product.append(
             ProductBreakdownItem(
                 product_id=str(product_id),
                 product_name=name,
                 product_category=category,
                 quantity=qty or 0,
-                revenue=rev or Decimal("0"),
+                revenue=revenue,
             )
         )
 
@@ -416,7 +446,7 @@ def _get_revenue_breakdown(db: TenantSession, popup_id: uuid.UUID) -> RevenueBre
                 label=category_labels.get(category, category.title()),
             )
         category_agg[category].quantity += qty or 0
-        category_agg[category].revenue += rev or Decimal("0")
+        category_agg[category].revenue += revenue
 
     return RevenueBreakdown(
         by_product=by_product,
