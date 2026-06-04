@@ -1,6 +1,6 @@
 "use client"
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { useQuery } from "@tanstack/react-query"
 import { addDays, startOfDay, subDays } from "date-fns"
 import {
   CalendarClock,
@@ -21,11 +21,8 @@ import {
 import Link from "next/link"
 import { Fragment, useEffect, useMemo, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
-import { toast } from "sonner"
 
 import {
-  ApiError,
-  EventParticipantsService,
   type EventPublic,
   EventsService,
   EventVenuesService,
@@ -41,6 +38,7 @@ import {
 import { cn } from "@/lib/utils"
 import type { EventsScrollSnapshot } from "./eventsViewState"
 import { summarizeRrule } from "./summarizeRrule"
+import { useEventRsvp } from "./useEventRsvp"
 import { useEventTimezone } from "./useEventTimezone"
 
 interface DayBodyProps {
@@ -154,7 +152,6 @@ export function DayBody({
   const isAuthed = mode === "authed"
   const useOverride = eventsOverride !== undefined
   const { t } = useTranslation()
-  const queryClient = useQueryClient()
   // Fall back to the popup's first booking day (or today, before the
   // popup record loads) when the parent hasn't set a date yet — no
   // `?date=` in the URL on first visit.
@@ -255,52 +252,9 @@ export function DayBody({
   // (public calendar) the tz is known synchronously, so this stays false.
   const isLoading = useOverride ? false : eventsLoading || tzLoading
 
-  // Recurring events require occurrence_start so the RSVP targets a single
-  // instance. That includes both expanded pseudo-rows (have occurrence_id)
-  // AND the series master itself, whose start_time IS the first occurrence.
-  // One-off events must not send it.
-  const rsvpBodyFor = (e: EventPublic) =>
-    e.rrule || e.occurrence_id ? { occurrence_start: e.start_time } : undefined
-  const toastRsvpError = (err: unknown) => {
-    const fallback = t("events.rsvp.action_error") as string
-    let detail = fallback
-    if (err instanceof ApiError && err.body && typeof err.body === "object") {
-      const body = err.body as { detail?: unknown }
-      if (typeof body.detail === "string") detail = body.detail
-    }
-    toast.error(detail)
-  }
-  const rsvpMutation = useMutation({
-    mutationFn: (e: EventPublic) =>
-      EventParticipantsService.registerForEvent({
-        eventId: e.id,
-        requestBody: rsvpBodyFor(e),
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["portal-events-day"] })
-    },
-    onError: toastRsvpError,
-  })
-  const cancelRsvpMutation = useMutation({
-    mutationFn: (e: EventPublic) =>
-      EventParticipantsService.cancelRegistration({
-        eventId: e.id,
-        requestBody: rsvpBodyFor(e),
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["portal-events-day"] })
-    },
-    onError: toastRsvpError,
-  })
-  // Tracks the in-flight RSVP target so the spinner stays on the
-  // specific event card (and recurring instance) the user clicked.
-  const pendingRsvpKey: string | null = (() => {
-    const pending =
-      (rsvpMutation.isPending && rsvpMutation.variables) ||
-      (cancelRsvpMutation.isPending && cancelRsvpMutation.variables) ||
-      null
-    return pending ? `${pending.id}:${pending.start_time}` : null
-  })()
+  const { rsvpMutation, cancelRsvpMutation, pendingRsvpKey } = useEventRsvp([
+    "portal-events-day",
+  ])
 
   // "HH:MM" in the popup timezone (24h) -> minutes since 00:00.
   const minutesInTz = useMemo(() => {
@@ -701,7 +655,7 @@ export function DayBody({
                         const leftPct = laneIndex * widthPct
                         const isShort = endMin - startMin < 60
                         const recurrenceLabel =
-                          summarizeRrule(event.rrule) ??
+                          summarizeRrule(event.rrule, t) ??
                           (event.recurrence_master_id
                             ? t("events.list.part_of_recurring_series")
                             : null)

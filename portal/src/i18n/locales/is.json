@@ -477,7 +477,7 @@
     "list": {
       "heading": "Viðburðir",
       "subheading": "Komandi viðburðir í {{cityName}}",
-      "subheading_with_tz": "Komandi viðburðir í {{cityName}} — tímar sýndir í {{timezone}}",
+      "subheading_with_tz": "Komandi viðburðir í {{cityName}}, tímar sýndir í {{timezone}}",
       "empty_state": "Engir viðburðir enn",
       "events_disabled_heading": "Viðburðir eru óvirkir",
       "events_disabled_message": "Skipuleggjandinn hefur slökkt á viðburðum fyrir {{cityName}}.",
@@ -577,7 +577,7 @@
       "page_title": "{{popupName}} - Dagatal",
       "page_title_fallback": "Dagatal",
       "subheading": "Komandi viðburðir í {{popupName}}",
-      "subheading_with_tz": "Komandi viðburðir í {{popupName}} — tímar sýndir í {{timezone}}"
+      "subheading_with_tz": "Komandi viðburðir í {{popupName}}, tímar sýndir í {{timezone}}"
     },
     "detail": {
       "event_not_found": "Viðburður fannst ekki",
@@ -625,10 +625,10 @@
     "form": {
       "create_heading": "Búa til viðburð",
       "create_subheading": "Nýr viðburður í {{cityName}}",
-      "create_subheading_with_tz": "Nýr viðburður í {{cityName}} — tímar í {{timezone}}",
+      "create_subheading_with_tz": "Nýr viðburður í {{cityName}}, tímar í {{timezone}}",
       "edit_heading": "Breyta viðburði",
       "edit_subheading": "Uppfæra viðburðinn þinn í {{cityName}}",
-      "edit_subheading_with_tz": "Uppfæra viðburðinn þinn í {{cityName}} — tímar í {{timezone}}",
+      "edit_subheading_with_tz": "Uppfæra viðburðinn þinn í {{cityName}}, tímar í {{timezone}}",
       "venue_label": "Staður",
       "venue_placeholder": "Enginn staður",
       "venue_not_bookable": "Þessi staður er ekki bókanlegur.",
@@ -636,7 +636,7 @@
       "venue_setup_teardown": "Staðurinn er læstur {{setupTime}} mín fyrir og eftir hverja áætlaða lotu fyrir uppsetningu/niðurtekt",
       "venue_closed_warning": "Valin dagsetning fellur á dag þegar staðurinn er lokaður.",
       "view_pictures_button": "Skoða myndir",
-      "venue_pictures_heading": "{{venue}} — myndir",
+      "venue_pictures_heading": "{{venue}}: myndir",
       "no_venue_pictures": "Þessi staður hefur ekki myndir enn.",
       "title_label": "Titill",
       "title_placeholder": "Nafn viðburðar",
@@ -749,7 +749,7 @@
         "venue_not_available": "Gerð staðar er ekki í boði",
         "venue_not_available_message": "Skipuleggjandinn hefur ekki virkjað gerð staða fyrir {{cityName}}.",
         "back_to_venues": "Til baka á staði",
-        "venue_submitted_success": "Staður sendur — bíður samþykkis stjórnanda",
+        "venue_submitted_success": "Staður sendur, bíður samþykkis stjórnanda",
         "venue_created_success": "Staður búinn til",
         "no_popup_error": "Enginn popup",
         "failed_to_create": "Mistókst að búa til stað",

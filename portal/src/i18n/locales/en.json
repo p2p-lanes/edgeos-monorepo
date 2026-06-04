@@ -502,7 +502,7 @@
     "list": {
       "heading": "Events",
       "subheading": "Upcoming events at {{cityName}}",
-      "subheading_with_tz": "Upcoming events at {{cityName}} — times shown in {{timezone}}",
+      "subheading_with_tz": "Upcoming events at {{cityName}}, times shown in {{timezone}}",
       "empty_state": "No events yet",
       "events_disabled_heading": "Events are disabled",
       "events_disabled_message": "The organizer has turned off events for {{cityName}}.",
@@ -591,6 +591,26 @@
       "checked_in": "Checked in",
       "action_error": "Couldn't update your RSVP. Please try again."
     },
+    "recurrence": {
+      "daily_one": "Repeats daily",
+      "daily_other": "Repeats every {{count}} days",
+      "weekly_one": "Repeats weekly",
+      "weekly_other": "Repeats every {{count}} weeks",
+      "weekly_on_one": "Repeats weekly on {{days}}",
+      "weekly_on_other": "Repeats every {{count}} weeks on {{days}}",
+      "monthly_one": "Repeats monthly",
+      "monthly_other": "Repeats every {{count}} months",
+      "count_suffix_one": ", for {{count}} occurrence",
+      "count_suffix_other": ", for {{count}} occurrences",
+      "until_suffix": ", until {{date}}",
+      "weekday_MO": "Monday",
+      "weekday_TU": "Tuesday",
+      "weekday_WE": "Wednesday",
+      "weekday_TH": "Thursday",
+      "weekday_FR": "Friday",
+      "weekday_SA": "Saturday",
+      "weekday_SU": "Sunday"
+    },
     "login_required": {
       "title": "Sign in to view this event",
       "message": "Event details are only visible to signed-in users. A ticket for {{popupName}} is required to participate.",
@@ -602,7 +622,7 @@
       "page_title": "{{popupName}} - Calendar",
       "page_title_fallback": "Calendar",
       "subheading": "Upcoming events at {{popupName}}",
-      "subheading_with_tz": "Upcoming events at {{popupName}} — times shown in {{timezone}}"
+      "subheading_with_tz": "Upcoming events at {{popupName}}, times shown in {{timezone}}"
     },
     "detail": {
       "event_not_found": "Event not found",
@@ -645,15 +665,22 @@
       "open_in_maps": "Open in Google Maps",
       "share_button": "Share event",
       "share_link_copied": "Link copied",
-      "share_link_error": "Couldn't copy link"
+      "share_link_error": "Couldn't copy link",
+      "admin_notes_heading": "Admin notes",
+      "admin_notes_staff_only": "Internal, staff only",
+      "admin_notes_placeholder": "Notes about this event, visible only to backoffice staff",
+      "admin_notes_save_button": "Save notes",
+      "admin_notes_saving_button": "Saving",
+      "admin_notes_saved_toast": "Notes saved",
+      "admin_notes_error_toast": "Could not save notes"
     },
     "form": {
       "create_heading": "Create event",
       "create_subheading": "New event at {{cityName}}",
-      "create_subheading_with_tz": "New event at {{cityName}} — times in {{timezone}}",
+      "create_subheading_with_tz": "New event at {{cityName}}, times in {{timezone}}",
       "edit_heading": "Edit event",
       "edit_subheading": "Update your event at {{cityName}}",
-      "edit_subheading_with_tz": "Update your event at {{cityName}} — times in {{timezone}}",
+      "edit_subheading_with_tz": "Update your event at {{cityName}}, times in {{timezone}}",
       "venue_label": "Venue",
       "venue_placeholder": "No venue",
       "venue_not_bookable": "This venue is not bookable.",
@@ -661,7 +688,7 @@
       "venue_setup_teardown": "Venue is blocked {{setupTime}}min before & after each scheduled session for setup/teardown",
       "venue_closed_warning": "The selected date falls on a day the venue is closed.",
       "view_pictures_button": "View pictures",
-      "venue_pictures_heading": "{{venue}} — pictures",
+      "venue_pictures_heading": "{{venue}}: pictures",
       "no_venue_pictures": "This venue has no pictures yet.",
       "title_label": "Title",
       "title_placeholder": "Event name",
@@ -774,7 +801,7 @@
         "venue_not_available": "Venue creation is not available",
         "venue_not_available_message": "The organizer has not enabled venue creation for {{cityName}}.",
         "back_to_venues": "Back to venues",
-        "venue_submitted_success": "Venue submitted — waiting for admin approval",
+        "venue_submitted_success": "Venue submitted, waiting for admin approval",
         "venue_created_success": "Venue created",
         "no_popup_error": "No popup",
         "failed_to_create": "Failed to create venue",

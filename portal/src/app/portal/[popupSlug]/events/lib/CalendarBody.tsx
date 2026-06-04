@@ -1,7 +1,7 @@
 "use client"
 
 import { monthBoundsInTz } from "@edgeos/shared-events"
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { useQuery } from "@tanstack/react-query"
 import {
   addDays,
   addMonths,
@@ -31,20 +31,14 @@ import {
 import Link from "next/link"
 import { useEffect, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
-import { toast } from "sonner"
 
-import {
-  ApiError,
-  EventParticipantsService,
-  type EventPublic,
-  EventsService,
-  HumansService,
-} from "@/client"
+import { type EventPublic, EventsService, HumansService } from "@/client"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { CoverImage } from "./CoverImage"
 import type { EventsScrollSnapshot } from "./eventsViewState"
 import { summarizeRrule } from "./summarizeRrule"
+import { useEventRsvp } from "./useEventRsvp"
 import { useEventTimezone } from "./useEventTimezone"
 
 interface CalendarBodyProps {
@@ -116,7 +110,6 @@ export function CalendarBody({
   const isAuthed = mode === "authed"
   const useOverride = eventsOverride !== undefined
   const { t } = useTranslation()
-  const queryClient = useQueryClient()
   const [currentMonth, setCurrentMonth] = useState(
     () => defaultDate ?? new Date(),
   )
@@ -190,53 +183,9 @@ export function CalendarBody({
     enabled: isAuthed && !useOverride && !!popupId && !tzLoading,
   })
 
-  // Recurring events require occurrence_start so the RSVP targets a single
-  // instance. That includes both expanded pseudo-rows (have occurrence_id)
-  // AND the series master itself, whose start_time IS the first occurrence.
-  // One-off events must not send it.
-  const rsvpBodyFor = (e: EventPublic) =>
-    e.rrule || e.occurrence_id ? { occurrence_start: e.start_time } : undefined
-  const toastRsvpError = (err: unknown) => {
-    const fallback = t("events.rsvp.action_error") as string
-    let detail = fallback
-    if (err instanceof ApiError && err.body && typeof err.body === "object") {
-      const body = err.body as { detail?: unknown }
-      if (typeof body.detail === "string") detail = body.detail
-    }
-    toast.error(detail)
-  }
-  const rsvpMutation = useMutation({
-    mutationFn: (e: EventPublic) =>
-      EventParticipantsService.registerForEvent({
-        eventId: e.id,
-        requestBody: rsvpBodyFor(e),
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["portal-events-calendar"] })
-    },
-    onError: toastRsvpError,
-  })
-  const cancelRsvpMutation = useMutation({
-    mutationFn: (e: EventPublic) =>
-      EventParticipantsService.cancelRegistration({
-        eventId: e.id,
-        requestBody: rsvpBodyFor(e),
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["portal-events-calendar"] })
-    },
-    onError: toastRsvpError,
-  })
-  // Tracks the in-flight RSVP target so we can pin the spinner to the
-  // specific event (and recurring occurrence) the user clicked instead
-  // of flipping every "Going" button on the day.
-  const pendingRsvpKey: string | null = (() => {
-    const pending =
-      (rsvpMutation.isPending && rsvpMutation.variables) ||
-      (cancelRsvpMutation.isPending && cancelRsvpMutation.variables) ||
-      null
-    return pending ? `${pending.id}:${pending.start_time}` : null
-  })()
+  const { rsvpMutation, cancelRsvpMutation, pendingRsvpKey } = useEventRsvp([
+    "portal-events-calendar",
+  ])
 
   const events = useOverride ? (eventsOverride ?? []) : (data?.results ?? [])
 
@@ -409,7 +358,7 @@ export function CalendarBody({
               <div className="space-y-2">
                 {selectedEvents.map((event) => {
                   const recurrenceLabel =
-                    summarizeRrule(event.rrule) ??
+                    summarizeRrule(event.rrule, t) ??
                     (event.recurrence_master_id
                       ? t("events.list.part_of_recurring_series")
                       : null)
