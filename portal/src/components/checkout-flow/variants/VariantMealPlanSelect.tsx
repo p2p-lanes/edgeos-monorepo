@@ -56,14 +56,6 @@ interface MealPlanProduct {
 /** Identifies which (attendee, product) cell is expanded for editing. */
 type OpenCell = { attendeeId: string; productId: string } | null
 
-const DEFAULT_CHEF_CHOICE: MenuOption = {
-  key: "chef",
-  title: "Chef's choice",
-  description: "Surprise me with what's freshest that day",
-  icon: "👨‍🍳",
-  tags: [],
-}
-
 // ---------------------------------------------------------------------------
 // templateConfig parsing
 // ---------------------------------------------------------------------------
@@ -89,13 +81,6 @@ interface RawSectionProduct {
   }>
 }
 
-interface RawChefChoice {
-  key?: string
-  icon?: string | null
-  title?: string
-  description?: string | null
-}
-
 interface MealPlanSection {
   key: string
   label: string
@@ -107,22 +92,10 @@ interface MealPlanSection {
 function parseMealPlanTemplateConfig(
   templateConfig: VariantProps["templateConfig"],
   products: ProductsPass[],
-): { sections: MealPlanSection[]; chefChoice: MenuOption } {
+): { sections: MealPlanSection[] } {
   const productById = new Map(products.map((p) => [p.id, p]))
 
   const rawSections = (templateConfig?.sections ?? []) as RawSection[]
-  const rawChef = (templateConfig?.chef_choice_option ??
-    null) as RawChefChoice | null
-
-  const chefChoice: MenuOption = rawChef
-    ? {
-        key: rawChef.key || "chef",
-        icon: rawChef.icon || DEFAULT_CHEF_CHOICE.icon,
-        title: rawChef.title || DEFAULT_CHEF_CHOICE.title,
-        description: rawChef.description || DEFAULT_CHEF_CHOICE.description,
-        tags: [],
-      }
-    : DEFAULT_CHEF_CHOICE
 
   const sections: MealPlanSection[] = [...rawSections]
     .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
@@ -163,7 +136,7 @@ function parseMealPlanTemplateConfig(
       }
     })
 
-  return { sections, chefChoice }
+  return { sections }
 }
 
 // ---------------------------------------------------------------------------
@@ -218,9 +191,7 @@ function formatCoverageRange(product: MealPlanProduct): string {
 function findMenuOption(
   product: MealPlanProduct,
   key: string,
-  chefChoice: MenuOption,
 ): MenuOption | null {
-  if (key === chefChoice.key) return chefChoice
   return product.menuOptions.find((o) => o.key === key) ?? null
 }
 
@@ -263,16 +234,6 @@ function isWeekFullyPlanned(
   return filledDayCount(item, product) === weekdayDates(product).length
 }
 
-function allDaysMatchKey(
-  item: SelectedMealPlanItem | undefined,
-  product: MealPlanProduct,
-  key: string,
-): boolean {
-  if (!item?.dailyChoices) return false
-  const dates = weekdayDates(product)
-  return dates.every((d) => item.dailyChoices?.[d] === key)
-}
-
 // ---------------------------------------------------------------------------
 // Pre-purchased detection
 // ---------------------------------------------------------------------------
@@ -313,7 +274,7 @@ export default function VariantMealPlanSelect({
     [products],
   )
 
-  const { sections, chefChoice } = useMemo(
+  const { sections } = useMemo(
     () => parseMealPlanTemplateConfig(templateConfig, mealPlanProducts),
     [templateConfig, mealPlanProducts],
   )
@@ -343,7 +304,12 @@ export default function VariantMealPlanSelect({
       product.id,
     )
     if (!selected) {
-      addMealPlan(attendee.id, product.id, weekdayDates(product))
+      addMealPlan(
+        attendee.id,
+        product.id,
+        weekdayDates(product),
+        product.menuOptions[0]?.key,
+      )
       setOpenCell({ attendeeId: attendee.id, productId: product.id })
       return
     }
@@ -420,7 +386,6 @@ export default function VariantMealPlanSelect({
             key={attendee.id}
             attendee={attendee}
             weeklyProducts={weeklyProducts}
-            chefChoice={chefChoice}
             mealPlans={cart.mealPlans}
             openCell={openCell}
             onCellClick={handleCellClick}
@@ -447,7 +412,6 @@ export default function VariantMealPlanSelect({
 interface AttendeeRowProps {
   attendee: AttendeePassState
   weeklyProducts: MealPlanProduct[]
-  chefChoice: MenuOption
   mealPlans: SelectedMealPlanItem[]
   openCell: OpenCell
   onCellClick: (a: AttendeePassState, p: MealPlanProduct) => void
@@ -466,7 +430,6 @@ interface AttendeeRowProps {
 function AttendeeRow({
   attendee,
   weeklyProducts,
-  chefChoice,
   mealPlans,
   openCell,
   onCellClick,
@@ -591,7 +554,6 @@ function AttendeeRow({
                   isLocked={isLocked}
                   isOpen={isOpen}
                   item={item}
-                  chefChoice={chefChoice}
                   onClick={() => onCellClick(attendee, product)}
                 />
               </div>
@@ -604,7 +566,6 @@ function AttendeeRow({
                     attendee={attendee}
                     product={product}
                     item={cartItem(mealPlans, attendee.id, product.id)}
-                    chefChoice={chefChoice}
                     onClose={onCloseEditor}
                     removeMealPlan={removeMealPlan}
                     setMealPlanDailyChoice={setMealPlanDailyChoice}
@@ -636,7 +597,6 @@ function AttendeeRow({
             attendee={attendee}
             product={openProduct}
             item={cartItem(mealPlans, attendee.id, openProduct.id)}
-            chefChoice={chefChoice}
             onClose={onCloseEditor}
             removeMealPlan={removeMealPlan}
             setMealPlanDailyChoice={setMealPlanDailyChoice}
@@ -711,7 +671,6 @@ function WeekCell({
   isLocked,
   isOpen,
   item,
-  chefChoice,
   onClick,
 }: {
   attendee: AttendeePassState
@@ -720,7 +679,6 @@ function WeekCell({
   isLocked: boolean
   isOpen: boolean
   item: SelectedMealPlanItem | undefined
-  chefChoice: MenuOption
   onClick: () => void
 }) {
   if (isLocked) {
@@ -819,7 +777,6 @@ function WeekCell({
       <DayEmojiStrip
         product={product}
         dailyChoices={item?.dailyChoices ?? null}
-        chefChoice={chefChoice}
       />
       <div className="flex items-center gap-1.5 leading-tight">
         {allSet ? (
@@ -845,18 +802,16 @@ function WeekCell({
 function DayEmojiStrip({
   product,
   dailyChoices,
-  chefChoice,
 }: {
   product: MealPlanProduct
   dailyChoices: Record<string, string> | null
-  chefChoice: MenuOption
 }) {
   const dates = weekdayDates(product)
   return (
     <div className="flex items-center justify-center gap-0.5">
       {dates.map((d) => {
         const pick = dailyChoices?.[d] ?? null
-        const opt = pick ? findMenuOption(product, pick, chefChoice) : null
+        const opt = pick ? findMenuOption(product, pick) : null
         return (
           <div
             key={d}
@@ -890,7 +845,6 @@ function DayPlanEditor({
   attendee,
   product,
   item,
-  chefChoice,
   onClose,
   removeMealPlan,
   setMealPlanDailyChoice,
@@ -898,7 +852,6 @@ function DayPlanEditor({
   attendee: AttendeePassState
   product: MealPlanProduct
   item: SelectedMealPlanItem | undefined
-  chefChoice: MenuOption
   onClose: () => void
   removeMealPlan: (attendeeId: string, productId: string) => void
   setMealPlanDailyChoice: (
@@ -908,23 +861,12 @@ function DayPlanEditor({
     menuKey: string,
   ) => void
 }) {
-  // True after the buyer has clicked "Customize per day" on the chef-default
-  // summary card. Stays true for the life of this editor instance so the
-  // expanded view persists while the buyer is overriding days.
-  const [isCustomizing, setIsCustomizing] = useState(false)
-
   if (!item) return null
 
   const dates = weekdayDates(product)
 
   // Pool of options the buyer can tap for any day this week.
-  const menuPool: MenuOption[] = [...product.menuOptions, chefChoice]
-
-  // Show the compact "Chef's choice for all days" summary as long as every day
-  // is still chef AND the buyer hasn't explicitly entered customize mode.
-  // Any override (or clicking "Customize per day") expands the per-day editor.
-  const allChef = allDaysMatchKey(item, product, chefChoice.key)
-  const showCompactDefault = allChef && !isCustomizing
+  const menuPool: MenuOption[] = product.menuOptions
 
   return (
     <div className="space-y-3 max-w-4xl mx-auto">
@@ -957,77 +899,51 @@ function DayPlanEditor({
           (rendered by AttendeeMetaSection above the editor) — they apply to
           every week, so they don't belong inside the per-week editor. */}
 
-      {/* Default state: chef's choice for all days. One slim row with an
-          escape hatch to per-day customization. */}
-      {showCompactDefault ? (
-        <div className="rounded-lg border border-border bg-card px-3 py-2 flex items-center gap-3">
-          <span className="text-lg leading-none shrink-0">
-            {chefChoice.icon}
-          </span>
-          <div className="flex-1 min-w-0">
-            <div className="text-sm font-semibold text-foreground leading-tight">
-              Chef's choice for all {dates.length} days
-            </div>
-            <div className="text-[11px] text-muted-foreground">
-              We'll surprise {attendee.name} with what's freshest each day.
-            </div>
-          </div>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => setIsCustomizing(true)}
-          >
-            Customize per day
-          </Button>
-        </div>
-      ) : (
-        // Customize mode — all 5 days always expanded. Desktop: one row per
-        // day with the date label inline-left of the 5 dish buttons. Mobile:
-        // date label stacks above the buttons (6 columns crush at 390px).
-        // No per-day "card" wrapper — the buttons themselves are the visual
-        // elements and the row is just flex layout with light separators.
-        <div className="rounded-lg border border-border bg-card divide-y divide-border/60">
-          {dates.map((d) => {
-            const dayPick = item.dailyChoices?.[d] ?? null
-            return (
-              <div
-                key={d}
-                className="flex flex-col md:flex-row md:items-center md:gap-2 p-1.5"
-              >
-                {/* Date label — plain inline text, no nested card. */}
-                <div className="md:min-w-[44px] md:text-center px-1 mb-1 md:mb-0">
-                  <span className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
-                    {formatWeekdayShort(d)} {formatDayNum(d)}
-                  </span>
-                </div>
-                <div
-                  className="grid gap-1 md:flex-1"
-                  style={{
-                    gridTemplateColumns: `repeat(${menuPool.length},minmax(0,1fr))`,
-                  }}
-                >
-                  {menuPool.map((opt) => (
-                    <DishButton
-                      key={opt.key}
-                      option={opt}
-                      isActive={dayPick === opt.key}
-                      onClick={() =>
-                        setMealPlanDailyChoice(
-                          attendee.id,
-                          product.id,
-                          d,
-                          opt.key,
-                        )
-                      }
-                    />
-                  ))}
-                </div>
+      {/* All 5 days always expanded. Desktop: one row per day with the date
+          label inline-left of the dish buttons. Mobile: date label stacks above
+          the buttons (6 columns crush at 390px). No per-day "card" wrapper —
+          the buttons themselves are the visual elements and the row is just
+          flex layout with light separators. */}
+      <div className="rounded-lg border border-border bg-card divide-y divide-border/60">
+        {dates.map((d) => {
+          const dayPick = item.dailyChoices?.[d] ?? null
+          return (
+            <div
+              key={d}
+              className="flex flex-col md:flex-row md:items-center md:gap-2 p-1.5"
+            >
+              {/* Date label — plain inline text, no nested card. */}
+              <div className="md:min-w-[44px] md:text-center px-1 mb-1 md:mb-0">
+                <span className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+                  {formatWeekdayShort(d)} {formatDayNum(d)}
+                </span>
               </div>
-            )
-          })}
-        </div>
-      )}
+              <div
+                className="grid gap-1 md:flex-1"
+                style={{
+                  gridTemplateColumns: `repeat(${menuPool.length},minmax(0,1fr))`,
+                }}
+              >
+                {menuPool.map((opt) => (
+                  <DishButton
+                    key={opt.key}
+                    option={opt}
+                    isActive={dayPick === opt.key}
+                    onClick={() =>
+                      setMealPlanDailyChoice(
+                        attendee.id,
+                        product.id,
+                        d,
+                        opt.key,
+                      )
+                    }
+                  />
+                ))}
+              </div>
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }
