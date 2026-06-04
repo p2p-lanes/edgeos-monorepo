@@ -5,6 +5,7 @@ import {
   Building2,
   Calendar,
   CalendarDays,
+  CalendarX,
   DollarSign,
   FileText,
   Globe,
@@ -13,12 +14,14 @@ import {
   Image,
   Key,
   Languages,
+  Link2,
   Link as LinkIcon,
   Lock,
   Mail,
   MapPin,
   QrCode,
   Scale,
+  Share2,
   ShieldCheck,
   ShoppingCart,
   Ticket,
@@ -231,6 +234,10 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
       show_attendee_directory: defaultValues?.show_attendee_directory ?? false,
       checkin_pass_lead_days:
         defaultValues?.checkin_pass_lead_days?.toString() ?? "",
+      invites_enabled: defaultValues?.invites_enabled ?? false,
+      referrals_enabled: defaultValues?.referrals_enabled ?? false,
+      group_private_events_enabled:
+        defaultValues?.group_private_events_enabled ?? false,
     },
     onSubmit: ({ value }) => {
       if (readOnly) return
@@ -289,6 +296,9 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
         checkin_pass_lead_days: value.checkin_pass_lead_days
           ? Number(value.checkin_pass_lead_days)
           : null,
+        invites_enabled: value.invites_enabled,
+        referrals_enabled: value.referrals_enabled,
+        group_private_events_enabled: value.group_private_events_enabled,
       }
       if (isEdit) {
         updateMutation.mutate(payload)
@@ -1319,6 +1329,62 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
               >
                 <Switch
                   id="events_enabled"
+                  checked={field.state.value}
+                  onCheckedChange={(checked) => field.handleChange(checked)}
+                  disabled={readOnly}
+                />
+              </InlineRow>
+            )}
+          </form.Field>
+        </InlineSection>
+
+        <Separator />
+
+        {/* Groups and Invites feature flags */}
+        <InlineSection title="Groups and Invites">
+          <form.Field name="invites_enabled">
+            {(field) => (
+              <InlineRow
+                icon={<Link2 className="h-4 w-4 text-muted-foreground" />}
+                label="Enable Invites"
+                description="Allow admins to create invite links with discounts and automatic approvals"
+              >
+                <Switch
+                  id="invites_enabled"
+                  checked={field.state.value}
+                  onCheckedChange={(checked) => field.handleChange(checked)}
+                  disabled={readOnly}
+                />
+              </InlineRow>
+            )}
+          </form.Field>
+
+          <form.Field name="referrals_enabled">
+            {(field) => (
+              <InlineRow
+                icon={<Share2 className="h-4 w-4 text-muted-foreground" />}
+                label="Enable Referrals"
+                description="Allow attendees to create referral codes and refer others"
+              >
+                <Switch
+                  id="referrals_enabled"
+                  checked={field.state.value}
+                  onCheckedChange={(checked) => field.handleChange(checked)}
+                  disabled={readOnly}
+                />
+              </InlineRow>
+            )}
+          </form.Field>
+
+          <form.Field name="group_private_events_enabled">
+            {(field) => (
+              <InlineRow
+                icon={<CalendarX className="h-4 w-4 text-muted-foreground" />}
+                label="Enable Group Private Events"
+                description="Allow group members to create private events scoped to their group"
+              >
+                <Switch
+                  id="group_private_events_enabled"
                   checked={field.state.value}
                   onCheckedChange={(checked) => field.handleChange(checked)}
                   disabled={readOnly}
