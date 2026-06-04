@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/collapsible"
 import { cn } from "@/lib/utils"
 import { CoverImage } from "./CoverImage"
+import { canManageEvent } from "./eventPermissions"
 import type { EventsScrollSnapshot } from "./eventsViewState"
 import { summarizeRrule } from "./summarizeRrule"
 
@@ -267,6 +268,10 @@ export function ListBody({
                     isAuthed &&
                     currentHumanId != null &&
                     event.owner_id === currentHumanId
+                  // Edit affordance follows manage rights (owner / host /
+                  // collaborator); the crown badge stays owner-only.
+                  const canManage =
+                    isAuthed && canManageEvent(event, currentHumanId)
                   const domId = event.occurrence_id
                     ? `event-card-${event.id}__${event.start_time}`
                     : `event-card-${event.id}`
@@ -486,7 +491,7 @@ export function ListBody({
                                 <Eye className="h-3.5 w-3.5" />
                               )}
                             </button>
-                            {isOwner && (
+                            {canManage && (
                               <Link
                                 href={`/portal/${slug}/events/${event.id}/edit`}
                                 onClick={(e) => e.stopPropagation()}
