@@ -3,8 +3,9 @@
 A scheduled Claude Code **routine** that runs once a day and does two things, as a
 **"Claude"** service user:
 
-1. **Telegram → tasks:** reads the last 24 h of a Telegram group and creates backoffice
-   tasks (`/tasks`) for any bug report or feature/change request that isn't already tracked.
+1. **Telegram → tasks:** reads the last 24 h of one or more Telegram groups (a single bot can
+   watch several) and creates backoffice tasks (`/tasks`) for any bug report or feature/change
+   request that isn't already tracked.
 2. **Task ↔ code reconciliation:** cross-references existing open tasks against the cloned
    repo and, when it finds clear evidence the work is already further along (merged to `dev`
    or shipped on `main`), leaves a `[reconcile]` comment and advances the task status.
@@ -69,13 +70,15 @@ curl -sX POST https://api.edgeos.world/api/v1/auth/user/authenticate \
 1. In Telegram, message **@BotFather** → `/newbot` → follow prompts → copy the **bot token**.
 2. Disable privacy mode so the bot can read all group messages (not just @mentions):
    `/setprivacy` → pick the bot → **Disable**.
-3. **Add the bot to the target group** (`web.telegram.org/k/#-4643549576`). It only sees
-   messages sent *after* it joins.
+3. **Add the bot to each target group** (e.g. `web.telegram.org/k/#-4643549576`). The same
+   bot can sit in many groups; `getUpdates` returns messages from all of them. It only sees
+   messages sent *after* it joins each group.
 4. Do NOT set a webhook on the bot — the reader uses `getUpdates`, which conflicts with webhooks.
 
-The target group id is in the web URL `web.telegram.org/k/#-4643549576` → `-4643549576`.
-(If the group is a supergroup, the Bot API id may be `-100…` instead — the reader logs the
-chat ids it sees in `chats_seen` so you can correct `TELEGRAM_CHAT_ID`.)
+Each group id is in its web URL `web.telegram.org/k/#-4643549576` → `-4643549576`. Put the
+ids you want to watch in `TELEGRAM_CHAT_ID` as a **comma-separated list** (a single id still
+works). (If a group is a supergroup, the Bot API id may be `-100…` instead — the reader logs
+the chat ids it sees in `chats_seen` so you can correct `TELEGRAM_CHAT_ID`.)
 
 ### 3. Smoke-test the reader locally (no deps — stdlib only)
 ```bash
@@ -101,7 +104,7 @@ bot only captures messages from after it joined).
 - **Environment variables:**
   ```
   TELEGRAM_BOT_TOKEN=123456:ABC...
-  TELEGRAM_CHAT_ID=-4643549576
+  TELEGRAM_CHAT_ID=-4643549576,-1001234567890   # comma-separated; one or many groups
   EDGEOS_API_BASE=https://api.edgeos.world
   CLAUDE_USER_EMAIL=ignacio+claude@muvinai.com
   ```
@@ -119,10 +122,20 @@ bot only captures messages from after it joined).
   `[tg:<message_id>]` dedupe marker.
 - Only one `getUpdates` consumer can run, and no webhook may be set on the bot.
 
+## Watching multiple groups
+A single bot in N groups is the whole mechanism: `getUpdates` returns every group's messages
+in one call, and the reader keeps the ones whose chat id is in the `TELEGRAM_CHAT_ID`
+allowlist. Each message carries `chat_id`/`chat_title`, so tasks name their source group and
+the dedupe marker is scoped per chat. To add a group: add the bot to it (privacy OFF), grab
+its id from the web URL, and append the id to `TELEGRAM_CHAT_ID`. No code change needed.
+
 ## How duplicates are avoided
-Each created task embeds a `[tg:<message_id>]` marker (and the permalink) in its `detail`.
-The routine skips any message whose id already appears in an existing task, so overlapping
-24 h windows across daily runs don't recreate tasks. The agent also dedupes by subject.
+Each created task embeds a chat-scoped `[tg:<chat_id>:<message_id>]` marker (and the
+permalink/source group) in its `detail`. Telegram `message_id`s repeat across groups, so the
+chat id disambiguates. The routine skips any message whose marker already appears in an
+existing task, so overlapping 24 h windows across daily runs don't recreate tasks; it also
+honors the legacy `[tg:<message_id>]` marker (pre-multi-group, group `-4643549576`) and
+dedupes by subject.
 
 ## Task ↔ code reconciliation
 For open tasks (`to_do` / `testing` / `next_release`), the routine fetches `origin/dev` and
