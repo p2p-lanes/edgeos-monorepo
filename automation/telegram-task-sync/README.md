@@ -129,6 +129,15 @@ allowlist. Each message carries `chat_id`/`chat_title`, so tasks name their sour
 the dedupe marker is scoped per chat. To add a group: add the bot to it (privacy OFF), grab
 its id from the web URL, and append the id to `TELEGRAM_CHAT_ID`. No code change needed.
 
+**Forum supergroups (Topics):** a group with Topics enabled is a *single* chat id — all its
+topics ("channels") share it, so one id in `TELEGRAM_CHAT_ID` captures every topic. The reader
+adds `message_thread_id` (which topic) and a best-effort `topic_name` to each message, and
+tasks note the topic. The topic *name* only ships in a `forum_topic_created/edited` service
+message (usually sent before the bot joined), so `topic_name` is null for older topics — the
+thread id still tells topics apart, and the forum's General topic is labelled "General".
+Note: a supergroup's Bot API id is the `-100…` form, which may differ from the `-<id>` shown
+in the web URL; confirm via the reader's `chats_seen` if "No messages matched" shows up.
+
 ## How duplicates are avoided
 Each created task embeds a chat-scoped `[tg:<chat_id>:<message_id>]` marker (and the
 permalink/source group) in its `detail`. Telegram `message_id`s repeat across groups, so the

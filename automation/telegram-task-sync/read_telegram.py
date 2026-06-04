@@ -31,11 +31,19 @@ Optional:
                                If unset/empty, returns messages from every chat the bot sees.
   TELEGRAM_WINDOW_HOURS  int   how far back to keep messages (default 24)
 
+Forum supergroups (groups with "Topics" on) share ONE chat id across all their topics; each
+message carries a `message_thread_id` that identifies its topic. This script surfaces that id
+plus a best-effort `topic_name`. The name only travels in a `forum_topic_created/edited`
+service message (usually sent long before the bot joined), so `topic_name` is filled only when
+that service message falls inside the window; the forum's "General" topic is labelled as such.
+
 Output (stdout): a JSON object
-  {"chat_ids", "window_hours", "since_utc", "count", "messages": [...], "chats_seen": {...}}
-where each message is {message_id, chat_id, chat_title, date, sender, text, permalink,
-reply_to}. `reply_to` is the quoted original when the message is a reply
-(id/date/sender/text), even if that original was sent before the bot joined; null otherwise.
+  {"chat_ids", "window_hours", "since_utc", "count", "messages": [...], "chats_seen": {...},
+   "topics_seen": {...}}
+where each message is {message_id, chat_id, chat_title, message_thread_id, topic_name, date,
+sender, text, permalink, reply_to}. `reply_to` is the quoted original when the message is a
+reply (id/date/sender/text), even if that original was sent before the bot joined; null
+otherwise.
 """
 
 import json
@@ -142,6 +150,10 @@ def main() -> None:
 
     messages: list[dict] = []
     chats_seen: dict[int, str] = {}
+    # Forum topic names, keyed by (chat_id, thread_id), harvested from the rare
+    # forum_topic_created/edited service messages that fall inside the window.
+    topic_names: dict[tuple[int, int], str] = {}
+    forum_chats: set[int] = set()  # chat ids whose chat.is_forum is true
     offset: int | None = None
 
     for _ in range(MAX_PAGES):
@@ -167,8 +179,18 @@ def main() -> None:
             )
             if cid is not None:
                 chats_seen[cid] = chat_title
+                if chat.get("is_forum"):
+                    forum_chats.add(cid)
             if chat_filter is not None and cid not in chat_filter:
                 continue
+            # Forum topic name only ships in a topic-created/edited service message; when one
+            # lands in the window, remember it. Its message_thread_id (or own message_id) is
+            # the thread id all the topic's messages carry. Do this BEFORE the text filter —
+            # service messages have no text and would otherwise be dropped here.
+            ft = msg.get("forum_topic_created") or msg.get("forum_topic_edited")
+            if ft and ft.get("name") and cid is not None:
+                tid = msg.get("message_thread_id") or msg.get("message_id")
+                topic_names[(cid, tid)] = ft["name"]
             if msg.get("date", 0) < since_ts:
                 continue
             text = (msg.get("text") or msg.get("caption") or "").strip()
@@ -179,6 +201,10 @@ def main() -> None:
                     "message_id": msg["message_id"],
                     "chat_id": cid,
                     "chat_title": chat_title,
+                    # Forum topic this message belongs to (None outside forums / General topic);
+                    # topic_name is filled best-effort after the loop.
+                    "message_thread_id": msg.get("message_thread_id"),
+                    "topic_name": None,
                     "date": datetime.fromtimestamp(msg["date"], UTC).isoformat(),
                     "sender": _sender_name(msg.get("from", {})),
                     "text": text,
@@ -189,6 +215,17 @@ def main() -> None:
                     "reply_to": _msg_summary(msg.get("reply_to_message")),
                 }
             )
+
+    # Attribute each message to its forum topic. The name is whatever we harvested from a
+    # topic-created/edited service message in the window; for a forum's General topic
+    # (no thread id) we label it explicitly; otherwise the name stays None (the thread id
+    # still distinguishes topics, just without a human label).
+    for m in messages:
+        tid = m["message_thread_id"]
+        if tid is not None:
+            m["topic_name"] = topic_names.get((m["chat_id"], tid))
+        elif m["chat_id"] in forum_chats:
+            m["topic_name"] = "General"
 
     # Chronological across all chats (oldest first); message_id is per-chat, so tie-break on it.
     messages.sort(key=lambda m: (m["date"], m["chat_id"] or 0, m["message_id"]))
@@ -201,6 +238,11 @@ def main() -> None:
             "update TELEGRAM_CHAT_ID accordingly.\n"
         )
 
+    # Nested {chat_id: {thread_id: name}} for the topic names we managed to harvest.
+    topics_seen: dict[int, dict[int, str]] = {}
+    for (cid, tid), name in topic_names.items():
+        topics_seen.setdefault(cid, {})[tid] = name
+
     json.dump(
         {
             "chat_ids": sorted(chat_filter) if chat_filter is not None else None,
@@ -209,6 +251,7 @@ def main() -> None:
             "count": len(messages),
             "messages": messages,
             "chats_seen": chats_seen,
+            "topics_seen": topics_seen,
         },
         sys.stdout,
         ensure_ascii=False,

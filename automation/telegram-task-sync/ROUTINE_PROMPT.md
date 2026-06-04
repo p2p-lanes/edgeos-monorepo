@@ -25,9 +25,13 @@ Run:
 python automation/telegram-task-sync/read_telegram.py
 ```
 It prints JSON with a `messages` array (each: `message_id`, `chat_id`, `chat_title`,
-`date`, `sender`, `text`, `permalink`, `reply_to`). Messages may come from **several
-groups** — `chat_id`/`chat_title` identify which one; treat each group's conversation on
-its own (don't merge issues across groups just because the wording is similar). `reply_to`,
+`message_thread_id`, `topic_name`, `date`, `sender`, `text`, `permalink`, `reply_to`).
+Messages may come from **several groups** — `chat_id`/`chat_title` identify which one; treat
+each group's conversation on its own (don't merge issues across groups just because the
+wording is similar). For **forum supergroups** (groups with Topics), `message_thread_id`
+identifies the topic within the group and `topic_name` is its label when known (e.g. "Bugs",
+"General"); `topic_name` may be null if the topic was created before the bot joined — the
+thread id still distinguishes topics. `reply_to`,
 when present, is the quoted original a message is replying to (id/date/sender/text) — even
 if it predates the bot joining; use it as context when classifying (e.g. a reply confirming
 or triaging an older bug report). If `count` is 0, write a short "nothing new" summary and
@@ -79,14 +83,15 @@ It is better to miss a borderline item than to spam the tracker.
 ```json
 {
   "title": "<concise, specific summary>",
-  "detail": "<what was reported, who reported it, relevant context>\n\nSource: <chat_title> — <permalink or chat_id>\n[tg:<chat_id>:<message_id>]",
+  "detail": "<what was reported, who reported it, relevant context>\n\nSource: <chat_title>[ › <topic_name>] — <permalink or chat_id>\n[tg:<chat_id>:<message_id>]",
   "type": "bug" | "feature",
   "status": "to_do",
   "visibility": "internal"
 }
 ```
 - `type`: "bug" for breakage, "feature" for requests/changes.
-- Name the **source group** (`chat_title`) in `detail` so a human knows where it came from.
+- Name the **source group** (`chat_title`, and the `topic_name` when present) in `detail` so
+  a human knows where it came from.
 - ALWAYS include the chat-scoped `[tg:<chat_id>:<message_id>]` marker (use the chat_id and
   message_id you based the task on; if you grouped several, include each marker) so future
   runs detect it as already created.
