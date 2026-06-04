@@ -5326,6 +5326,7 @@ export type HumansSearchHumansPortalData = {
      * Maximum number of items to return
      */
     limit?: number;
+    popupId: string;
     search?: (string | null);
     /**
      * Number of items to skip
