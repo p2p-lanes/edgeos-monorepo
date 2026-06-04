@@ -191,6 +191,10 @@ class ApplicationCreate(BaseModel):
     human_id: uuid.UUID | None = None
     group_id: uuid.UUID | None = None  # Optional group to join
 
+    # Attribution columns — groups-rework T-gr-032 (REQ-GR-009, REQ-GR-016)
+    invite_id: uuid.UUID | None = None
+    referral_id: uuid.UUID | None = None
+
     # Scholarship request (human-submittable fields only)
     scholarship_request: bool = False
     scholarship_details: str | None = None

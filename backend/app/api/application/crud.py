@@ -410,6 +410,9 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
             "custom_fields",
             "status",
             "group_id",
+            # Attribution columns — groups-rework T-gr-032
+            "invite_id",
+            "referral_id",
             # Scholarship human-submittable fields (Phase 2.2)
             "scholarship_request",
             "scholarship_details",
@@ -423,12 +426,31 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         data["tenant_id"] = tenant_id
         data["human_id"] = human_id
 
+        # Resolve referral when referral_id is provided.
+        # Validate use limits and expiry; increment uses; auto-approve if flag set.
+        # T-gr-032: referral attribution wiring (groups-rework Decision 1f).
+        _referral_id = getattr(app_data, "referral_id", None)
+        _referral = None
+        if _referral_id:
+            from app.api.referral.crud import referrals_crud as _referrals_crud
+
+            _referral = _referrals_crud.get(session, _referral_id)
+            if not _referral:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Referral not found",
+                )
+            # Validate the referral is still usable (expiry + use limit)
+            _referrals_crud.validate_for_use(_referral)
+
         # Auto-accept only when the group explicitly enables it via the
-        # auto_approve_applications flag. Previously this triggered for any
-        # application with a group_id (implicit); now the flag must be True.
-        # Design Decision 1f: NO retroactive changes — existing ACCEPTED
-        # applications are never touched here; only NEW applications branch.
-        should_auto_accept = bool(_group and _group.auto_approve_applications)
+        # auto_approve_applications flag, or when the referral enables it.
+        # Previously this triggered for any application with a group_id (implicit);
+        # now the flag must be True. Design Decision 1f: NO retroactive changes.
+        should_auto_accept = bool(
+            (_group and _group.auto_approve_applications)
+            or (_referral and _referral.auto_approve)
+        )
         if should_auto_accept:
             if human.red_flag:
                 data["status"] = ApplicationStatus.REJECTED.value
@@ -527,6 +549,12 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
                         human_id=human_id,
                     )
                 )
+
+        # Increment referral current_uses now that the application is being committed.
+        # T-gr-032: referral attribution — spec REQ-GR-009.
+        if _referral is not None:
+            _referral.current_uses += 1
+            session.add(_referral)
 
         session.commit()
         session.refresh(application)
