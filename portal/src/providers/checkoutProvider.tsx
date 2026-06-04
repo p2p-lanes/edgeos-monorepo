@@ -90,11 +90,13 @@ interface CheckoutContextValue {
   /** Add a meal-plan cart entry for (attendee, weekly product). `weekdayDates`
    *  are the Mon–Fri ISO dates derived by the variant from the step's
    *  template_config coverage range. The reducer seeds dailyChoices to
-   *  {date: "chef"} for every weekday. */
+   *  {date: defaultKey} for every weekday (the variant passes the product's
+   *  first menu option); days start unset when `defaultKey` is omitted. */
   addMealPlan: (
     attendeeId: string,
     productId: string,
     weekdayDates: string[],
+    defaultKey?: string,
   ) => void
   removeMealPlan: (attendeeId: string, productId: string) => void
   setMealPlanDailyChoice: (
