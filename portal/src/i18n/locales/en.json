@@ -225,6 +225,8 @@
     },
     "to_pay": "To Pay",
     "credit_label": "Credit: {{amount}}",
+    "edit_mode_title": "Edit Mode",
+    "edit_mode_description": "Select a purchased pass to get credit, then choose a new one.",
     "cart": {
       "close_aria": "Close cart",
       "empty_title": "Your cart is empty",
