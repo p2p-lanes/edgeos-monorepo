@@ -1187,7 +1187,7 @@ export type EmailTemplatePublic = {
     updated_at?: (string | null);
 };
 
-export type EmailTemplateType = 'login_code_user' | 'login_code_human' | 'application_received' | 'application_accepted' | 'application_rejected' | 'application_accepted_with_discount' | 'application_accepted_with_incentive' | 'application_accepted_scholarship_rejected' | 'payment_confirmed' | 'abandoned_cart' | 'edit_passes_confirmed' | 'event_invitation' | 'event_updated' | 'event_cancelled' | 'event_approval_approved' | 'event_approval_rejected' | 'check_in_pass';
+export type EmailTemplateType = 'login_code_user' | 'login_code_human' | 'application_received' | 'application_accepted' | 'application_rejected' | 'application_accepted_with_discount' | 'application_accepted_with_incentive' | 'application_accepted_scholarship_rejected' | 'payment_confirmed' | 'abandoned_cart' | 'edit_passes_confirmed' | 'event_invitation' | 'event_updated' | 'event_cancelled' | 'event_rsvp_cancelled' | 'event_approval_approved' | 'event_approval_rejected' | 'check_in_pass';
 
 export type EmailTemplateUpdate = {
     subject?: (string | null);
@@ -1404,6 +1404,7 @@ export type EventPublic = {
     track_title?: (string | null);
     hidden?: boolean;
     my_rsvp_status?: (string | null);
+    attendee_count?: (number | null);
 };
 
 /**

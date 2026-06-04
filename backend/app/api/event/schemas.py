@@ -202,6 +202,11 @@ class EventPublic(EventBase):
     # list/get helpers. None means "not registered"; "registered" /
     # "checked_in" / "cancelled" mirror ParticipantStatus.
     my_rsvp_status: str | None = None
+    # Number of active (non-cancelled) registrations, i.e. the count that
+    # capacity is enforced against. Includes attendees who hid their name, so
+    # the displayed count stays consistent with "Event is full". Populated by
+    # the portal detail endpoint; None when not computed.
+    attendee_count: int | None = None
 
     model_config = ConfigDict(from_attributes=True)
 

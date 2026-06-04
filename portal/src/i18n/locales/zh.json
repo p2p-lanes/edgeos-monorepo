@@ -569,6 +569,7 @@
     "rsvp": {
       "going": "已报名",
       "rsvp": "报名",
+      "full": "已满",
       "cancel": "取消报名",
       "check_in": "签到",
       "check_in_opens_at_start": "签到将在活动开始时开放",

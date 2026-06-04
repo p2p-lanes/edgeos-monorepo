@@ -27,6 +27,8 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session, select
 
+from app.api.application.models import Applications
+from app.api.application.schemas import ApplicationStatus
 from app.api.event.models import Events
 from app.api.event.schemas import EventStatus, EventVisibility
 from app.api.event_participant.models import EventParticipants
@@ -117,6 +119,75 @@ def _fetch_participant(
 # from app.services.event_itip inside _notify_rsvp, so patching the module
 # attribute intercepts every real dispatch.
 _ITIP_TARGET = "app.services.event_itip.send_itip_to_single_recipient"
+
+
+# ---------------------------------------------------------------------------
+# Portal: participant count vs. privacy-hidden list
+# ---------------------------------------------------------------------------
+
+
+class TestPortalAttendeeCount:
+    """The capacity badge must include name-hidden attendees.
+
+    Participants who hid their name are dropped from the participant LIST, but
+    they still occupy a slot and count toward "Event is full". The detail
+    endpoint exposes ``attendee_count`` so the displayed count stays consistent
+    with the capacity guard instead of being derived from the filtered list.
+    """
+
+    def test_attendee_count_includes_name_hidden_participants(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+    ) -> None:
+        popup = _make_popup(db, tenant_a)
+        event = _make_event(db, tenant_a, popup)
+        viewer = _make_human(db, tenant_a)
+        visible = _make_human(db, tenant_a, email="visible@test.com")
+        hider = _make_human(db, tenant_a, email="hider@test.com")
+
+        for human in (visible, hider):
+            db.add(
+                EventParticipants(
+                    tenant_id=tenant_a.id,
+                    event_id=event.id,
+                    profile_id=human.id,
+                    status=ParticipantStatus.REGISTERED,
+                )
+            )
+        # The hider opted out of showing their name on their application.
+        db.add(
+            Applications(
+                id=uuid.uuid4(),
+                tenant_id=tenant_a.id,
+                popup_id=popup.id,
+                human_id=hider.id,
+                status=ApplicationStatus.ACCEPTED.value,
+                info_not_shared=["first_name"],
+            )
+        )
+        db.commit()
+
+        # Detail count includes both registrations (capacity-consistent).
+        detail = client.get(
+            f"/api/v1/events/portal/events/{event.id}",
+            headers=_human_headers(viewer),
+        )
+        assert detail.status_code == 200, detail.text
+        assert detail.json()["attendee_count"] == 2
+
+        # ...but the participant list still hides the name-hider.
+        listing = client.get(
+            f"/api/v1/event-participants/portal/participants?event_id={event.id}",
+            headers=_human_headers(viewer),
+        )
+        assert listing.status_code == 200, listing.text
+        results = listing.json()["results"]
+        profile_ids = {r["profile_id"] for r in results}
+        assert str(hider.id) not in profile_ids
+        assert str(visible.id) in profile_ids
+        assert len(results) == 1
 
 
 # ---------------------------------------------------------------------------
