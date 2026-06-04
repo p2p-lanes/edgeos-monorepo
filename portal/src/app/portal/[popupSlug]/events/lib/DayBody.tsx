@@ -450,13 +450,23 @@ export function DayBody({
     if (autoScrolledDayKeyRef.current === dayKey) return
     if (!scrollRef.current && !mobileScrollRef.current) return
     autoScrolledDayKeyRef.current = dayKey
-    let earliest = Number.POSITIVE_INFINITY
+    // When the selected day is today, anchor on the first *upcoming* event
+    // (start at or after now in the popup tz) so the user lands on what's
+    // next instead of the morning's already-finished sessions. Any other
+    // day keeps anchoring on its earliest event.
+    let anchorMin = Number.POSITIVE_INFINITY
     for (const items of columnEvents.values()) {
-      if (items.length > 0 && items[0].startMin < earliest) {
-        earliest = items[0].startMin
+      for (const it of items) {
+        if (isViewingToday && it.startMin < nowMin) continue
+        if (it.startMin < anchorMin) anchorMin = it.startMin
+        break
       }
     }
-    const anchor = Number.isFinite(earliest) ? earliest : 8 * 60
+    const anchor = Number.isFinite(anchorMin)
+      ? anchorMin
+      : isViewingToday
+        ? nowMin
+        : 8 * 60
     if (scrollRef.current) {
       const target = Math.max(0, anchor * MIN_PX - HOUR_PX)
       scrollRef.current.scrollTo({ top: target, behavior: "smooth" })
@@ -465,7 +475,9 @@ export function DayBody({
       const target = Math.max(0, anchor * M_MIN_W - M_HOUR_W)
       mobileScrollRef.current.scrollTo({ left: target, behavior: "smooth" })
     }
-  }, [columnEvents, dayKey])
+    // `isViewingToday`/`nowMin` are read for the upcoming-anchor math; the
+    // once-per-day guard above keeps the minute tick from re-scrolling.
+  }, [columnEvents, dayKey, isViewingToday, nowMin])
 
   const goPrev = () => setSelectedDate((d) => subDays(d, 1))
   const goNext = () => setSelectedDate((d) => addDays(d, 1))

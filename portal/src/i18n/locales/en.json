@@ -505,6 +505,7 @@
       "subheading": "Upcoming events at {{cityName}}",
       "subheading_with_tz": "Upcoming events at {{cityName}}, times shown in {{timezone}}",
       "empty_state": "No events yet",
+      "now": "Now",
       "events_disabled_heading": "Events are disabled",
       "events_disabled_message": "The organizer has turned off events for {{cityName}}.",
       "part_of_recurring_series": "Part of a recurring series",

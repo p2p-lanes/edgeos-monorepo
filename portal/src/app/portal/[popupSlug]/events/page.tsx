@@ -14,11 +14,7 @@ import {
 } from "react"
 import { createPortal } from "react-dom"
 import { useTranslation } from "react-i18next"
-import {
-  type EventPublic,
-  EventsService,
-  HumansService,
-} from "@/client"
+import { type EventPublic, EventsService, HumansService } from "@/client"
 import { Button } from "@/components/ui/button"
 import { useCityProvider } from "@/providers/cityProvider"
 import { CalendarBody } from "./lib/CalendarBody"
@@ -749,6 +745,9 @@ export default function EventsPage() {
             onHide={(id) => hideMutation.mutate(id)}
             onUnhide={(id) => unhideMutation.mutate(id)}
             placeholderUrl={eventSettings?.placeholder_url}
+            autoScrollToUpcoming={
+              !restoredScroll?.outer && !focusEventRef.current?.id
+            }
           />
         )}
       </div>
