@@ -5421,6 +5421,58 @@ export const EventCalendarTrackSchema = {
     description: 'Minimal track projection for the public calendar toolbar.'
 } as const;
 
+export const EventCollaboratorPublicSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        first_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'First Name'
+        },
+        last_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Last Name'
+        },
+        picture_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Picture Url'
+        }
+    },
+    type: 'object',
+    required: ['id'],
+    title: 'EventCollaboratorPublic',
+    description: `Slim human projection for an event's collaborator chips in the portal.
+
+Mirrors \`\`HumanPortalPublic\`\` so the same picker/avatar rendering works
+for already-saved collaborators. Resolved from \`\`Events.collaborator_ids\`\`
+by the portal get/create/update endpoints (the list endpoints leave it
+empty — collaborators aren't shown on cards).`
+} as const;
+
 export const EventCreateSchema = {
     properties: {
         popup_id: {
@@ -5587,6 +5639,15 @@ export const EventCreateSchema = {
                 }
             ],
             title: 'Host Id'
+        },
+        collaborator_ids: {
+            items: {
+                type: 'string',
+                format: 'uuid'
+            },
+            type: 'array',
+            title: 'Collaborator Ids',
+            default: []
         },
         status: {
             '$ref': '#/components/schemas/EventStatus',
@@ -6123,6 +6184,14 @@ export const EventPublicSchema = {
             ],
             title: 'Host Id'
         },
+        collaborator_ids: {
+            items: {
+                type: 'string',
+                format: 'uuid'
+            },
+            type: 'array',
+            title: 'Collaborator Ids'
+        },
         status: {
             '$ref': '#/components/schemas/EventStatus',
             default: 'draft'
@@ -6248,6 +6317,14 @@ export const EventPublicSchema = {
                 }
             ],
             title: 'Track Title'
+        },
+        collaborators: {
+            items: {
+                '$ref': '#/components/schemas/EventCollaboratorPublic'
+            },
+            type: 'array',
+            title: 'Collaborators',
+            default: []
         },
         hidden: {
             type: 'boolean',
@@ -7116,6 +7193,21 @@ export const EventUpdateSchema = {
                 }
             ],
             title: 'Host Id'
+        },
+        collaborator_ids: {
+            anyOf: [
+                {
+                    items: {
+                        type: 'string',
+                        format: 'uuid'
+                    },
+                    type: 'array'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Collaborator Ids'
         },
         status: {
             anyOf: [

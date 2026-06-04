@@ -36,6 +36,7 @@ import {
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { useCityProvider } from "@/providers/cityProvider"
+import { CollaboratorsField } from "../components/CollaboratorsField"
 import { EventScheduleFields } from "../components/EventScheduleFields"
 import { EventVenueField } from "../components/EventVenueField"
 import { HostDisplayField } from "../components/HostDisplayField"
@@ -209,6 +210,7 @@ function NewPortalEventForm({
   const [coverUrl, setCoverUrl] = useState("")
   const [hostDisplayName, setHostDisplayName] = useState("")
   const [hostId, setHostId] = useState<string | null>(null)
+  const [collaboratorIds, setCollaboratorIds] = useState<string[]>([])
 
   // ---- venue + availability ------------------------------------------
   const {
@@ -285,6 +287,7 @@ function NewPortalEventForm({
           tags,
           host_display_name: hostDisplayName.trim() || null,
           host_id: hostId,
+          collaborator_ids: collaboratorIds,
           status: "published",
         },
       })
@@ -550,6 +553,12 @@ function NewPortalEventForm({
           onHostIdChange={setHostId}
           currentUserName={currentHumanName}
           popupName={city?.name}
+          popupId={popupId}
+        />
+
+        <CollaboratorsField
+          value={collaboratorIds}
+          onChange={setCollaboratorIds}
           popupId={popupId}
         />
 
