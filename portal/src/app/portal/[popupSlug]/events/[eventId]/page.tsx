@@ -444,14 +444,6 @@ export default function EventDetailPage() {
       : sharePath
 
   const handleShare = async () => {
-    if (typeof navigator !== "undefined" && navigator.share) {
-      try {
-        await navigator.share({ title: event.title, url: shareUrl })
-        return
-      } catch (err) {
-        if (err instanceof Error && err.name === "AbortError") return
-      }
-    }
     try {
       await navigator.clipboard.writeText(shareUrl)
       setCopied(true)
