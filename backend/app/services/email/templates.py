@@ -232,6 +232,22 @@ class EventCancelledContext(BaseModel):
     venue_title: str = ""
 
 
+class EventRsvpCancelledContext(BaseModel):
+    """Context for event/rsvp_cancelled.html — self-service RSVP cancellation.
+
+    Sent when a human cancels their own registration. The event itself is not
+    cancelled, so the copy confirms the registration was removed rather than
+    announcing an event cancellation.
+    """
+
+    first_name: str = ""
+    event_title: str
+    popup_name: str = ""
+    event_when: str = ""
+    venue_title: str = ""
+    event_url: str = ""
+
+
 class EventApprovalApprovedContext(BaseModel):
     """Context for event/approval_approved.html template.
 
@@ -315,6 +331,7 @@ class EmailTemplates:
     EVENT_INVITATION = "event/invitation.html"
     EVENT_UPDATED = "event/updated.html"
     EVENT_CANCELLED = "event/cancelled.html"
+    EVENT_RSVP_CANCELLED = "event/rsvp_cancelled.html"
     EVENT_APPROVAL_APPROVED = "event/approval_approved.html"
     EVENT_APPROVAL_REJECTED = "event/approval_rejected.html"
 
@@ -337,6 +354,7 @@ TEMPLATE_TYPE_TO_FILE: dict[EmailTemplateType, str] = {
     EmailTemplateType.EVENT_INVITATION: "event/invitation.html",
     EmailTemplateType.EVENT_UPDATED: "event/updated.html",
     EmailTemplateType.EVENT_CANCELLED: "event/cancelled.html",
+    EmailTemplateType.EVENT_RSVP_CANCELLED: "event/rsvp_cancelled.html",
     EmailTemplateType.EVENT_APPROVAL_APPROVED: "event/approval_approved.html",
     EmailTemplateType.EVENT_APPROVAL_REJECTED: "event/approval_rejected.html",
     EmailTemplateType.CHECK_IN_PASS: "check_in/pass.html",
@@ -1124,6 +1142,56 @@ POPUP_TEMPLATE_METADATA: list[dict[str, Any]] = [
                 "label": "Venue",
                 "type": "string",
                 "description": "Venue name (may be empty)",
+                "required": False,
+                "group": "Event",
+            },
+            *_POPUP_EVENT_VARIABLES,
+        ],
+    },
+    {
+        "type": EmailTemplateType.EVENT_RSVP_CANCELLED,
+        "label": "Registration Cancelled",
+        "description": "Sent to a recipient who cancels their own registration to an event.",
+        "category": "Event",
+        "default_subject": "Your registration was cancelled: {{ event_title }}",
+        "variables": [
+            {
+                "name": "first_name",
+                "label": "First Name",
+                "type": "string",
+                "description": "Recipient's first name",
+                "required": False,
+                "group": "Recipient",
+            },
+            {
+                "name": "event_title",
+                "label": "Event Title",
+                "type": "string",
+                "description": "Title of the event",
+                "required": True,
+                "group": "Event",
+            },
+            {
+                "name": "event_when",
+                "label": "When",
+                "type": "string",
+                "description": "Formatted start date/time",
+                "required": False,
+                "group": "Event",
+            },
+            {
+                "name": "venue_title",
+                "label": "Venue",
+                "type": "string",
+                "description": "Venue name (may be empty)",
+                "required": False,
+                "group": "Event",
+            },
+            {
+                "name": "event_url",
+                "label": "Event URL",
+                "type": "string",
+                "description": "Link back to the event in the portal",
                 "required": False,
                 "group": "Event",
             },
