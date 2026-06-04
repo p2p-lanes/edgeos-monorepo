@@ -6395,6 +6395,11 @@ export class TasksService {
     /**
      * List Tasks
      * List tasks the current user may see (filtered by visibility).
+     *
+     * For a superadmin, the active workspace header (``X-Tenant-Id``) scopes the
+     * board to that tenant: tenant tasks of other tenants are hidden, while global
+     * (universal/internal) tasks stay visible. A malformed/absent header keeps the
+     * cross-tenant view.
      * @param data The data for the request.
      * @param data.status
      * @param data.type
@@ -6404,6 +6409,7 @@ export class TasksService {
      * @param data.search
      * @param data.skip Number of items to skip
      * @param data.limit Maximum number of items to return
+     * @param data.xTenantId
      * @returns ListModel_TaskPublic_ Successful Response
      * @throws ApiError
      */
@@ -6411,6 +6417,9 @@ export class TasksService {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/api/v1/tasks',
+            headers: {
+                'X-Tenant-Id': data.xTenantId
+            },
             query: {
                 status: data.status,
                 type: data.type,

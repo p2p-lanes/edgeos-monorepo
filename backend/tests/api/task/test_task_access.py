@@ -79,6 +79,21 @@ def test_superadmin_sees_all_visibilities(
         assert str(visibility_tasks[key].id) in ids
 
 
+def test_superadmin_board_scoped_to_active_workspace(
+    client, superadmin_token, tenant_a: Tenants, visibility_tasks
+) -> None:
+    """With an active workspace (X-Tenant-Id), the superadmin board hides other
+    tenants' tasks but keeps global (universal/internal) ones visible."""
+    headers = _auth(superadmin_token) | {"X-Tenant-Id": str(tenant_a.id)}
+    r = client.get("/api/v1/tasks?limit=1000", headers=headers)
+    assert r.status_code == 200
+    ids = {t["id"] for t in r.json()["results"]}
+    assert str(visibility_tasks["universal"].id) in ids
+    assert str(visibility_tasks["internal"].id) in ids
+    assert str(visibility_tasks["tenant_a"].id) in ids
+    assert str(visibility_tasks["tenant_b"].id) not in ids
+
+
 def test_get_task_404_when_not_viewable(
     client, admin_token_tenant_a, visibility_tasks
 ) -> None:

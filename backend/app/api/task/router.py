@@ -10,8 +10,9 @@ The ``tasks`` table is global, so every endpoint uses the privileged main engine
 
 import uuid
 from datetime import UTC, datetime
+from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, Header, HTTPException, Query, status
 
 from app.api.shared.enums import UserRole
 from app.api.shared.response import (
@@ -160,8 +161,22 @@ async def list_tasks(
     search: str | None = None,
     skip: PaginationSkip = 0,
     limit: PaginationLimit = 100,
+    x_tenant_id: Annotated[str | None, Header(alias="X-Tenant-Id")] = None,
 ) -> ListModel[TaskPublic]:
-    """List tasks the current user may see (filtered by visibility)."""
+    """List tasks the current user may see (filtered by visibility).
+
+    For a superadmin, the active workspace header (``X-Tenant-Id``) scopes the
+    board to that tenant: tenant tasks of other tenants are hidden, while global
+    (universal/internal) tasks stay visible. A malformed/absent header keeps the
+    cross-tenant view.
+    """
+    active_tenant_id: uuid.UUID | None = None
+    if x_tenant_id:
+        try:
+            active_tenant_id = uuid.UUID(x_tenant_id)
+        except ValueError:
+            active_tenant_id = None
+
     tasks, total = crud.tasks_crud.find_tasks(
         db,
         skip=skip,
@@ -173,6 +188,7 @@ async def list_tasks(
         release=release,
         search=search,
         viewer=current_user,
+        active_tenant_id=active_tenant_id,
     )
     return ListModel[TaskPublic](
         results=crud.to_public_list(db, tasks),
