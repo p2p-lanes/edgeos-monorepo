@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query"
+import { keepPreviousData, useQuery } from "@tanstack/react-query"
 import { useEffect, useState } from "react"
 import { ApplicationsService } from "@/client"
 import { queryKeys } from "@/lib/query-keys"
@@ -47,6 +47,9 @@ const useGetData = () => {
       }
     },
     enabled: !!city?.id && attendeeDirectoryEnabled,
+    // Keep the previous page's data (including total) while the next page
+    // loads, so the page count never collapses to 0 mid-navigation.
+    placeholderData: keepPreviousData,
   })
 
   const handlePageChange = (page: number) => {
