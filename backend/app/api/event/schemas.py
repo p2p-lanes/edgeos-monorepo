@@ -292,6 +292,31 @@ class EventPublicCalendarResponse(BaseModel):
     meta: EventCalendarMeta
 
 
+def _enforce_group_id_rules(
+    *,
+    group_id: uuid.UUID | None,
+    visibility: EventVisibility | None,
+) -> None:
+    """Schema-level validator for group_id field rules.
+
+    Enforces:
+    - group_id IS NOT NULL AND visibility != PRIVATE → 422 (orphan group_id).
+    - group_id IS NOT NULL AND visibility IS NULL (update patch, no visibility
+      field supplied) → allowed at schema level; router must check effective
+      visibility of the stored event.
+
+    The deeper checks (enable_private_events flag, creator membership,
+    mutual exclusion with EventInvitations) require DB access and are
+    therefore enforced in the router, not here.
+    """
+    if group_id is not None and visibility is not None:
+        if visibility != EventVisibility.PRIVATE:
+            raise ValueError(
+                "group_id can only be set on PRIVATE events. "
+                "Set visibility to PRIVATE or clear group_id."
+            )
+
+
 class EventCreate(BaseModel):
     """Event schema for creation."""
 
@@ -316,6 +341,11 @@ class EventCreate(BaseModel):
     status: EventStatus = EventStatus.DRAFT
     highlighted: bool = False
     recurrence: RecurrenceRule | None = None
+    # Groups-rework: optional group scope for PRIVATE events.
+    # When set, visibility MUST be PRIVATE; the group MUST have
+    # enable_private_events=True; and the event creator MUST be a member of the
+    # group. Mutually exclusive with explicit EventInvitations rows.
+    group_id: uuid.UUID | None = None
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
@@ -325,6 +355,14 @@ class EventCreate(BaseModel):
             venue_id=self.venue_id,
             name=self.custom_location_name,
             url=self.custom_location_url,
+        )
+        return self
+
+    @model_validator(mode="after")
+    def _validate_group_id(self) -> "EventCreate":
+        _enforce_group_id_rules(
+            group_id=self.group_id,
+            visibility=self.visibility,
         )
         return self
 
@@ -351,6 +389,9 @@ class EventUpdate(BaseModel):
     host_display_name: str | None = None
     status: EventStatus | None = None
     highlighted: bool | None = None
+    # Groups-rework: optional group scope for PRIVATE events.
+    # Setting to None clears an existing group association.
+    group_id: uuid.UUID | None = None
 
     @model_validator(mode="after")
     def _validate_custom_location(self) -> "EventUpdate":
@@ -368,6 +409,18 @@ class EventUpdate(BaseModel):
             name=self.custom_location_name,
             url=self.custom_location_url,
         )
+        return self
+
+    @model_validator(mode="after")
+    def _validate_group_id(self) -> "EventUpdate":
+        # Only validate when group_id or visibility are being touched.
+        if self.group_id is None and self.visibility is None:
+            return self
+        if self.group_id is not None:
+            _enforce_group_id_rules(
+                group_id=self.group_id,
+                visibility=self.visibility,
+            )
         return self
 
 

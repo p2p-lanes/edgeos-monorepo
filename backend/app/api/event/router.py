@@ -70,6 +70,70 @@ from app.services.event_itip import send_event_itip as _send_event_itip
 router = APIRouter(prefix="/events", tags=["events"])
 
 
+def _validate_group_event_rules(
+    db,
+    *,
+    group_id: uuid.UUID | None,
+    event_invitations_provided: bool,
+    creator_human_id: uuid.UUID | None,
+    popup_id: uuid.UUID,
+) -> None:
+    """Enforce server-side validators for group-scoped PRIVATE events.
+
+    Called from create_event (admin) and create_portal_event (portal human)
+    after schema-level validation has already rejected non-PRIVATE+group_id
+    combinations.
+
+    Validators (per design Decision 1a-1):
+    1. Mutual exclusion: group_id + explicit EventInvitations → 422.
+    2. enable_private_events gate: group.enable_private_events must be True → 422.
+    3. Creator must be member: owner must have a GroupMembers row → 403.
+       (Admin bypass: creator_human_id=None skips membership check.)
+    """
+    if group_id is None:
+        return
+
+    # Validator 1: mutual exclusion
+    if event_invitations_provided:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                "Specify either group_id or invitations, not both. "
+                "A group-scoped PRIVATE event uses group membership as the "
+                "access control list; explicit invitations are not allowed."
+            ),
+        )
+
+    # Validator 2: enable_private_events gate
+    from app.api.group.crud import groups_crud
+
+    group = groups_crud.get(db, group_id)
+    if group is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Group not found.",
+        )
+    if not group.enable_private_events:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                "The selected group does not have private events enabled. "
+                "An admin must enable enable_private_events on the group first."
+            ),
+        )
+
+    # Validator 3: creator must be a current member (portal only; admin bypasses)
+    if creator_human_id is not None:
+        from app.api.group.crud import groups_crud as _gc
+
+        member_group_ids = _gc.get_human_group_ids(db, creator_human_id, popup_id)
+        if group_id not in member_group_ids:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not a member of the specified group.",
+            )
+
+
 async def _send_event_invitation_emails(
     db,
     event,
@@ -963,6 +1027,16 @@ async def create_event(
             allow_unbookable=True,
         )
 
+    # Groups-rework: validate group_id rules (T-gr-036..T-gr-038).
+    # Admin path: creator_human_id=None skips the membership check.
+    _validate_group_event_rules(
+        db,
+        group_id=event_in.group_id,
+        event_invitations_provided=False,
+        creator_human_id=None,
+        popup_id=event_in.popup_id,
+    )
+
     tenant_id = (
         popup.tenant_id
         if current_user.role == UserRole.SUPERADMIN
@@ -1821,6 +1895,17 @@ async def bulk_invite(
     event = crud.events_crud.get(db, event_id)
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
+    # Groups-rework: mutual exclusion (T-gr-036). Group-scoped PRIVATE events
+    # use group membership as the access control list; explicit invitations
+    # are not allowed alongside a group_id.
+    if event.group_id is not None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                "This event is scoped to a group. Explicit invitations are not "
+                "allowed on group-scoped PRIVATE events."
+            ),
+        )
     result = _run_bulk_invite(db, event, payload.emails, current_user.id)
     await _send_event_invitation_emails(db, event, result.invited)
     return result
@@ -2055,6 +2140,16 @@ async def bulk_invite_portal(
     current_human: CurrentHuman,
 ) -> EventInvitationBulkResult:
     event = _ensure_portal_event_owner(db, event_id, current_human)
+    # Groups-rework: mutual exclusion (T-gr-036). Group-scoped PRIVATE events
+    # use group membership; explicit invitations are not allowed.
+    if event.group_id is not None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                "This event is scoped to a group. Explicit invitations are not "
+                "allowed on group-scoped PRIVATE events."
+            ),
+        )
     result = _run_bulk_invite(db, event, payload.emails, current_human.id)
     await _send_event_invitation_emails(db, event, result.invited)
     return result
@@ -2615,6 +2710,16 @@ async def create_portal_event(
             exdates=None,
             timezone=event_in.timezone,
         )
+
+    # Groups-rework: validate group_id rules (T-gr-036..T-gr-038).
+    # Portal path: creator_human_id is set so membership check is enforced.
+    _validate_group_event_rules(
+        db,
+        group_id=event_in.group_id,
+        event_invitations_provided=False,
+        creator_human_id=current_human.id,
+        popup_id=event_in.popup_id,
+    )
 
     event_data = event_in.model_dump()
     event_data.pop("recurrence", None)

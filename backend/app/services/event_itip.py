@@ -24,6 +24,44 @@ from app.services.event_datetime import format_event_when, format_event_when_ran
 from app.services.ical import build_event_ics
 
 
+def _gather_from_group_members(db, event) -> list[dict[str, Any]]:
+    """Resolve iTIP recipients from group membership.
+
+    Used for group-scoped PRIVATE events (event.group_id IS NOT NULL).
+    Email-only whitelist entries (human_id IS NULL) are intentionally skipped:
+    they have no human account to correlate a calendar invite with.
+    """
+    from sqlmodel import select
+
+    from app.api.group.models import GroupMembers
+    from app.api.human.models import Humans
+
+    rows: list[dict[str, Any]] = []
+    seen: set[uuid.UUID] = set()
+
+    member_rows = list(
+        db.exec(
+            select(Humans)
+            .join(GroupMembers, GroupMembers.human_id == Humans.id)
+            .where(GroupMembers.group_id == event.group_id)
+            .where(GroupMembers.human_id.is_not(None))  # type: ignore[union-attr]
+        ).all()
+    )
+    for h in member_rows:
+        if not h.email or h.id in seen:
+            continue
+        seen.add(h.id)
+        rows.append(
+            {
+                "human_id": h.id,
+                "email": h.email,
+                "first_name": h.first_name or "",
+                "occurrence_start": None,
+            }
+        )
+    return rows
+
+
 def gather_event_recipients(
     db,
     event,
@@ -32,11 +70,16 @@ def gather_event_recipients(
 ) -> list[dict[str, Any]]:
     """Return attendees for iTIP updates as ``(human, occurrence)`` rows.
 
-    Includes anyone with an ``EventInvitations`` row (series-level, no
-    occurrence scoping) plus any active ``EventParticipants`` (status !=
-    cancelled). Each participant row keeps its own ``occurrence_start`` so
-    the per-recipient ICS can carry a matching ``RECURRENCE-ID`` and
-    correlate updates with the calendar entry the user already has.
+    Branching logic (per design Decision 1h):
+    - PRIVATE + group_id IS NOT NULL: recipients are current group members
+      resolved to humans (email-only whitelist rows skipped).
+    - PRIVATE + group_id IS NULL: recipients are explicit EventInvitations
+      rows (current behavior, unchanged).
+    - Non-PRIVATE: active participants only (current behavior, unchanged).
+
+    Each participant row keeps its own ``occurrence_start`` so the
+    per-recipient ICS can carry a matching ``RECURRENCE-ID`` and correlate
+    updates with the calendar entry the user already has.
 
     The same human can show up multiple times if they RSVPd to several
     occurrences of a recurring series — we want one email per
@@ -51,6 +94,7 @@ def gather_event_recipients(
     from sqlmodel import select
 
     from app.api.event.models import EventInvitations
+    from app.api.event.schemas import EventVisibility
     from app.api.event_participant.models import EventParticipants
     from app.api.event_participant.schemas import ParticipantStatus
     from app.api.human.models import Humans
@@ -59,6 +103,15 @@ def gather_event_recipients(
     seen: set[tuple[uuid.UUID, datetime | None]] = set()
 
     if occurrence_start is None:
+        # Groups-rework (Decision 1h): branch on group_id for PRIVATE events.
+        event_visibility = getattr(event, "visibility", None)
+        event_group_id = getattr(event, "group_id", None)
+
+        if event_visibility == EventVisibility.PRIVATE and event_group_id is not None:
+            # Group-scoped PRIVATE: iTIP goes to group members.
+            return _gather_from_group_members(db, event)
+
+        # Invitation-based PRIVATE or non-PRIVATE: use EventInvitations.
         invited_rows = list(
             db.exec(
                 select(Humans)
