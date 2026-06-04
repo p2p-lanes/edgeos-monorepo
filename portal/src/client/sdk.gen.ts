@@ -2927,7 +2927,7 @@ export class EventsService {
     
     /**
      * Update Event Admin Notes
-     * Set an event's staff-only notes (any backoffice user).
+     * Set an event's staff-only notes (requires events write access).
      * @param data The data for the request.
      * @param data.eventId
      * @param data.requestBody

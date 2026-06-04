@@ -583,6 +583,7 @@
     "rsvp": {
       "going": "Asistiré",
       "rsvp": "Anotarme",
+      "full": "Completo",
       "cancel": "Cancelar RSVP",
       "check_in": "Check-in",
       "check_in_opens_at_start": "El check-in se habilita al comenzar el evento",

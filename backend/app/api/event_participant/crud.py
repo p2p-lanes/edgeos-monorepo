@@ -101,6 +101,45 @@ class EventParticipantsCRUD(
             )
         return session.exec(statement).one()
 
+    def cancel_all_for_event(
+        self,
+        session: Session,
+        event_id: uuid.UUID,
+        occurrence_start: datetime | None = None,
+        scope_to_occurrence: bool = False,
+    ) -> int:
+        """Cancel every active registration for an event.
+
+        Flips REGISTERED / CHECKED_IN rows to CANCELLED, mirroring the set of
+        attendees that receive the iTIP CANCEL. Called when an event (or a
+        single occurrence) is cancelled so a later re-publish does not
+        resurface stale RSVPs. ``registered_at`` is preserved so a later
+        re-registration keeps its original history.
+
+        Returns the number of rows cancelled. Must run AFTER the iTIP CANCEL
+        is dispatched, since recipient collection skips CANCELLED rows.
+        """
+        statement = select(EventParticipants).where(
+            EventParticipants.event_id == event_id,
+            EventParticipants.status != ParticipantStatus.CANCELLED,
+        )
+        if scope_to_occurrence:
+            if occurrence_start is None:
+                statement = statement.where(
+                    EventParticipants.occurrence_start.is_(None)  # type: ignore[union-attr]
+                )
+            else:
+                statement = statement.where(
+                    EventParticipants.occurrence_start == occurrence_start
+                )
+        rows = list(session.exec(statement).all())
+        for row in rows:
+            row.status = ParticipantStatus.CANCELLED
+            session.add(row)
+        if rows:
+            session.commit()
+        return len(rows)
+
     def find_by_profile(
         self,
         session: Session,

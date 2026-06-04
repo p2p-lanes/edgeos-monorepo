@@ -1133,6 +1133,12 @@ async def cancel_event(
     cancel_update = EventUpdate(status=EventStatus.CANCELLED)
     updated = crud.events_crud.update(db, event, cancel_update)
     await _bump_and_dispatch_itip_cancel(db, updated)
+    # Cancel the RSVPs themselves (after dispatch, so attendees still get the
+    # iTIP CANCEL): otherwise a later re-publish would resurface stale
+    # registrations even though their calendar entry was removed.
+    from app.api.event_participant.crud import event_participants_crud
+
+    event_participants_crud.cancel_all_for_event(db, updated.id)
     record_event_audit(
         db,
         event=updated,
@@ -2472,9 +2478,23 @@ async def get_portal_event(
         rsvp_q = rsvp_q.where(EventParticipants.occurrence_start == occurrence_start)
     rsvp = db.exec(rsvp_q).first()
 
+    # Active-registration count for the capacity badge. Mirrors the "Event is
+    # full" guard exactly: keys on this event's own id (the same path param the
+    # register endpoint counts against, NOT the recurrence master) and the same
+    # occurrence, counting non-cancelled rows with no privacy filtering. Keeps
+    # the badge consistent with what registration actually allows, even for a
+    # detached occurrence that carries its own capacity.
+    from app.api.event_participant.crud import event_participants_crud
+
+    attendee_count = event_participants_crud.count_active_for_event(
+        db, event.id, occurrence_start=occurrence_start
+    )
+
     pub = _to_public(event)
+    updates: dict[str, object] = {"attendee_count": attendee_count}
     if rsvp:
-        pub = pub.model_copy(update={"my_rsvp_status": rsvp})
+        updates["my_rsvp_status"] = rsvp
+    pub = pub.model_copy(update=updates)
     return pub
 
 
@@ -2809,6 +2829,12 @@ async def cancel_portal_event(
     cancel_update = EventUpdate(status=EventStatus.CANCELLED)
     updated = crud.events_crud.update(db, event, cancel_update)
     await _bump_and_dispatch_itip_cancel(db, updated)
+    # Cancel the RSVPs themselves (after dispatch, so attendees still get the
+    # iTIP CANCEL): otherwise a later re-publish would resurface stale
+    # registrations even though their calendar entry was removed.
+    from app.api.event_participant.crud import event_participants_crud
+
+    event_participants_crud.cancel_all_for_event(db, updated.id)
     record_event_audit(
         db,
         event=updated,

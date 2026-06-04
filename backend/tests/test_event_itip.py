@@ -753,6 +753,44 @@ class TestCancelAndDeleteDispatchCancel:
         assert send_mock.await_count == 1
         assert send_mock.await_args.kwargs["method"] == "CANCEL"
 
+    def test_cancel_cancels_rsvps_after_dispatching_email(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+        admin_token_tenant_a: str,
+    ) -> None:
+        """Cancelling an event flips its RSVPs to CANCELLED.
+
+        Prevents a later re-publish from resurfacing stale registrations
+        (the attendee's calendar entry was already removed). The flip MUST
+        happen after recipients are gathered, so the attendee still receives
+        the iTIP CANCEL.
+        """
+        popup = _make_popup(db, tenant_a)
+        event = _make_event(db, tenant_a, popup)
+        human = _make_human(db, tenant_a, email="attendee@test.com")
+        participant = _register(db, event, human)
+
+        send_mock = AsyncMock(return_value=None)
+        with _patch_send_everywhere(send_mock):
+            resp = client.post(
+                f"/api/v1/events/{event.id}/cancel",
+                headers=_auth(admin_token_tenant_a),
+            )
+
+        assert resp.status_code == 200, resp.text
+        # The attendee was still active when recipients were collected, so the
+        # CANCEL email targets them (dispatch ran before the status flip).
+        recipients = send_mock.await_args.args[2]
+        assert any(r["email"] == human.email for r in recipients)
+        # The RSVP row is now cancelled, so the portal no longer reports the
+        # human as registered after a re-publish.
+        db.expire_all()
+        refreshed = db.get(EventParticipants, participant.id)
+        assert refreshed is not None
+        assert refreshed.status == ParticipantStatus.CANCELLED
+
     def test_cancel_endpoint_routes_to_send_event_cancelled(
         self,
         client: TestClient,

@@ -5153,7 +5153,7 @@ export const EmailTemplatePublicSchema = {
 
 export const EmailTemplateTypeSchema = {
     type: 'string',
-    enum: ['login_code_user', 'login_code_human', 'application_received', 'application_accepted', 'application_rejected', 'application_accepted_with_discount', 'application_accepted_with_incentive', 'application_accepted_scholarship_rejected', 'payment_confirmed', 'abandoned_cart', 'edit_passes_confirmed', 'event_invitation', 'event_updated', 'event_cancelled', 'event_approval_approved', 'event_approval_rejected', 'check_in_pass'],
+    enum: ['login_code_user', 'login_code_human', 'application_received', 'application_accepted', 'application_rejected', 'application_accepted_with_discount', 'application_accepted_with_incentive', 'application_accepted_scholarship_rejected', 'payment_confirmed', 'abandoned_cart', 'edit_passes_confirmed', 'event_invitation', 'event_updated', 'event_cancelled', 'event_rsvp_cancelled', 'event_approval_approved', 'event_approval_rejected', 'check_in_pass'],
     title: 'EmailTemplateType'
 } as const;
 
@@ -6264,6 +6264,17 @@ export const EventPublicSchema = {
                 }
             ],
             title: 'My Rsvp Status'
+        },
+        attendee_count: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Attendee Count'
         }
     },
     type: 'object',
