@@ -3,6 +3,7 @@ import { CSS } from "@dnd-kit/utilities"
 
 import type { TaskPublic } from "@/client"
 import { Badge } from "@/components/ui/badge"
+import useAuth from "@/hooks/useAuth"
 import { cn } from "@/lib/utils"
 import { TYPE_CLASSES, TYPE_LABELS } from "./taskMeta"
 
@@ -14,6 +15,7 @@ interface TaskCardProps {
 }
 
 export function TaskCard({ task, onOpen, draggable = true }: TaskCardProps) {
+  const { isSuperadmin } = useAuth()
   const { attributes, listeners, setNodeRef, transform, isDragging } =
     useDraggable({
       id: task.id,
@@ -53,7 +55,7 @@ export function TaskCard({ task, onOpen, draggable = true }: TaskCardProps) {
         <span className="truncate text-xs text-muted-foreground">
           {task.responsible_name ?? "Unassigned"}
         </span>
-        {task.visibility !== "internal" && (
+        {isSuperadmin && task.visibility !== "internal" && (
           <span className="shrink-0 text-[11px] uppercase text-muted-foreground">
             {task.visibility}
           </span>
