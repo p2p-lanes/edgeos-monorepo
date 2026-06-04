@@ -364,40 +364,43 @@ export function TaskDialog({ open, onOpenChange, taskId }: TaskDialogProps) {
               />
             </div>
 
-            <div className="space-y-2">
-              <Label>Visibility</Label>
-              <Select
-                value={form.visibility}
-                onValueChange={(v) => {
-                  const vis = v as TaskVisibility
-                  // Default the target tenant to the one being worked in.
-                  setForm((prev) => ({
-                    ...prev,
-                    visibility: vis,
-                    target_tenant_id:
-                      vis === "tenant" &&
-                      !prev.target_tenant_id &&
-                      selectedTenantId
-                        ? selectedTenantId
-                        : prev.target_tenant_id,
-                  }))
-                }}
-                disabled={readOnly}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {TASK_VISIBILITIES.map((v) => (
-                    <SelectItem key={v} value={v}>
-                      {VISIBILITY_LABELS[v]}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            {/* Visibility & tenant scoping are superadmin-only concerns. */}
+            {isSuperadmin && (
+              <div className="space-y-2">
+                <Label>Visibility</Label>
+                <Select
+                  value={form.visibility}
+                  onValueChange={(v) => {
+                    const vis = v as TaskVisibility
+                    // Default the target tenant to the one being worked in.
+                    setForm((prev) => ({
+                      ...prev,
+                      visibility: vis,
+                      target_tenant_id:
+                        vis === "tenant" &&
+                        !prev.target_tenant_id &&
+                        selectedTenantId
+                          ? selectedTenantId
+                          : prev.target_tenant_id,
+                    }))
+                  }}
+                  disabled={readOnly}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {TASK_VISIBILITIES.map((v) => (
+                      <SelectItem key={v} value={v}>
+                        {VISIBILITY_LABELS[v]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
-            {form.visibility === "tenant" && (
+            {isSuperadmin && form.visibility === "tenant" && (
               <div className="space-y-2">
                 <Label>Tenant</Label>
                 <Select
