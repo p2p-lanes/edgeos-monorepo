@@ -9,7 +9,7 @@ import {
 import { useForm, useStore } from "@tanstack/react-form"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Link, useNavigate } from "@tanstack/react-router"
-import { Home, Trash2, UserSearch, Video } from "lucide-react"
+import { Home, Trash2, UserSearch, Video, X } from "lucide-react"
 import { useEffect, useMemo, useRef, useState } from "react"
 import {
   type EventCreate,
@@ -25,6 +25,7 @@ import {
 } from "@/client"
 import { DangerZone } from "@/components/Common/DangerZone"
 import { FieldError } from "@/components/Common/FieldError"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { DatePicker } from "@/components/ui/date-picker"
 import { ImageUpload } from "@/components/ui/image-upload"
@@ -174,6 +175,54 @@ export function EventForm({
     const name = [h.first_name, h.last_name].filter(Boolean).join(" ").trim()
     return name || h.email
   }
+
+  // --- Collaborators: multi participant picker ---------------------------
+  // Collaborators can edit, cancel and manage the event just like its
+  // creator (same flat-permission model as the portal edit form). Mirrors
+  // the Displayed host picker but accumulates a list instead of one pick.
+  const [collaboratorPickerOpen, setCollaboratorPickerOpen] = useState(false)
+  const [collaboratorSearch, setCollaboratorSearch] = useState("")
+  const [debouncedCollaboratorSearch, setDebouncedCollaboratorSearch] =
+    useState("")
+  useEffect(() => {
+    const handle = setTimeout(
+      () => setDebouncedCollaboratorSearch(collaboratorSearch),
+      250,
+    )
+    return () => clearTimeout(handle)
+  }, [collaboratorSearch])
+  const trimmedCollaboratorSearch = debouncedCollaboratorSearch.trim()
+  const {
+    data: collaboratorSearchResults,
+    isFetching: collaboratorSearchFetching,
+  } = useQuery({
+    queryKey: [
+      "humans",
+      "event-collaborator-picker",
+      selectedPopupId,
+      trimmedCollaboratorSearch,
+    ],
+    queryFn: () =>
+      HumansService.listHumans({
+        popupId: selectedPopupId!,
+        search: trimmedCollaboratorSearch || null,
+        limit: 10,
+      }),
+    enabled: collaboratorPickerOpen && !!selectedPopupId,
+  })
+  // Display names for the selected collaborator chips. Seeded from the
+  // resolved profiles the API returns for an existing event, and extended
+  // as the user picks more humans from the search popover.
+  const [collaboratorNames, setCollaboratorNames] = useState<
+    Record<string, string>
+  >(() =>
+    Object.fromEntries(
+      (defaultValues?.collaborators ?? []).map((c) => [
+        c.id,
+        [c.first_name, c.last_name].filter(Boolean).join(" ").trim() || c.id,
+      ]),
+    ),
+  )
 
   const { data: venues } = useQuery({
     queryKey: ["event-venues", selectedPopupId],
@@ -348,6 +397,7 @@ export function EventForm({
       highlighted: defaultValues?.highlighted ?? false,
       host_display_name: defaultValues?.host_display_name ?? "",
       host_id: defaultValues?.host_id ?? null,
+      collaborator_ids: defaultValues?.collaborator_ids ?? [],
       tags: defaultValues?.tags ?? [],
     },
     onSubmit: ({ value }) => {
@@ -405,6 +455,7 @@ export function EventForm({
           kind: value.kind || null,
           host_display_name: hostDisplayName,
           host_id: value.host_id,
+          collaborator_ids: value.collaborator_ids,
           start_time: startDate.toISOString(),
           end_time: endDate.toISOString(),
           timezone: value.timezone,
@@ -432,6 +483,7 @@ export function EventForm({
           kind: value.kind || null,
           host_display_name: hostDisplayName,
           host_id: value.host_id,
+          collaborator_ids: value.collaborator_ids,
           start_time: startDate.toISOString(),
           end_time: endDate.toISOString(),
           timezone: value.timezone,
@@ -1603,6 +1655,126 @@ export function EventForm({
                 )}
               </div>
             )}
+          </form.Field>
+        </InlineRow>
+
+        <InlineRow
+          label="Collaborators"
+          description="Co-organizers who can edit, cancel and manage this event — just like its creator."
+        >
+          <form.Field name="collaborator_ids">
+            {(field) => {
+              const ids = field.state.value
+              const addCollaborator = (h: HumanPublic) => {
+                if (ids.includes(h.id)) return
+                setCollaboratorNames((prev) => ({
+                  ...prev,
+                  [h.id]: humanDisplayName(h),
+                }))
+                field.handleChange([...ids, h.id])
+              }
+              const removeCollaborator = (id: string) =>
+                field.handleChange(ids.filter((cid) => cid !== id))
+              return (
+                <div className="flex w-full max-w-[380px] flex-col gap-2">
+                  {ids.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {ids.map((id) => (
+                        <Badge
+                          key={id}
+                          variant="secondary"
+                          className="gap-1 pr-1 font-normal"
+                        >
+                          {collaboratorNames[id] ?? id}
+                          {!readOnly && (
+                            <button
+                              type="button"
+                              className="rounded-sm hover:bg-muted-foreground/20"
+                              aria-label={`Remove ${collaboratorNames[id] ?? "collaborator"}`}
+                              onClick={() => removeCollaborator(id)}
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          )}
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
+                  {!readOnly && (
+                    <div className="flex justify-end">
+                      <Popover
+                        open={collaboratorPickerOpen}
+                        onOpenChange={(open) => {
+                          setCollaboratorPickerOpen(open)
+                          if (!open) setCollaboratorSearch("")
+                        }}
+                      >
+                        <PopoverTrigger asChild>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 px-2 text-xs"
+                            disabled={!selectedPopupId}
+                          >
+                            <UserSearch className="mr-1 h-3.5 w-3.5" />
+                            Add collaborator…
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent align="end" className="w-72 p-0">
+                          <div className="border-b p-2">
+                            <Input
+                              autoFocus
+                              value={collaboratorSearch}
+                              onChange={(e) =>
+                                setCollaboratorSearch(e.target.value)
+                              }
+                              placeholder="Search participants"
+                              className="h-8"
+                            />
+                          </div>
+                          <div className="max-h-64 overflow-y-auto py-1">
+                            {collaboratorSearchResults?.results?.length ? (
+                              collaboratorSearchResults.results.map((h) => {
+                                const name = humanDisplayName(h)
+                                const already = ids.includes(h.id)
+                                return (
+                                  <button
+                                    key={h.id}
+                                    type="button"
+                                    disabled={already}
+                                    className="flex w-full flex-col items-start gap-0.5 px-3 py-2 text-left text-sm hover:bg-muted disabled:opacity-50"
+                                    onClick={() => addCollaborator(h)}
+                                  >
+                                    <span className="font-medium">
+                                      {name}
+                                      {already ? " (added)" : ""}
+                                    </span>
+                                    {h.email && h.email !== name && (
+                                      <span className="text-xs text-muted-foreground">
+                                        {h.email}
+                                      </span>
+                                    )}
+                                  </button>
+                                )
+                              })
+                            ) : (
+                              <p className="px-3 py-4 text-center text-xs text-muted-foreground">
+                                {collaboratorSearchFetching
+                                  ? "Searching…"
+                                  : trimmedCollaboratorSearch
+                                    ? "No matches"
+                                    : "Type to search participants"}
+                              </p>
+                            )}
+                          </div>
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                  )}
+                </div>
+              )
+            }}
           </form.Field>
         </InlineRow>
 
