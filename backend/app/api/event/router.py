@@ -935,10 +935,10 @@ async def get_event_admin_notes(
 async def update_event_admin_notes(
     event_id: uuid.UUID,
     payload: EventAdminNotes,
-    db: TenantSession,
-    _: CurrentUser,
+    db: AdminOrApiKeySession_EventsWrite,
+    _: AdminOrApiKey_EventsWrite,
 ) -> EventAdminNotes:
-    """Set an event's staff-only notes (any backoffice user)."""
+    """Set an event's staff-only notes (requires events write access)."""
     event = crud.events_crud.get(db, event_id)
     if not event:
         raise HTTPException(
