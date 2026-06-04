@@ -20,6 +20,7 @@ import { useCityProvider } from "@/providers/cityProvider"
 import { CalendarBody } from "./lib/CalendarBody"
 import { DayBody } from "./lib/DayBody"
 import { EventsToolbar, type EventsView } from "./lib/EventsToolbar"
+import { canManageEvent } from "./lib/eventPermissions"
 import {
   consumeEventsViewState,
   type EventsScrollSnapshot,
@@ -350,8 +351,9 @@ export default function EventsPage() {
   // "My events" + "My RSVPs" together shows the *union* (everything I
   // own + everything I'm going to) rather than the intersection.
   // - all:    no filter on → published events for everyone
-  // - mine:   "My events" on → events I own (any status, filtered locally
-  //           since the API has no owner filter)
+  // - mine:   "My events" on → events I manage as owner, host, or
+  //           collaborator (any status, filtered locally since the API
+  //           has no owner filter)
   // - rsvped: "My RSVPs" on → published events I'm registered for
   const useAllChannel = !mineOnly && !rsvpedOnly
   const useMineChannel = mineOnly
@@ -483,8 +485,8 @@ export default function EventsPage() {
     // recurring instance and its master don't collapse into one row.
     const byKey = new Map<string, EventPublic>()
     if (useMineChannel) {
-      const mine = (mineQuery.data?.results ?? []).filter(
-        (e) => currentHuman != null && e.owner_id === currentHuman.id,
+      const mine = (mineQuery.data?.results ?? []).filter((e) =>
+        canManageEvent(e, currentHuman?.id),
       )
       for (const e of mine) byKey.set(`${e.id}:${e.start_time}`, e)
     }
