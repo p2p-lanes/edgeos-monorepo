@@ -6,6 +6,8 @@ from fastapi import APIRouter, HTTPException, status
 if TYPE_CHECKING:
     from sqlmodel import Session
 
+    from app.api.invite.schemas import InvitePublicPreview
+
 from app.api.group import crud
 from app.api.group.models import Groups
 from app.api.group.schemas import (
@@ -18,6 +20,7 @@ from app.api.group.schemas import (
     GroupMemberPublic,
     GroupMemberUpdate,
     GroupPublic,
+    GroupSlugResolution,
     GroupUpdate,
     GroupWithMembers,
 )
@@ -760,3 +763,132 @@ async def get_group_public(
         )
 
     return GroupPublic.model_validate(group)
+
+
+# ---------------------------------------------------------------------------
+# Portal URL compat layer — T-gr-043, T-gr-044
+# Spec: REQ-GR-027, REQ-GR-028
+# Design: Decision 1e — GroupSlugResolution with kind discriminator
+# ---------------------------------------------------------------------------
+
+portal_router = APIRouter(prefix="/portal", tags=["portal"])
+
+
+@portal_router.get(
+    "/groups/{slug}",
+    response_model=GroupSlugResolution,
+    summary="Resolve group slug or invite token (URL compat layer)",
+)
+async def resolve_group_slug(
+    slug: str,
+    popup_id: uuid.UUID,
+    db: SessionDep,
+) -> GroupSlugResolution:
+    """Resolve /portal/groups/{slug} to either a group or an invite.
+
+    Resolution order (Design: Decision 1e):
+      1. Look up groups by slug within the popup → kind="group"
+      2. Look up invites by token within the popup → kind="invite"
+      3. 404 if neither found
+
+    Legacy email links that land on /groups/{slug} can be transparently
+    redirected to /invite/{token} by the portal when kind="invite".
+
+    Spec: REQ-GR-027 — fallback resolver for post-migration invite tokens.
+    """
+    from app.api.invite.crud import invites_crud
+    from app.api.invite.schemas import InvitePublicPreview
+
+    # Step 1: resolve as a group slug
+    group = crud.groups_crud.get_by_slug(db, slug, popup_id=popup_id)
+    if group:
+        return GroupSlugResolution(
+            kind="group",
+            group=GroupPublic.model_validate(group),
+            invite=None,
+        )
+
+    # Step 2: resolve as an invite token (migrated EE26 groups land here)
+    invite = invites_crud.get_by_token(db, popup_id=popup_id, token=slug)
+    if invite:
+        # Resolve inviter_name for the preview payload
+        from sqlmodel import select as _select
+
+        from app.api.user.models import Users
+
+        inviter_name: str | None = None
+        creator = db.exec(_select(Users).where(Users.id == invite.created_by)).first()
+        if creator:
+            inviter_name = creator.full_name or creator.email
+
+        preview = InvitePublicPreview(
+            popup_id=invite.popup_id,
+            token=invite.token,
+            inviter_name=inviter_name,
+            is_email_restricted=invite.recipient_email is not None,
+            discount_percentage=invite.discount_percentage,
+            max_uses=invite.max_uses,
+            current_uses=invite.current_uses,
+            expires_at=invite.expires_at,
+        )
+        return GroupSlugResolution(
+            kind="invite",
+            group=None,
+            invite=preview.model_dump(mode="json"),
+        )
+
+    raise HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail="Group or invite not found",
+    )
+
+
+@portal_router.get(
+    "/invite/{token}",
+    response_model=None,
+    summary="Canonical invite forward endpoint (redirect to redeem preview)",
+)
+async def canonical_invite_forward(
+    token: str,
+    db: SessionDep,
+) -> "InvitePublicPreview":
+    """Canonical forward endpoint for invite URLs.
+
+    This is the preferred URL for invite links going forward. It is a thin
+    proxy to GET /invites/redeem/{token} preview semantics.
+
+    Spec: REQ-GR-028 — /invite/{token} as canonical portal endpoint.
+    Design: Decision 1e — both /groups/{slug} (compat) and /invite/{token}
+    (canonical) support redemption during the migration window.
+    """
+    from app.api.invite.crud import invites_crud
+    from app.api.invite.schemas import InvitePublicPreview
+
+    invite = invites_crud.get_by_token_any_popup(db, token)
+    if not invite:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Invite not found"
+        )
+
+    # Apply guard chain for preview (expired/exhausted → 410 Gone)
+    invites_crud.validate_for_redemption(invite)
+
+    from sqlmodel import select as _select
+
+    from app.api.user.models import Users
+
+    inviter_name: str | None = None
+    creator = db.exec(_select(Users).where(Users.id == invite.created_by)).first()
+    if creator:
+        inviter_name = creator.full_name or creator.email
+
+    return InvitePublicPreview(
+        popup_id=invite.popup_id,
+        token=invite.token,
+        inviter_name=inviter_name,
+        is_email_restricted=invite.recipient_email is not None,
+        discount_percentage=invite.discount_percentage,
+        max_uses=invite.max_uses,
+        current_uses=invite.current_uses,
+        expires_at=invite.expires_at,
+    )

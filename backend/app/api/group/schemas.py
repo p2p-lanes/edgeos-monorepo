@@ -219,3 +219,28 @@ class GroupProductsBase(SQLModel):
     product_id: uuid.UUID = Field(
         foreign_key="products.id", primary_key=True, index=True
     )
+
+
+class GroupSlugResolution(BaseModel):
+    """Response for GET /api/v1/portal/groups/{slug} — URL compat resolver.
+
+    Design: Decision 1e — same-shape response with kind discriminator.
+    Spec: REQ-GR-027 (slug resolver fallback to invites), REQ-GR-028 (canonical endpoint).
+
+    Resolution order:
+      1. groups_crud.get_by_slug → kind="group"
+      2. invites_crud.get_by_token → kind="invite"
+      3. 404
+
+    Caller (portal) branches once on kind. When kind="invite", the portal
+    redirects to /invite/{token} for canonical redemption flow.
+
+    invite field is typed as dict to avoid a circular schema import at module load;
+    the router populates it from InvitePublicPreview.model_dump().
+    """
+
+    kind: str  # "group" | "invite"
+    group: GroupPublic | None = None
+    invite: dict | None = None  # serialized InvitePublicPreview when kind="invite"
+
+    model_config = ConfigDict(from_attributes=True)
