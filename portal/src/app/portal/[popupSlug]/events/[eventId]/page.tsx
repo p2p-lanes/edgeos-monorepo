@@ -61,6 +61,7 @@ import { cn } from "@/lib/utils"
 import { useCityProvider } from "@/providers/cityProvider"
 import { AddToCalendarModal } from "../lib/AddToCalendarModal"
 import { CoverImage } from "../lib/CoverImage"
+import { canManageEvent } from "../lib/eventPermissions"
 import { summarizeRrule } from "../lib/summarizeRrule"
 import { useCalendarAddedFlag } from "../lib/useCalendarAddedFlag"
 import {
@@ -218,8 +219,7 @@ export default function EventDetailPage() {
     (p: EventParticipantPublic) => p.status !== "cancelled",
   )
 
-  const isOwner =
-    !!event && !!currentHuman && event.owner_id === currentHuman.id
+  const canManage = !!event && canManageEvent(event, currentHuman?.id)
 
   // RSVP state is sourced from the event's own `my_rsvp_status` field so
   // this page agrees with the list/day/calendar views (which read the
@@ -312,7 +312,7 @@ export default function EventDetailPage() {
     queryKey: ["portal-event-invitations", params.eventId],
     queryFn: () =>
       EventsService.listPortalInvitations({ eventId: params.eventId }),
-    enabled: !!params.eventId && isOwner,
+    enabled: !!params.eventId && canManage,
   })
 
   const [emailsInput, setEmailsInput] = useState("")
@@ -482,7 +482,7 @@ export default function EventDetailPage() {
           <ArrowLeft className="h-4 w-4" /> {t("events.common.back_to_events")}
         </Link>
         <div className="flex items-center gap-2 shrink-0">
-          {isOwner && event.status !== "cancelled" && (
+          {canManage && event.status !== "cancelled" && (
             <Dialog open={cancelEventOpen} onOpenChange={setCancelEventOpen}>
               <DialogTrigger asChild>
                 <Button
@@ -526,7 +526,7 @@ export default function EventDetailPage() {
               </DialogContent>
             </Dialog>
           )}
-          {isOwner && (
+          {canManage && (
             <Button asChild variant="outline" size="sm">
               <Link
                 href={`/portal/${city?.slug}/events/${event.id}/edit`}
@@ -554,7 +554,7 @@ export default function EventDetailPage() {
         </div>
       )}
 
-      {isOwner && event.status === "rejected" && event.rejection_reason && (
+      {canManage && event.status === "rejected" && event.rejection_reason && (
         <div className="flex items-start gap-2.5 rounded-xl border border-red-300 bg-red-50 p-3 text-red-900 dark:border-red-500/40 dark:bg-red-950/40 dark:text-red-100">
           <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0 text-red-600 dark:text-red-400" />
           <div className="text-sm">
@@ -930,8 +930,8 @@ export default function EventDetailPage() {
         </div>
       )}
 
-      {/* Owner-only: Paste attendees to invite */}
-      {isOwner && (
+      {/* Managers only (owner / host / collaborators): paste attendees to invite */}
+      {canManage && (
         <div className="rounded-xl border bg-card p-4 space-y-3">
           <div className="flex items-center gap-2">
             <Mail className="h-4 w-4 text-primary" />

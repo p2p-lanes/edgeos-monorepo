@@ -22,6 +22,7 @@ from app.api.event.schemas import (
     EventAvailabilityResult,
     EventCalendarMeta,
     EventCalendarTrack,
+    EventCollaboratorPublic,
     EventCreate,
     EventHostOption,
     EventInvitationBulkCreate,
@@ -616,7 +617,17 @@ def _ics_utc_stamp(dt: datetime) -> str:
 
 
 def _render_ics(event) -> str:
-    """Render a minimal, RFC-5545-compliant VCALENDAR string for one event."""
+    """Render a minimal, RFC-5545-compliant VCALENDAR string for one event.
+
+    The UID MUST match the one the iTIP path emits (``{event.id}@edgeos`` —
+    see ``app/services/ical.build_event_ics``). Calendars key entries on UID:
+    if the "Add to calendar" download used a different UID than the
+    invitation / RSVP email, the user would end up with TWO separate entries
+    for the same event, and a later organiser CANCEL (which targets the iTIP
+    UID) could only ever remove one of them — leaving the downloaded copy
+    stranded on their calendar. Keeping a single UID makes the download and
+    the emailed invite the same entry, so a cancellation reconciles it.
+    """
     dtstamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     dtstart = _ics_utc_stamp(event.start_time)
     dtend = _ics_utc_stamp(event.end_time)
@@ -631,7 +642,7 @@ def _render_ics(event) -> str:
         "CALSCALE:GREGORIAN",
         "METHOD:PUBLISH",
         "BEGIN:VEVENT",
-        f"UID:event-{event.id}@edgeos",
+        f"UID:{event.id}@edgeos",
         f"DTSTAMP:{dtstamp}",
         f"DTSTART:{dtstart}",
         f"DTEND:{dtend}",
@@ -906,7 +917,7 @@ async def get_event(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Event not found"
         )
-    return _to_public(event)
+    return _with_collaborators(db, _to_public(event), event)
 
 
 # ---------------------------------------------------------------------------
@@ -1034,7 +1045,7 @@ async def create_event(
         actor=actor_from_user(current_user),
     )
 
-    return _to_public(event)
+    return _with_collaborators(db, _to_public(event), event)
 
 
 @router.patch("/{event_id}", response_model=EventPublic)
@@ -1111,7 +1122,7 @@ async def update_event(
         changes=compute_changes(audit_before, audit_after),
     )
 
-    return _to_public(updated)
+    return _with_collaborators(db, _to_public(updated), updated)
 
 
 @router.post("/{event_id}/cancel", response_model=EventPublic)
@@ -1859,14 +1870,75 @@ async def delete_invitation(
 # ---------------------------------------------------------------------------
 
 
+def _event_collaborator_ids(event) -> list[uuid.UUID]:
+    """Collaborator ids on an event as real UUIDs.
+
+    The column is a native ``uuid[]`` so values normally arrive as UUIDs, but
+    we coerce defensively (expanded occurrence pseudo-rows / JSON round-trips
+    can surface strings) and drop anything unparseable.
+    """
+    out: list[uuid.UUID] = []
+    for value in getattr(event, "collaborator_ids", None) or []:
+        if isinstance(value, uuid.UUID):
+            out.append(value)
+            continue
+        try:
+            out.append(uuid.UUID(str(value)))
+        except (ValueError, TypeError):
+            continue
+    return out
+
+
 def _human_manages_event(event, current_human) -> bool:
     """Whether a human may manage an event (edit / cancel / invitations).
 
-    True for the event's owner (creator) or its designated host — the host
-    carries the same responsibility over the event even though they didn't
-    create it. ``host_id`` is NULL when no directory human was assigned.
+    True for the event's owner (creator), its designated host, or any of its
+    collaborators — all carry the same responsibility over the event even
+    though they didn't create it. ``host_id`` is NULL when no directory human
+    was assigned; ``collaborator_ids`` is empty when none were added.
     """
-    return current_human.id in (event.owner_id, event.host_id)
+    if current_human.id in (event.owner_id, event.host_id):
+        return True
+    return current_human.id in _event_collaborator_ids(event)
+
+
+def _resolve_collaborators(db, event) -> list[EventCollaboratorPublic]:
+    """Resolve an event's ``collaborator_ids`` to slim human profiles.
+
+    Preserves the stored order and silently skips ids that no longer resolve
+    to a human in the tenant. Returns ``[]`` when there are no collaborators.
+    """
+    ids = _event_collaborator_ids(event)
+    if not ids:
+        return []
+
+    from sqlmodel import select
+
+    from app.api.human.models import Humans
+
+    rows = db.exec(select(Humans).where(Humans.id.in_(ids))).all()
+    by_id = {h.id: h for h in rows}
+    resolved: list[EventCollaboratorPublic] = []
+    for cid in ids:
+        human = by_id.get(cid)
+        if human is None:
+            continue
+        resolved.append(
+            EventCollaboratorPublic(
+                id=human.id,
+                first_name=human.first_name,
+                last_name=human.last_name,
+                picture_url=human.picture_url,
+            )
+        )
+    return resolved
+
+
+def _with_collaborators(db, public: EventPublic, event) -> EventPublic:
+    """Attach resolved collaborator profiles to a single-event response."""
+    return public.model_copy(
+        update={"collaborators": _resolve_collaborators(db, event)}
+    )
 
 
 def _ensure_portal_event_owner(db, event_id: uuid.UUID, current_human):
@@ -2495,7 +2567,7 @@ async def get_portal_event(
     if rsvp:
         updates["my_rsvp_status"] = rsvp
     pub = pub.model_copy(update=updates)
-    return pub
+    return _with_collaborators(db, pub, event)
 
 
 # ---------------------------------------------------------------------------
@@ -2719,7 +2791,7 @@ async def create_portal_event(
         actor=actor_from_human(current_human),
     )
 
-    return _to_public(event)
+    return _with_collaborators(db, _to_public(event), event)
 
 
 @router.patch("/portal/events/{event_id}", response_model=EventPublic)
@@ -2801,7 +2873,7 @@ async def update_portal_event(
         snapshot=audit_after,
         changes=compute_changes(audit_before, audit_after),
     )
-    return _to_public(updated)
+    return _with_collaborators(db, _to_public(updated), updated)
 
 
 @router.post("/portal/events/{event_id}/cancel", response_model=EventPublic)

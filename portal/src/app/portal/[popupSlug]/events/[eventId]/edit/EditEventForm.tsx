@@ -18,6 +18,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { CollaboratorsField } from "../../components/CollaboratorsField"
 import { EventScheduleFields } from "../../components/EventScheduleFields"
 import { HostDisplayField } from "../../components/HostDisplayField"
 import {
@@ -289,6 +290,13 @@ export function EditEventForm({
           currentUserName={currentHumanName}
           popupName={cityName}
           popupId={popupId}
+        />
+
+        <CollaboratorsField
+          value={form.collaboratorIds}
+          onChange={form.setCollaboratorIds}
+          popupId={popupId}
+          initialCollaborators={event.collaborators ?? undefined}
         />
 
         <div className="space-y-2">

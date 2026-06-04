@@ -1260,6 +1260,21 @@ export type EventCalendarTrack = {
 };
 
 /**
+ * Slim human projection for an event's collaborator chips in the portal.
+ *
+ * Mirrors ``HumanPortalPublic`` so the same picker/avatar rendering works
+ * for already-saved collaborators. Resolved from ``Events.collaborator_ids``
+ * by the portal get/create/update endpoints (the list endpoints leave it
+ * empty — collaborators aren't shown on cards).
+ */
+export type EventCollaboratorPublic = {
+    id: string;
+    first_name?: (string | null);
+    last_name?: (string | null);
+    picture_url?: (string | null);
+};
+
+/**
  * Event schema for creation.
  */
 export type EventCreate = {
@@ -1282,6 +1297,7 @@ export type EventCreate = {
     kind?: (string | null);
     host_display_name?: (string | null);
     host_id?: (string | null);
+    collaborator_ids?: Array<(string)>;
     status?: EventStatus;
     highlighted?: boolean;
     recurrence?: (RecurrenceRule | null);
@@ -1387,6 +1403,7 @@ export type EventPublic = {
     kind?: (string | null);
     host_display_name?: (string | null);
     host_id?: (string | null);
+    collaborator_ids?: Array<(string)>;
     status?: EventStatus;
     highlighted?: boolean;
     rejection_reason?: (string | null);
@@ -1402,6 +1419,7 @@ export type EventPublic = {
     venue_location?: (string | null);
     venue_image_url?: (string | null);
     track_title?: (string | null);
+    collaborators?: Array<EventCollaboratorPublic>;
     hidden?: boolean;
     my_rsvp_status?: (string | null);
     attendee_count?: (number | null);
@@ -1550,6 +1568,7 @@ export type EventUpdate = {
     kind?: (string | null);
     host_display_name?: (string | null);
     host_id?: (string | null);
+    collaborator_ids?: (Array<(string)> | null);
     status?: (EventStatus | null);
     highlighted?: (boolean | null);
 };

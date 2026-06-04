@@ -5,7 +5,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 from sqlalchemy import Text
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB
+from sqlalchemy.dialects.postgresql import UUID as PgUUID
 from sqlmodel import Column, DateTime, Field, SQLModel
 
 
@@ -99,6 +100,17 @@ class EventBase(SQLModel):
     # rights as the owner (edit / cancel / invitations). NULL when the host is
     # free text or unset. Modeled like owner_id: indexed uuid, no hard FK.
     host_id: uuid.UUID | None = Field(default=None, index=True)
+    # Humans who collaborate on the event. Each id grants the SAME manage
+    # rights as the owner / host (edit / cancel / invitations). Stored as a
+    # native ``uuid[]`` (not JSONB) so membership checks and serialization
+    # round-trip as real UUIDs instead of strings. Empty by default; any
+    # collaborator may add or remove others.
+    collaborator_ids: list[uuid.UUID] = Field(
+        default_factory=list,
+        sa_column=Column(
+            ARRAY(PgUUID(as_uuid=True)), nullable=False, server_default="{}"
+        ),
+    )
     status: EventStatus = Field(default=EventStatus.DRAFT)
     # When true, portal clients render the event with a "special" treatment
     # (badge, accent border) so it stands out in the list/day/calendar views.
@@ -176,6 +188,23 @@ def _enforce_custom_location_xor(
         raise ValueError("venue_id and custom_location_* are mutually exclusive.")
 
 
+class EventCollaboratorPublic(BaseModel):
+    """Slim human projection for an event's collaborator chips in the portal.
+
+    Mirrors ``HumanPortalPublic`` so the same picker/avatar rendering works
+    for already-saved collaborators. Resolved from ``Events.collaborator_ids``
+    by the portal get/create/update endpoints (the list endpoints leave it
+    empty — collaborators aren't shown on cards).
+    """
+
+    id: uuid.UUID
+    first_name: str | None = None
+    last_name: str | None = None
+    picture_url: str | None = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class EventPublic(EventBase):
     """Event schema for API responses."""
 
@@ -194,6 +223,12 @@ class EventPublic(EventBase):
     # Denormalized track name so portal clients can render the track label
     # without a follow-up call. None when the event has no track.
     track_title: str | None = None
+    # Collaborators resolved to their human profiles (id + name + avatar) so
+    # the edit form can render the saved collaborator chips without a separate
+    # lookup. The raw ``collaborator_ids`` are also present (inherited from
+    # EventBase). Only populated by the single-event get/create/update
+    # endpoints; empty on list responses.
+    collaborators: list[EventCollaboratorPublic] = []
     # True when the current human has hidden this event (per-user marker).
     # Only populated by portal endpoints and only ever True inside responses
     # to ``?include_hidden=true`` — otherwise hidden events are filtered out.
@@ -321,6 +356,7 @@ class EventCreate(BaseModel):
     kind: str | None = None
     host_display_name: str | None = None
     host_id: uuid.UUID | None = None
+    collaborator_ids: list[uuid.UUID] = []
     status: EventStatus = EventStatus.DRAFT
     highlighted: bool = False
     recurrence: RecurrenceRule | None = None
@@ -360,6 +396,7 @@ class EventUpdate(BaseModel):
     kind: str | None = None
     host_display_name: str | None = None
     host_id: uuid.UUID | None = None
+    collaborator_ids: list[uuid.UUID] | None = None
     status: EventStatus | None = None
     highlighted: bool | None = None
 

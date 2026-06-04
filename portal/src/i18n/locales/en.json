@@ -422,6 +422,7 @@
     "status": "Status",
     "groups": "Groups",
     "events": "Event Calendar",
+    "tracks": "Tracks",
     "venues": "Venues",
     "api_keys": "API Keys",
     "api_docs": "API Docs"
@@ -504,6 +505,7 @@
       "subheading": "Upcoming events at {{cityName}}",
       "subheading_with_tz": "Upcoming events at {{cityName}}, times shown in {{timezone}}",
       "empty_state": "No events yet",
+      "now": "Now",
       "events_disabled_heading": "Events are disabled",
       "events_disabled_message": "The organizer has turned off events for {{cityName}}.",
       "part_of_recurring_series": "Part of a recurring series",
@@ -727,6 +729,11 @@
       "host_type_to_search": "Type to search participants",
       "host_helper": "Name shown to participants on the event page.",
       "host_helper_with_popup": "Name shown to participants. Leave blank to use \"{{name}}\".",
+      "collaborators_label": "Collaborators (optional)",
+      "collaborators_add": "Add collaborator…",
+      "collaborators_added": "Added",
+      "collaborators_remove": "Remove {{name}}",
+      "collaborators_helper": "Collaborators can edit, cancel, and manage this event — just like its creator.",
       "visibility_private_short": "Private",
       "visibility_unlisted_short": "Unlisted",
       "description_label": "Description (optional)",
@@ -771,6 +778,20 @@
       "not_your_event_heading": "Not your event",
       "not_your_event_message": "Only the event creator can edit this event.",
       "back_to_event": "Back to event"
+    },
+    "tracks": {
+      "list": {
+        "heading": "Tracks",
+        "subheading": "Browse events at {{cityName}} grouped into topic-based tracks.",
+        "search_placeholder": "Search tracks...",
+        "event_count_one": "{{count}} event",
+        "event_count_other": "{{count}} events",
+        "empty_state": "No tracks with events yet",
+        "no_matches": "No tracks match your search",
+        "share_link": "Copy track link",
+        "link_copied": "Track link copied",
+        "link_error": "Couldn't copy the link"
+      }
     },
     "venues": {
       "list": {
