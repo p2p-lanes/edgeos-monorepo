@@ -5151,24 +5151,27 @@ export class HumansService {
     
     /**
      * Search participants directory
-     * Search humans in the current tenant for portal pickers.
+     * Search a popup's attendees who share their name, for portal pickers.
      *
      * Used by the event-creation Displayed-host field to let a creator pick a
-     * participant by name. RLS already scopes to the caller's tenant via
-     * HumanTenantSession; the slim response schema omits email so this isn't
-     * a wider exposure than the participant lists portal users can already see.
+     * host. Scoped to humans who actually attend ``popup_id`` (accepted
+     * application with a ticket-holding main/spouse attendee) AND who have not
+     * hidden their name via ``info_not_shared`` for that popup. RLS scopes to the
+     * caller's tenant; the slim response schema omits email.
      * @param data The data for the request.
+     * @param data.popupId
      * @param data.search
      * @param data.skip Number of items to skip
      * @param data.limit Maximum number of items to return
      * @returns ListModel_HumanPortalPublic_ Successful Response
      * @throws ApiError
      */
-    public static searchHumansPortal(data: HumansSearchHumansPortalData = {}): CancelablePromise<HumansSearchHumansPortalResponse> {
+    public static searchHumansPortal(data: HumansSearchHumansPortalData): CancelablePromise<HumansSearchHumansPortalResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/api/v1/humans/portal/search',
             query: {
+                popup_id: data.popupId,
                 search: data.search,
                 skip: data.skip,
                 limit: data.limit

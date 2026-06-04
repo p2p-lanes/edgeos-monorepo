@@ -3042,6 +3042,17 @@ export const AttendeesDirectoryEntrySchema = {
             ],
             title: 'Picture Url'
         },
+        category: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Category'
+        },
         participation: {
             items: {
                 '$ref': '#/components/schemas/DirectoryProduct'
@@ -3062,7 +3073,10 @@ export const AttendeesDirectoryEntrySchema = {
     type: 'object',
     required: ['id'],
     title: 'AttendeesDirectoryEntry',
-    description: 'Single entry in the attendees directory.'
+    description: `Single entry in the attendees directory.
+
+The directory is attendee-centric: one entry per ticket-holding attendee
+(any category), sourced from that attendee's own human record.`
 } as const;
 
 export const AuditLogPublicSchema = {
@@ -15464,6 +15478,10 @@ export const TaskCreateSchema = {
             '$ref': '#/components/schemas/TaskType',
             default: 'feature'
         },
+        priority: {
+            '$ref': '#/components/schemas/TaskPriority',
+            default: 'medium'
+        },
         responsible_user_id: {
             anyOf: [
                 {
@@ -15537,6 +15555,10 @@ export const TaskDetailPublicSchema = {
         },
         type: {
             '$ref': '#/components/schemas/TaskType'
+        },
+        priority: {
+            '$ref': '#/components/schemas/TaskPriority',
+            default: 'medium'
         },
         responsible_user_id: {
             anyOf: [
@@ -15662,6 +15684,12 @@ export const TaskMediaTypeSchema = {
     title: 'TaskMediaType'
 } as const;
 
+export const TaskPrioritySchema = {
+    type: 'string',
+    enum: ['low', 'medium', 'high'],
+    title: 'TaskPriority'
+} as const;
+
 export const TaskPublicSchema = {
     properties: {
         id: {
@@ -15689,6 +15717,10 @@ export const TaskPublicSchema = {
         },
         type: {
             '$ref': '#/components/schemas/TaskType'
+        },
+        priority: {
+            '$ref': '#/components/schemas/TaskPriority',
+            default: 'medium'
         },
         responsible_user_id: {
             anyOf: [
@@ -15865,6 +15897,16 @@ export const TaskUpdateSchema = {
             anyOf: [
                 {
                     '$ref': '#/components/schemas/TaskType'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        priority: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/TaskPriority'
                 },
                 {
                     type: 'null'

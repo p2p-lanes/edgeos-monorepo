@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 
 from fastapi import HTTPException, status
 from sqlalchemy import desc, exists, or_
+from sqlalchemy.dialects import postgresql
 from sqlalchemy.orm import selectinload
 from sqlmodel import Session, col, func, select
 
@@ -271,6 +272,101 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         results = list(session.exec(statement).all())
 
         return results, total
+
+    def find_directory_humans(
+        self,
+        session: Session,
+        popup_id: uuid.UUID,
+        q: str | None = None,
+        skip: int = 0,
+        limit: int = 20,
+    ) -> tuple[list["Humans"], int]:
+        """Find humans in the Portal attendee directory who share their name.
+
+        Same population as ``find_directory`` (accepted application, the attendee
+        holds at least one product, directory-visible main/spouse category) but
+        returns the distinct underlying Humans instead of Attendee rows. Powers
+        the event host picker: a creator may only pick a host who actually
+        attends this popup AND has not hidden their name for it.
+
+        Applications that listed "first_name" or "last_name" in
+        ``info_not_shared`` are excluded — picking them would surface a name the
+        attendee chose to hide. Humans with no usable name are also excluded so
+        the picker never renders a blank entry. Optional ``q`` does an ilike
+        match on the human's first/last name.
+        """
+        has_products = exists().where(AttendeeProducts.attendee_id == Attendees.id)
+        # info_not_shared is a Postgres text[] column, so name-hiding is detected
+        # with the array-overlap operator (&&): true when the list shares any
+        # element with {first_name, last_name}. (?| is a JSONB operator and does
+        # NOT apply to a real array column.) Negated to EXCLUDE those rows.
+        hides_name = col(Applications.info_not_shared).op("&&")(
+            postgresql.array(("first_name", "last_name"))
+        )
+        has_name = or_(
+            func.trim(func.coalesce(col(Humans.first_name), "")) != "",
+            func.trim(func.coalesce(col(Humans.last_name), "")) != "",
+        )
+
+        base_statement = (
+            select(Humans)
+            .join(Attendees, Attendees.human_id == Humans.id)  # type: ignore[arg-type]
+            .join(Applications, Attendees.application_id == Applications.id)  # type: ignore[arg-type]
+            .join(
+                AttendeeCategories,
+                Attendees.category_id == AttendeeCategories.id,  # type: ignore[arg-type]
+            )
+            .where(Attendees.popup_id == popup_id)
+            .where(Applications.status == ApplicationStatus.ACCEPTED.value)
+            .where(has_products)
+            .where(col(AttendeeCategories.key).in_(DIRECTORY_VISIBLE_CATEGORY_KEYS))
+            .where(~hides_name)
+            .where(has_name)
+        )
+
+        if q:
+            search_term = f"%{q}%"
+            base_statement = base_statement.where(
+                or_(
+                    col(Humans.first_name).ilike(search_term),
+                    col(Humans.last_name).ilike(search_term),
+                )
+            )
+
+        distinct_statement = base_statement.distinct()
+        count_statement = select(func.count()).select_from(
+            distinct_statement.subquery()
+        )
+        total = session.exec(count_statement).one()
+
+        results = list(session.exec(distinct_statement.offset(skip).limit(limit)).all())
+        return results, total
+
+    def human_ids_hiding_name(
+        self,
+        session: Session,
+        popup_id: uuid.UUID,
+        human_ids: list[uuid.UUID],
+    ) -> set[uuid.UUID]:
+        """Return the subset of ``human_ids`` who hid their name for ``popup_id``.
+
+        A human hides their name when their Application for the popup lists
+        "first_name" or "last_name" in ``info_not_shared``. Used to drop those
+        people from portal-facing participant/RSVP lists.
+        """
+        if not human_ids:
+            return set()
+
+        hides_name = col(Applications.info_not_shared).op("&&")(
+            postgresql.array(("first_name", "last_name"))
+        )
+        statement = (
+            select(Applications.human_id)
+            .where(Applications.popup_id == popup_id)
+            .where(col(Applications.human_id).in_(human_ids))
+            .where(hides_name)
+        )
+        return set(session.exec(statement).all())
 
     def create_internal(
         self,
