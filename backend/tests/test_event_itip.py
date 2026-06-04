@@ -172,6 +172,7 @@ def _patch_email_service():
     service.send_event_invitation = AsyncMock(return_value=True)
     service.send_event_updated = AsyncMock(return_value=True)
     service.send_event_cancelled = AsyncMock(return_value=True)
+    service.send_event_rsvp_cancelled = AsyncMock(return_value=True)
 
     stack = ExitStack()
     stack.enter_context(
@@ -775,6 +776,9 @@ class TestCancelAndDeleteDispatchCancel:
         service.send_event_cancelled.assert_awaited_once()
         service.send_event_invitation.assert_not_awaited()
         service.send_event_updated.assert_not_awaited()
+        # Organiser cancellation must use the "event cancelled" template, never
+        # the self-service "registration cancelled" one.
+        service.send_event_rsvp_cancelled.assert_not_awaited()
 
     def test_double_cancel_returns_400(
         self,

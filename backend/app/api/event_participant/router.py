@@ -360,7 +360,11 @@ async def _notify_rsvp(
             human_id=human.id,
             method=method,
             occurrence_start=occurrence_start,
-            is_self_rsvp=method == "REQUEST",
+            # Always the human acting on their own registration, whether
+            # registering (REQUEST) or withdrawing (CANCEL). On CANCEL this
+            # selects the "registration cancelled" email instead of the
+            # organiser-driven "event cancelled" notice.
+            is_self_rsvp=True,
         )
     except Exception as exc:  # pragma: no cover - defensive
         logger.warning("iTIP {} delivery to {} failed: {}", method, human.email, exc)
