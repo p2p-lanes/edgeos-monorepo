@@ -57,13 +57,14 @@ export function HostDisplayField({
   const trimmedSearch = debouncedSearch.trim()
 
   const { data: results, isFetching } = useQuery({
-    queryKey: ["host-picker-humans", trimmedSearch],
+    queryKey: ["host-picker-humans", popupId, trimmedSearch],
     queryFn: () =>
       HumansService.searchHumansPortal({
+        popupId: popupId as string,
         search: trimmedSearch || null,
         limit: 10,
       }),
-    enabled: pickerOpen,
+    enabled: pickerOpen && !!popupId,
   })
 
   return (

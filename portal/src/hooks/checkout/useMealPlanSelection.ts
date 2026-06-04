@@ -7,8 +7,10 @@ import type { ProductsPass } from "@/types/Products"
  *
  * One entry per (attendee, weekly product). The reducer mirrors
  * `cart-state.prototype.ts`:
- *   - `addMealPlan` seeds `dailyChoices` to {date: "chef"} for every weekday
- *     in the coverage range; the buyer overrides per day from the editor.
+ *   - `addMealPlan` seeds `dailyChoices` to {date: defaultKey} for every
+ *     weekday in the coverage range (the variant passes the product's first
+ *     menu option as the default); the buyer overrides per day from the editor.
+ *     When the product has no menu options, days start unset.
  *   - `removeMealPlan` drops the entry.
  *   - `setMealPlanDailyChoice` updates a single date's pick.
  *   - `setMealPlanDietaryRestriction` / `setMealPlanSpecialRequest` apply at
@@ -22,7 +24,12 @@ export function useMealPlanSelection(allActiveProducts: ProductsPass[]) {
   const [mealPlans, setMealPlans] = useState<SelectedMealPlanItem[]>([])
 
   const addMealPlan = useCallback(
-    (attendeeId: string, productId: string, weekdayDates: string[]) => {
+    (
+      attendeeId: string,
+      productId: string,
+      weekdayDates: string[],
+      defaultKey?: string,
+    ) => {
       const product = allActiveProducts.find((p) => p.id === productId)
       if (!product) return
       setMealPlans((prev) => {
@@ -37,9 +44,11 @@ export function useMealPlanSelection(allActiveProducts: ProductsPass[]) {
         // Inherit per-attendee dietary + special request from any sibling
         // entry so previously typed values stick when adding another week.
         const sibling = prev.find((m) => m.attendeeId === attendeeId)
-        const dailyChoices = Object.fromEntries(
-          weekdayDates.map((d) => [d, "chef"]),
-        )
+        // Pre-select every weekday with the product's first menu option so the
+        // week reads as complete on add. Products with no menu start unset.
+        const dailyChoices = defaultKey
+          ? Object.fromEntries(weekdayDates.map((d) => [d, defaultKey]))
+          : {}
         return [
           ...prev,
           {

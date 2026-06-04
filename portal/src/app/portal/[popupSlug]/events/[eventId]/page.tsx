@@ -69,6 +69,7 @@ import {
 } from "../lib/useEventTimezone"
 
 function AdminNotesSection({ eventId }: { eventId: string }) {
+  const { t } = useTranslation()
   const queryClient = useQueryClient()
   const [value, setValue] = useState("")
   const [dirty, setDirty] = useState(false)
@@ -95,9 +96,9 @@ function AdminNotesSection({ eventId }: { eventId: string }) {
     onSuccess: (res) => {
       setDirty(false)
       queryClient.setQueryData(["portal-event-admin-notes", eventId], res)
-      toast.success("Notes saved")
+      toast.success(t("events.detail.admin_notes_saved_toast"))
     },
-    onError: () => toast.error("Could not save notes"),
+    onError: () => toast.error(t("events.detail.admin_notes_error_toast")),
   })
 
   if (!isSuccess) return null
@@ -106,15 +107,17 @@ function AdminNotesSection({ eventId }: { eventId: string }) {
     <div className="rounded-xl border bg-card p-4 space-y-3">
       <div className="flex items-center gap-2">
         <Lock className="h-4 w-4 text-muted-foreground" />
-        <h3 className="text-sm font-semibold">Admin notes</h3>
+        <h3 className="text-sm font-semibold">
+          {t("events.detail.admin_notes_heading")}
+        </h3>
         <span className="text-xs text-muted-foreground">
-          Internal — staff only
+          {t("events.detail.admin_notes_staff_only")}
         </span>
       </div>
       <Textarea
         value={value}
         rows={4}
-        placeholder="Notes about this event, visible only to backoffice staff…"
+        placeholder={t("events.detail.admin_notes_placeholder") as string}
         onChange={(e) => {
           setValue(e.target.value)
           setDirty(true)
@@ -126,7 +129,9 @@ function AdminNotesSection({ eventId }: { eventId: string }) {
           disabled={!dirty || saveMutation.isPending}
           onClick={() => saveMutation.mutate()}
         >
-          {saveMutation.isPending ? "Saving…" : "Save notes"}
+          {saveMutation.isPending
+            ? t("events.detail.admin_notes_saving_button")
+            : t("events.detail.admin_notes_save_button")}
         </Button>
       </div>
     </div>
@@ -439,14 +444,6 @@ export default function EventDetailPage() {
       : sharePath
 
   const handleShare = async () => {
-    if (typeof navigator !== "undefined" && navigator.share) {
-      try {
-        await navigator.share({ title: event.title, url: shareUrl })
-        return
-      } catch (err) {
-        if (err instanceof Error && err.name === "AbortError") return
-      }
-    }
     try {
       await navigator.clipboard.writeText(shareUrl)
       setCopied(true)
@@ -684,7 +681,7 @@ export default function EventDetailPage() {
             </p>
             {timezone && (
               <p className="text-[11px] text-muted-foreground/80 mt-0.5">
-                — {t("events.common.in_timezone_time", { timezone })}
+                {t("events.common.in_timezone_time", { timezone })}
               </p>
             )}
           </div>
@@ -716,7 +713,7 @@ export default function EventDetailPage() {
               <Repeat className="h-4 w-4 text-blue-600" />
             </div>
             <p className="text-sm text-muted-foreground">
-              {summarizeRrule(event.rrule)}
+              {summarizeRrule(event.rrule, t)}
             </p>
           </div>
         )}

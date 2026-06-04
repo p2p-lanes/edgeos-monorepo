@@ -175,22 +175,27 @@ async def update_current_human(
 async def search_humans_portal(
     db: HumanTenantSession,
     _: CurrentHuman,
+    popup_id: uuid.UUID,
     search: str | None = None,
     skip: PaginationSkip = 0,
     limit: PaginationLimit = 20,
 ) -> ListModel[HumanPortalPublic]:
-    """Search humans in the current tenant for portal pickers.
+    """Search a popup's attendees who share their name, for portal pickers.
 
     Used by the event-creation Displayed-host field to let a creator pick a
-    participant by name. RLS already scopes to the caller's tenant via
-    HumanTenantSession; the slim response schema omits email so this isn't
-    a wider exposure than the participant lists portal users can already see.
+    host. Scoped to humans who actually attend ``popup_id`` (accepted
+    application with a ticket-holding main/spouse attendee) AND who have not
+    hidden their name via ``info_not_shared`` for that popup. RLS scopes to the
+    caller's tenant; the slim response schema omits email.
     """
-    humans, total = crud.search_named(
+    from app.api.application.crud import applications_crud
+
+    humans, total = applications_crud.find_directory_humans(
         db,
+        popup_id=popup_id,
+        q=search,
         skip=skip,
         limit=limit,
-        search=search,
     )
     return ListModel[HumanPortalPublic](
         results=[HumanPortalPublic.model_validate(h) for h in humans],

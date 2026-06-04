@@ -298,7 +298,7 @@ export function ListBody({
                               <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5">
                                 <Repeat className="h-3 w-3" />
                                 <span className="truncate">
-                                  {summarizeRrule(event.rrule) ??
+                                  {summarizeRrule(event.rrule, t) ??
                                     t("events.list.part_of_recurring_series")}
                                 </span>
                               </div>

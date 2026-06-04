@@ -14,10 +14,7 @@ import {
 } from "react"
 import { createPortal } from "react-dom"
 import { useTranslation } from "react-i18next"
-import { toast } from "sonner"
 import {
-  ApiError,
-  EventParticipantsService,
   type EventPublic,
   EventsService,
   HumansService,
@@ -36,6 +33,7 @@ import {
 } from "./lib/eventsViewState"
 import { ListBody } from "./lib/ListBody"
 import { eventListWindowForPopup } from "./lib/listWindow"
+import { useEventRsvp } from "./lib/useEventRsvp"
 import {
   useEventTimezone,
   usePortalEventSettings,
@@ -433,55 +431,9 @@ export default function EventsPage() {
     staleTime: 30 * 1000,
   })
 
-  // Recurring events require occurrence_start so the RSVP targets a single
-  // instance. That includes both expanded pseudo-rows (have occurrence_id)
-  // AND the series master itself, whose start_time IS the first occurrence.
-  // One-off events must not send it.
-  const rsvpBodyFor = (e: EventPublic) =>
-    e.rrule || e.occurrence_id ? { occurrence_start: e.start_time } : undefined
-  const toastRsvpError = (err: unknown) => {
-    const fallback = t("events.rsvp.action_error") as string
-    let detail = fallback
-    if (err instanceof ApiError && err.body && typeof err.body === "object") {
-      const body = err.body as { detail?: unknown }
-      if (typeof body.detail === "string") detail = body.detail
-    }
-    toast.error(detail)
-  }
-  const rsvpMutation = useMutation({
-    mutationFn: (e: EventPublic) =>
-      EventParticipantsService.registerForEvent({
-        eventId: e.id,
-        requestBody: rsvpBodyFor(e),
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["portal-events"] })
-    },
-    onError: toastRsvpError,
-  })
-  const cancelRsvpMutation = useMutation({
-    mutationFn: (e: EventPublic) =>
-      EventParticipantsService.cancelRegistration({
-        eventId: e.id,
-        requestBody: rsvpBodyFor(e),
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["portal-events"] })
-    },
-    onError: toastRsvpError,
-  })
-  // The row whose RSVP request is currently in flight, in the
-  // `${id}:${start_time}` format ListBody matches against. Including the
-  // occurrence start in the key keeps the spinner pinned to the specific
-  // recurring instance the user clicked rather than every row sharing
-  // the same event id.
-  const pendingRsvpKey: string | null = (() => {
-    const pending =
-      (rsvpMutation.isPending && rsvpMutation.variables) ||
-      (cancelRsvpMutation.isPending && cancelRsvpMutation.variables) ||
-      null
-    return pending ? `${pending.id}:${pending.start_time}` : null
-  })()
+  const { rsvpMutation, cancelRsvpMutation, pendingRsvpKey } = useEventRsvp([
+    "portal-events",
+  ])
 
   const hideMutation = useMutation({
     mutationFn: (eventId: string) => EventsService.hidePortalEvent({ eventId }),

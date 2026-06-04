@@ -21,7 +21,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime, timedelta
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
@@ -336,6 +336,59 @@ class TestPortalCancelRegistration:
         assert itip_mock.await_count == 1
         assert itip_mock.await_args.kwargs["method"] == "CANCEL"
         assert itip_mock.await_args.kwargs["email"] == human.email
+        # The human is cancelling their own RSVP, so the iTIP flow is flagged
+        # self-service. This is what routes to the "registration cancelled"
+        # email instead of the organiser "event cancelled" notice.
+        assert itip_mock.await_args.kwargs["is_self_rsvp"] is True
+
+    def test_cancel_routes_to_rsvp_cancelled_not_event_cancelled(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+    ) -> None:
+        """Self-cancel must use the "registration cancelled" email.
+
+        Regression guard: cancelling your own RSVP previously reused the
+        organiser "event cancelled" template, wrongly telling the user the
+        event itself had been cancelled.
+        """
+        popup = _make_popup(db, tenant_a)
+        event = _make_event(db, tenant_a, popup)
+        human = _make_human(db, tenant_a)
+
+        # Register with the iTIP send fully stubbed so only the cancel below
+        # exercises the real template-routing path.
+        with patch(_ITIP_TARGET, new=AsyncMock(return_value=None)):
+            client.post(
+                f"/api/v1/event-participants/portal/register/{event.id}",
+                headers=_human_headers(human),
+            )
+
+        from app.core.config import settings
+
+        service = MagicMock()
+        service.send_event_cancelled = AsyncMock(return_value=True)
+        service.send_event_rsvp_cancelled = AsyncMock(return_value=True)
+        service.send_event_invitation = AsyncMock(return_value=True)
+
+        with (
+            patch("app.services.event_itip.get_email_service", return_value=service),
+            patch.object(
+                type(settings),
+                "emails_enabled",
+                new_callable=PropertyMock,
+                return_value=True,
+            ),
+        ):
+            resp = client.post(
+                f"/api/v1/event-participants/portal/cancel-registration/{event.id}",
+                headers=_human_headers(human),
+            )
+
+        assert resp.status_code == 200, resp.text
+        service.send_event_rsvp_cancelled.assert_awaited_once()
+        service.send_event_cancelled.assert_not_awaited()
 
     def test_cancel_without_registration_returns_404(
         self,

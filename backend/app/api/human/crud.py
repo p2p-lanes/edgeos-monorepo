@@ -214,41 +214,6 @@ class HumansCRUD(BaseCRUD[Humans, HumanCreate, HumanUpdate]):
         results = list(session.exec(statement.offset(skip).limit(limit)).all())
         return results, total
 
-    def search_named(
-        self,
-        session: Session,
-        *,
-        skip: int = 0,
-        limit: int = 100,
-        search: str | None = None,
-    ) -> tuple[list[Humans], int]:
-        """Search humans that have a usable display name.
-
-        Powers the portal participant picker. Humans with neither a first nor
-        a last name are excluded so the picker never falls back to rendering a
-        raw UUID prefix.
-        """
-        has_name = or_(
-            func.trim(func.coalesce(col(Humans.first_name), "")) != "",
-            func.trim(func.coalesce(col(Humans.last_name), "")) != "",
-        )
-        statement = select(Humans).where(has_name)
-
-        if search:
-            search_term = f"%{search}%"
-            statement = statement.where(
-                or_(
-                    col(Humans.first_name).ilike(search_term),
-                    col(Humans.last_name).ilike(search_term),
-                )
-            )
-
-        count_statement = select(func.count()).select_from(statement.subquery())
-        total = session.exec(count_statement).one()
-
-        results = list(session.exec(statement.offset(skip).limit(limit)).all())
-        return results, total
-
     def get_profile_stats(
         self, session: Session, human_id: uuid.UUID
     ) -> HumanProfileStats:
