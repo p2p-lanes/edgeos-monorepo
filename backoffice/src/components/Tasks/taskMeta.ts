@@ -1,4 +1,5 @@
 import type {
+  TaskApp,
   TaskPriority,
   TaskStatus,
   TaskType,
@@ -59,6 +60,14 @@ export const PRIORITY_CLASSES: Record<TaskPriority, string> = {
   low: "bg-slate-100 text-slate-600 border-slate-200",
   medium: "bg-sky-100 text-sky-700 border-sky-200",
   high: "bg-orange-100 text-orange-800 border-orange-200",
+}
+
+/** Optional surface a task relates to. */
+export const TASK_APPS: TaskApp[] = ["portal", "backoffice"]
+
+export const APP_LABELS: Record<TaskApp, string> = {
+  portal: "Portal",
+  backoffice: "Backoffice",
 }
 
 export const TASK_VISIBILITIES: TaskVisibility[] = [

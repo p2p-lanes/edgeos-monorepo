@@ -56,6 +56,10 @@ class Task(SQLModel, table=True):
     # Free-text release tag (e.g. "v1.2.0", "R42"). No Release entity yet.
     release: str | None = Field(default=None, max_length=50, nullable=True)
 
+    # Optional surface the task relates to: "portal" | "backoffice" (NULL =
+    # unspecified). See app.api.task.schemas: TaskApp.
+    app: str | None = Field(default=None, max_length=16, nullable=True, index=True)
+
     # Future tenant-exposure control. Dormant in phase 1 (default internal).
     visibility: str = Field(default="internal", max_length=16, index=True)
     # Required only when visibility == "tenant"; else NULL.

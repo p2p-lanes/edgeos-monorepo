@@ -3096,6 +3096,11 @@ export type SendTestRequest = {
 };
 
 /**
+ * Which surface a task relates to. Optional (NULL = unspecified).
+ */
+export type TaskApp = 'portal' | 'backoffice';
+
+/**
  * Count of tasks archived by a bulk operation.
  */
 export type TaskArchiveResult = {
@@ -3153,6 +3158,7 @@ export type TaskCreate = {
     priority?: TaskPriority;
     responsible_user_id?: (string | null);
     release?: (string | null);
+    app?: (TaskApp | null);
     visibility?: TaskVisibility;
     target_tenant_id?: (string | null);
 };
@@ -3168,6 +3174,7 @@ export type TaskDetailPublic = {
     responsible_name?: (string | null);
     responsible_email?: (string | null);
     release?: (string | null);
+    app?: (TaskApp | null);
     visibility: TaskVisibility;
     target_tenant_id?: (string | null);
     published_at?: (string | null);
@@ -3194,6 +3201,7 @@ export type TaskPublic = {
     responsible_name?: (string | null);
     responsible_email?: (string | null);
     release?: (string | null);
+    app?: (TaskApp | null);
     visibility: TaskVisibility;
     target_tenant_id?: (string | null);
     published_at?: (string | null);
@@ -3223,6 +3231,7 @@ export type TaskUpdate = {
     priority?: (TaskPriority | null);
     responsible_user_id?: (string | null);
     release?: (string | null);
+    app?: (TaskApp | null);
     visibility?: (TaskVisibility | null);
     target_tenant_id?: (string | null);
 };

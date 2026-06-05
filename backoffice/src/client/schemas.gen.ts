@@ -15358,6 +15358,13 @@ export const SendTestRequestSchema = {
     title: 'SendTestRequest'
 } as const;
 
+export const TaskAppSchema = {
+    type: 'string',
+    enum: ['portal', 'backoffice'],
+    title: 'TaskApp',
+    description: 'Which surface a task relates to. Optional (NULL = unspecified).'
+} as const;
+
 export const TaskArchiveResultSchema = {
     properties: {
         archived: {
@@ -15622,6 +15629,16 @@ export const TaskCreateSchema = {
             ],
             title: 'Release'
         },
+        app: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/TaskApp'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
         visibility: {
             '$ref': '#/components/schemas/TaskVisibility',
             default: 'internal'
@@ -15720,6 +15737,16 @@ export const TaskDetailPublicSchema = {
                 }
             ],
             title: 'Release'
+        },
+        app: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/TaskApp'
+                },
+                {
+                    type: 'null'
+                }
+            ]
         },
         visibility: {
             '$ref': '#/components/schemas/TaskVisibility'
@@ -15894,6 +15921,16 @@ export const TaskPublicSchema = {
                 }
             ],
             title: 'Release'
+        },
+        app: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/TaskApp'
+                },
+                {
+                    type: 'null'
+                }
+            ]
         },
         visibility: {
             '$ref': '#/components/schemas/TaskVisibility'
@@ -16076,6 +16113,16 @@ export const TaskUpdateSchema = {
                 }
             ],
             title: 'Release'
+        },
+        app: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/TaskApp'
+                },
+                {
+                    type: 'null'
+                }
+            ]
         },
         visibility: {
             anyOf: [

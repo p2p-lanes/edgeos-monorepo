@@ -27,6 +27,13 @@ class TaskPriority(str, Enum):
     HIGH = "high"
 
 
+class TaskApp(str, Enum):
+    """Which surface a task relates to. Optional (NULL = unspecified)."""
+
+    PORTAL = "portal"
+    BACKOFFICE = "backoffice"
+
+
 class TaskVisibility(str, Enum):
     UNIVERSAL = "universal"  # all tenants (phase 2)
     TENANT = "tenant"  # a single target tenant (phase 2)
@@ -104,6 +111,7 @@ class TaskCreate(BaseModel):
     priority: TaskPriority = TaskPriority.MEDIUM
     responsible_user_id: uuid.UUID | None = None
     release: str | None = Field(default=None, max_length=50)
+    app: TaskApp | None = None
     visibility: TaskVisibility = TaskVisibility.INTERNAL
     target_tenant_id: uuid.UUID | None = None
 
@@ -118,6 +126,7 @@ class TaskUpdate(BaseModel):
     priority: TaskPriority | None = None
     responsible_user_id: uuid.UUID | None = None
     release: str | None = Field(default=None, max_length=50)
+    app: TaskApp | None = None
     visibility: TaskVisibility | None = None
     target_tenant_id: uuid.UUID | None = None
 
@@ -163,6 +172,7 @@ class TaskPublic(BaseModel):
     responsible_name: str | None = None
     responsible_email: str | None = None
     release: str | None = None
+    app: TaskApp | None = None
     visibility: TaskVisibility
     target_tenant_id: uuid.UUID | None = None
     published_at: datetime | None = None

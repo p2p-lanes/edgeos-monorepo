@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import useAuth from "@/hooks/useAuth"
 import { cn } from "@/lib/utils"
 import {
+  APP_LABELS,
   PRIORITY_CLASSES,
   PRIORITY_LABELS,
   STATUS_CLASSES,
@@ -79,6 +80,18 @@ export const taskColumns: ColumnDef<TaskPublic>[] = [
         {TYPE_LABELS[row.original.type]}
       </Badge>
     ),
+  },
+  {
+    accessorKey: "app",
+    header: ({ column }) => <SortableHeader label="App" column={column} />,
+    cell: ({ row }) =>
+      row.original.app ? (
+        <Badge variant="outline" className="font-normal">
+          {APP_LABELS[row.original.app]}
+        </Badge>
+      ) : (
+        <span className="text-sm text-muted-foreground">—</span>
+      ),
   },
   {
     accessorKey: "priority",

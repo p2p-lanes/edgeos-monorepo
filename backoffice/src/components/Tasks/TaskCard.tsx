@@ -6,7 +6,7 @@ import type { TaskPublic } from "@/client"
 import { Badge } from "@/components/ui/badge"
 import useAuth from "@/hooks/useAuth"
 import { cn } from "@/lib/utils"
-import { TYPE_CLASSES, TYPE_LABELS } from "./taskMeta"
+import { APP_LABELS, TYPE_CLASSES, TYPE_LABELS } from "./taskMeta"
 import { useTaskArchive } from "./useTaskArchive"
 
 interface TaskCardProps {
@@ -53,6 +53,11 @@ export function TaskCard({ task, onOpen, draggable = true }: TaskCardProps) {
           >
             {TYPE_LABELS[task.type]}
           </Badge>
+          {task.app && (
+            <Badge variant="secondary" className="font-normal">
+              {APP_LABELS[task.app]}
+            </Badge>
+          )}
           {task.release && (
             <span className="font-mono text-[11px] text-muted-foreground">
               {task.release}
