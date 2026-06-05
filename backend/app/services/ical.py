@@ -162,6 +162,15 @@ def build_event_ics(
             f"SUMMARY:{title}",
         ]
     )
+    # For a series master (not a single-occurrence update keyed by
+    # RECURRENCE-ID), carry the RRULE/EXDATE so the recipient's calendar
+    # expands every occurrence and later organiser updates reconcile the
+    # whole series instead of just the first instance.
+    if recurrence_id is None and getattr(event, "rrule", None):
+        lines.append(f"RRULE:{event.rrule}")
+        exdates = getattr(event, "recurrence_exdates", None) or []
+        if exdates:
+            lines.append(f"EXDATE:{','.join(_fmt_utc(d) for d in exdates)}")
     if description:
         lines.append(f"DESCRIPTION:{description}")
     if location:

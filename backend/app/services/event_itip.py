@@ -168,6 +168,12 @@ async def send_event_itip(
     service = get_email_service()
     from_address = popup.tenant.sender_email if popup and popup.tenant else None
     from_name = popup.tenant.sender_name if popup and popup.tenant else None
+    # ORGANIZER must always be present and match the actual From, or clients
+    # (Gmail especially) treat the REQUEST as malformed / from a different
+    # organiser and silently refuse to update the existing entry. The email
+    # service sends from ``from_address or settings.SENDER_EMAIL``, so mirror
+    # that exact resolution so ORGANIZER == From in every case.
+    organizer_email = from_address or settings.SENDER_EMAIL
     organizer_name = from_name or popup_name or None
 
     is_cancelled = method == "CANCEL"
@@ -222,7 +228,7 @@ async def send_event_itip(
                 event,
                 recipient_email=r["email"],
                 recipient_name=r["first_name"] or None,
-                organizer_email=from_address,
+                organizer_email=organizer_email,
                 organizer_name=organizer_name,
                 event_url=event_url or None,
                 method=method,
@@ -441,9 +447,17 @@ def calendar_fields_changed(before: dict, after) -> bool:
         "venue_id",
         "custom_location_name",
         "custom_location_url",
+        # Also material for what the calendar entry shows / when it recurs:
+        "meeting_url",  # the join link for online events (rendered as LOCATION)
+        "content",  # description
+        "timezone",
+        "rrule",
+        "recurrence_exdates",
     )
     for f in fields:
-        if before.get(f) != getattr(after, f, None):
+        # Only compare fields the caller actually snapshotted, so a partial
+        # ``before`` dict never reports a spurious change.
+        if f in before and before[f] != getattr(after, f, None):
             return True
     return False
 
