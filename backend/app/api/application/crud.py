@@ -244,6 +244,12 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
                 or_(
                     col(Humans.first_name).ilike(search_term),
                     col(Humans.last_name).ilike(search_term),
+                    # Full name ("first last") so a query spanning both fields —
+                    # e.g. "eva shang" — matches; the per-field checks above only
+                    # catch a term that fits within a single column.
+                    func.concat_ws(
+                        " ", Humans.first_name, Humans.last_name
+                    ).ilike(search_term),
                     col(Humans.email).ilike(search_term),
                     col(Humans.telegram).ilike(search_term),
                 )
@@ -330,6 +336,10 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
                 or_(
                     col(Humans.first_name).ilike(search_term),
                     col(Humans.last_name).ilike(search_term),
+                    # Full name so "first last" queries match (see find_directory).
+                    func.concat_ws(
+                        " ", Humans.first_name, Humans.last_name
+                    ).ilike(search_term),
                 )
             )
 
