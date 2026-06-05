@@ -28,6 +28,7 @@ import {
 } from "./lib/eventsViewState"
 import { ListBody } from "./lib/ListBody"
 import { eventListWindowForPopup } from "./lib/listWindow"
+import { SubscribeCalendarButton } from "./lib/SubscribeCalendarButton"
 import { useEventRsvp } from "./lib/useEventRsvp"
 import {
   useEventTimezone,
@@ -653,21 +654,25 @@ export default function EventsPage() {
           <h1 className="text-2xl font-bold tracking-tight">
             {t("events.list.heading")}
           </h1>
-          {creationEnabled &&
-            (eventSettings?.can_publish_event ?? "everyone") === "everyone" && (
-              <Button asChild size="sm" className="shrink-0 px-2 sm:px-3">
-                <Link
-                  href={`/portal/${city?.slug}/events/new`}
-                  aria-label={t("events.toolbar.create_event")}
-                  title={t("events.toolbar.create_event")}
-                >
-                  <Plus className="h-4 w-4 sm:mr-2" />
-                  <span className="hidden sm:inline">
-                    {t("events.toolbar.create_event")}
-                  </span>
-                </Link>
-              </Button>
-            )}
+          <div className="flex shrink-0 items-center gap-2">
+            {city?.id && <SubscribeCalendarButton popupId={city.id} />}
+            {creationEnabled &&
+              (eventSettings?.can_publish_event ?? "everyone") ===
+                "everyone" && (
+                <Button asChild size="sm" className="shrink-0 px-2 sm:px-3">
+                  <Link
+                    href={`/portal/${city?.slug}/events/new`}
+                    aria-label={t("events.toolbar.create_event")}
+                    title={t("events.toolbar.create_event")}
+                  >
+                    <Plus className="h-4 w-4 sm:mr-2" />
+                    <span className="hidden sm:inline">
+                      {t("events.toolbar.create_event")}
+                    </span>
+                  </Link>
+                </Button>
+              )}
+          </div>
         </div>
         <p className="text-sm text-muted-foreground mt-1">
           {timezone
