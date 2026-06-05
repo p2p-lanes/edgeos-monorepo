@@ -1202,6 +1202,10 @@ async def update_event(
         "content": event.content,
         "custom_location_name": event.custom_location_name,
         "custom_location_url": event.custom_location_url,
+        "meeting_url": event.meeting_url,
+        "timezone": event.timezone,
+        "rrule": event.rrule,
+        "recurrence_exdates": event.recurrence_exdates,
     }
     updated = crud.events_crud.update(db, event, event_in)
 
@@ -3008,6 +3012,10 @@ async def update_portal_event(
         "content": event.content,
         "custom_location_name": event.custom_location_name,
         "custom_location_url": event.custom_location_url,
+        "meeting_url": event.meeting_url,
+        "timezone": event.timezone,
+        "rrule": event.rrule,
+        "recurrence_exdates": event.recurrence_exdates,
     }
     updated = crud.events_crud.update(db, event, event_in)
     if _event_calendar_fields_changed(before, updated):
