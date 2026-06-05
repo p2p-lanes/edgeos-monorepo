@@ -39,6 +39,7 @@ from app.api.event.schemas import (
     OccurrenceConflict,
     OccurrenceRef,
     RecurrenceUpdate,
+    TrackEventCount,
 )
 from app.api.event_audit.crud import build_event_snapshot, record_event_audit
 from app.api.event_audit.schemas import EventAuditAction
@@ -2314,6 +2315,7 @@ async def list_portal_events(
     start_before: datetime | None = None,
     search: str | None = None,
     rsvped_only: bool = False,
+    managed_only: bool = False,
     include_hidden: bool = False,
     skip: PaginationSkip = 0,
     limit: PaginationLimit = 100,
@@ -2332,6 +2334,10 @@ async def list_portal_events(
             start_after=start_after,
             start_before=start_before,
             search=search,
+            # "My events" channel: restrict to events the caller manages
+            # (owner / host / collaborator) in SQL, so pagination counts the
+            # managed set instead of post-filtering a truncated page.
+            managed_by_human_id=current_human.id if managed_only else None,
         )
     else:
         events, total = crud.events_crud.find(
@@ -2342,7 +2348,13 @@ async def list_portal_events(
             search_fields=["title"],
         )
 
-    visible = _portal_visibility_filter(db, events, current_human.id)
+    # ``managed_only`` already restricted the query to events the caller
+    # manages, which are by definition visible to them — skip the owner/invite
+    # visibility filter so a managed private/unlisted event is never dropped.
+    if managed_only:
+        visible = events
+    else:
+        visible = _portal_visibility_filter(db, events, current_human.id)
     # Cancelled events are removed from every portal listing — owners who want
     # to see them after the fact can still hit the detail URL directly. The
     # ``event_status`` query param can't express "exclude cancelled" alongside
@@ -2513,6 +2525,25 @@ async def portal_hidden_events_count(
         ).where(Events.popup_id == popup_id)
     count = db.exec(stmt).one()
     return {"count": int(count or 0)}
+
+
+@router.get("/portal/events/track-counts", response_model=list[TrackEventCount])
+async def list_portal_track_event_counts(
+    db: HumanTenantSession,
+    _: CurrentHuman,
+    popup_id: uuid.UUID,
+) -> list[TrackEventCount]:
+    """Distinct published-event count per track for a popup.
+
+    Lets the portal track filter / Tracks section render counts and hide
+    empty tracks without fetching the whole event list to count on the
+    client (which also capped at the page limit).
+    """
+    counts = crud.events_crud.count_published_events_by_track(db, popup_id=popup_id)
+    return [
+        TrackEventCount(track_id=track_id, event_count=count)
+        for track_id, count in counts.items()
+    ]
 
 
 @router.get("/portal/events/{event_id}", response_model=EventPublic)

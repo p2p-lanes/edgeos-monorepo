@@ -3509,6 +3509,18 @@ export type TrackCreate = {
     topic?: Array<(string)>;
 };
 
+/**
+ * Number of distinct published events that belong to a track.
+ *
+ * Backs the portal track filter / Tracks section so it can show per-track
+ * counts (and hide empty tracks) without pulling the full event list to the
+ * client just to count.
+ */
+export type TrackEventCount = {
+    track_id: string;
+    event_count: number;
+};
+
 export type TrackPublic = {
     tenant_id: string;
     popup_id: string;
@@ -4790,6 +4802,7 @@ export type EventsListPortalEventsData = {
      * Maximum number of items to return
      */
     limit?: number;
+    managedOnly?: boolean;
     popupId?: (string | null);
     rsvpedOnly?: boolean;
     search?: (string | null);
@@ -4825,6 +4838,12 @@ export type EventsPortalHiddenEventsCountData = {
 export type EventsPortalHiddenEventsCountResponse = ({
     [key: string]: (number);
 });
+
+export type EventsListPortalTrackEventCountsData = {
+    popupId: string;
+};
+
+export type EventsListPortalTrackEventCountsResponse = (Array<TrackEventCount>);
 
 export type EventsGetPortalEventData = {
     eventId: string;

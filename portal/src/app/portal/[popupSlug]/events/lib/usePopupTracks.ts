@@ -19,11 +19,12 @@ export interface TrackWithEventCount extends TrackPublic {
  * from here so users never see a track that resolves to nothing (the
  * curated track list often contains tracks no published event uses yet).
  *
- * Presence is derived from a single broad pull of the popup's published
- * events across its whole history — deliberately *not* windowed to the
- * upcoming range, so a track whose events are all in the past still shows
- * up. Counts distinct event ids so recurring occurrences don't inflate
- * the per-track number.
+ * Presence is derived from a server-side aggregation over the popup's
+ * published events across its whole history — deliberately *not* windowed
+ * to the upcoming range, so a track whose events are all in the past still
+ * shows up. The backend counts distinct event ids so recurring occurrences
+ * don't inflate the per-track number and the result isn't capped by a page
+ * limit.
  */
 export function usePopupTracks(popupId: string | undefined) {
   const tracksQuery = useQuery({
@@ -37,33 +38,23 @@ export function usePopupTracks(popupId: string | undefined) {
     staleTime: 5 * 60 * 1000,
   })
 
-  const eventsQuery = useQuery({
+  const countsQuery = useQuery({
     queryKey: ["portal-track-event-counts", popupId],
     queryFn: () =>
-      EventsService.listPortalEvents({
+      EventsService.listPortalTrackEventCounts({
         popupId: popupId as string,
-        eventStatus: "published",
-        limit: 200,
       }),
     enabled: !!popupId,
     staleTime: 5 * 60 * 1000,
   })
 
   const countsByTrack = useMemo(() => {
-    const distinctIds = new Map<string, Set<string>>()
-    for (const event of eventsQuery.data?.results ?? []) {
-      if (!event.track_id) continue
-      let ids = distinctIds.get(event.track_id)
-      if (!ids) {
-        ids = new Set()
-        distinctIds.set(event.track_id, ids)
-      }
-      ids.add(event.id)
-    }
     const counts = new Map<string, number>()
-    for (const [trackId, ids] of distinctIds) counts.set(trackId, ids.size)
+    for (const row of countsQuery.data ?? []) {
+      counts.set(row.track_id, row.event_count)
+    }
     return counts
-  }, [eventsQuery.data])
+  }, [countsQuery.data])
 
   const tracksWithEvents = useMemo<TrackWithEventCount[]>(() => {
     const all = tracksQuery.data?.results ?? []
@@ -77,6 +68,6 @@ export function usePopupTracks(popupId: string | undefined) {
 
   return {
     tracksWithEvents,
-    isLoading: tracksQuery.isLoading || eventsQuery.isLoading,
+    isLoading: tracksQuery.isLoading || countsQuery.isLoading,
   }
 }
