@@ -6111,6 +6111,12 @@ export type ReferralsListReferralsAdminData = {
 
 export type ReferralsListReferralsAdminResponse = (ListModel_ReferralPublic_);
 
+export type ReferralsGetReferralAdminData = {
+    referralId: string;
+};
+
+export type ReferralsGetReferralAdminResponse = (ReferralPublic);
+
 export type ReferralsUpdateReferralAdminData = {
     referralId: string;
     requestBody: ReferralAdminUpdate;

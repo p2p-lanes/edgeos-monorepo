@@ -37,12 +37,7 @@ export const Route = createFileRoute("/_layout/referrals/$referralId/edit")({
 function getReferralQueryOptions(referralId: string) {
   return {
     queryKey: ["referrals", referralId],
-    queryFn: () =>
-      ReferralsService.listReferralsAdmin({ limit: 100 }).then((list) => {
-        const found = list.results.find((r) => r.id === referralId)
-        if (!found) throw new Error("Referral not found")
-        return found
-      }),
+    queryFn: () => ReferralsService.getReferralAdmin({ referralId }),
   }
 }
 

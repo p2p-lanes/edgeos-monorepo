@@ -221,6 +221,24 @@ async def list_referrals_admin(
     )
 
 
+@admin_router.get("/{referral_id}", response_model=ReferralPublic)
+async def get_referral_admin(
+    referral_id: uuid.UUID,
+    db: SessionDep,
+    _: CurrentAdmin,
+) -> ReferralPublic:
+    """Admin: fetch a single referral by id.
+
+    Spec: API surface GET /admin/referrals/{id}.
+    """
+    referral = referrals_crud.get(db, referral_id)
+    if not referral:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Referral not found"
+        )
+    return ReferralPublic.model_validate(referral)
+
+
 @admin_router.patch("/{referral_id}", response_model=ReferralPublic)
 async def update_referral_admin(
     referral_id: uuid.UUID,
