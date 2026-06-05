@@ -14120,6 +14120,39 @@ export const PopupUpdateSchema = {
                 }
             ],
             title: 'Checkin Pass Lead Days'
+        },
+        invites_enabled: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Invites Enabled'
+        },
+        referrals_enabled: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Referrals Enabled'
+        },
+        group_private_events_enabled: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Group Private Events Enabled'
         }
     },
     additionalProperties: false,

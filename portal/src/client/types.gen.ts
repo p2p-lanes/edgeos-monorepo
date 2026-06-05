@@ -2877,6 +2877,9 @@ export type PopupUpdate = {
     show_attendee_directory?: (boolean | null);
     credits_enabled?: (boolean | null);
     checkin_pass_lead_days?: (number | null);
+    invites_enabled?: (boolean | null);
+    referrals_enabled?: (boolean | null);
+    group_private_events_enabled?: (boolean | null);
 };
 
 /**

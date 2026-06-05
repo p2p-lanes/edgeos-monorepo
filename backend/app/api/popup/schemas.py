@@ -324,6 +324,10 @@ class PopupUpdate(SQLModel):
     show_attendee_directory: bool | None = None
     credits_enabled: bool | None = None
     checkin_pass_lead_days: int | None = None
+    # groups-rework popup feature flags
+    invites_enabled: bool | None = None
+    referrals_enabled: bool | None = None
+    group_private_events_enabled: bool | None = None
 
     @field_validator("currency")
     @classmethod
