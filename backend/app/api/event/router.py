@@ -917,7 +917,7 @@ async def get_event(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Event not found"
         )
-    return _with_collaborators(db, _to_public(event), event)
+    return _with_collaborators(db, _to_public(event), event, include_email=True)
 
 
 # ---------------------------------------------------------------------------
@@ -1045,7 +1045,7 @@ async def create_event(
         actor=actor_from_user(current_user),
     )
 
-    return _with_collaborators(db, _to_public(event), event)
+    return _with_collaborators(db, _to_public(event), event, include_email=True)
 
 
 @router.patch("/{event_id}", response_model=EventPublic)
@@ -1122,7 +1122,7 @@ async def update_event(
         changes=compute_changes(audit_before, audit_after),
     )
 
-    return _with_collaborators(db, _to_public(updated), updated)
+    return _with_collaborators(db, _to_public(updated), updated, include_email=True)
 
 
 @router.post("/{event_id}/cancel", response_model=EventPublic)
@@ -1889,24 +1889,36 @@ def _event_collaborator_ids(event) -> list[uuid.UUID]:
     return out
 
 
-def _human_manages_event(event, current_human) -> bool:
-    """Whether a human may manage an event (edit / cancel / invitations).
+def _human_id_manages_event(event, human_id: uuid.UUID) -> bool:
+    """Whether the human id may manage an event (edit / cancel / invitations).
 
     True for the event's owner (creator), its designated host, or any of its
     collaborators — all carry the same responsibility over the event even
     though they didn't create it. ``host_id`` is NULL when no directory human
     was assigned; ``collaborator_ids`` is empty when none were added.
     """
-    if current_human.id in (event.owner_id, event.host_id):
+    if human_id in (event.owner_id, event.host_id):
         return True
-    return current_human.id in _event_collaborator_ids(event)
+    return human_id in _event_collaborator_ids(event)
 
 
-def _resolve_collaborators(db, event) -> list[EventCollaboratorPublic]:
+def _human_manages_event(event, current_human) -> bool:
+    """``_human_id_manages_event`` for an authenticated human object."""
+    return _human_id_manages_event(event, current_human.id)
+
+
+def _resolve_collaborators(
+    db, event, *, include_email: bool = False
+) -> list[EventCollaboratorPublic]:
     """Resolve an event's ``collaborator_ids`` to slim human profiles.
 
     Preserves the stored order and silently skips ids that no longer resolve
     to a human in the tenant. Returns ``[]`` when there are no collaborators.
+
+    ``include_email`` adds the human's email to each profile so a nameless
+    collaborator chip can fall back to it. Only the admin (backoffice)
+    endpoints set this; the portal leaves it off so organizer emails aren't
+    exposed to every viewer of a public event.
     """
     ids = _event_collaborator_ids(event)
     if not ids:
@@ -1929,15 +1941,22 @@ def _resolve_collaborators(db, event) -> list[EventCollaboratorPublic]:
                 first_name=human.first_name,
                 last_name=human.last_name,
                 picture_url=human.picture_url,
+                email=human.email if include_email else None,
             )
         )
     return resolved
 
 
-def _with_collaborators(db, public: EventPublic, event) -> EventPublic:
+def _with_collaborators(
+    db, public: EventPublic, event, *, include_email: bool = False
+) -> EventPublic:
     """Attach resolved collaborator profiles to a single-event response."""
     return public.model_copy(
-        update={"collaborators": _resolve_collaborators(db, event)}
+        update={
+            "collaborators": _resolve_collaborators(
+                db, event, include_email=include_email
+            )
+        }
     )
 
 
@@ -2241,10 +2260,11 @@ def _portal_visibility_filter(db, events: list, human_id: uuid.UUID) -> list:
 
     Rules:
     - public: visible to all.
-    - private: only owner + invited humans.
-    - unlisted: hidden from public listings, but the owner still sees their
-      own unlisted events (e.g. pending_approval requests they created).
-      Detail is reachable via direct link for non-owners.
+    - private: only managers (owner / host / collaborators) + invited humans.
+    - unlisted: hidden from public listings, but managers (owner / host /
+      collaborators) still see their own unlisted events (e.g.
+      pending_approval requests they created). Detail is reachable via direct
+      link for non-managers.
     """
     from sqlmodel import select
 
@@ -2270,10 +2290,12 @@ def _portal_visibility_filter(db, events: list, human_id: uuid.UUID) -> list:
         if e.visibility == EventVisibility.PUBLIC:
             visible.append(e)
         elif e.visibility == EventVisibility.UNLISTED:
-            if e.owner_id == human_id:
+            if _human_id_manages_event(e, human_id):
                 visible.append(e)
         elif e.visibility == EventVisibility.PRIVATE:
-            if _invitation_visible_to_human(e, human_id, invited_map.get(e.id, set())):
+            if _human_id_manages_event(e, human_id) or _invitation_visible_to_human(
+                e, human_id, invited_map.get(e.id, set())
+            ):
                 visible.append(e)
     return visible
 
@@ -2926,9 +2948,8 @@ async def export_portal_event_ics(
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
     # Re-use the same visibility gate as the detail endpoint.
-    if (
-        event.visibility == EventVisibility.PRIVATE
-        and event.owner_id != current_human.id
+    if event.visibility == EventVisibility.PRIVATE and not _human_manages_event(
+        event, current_human
     ):
         from sqlmodel import select
 
