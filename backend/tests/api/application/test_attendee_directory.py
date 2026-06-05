@@ -245,6 +245,15 @@ def test_companion_searchable_by_own_name(db: Session, directory_world) -> None:
     assert results[0].id == directory_world["scott"].id
 
 
+def test_directory_searchable_by_full_name(db: Session, directory_world) -> None:
+    """A 'first last' query matches even though it spans both name columns."""
+    for query in ("Scott Brylow", "scott brylow"):
+        results, _ = applications_crud.find_directory(
+            db, popup_id=directory_world["popup"].id, q=query
+        )
+        assert {a.id for a in results} == {directory_world["scott"].id}, query
+
+
 def test_companion_entry_uses_own_profile_no_masking(
     db: Session, directory_world
 ) -> None:
