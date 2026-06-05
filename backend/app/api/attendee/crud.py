@@ -102,6 +102,7 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
         limit: int = 100,
         search: str | None = None,
         has_tickets: bool | None = None,
+        category_id: uuid.UUID | None = None,
     ) -> tuple[list[Attendees], int]:
         """Find attendees by popup_id with eager loading.
 
@@ -130,6 +131,11 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
             )
             base_statement = base_statement.where(
                 ticket_exists if has_tickets else ~ticket_exists
+            )
+
+        if category_id is not None:
+            base_statement = base_statement.where(
+                Attendees.category_id == category_id
             )
 
         # Use proper count query instead of fetching all rows

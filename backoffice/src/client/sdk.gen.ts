@@ -1185,6 +1185,7 @@ export class AttendeesService {
      * @param data.email
      * @param data.search
      * @param data.hasTickets
+     * @param data.categoryId
      * @param data.skip Number of items to skip
      * @param data.limit Maximum number of items to return
      * @param data.xTenantId
@@ -1204,6 +1205,7 @@ export class AttendeesService {
                 email: data.email,
                 search: data.search,
                 has_tickets: data.hasTickets,
+                category_id: data.categoryId,
                 skip: data.skip,
                 limit: data.limit
             },

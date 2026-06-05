@@ -4105,6 +4105,7 @@ export type AttendeesDeleteMyAttendeeForPopupResponse = ({
 
 export type AttendeesListAttendeesData = {
     applicationId?: (string | null);
+    categoryId?: (string | null);
     email?: (string | null);
     hasTickets?: (boolean | null);
     /**
