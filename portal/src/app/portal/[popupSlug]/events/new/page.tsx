@@ -40,6 +40,7 @@ import { CollaboratorsField } from "../components/CollaboratorsField"
 import { EventScheduleFields } from "../components/EventScheduleFields"
 import { EventVenueField } from "../components/EventVenueField"
 import { HostDisplayField } from "../components/HostDisplayField"
+import { VisibilityHint } from "../components/VisibilityHint"
 import { todayInTz, useEventScheduling } from "../lib/useEventScheduling"
 import { usePortalEventSettings } from "../lib/useEventTimezone"
 import { useFileUpload } from "../lib/useFileUpload"
@@ -699,6 +700,7 @@ function NewPortalEventForm({
             {t("events.form.create_button")}
           </Button>
         </div>
+        <VisibilityHint value={visibility} />
       </form>
 
       {pendingCrop && (

@@ -63,8 +63,16 @@ class TasksCRUD(BaseCRUD[Task, TaskCreate, TaskUpdate]):
         search: str | None = None,
         viewer: "UserPublic | None" = None,
         active_tenant_id: uuid.UUID | None = None,
+        archived: bool | None = None,
     ) -> tuple[list[Task], int]:
         statement = select(Task)
+
+        # Archive gate: ``False`` → active board (archived_at IS NULL),
+        # ``True`` → the archive view, ``None`` → no filter (both).
+        if archived is True:
+            statement = statement.where(col(Task.archived_at).is_not(None))
+        elif archived is False:
+            statement = statement.where(col(Task.archived_at).is_(None))
 
         # Visibility gate for non-superadmin viewers: only universal tasks and
         # tenant tasks targeting their own tenant. internal tasks never reach
