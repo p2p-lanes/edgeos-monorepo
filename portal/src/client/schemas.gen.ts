@@ -17482,6 +17482,28 @@ export const TrackCreateSchema = {
     title: 'TrackCreate'
 } as const;
 
+export const TrackEventCountSchema = {
+    properties: {
+        track_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Track Id'
+        },
+        event_count: {
+            type: 'integer',
+            title: 'Event Count'
+        }
+    },
+    type: 'object',
+    required: ['track_id', 'event_count'],
+    title: 'TrackEventCount',
+    description: `Number of distinct published events that belong to a track.
+
+Backs the portal track filter / Tracks section so it can show per-track
+counts (and hide empty tracks) without pulling the full event list to the
+client just to count.`
+} as const;
+
 export const TrackPublicSchema = {
     properties: {
         tenant_id: {

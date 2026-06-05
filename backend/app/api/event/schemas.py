@@ -211,6 +211,18 @@ class EventCollaboratorPublic(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class TrackEventCount(BaseModel):
+    """Number of distinct published events that belong to a track.
+
+    Backs the portal track filter / Tracks section so it can show per-track
+    counts (and hide empty tracks) without pulling the full event list to the
+    client just to count.
+    """
+
+    track_id: uuid.UUID
+    event_count: int
+
+
 class EventPublic(EventBase):
     """Event schema for API responses."""
 

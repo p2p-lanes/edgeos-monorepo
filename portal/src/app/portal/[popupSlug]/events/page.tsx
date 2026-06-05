@@ -20,7 +20,6 @@ import { useCityProvider } from "@/providers/cityProvider"
 import { CalendarBody } from "./lib/CalendarBody"
 import { DayBody } from "./lib/DayBody"
 import { EventsToolbar, type EventsView } from "./lib/EventsToolbar"
-import { canManageEvent } from "./lib/eventPermissions"
 import {
   consumeEventsViewState,
   type EventsScrollSnapshot,
@@ -404,6 +403,10 @@ export default function EventsPage() {
         search: search || undefined,
         // No status filter: include my drafts / pending / rejected.
         eventStatus: undefined,
+        // Restrict to events I manage (owner / host / collaborator) in the
+        // backend, so pagination counts the managed set instead of dropping
+        // managed events that fall past the page limit by start_time.
+        managedOnly: true,
         includeHidden: showHidden || undefined,
         tags: selectedTags.length ? selectedTags : undefined,
         trackIds: selectedTrackIds.length ? selectedTrackIds : undefined,
@@ -485,10 +488,11 @@ export default function EventsPage() {
     // recurring instance and its master don't collapse into one row.
     const byKey = new Map<string, EventPublic>()
     if (useMineChannel) {
-      const mine = (mineQuery.data?.results ?? []).filter((e) =>
-        canManageEvent(e, currentHuman?.id),
-      )
-      for (const e of mine) byKey.set(`${e.id}:${e.start_time}`, e)
+      // The backend already restricts this channel to events I manage
+      // (managedOnly), so no front-side filter is needed.
+      for (const e of mineQuery.data?.results ?? []) {
+        byKey.set(`${e.id}:${e.start_time}`, e)
+      }
     }
     if (useRsvpedChannel) {
       for (const e of rsvpedQuery.data?.results ?? []) {
@@ -505,7 +509,6 @@ export default function EventsPage() {
     allQuery.data,
     mineQuery.data,
     rsvpedQuery.data,
-    currentHuman,
   ])
   // Restore outer scroll position once after returning from event
   // detail. List view waits for events to load (so the page has the
