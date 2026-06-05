@@ -1283,12 +1283,18 @@ export type EventCalendarTrack = {
  * for already-saved collaborators. Resolved from ``Events.collaborator_ids``
  * by the portal get/create/update endpoints (the list endpoints leave it
  * empty — collaborators aren't shown on cards).
+ *
+ * ``email`` is only populated by the admin (backoffice) endpoints so a chip
+ * for a human with no name can fall back to their email; the portal
+ * endpoints leave it ``None`` to avoid exposing organizer emails to every
+ * viewer of a public event.
  */
 export type EventCollaboratorPublic = {
     id: string;
     first_name?: (string | null);
     last_name?: (string | null);
     picture_url?: (string | null);
+    email?: (string | null);
 };
 
 /**
@@ -3113,6 +3119,18 @@ export type SendTestRequest = {
 };
 
 /**
+ * Which surface a task relates to. Optional (NULL = unspecified).
+ */
+export type TaskApp = 'portal' | 'backoffice';
+
+/**
+ * Count of tasks archived by a bulk operation.
+ */
+export type TaskArchiveResult = {
+    archived: number;
+};
+
+/**
  * Register an already-uploaded S3 object as a task attachment.
  *
  * The file itself is uploaded directly to S3 via POST /uploads/presigned-url;
@@ -3163,6 +3181,7 @@ export type TaskCreate = {
     priority?: TaskPriority;
     responsible_user_id?: (string | null);
     release?: (string | null);
+    app?: (TaskApp | null);
     visibility?: TaskVisibility;
     target_tenant_id?: (string | null);
 };
@@ -3178,9 +3197,11 @@ export type TaskDetailPublic = {
     responsible_name?: (string | null);
     responsible_email?: (string | null);
     release?: (string | null);
+    app?: (TaskApp | null);
     visibility: TaskVisibility;
     target_tenant_id?: (string | null);
     published_at?: (string | null);
+    archived_at?: (string | null);
     created_by?: (string | null);
     created_by_name?: (string | null);
     created_at: string;
@@ -3203,9 +3224,11 @@ export type TaskPublic = {
     responsible_name?: (string | null);
     responsible_email?: (string | null);
     release?: (string | null);
+    app?: (TaskApp | null);
     visibility: TaskVisibility;
     target_tenant_id?: (string | null);
     published_at?: (string | null);
+    archived_at?: (string | null);
     created_by?: (string | null);
     created_by_name?: (string | null);
     created_at: string;
@@ -3231,6 +3254,7 @@ export type TaskUpdate = {
     priority?: (TaskPriority | null);
     responsible_user_id?: (string | null);
     release?: (string | null);
+    app?: (TaskApp | null);
     visibility?: (TaskVisibility | null);
     target_tenant_id?: (string | null);
 };
@@ -3518,6 +3542,18 @@ export type TrackCreate = {
     name: string;
     description?: (string | null);
     topic?: Array<(string)>;
+};
+
+/**
+ * Number of distinct published events that belong to a track.
+ *
+ * Backs the portal track filter / Tracks section so it can show per-track
+ * counts (and hide empty tracks) without pulling the full event list to the
+ * client just to count.
+ */
+export type TrackEventCount = {
+    track_id: string;
+    event_count: number;
 };
 
 export type TrackPublic = {
@@ -4113,6 +4149,7 @@ export type AttendeesUpdateMyMealPlanTicketResponse = (AttendeeWithOriginPublic)
 
 export type AttendeesListAttendeesData = {
     applicationId?: (string | null);
+    categoryId?: (string | null);
     email?: (string | null);
     hasTickets?: (boolean | null);
     /**
@@ -4603,6 +4640,12 @@ export type EventsListPublicCalendarData = {
 
 export type EventsListPublicCalendarResponse = (EventPublicCalendarResponse);
 
+export type EventsPublicCalendarIcsData = {
+    popupId: string;
+};
+
+export type EventsPublicCalendarIcsResponse = (unknown);
+
 export type EventsListEventsData = {
     eventStatus?: (EventStatus | null);
     kind?: (string | null);
@@ -4810,6 +4853,7 @@ export type EventsListPortalEventsData = {
      * Maximum number of items to return
      */
     limit?: number;
+    managedOnly?: boolean;
     popupId?: (string | null);
     rsvpedOnly?: boolean;
     search?: (string | null);
@@ -4845,6 +4889,12 @@ export type EventsPortalHiddenEventsCountData = {
 export type EventsPortalHiddenEventsCountResponse = ({
     [key: string]: (number);
 });
+
+export type EventsListPortalTrackEventCountsData = {
+    popupId: string;
+};
+
+export type EventsListPortalTrackEventCountsResponse = (Array<TrackEventCount>);
 
 export type EventsGetPortalEventData = {
     eventId: string;
@@ -5723,6 +5773,7 @@ export type TasksReportBugData = {
 export type TasksReportBugResponse = (TaskPublic);
 
 export type TasksListTasksData = {
+    archived?: (boolean | null);
     /**
      * Maximum number of items to return
      */
@@ -5773,6 +5824,20 @@ export type TasksUpdateTaskStatusData = {
 };
 
 export type TasksUpdateTaskStatusResponse = (TaskPublic);
+
+export type TasksArchivePublishedTasksResponse = (TaskArchiveResult);
+
+export type TasksArchiveTaskData = {
+    taskId: string;
+};
+
+export type TasksArchiveTaskResponse = (TaskPublic);
+
+export type TasksUnarchiveTaskData = {
+    taskId: string;
+};
+
+export type TasksUnarchiveTaskResponse = (TaskPublic);
 
 export type TasksAddAttachmentData = {
     requestBody: TaskAttachmentCreate;

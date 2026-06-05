@@ -195,14 +195,32 @@ class EventCollaboratorPublic(BaseModel):
     for already-saved collaborators. Resolved from ``Events.collaborator_ids``
     by the portal get/create/update endpoints (the list endpoints leave it
     empty — collaborators aren't shown on cards).
+
+    ``email`` is only populated by the admin (backoffice) endpoints so a chip
+    for a human with no name can fall back to their email; the portal
+    endpoints leave it ``None`` to avoid exposing organizer emails to every
+    viewer of a public event.
     """
 
     id: uuid.UUID
     first_name: str | None = None
     last_name: str | None = None
     picture_url: str | None = None
+    email: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class TrackEventCount(BaseModel):
+    """Number of distinct published events that belong to a track.
+
+    Backs the portal track filter / Tracks section so it can show per-track
+    counts (and hide empty tracks) without pulling the full event list to the
+    client just to count.
+    """
+
+    track_id: uuid.UUID
+    event_count: int
 
 
 class EventPublic(EventBase):

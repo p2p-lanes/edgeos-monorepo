@@ -493,6 +493,7 @@ async def list_attendees(
     email: str | None = None,
     search: str | None = None,
     has_tickets: bool | None = None,
+    category_id: uuid.UUID | None = None,
     skip: PaginationSkip = 0,
     limit: PaginationLimit = 100,
 ) -> ListModel[AttendeeListItem]:
@@ -517,6 +518,7 @@ async def list_attendees(
             limit=limit,
             search=search,
             has_tickets=has_tickets,
+            category_id=category_id,
         )
     elif email:
         attendees, total = crud.attendees_crud.find_by_email(

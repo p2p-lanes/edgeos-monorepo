@@ -219,7 +219,9 @@ export function EventForm({
     Object.fromEntries(
       (defaultValues?.collaborators ?? []).map((c) => [
         c.id,
-        [c.first_name, c.last_name].filter(Boolean).join(" ").trim() || c.id,
+        [c.first_name, c.last_name].filter(Boolean).join(" ").trim() ||
+          c.email ||
+          c.id,
       ]),
     ),
   )

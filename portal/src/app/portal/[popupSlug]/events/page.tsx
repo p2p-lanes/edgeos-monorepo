@@ -16,11 +16,11 @@ import { createPortal } from "react-dom"
 import { useTranslation } from "react-i18next"
 import { type EventPublic, EventsService, HumansService } from "@/client"
 import { Button } from "@/components/ui/button"
+import { cn } from "@/lib/utils"
 import { useCityProvider } from "@/providers/cityProvider"
 import { CalendarBody } from "./lib/CalendarBody"
 import { DayBody } from "./lib/DayBody"
 import { EventsToolbar, type EventsView } from "./lib/EventsToolbar"
-import { canManageEvent } from "./lib/eventPermissions"
 import {
   consumeEventsViewState,
   type EventsScrollSnapshot,
@@ -29,6 +29,7 @@ import {
 } from "./lib/eventsViewState"
 import { ListBody } from "./lib/ListBody"
 import { eventListWindowForPopup } from "./lib/listWindow"
+import { SubscribeCalendarButton } from "./lib/SubscribeCalendarButton"
 import { useEventRsvp } from "./lib/useEventRsvp"
 import {
   useEventTimezone,
@@ -404,6 +405,10 @@ export default function EventsPage() {
         search: search || undefined,
         // No status filter: include my drafts / pending / rejected.
         eventStatus: undefined,
+        // Restrict to events I manage (owner / host / collaborator) in the
+        // backend, so pagination counts the managed set instead of dropping
+        // managed events that fall past the page limit by start_time.
+        managedOnly: true,
         includeHidden: showHidden || undefined,
         tags: selectedTags.length ? selectedTags : undefined,
         trackIds: selectedTrackIds.length ? selectedTrackIds : undefined,
@@ -485,10 +490,11 @@ export default function EventsPage() {
     // recurring instance and its master don't collapse into one row.
     const byKey = new Map<string, EventPublic>()
     if (useMineChannel) {
-      const mine = (mineQuery.data?.results ?? []).filter((e) =>
-        canManageEvent(e, currentHuman?.id),
-      )
-      for (const e of mine) byKey.set(`${e.id}:${e.start_time}`, e)
+      // The backend already restricts this channel to events I manage
+      // (managedOnly), so no front-side filter is needed.
+      for (const e of mineQuery.data?.results ?? []) {
+        byKey.set(`${e.id}:${e.start_time}`, e)
+      }
     }
     if (useRsvpedChannel) {
       for (const e of rsvpedQuery.data?.results ?? []) {
@@ -505,7 +511,6 @@ export default function EventsPage() {
     allQuery.data,
     mineQuery.data,
     rsvpedQuery.data,
-    currentHuman,
   ])
   // Restore outer scroll position once after returning from event
   // detail. List view waits for events to load (so the page has the
@@ -650,21 +655,25 @@ export default function EventsPage() {
           <h1 className="text-2xl font-bold tracking-tight">
             {t("events.list.heading")}
           </h1>
-          {creationEnabled &&
-            (eventSettings?.can_publish_event ?? "everyone") === "everyone" && (
-              <Button asChild size="sm" className="shrink-0 px-2 sm:px-3">
-                <Link
-                  href={`/portal/${city?.slug}/events/new`}
-                  aria-label={t("events.toolbar.create_event")}
-                  title={t("events.toolbar.create_event")}
-                >
-                  <Plus className="h-4 w-4 sm:mr-2" />
-                  <span className="hidden sm:inline">
-                    {t("events.toolbar.create_event")}
-                  </span>
-                </Link>
-              </Button>
-            )}
+          <div className="flex shrink-0 items-center gap-2">
+            {city?.id && <SubscribeCalendarButton popupId={city.id} />}
+            {creationEnabled &&
+              (eventSettings?.can_publish_event ?? "everyone") ===
+                "everyone" && (
+                <Button asChild size="sm" className="shrink-0 px-2 sm:px-3">
+                  <Link
+                    href={`/portal/${city?.slug}/events/new`}
+                    aria-label={t("events.toolbar.create_event")}
+                    title={t("events.toolbar.create_event")}
+                  >
+                    <Plus className="h-4 w-4 sm:mr-2" />
+                    <span className="hidden sm:inline">
+                      {t("events.toolbar.create_event")}
+                    </span>
+                  </Link>
+                </Button>
+              )}
+          </div>
         </div>
         <p className="text-sm text-muted-foreground mt-1">
           {timezone
@@ -677,7 +686,16 @@ export default function EventsPage() {
       </div>
 
       {!isDayFullscreen && (
-        <div className="mb-4">
+        <div
+          className={cn(
+            "mb-4",
+            // Freeze the filters for the list & calendar views (the page
+            // scrolls there). The day grid has its own internal scroll, so
+            // it keeps the toolbar in normal flow.
+            view !== "day" &&
+              "sticky top-0 z-20 -mx-4 bg-background px-4 pb-3 pt-2 sm:-mx-6 sm:px-6",
+          )}
+        >
           <EventsToolbar
             view={view}
             onViewChange={setView}

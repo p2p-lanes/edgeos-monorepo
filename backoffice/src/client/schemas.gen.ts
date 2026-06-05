@@ -5504,6 +5504,17 @@ export const EventCollaboratorPublicSchema = {
                 }
             ],
             title: 'Picture Url'
+        },
+        email: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Email'
         }
     },
     type: 'object',
@@ -5514,7 +5525,12 @@ export const EventCollaboratorPublicSchema = {
 Mirrors \`\`HumanPortalPublic\`\` so the same picker/avatar rendering works
 for already-saved collaborators. Resolved from \`\`Events.collaborator_ids\`\`
 by the portal get/create/update endpoints (the list endpoints leave it
-empty — collaborators aren't shown on cards).`
+empty — collaborators aren't shown on cards).
+
+\`\`email\`\` is only populated by the admin (backoffice) endpoints so a chip
+for a human with no name can fall back to their email; the portal
+endpoints leave it \`\`None\`\` to avoid exposing organizer emails to every
+viewer of a public event.`
 } as const;
 
 export const EventCreateSchema = {
@@ -15402,6 +15418,26 @@ export const SendTestRequestSchema = {
     title: 'SendTestRequest'
 } as const;
 
+export const TaskAppSchema = {
+    type: 'string',
+    enum: ['portal', 'backoffice'],
+    title: 'TaskApp',
+    description: 'Which surface a task relates to. Optional (NULL = unspecified).'
+} as const;
+
+export const TaskArchiveResultSchema = {
+    properties: {
+        archived: {
+            type: 'integer',
+            title: 'Archived'
+        }
+    },
+    type: 'object',
+    required: ['archived'],
+    title: 'TaskArchiveResult',
+    description: 'Count of tasks archived by a bulk operation.'
+} as const;
+
 export const TaskAttachmentCreateSchema = {
     properties: {
         storage_key: {
@@ -15653,6 +15689,16 @@ export const TaskCreateSchema = {
             ],
             title: 'Release'
         },
+        app: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/TaskApp'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
         visibility: {
             '$ref': '#/components/schemas/TaskVisibility',
             default: 'internal'
@@ -15752,6 +15798,16 @@ export const TaskDetailPublicSchema = {
             ],
             title: 'Release'
         },
+        app: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/TaskApp'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
         visibility: {
             '$ref': '#/components/schemas/TaskVisibility'
         },
@@ -15778,6 +15834,18 @@ export const TaskDetailPublicSchema = {
                 }
             ],
             title: 'Published At'
+        },
+        archived_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Archived At'
         },
         created_by: {
             anyOf: [
@@ -15914,6 +15982,16 @@ export const TaskPublicSchema = {
             ],
             title: 'Release'
         },
+        app: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/TaskApp'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
         visibility: {
             '$ref': '#/components/schemas/TaskVisibility'
         },
@@ -15940,6 +16018,18 @@ export const TaskPublicSchema = {
                 }
             ],
             title: 'Published At'
+        },
+        archived_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Archived At'
         },
         created_by: {
             anyOf: [
@@ -16083,6 +16173,16 @@ export const TaskUpdateSchema = {
                 }
             ],
             title: 'Release'
+        },
+        app: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/TaskApp'
+                },
+                {
+                    type: 'null'
+                }
+            ]
         },
         visibility: {
             anyOf: [
@@ -17508,6 +17608,28 @@ export const TrackCreateSchema = {
     type: 'object',
     required: ['popup_id', 'name'],
     title: 'TrackCreate'
+} as const;
+
+export const TrackEventCountSchema = {
+    properties: {
+        track_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Track Id'
+        },
+        event_count: {
+            type: 'integer',
+            title: 'Event Count'
+        }
+    },
+    type: 'object',
+    required: ['track_id', 'event_count'],
+    title: 'TrackEventCount',
+    description: `Number of distinct published events that belong to a track.
+
+Backs the portal track filter / Tracks section so it can show per-track
+counts (and hide empty tracks) without pulling the full event list to the
+client just to count.`
 } as const;
 
 export const TrackPublicSchema = {

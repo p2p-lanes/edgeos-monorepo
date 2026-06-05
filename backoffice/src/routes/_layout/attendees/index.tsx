@@ -4,7 +4,11 @@ import type { ColumnDef } from "@tanstack/react-table"
 import { Download, EllipsisVertical, Gift, Pencil, Users } from "lucide-react"
 import { Suspense, useState } from "react"
 
-import { type AttendeeListItem, AttendeesService } from "@/client"
+import {
+  AttendeeCategoriesService,
+  type AttendeeListItem,
+  AttendeesService,
+} from "@/client"
 import { ProductsCell } from "@/components/Attendees/ProductsCell"
 import { DataTable, SortableHeader } from "@/components/Common/DataTable"
 import { EmptyState } from "@/components/Common/EmptyState"
@@ -19,6 +23,13 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Label } from "@/components/ui/label"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Switch } from "@/components/ui/switch"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
@@ -79,6 +90,7 @@ function getAttendeesQueryOptions(
   pageSize: number,
   search?: string,
   hasTickets?: boolean,
+  categoryId?: string,
 ) {
   return {
     queryFn: () =>
@@ -88,13 +100,19 @@ function getAttendeesQueryOptions(
         popupId: popupId || undefined,
         search: search || undefined,
         hasTickets: hasTickets || undefined,
+        categoryId: categoryId || undefined,
       }),
-    queryKey: ["attendees", popupId, { page, pageSize, search, hasTickets }],
+    queryKey: [
+      "attendees",
+      popupId,
+      { page, pageSize, search, hasTickets, categoryId },
+    ],
   }
 }
 
 type AttendeesSearchParams = TableSearchParams & {
   hasTickets?: boolean
+  categoryId?: string
 }
 
 export const Route = createFileRoute("/_layout/attendees/")({
@@ -105,6 +123,9 @@ export const Route = createFileRoute("/_layout/attendees/")({
     // "true" string so the param round-trips regardless of how it was encoded.
     ...(raw.hasTickets === true || raw.hasTickets === "true"
       ? { hasTickets: true }
+      : {}),
+    ...(typeof raw.categoryId === "string" && raw.categoryId
+      ? { categoryId: raw.categoryId }
       : {}),
   }),
   head: () => ({
@@ -194,6 +215,7 @@ function AttendeesTableContent() {
     "/attendees",
   )
   const hasTickets = searchParams.hasTickets ?? false
+  const categoryId = searchParams.categoryId
 
   const setHasTickets = (value: boolean) => {
     navigate({
@@ -207,6 +229,30 @@ function AttendeesTableContent() {
     })
   }
 
+  // The category filter resets to the first page so the server pagination
+  // stays consistent.
+  const setCategory = (value: string | undefined) => {
+    navigate({
+      to: "/attendees",
+      search: (prev: Record<string, unknown>) => ({
+        ...prev,
+        categoryId: value || undefined,
+        page: 0,
+      }),
+      replace: true,
+    })
+  }
+
+  const { data: categoriesData } = useQuery({
+    queryKey: ["attendee-categories", selectedPopupId],
+    queryFn: () =>
+      AttendeeCategoriesService.listAttendeeCategories({
+        popupId: selectedPopupId!,
+      }),
+    enabled: !!selectedPopupId,
+  })
+  const categories = categoriesData?.results ?? []
+
   const { data: attendees } = useQuery({
     ...getAttendeesQueryOptions(
       selectedPopupId,
@@ -214,6 +260,7 @@ function AttendeesTableContent() {
       pagination.pageSize,
       search,
       hasTickets,
+      categoryId,
     ),
     placeholderData: keepPreviousData,
   })
@@ -235,18 +282,36 @@ function AttendeesTableContent() {
         })
       }
       filterBar={
-        <div className="flex items-center gap-2">
-          <Switch
-            id="attendees-has-tickets"
-            checked={hasTickets}
-            onCheckedChange={(checked) => setHasTickets(checked === true)}
-          />
-          <Label
-            htmlFor="attendees-has-tickets"
-            className="whitespace-nowrap text-sm font-normal text-muted-foreground"
+        <div className="flex flex-wrap items-center gap-3">
+          <Select
+            value={categoryId ?? "all"}
+            onValueChange={(v) => setCategory(v === "all" ? undefined : v)}
           >
-            With tickets only
-          </Label>
+            <SelectTrigger className="h-9 w-44">
+              <SelectValue placeholder="Category" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All categories</SelectItem>
+              {categories.map((c) => (
+                <SelectItem key={c.id} value={c.id}>
+                  {c.key}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <div className="flex items-center gap-2">
+            <Switch
+              id="attendees-has-tickets"
+              checked={hasTickets}
+              onCheckedChange={(checked) => setHasTickets(checked === true)}
+            />
+            <Label
+              htmlFor="attendees-has-tickets"
+              className="whitespace-nowrap text-sm font-normal text-muted-foreground"
+            >
+              With tickets only
+            </Label>
+          </div>
         </div>
       }
       serverPagination={{
@@ -255,7 +320,7 @@ function AttendeesTableContent() {
         onPaginationChange: setPagination,
       }}
       emptyState={
-        !search && !hasTickets ? (
+        !search && !hasTickets && !categoryId ? (
           <EmptyState
             icon={Users}
             title="No attendees yet"

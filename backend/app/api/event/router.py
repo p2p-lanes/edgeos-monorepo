@@ -39,6 +39,7 @@ from app.api.event.schemas import (
     OccurrenceConflict,
     OccurrenceRef,
     RecurrenceUpdate,
+    TrackEventCount,
 )
 from app.api.event_audit.crud import build_event_snapshot, record_event_audit
 from app.api.event_audit.schemas import EventAuditAction
@@ -616,6 +617,45 @@ def _ics_utc_stamp(dt: datetime) -> str:
     return dt.astimezone(UTC).strftime("%Y%m%dT%H%M%SZ")
 
 
+def _ics_vevent_lines(
+    event, dtstamp: str, *, include_recurrence: bool = False
+) -> list[str]:
+    """Render one VEVENT block as RFC-5545 lines.
+
+    ``include_recurrence`` emits RRULE/EXDATE so a recurring master expands
+    natively in the subscriber's calendar — used by the popup feed. The
+    single-event download leaves it off so it adds just that one instance.
+    """
+    summary = (event.title or "").replace("\n", " ").replace(",", r"\,")
+    description = (event.content or "").replace("\n", r"\n").replace(",", r"\,")
+    location = event.meeting_url or ""
+
+    lines: list[str] = [
+        "BEGIN:VEVENT",
+        f"UID:{event.id}@edgeos",
+        f"DTSTAMP:{dtstamp}",
+        f"DTSTART:{_ics_utc_stamp(event.start_time)}",
+        f"DTEND:{_ics_utc_stamp(event.end_time)}",
+        f"SUMMARY:{summary}",
+    ]
+    if description:
+        lines.append(f"DESCRIPTION:{description}")
+    if location:
+        lines.append(f"LOCATION:{location}")
+    if include_recurrence and getattr(event, "rrule", None):
+        lines.append(f"RRULE:{event.rrule}")
+        exdates = getattr(event, "recurrence_exdates", None) or []
+        if exdates:
+            lines.append(f"EXDATE:{','.join(_ics_utc_stamp(d) for d in exdates)}")
+    lines.append(
+        "STATUS:CANCELLED"
+        if event.status == EventStatus.CANCELLED
+        else "STATUS:CONFIRMED"
+    )
+    lines.append("END:VEVENT")
+    return lines
+
+
 def _render_ics(event) -> str:
     """Render a minimal, RFC-5545-compliant VCALENDAR string for one event.
 
@@ -629,34 +669,39 @@ def _render_ics(event) -> str:
     the emailed invite the same entry, so a cancellation reconciles it.
     """
     dtstamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
-    dtstart = _ics_utc_stamp(event.start_time)
-    dtend = _ics_utc_stamp(event.end_time)
-    summary = (event.title or "").replace("\n", " ").replace(",", r"\,")
-    description = (event.content or "").replace("\n", r"\n").replace(",", r"\,")
-    location = event.meeting_url or ""
-
     lines: list[str] = [
         "BEGIN:VCALENDAR",
         "VERSION:2.0",
         "PRODID:-//EdgeOS//Events//EN",
         "CALSCALE:GREGORIAN",
         "METHOD:PUBLISH",
-        "BEGIN:VEVENT",
-        f"UID:{event.id}@edgeos",
-        f"DTSTAMP:{dtstamp}",
-        f"DTSTART:{dtstart}",
-        f"DTEND:{dtend}",
-        f"SUMMARY:{summary}",
+        *_ics_vevent_lines(event, dtstamp),
+        "END:VCALENDAR",
     ]
-    if description:
-        lines.append(f"DESCRIPTION:{description}")
-    if location:
-        lines.append(f"LOCATION:{location}")
-    if event.status == EventStatus.CANCELLED:
-        lines.append("STATUS:CANCELLED")
-    else:
-        lines.append("STATUS:CONFIRMED")
-    lines.extend(["END:VEVENT", "END:VCALENDAR"])
+    return "\r\n".join(lines) + "\r\n"
+
+
+def _render_ics_feed(calendar_name: str, events: list) -> str:
+    """Render a VCALENDAR feed of many events (the popup subscription feed).
+
+    Recurring masters carry their RRULE so the calendar app expands them and
+    stays in sync. REFRESH-INTERVAL / X-PUBLISHED-TTL hint a 1h poll.
+    """
+    dtstamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+    name = (calendar_name or "Events").replace("\n", " ").replace(",", r"\,")
+    lines: list[str] = [
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "PRODID:-//EdgeOS//Events//EN",
+        "CALSCALE:GREGORIAN",
+        "METHOD:PUBLISH",
+        f"X-WR-CALNAME:{name}",
+        "REFRESH-INTERVAL;VALUE=DURATION:PT1H",
+        "X-PUBLISHED-TTL:PT1H",
+    ]
+    for event in events:
+        lines.extend(_ics_vevent_lines(event, dtstamp, include_recurrence=True))
+    lines.append("END:VCALENDAR")
     return "\r\n".join(lines) + "\r\n"
 
 
@@ -826,6 +871,57 @@ async def list_public_calendar(
     )
 
 
+@router.get(
+    "/public/calendar.ics",
+    dependencies=[
+        Depends(
+            RateLimit(limit=120, window_sec=60, key_prefix="rl:events-public-ics")
+        ),
+    ],
+)
+async def public_calendar_ics(
+    db: SessionDep,
+    popup_id: uuid.UUID,
+) -> Response:
+    """Anonymous iCalendar subscription feed of a popup's public events.
+
+    Served by ``popup_id`` (globally unique) so calendar apps — which fetch
+    the feed without Origin/Referer — can subscribe without tenant
+    resolution. Only ``published`` + ``visibility=public`` events are
+    included, matching the public calendar; recurring masters carry their
+    RRULE so the subscription stays in sync.
+    """
+    from app.api.popup.crud import popups_crud
+    from app.api.popup.schemas import PopupStatus
+
+    popup = popups_crud.get(db, popup_id)
+    if not popup or popup.status != PopupStatus.active:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Popup not found"
+        )
+
+    events, _ = crud.events_crud.find_by_popup(
+        db,
+        popup_id=popup.id,
+        skip=0,
+        limit=1000,
+        event_status=EventStatus.PUBLISHED,
+        visibility=EventVisibility.PUBLIC,
+        exclude_statuses=[EventStatus.CANCELLED],
+    )
+    ics = _render_ics_feed(f"{popup.name} — Events", events)
+    # attachment so the portal's "Download .ics" link saves a file even
+    # cross-origin; calendar apps ignore this header when subscribing.
+    return Response(
+        content=ics,
+        media_type="text/calendar; charset=utf-8",
+        headers={
+            "Content-Disposition": f'attachment; filename="{popup.slug or "events"}.ics"',
+            "Cache-Control": "public, max-age=3600",
+        },
+    )
+
+
 # ---------------------------------------------------------------------------
 # Backoffice endpoints (user token)
 # ---------------------------------------------------------------------------
@@ -917,7 +1013,7 @@ async def get_event(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Event not found"
         )
-    return _with_collaborators(db, _to_public(event), event)
+    return _with_collaborators(db, _to_public(event), event, include_email=True)
 
 
 # ---------------------------------------------------------------------------
@@ -1045,7 +1141,7 @@ async def create_event(
         actor=actor_from_user(current_user),
     )
 
-    return _with_collaborators(db, _to_public(event), event)
+    return _with_collaborators(db, _to_public(event), event, include_email=True)
 
 
 @router.patch("/{event_id}", response_model=EventPublic)
@@ -1106,6 +1202,10 @@ async def update_event(
         "content": event.content,
         "custom_location_name": event.custom_location_name,
         "custom_location_url": event.custom_location_url,
+        "meeting_url": event.meeting_url,
+        "timezone": event.timezone,
+        "rrule": event.rrule,
+        "recurrence_exdates": event.recurrence_exdates,
     }
     updated = crud.events_crud.update(db, event, event_in)
 
@@ -1122,7 +1222,7 @@ async def update_event(
         changes=compute_changes(audit_before, audit_after),
     )
 
-    return _with_collaborators(db, _to_public(updated), updated)
+    return _with_collaborators(db, _to_public(updated), updated, include_email=True)
 
 
 @router.post("/{event_id}/cancel", response_model=EventPublic)
@@ -1889,24 +1989,36 @@ def _event_collaborator_ids(event) -> list[uuid.UUID]:
     return out
 
 
-def _human_manages_event(event, current_human) -> bool:
-    """Whether a human may manage an event (edit / cancel / invitations).
+def _human_id_manages_event(event, human_id: uuid.UUID) -> bool:
+    """Whether the human id may manage an event (edit / cancel / invitations).
 
     True for the event's owner (creator), its designated host, or any of its
     collaborators — all carry the same responsibility over the event even
     though they didn't create it. ``host_id`` is NULL when no directory human
     was assigned; ``collaborator_ids`` is empty when none were added.
     """
-    if current_human.id in (event.owner_id, event.host_id):
+    if human_id in (event.owner_id, event.host_id):
         return True
-    return current_human.id in _event_collaborator_ids(event)
+    return human_id in _event_collaborator_ids(event)
 
 
-def _resolve_collaborators(db, event) -> list[EventCollaboratorPublic]:
+def _human_manages_event(event, current_human) -> bool:
+    """``_human_id_manages_event`` for an authenticated human object."""
+    return _human_id_manages_event(event, current_human.id)
+
+
+def _resolve_collaborators(
+    db, event, *, include_email: bool = False
+) -> list[EventCollaboratorPublic]:
     """Resolve an event's ``collaborator_ids`` to slim human profiles.
 
     Preserves the stored order and silently skips ids that no longer resolve
     to a human in the tenant. Returns ``[]`` when there are no collaborators.
+
+    ``include_email`` adds the human's email to each profile so a nameless
+    collaborator chip can fall back to it. Only the admin (backoffice)
+    endpoints set this; the portal leaves it off so organizer emails aren't
+    exposed to every viewer of a public event.
     """
     ids = _event_collaborator_ids(event)
     if not ids:
@@ -1929,15 +2041,22 @@ def _resolve_collaborators(db, event) -> list[EventCollaboratorPublic]:
                 first_name=human.first_name,
                 last_name=human.last_name,
                 picture_url=human.picture_url,
+                email=human.email if include_email else None,
             )
         )
     return resolved
 
 
-def _with_collaborators(db, public: EventPublic, event) -> EventPublic:
+def _with_collaborators(
+    db, public: EventPublic, event, *, include_email: bool = False
+) -> EventPublic:
     """Attach resolved collaborator profiles to a single-event response."""
     return public.model_copy(
-        update={"collaborators": _resolve_collaborators(db, event)}
+        update={
+            "collaborators": _resolve_collaborators(
+                db, event, include_email=include_email
+            )
+        }
     )
 
 
@@ -2241,10 +2360,11 @@ def _portal_visibility_filter(db, events: list, human_id: uuid.UUID) -> list:
 
     Rules:
     - public: visible to all.
-    - private: only owner + invited humans.
-    - unlisted: hidden from public listings, but the owner still sees their
-      own unlisted events (e.g. pending_approval requests they created).
-      Detail is reachable via direct link for non-owners.
+    - private: only managers (owner / host / collaborators) + invited humans.
+    - unlisted: hidden from public listings, but managers (owner / host /
+      collaborators) still see their own unlisted events (e.g.
+      pending_approval requests they created). Detail is reachable via direct
+      link for non-managers.
     """
     from sqlmodel import select
 
@@ -2270,10 +2390,12 @@ def _portal_visibility_filter(db, events: list, human_id: uuid.UUID) -> list:
         if e.visibility == EventVisibility.PUBLIC:
             visible.append(e)
         elif e.visibility == EventVisibility.UNLISTED:
-            if e.owner_id == human_id:
+            if _human_id_manages_event(e, human_id):
                 visible.append(e)
         elif e.visibility == EventVisibility.PRIVATE:
-            if _invitation_visible_to_human(e, human_id, invited_map.get(e.id, set())):
+            if _human_id_manages_event(e, human_id) or _invitation_visible_to_human(
+                e, human_id, invited_map.get(e.id, set())
+            ):
                 visible.append(e)
     return visible
 
@@ -2292,6 +2414,7 @@ async def list_portal_events(
     start_before: datetime | None = None,
     search: str | None = None,
     rsvped_only: bool = False,
+    managed_only: bool = False,
     include_hidden: bool = False,
     skip: PaginationSkip = 0,
     limit: PaginationLimit = 100,
@@ -2310,6 +2433,10 @@ async def list_portal_events(
             start_after=start_after,
             start_before=start_before,
             search=search,
+            # "My events" channel: restrict to events the caller manages
+            # (owner / host / collaborator) in SQL, so pagination counts the
+            # managed set instead of post-filtering a truncated page.
+            managed_by_human_id=current_human.id if managed_only else None,
         )
     else:
         events, total = crud.events_crud.find(
@@ -2320,7 +2447,13 @@ async def list_portal_events(
             search_fields=["title"],
         )
 
-    visible = _portal_visibility_filter(db, events, current_human.id)
+    # ``managed_only`` already restricted the query to events the caller
+    # manages, which are by definition visible to them — skip the owner/invite
+    # visibility filter so a managed private/unlisted event is never dropped.
+    if managed_only:
+        visible = events
+    else:
+        visible = _portal_visibility_filter(db, events, current_human.id)
     # Cancelled events are removed from every portal listing — owners who want
     # to see them after the fact can still hit the detail URL directly. The
     # ``event_status`` query param can't express "exclude cancelled" alongside
@@ -2491,6 +2624,25 @@ async def portal_hidden_events_count(
         ).where(Events.popup_id == popup_id)
     count = db.exec(stmt).one()
     return {"count": int(count or 0)}
+
+
+@router.get("/portal/events/track-counts", response_model=list[TrackEventCount])
+async def list_portal_track_event_counts(
+    db: HumanTenantSession,
+    _: CurrentHuman,
+    popup_id: uuid.UUID,
+) -> list[TrackEventCount]:
+    """Distinct published-event count per track for a popup.
+
+    Lets the portal track filter / Tracks section render counts and hide
+    empty tracks without fetching the whole event list to count on the
+    client (which also capped at the page limit).
+    """
+    counts = crud.events_crud.count_published_events_by_track(db, popup_id=popup_id)
+    return [
+        TrackEventCount(track_id=track_id, event_count=count)
+        for track_id, count in counts.items()
+    ]
 
 
 @router.get("/portal/events/{event_id}", response_model=EventPublic)
@@ -2860,6 +3012,10 @@ async def update_portal_event(
         "content": event.content,
         "custom_location_name": event.custom_location_name,
         "custom_location_url": event.custom_location_url,
+        "meeting_url": event.meeting_url,
+        "timezone": event.timezone,
+        "rrule": event.rrule,
+        "recurrence_exdates": event.recurrence_exdates,
     }
     updated = crud.events_crud.update(db, event, event_in)
     if _event_calendar_fields_changed(before, updated):
@@ -2926,9 +3082,8 @@ async def export_portal_event_ics(
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
     # Re-use the same visibility gate as the detail endpoint.
-    if (
-        event.visibility == EventVisibility.PRIVATE
-        and event.owner_id != current_human.id
+    if event.visibility == EventVisibility.PRIVATE and not _human_manages_event(
+        event, current_human
     ):
         from sqlmodel import select
 
