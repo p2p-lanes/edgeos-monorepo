@@ -22,6 +22,7 @@ from sqlmodel import Session
 from app.api.human.models import Humans
 from app.api.popup.models import Popups
 from app.api.tenant.models import Tenants
+from app.api.track.models import Tracks
 from app.core.security import create_access_token
 
 PORTAL_EVENTS = "/api/v1/events/portal/events"
@@ -289,3 +290,115 @@ class TestCollaboratorEmailResolution:
         )
         assert portal_resp.status_code == 200, portal_resp.text
         assert portal_resp.json()["collaborators"][0]["email"] is None
+
+
+class TestManagedOnlyListing:
+    """``managed_only`` filters the portal listing to events the caller manages.
+
+    Filtering happens in SQL (owner / host / collaborator), so a managed event
+    is returned regardless of where it falls in the popup's start-time order —
+    the previous front-side filter over a paginated page silently dropped
+    managed events that sat past the fetch limit.
+    """
+
+    def _post(
+        self, client: TestClient, popup: Popups, owner: Humans, payload_extra: dict
+    ) -> dict:
+        payload = {**_create_payload(popup, collaborator_ids=[]), **payload_extra}
+        resp = client.post(PORTAL_EVENTS, headers=_human_auth(owner), json=payload)
+        assert resp.status_code == 201, resp.text
+        return resp.json()
+
+    def test_managed_event_returned_regardless_of_page_position(
+        self, client: TestClient, db: Session, tenant_a: Tenants
+    ) -> None:
+        popup = _make_popup(db, tenant_a)
+        other = _make_human(db, tenant_a, first="Other")
+        manager = _make_human(db, tenant_a, first="Manager")
+
+        # Non-managed public events with EARLY start times fill the first page.
+        for day in (1, 2, 3):
+            self._post(
+                client,
+                popup,
+                other,
+                {
+                    "start_time": f"2026-05-0{day}T10:00:00+00:00",
+                    "end_time": f"2026-05-0{day}T11:00:00+00:00",
+                },
+            )
+        # A PRIVATE event the manager collaborates on, with a LATE start time
+        # (past a small page when ordered by start_time).
+        managed = self._post(
+            client,
+            popup,
+            other,
+            {
+                "visibility": "private",
+                "collaborator_ids": [str(manager.id)],
+                "start_time": "2026-05-20T10:00:00+00:00",
+                "end_time": "2026-05-20T11:00:00+00:00",
+            },
+        )
+
+        resp = client.get(
+            PORTAL_EVENTS,
+            params={"popup_id": str(popup.id), "managed_only": "true", "limit": 2},
+            headers=_human_auth(manager),
+        )
+        assert resp.status_code == 200, resp.text
+        body = resp.json()
+        ids = {e["id"] for e in body["results"]}
+        assert ids == {managed["id"]}
+        # Only the managed event is counted, so paging reflects the managed set.
+        assert body["paging"]["total"] == 1
+
+    def test_managed_only_empty_for_non_manager(
+        self, client: TestClient, db: Session, tenant_a: Tenants
+    ) -> None:
+        popup = _make_popup(db, tenant_a)
+        owner = _make_human(db, tenant_a, first="Owner")
+        stranger = _make_human(db, tenant_a, first="Stranger")
+        self._post(client, popup, owner, {})
+
+        resp = client.get(
+            PORTAL_EVENTS,
+            params={"popup_id": str(popup.id), "managed_only": "true"},
+            headers=_human_auth(stranger),
+        )
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["results"] == []
+
+
+class TestTrackEventCounts:
+    """``/portal/events/track-counts`` aggregates per-track counts server-side."""
+
+    def test_counts_distinct_published_events_per_track(
+        self, client: TestClient, db: Session, tenant_a: Tenants
+    ) -> None:
+        popup = _make_popup(db, tenant_a)
+        owner = _make_human(db, tenant_a, first="Owner")
+        track = Tracks(tenant_id=tenant_a.id, popup_id=popup.id, name="Track A")
+        db.add(track)
+        db.commit()
+        db.refresh(track)
+
+        for _ in range(2):
+            resp = client.post(
+                PORTAL_EVENTS,
+                headers=_human_auth(owner),
+                json={
+                    **_create_payload(popup, collaborator_ids=[]),
+                    "track_id": str(track.id),
+                },
+            )
+            assert resp.status_code == 201, resp.text
+
+        resp = client.get(
+            f"{PORTAL_EVENTS}/track-counts",
+            params={"popup_id": str(popup.id)},
+            headers=_human_auth(owner),
+        )
+        assert resp.status_code == 200, resp.text
+        counts = {row["track_id"]: row["event_count"] for row in resp.json()}
+        assert counts.get(str(track.id)) == 2
