@@ -12,10 +12,19 @@ import {
   PRIORITY_LABELS,
   STATUS_CLASSES,
   STATUS_LABELS,
+  TASK_PRIORITIES,
+  TASK_STATUSES,
   TYPE_CLASSES,
   TYPE_LABELS,
 } from "./taskMeta"
 import { useTaskArchive } from "./useTaskArchive"
+
+// Logical (not alphabetical) ordering for the priority/status columns so the
+// header sort runs low→high and to_do→cancelled instead of by string.
+const byRank =
+  (order: readonly string[], key: "priority" | "status") =>
+  (a: { original: TaskPublic }, b: { original: TaskPublic }) =>
+    order.indexOf(a.original[key] ?? "") - order.indexOf(b.original[key] ?? "")
 
 function ArchiveCell({ task }: { task: TaskPublic }) {
   const { isSuperadmin } = useAuth()
@@ -61,7 +70,7 @@ export const taskColumns: ColumnDef<TaskPublic>[] = [
   },
   {
     accessorKey: "type",
-    header: "Type",
+    header: ({ column }) => <SortableHeader label="Type" column={column} />,
     cell: ({ row }) => (
       <Badge
         variant="outline"
@@ -73,7 +82,8 @@ export const taskColumns: ColumnDef<TaskPublic>[] = [
   },
   {
     accessorKey: "priority",
-    header: "Priority",
+    header: ({ column }) => <SortableHeader label="Priority" column={column} />,
+    sortingFn: byRank(TASK_PRIORITIES, "priority"),
     cell: ({ row }) => {
       const priority = row.original.priority ?? "medium"
       return (
@@ -88,7 +98,8 @@ export const taskColumns: ColumnDef<TaskPublic>[] = [
   },
   {
     accessorKey: "status",
-    header: "Status",
+    header: ({ column }) => <SortableHeader label="Status" column={column} />,
+    sortingFn: byRank(TASK_STATUSES, "status"),
     cell: ({ row }) => (
       <Badge
         variant="outline"
@@ -100,7 +111,9 @@ export const taskColumns: ColumnDef<TaskPublic>[] = [
   },
   {
     accessorKey: "responsible_name",
-    header: "Responsible",
+    header: ({ column }) => (
+      <SortableHeader label="Responsible" column={column} />
+    ),
     cell: ({ row }) => (
       <span className="text-sm text-muted-foreground">
         {row.original.responsible_name ?? "—"}
@@ -109,7 +122,9 @@ export const taskColumns: ColumnDef<TaskPublic>[] = [
   },
   {
     accessorKey: "created_by_name",
-    header: "Created by",
+    header: ({ column }) => (
+      <SortableHeader label="Created by" column={column} />
+    ),
     cell: ({ row }) => (
       <span className="text-sm text-muted-foreground">
         {row.original.created_by_name ?? "—"}
@@ -118,7 +133,7 @@ export const taskColumns: ColumnDef<TaskPublic>[] = [
   },
   {
     accessorKey: "release",
-    header: "Release",
+    header: ({ column }) => <SortableHeader label="Release" column={column} />,
     cell: ({ row }) => (
       <span className="font-mono text-xs text-muted-foreground">
         {row.original.release ?? "—"}

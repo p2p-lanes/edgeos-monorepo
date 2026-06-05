@@ -5,6 +5,7 @@ import { useMemo, useState } from "react"
 
 import {
   type TaskPublic,
+  type TaskStatus,
   TasksService,
   type TaskType,
   UsersService,
@@ -14,7 +15,12 @@ import { EmptyState } from "@/components/Common/EmptyState"
 import { taskColumns } from "@/components/Tasks/columns"
 import { TaskBoard } from "@/components/Tasks/TaskBoard"
 import { TaskDialog } from "@/components/Tasks/TaskDialog"
-import { TASK_TYPES, TYPE_LABELS } from "@/components/Tasks/taskMeta"
+import {
+  STATUS_LABELS,
+  TASK_STATUSES,
+  TASK_TYPES,
+  TYPE_LABELS,
+} from "@/components/Tasks/taskMeta"
 import { useTaskArchive } from "@/components/Tasks/useTaskArchive"
 import { Button } from "@/components/ui/button"
 import {
@@ -55,6 +61,7 @@ function Tasks() {
   const { isSuperadmin, isUserLoading } = useAuth()
   const [search, setSearch] = useState("")
   const [typeFilter, setTypeFilter] = useState<TaskType | "all">("all")
+  const [statusFilter, setStatusFilter] = useState<TaskStatus | "all">("all")
   const [responsibleFilter, setResponsibleFilter] = useState<string>("all")
   const [newOpen, setNewOpen] = useState(false)
   const [tab, setTab] = useState("kanban")
@@ -90,6 +97,7 @@ function Tasks() {
     return (tasks: TaskPublic[]) =>
       tasks.filter((task) => {
         if (typeFilter !== "all" && task.type !== typeFilter) return false
+        if (statusFilter !== "all" && task.status !== statusFilter) return false
         if (responsibleFilter === "unassigned") {
           if (task.responsible_user_id) return false
         } else if (
@@ -104,7 +112,7 @@ function Tasks() {
           (task.detail ?? "").toLowerCase().includes(q)
         )
       })
-  }, [typeFilter, responsibleFilter, search])
+  }, [typeFilter, statusFilter, responsibleFilter, search])
 
   const filtered = useMemo(
     () => applyFilters(data?.results ?? []),
@@ -175,6 +183,22 @@ function Tasks() {
             {TASK_TYPES.map((t) => (
               <SelectItem key={t} value={t}>
                 {TYPE_LABELS[t]}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select
+          value={statusFilter}
+          onValueChange={(v) => setStatusFilter(v as TaskStatus | "all")}
+        >
+          <SelectTrigger className="w-44">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All statuses</SelectItem>
+            {TASK_STATUSES.map((s) => (
+              <SelectItem key={s} value={s}>
+                {STATUS_LABELS[s]}
               </SelectItem>
             ))}
           </SelectContent>
