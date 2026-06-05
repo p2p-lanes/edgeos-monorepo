@@ -5460,6 +5460,17 @@ export const EventCollaboratorPublicSchema = {
                 }
             ],
             title: 'Picture Url'
+        },
+        email: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Email'
         }
     },
     type: 'object',
@@ -5470,7 +5481,12 @@ export const EventCollaboratorPublicSchema = {
 Mirrors \`\`HumanPortalPublic\`\` so the same picker/avatar rendering works
 for already-saved collaborators. Resolved from \`\`Events.collaborator_ids\`\`
 by the portal get/create/update endpoints (the list endpoints leave it
-empty — collaborators aren't shown on cards).`
+empty — collaborators aren't shown on cards).
+
+\`\`email\`\` is only populated by the admin (backoffice) endpoints so a chip
+for a human with no name can fall back to their email; the portal
+endpoints leave it \`\`None\`\` to avoid exposing organizer emails to every
+viewer of a public event.`
 } as const;
 
 export const EventCreateSchema = {

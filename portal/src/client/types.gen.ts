@@ -1266,12 +1266,18 @@ export type EventCalendarTrack = {
  * for already-saved collaborators. Resolved from ``Events.collaborator_ids``
  * by the portal get/create/update endpoints (the list endpoints leave it
  * empty — collaborators aren't shown on cards).
+ *
+ * ``email`` is only populated by the admin (backoffice) endpoints so a chip
+ * for a human with no name can fall back to their email; the portal
+ * endpoints leave it ``None`` to avoid exposing organizer emails to every
+ * viewer of a public event.
  */
 export type EventCollaboratorPublic = {
     id: string;
     first_name?: (string | null);
     last_name?: (string | null);
     picture_url?: (string | null);
+    email?: (string | null);
 };
 
 /**

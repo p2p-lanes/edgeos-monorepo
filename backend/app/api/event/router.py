@@ -917,7 +917,7 @@ async def get_event(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Event not found"
         )
-    return _with_collaborators(db, _to_public(event), event)
+    return _with_collaborators(db, _to_public(event), event, include_email=True)
 
 
 # ---------------------------------------------------------------------------
@@ -1045,7 +1045,7 @@ async def create_event(
         actor=actor_from_user(current_user),
     )
 
-    return _with_collaborators(db, _to_public(event), event)
+    return _with_collaborators(db, _to_public(event), event, include_email=True)
 
 
 @router.patch("/{event_id}", response_model=EventPublic)
@@ -1122,7 +1122,7 @@ async def update_event(
         changes=compute_changes(audit_before, audit_after),
     )
 
-    return _with_collaborators(db, _to_public(updated), updated)
+    return _with_collaborators(db, _to_public(updated), updated, include_email=True)
 
 
 @router.post("/{event_id}/cancel", response_model=EventPublic)
@@ -1907,11 +1907,18 @@ def _human_manages_event(event, current_human) -> bool:
     return _human_id_manages_event(event, current_human.id)
 
 
-def _resolve_collaborators(db, event) -> list[EventCollaboratorPublic]:
+def _resolve_collaborators(
+    db, event, *, include_email: bool = False
+) -> list[EventCollaboratorPublic]:
     """Resolve an event's ``collaborator_ids`` to slim human profiles.
 
     Preserves the stored order and silently skips ids that no longer resolve
     to a human in the tenant. Returns ``[]`` when there are no collaborators.
+
+    ``include_email`` adds the human's email to each profile so a nameless
+    collaborator chip can fall back to it. Only the admin (backoffice)
+    endpoints set this; the portal leaves it off so organizer emails aren't
+    exposed to every viewer of a public event.
     """
     ids = _event_collaborator_ids(event)
     if not ids:
@@ -1934,15 +1941,22 @@ def _resolve_collaborators(db, event) -> list[EventCollaboratorPublic]:
                 first_name=human.first_name,
                 last_name=human.last_name,
                 picture_url=human.picture_url,
+                email=human.email if include_email else None,
             )
         )
     return resolved
 
 
-def _with_collaborators(db, public: EventPublic, event) -> EventPublic:
+def _with_collaborators(
+    db, public: EventPublic, event, *, include_email: bool = False
+) -> EventPublic:
     """Attach resolved collaborator profiles to a single-event response."""
     return public.model_copy(
-        update={"collaborators": _resolve_collaborators(db, event)}
+        update={
+            "collaborators": _resolve_collaborators(
+                db, event, include_email=include_email
+            )
+        }
     )
 
 

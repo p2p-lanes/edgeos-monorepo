@@ -236,3 +236,56 @@ class TestCollaboratorsListVisibility:
         assert event_id in self._list_ids(client, popup, host)
         assert event_id in self._list_ids(client, popup, collab)
         assert event_id not in self._list_ids(client, popup, stranger)
+
+
+class TestCollaboratorEmailResolution:
+    """A nameless collaborator's chip falls back to email in the backoffice.
+
+    The admin (backoffice) endpoints resolve ``email`` so a human with no
+    name shows their email instead of a raw id; the portal endpoints leave it
+    ``None`` so organizer emails aren't exposed to every viewer.
+    """
+
+    def test_admin_resolves_email_portal_does_not(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+        admin_token_tenant_a: str,
+    ) -> None:
+        popup = _make_popup(db, tenant_a)
+        owner = _make_human(db, tenant_a, first="Owner")
+        # Nameless human: the chip has nothing but the email to fall back to.
+        nameless = Humans(
+            tenant_id=tenant_a.id,
+            email=f"nameless-{uuid.uuid4().hex[:8]}@test.com",
+            first_name=None,
+            last_name=None,
+        )
+        db.add(nameless)
+        db.commit()
+        db.refresh(nameless)
+
+        created = client.post(
+            PORTAL_EVENTS,
+            headers=_human_auth(owner),
+            json=_create_payload(popup, collaborator_ids=[nameless.id]),
+        ).json()
+
+        # Admin (backoffice) GET exposes the email for the fallback.
+        admin_resp = client.get(
+            f"/api/v1/events/{created['id']}",
+            headers={"Authorization": f"Bearer {admin_token_tenant_a}"},
+        )
+        assert admin_resp.status_code == 200, admin_resp.text
+        collab = admin_resp.json()["collaborators"][0]
+        assert collab["id"] == str(nameless.id)
+        assert collab["email"] == nameless.email
+
+        # Portal GET must not leak the organizer email.
+        portal_resp = client.get(
+            f"{PORTAL_EVENTS}/{created['id']}",
+            headers=_human_auth(owner),
+        )
+        assert portal_resp.status_code == 200, portal_resp.text
+        assert portal_resp.json()["collaborators"][0]["email"] is None
