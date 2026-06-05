@@ -172,7 +172,9 @@ export function ListBody({
   const nowDivider = (withRef: boolean) => (
     <div
       ref={withRef ? autoScrollRef : undefined}
-      className="flex items-center gap-2 py-1 scroll-mt-20"
+      // scroll-margin clears the frozen filters bar so the auto-scroll lands
+      // the divider just below it instead of behind it.
+      className="flex items-center gap-2 py-1 scroll-mt-28"
     >
       <span className="h-1.5 w-1.5 rounded-full bg-red-500 shrink-0" />
       <span className="text-[10px] font-semibold uppercase tracking-wide text-red-500 shrink-0">
@@ -321,7 +323,10 @@ export function ListBody({
                       <div
                         id={domId}
                         ref={isUpcomingAnchor ? autoScrollRef : undefined}
-                        className={cardClass}
+                        className={cn(
+                          cardClass,
+                          isUpcomingAnchor && "scroll-mt-28",
+                        )}
                       >
                         <Link
                           href={href}

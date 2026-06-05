@@ -16,6 +16,7 @@ import { createPortal } from "react-dom"
 import { useTranslation } from "react-i18next"
 import { type EventPublic, EventsService, HumansService } from "@/client"
 import { Button } from "@/components/ui/button"
+import { cn } from "@/lib/utils"
 import { useCityProvider } from "@/providers/cityProvider"
 import { CalendarBody } from "./lib/CalendarBody"
 import { DayBody } from "./lib/DayBody"
@@ -680,7 +681,16 @@ export default function EventsPage() {
       </div>
 
       {!isDayFullscreen && (
-        <div className="mb-4">
+        <div
+          className={cn(
+            "mb-4",
+            // Freeze the filters for the list & calendar views (the page
+            // scrolls there). The day grid has its own internal scroll, so
+            // it keeps the toolbar in normal flow.
+            view !== "day" &&
+              "sticky top-0 z-20 -mx-4 bg-background px-4 pb-3 pt-2 sm:-mx-6 sm:px-6",
+          )}
+        >
           <EventsToolbar
             view={view}
             onViewChange={setView}
