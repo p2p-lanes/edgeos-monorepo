@@ -1889,17 +1889,22 @@ def _event_collaborator_ids(event) -> list[uuid.UUID]:
     return out
 
 
-def _human_manages_event(event, current_human) -> bool:
-    """Whether a human may manage an event (edit / cancel / invitations).
+def _human_id_manages_event(event, human_id: uuid.UUID) -> bool:
+    """Whether the human id may manage an event (edit / cancel / invitations).
 
     True for the event's owner (creator), its designated host, or any of its
     collaborators — all carry the same responsibility over the event even
     though they didn't create it. ``host_id`` is NULL when no directory human
     was assigned; ``collaborator_ids`` is empty when none were added.
     """
-    if current_human.id in (event.owner_id, event.host_id):
+    if human_id in (event.owner_id, event.host_id):
         return True
-    return current_human.id in _event_collaborator_ids(event)
+    return human_id in _event_collaborator_ids(event)
+
+
+def _human_manages_event(event, current_human) -> bool:
+    """``_human_id_manages_event`` for an authenticated human object."""
+    return _human_id_manages_event(event, current_human.id)
 
 
 def _resolve_collaborators(db, event) -> list[EventCollaboratorPublic]:
@@ -2241,10 +2246,11 @@ def _portal_visibility_filter(db, events: list, human_id: uuid.UUID) -> list:
 
     Rules:
     - public: visible to all.
-    - private: only owner + invited humans.
-    - unlisted: hidden from public listings, but the owner still sees their
-      own unlisted events (e.g. pending_approval requests they created).
-      Detail is reachable via direct link for non-owners.
+    - private: only managers (owner / host / collaborators) + invited humans.
+    - unlisted: hidden from public listings, but managers (owner / host /
+      collaborators) still see their own unlisted events (e.g.
+      pending_approval requests they created). Detail is reachable via direct
+      link for non-managers.
     """
     from sqlmodel import select
 
@@ -2270,10 +2276,12 @@ def _portal_visibility_filter(db, events: list, human_id: uuid.UUID) -> list:
         if e.visibility == EventVisibility.PUBLIC:
             visible.append(e)
         elif e.visibility == EventVisibility.UNLISTED:
-            if e.owner_id == human_id:
+            if _human_id_manages_event(e, human_id):
                 visible.append(e)
         elif e.visibility == EventVisibility.PRIVATE:
-            if _invitation_visible_to_human(e, human_id, invited_map.get(e.id, set())):
+            if _human_id_manages_event(e, human_id) or _invitation_visible_to_human(
+                e, human_id, invited_map.get(e.id, set())
+            ):
                 visible.append(e)
     return visible
 
@@ -2926,9 +2934,8 @@ async def export_portal_event_ics(
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
     # Re-use the same visibility gate as the detail endpoint.
-    if (
-        event.visibility == EventVisibility.PRIVATE
-        and event.owner_id != current_human.id
+    if event.visibility == EventVisibility.PRIVATE and not _human_manages_event(
+        event, current_human
     ):
         from sqlmodel import select
 

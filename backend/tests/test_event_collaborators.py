@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import uuid
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session
 
@@ -171,3 +172,67 @@ class TestCollaboratorsPermissions:
         )
         assert resp.status_code == 200, resp.text
         assert resp.json()["title"] == "Edited by newcomer"
+
+
+class TestCollaboratorsListVisibility:
+    """Host and collaborators see private/unlisted events in portal listings.
+
+    The owner has always seen their own private/unlisted events; managers
+    (host / collaborators) now get the same listing visibility — mirroring
+    ``_human_manages_event`` — while a stranger still does not see them.
+    """
+
+    def _create(
+        self,
+        client: TestClient,
+        popup: Popups,
+        owner: Humans,
+        *,
+        visibility: str,
+        host_id: uuid.UUID | None = None,
+        collaborator_ids: list[uuid.UUID] | None = None,
+    ) -> str:
+        payload = _create_payload(popup, collaborator_ids=collaborator_ids or [])
+        payload["visibility"] = visibility
+        if host_id is not None:
+            payload["host_id"] = str(host_id)
+        resp = client.post(PORTAL_EVENTS, headers=_human_auth(owner), json=payload)
+        assert resp.status_code == 201, resp.text
+        return resp.json()["id"]
+
+    def _list_ids(self, client: TestClient, popup: Popups, human: Humans) -> set[str]:
+        resp = client.get(
+            PORTAL_EVENTS,
+            params={"popup_id": str(popup.id)},
+            headers=_human_auth(human),
+        )
+        assert resp.status_code == 200, resp.text
+        return {item["id"] for item in resp.json()["results"]}
+
+    @pytest.mark.parametrize("visibility", ["private", "unlisted"])
+    def test_host_and_collaborator_see_restricted_event(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+        visibility: str,
+    ) -> None:
+        popup = _make_popup(db, tenant_a)
+        owner = _make_human(db, tenant_a, first="Owner")
+        host = _make_human(db, tenant_a, first="Host")
+        collab = _make_human(db, tenant_a, first="Collab")
+        stranger = _make_human(db, tenant_a, first="Stranger")
+
+        event_id = self._create(
+            client,
+            popup,
+            owner,
+            visibility=visibility,
+            host_id=host.id,
+            collaborator_ids=[collab.id],
+        )
+
+        assert event_id in self._list_ids(client, popup, owner)
+        assert event_id in self._list_ids(client, popup, host)
+        assert event_id in self._list_ids(client, popup, collab)
+        assert event_id not in self._list_ids(client, popup, stranger)
