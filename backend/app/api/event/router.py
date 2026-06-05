@@ -75,6 +75,70 @@ from app.services.event_itip import send_event_itip as _send_event_itip
 router = APIRouter(prefix="/events", tags=["events"])
 
 
+def _validate_group_event_rules(
+    db,
+    *,
+    group_id: uuid.UUID | None,
+    event_invitations_provided: bool,
+    creator_human_id: uuid.UUID | None,
+    popup_id: uuid.UUID,
+) -> None:
+    """Enforce server-side validators for group-scoped PRIVATE events.
+
+    Called from create_event (admin) and create_portal_event (portal human)
+    after schema-level validation has already rejected non-PRIVATE+group_id
+    combinations.
+
+    Validators (per design Decision 1a-1):
+    1. Mutual exclusion: group_id + explicit EventInvitations → 422.
+    2. enable_private_events gate: group.enable_private_events must be True → 422.
+    3. Creator must be member: owner must have a GroupMembers row → 403.
+       (Admin bypass: creator_human_id=None skips membership check.)
+    """
+    if group_id is None:
+        return
+
+    # Validator 1: mutual exclusion
+    if event_invitations_provided:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                "Specify either group_id or invitations, not both. "
+                "A group-scoped PRIVATE event uses group membership as the "
+                "access control list; explicit invitations are not allowed."
+            ),
+        )
+
+    # Validator 2: enable_private_events gate
+    from app.api.group.crud import groups_crud
+
+    group = groups_crud.get(db, group_id)
+    if group is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Group not found.",
+        )
+    if not group.enable_private_events:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                "The selected group does not have private events enabled. "
+                "An admin must enable enable_private_events on the group first."
+            ),
+        )
+
+    # Validator 3: creator must be a current member (portal only; admin bypasses)
+    if creator_human_id is not None:
+        from app.api.group.crud import groups_crud as _gc
+
+        member_group_ids = _gc.get_human_group_ids(db, creator_human_id, popup_id)
+        if group_id not in member_group_ids:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not a member of the specified group.",
+            )
+
+
 async def _send_event_invitation_emails(
     db,
     event,
@@ -993,6 +1057,16 @@ async def create_event(
             allow_unbookable=True,
         )
 
+    # Groups-rework: validate group_id rules (T-gr-036..T-gr-038).
+    # Admin path: creator_human_id=None skips the membership check.
+    _validate_group_event_rules(
+        db,
+        group_id=event_in.group_id,
+        event_invitations_provided=False,
+        creator_human_id=None,
+        popup_id=event_in.popup_id,
+    )
+
     tenant_id = (
         popup.tenant_id
         if current_user.role == UserRole.SUPERADMIN
@@ -1518,10 +1592,121 @@ async def check_availability(
 async def check_availability_portal(
     payload: EventAvailabilityCheck,
     db: HumanTenantSession,
-    _: CurrentHuman,
+    current_human: CurrentHuman,
 ) -> EventAvailabilityResult:
-    """Portal-facing variant of /check-availability authenticated as a human."""
-    return _run_availability_check(db, payload)
+    """Portal-facing variant of /check-availability authenticated as a human.
+
+    For PRIVATE events that the viewer cannot fully see, the conflict is
+    returned as an opaque entry in ``opaque_conflicts`` (EventOpaque) instead
+    of a raw UUID in ``conflicts``. This lets the portal render a "Busy" block
+    without leaking the event's metadata.
+    """
+    from sqlmodel import select as _select
+
+    from app.api.event.models import EventInvitations as _EventInvitations
+    from app.api.event_venue.models import EventVenues as _EventVenues
+    from app.api.event_venue.schemas import VenueBookingMode as _VenueBookingMode
+    from app.api.group.crud import groups_crud
+    from app.services.event_visibility import project_event_for
+
+    # Base availability check (open hours, booking mode gate).
+    venue = db.get(_EventVenues, payload.venue_id)
+    if not venue:
+        raise HTTPException(status_code=404, detail="Venue not found")
+    effective_mode = _resolve_effective_booking_mode(
+        db, venue, payload.start_time, payload.end_time
+    )
+    if effective_mode == _VenueBookingMode.UNBOOKABLE.value:
+        return EventAvailabilityResult(
+            available=False,
+            conflicts=[],
+            reason="Venue is not bookable at the selected time",
+            effective_booking_mode=effective_mode,
+        )
+
+    window_start, window_end = crud.compute_booking_window(
+        payload.start_time,
+        payload.end_time,
+        venue.setup_time_minutes,
+        venue.teardown_time_minutes,
+    )
+    conflict_events = crud.events_crud.find_venue_conflicts(
+        db,
+        venue_id=payload.venue_id,
+        window_start=window_start,
+        window_end=window_end,
+        exclude_event_id=payload.exclude_event_id,
+    )
+
+    if not conflict_events:
+        return EventAvailabilityResult(
+            available=True,
+            effective_booking_mode=effective_mode,
+        )
+
+    # Pre-compute viewer's group membership once for this popup.
+    # Use the venue's popup_id as the scope for group lookup.
+    viewer_group_ids = groups_crud.get_human_group_ids(
+        db, current_human.id, venue.popup_id
+    )
+
+    # Build invitee sets for invitation-based PRIVATE events (group_id IS NULL).
+    private_invitation_event_ids = [
+        ev.id
+        for ev in conflict_events
+        if ev.visibility == EventVisibility.PRIVATE and ev.group_id is None
+    ]
+    invited_map: dict[uuid.UUID, set[uuid.UUID]] = {}
+    if private_invitation_event_ids:
+        invs = list(
+            db.exec(
+                _select(_EventInvitations).where(
+                    _EventInvitations.event_id.in_(private_invitation_event_ids),
+                    _EventInvitations.human_id == current_human.id,
+                )
+            ).all()
+        )
+        for inv in invs:
+            invited_map.setdefault(inv.event_id, set()).add(inv.human_id)
+
+    class _Viewer:
+        id = current_human.id
+
+    viewer = _Viewer()
+
+    full_conflict_ids: list[uuid.UUID] = []
+    opaque_conflicts: list = []
+
+    for ev in conflict_events:
+        result = project_event_for(
+            viewer=viewer,
+            event=ev,
+            viewer_group_ids=viewer_group_ids,
+            is_admin_in_popup=False,
+            mode="availability",
+            invitee_ids=invited_map.get(ev.id, set()),
+        )
+        if result is None:
+            # listing-mode None: should not happen in availability mode, but guard
+            continue
+        from app.api.event.schemas import EventOpaque as _EventOpaque
+
+        if isinstance(result, _EventOpaque):
+            opaque_conflicts.append(result)
+        else:
+            full_conflict_ids.append(ev.id)
+
+    return EventAvailabilityResult(
+        available=len(full_conflict_ids) == 0 and len(opaque_conflicts) == 0,
+        conflicts=full_conflict_ids,
+        reason=(
+            None
+            if not full_conflict_ids and not opaque_conflicts
+            else "Conflicts with existing events"
+        ),
+        effective_booking_mode=effective_mode,
+        opaque_conflicts=opaque_conflicts,
+    )
 
 
 # Cap on how many conflicting occurrences we report up-front to the
@@ -1822,6 +2007,17 @@ async def bulk_invite(
     event = crud.events_crud.get(db, event_id)
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
+    # Groups-rework: mutual exclusion (T-gr-036). Group-scoped PRIVATE events
+    # use group membership as the access control list; explicit invitations
+    # are not allowed alongside a group_id.
+    if event.group_id is not None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                "This event is scoped to a group. Explicit invitations are not "
+                "allowed on group-scoped PRIVATE events."
+            ),
+        )
     result = _run_bulk_invite(db, event, payload.emails, current_user.id)
     await _send_event_invitation_emails(db, event, result.invited)
     invite_snapshot = build_event_snapshot(db, event)
@@ -2185,6 +2381,16 @@ async def bulk_invite_portal(
     current_human: CurrentHuman,
 ) -> EventInvitationBulkResult:
     event = _ensure_portal_event_owner(db, event_id, current_human)
+    # Groups-rework: mutual exclusion (T-gr-036). Group-scoped PRIVATE events
+    # use group membership; explicit invitations are not allowed.
+    if event.group_id is not None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                "This event is scoped to a group. Explicit invitations are not "
+                "allowed on group-scoped PRIVATE events."
+            ),
+        )
     result = _run_bulk_invite(db, event, payload.emails, current_human.id)
     await _send_event_invitation_emails(db, event, result.invited)
     invite_snapshot = build_event_snapshot(db, event)
@@ -2255,35 +2461,66 @@ async def export_event_ics(
 # ---------------------------------------------------------------------------
 
 
-def _portal_visibility_filter(db, events: list, human_id: uuid.UUID) -> list:
+def _portal_visibility_filter(
+    db,
+    events: list,
+    human_id: uuid.UUID,
+    popup_id: uuid.UUID | None = None,
+) -> list:
     """Apply visibility rules to a portal event list.
 
     Rules:
     - public: visible to all.
-    - private: only managers (owner / host / collaborators) + invited humans.
+    - private (group-scoped, group_id IS NOT NULL): visible to managers
+      (owner / host / collaborators) + group members.
+    - private (invitation-based, group_id IS NULL): visible to managers
+      (owner / host / collaborators) + invited humans.
     - unlisted: hidden from public listings, but managers (owner / host /
       collaborators) still see their own unlisted events (e.g.
       pending_approval requests they created). Detail is reachable via direct
       link for non-managers.
+
+    The opacity chokepoint (project_event_for with mode='listing') gates the
+    group-member / invitee access for PRIVATE events; managers are granted
+    access independently via _human_id_manages_event so collaborator/host
+    visibility is preserved.
     """
     from sqlmodel import select
 
     from app.api.event.models import EventInvitations
+    from app.api.group.crud import groups_crud
+    from app.services.event_visibility import project_event_for
 
-    private_event_ids = [
-        e.id for e in events if e.visibility == EventVisibility.PRIVATE
+    # Pre-compute viewer's group membership once per request (one query).
+    # If popup_id is not known (legacy callers), fall back to empty set — safe
+    # because group membership without popup scope never grants access.
+    viewer_group_ids: set[uuid.UUID] = set()
+    if popup_id is not None:
+        viewer_group_ids = groups_crud.get_human_group_ids(db, human_id, popup_id)
+
+    # Build invitee map for invitation-based PRIVATE events (group_id IS NULL).
+    private_invitation_event_ids = [
+        e.id
+        for e in events
+        if e.visibility == EventVisibility.PRIVATE and e.group_id is None
     ]
     invited_map: dict[uuid.UUID, set[uuid.UUID]] = {}
-    if private_event_ids:
+    if private_invitation_event_ids:
         invs = list(
             db.exec(
                 select(EventInvitations).where(
-                    EventInvitations.event_id.in_(private_event_ids)
+                    EventInvitations.event_id.in_(private_invitation_event_ids)
                 )
             ).all()
         )
         for inv in invs:
             invited_map.setdefault(inv.event_id, set()).add(inv.human_id)
+
+    # Fake viewer object with .id for the chokepoint.
+    class _Viewer:
+        id = human_id
+
+    viewer = _Viewer()
 
     visible = []
     for e in events:
@@ -2293,8 +2530,19 @@ def _portal_visibility_filter(db, events: list, human_id: uuid.UUID) -> list:
             if _human_id_manages_event(e, human_id):
                 visible.append(e)
         elif e.visibility == EventVisibility.PRIVATE:
-            if _human_id_manages_event(e, human_id) or _invitation_visible_to_human(
-                e, human_id, invited_map.get(e.id, set())
+            # Managers (owner / host / collaborators) always see their event.
+            # Group members and invited humans are gated by the opacity
+            # chokepoint (group-scoped vs invitation-based privacy).
+            if _human_id_manages_event(e, human_id) or (
+                project_event_for(
+                    viewer=viewer,
+                    event=e,
+                    viewer_group_ids=viewer_group_ids,
+                    is_admin_in_popup=False,
+                    mode="listing",
+                    invitee_ids=invited_map.get(e.id, set()),
+                )
+                is not None
             ):
                 visible.append(e)
     return visible
@@ -2342,7 +2590,7 @@ async def list_portal_events(
             search_fields=["title"],
         )
 
-    visible = _portal_visibility_filter(db, events, current_human.id)
+    visible = _portal_visibility_filter(db, events, current_human.id, popup_id=popup_id)
     # Cancelled events are removed from every portal listing — owners who want
     # to see them after the fact can still hit the detail URL directly. The
     # ``event_status`` query param can't express "exclude cancelled" alongside
@@ -2539,12 +2787,39 @@ async def get_portal_event(
         )
 
     if event.visibility == EventVisibility.PRIVATE:
-        invited = db.exec(
-            select(EventInvitations)
-            .where(EventInvitations.event_id == event_id)
-            .where(EventInvitations.human_id == current_human.id)
-        ).first()
-        if not invited and not _human_manages_event(event, current_human):
+        from app.api.group.crud import groups_crud
+        from app.services.event_visibility import project_event_for
+
+        # Pre-compute group membership for this viewer.
+        viewer_group_ids = groups_crud.get_human_group_ids(
+            db, current_human.id, event.popup_id
+        )
+
+        # Build invitee set for invitation-based PRIVATE events.
+        invitee_ids: set[uuid.UUID] = set()
+        if event.group_id is None:
+            inv = db.exec(
+                select(EventInvitations)
+                .where(EventInvitations.event_id == event_id)
+                .where(EventInvitations.human_id == current_human.id)
+            ).first()
+            if inv:
+                invitee_ids = {current_human.id}
+
+        class _Viewer:
+            id = current_human.id
+
+        result = project_event_for(
+            viewer=_Viewer(),
+            event=event,
+            viewer_group_ids=viewer_group_ids,
+            is_admin_in_popup=False,
+            mode="listing",
+            invitee_ids=invitee_ids,
+        )
+        # Managers (owner / host / collaborators) always have access; otherwise
+        # fall back to the opacity chokepoint (group member / invitee).
+        if result is None and not _human_manages_event(event, current_human):
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail="Event not found"
             )
@@ -2737,6 +3012,16 @@ async def create_portal_event(
             exdates=None,
             timezone=event_in.timezone,
         )
+
+    # Groups-rework: validate group_id rules (T-gr-036..T-gr-038).
+    # Portal path: creator_human_id is set so membership check is enforced.
+    _validate_group_event_rules(
+        db,
+        group_id=event_in.group_id,
+        event_invitations_provided=False,
+        creator_human_id=current_human.id,
+        popup_id=event_in.popup_id,
+    )
 
     event_data = event_in.model_dump()
     event_data.pop("recurrence", None)

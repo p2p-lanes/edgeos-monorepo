@@ -37,6 +37,8 @@ def test_group_application_creates_main_attendee(
         popup_id=popup.id,
         name="Group T",
         slug=f"group-t-{uuid.uuid4().hex[:8]}",
+        auto_approve_applications=True,
+        express_checkout=True,
     )
     db.add(group)
     db.commit()

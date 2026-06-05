@@ -18,6 +18,7 @@ import {
   ApiError,
   type EventSettingsPublic,
   EventsService,
+  GroupsService,
   HumansService,
   type PopupPublic,
   type TrackPublic,
@@ -203,6 +204,27 @@ function NewPortalEventForm({
   }, [popupStartKey, popupEndKey, displayTz, setDateStr])
 
   const [visibility, setVisibility] = useState<Visibility>("public")
+  const [groupId, setGroupId] = useState<string>("")
+
+  // Fetch human's groups that have enable_private_events=true, scoped to popup.
+  // Only shown when visibility=private and at least one eligible group exists.
+  const { data: myGroupsData } = useQuery({
+    queryKey: ["my-groups-private", popupId],
+    queryFn: () => GroupsService.listMyGroups({ limit: 100 }),
+    enabled: visibility === "private" && !!popupId,
+    staleTime: 60_000,
+  })
+  const eligibleGroups = (myGroupsData?.results ?? []).filter(
+    (g) =>
+      g.enable_private_events === true && (!popupId || g.popup_id === popupId),
+  )
+
+  // When switching away from private, reset the group picker
+  const handleVisibilityChange = (next: Visibility) => {
+    setVisibility(next)
+    if (next !== "private") setGroupId("")
+  }
+
   const [maxParticipants, setMaxParticipants] = useState("")
   const [meetingUrl, setMeetingUrl] = useState("")
   const [tags, setTags] = useState<string[]>([])
@@ -279,6 +301,7 @@ function NewPortalEventForm({
             : null,
           track_id: trackId || null,
           visibility,
+          group_id: groupId || null,
           max_participant: maxParticipants
             ? Math.max(0, parseInt(maxParticipants, 10))
             : null,
@@ -528,7 +551,7 @@ function NewPortalEventForm({
           </Label>
           <Select
             value={visibility}
-            onValueChange={(v) => setVisibility(v as Visibility)}
+            onValueChange={(v) => handleVisibilityChange(v as Visibility)}
           >
             <SelectTrigger id="visibility" className="w-full">
               <SelectValue />
@@ -546,6 +569,38 @@ function NewPortalEventForm({
             </SelectContent>
           </Select>
         </div>
+
+        {/* Share with group — shown only when private + eligible groups exist */}
+        {visibility === "private" && eligibleGroups.length > 0 && (
+          <div className="space-y-2">
+            <Label htmlFor="group-picker">
+              {t("events.form.share_with_group_label")}
+            </Label>
+            <Select
+              value={groupId}
+              onValueChange={(v) => setGroupId(v === "__none__" ? "" : v)}
+            >
+              <SelectTrigger id="group-picker" className="w-full">
+                <SelectValue
+                  placeholder={t("events.form.share_with_group_placeholder")}
+                />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">
+                  {t("events.form.share_with_group_placeholder")}
+                </SelectItem>
+                {eligibleGroups.map((g) => (
+                  <SelectItem key={g.id} value={g.id}>
+                    {g.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              {t("events.form.share_with_group_helper")}
+            </p>
+          </div>
+        )}
 
         <HostDisplayField
           value={hostDisplayName}

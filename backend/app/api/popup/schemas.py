@@ -181,6 +181,19 @@ class PopupBase(SQLModel):
         default=False,
         sa_column=Column(Boolean, nullable=False, server_default="false"),
     )
+    # Groups-rework: per-popup feature flags for invite/referral/group-private-events
+    invites_enabled: bool = Field(
+        default=False,
+        sa_column=Column(Boolean, nullable=False, server_default="false"),
+    )
+    referrals_enabled: bool = Field(
+        default=False,
+        sa_column=Column(Boolean, nullable=False, server_default="false"),
+    )
+    group_private_events_enabled: bool = Field(
+        default=False,
+        sa_column=Column(Boolean, nullable=False, server_default="false"),
+    )
 
     @field_validator("currency")
     @classmethod

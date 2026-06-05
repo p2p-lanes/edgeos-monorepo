@@ -108,6 +108,9 @@ from app.api.group.schemas import GroupCreate, GroupPublic, GroupUpdate
 from app.api.human.models import Humans
 from app.api.human.schemas import HumanCreate, HumanPublic, HumanUpdate
 
+# Invite and Referral models (groups-rework)
+from app.api.invite.models import Invites
+
 # Payment models
 from app.api.payment.models import PaymentProducts, Payments
 from app.api.payment.schemas import PaymentCreate, PaymentPublic, PaymentUpdate
@@ -121,6 +124,7 @@ from app.api.popup_reviewer.schemas import (
 )
 from app.api.product.models import Products
 from app.api.product.schemas import ProductCreate, ProductPublic, ProductUpdate
+from app.api.referral.models import Referrals
 
 # Task tracker
 from app.api.task.models import Task, TaskAttachment, TaskComment
@@ -230,6 +234,9 @@ __all__ = [
     "GroupCreate",
     "GroupPublic",
     "GroupUpdate",
+    # Invites and Referrals (groups-rework)
+    "Invites",
+    "Referrals",
     # Application & Attendee
     "Applications",
     "ApplicationSnapshots",

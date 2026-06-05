@@ -111,6 +111,14 @@ class ApplicationBase(SQLModel):
     )
     incentive_currency: str | None = Field(default=None, max_length=10, nullable=True)
 
+    # Groups-rework: attribution columns for invite/referral flows
+    invite_id: uuid.UUID | None = Field(
+        default=None, foreign_key="invites.id", nullable=True
+    )
+    referral_id: uuid.UUID | None = Field(
+        default=None, foreign_key="referrals.id", nullable=True
+    )
+
 
 class ApplicationPublic(BaseModel):
     """Application schema for API responses."""
@@ -182,6 +190,10 @@ class ApplicationCreate(BaseModel):
     status: UserSettableStatus | None = None
     human_id: uuid.UUID | None = None
     group_id: uuid.UUID | None = None  # Optional group to join
+
+    # Attribution columns — groups-rework T-gr-032 (REQ-GR-009, REQ-GR-016)
+    invite_id: uuid.UUID | None = None
+    referral_id: uuid.UUID | None = None
 
     # Scholarship request (human-submittable fields only)
     scholarship_request: bool = False

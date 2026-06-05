@@ -164,11 +164,27 @@ class HumansCRUD(BaseCRUD[Humans, HumanCreate, HumanUpdate]):
     def create_internal(
         self, session: Session, human_data: HumanCreate, tenant_id: uuid.UUID
     ) -> Humans:
-        """Create a human with explicit tenant_id (for admin-created humans)."""
+        """Create a human with explicit tenant_id (for admin-created humans).
+
+        After committing the new human row, runs the whitelist resolution hook
+        best-effort (Design Decision 1g): looks up group_whitelisted_emails
+        matching the new human's email and inserts group_members rows.
+        Any failure in the hook is logged and swallowed — signup always succeeds.
+        """
         db_obj = Humans(**human_data.model_dump(), tenant_id=tenant_id)
         session.add(db_obj)
         session.commit()
         session.refresh(db_obj)
+
+        # Best-effort whitelist resolution — never blocks signup
+        try:
+            resolve_whitelist_memberships(session, db_obj)
+        except Exception:
+            logger.exception(
+                "Whitelist resolution failed for human {} — signup continues",
+                db_obj.id,
+            )
+
         return db_obj
 
     def find_with_incomplete_application(
@@ -503,3 +519,50 @@ def _days_for_attendee(attendee, popup_days: int | None) -> int:  # noqa: ANN001
 
 
 humans_crud = HumansCRUD()
+
+
+def resolve_whitelist_memberships(session: Session, human: Humans) -> None:
+    """Add a newly created human to all groups that whitelisted their email.
+
+    Best-effort — caller must wrap in try/except and never let exceptions
+    propagate to the HTTP layer.  Idempotent: INSERT ... ON CONFLICT DO NOTHING
+    semantics via a check-before-insert guard so re-running is a no-op.
+
+    Design Decision 1g:
+    - Lookup group_whitelisted_emails case-insensitively by human.email
+    - For each matching group, insert into group_members if not already present
+    - Never touches applications — M:N membership only
+    """
+    from sqlalchemy import func
+    from sqlmodel import select as _select
+
+    from app.api.group.models import GroupMembers, GroupWhitelistedEmails
+
+    email_lower = human.email.lower()
+
+    matching_wl_rows = session.exec(
+        _select(GroupWhitelistedEmails).where(
+            func.lower(GroupWhitelistedEmails.email) == email_lower
+        )
+    ).all()
+
+    for wl in matching_wl_rows:
+        # Idempotency: skip if already a member
+        existing = session.exec(
+            _select(GroupMembers).where(
+                GroupMembers.group_id == wl.group_id,
+                GroupMembers.human_id == human.id,
+            )
+        ).first()
+        if existing:
+            continue
+
+        member_row = GroupMembers(
+            tenant_id=wl.tenant_id,
+            group_id=wl.group_id,
+            human_id=human.id,
+        )
+        session.add(member_row)
+
+    if matching_wl_rows:
+        session.commit()

@@ -136,6 +136,12 @@ class EventBase(SQLModel):
     # venue, cancel) so updated invitation emails replace the prior calendar
     # entry in Gmail / Apple Calendar / Outlook instead of creating a new one.
     ical_sequence: int = Field(default=0, ge=0)
+    # Groups-rework: links a PRIVATE event to a group for group-scoped access.
+    # Semantics: visibility=PRIVATE AND group_id IS NOT NULL → group-scoped PRIVATE.
+    # visibility=PRIVATE AND group_id IS NULL → invitation-based PRIVATE (existing behavior).
+    group_id: uuid.UUID | None = Field(
+        default=None, foreign_key="groups.id", nullable=True
+    )
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(UTC),
         sa_type=DateTime(timezone=True),
@@ -252,6 +258,26 @@ class EventPublic(EventBase):
     model_config = ConfigDict(from_attributes=True)
 
 
+class EventOpaque(BaseModel):
+    """Opaque event projection for non-privileged viewers on availability endpoints.
+
+    Contains ONLY the fields needed to communicate a booking conflict without
+    leaking any event metadata. Used as the non-full-detail branch of the
+    ``EventPublic | EventOpaque`` discriminated union.
+
+    Fields MUST match the design's Decision 1d contract:
+      id, start_time, end_time, venue_id, is_opaque: Literal[True]
+    """
+
+    id: uuid.UUID
+    start_time: datetime
+    end_time: datetime
+    venue_id: uuid.UUID | None = None
+    is_opaque: Literal[True] = True
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class EventHostOption(BaseModel):
     """A distinct event host for the backoffice "filter events by creator" picker.
 
@@ -340,6 +366,31 @@ class EventPublicCalendarResponse(BaseModel):
     meta: EventCalendarMeta
 
 
+def _enforce_group_id_rules(
+    *,
+    group_id: uuid.UUID | None,
+    visibility: EventVisibility | None,
+) -> None:
+    """Schema-level validator for group_id field rules.
+
+    Enforces:
+    - group_id IS NOT NULL AND visibility != PRIVATE → 422 (orphan group_id).
+    - group_id IS NOT NULL AND visibility IS NULL (update patch, no visibility
+      field supplied) → allowed at schema level; router must check effective
+      visibility of the stored event.
+
+    The deeper checks (enable_private_events flag, creator membership,
+    mutual exclusion with EventInvitations) require DB access and are
+    therefore enforced in the router, not here.
+    """
+    if group_id is not None and visibility is not None:
+        if visibility != EventVisibility.PRIVATE:
+            raise ValueError(
+                "group_id can only be set on PRIVATE events. "
+                "Set visibility to PRIVATE or clear group_id."
+            )
+
+
 class EventCreate(BaseModel):
     """Event schema for creation."""
 
@@ -366,6 +417,11 @@ class EventCreate(BaseModel):
     status: EventStatus = EventStatus.DRAFT
     highlighted: bool = False
     recurrence: RecurrenceRule | None = None
+    # Groups-rework: optional group scope for PRIVATE events.
+    # When set, visibility MUST be PRIVATE; the group MUST have
+    # enable_private_events=True; and the event creator MUST be a member of the
+    # group. Mutually exclusive with explicit EventInvitations rows.
+    group_id: uuid.UUID | None = None
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
@@ -377,6 +433,14 @@ class EventCreate(BaseModel):
             venue_id=self.venue_id,
             name=self.custom_location_name,
             url=self.custom_location_url,
+        )
+        return self
+
+    @model_validator(mode="after")
+    def _validate_group_id(self) -> "EventCreate":
+        _enforce_group_id_rules(
+            group_id=self.group_id,
+            visibility=self.visibility,
         )
         return self
 
@@ -405,6 +469,9 @@ class EventUpdate(BaseModel):
     collaborator_ids: list[uuid.UUID] | None = None
     status: EventStatus | None = None
     highlighted: bool | None = None
+    # Groups-rework: optional group scope for PRIVATE events.
+    # Setting to None clears an existing group association.
+    group_id: uuid.UUID | None = None
 
     _normalize_datetimes = field_validator("start_time", "end_time")(_require_utc_aware)
 
@@ -424,6 +491,18 @@ class EventUpdate(BaseModel):
             name=self.custom_location_name,
             url=self.custom_location_url,
         )
+        return self
+
+    @model_validator(mode="after")
+    def _validate_group_id(self) -> "EventUpdate":
+        # Only validate when group_id or visibility are being touched.
+        if self.group_id is None and self.visibility is None:
+            return self
+        if self.group_id is not None:
+            _enforce_group_id_rules(
+                group_id=self.group_id,
+                visibility=self.visibility,
+            )
         return self
 
 
@@ -492,6 +571,10 @@ class EventAvailabilityResult(BaseModel):
     # into account so the portal can show a precise warning ("this time
     # requires approval") instead of a venue-wide hint.
     effective_booking_mode: str | None = None
+    # Opaque conflict shapes for PRIVATE events the viewer cannot fully see.
+    # Only populated by portal-authenticated endpoints (check_availability_portal).
+    # Backoffice/admin callers always have full visibility and this list stays empty.
+    opaque_conflicts: list[EventOpaque] = []
 
 
 class EventRecurringAvailabilityCheck(BaseModel):
