@@ -3102,6 +3102,18 @@ export type SendTestRequest = {
 };
 
 /**
+ * Which surface a task relates to. Optional (NULL = unspecified).
+ */
+export type TaskApp = 'portal' | 'backoffice';
+
+/**
+ * Count of tasks archived by a bulk operation.
+ */
+export type TaskArchiveResult = {
+    archived: number;
+};
+
+/**
  * Register an already-uploaded S3 object as a task attachment.
  *
  * The file itself is uploaded directly to S3 via POST /uploads/presigned-url;
@@ -3152,6 +3164,7 @@ export type TaskCreate = {
     priority?: TaskPriority;
     responsible_user_id?: (string | null);
     release?: (string | null);
+    app?: (TaskApp | null);
     visibility?: TaskVisibility;
     target_tenant_id?: (string | null);
 };
@@ -3167,9 +3180,11 @@ export type TaskDetailPublic = {
     responsible_name?: (string | null);
     responsible_email?: (string | null);
     release?: (string | null);
+    app?: (TaskApp | null);
     visibility: TaskVisibility;
     target_tenant_id?: (string | null);
     published_at?: (string | null);
+    archived_at?: (string | null);
     created_by?: (string | null);
     created_by_name?: (string | null);
     created_at: string;
@@ -3192,9 +3207,11 @@ export type TaskPublic = {
     responsible_name?: (string | null);
     responsible_email?: (string | null);
     release?: (string | null);
+    app?: (TaskApp | null);
     visibility: TaskVisibility;
     target_tenant_id?: (string | null);
     published_at?: (string | null);
+    archived_at?: (string | null);
     created_by?: (string | null);
     created_by_name?: (string | null);
     created_at: string;
@@ -3220,6 +3237,7 @@ export type TaskUpdate = {
     priority?: (TaskPriority | null);
     responsible_user_id?: (string | null);
     release?: (string | null);
+    app?: (TaskApp | null);
     visibility?: (TaskVisibility | null);
     target_tenant_id?: (string | null);
 };
@@ -5722,6 +5740,7 @@ export type TasksReportBugData = {
 export type TasksReportBugResponse = (TaskPublic);
 
 export type TasksListTasksData = {
+    archived?: (boolean | null);
     /**
      * Maximum number of items to return
      */
@@ -5772,6 +5791,20 @@ export type TasksUpdateTaskStatusData = {
 };
 
 export type TasksUpdateTaskStatusResponse = (TaskPublic);
+
+export type TasksArchivePublishedTasksResponse = (TaskArchiveResult);
+
+export type TasksArchiveTaskData = {
+    taskId: string;
+};
+
+export type TasksArchiveTaskResponse = (TaskPublic);
+
+export type TasksUnarchiveTaskData = {
+    taskId: string;
+};
+
+export type TasksUnarchiveTaskResponse = (TaskPublic);
 
 export type TasksAddAttachmentData = {
     requestBody: TaskAttachmentCreate;
