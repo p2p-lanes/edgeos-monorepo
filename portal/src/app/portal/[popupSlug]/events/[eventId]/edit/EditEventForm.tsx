@@ -21,6 +21,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { CollaboratorsField } from "../../components/CollaboratorsField"
 import { EventScheduleFields } from "../../components/EventScheduleFields"
 import { HostDisplayField } from "../../components/HostDisplayField"
+import { VisibilityHint } from "../../components/VisibilityHint"
 import {
   formatDateKeyInTz,
   formatHhmmInTz,
@@ -354,6 +355,7 @@ export function EditEventForm({
           canSubmit={canSubmit}
           isSubmitting={updateMutation.isPending}
         />
+        <VisibilityHint value={form.visibility} />
       </form>
     </div>
   )
