@@ -627,6 +627,23 @@ export type AttendeeTicketLine = {
 };
 
 /**
+ * Request body to edit a meal-plan ticket's choices post-purchase (portal).
+ *
+ * Replaces the three choice keys inside AttendeeProducts.purchase_metadata:
+ * daily_choices (ISO date -> menu key | "chef"), dietary_restriction, and
+ * special_request. The key/date semantics are NOT validated here — that needs
+ * the meal-plan step's template_config and happens in the CRUD layer via
+ * ticketing_step.meal_plan.validate_daily_choices.
+ */
+export type AttendeeTicketMetadataUpdate = {
+    daily_choices: {
+        [key: string]: (string);
+    };
+    dietary_restriction?: (string | null);
+    special_request?: (string | null);
+};
+
+/**
  * Request body to change the product of an attendee's ticket (admin panel).
  */
 export type AttendeeTicketProductSwap = {
@@ -4120,6 +4137,15 @@ export type AttendeesDeleteMyAttendeeForPopupData = {
 export type AttendeesDeleteMyAttendeeForPopupResponse = ({
     [key: string]: unknown;
 });
+
+export type AttendeesUpdateMyMealPlanTicketData = {
+    attendeeId: string;
+    popupId: string;
+    requestBody: AttendeeTicketMetadataUpdate;
+    ticketId: string;
+};
+
+export type AttendeesUpdateMyMealPlanTicketResponse = (AttendeeWithOriginPublic);
 
 export type AttendeesListAttendeesData = {
     applicationId?: (string | null);

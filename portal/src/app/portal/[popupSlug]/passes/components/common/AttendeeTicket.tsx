@@ -1,7 +1,10 @@
-import { ChevronRight, QrCode, User } from "lucide-react"
-import React, { useState } from "react"
+import { useQuery } from "@tanstack/react-query"
+import { ChevronRight, Pencil, QrCode, User } from "lucide-react"
+import React, { useMemo, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { TICKET_CATEGORY } from "@/checkout/popupCheckoutPolicy"
+import { TicketingStepsService } from "@/client"
+import { mealPlanProductIds } from "@/components/checkout-flow/variants/mealPlanShared"
 import {
   Collapsible,
   CollapsibleContent,
@@ -11,6 +14,7 @@ import { Separator } from "@/components/ui/separator"
 import useAttendee from "@/hooks/useAttendee"
 import { cn } from "@/lib/utils"
 import { useCityProvider } from "@/providers/cityProvider"
+import { usePassesProvider } from "@/providers/passesProvider"
 import type { AttendeePassState } from "@/types/Attendee"
 import type { ProductsPass } from "@/types/Products"
 import { badgeName } from "../../constants/multiuse"
@@ -18,6 +22,7 @@ import useModal from "../../hooks/useModal"
 import { compareByCategory, getCategoryIcon } from "../../utils/categoryDisplay"
 import { AttendeeModal } from "../AttendeeModal"
 import OptionsMenu from "./Buttons/OptionsMenu"
+import { MealPlanEditModal } from "./MealPlanEditModal"
 import Product from "./Products/ProductTicket"
 import QRcode from "./QRcode"
 
@@ -56,10 +61,32 @@ const AttendeeTicket = ({
     .sort(sortProductsByPriority)
   const { getCity } = useCityProvider()
   const city = getCity()
+  const { products } = usePassesProvider()
   const { handleEdit, handleCloseModal, modal, handleDelete } = useModal()
   const { removeAttendee, editAttendee } = useAttendee()
   const hasPurchased = attendee.products.some((product) => product.purchased)
   const isMainAttendee = attendee.category === "main"
+
+  // Meal-plan editing: resolve which purchased tickets are meal-plan weeks via
+  // the popup's meal-plan-select step config (more robust than matching a
+  // configurable category string). Reuses the same portal query as YourPasses,
+  // so React Query dedupes it by key.
+  const popupId = city?.id ? String(city.id) : null
+  const { data: ticketingStepsData } = useQuery({
+    queryKey: ["ticketing-steps-portal", popupId],
+    queryFn: () =>
+      TicketingStepsService.listPortalTicketingSteps({ popupId: popupId! }),
+    enabled: !!popupId,
+  })
+  const mealPlanStep = (ticketingStepsData?.results ?? []).find(
+    (s) => s.template === "meal-plan-select",
+  )
+  const mealPlanTemplateConfig = mealPlanStep?.template_config ?? null
+  const mealPlanIds = useMemo(
+    () => mealPlanProductIds(mealPlanTemplateConfig),
+    [mealPlanTemplateConfig],
+  )
+  const [mealPlanModalOpen, setMealPlanModalOpen] = useState(false)
 
   // Used by buy mode <Product> components to disable day/week tickets when a
   // monthly pass is selected/purchased (buy-mode logic is out of scope here).
@@ -82,6 +109,12 @@ const AttendeeTicket = ({
   const ticketEntries = [...(attendee.ticket_entries ?? [])]
     .filter((e) => e.product_category !== "patreon")
     .sort(compareByCategory)
+
+  // Purchased meal-plan tickets (any week of the plan). The edit button on each
+  // such row opens a single modal that edits all of this attendee's weeks.
+  const mealPlanEntries = ticketEntries.filter((e) =>
+    mealPlanIds.has(e.product_id),
+  )
 
   // Inline QR modal state — drives the shared <QRcode> modal at bottom of file.
   // Tracks lastScanAt alongside the code so the modal can flag already-used QRs.
@@ -233,6 +266,19 @@ const AttendeeTicket = ({
                           {entry.product_name}
                         </span>
                       </div>
+                      {mealPlanIds.has(entry.product_id) && (
+                        <button
+                          type="button"
+                          onClick={() => setMealPlanModalOpen(true)}
+                          aria-label="Edit meal plan"
+                          className="flex items-center gap-1 text-xs font-medium text-pass-text hover:text-pass-title transition-colors cursor-pointer flex-shrink-0"
+                        >
+                          <Pencil className="w-4 h-4" />
+                          <span className="hidden sm:inline">
+                            Edit meal plan
+                          </span>
+                        </button>
+                      )}
                       {entry.requires_check_in === true && (
                         <button
                           type="button"
@@ -417,6 +463,17 @@ const AttendeeTicket = ({
           category={modal.category}
           editingAttendee={modal.editingAttendee}
           isDelete={modal.isDelete}
+        />
+      )}
+
+      {mealPlanModalOpen && mealPlanEntries.length > 0 && (
+        <MealPlanEditModal
+          open={mealPlanModalOpen}
+          onClose={() => setMealPlanModalOpen(false)}
+          attendee={attendee}
+          mealPlanEntries={mealPlanEntries}
+          templateConfig={mealPlanTemplateConfig}
+          products={products}
         />
       )}
     </div>

@@ -2651,6 +2651,50 @@ export const AttendeeTicketLineSchema = {
     description: 'One product + quantity line in a bulk ticket add.'
 } as const;
 
+export const AttendeeTicketMetadataUpdateSchema = {
+    properties: {
+        daily_choices: {
+            additionalProperties: {
+                type: 'string'
+            },
+            type: 'object',
+            title: 'Daily Choices'
+        },
+        dietary_restriction: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Dietary Restriction'
+        },
+        special_request: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Special Request'
+        }
+    },
+    type: 'object',
+    required: ['daily_choices'],
+    title: 'AttendeeTicketMetadataUpdate',
+    description: `Request body to edit a meal-plan ticket's choices post-purchase (portal).
+
+Replaces the three choice keys inside AttendeeProducts.purchase_metadata:
+daily_choices (ISO date -> menu key | "chef"), dietary_restriction, and
+special_request. The key/date semantics are NOT validated here — that needs
+the meal-plan step's template_config and happens in the CRUD layer via
+ticketing_step.meal_plan.validate_daily_choices.`
+} as const;
+
 export const AttendeeTicketProductSwapSchema = {
     properties: {
         product_id: {
