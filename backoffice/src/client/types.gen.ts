@@ -4614,6 +4614,12 @@ export type EventsListPublicCalendarData = {
 
 export type EventsListPublicCalendarResponse = (EventPublicCalendarResponse);
 
+export type EventsPublicCalendarIcsData = {
+    popupId: string;
+};
+
+export type EventsPublicCalendarIcsResponse = (unknown);
+
 export type EventsListEventsData = {
     eventStatus?: (EventStatus | null);
     kind?: (string | null);
