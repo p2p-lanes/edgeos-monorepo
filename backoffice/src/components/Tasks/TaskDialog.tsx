@@ -1,8 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { Copy, Trash2 } from "lucide-react"
+import { Archive, ArchiveRestore, Copy, Trash2 } from "lucide-react"
 import { useEffect, useState } from "react"
 
 import {
+  type TaskApp,
   type TaskPriority,
   type TaskStatus,
   TasksService,
@@ -39,8 +40,10 @@ import { createErrorHandler } from "@/utils"
 import { TaskAttachments } from "./TaskAttachments"
 import { TaskCommentThread } from "./TaskCommentThread"
 import {
+  APP_LABELS,
   PRIORITY_LABELS,
   STATUS_LABELS,
+  TASK_APPS,
   TASK_PRIORITIES,
   TASK_STATUSES,
   TASK_TYPES,
@@ -48,6 +51,7 @@ import {
   TYPE_LABELS,
   VISIBILITY_LABELS,
 } from "./taskMeta"
+import { useTaskArchive } from "./useTaskArchive"
 
 const NONE = "__none__"
 
@@ -68,6 +72,8 @@ interface FormState {
   target_tenant_id: string
   responsible_user_id: string
   release: string
+  /** "" means unspecified. */
+  app: TaskApp | ""
 }
 
 const DEFAULTS: FormState = {
@@ -80,6 +86,7 @@ const DEFAULTS: FormState = {
   target_tenant_id: "",
   responsible_user_id: "",
   release: "",
+  app: "",
 }
 
 export function TaskDialog({ open, onOpenChange, taskId }: TaskDialogProps) {
@@ -126,6 +133,7 @@ export function TaskDialog({ open, onOpenChange, taskId }: TaskDialogProps) {
         target_tenant_id: task.target_tenant_id ?? "",
         responsible_user_id: task.responsible_user_id ?? "",
         release: task.release ?? "",
+        app: task.app ?? "",
       })
     } else if (!isEdit) {
       setForm(DEFAULTS)
@@ -146,6 +154,7 @@ export function TaskDialog({ open, onOpenChange, taskId }: TaskDialogProps) {
       form.visibility === "tenant" ? form.target_tenant_id || null : null,
     responsible_user_id: form.responsible_user_id || null,
     release: form.release.trim() || null,
+    app: form.app || null,
   })
 
   const invalidate = () => {
@@ -202,6 +211,9 @@ export function TaskDialog({ open, onOpenChange, taskId }: TaskDialogProps) {
     if (isEdit) updateMutation.mutate()
     else createMutation.mutate()
   }
+
+  const { archive, unarchive } = useTaskArchive()
+  const isArchived = task?.archived_at != null
 
   const users = usersData?.results ?? []
   const tenants = tenantsData?.results ?? []
@@ -364,6 +376,29 @@ export function TaskDialog({ open, onOpenChange, taskId }: TaskDialogProps) {
               />
             </div>
 
+            <div className="space-y-2">
+              <Label>App</Label>
+              <Select
+                value={form.app || NONE}
+                onValueChange={(v) =>
+                  set("app", v === NONE ? "" : (v as TaskApp))
+                }
+                disabled={readOnly}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Unspecified" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NONE}>Unspecified</SelectItem>
+                  {TASK_APPS.map((a) => (
+                    <SelectItem key={a} value={a}>
+                      {APP_LABELS[a]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
             {/* Visibility & tenant scoping are superadmin-only concerns. */}
             {isSuperadmin && (
               <div className="space-y-2">
@@ -444,14 +479,32 @@ export function TaskDialog({ open, onOpenChange, taskId }: TaskDialogProps) {
 
         <DialogFooter className="sm:justify-between">
           {isEdit && !readOnly ? (
-            <LoadingButton
-              variant="destructive"
-              loading={deleteMutation.isPending}
-              onClick={() => deleteMutation.mutate()}
-            >
-              <Trash2 className="mr-2 h-4 w-4" />
-              Delete
-            </LoadingButton>
+            <div className="flex gap-2">
+              <LoadingButton
+                variant="destructive"
+                loading={deleteMutation.isPending}
+                onClick={() => deleteMutation.mutate()}
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                Delete
+              </LoadingButton>
+              <LoadingButton
+                variant="outline"
+                loading={archive.isPending || unarchive.isPending}
+                onClick={() =>
+                  isArchived
+                    ? unarchive.mutate(taskId!)
+                    : archive.mutate(taskId!)
+                }
+              >
+                {isArchived ? (
+                  <ArchiveRestore className="mr-2 h-4 w-4" />
+                ) : (
+                  <Archive className="mr-2 h-4 w-4" />
+                )}
+                {isArchived ? "Unarchive" : "Archive"}
+              </LoadingButton>
+            </div>
           ) : (
             <span />
           )}

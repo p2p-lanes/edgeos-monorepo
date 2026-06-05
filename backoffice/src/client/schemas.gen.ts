@@ -16306,6 +16306,26 @@ export const SendTestRequestSchema = {
     title: 'SendTestRequest'
 } as const;
 
+export const TaskAppSchema = {
+    type: 'string',
+    enum: ['portal', 'backoffice'],
+    title: 'TaskApp',
+    description: 'Which surface a task relates to. Optional (NULL = unspecified).'
+} as const;
+
+export const TaskArchiveResultSchema = {
+    properties: {
+        archived: {
+            type: 'integer',
+            title: 'Archived'
+        }
+    },
+    type: 'object',
+    required: ['archived'],
+    title: 'TaskArchiveResult',
+    description: 'Count of tasks archived by a bulk operation.'
+} as const;
+
 export const TaskAttachmentCreateSchema = {
     properties: {
         storage_key: {
@@ -16557,6 +16577,16 @@ export const TaskCreateSchema = {
             ],
             title: 'Release'
         },
+        app: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/TaskApp'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
         visibility: {
             '$ref': '#/components/schemas/TaskVisibility',
             default: 'internal'
@@ -16656,6 +16686,16 @@ export const TaskDetailPublicSchema = {
             ],
             title: 'Release'
         },
+        app: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/TaskApp'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
         visibility: {
             '$ref': '#/components/schemas/TaskVisibility'
         },
@@ -16682,6 +16722,18 @@ export const TaskDetailPublicSchema = {
                 }
             ],
             title: 'Published At'
+        },
+        archived_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Archived At'
         },
         created_by: {
             anyOf: [
@@ -16818,6 +16870,16 @@ export const TaskPublicSchema = {
             ],
             title: 'Release'
         },
+        app: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/TaskApp'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
         visibility: {
             '$ref': '#/components/schemas/TaskVisibility'
         },
@@ -16844,6 +16906,18 @@ export const TaskPublicSchema = {
                 }
             ],
             title: 'Published At'
+        },
+        archived_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Archived At'
         },
         created_by: {
             anyOf: [
@@ -16987,6 +17061,16 @@ export const TaskUpdateSchema = {
                 }
             ],
             title: 'Release'
+        },
+        app: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/TaskApp'
+                },
+                {
+                    type: 'null'
+                }
+            ]
         },
         visibility: {
             anyOf: [
@@ -18412,6 +18496,28 @@ export const TrackCreateSchema = {
     type: 'object',
     required: ['popup_id', 'name'],
     title: 'TrackCreate'
+} as const;
+
+export const TrackEventCountSchema = {
+    properties: {
+        track_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Track Id'
+        },
+        event_count: {
+            type: 'integer',
+            title: 'Event Count'
+        }
+    },
+    type: 'object',
+    required: ['track_id', 'event_count'],
+    title: 'TrackEventCount',
+    description: `Number of distinct published events that belong to a track.
+
+Backs the portal track filter / Tracks section so it can show per-track
+counts (and hide empty tracks) without pulling the full event list to the
+client just to count.`
 } as const;
 
 export const TrackPublicSchema = {
