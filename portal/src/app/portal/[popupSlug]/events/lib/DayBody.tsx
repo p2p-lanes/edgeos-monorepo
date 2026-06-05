@@ -594,8 +594,12 @@ export function DayBody({
               isFullscreen ? "max-h-[calc(100vh-9rem)]" : "max-h-[70vh]",
             )}
           >
+            {/* min-w-max makes the grid box span the full content width (not
+              just the scroll viewport). Without it the `1fr` columns overflow
+              a viewport-wide box, so the sticky-left hour column only stays
+              pinned within that first viewport and scrolls away after. */}
             <div
-              className="grid"
+              className="grid min-w-max"
               style={{
                 gridTemplateColumns: `${HOUR_LABEL_COL}px repeat(${venueCount}, minmax(${VENUE_COL_MIN}px, 1fr))`,
               }}

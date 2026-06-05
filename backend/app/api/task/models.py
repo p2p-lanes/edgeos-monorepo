@@ -56,6 +56,10 @@ class Task(SQLModel, table=True):
     # Free-text release tag (e.g. "v1.2.0", "R42"). No Release entity yet.
     release: str | None = Field(default=None, max_length=50, nullable=True)
 
+    # Optional surface the task relates to: "portal" | "backoffice" (NULL =
+    # unspecified). See app.api.task.schemas: TaskApp.
+    app: str | None = Field(default=None, max_length=16, nullable=True, index=True)
+
     # Future tenant-exposure control. Dormant in phase 1 (default internal).
     visibility: str = Field(default="internal", max_length=16, index=True)
     # Required only when visibility == "tenant"; else NULL.
@@ -67,6 +71,14 @@ class Task(SQLModel, table=True):
     published_at: datetime | None = Field(
         default=None,
         sa_column=Column(DateTime(timezone=True), nullable=True),
+    )
+
+    # Stamped when the task is archived (hidden from the board, kept for the
+    # record). NULL means active. Orthogonal to ``status`` — a published task
+    # can be archived without changing its column.
+    archived_at: datetime | None = Field(
+        default=None,
+        sa_column=Column(DateTime(timezone=True), nullable=True, index=True),
     )
 
     created_by: uuid.UUID | None = Field(

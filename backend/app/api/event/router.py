@@ -617,6 +617,45 @@ def _ics_utc_stamp(dt: datetime) -> str:
     return dt.astimezone(UTC).strftime("%Y%m%dT%H%M%SZ")
 
 
+def _ics_vevent_lines(
+    event, dtstamp: str, *, include_recurrence: bool = False
+) -> list[str]:
+    """Render one VEVENT block as RFC-5545 lines.
+
+    ``include_recurrence`` emits RRULE/EXDATE so a recurring master expands
+    natively in the subscriber's calendar — used by the popup feed. The
+    single-event download leaves it off so it adds just that one instance.
+    """
+    summary = (event.title or "").replace("\n", " ").replace(",", r"\,")
+    description = (event.content or "").replace("\n", r"\n").replace(",", r"\,")
+    location = event.meeting_url or ""
+
+    lines: list[str] = [
+        "BEGIN:VEVENT",
+        f"UID:{event.id}@edgeos",
+        f"DTSTAMP:{dtstamp}",
+        f"DTSTART:{_ics_utc_stamp(event.start_time)}",
+        f"DTEND:{_ics_utc_stamp(event.end_time)}",
+        f"SUMMARY:{summary}",
+    ]
+    if description:
+        lines.append(f"DESCRIPTION:{description}")
+    if location:
+        lines.append(f"LOCATION:{location}")
+    if include_recurrence and getattr(event, "rrule", None):
+        lines.append(f"RRULE:{event.rrule}")
+        exdates = getattr(event, "recurrence_exdates", None) or []
+        if exdates:
+            lines.append(f"EXDATE:{','.join(_ics_utc_stamp(d) for d in exdates)}")
+    lines.append(
+        "STATUS:CANCELLED"
+        if event.status == EventStatus.CANCELLED
+        else "STATUS:CONFIRMED"
+    )
+    lines.append("END:VEVENT")
+    return lines
+
+
 def _render_ics(event) -> str:
     """Render a minimal, RFC-5545-compliant VCALENDAR string for one event.
 
@@ -630,34 +669,39 @@ def _render_ics(event) -> str:
     the emailed invite the same entry, so a cancellation reconciles it.
     """
     dtstamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
-    dtstart = _ics_utc_stamp(event.start_time)
-    dtend = _ics_utc_stamp(event.end_time)
-    summary = (event.title or "").replace("\n", " ").replace(",", r"\,")
-    description = (event.content or "").replace("\n", r"\n").replace(",", r"\,")
-    location = event.meeting_url or ""
-
     lines: list[str] = [
         "BEGIN:VCALENDAR",
         "VERSION:2.0",
         "PRODID:-//EdgeOS//Events//EN",
         "CALSCALE:GREGORIAN",
         "METHOD:PUBLISH",
-        "BEGIN:VEVENT",
-        f"UID:{event.id}@edgeos",
-        f"DTSTAMP:{dtstamp}",
-        f"DTSTART:{dtstart}",
-        f"DTEND:{dtend}",
-        f"SUMMARY:{summary}",
+        *_ics_vevent_lines(event, dtstamp),
+        "END:VCALENDAR",
     ]
-    if description:
-        lines.append(f"DESCRIPTION:{description}")
-    if location:
-        lines.append(f"LOCATION:{location}")
-    if event.status == EventStatus.CANCELLED:
-        lines.append("STATUS:CANCELLED")
-    else:
-        lines.append("STATUS:CONFIRMED")
-    lines.extend(["END:VEVENT", "END:VCALENDAR"])
+    return "\r\n".join(lines) + "\r\n"
+
+
+def _render_ics_feed(calendar_name: str, events: list) -> str:
+    """Render a VCALENDAR feed of many events (the popup subscription feed).
+
+    Recurring masters carry their RRULE so the calendar app expands them and
+    stays in sync. REFRESH-INTERVAL / X-PUBLISHED-TTL hint a 1h poll.
+    """
+    dtstamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+    name = (calendar_name or "Events").replace("\n", " ").replace(",", r"\,")
+    lines: list[str] = [
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "PRODID:-//EdgeOS//Events//EN",
+        "CALSCALE:GREGORIAN",
+        "METHOD:PUBLISH",
+        f"X-WR-CALNAME:{name}",
+        "REFRESH-INTERVAL;VALUE=DURATION:PT1H",
+        "X-PUBLISHED-TTL:PT1H",
+    ]
+    for event in events:
+        lines.extend(_ics_vevent_lines(event, dtstamp, include_recurrence=True))
+    lines.append("END:VCALENDAR")
     return "\r\n".join(lines) + "\r\n"
 
 
@@ -824,6 +868,57 @@ async def list_public_calendar(
             popup_name=popup.name,
             placeholder_url=placeholder_url,
         ),
+    )
+
+
+@router.get(
+    "/public/calendar.ics",
+    dependencies=[
+        Depends(
+            RateLimit(limit=120, window_sec=60, key_prefix="rl:events-public-ics")
+        ),
+    ],
+)
+async def public_calendar_ics(
+    db: SessionDep,
+    popup_id: uuid.UUID,
+) -> Response:
+    """Anonymous iCalendar subscription feed of a popup's public events.
+
+    Served by ``popup_id`` (globally unique) so calendar apps — which fetch
+    the feed without Origin/Referer — can subscribe without tenant
+    resolution. Only ``published`` + ``visibility=public`` events are
+    included, matching the public calendar; recurring masters carry their
+    RRULE so the subscription stays in sync.
+    """
+    from app.api.popup.crud import popups_crud
+    from app.api.popup.schemas import PopupStatus
+
+    popup = popups_crud.get(db, popup_id)
+    if not popup or popup.status != PopupStatus.active:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Popup not found"
+        )
+
+    events, _ = crud.events_crud.find_by_popup(
+        db,
+        popup_id=popup.id,
+        skip=0,
+        limit=1000,
+        event_status=EventStatus.PUBLISHED,
+        visibility=EventVisibility.PUBLIC,
+        exclude_statuses=[EventStatus.CANCELLED],
+    )
+    ics = _render_ics_feed(f"{popup.name} — Events", events)
+    # attachment so the portal's "Download .ics" link saves a file even
+    # cross-origin; calendar apps ignore this header when subscribing.
+    return Response(
+        content=ics,
+        media_type="text/calendar; charset=utf-8",
+        headers={
+            "Content-Disposition": f'attachment; filename="{popup.slug or "events"}.ics"',
+            "Cache-Control": "public, max-age=3600",
+        },
     )
 
 
@@ -1107,6 +1202,10 @@ async def update_event(
         "content": event.content,
         "custom_location_name": event.custom_location_name,
         "custom_location_url": event.custom_location_url,
+        "meeting_url": event.meeting_url,
+        "timezone": event.timezone,
+        "rrule": event.rrule,
+        "recurrence_exdates": event.recurrence_exdates,
     }
     updated = crud.events_crud.update(db, event, event_in)
 
@@ -2913,6 +3012,10 @@ async def update_portal_event(
         "content": event.content,
         "custom_location_name": event.custom_location_name,
         "custom_location_url": event.custom_location_url,
+        "meeting_url": event.meeting_url,
+        "timezone": event.timezone,
+        "rrule": event.rrule,
+        "recurrence_exdates": event.recurrence_exdates,
     }
     updated = crud.events_crud.update(db, event, event_in)
     if _event_calendar_fields_changed(before, updated):
