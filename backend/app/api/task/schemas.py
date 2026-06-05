@@ -132,6 +132,12 @@ class TaskStatusUpdate(BaseModel):
     model_config = ConfigDict(use_enum_values=True)
 
 
+class TaskArchiveResult(BaseModel):
+    """Count of tasks archived by a bulk operation."""
+
+    archived: int
+
+
 class BugReportCreate(BaseModel):
     """The 'report a bug' payload, open to every backoffice user.
 
@@ -160,6 +166,7 @@ class TaskPublic(BaseModel):
     visibility: TaskVisibility
     target_tenant_id: uuid.UUID | None = None
     published_at: datetime | None = None
+    archived_at: datetime | None = None
     created_by: uuid.UUID | None = None
     created_by_name: str | None = None
     created_at: datetime

@@ -15358,6 +15358,19 @@ export const SendTestRequestSchema = {
     title: 'SendTestRequest'
 } as const;
 
+export const TaskArchiveResultSchema = {
+    properties: {
+        archived: {
+            type: 'integer',
+            title: 'Archived'
+        }
+    },
+    type: 'object',
+    required: ['archived'],
+    title: 'TaskArchiveResult',
+    description: 'Count of tasks archived by a bulk operation.'
+} as const;
+
 export const TaskAttachmentCreateSchema = {
     properties: {
         storage_key: {
@@ -15735,6 +15748,18 @@ export const TaskDetailPublicSchema = {
             ],
             title: 'Published At'
         },
+        archived_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Archived At'
+        },
         created_by: {
             anyOf: [
                 {
@@ -15896,6 +15921,18 @@ export const TaskPublicSchema = {
                 }
             ],
             title: 'Published At'
+        },
+        archived_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Archived At'
         },
         created_by: {
             anyOf: [

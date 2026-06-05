@@ -69,6 +69,14 @@ class Task(SQLModel, table=True):
         sa_column=Column(DateTime(timezone=True), nullable=True),
     )
 
+    # Stamped when the task is archived (hidden from the board, kept for the
+    # record). NULL means active. Orthogonal to ``status`` — a published task
+    # can be archived without changing its column.
+    archived_at: datetime | None = Field(
+        default=None,
+        sa_column=Column(DateTime(timezone=True), nullable=True, index=True),
+    )
+
     created_by: uuid.UUID | None = Field(
         default=None, foreign_key="users.id", nullable=True
     )

@@ -1,8 +1,11 @@
 import type { ColumnDef } from "@tanstack/react-table"
+import { Archive, ArchiveRestore } from "lucide-react"
 
 import type { TaskPublic } from "@/client"
 import { SortableHeader } from "@/components/Common/DataTable"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import useAuth from "@/hooks/useAuth"
 import { cn } from "@/lib/utils"
 import {
   PRIORITY_CLASSES,
@@ -12,6 +15,41 @@ import {
   TYPE_CLASSES,
   TYPE_LABELS,
 } from "./taskMeta"
+import { useTaskArchive } from "./useTaskArchive"
+
+function ArchiveCell({ task }: { task: TaskPublic }) {
+  const { isSuperadmin } = useAuth()
+  const { archive, unarchive } = useTaskArchive()
+  if (!isSuperadmin) return null
+  const isArchived = task.archived_at != null
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="sm"
+      className="h-7 px-2 text-xs"
+      disabled={archive.isPending || unarchive.isPending}
+      onClick={(e) => {
+        // The row is clickable (opens the task); keep this action local.
+        e.stopPropagation()
+        if (isArchived) unarchive.mutate(task.id)
+        else archive.mutate(task.id)
+      }}
+    >
+      {isArchived ? (
+        <>
+          <ArchiveRestore className="mr-1 h-3.5 w-3.5" />
+          Unarchive
+        </>
+      ) : (
+        <>
+          <Archive className="mr-1 h-3.5 w-3.5" />
+          Archive
+        </>
+      )}
+    </Button>
+  )
+}
 
 export const taskColumns: ColumnDef<TaskPublic>[] = [
   {
@@ -95,5 +133,10 @@ export const taskColumns: ColumnDef<TaskPublic>[] = [
         {new Date(row.original.updated_at).toLocaleDateString()}
       </span>
     ),
+  },
+  {
+    id: "actions",
+    header: "",
+    cell: ({ row }) => <ArchiveCell task={row.original} />,
   },
 ]

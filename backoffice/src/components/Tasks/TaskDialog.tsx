@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { Copy, Trash2 } from "lucide-react"
+import { Archive, ArchiveRestore, Copy, Trash2 } from "lucide-react"
 import { useEffect, useState } from "react"
 
 import {
@@ -48,6 +48,7 @@ import {
   TYPE_LABELS,
   VISIBILITY_LABELS,
 } from "./taskMeta"
+import { useTaskArchive } from "./useTaskArchive"
 
 const NONE = "__none__"
 
@@ -202,6 +203,9 @@ export function TaskDialog({ open, onOpenChange, taskId }: TaskDialogProps) {
     if (isEdit) updateMutation.mutate()
     else createMutation.mutate()
   }
+
+  const { archive, unarchive } = useTaskArchive()
+  const isArchived = task?.archived_at != null
 
   const users = usersData?.results ?? []
   const tenants = tenantsData?.results ?? []
@@ -444,14 +448,32 @@ export function TaskDialog({ open, onOpenChange, taskId }: TaskDialogProps) {
 
         <DialogFooter className="sm:justify-between">
           {isEdit && !readOnly ? (
-            <LoadingButton
-              variant="destructive"
-              loading={deleteMutation.isPending}
-              onClick={() => deleteMutation.mutate()}
-            >
-              <Trash2 className="mr-2 h-4 w-4" />
-              Delete
-            </LoadingButton>
+            <div className="flex gap-2">
+              <LoadingButton
+                variant="destructive"
+                loading={deleteMutation.isPending}
+                onClick={() => deleteMutation.mutate()}
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                Delete
+              </LoadingButton>
+              <LoadingButton
+                variant="outline"
+                loading={archive.isPending || unarchive.isPending}
+                onClick={() =>
+                  isArchived
+                    ? unarchive.mutate(taskId!)
+                    : archive.mutate(taskId!)
+                }
+              >
+                {isArchived ? (
+                  <ArchiveRestore className="mr-2 h-4 w-4" />
+                ) : (
+                  <Archive className="mr-2 h-4 w-4" />
+                )}
+                {isArchived ? "Unarchive" : "Archive"}
+              </LoadingButton>
+            </div>
           ) : (
             <span />
           )}
