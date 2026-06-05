@@ -184,3 +184,38 @@ def test_report_bug_is_scoped_to_reporter_tenant(
     assert body["type"] == "bug"
     assert body["visibility"] == "tenant"
     assert body["target_tenant_id"] == str(tenant_a.id)
+
+
+def test_app_field_roundtrips_and_clears(client, superadmin_token) -> None:
+    """The optional `app` (portal | backoffice) persists, updates and clears."""
+    created = client.post(
+        "/api/v1/tasks",
+        headers=_auth(superadmin_token),
+        json={"title": "app-field", "app": "portal"},
+    )
+    assert created.status_code == 201
+    assert created.json()["app"] == "portal"
+    tid = created.json()["id"]
+
+    # Defaults to null when omitted.
+    plain = client.post(
+        "/api/v1/tasks", headers=_auth(superadmin_token), json={"title": "no-app"}
+    )
+    assert plain.status_code == 201
+    assert plain.json()["app"] is None
+
+    updated = client.put(
+        f"/api/v1/tasks/{tid}",
+        headers=_auth(superadmin_token),
+        json={"app": "backoffice"},
+    )
+    assert updated.status_code == 200
+    assert updated.json()["app"] == "backoffice"
+
+    cleared = client.put(
+        f"/api/v1/tasks/{tid}",
+        headers=_auth(superadmin_token),
+        json={"app": None},
+    )
+    assert cleared.status_code == 200
+    assert cleared.json()["app"] is None
