@@ -27,11 +27,7 @@ const useResources = () => {
   const eventsEnabled = city?.events_enabled ?? true
   const attendeeDirectoryEnabled =
     city?.sale_type !== "direct" && (city?.show_attendee_directory ?? false)
-  // referrals_enabled is present at runtime but not yet in the generated
-  // portal client type — use a safe cast until the client is regenerated.
-  const referralsEnabled =
-    (city as (typeof city & { referrals_enabled?: boolean }) | undefined)
-      ?.referrals_enabled === true
+  const referralsEnabled = city?.referrals_enabled === true
 
   const isCompanion = participation?.type === "companion"
   const canSeeAttendees = application?.status === "accepted"

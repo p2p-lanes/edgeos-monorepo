@@ -2852,6 +2852,9 @@ export type PopupPublic = {
     events_enabled?: boolean;
     show_attendee_directory?: boolean;
     credits_enabled?: boolean;
+    invites_enabled?: boolean;
+    referrals_enabled?: boolean;
+    group_private_events_enabled?: boolean;
 };
 
 /**

@@ -13819,6 +13819,21 @@ export const PopupPublicSchema = {
             type: 'boolean',
             title: 'Credits Enabled',
             default: false
+        },
+        invites_enabled: {
+            type: 'boolean',
+            title: 'Invites Enabled',
+            default: false
+        },
+        referrals_enabled: {
+            type: 'boolean',
+            title: 'Referrals Enabled',
+            default: false
+        },
+        group_private_events_enabled: {
+            type: 'boolean',
+            title: 'Group Private Events Enabled',
+            default: false
         }
     },
     type: 'object',

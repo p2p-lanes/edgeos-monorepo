@@ -5,7 +5,6 @@ import { useTranslation } from "react-i18next"
 import HeaderProfile from "@/components/profile/HeaderProfile"
 import HumanForm from "@/components/profile/HumanForm"
 import PopupsHistory from "@/components/profile/PopupsHistory"
-import ReferralLinks from "@/components/profile/ReferralLinks"
 import StatsCards from "@/components/profile/StatsCards"
 import { Card } from "@/components/ui/card"
 import { Loader } from "@/components/ui/Loader"
@@ -128,9 +127,6 @@ export default function ProfileContent() {
           />
 
           <StatsCards stats={stats} isLoading={isStatsLoading} />
-
-          {/* LEGACY: referral_count removed from API – review for deletion */}
-          <ReferralLinks referralCount={0} />
 
           <PopupsHistory popups={stats?.popups ?? []} />
         </div>

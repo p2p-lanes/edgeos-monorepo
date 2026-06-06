@@ -407,6 +407,10 @@ class PopupPublic(SQLModel):
     events_enabled: bool = True
     show_attendee_directory: bool = False
     credits_enabled: bool = False
+    # groups-rework feature flags (portal needs these to gate nav/UI)
+    invites_enabled: bool = False
+    referrals_enabled: bool = False
+    group_private_events_enabled: bool = False
 
 
 class PopupAdmin(PopupBase):
