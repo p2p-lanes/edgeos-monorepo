@@ -11,6 +11,7 @@ import {
   Check,
   CheckCircle,
   Clock,
+  Globe,
   Home,
   Layers,
   Lock,
@@ -482,6 +483,17 @@ export default function EventDetailPage() {
           <ArrowLeft className="h-4 w-4" /> {t("events.common.back_to_events")}
         </Link>
         <div className="flex items-center gap-2 shrink-0">
+          <Button asChild variant="outline" size="sm">
+            <a
+              href={`https://ee26.geobrowser.io/events/${event.id}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label={t("events.detail.view_on_geobrowser")}
+            >
+              <Globe className="mr-2 h-3.5 w-3.5" />
+              {t("events.detail.view_on_geobrowser")}
+            </a>
+          </Button>
           {canManage && event.status !== "cancelled" && (
             <Dialog open={cancelEventOpen} onOpenChange={setCancelEventOpen}>
               <DialogTrigger asChild>

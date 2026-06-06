@@ -663,6 +663,7 @@
       "pending_approval_banner_title": "Pendiente de aprobación",
       "pending_approval_banner_message": "Tu evento está pendiente de aprobación y aún no es visible para otros.",
       "open_in_maps": "Abrir en Google Maps",
+      "view_on_geobrowser": "Ver en Geobrowser",
       "share_button": "Compartir evento",
       "share_link_copied": "Link copiado",
       "share_link_error": "No se pudo copiar el link",
