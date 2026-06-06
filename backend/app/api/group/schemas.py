@@ -183,10 +183,22 @@ class GroupMemberBatchResult(GroupMemberPublic):
     err_msg: str | None = None
 
 
+class MyGroupPublic(GroupPublic):
+    """Group public schema augmented with the viewer's role (portal)."""
+
+    is_leader: bool = False
+
+
 class GroupWithMembers(GroupPublic):
     """Group with members list."""
 
     members: list[GroupMemberPublic] = []
+
+
+class MyGroupWithMembers(GroupWithMembers):
+    """Group with members and viewer role (portal detail)."""
+
+    is_leader: bool = False
 
 
 class GroupLeaderBase(SQLModel):

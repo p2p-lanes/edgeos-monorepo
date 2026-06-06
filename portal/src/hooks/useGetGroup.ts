@@ -1,16 +1,16 @@
 import { useQuery } from "@tanstack/react-query"
-import { GroupsService, type GroupWithMembers } from "@/client"
+import { GroupsService, type MyGroupWithMembers } from "@/client"
 import { queryKeys } from "@/lib/query-keys"
 
 interface UseGetGroupResult {
-  group: GroupWithMembers | null
+  group: MyGroupWithMembers | null
   loading: boolean
   error: string | null
   refetch: () => Promise<void>
 }
 
 const useGetGroup = (groupId: string | null): UseGetGroupResult => {
-  const query = useQuery({
+  const query = useQuery<MyGroupWithMembers>({
     queryKey: queryKeys.groups.detail(groupId ?? ""),
     queryFn: async () => {
       const result = await GroupsService.getMyGroup({ groupId: groupId! })

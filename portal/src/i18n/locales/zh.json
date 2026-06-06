@@ -468,7 +468,10 @@
     "member_updated": "成员更新成功",
     "member_added": "成员添加成功",
     "member_update_failed": "更新成员失败。请重试。",
-    "member_add_failed": "添加成员失败。请重试。"
+    "member_add_failed": "添加成员失败。请重试。",
+    "role_ambassador": "大使",
+    "role_leader": "领导者",
+    "role_member": "成员"
   },
   "referrals": {
     "title": "Referrals",

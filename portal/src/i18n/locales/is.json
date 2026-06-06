@@ -458,7 +458,10 @@
     "member_updated": "Meðlimi uppfært",
     "member_added": "Meðlimi bætt við",
     "member_update_failed": "Mistókst að uppfæra meðlim. Vinsamlegast reyndu aftur.",
-    "member_add_failed": "Mistókst að bæta við meðlim. Vinsamlegast reyndu aftur."
+    "member_add_failed": "Mistókst að bæta við meðlim. Vinsamlegast reyndu aftur.",
+    "role_ambassador": "Sendiherrar",
+    "role_leader": "Forystumaður",
+    "role_member": "Meðlimur"
   },
   "referrals": {
     "title": "Referrals",

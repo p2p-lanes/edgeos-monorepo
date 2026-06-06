@@ -90,6 +90,7 @@ const GroupPage = () => {
             members={currentMembers}
             onMemberUpdated={refetch}
             isAmbassadorGroup={group.is_ambassador_group}
+            isLeader={group.is_leader ?? false}
           />
 
           <Pagination

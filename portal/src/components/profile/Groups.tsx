@@ -1,8 +1,9 @@
 import { Check, Copy } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
+import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
-import type { GroupPublic } from "@/client"
+import type { MyGroupPublic } from "@/client"
 import { getPublicGroupLink } from "@/lib/group-route"
 import { useCityProvider } from "@/providers/cityProvider"
 import useGetGroups from "../Sidebar/hooks/useGetGroups"
@@ -11,17 +12,24 @@ import { Button } from "../ui/button"
 import { Card } from "../ui/card"
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip"
 
-const getCheckoutLinkForGroup = (group: GroupPublic): string => {
+const getCheckoutLinkForGroup = (group: MyGroupPublic): string => {
   return getPublicGroupLink(window.location.origin, group.slug)
 }
 
 const Groups = () => {
   const { data: groups = [] } = useGetGroups()
+  const { t } = useTranslation()
   const router = useRouter()
   const { getPopups } = useCityProvider()
   const popups = getPopups()
 
   if (groups.length === 0) return null
+
+  const getRoleBadgeLabel = (group: MyGroupPublic): string => {
+    if (group.is_ambassador_group) return t("groups.role_ambassador")
+    if (group.is_leader) return t("groups.role_leader")
+    return t("groups.role_member")
+  }
 
   return (
     <div className="bg-card rounded-lg border border-border mb-8">
@@ -55,9 +63,8 @@ const Groups = () => {
                     <h3 className="font-semibold text-foreground">
                       {group.name}
                     </h3>
-                    {/* LEGACY: popup_name removed from API – review for deletion */}
                     <Badge variant={"outline"} className="w-fit mt-1">
-                      {group.is_ambassador_group ? "Ambassador" : "Group"}
+                      {getRoleBadgeLabel(group)}
                     </Badge>
                   </div>
                   <ButtonCopyLink group={group} isPopupActive={isPopupActive} />
@@ -75,7 +82,7 @@ export const ButtonCopyLink = ({
   group,
   isPopupActive,
 }: {
-  group: GroupPublic
+  group: MyGroupPublic
   isPopupActive: boolean
 }) => {
   const [isCopied, setIsCopied] = useState(false)
@@ -83,7 +90,7 @@ export const ButtonCopyLink = ({
   // Don't render button if popup is not active
   if (!isPopupActive) return null
 
-  const handleCopyCheckoutLink = async (group: GroupPublic) => {
+  const handleCopyCheckoutLink = async (group: MyGroupPublic) => {
     const checkoutLink = getCheckoutLinkForGroup(group)
 
     try {

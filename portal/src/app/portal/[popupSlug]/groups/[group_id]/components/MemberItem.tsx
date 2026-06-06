@@ -19,12 +19,14 @@ interface MemberItemProps {
   member: GroupMemberPublic
   onMemberUpdated?: () => void
   isAmbassadorGroup?: boolean
+  isLeader?: boolean
 }
 
 const MemberItem = ({
   member,
   onMemberUpdated,
   isAmbassadorGroup,
+  isLeader,
 }: MemberItemProps) => {
   const [isExpanded, setIsExpanded] = useState(false)
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
@@ -144,7 +146,7 @@ const MemberItem = ({
               </div>
 
               <div className="flex justify-end gap-3">
-                {!isAmbassadorGroup && (
+                {!isAmbassadorGroup && isLeader && (
                   <>
                     <Button
                       variant={"outline"}

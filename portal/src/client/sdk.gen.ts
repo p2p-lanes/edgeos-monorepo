@@ -4924,11 +4924,11 @@ export class GroupsService {
     
     /**
      * List My Groups
-     * List groups where current human is a leader (Portal).
+     * List groups where current human is a leader or member (Portal).
      * @param data The data for the request.
      * @param data.skip Number of items to skip
      * @param data.limit Maximum number of items to return
-     * @returns ListModel_GroupPublic_ Successful Response
+     * @returns ListModel_MyGroupPublic_ Successful Response
      * @throws ApiError
      */
     public static listMyGroups(data: GroupsListMyGroupsData = {}): CancelablePromise<GroupsListMyGroupsResponse> {
@@ -4947,10 +4947,10 @@ export class GroupsService {
     
     /**
      * Get My Group
-     * Get a group where current human is a leader (Portal).
+     * Get a group where current human is a leader or member (Portal, read-only for members).
      * @param data The data for the request.
      * @param data.groupId
-     * @returns GroupWithMembers Successful Response
+     * @returns MyGroupWithMembers Successful Response
      * @throws ApiError
      */
     public static getMyGroup(data: GroupsGetMyGroupData): CancelablePromise<GroupsGetMyGroupResponse> {

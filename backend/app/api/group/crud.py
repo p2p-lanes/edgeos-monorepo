@@ -102,6 +102,58 @@ class GroupsCRUD(BaseCRUD[Groups, GroupCreate, GroupUpdate]):
 
         return results, total
 
+    def find_by_member_or_leader(
+        self,
+        session: Session,
+        human_id: uuid.UUID,
+        skip: int = 0,
+        limit: int = 100,
+    ) -> tuple[list[Groups], int]:
+        """Find groups where human is a leader OR a member (DISTINCT)."""
+        from sqlalchemy import union
+
+        leader_q = (
+            select(Groups.id)
+            .join(GroupLeaders, GroupLeaders.group_id == Groups.id)  # type: ignore[arg-type]
+            .where(GroupLeaders.human_id == human_id)
+        )
+        member_q = (
+            select(Groups.id)
+            .join(GroupMembers, GroupMembers.group_id == Groups.id)  # type: ignore[arg-type]
+            .where(GroupMembers.human_id == human_id)
+        )
+        combined_ids = union(leader_q, member_q).subquery()
+
+        statement = select(Groups).where(Groups.id.in_(select(combined_ids)))  # type: ignore[arg-type]
+
+        count_statement = select(func.count()).select_from(statement.subquery())
+        total = session.exec(count_statement).one()
+
+        statement = (
+            statement.options(*_list_eager_load())
+            .order_by(desc(Groups.created_at))  # type: ignore[arg-type]
+            .offset(skip)
+            .limit(limit)
+        )
+        results = list(session.exec(statement).all())
+
+        return results, total
+
+    def get_leader_group_ids(
+        self,
+        session: Session,
+        human_id: uuid.UUID,
+    ) -> set[uuid.UUID]:
+        """Return the set of group IDs where human is a LEADER.
+
+        Used to compute is_leader per group without N+1 queries.
+        """
+        statement = select(GroupLeaders.group_id).where(
+            GroupLeaders.human_id == human_id
+        )
+        rows = session.exec(statement).all()
+        return set(rows)
+
     def find_by_popup(
         self,
         session: Session,

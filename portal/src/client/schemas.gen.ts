@@ -11045,6 +11045,24 @@ export const ListModel_InvitePublic_Schema = {
     title: 'ListModel[InvitePublic]'
 } as const;
 
+export const ListModel_MyGroupPublic_Schema = {
+    properties: {
+        results: {
+            items: {
+                '$ref': '#/components/schemas/MyGroupPublic'
+            },
+            type: 'array',
+            title: 'Results'
+        },
+        paging: {
+            '$ref': '#/components/schemas/Paging'
+        }
+    },
+    type: 'object',
+    required: ['results', 'paging'],
+    title: 'ListModel[MyGroupPublic]'
+} as const;
+
 export const ListModel_PaymentPublic_Schema = {
     properties: {
         results: {
@@ -11286,6 +11304,304 @@ export const MeAccessSchema = {
     required: ['app_name', 'scopes', 'api_key_scopes'],
     title: 'MeAccess',
     description: 'Response shape for GET /me/access.'
+} as const;
+
+export const MyGroupPublicSchema = {
+    properties: {
+        tenant_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Tenant Id'
+        },
+        popup_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Popup Id'
+        },
+        name: {
+            type: 'string',
+            title: 'Name'
+        },
+        slug: {
+            type: 'string',
+            title: 'Slug'
+        },
+        description: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Description'
+        },
+        discount_percentage: {
+            type: 'string',
+            pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$',
+            title: 'Discount Percentage',
+            default: '0'
+        },
+        max_members: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Max Members'
+        },
+        welcome_message: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Welcome Message'
+        },
+        is_ambassador_group: {
+            type: 'boolean',
+            title: 'Is Ambassador Group',
+            default: false
+        },
+        ambassador_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Ambassador Id'
+        },
+        auto_approve_applications: {
+            type: 'boolean',
+            title: 'Auto Approve Applications',
+            default: false
+        },
+        express_checkout: {
+            type: 'boolean',
+            title: 'Express Checkout',
+            default: false
+        },
+        enable_private_events: {
+            type: 'boolean',
+            title: 'Enable Private Events',
+            default: false
+        },
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        created_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Created At'
+        },
+        updated_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Updated At'
+        },
+        whitelisted_emails: {
+            items: {
+                '$ref': '#/components/schemas/GroupWhitelistedEmailPublic'
+            },
+            type: 'array',
+            title: 'Whitelisted Emails',
+            default: []
+        },
+        is_open: {
+            type: 'boolean',
+            title: 'Is Open',
+            default: true
+        },
+        is_leader: {
+            type: 'boolean',
+            title: 'Is Leader',
+            default: false
+        }
+    },
+    type: 'object',
+    required: ['tenant_id', 'popup_id', 'name', 'slug', 'id'],
+    title: 'MyGroupPublic',
+    description: "Group public schema augmented with the viewer's role (portal)."
+} as const;
+
+export const MyGroupWithMembersSchema = {
+    properties: {
+        tenant_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Tenant Id'
+        },
+        popup_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Popup Id'
+        },
+        name: {
+            type: 'string',
+            title: 'Name'
+        },
+        slug: {
+            type: 'string',
+            title: 'Slug'
+        },
+        description: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Description'
+        },
+        discount_percentage: {
+            type: 'string',
+            pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$',
+            title: 'Discount Percentage',
+            default: '0'
+        },
+        max_members: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Max Members'
+        },
+        welcome_message: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Welcome Message'
+        },
+        is_ambassador_group: {
+            type: 'boolean',
+            title: 'Is Ambassador Group',
+            default: false
+        },
+        ambassador_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Ambassador Id'
+        },
+        auto_approve_applications: {
+            type: 'boolean',
+            title: 'Auto Approve Applications',
+            default: false
+        },
+        express_checkout: {
+            type: 'boolean',
+            title: 'Express Checkout',
+            default: false
+        },
+        enable_private_events: {
+            type: 'boolean',
+            title: 'Enable Private Events',
+            default: false
+        },
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        created_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Created At'
+        },
+        updated_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Updated At'
+        },
+        whitelisted_emails: {
+            items: {
+                '$ref': '#/components/schemas/GroupWhitelistedEmailPublic'
+            },
+            type: 'array',
+            title: 'Whitelisted Emails',
+            default: []
+        },
+        is_open: {
+            type: 'boolean',
+            title: 'Is Open',
+            default: true
+        },
+        members: {
+            items: {
+                '$ref': '#/components/schemas/GroupMemberPublic'
+            },
+            type: 'array',
+            title: 'Members',
+            default: []
+        },
+        is_leader: {
+            type: 'boolean',
+            title: 'Is Leader',
+            default: false
+        }
+    },
+    type: 'object',
+    required: ['tenant_id', 'popup_id', 'name', 'slug', 'id'],
+    title: 'MyGroupWithMembers',
+    description: 'Group with members and viewer role (portal detail).'
 } as const;
 
 export const NoParticipationSchema = {

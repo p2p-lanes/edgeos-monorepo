@@ -484,7 +484,10 @@
     "member_updated": "Member updated successfully",
     "member_added": "Member added successfully",
     "member_update_failed": "Failed to update member. Please try again.",
-    "member_add_failed": "Failed to add member. Please try again."
+    "member_add_failed": "Failed to add member. Please try again.",
+    "role_ambassador": "Ambassador",
+    "role_leader": "Leader",
+    "role_member": "Member"
   },
   "referrals": {
     "title": "Referrals",

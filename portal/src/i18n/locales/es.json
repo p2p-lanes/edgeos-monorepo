@@ -482,7 +482,10 @@
     "member_updated": "Miembro actualizado exitosamente",
     "member_added": "Miembro agregado exitosamente",
     "member_update_failed": "Error al actualizar el miembro. Por favor intentá de nuevo.",
-    "member_add_failed": "Error al agregar el miembro. Por favor intentá de nuevo."
+    "member_add_failed": "Error al agregar el miembro. Por favor intentá de nuevo.",
+    "role_ambassador": "Embajador",
+    "role_leader": "Lider",
+    "role_member": "Miembro"
   },
   "referrals": {
     "title": "Referidos",

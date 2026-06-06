@@ -23,6 +23,8 @@ from app.api.group.schemas import (
     GroupSlugResolution,
     GroupUpdate,
     GroupWithMembers,
+    MyGroupPublic,
+    MyGroupWithMembers,
 )
 from app.api.shared.enums import UserRole
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
@@ -235,31 +237,39 @@ async def delete_group(
     crud.groups_crud.delete(db, group)
 
 
-@router.get("/my/groups", response_model=ListModel[GroupPublic])
+@router.get("/my/groups", response_model=ListModel[MyGroupPublic])
 async def list_my_groups(
     db: SessionDep,
     current_human: CurrentHuman,
     skip: PaginationSkip = 0,
     limit: PaginationLimit = 100,
-) -> ListModel[GroupPublic]:
-    """List groups where current human is a leader (Portal)."""
-    groups, total = crud.groups_crud.find_by_leader(
+) -> ListModel[MyGroupPublic]:
+    """List groups where current human is a leader or member (Portal)."""
+    groups, total = crud.groups_crud.find_by_member_or_leader(
         db, human_id=current_human.id, skip=skip, limit=limit
     )
 
-    return ListModel[GroupPublic](
-        results=[GroupPublic.model_validate(g) for g in groups],
+    leader_ids = crud.groups_crud.get_leader_group_ids(db, human_id=current_human.id)
+
+    return ListModel[MyGroupPublic](
+        results=[
+            MyGroupPublic(
+                **GroupPublic.model_validate(g).model_dump(),
+                is_leader=g.id in leader_ids,
+            )
+            for g in groups
+        ],
         paging=Paging(offset=skip, limit=limit, total=total),
     )
 
 
-@router.get("/my/{group_id}", response_model=GroupWithMembers)
+@router.get("/my/{group_id}", response_model=MyGroupWithMembers)
 async def get_my_group(
     group_id: uuid.UUID,
     db: SessionDep,
     current_human: CurrentHuman,
-) -> GroupWithMembers:
-    """Get a group where current human is a leader (Portal)."""
+) -> MyGroupWithMembers:
+    """Get a group where current human is a leader or member (Portal, read-only for members)."""
     group = crud.groups_crud.get_with_members(db, group_id)
 
     if not group:
@@ -268,11 +278,19 @@ async def get_my_group(
             detail="Group not found",
         )
 
-    _check_leader_permission(group, current_human.id)
+    is_leader = group.is_leader(current_human.id)
+    is_member = crud.groups_crud.is_member(db, group_id, current_human.id)
 
-    return GroupWithMembers(
+    if not is_leader and not is_member:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You are not a member of this group",
+        )
+
+    return MyGroupWithMembers(
         **GroupPublic.model_validate(group).model_dump(),
         members=_build_members(group),
+        is_leader=is_leader,
     )
 
 

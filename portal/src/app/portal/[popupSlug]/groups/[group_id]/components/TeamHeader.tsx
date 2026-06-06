@@ -1,7 +1,8 @@
 import { Check, Copy, Import, Plus, Users } from "lucide-react"
 import { useState } from "react"
+import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
-import type { GroupWithMembers } from "@/client"
+import type { MyGroupWithMembers } from "@/client"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { getPublicGroupLink } from "@/lib/group-route"
@@ -11,7 +12,7 @@ import WelcomeMessageModal from "./WelcomeMessageModal"
 
 interface TeamHeaderProps {
   totalMembers: number
-  group: GroupWithMembers
+  group: MyGroupWithMembers
   onMemberAdded?: () => void
   onGroupUpdated?: () => void
 }
@@ -22,6 +23,7 @@ const TeamHeader = ({
   onMemberAdded,
   onGroupUpdated,
 }: TeamHeaderProps) => {
+  const { t } = useTranslation()
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isImportModalOpen, setIsImportModalOpen] = useState(false)
   const [isWelcomeMessageModalOpen, setIsWelcomeMessageModalOpen] =
@@ -80,6 +82,13 @@ const TeamHeader = ({
   }
 
   const isAmbassadorGroup = group.is_ambassador_group
+  const isLeader = group.is_leader ?? false
+
+  const roleBadgeLabel = isAmbassadorGroup
+    ? t("groups.role_ambassador")
+    : isLeader
+      ? t("groups.role_leader")
+      : t("groups.role_member")
 
   return (
     <div className="space-y-6">
@@ -87,7 +96,7 @@ const TeamHeader = ({
         <div className="flex items-center gap-4 mb-2">
           <h1 className="text-2xl font-bold">{group.name}</h1>
           <Badge variant={"outline"} className="w-fit mt-1">
-            {group.is_ambassador_group ? "Ambassador" : "Group"}
+            {roleBadgeLabel}
           </Badge>
         </div>
         <p className="text-gray-500 text-sm">
@@ -106,7 +115,7 @@ const TeamHeader = ({
         </div>
 
         <div className="flex gap-3 flex-wrap">
-          {!isAmbassadorGroup && (
+          {!isAmbassadorGroup && isLeader && (
             <>
               <Button
                 variant="outline"

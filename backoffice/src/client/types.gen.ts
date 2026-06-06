@@ -2335,6 +2335,11 @@ export type ListModel_InvitePublic_ = {
     paging: Paging;
 };
 
+export type ListModel_MyGroupPublic_ = {
+    results: Array<MyGroupPublic>;
+    paging: Paging;
+};
+
 export type ListModel_PaymentPublic_ = {
     results: Array<PaymentPublic>;
     paging: Paging;
@@ -2402,6 +2407,57 @@ export type MeAccess = {
     app_name: string;
     scopes: Array<(string)>;
     api_key_scopes: Array<(string)>;
+};
+
+/**
+ * Group public schema augmented with the viewer's role (portal).
+ */
+export type MyGroupPublic = {
+    tenant_id: string;
+    popup_id: string;
+    name: string;
+    slug: string;
+    description?: (string | null);
+    discount_percentage?: string;
+    max_members?: (number | null);
+    welcome_message?: (string | null);
+    is_ambassador_group?: boolean;
+    ambassador_id?: (string | null);
+    auto_approve_applications?: boolean;
+    express_checkout?: boolean;
+    enable_private_events?: boolean;
+    id: string;
+    created_at?: (string | null);
+    updated_at?: (string | null);
+    whitelisted_emails?: Array<GroupWhitelistedEmailPublic>;
+    is_open?: boolean;
+    is_leader?: boolean;
+};
+
+/**
+ * Group with members and viewer role (portal detail).
+ */
+export type MyGroupWithMembers = {
+    tenant_id: string;
+    popup_id: string;
+    name: string;
+    slug: string;
+    description?: (string | null);
+    discount_percentage?: string;
+    max_members?: (number | null);
+    welcome_message?: (string | null);
+    is_ambassador_group?: boolean;
+    ambassador_id?: (string | null);
+    auto_approve_applications?: boolean;
+    express_checkout?: boolean;
+    enable_private_events?: boolean;
+    id: string;
+    created_at?: (string | null);
+    updated_at?: (string | null);
+    whitelisted_emails?: Array<GroupWhitelistedEmailPublic>;
+    is_open?: boolean;
+    members?: Array<GroupMemberPublic>;
+    is_leader?: boolean;
 };
 
 /**
@@ -5544,13 +5600,13 @@ export type GroupsListMyGroupsData = {
     skip?: number;
 };
 
-export type GroupsListMyGroupsResponse = (ListModel_GroupPublic_);
+export type GroupsListMyGroupsResponse = (ListModel_MyGroupPublic_);
 
 export type GroupsGetMyGroupData = {
     groupId: string;
 };
 
-export type GroupsGetMyGroupResponse = (GroupWithMembers);
+export type GroupsGetMyGroupResponse = (MyGroupWithMembers);
 
 export type GroupsUpdateMyGroupData = {
     groupId: string;
