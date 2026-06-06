@@ -223,6 +223,20 @@ class TrackEventCount(BaseModel):
     event_count: int
 
 
+class DayEventCount(BaseModel):
+    """Number of occurrence-expanded events that start on a given calendar day.
+
+    Backs the portal calendar grid dots: the frontend can fetch per-day counts
+    for an entire month without pulling full event payloads, then render a dot
+    on each day that has at least one event.  ``day`` is formatted as
+    ``YYYY-MM-DD`` in the popup's configured timezone so it aligns with the
+    frontend's ``formatDayKey`` helper.
+    """
+
+    day: str
+    count: int
+
+
 class EventPublic(EventBase):
     """Event schema for API responses."""
 

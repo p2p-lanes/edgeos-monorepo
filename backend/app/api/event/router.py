@@ -1,6 +1,7 @@
 import uuid
 from collections.abc import Iterable
 from datetime import UTC, datetime, timedelta
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from loguru import logger
@@ -17,6 +18,7 @@ from app.api.event.recurrence import (
     parse_rrule,
 )
 from app.api.event.schemas import (
+    DayEventCount,
     EventAdminNotes,
     EventAvailabilityCheck,
     EventAvailabilityResult,
@@ -874,9 +876,7 @@ async def list_public_calendar(
 @router.get(
     "/public/calendar.ics",
     dependencies=[
-        Depends(
-            RateLimit(limit=120, window_sec=60, key_prefix="rl:events-public-ics")
-        ),
+        Depends(RateLimit(limit=120, window_sec=60, key_prefix="rl:events-public-ics")),
     ],
 )
 async def public_calendar_ics(
@@ -2400,6 +2400,61 @@ def _portal_visibility_filter(db, events: list, human_id: uuid.UUID) -> list:
     return visible
 
 
+def _rsvp_lookup_key(e) -> tuple[uuid.UUID, datetime | None]:
+    """Build the ``(event_id, occurrence_start)`` key used to locate the
+    human's RSVP row.
+
+    RSVPs for recurring events are per-occurrence, so every recurring row
+    — expanded pseudo-rows, detached override children, and the master
+    itself — maps to its own occurrence's ``start_time``.  The master's
+    ``start_time`` IS the first occurrence's dtstart, so it shares the
+    same key as its expanded siblings.
+    """
+    is_expanded = e.__dict__.get("_occurrence_id") is not None
+    if is_expanded:
+        return (e.id, e.start_time)
+    if getattr(e, "recurrence_master_id", None):
+        return (e.recurrence_master_id, e.start_time)
+    if getattr(e, "rrule", None):
+        return (e.id, e.start_time)
+    return (e.id, None)
+
+
+def _filter_rsvped_events(db, events: list, human_id: uuid.UUID) -> list:
+    """Return only the events from ``events`` that ``human_id`` has RSVPed to.
+
+    Queries ``EventParticipants`` in a single batched call and filters
+    in-memory, so both ``list_portal_events`` and calendar-summary can
+    reuse the same logic without duplicating the DB round-trip.
+    """
+    from sqlmodel import select
+
+    from app.api.event_participant.models import EventParticipants
+    from app.api.event_participant.schemas import ParticipantStatus
+
+    keys: list[tuple[uuid.UUID, datetime | None]] = []
+    for e in events:
+        k = _rsvp_lookup_key(e)
+        if k is not None:
+            keys.append(k)
+    if not keys:
+        return []
+    event_ids = list({k[0] for k in keys})
+    rows = db.exec(
+        select(
+            EventParticipants.event_id,
+            EventParticipants.occurrence_start,
+        )
+        .where(EventParticipants.profile_id == human_id)
+        .where(EventParticipants.event_id.in_(event_ids))
+        .where(EventParticipants.status != ParticipantStatus.CANCELLED)
+    ).all()
+    active_set = {(row[0], row[1]) for row in rows}
+    return [
+        e for e in events if (k := _rsvp_lookup_key(e)) is not None and k in active_set
+    ]
+
+
 @router.get("/portal/events", response_model=ListModel[EventPublic])
 async def list_portal_events(
     db: HumanTenantSession,
@@ -2461,54 +2516,8 @@ async def list_portal_events(
     # filter here unconditionally.
     visible = [e for e in visible if e.status != EventStatus.CANCELLED]
 
-    def _rsvp_lookup_key(e) -> tuple[uuid.UUID, datetime | None]:
-        """Build the ``(event_id, occurrence_start)`` key used to find this
-        user's RSVP row. RSVPs for recurring events are per-occurrence, so
-        every recurring row — expanded pseudo-rows, detached override
-        children, and the master itself — maps to its own occurrence's
-        ``start_time``. The master's ``start_time`` IS the first
-        occurrence's dtstart, so it shares the same key as its expanded
-        siblings.
-        """
-        is_expanded = e.__dict__.get("_occurrence_id") is not None
-        if is_expanded:
-            return (e.id, e.start_time)
-        if getattr(e, "recurrence_master_id", None):
-            return (e.recurrence_master_id, e.start_time)
-        if getattr(e, "rrule", None):
-            return (e.id, e.start_time)
-        return (e.id, None)
-
     if rsvped_only:
-        from sqlmodel import select
-
-        from app.api.event_participant.models import EventParticipants
-        from app.api.event_participant.schemas import ParticipantStatus
-
-        keys: list[tuple[uuid.UUID, datetime | None]] = []
-        for e in visible:
-            k = _rsvp_lookup_key(e)
-            if k is not None:
-                keys.append(k)
-        if keys:
-            event_ids = list({k[0] for k in keys})
-            rows = db.exec(
-                select(
-                    EventParticipants.event_id,
-                    EventParticipants.occurrence_start,
-                )
-                .where(EventParticipants.profile_id == current_human.id)
-                .where(EventParticipants.event_id.in_(event_ids))
-                .where(EventParticipants.status != ParticipantStatus.CANCELLED)
-            ).all()
-            active_set = {(row[0], row[1]) for row in rows}
-            visible = [
-                e
-                for e in visible
-                if (k := _rsvp_lookup_key(e)) is not None and k in active_set
-            ]
-        else:
-            visible = []
+        visible = _filter_rsvped_events(db, visible, current_human.id)
 
     # Hide events the human previously dismissed. We hide the series as a
     # whole: an event is filtered if its own id OR its recurrence_master_id
@@ -2575,7 +2584,12 @@ async def list_portal_events(
 
     return ListModel[EventPublic](
         results=[_publicize(e) for e in visible],
-        paging=Paging(offset=skip, limit=limit, total=len(visible)),
+        # ``total`` is the pre-pagination DB-row count from find_by_popup, not
+        # ``len(visible)``: post-filtering (visibility/cancelled/hidden) and
+        # recurrence expansion make the visible page size an unreliable cursor,
+        # so clients paging through the full set need the row count to know when
+        # to stop.
+        paging=Paging(offset=skip, limit=limit, total=total),
     )
 
 
@@ -2642,6 +2656,81 @@ async def list_portal_track_event_counts(
     return [
         TrackEventCount(track_id=track_id, event_count=count)
         for track_id, count in counts.items()
+    ]
+
+
+@router.get("/portal/events/calendar-summary", response_model=list[DayEventCount])
+async def portal_calendar_summary(
+    db: HumanTenantSession,
+    current_human: CurrentHuman,
+    popup_id: uuid.UUID,
+    start_after: datetime | None = None,
+    start_before: datetime | None = None,
+    search: str | None = None,
+    tags: list[str] | None = Query(default=None),
+    track_ids: list[uuid.UUID] | None = Query(default=None),
+    rsvped_only: bool = False,
+) -> list[DayEventCount]:
+    """Per-day event counts for a popup's calendar grid.
+
+    Returns a compact list of ``{day, count}`` items so the portal
+    calendar can render dots on days with events without fetching full
+    event payloads.  ``day`` is formatted as ``YYYY-MM-DD`` in the
+    popup's configured timezone.  Only published, non-cancelled events
+    that pass visibility rules are counted.
+    """
+    from app.api.event_venue.router import _resolve_popup_timezone
+
+    events = crud.events_crud.find_in_range_expanded(
+        db,
+        popup_id=popup_id,
+        start_after=start_after,
+        start_before=start_before,
+        event_status=EventStatus.PUBLISHED,
+        search=search,
+        tags=tags,
+        track_ids=track_ids,
+    )
+    visible = _portal_visibility_filter(db, events, current_human.id)
+    visible = [e for e in visible if e.status != EventStatus.CANCELLED]
+    if rsvped_only:
+        visible = _filter_rsvped_events(db, visible, current_human.id)
+
+    # Drop events the human dismissed, matching list_portal_events, so a hidden
+    # event never leaves a phantom dot on the grid. The calendar never surfaces
+    # hidden events, so there is no include_hidden escape hatch here.
+    from sqlmodel import select
+
+    from app.api.event.models import EventHiddenByHuman
+
+    hidden_ids = set(
+        db.exec(
+            select(EventHiddenByHuman.event_id).where(
+                EventHiddenByHuman.human_id == current_human.id
+            )
+        ).all()
+    )
+    if hidden_ids:
+        visible = [
+            e
+            for e in visible
+            if e.id not in hidden_ids
+            and (e.recurrence_master_id or e.id) not in hidden_ids
+        ]
+
+    tz = ZoneInfo(_resolve_popup_timezone(db, popup_id))
+    day_counts: dict[str, int] = {}
+    for e in visible:
+        # Naive datetimes stored in DB are UTC (match _strip_tz convention).
+        if e.start_time.tzinfo is None:
+            aware = e.start_time.replace(tzinfo=ZoneInfo("UTC"))
+        else:
+            aware = e.start_time
+        day_key = aware.astimezone(tz).strftime("%Y-%m-%d")
+        day_counts[day_key] = day_counts.get(day_key, 0) + 1
+
+    return [
+        DayEventCount(day=day, count=count) for day, count in sorted(day_counts.items())
     ]
 
 

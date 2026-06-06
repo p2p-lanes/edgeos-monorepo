@@ -4948,6 +4948,29 @@ export const DashboardStatsSchema = {
     description: 'Complete dashboard statistics.'
 } as const;
 
+export const DayEventCountSchema = {
+    properties: {
+        day: {
+            type: 'string',
+            title: 'Day'
+        },
+        count: {
+            type: 'integer',
+            title: 'Count'
+        }
+    },
+    type: 'object',
+    required: ['day', 'count'],
+    title: 'DayEventCount',
+    description: `Number of occurrence-expanded events that start on a given calendar day.
+
+Backs the portal calendar grid dots: the frontend can fetch per-day counts
+for an entire month without pulling full event payloads, then render a dot
+on each day that has at least one event.  \`\`day\`\` is formatted as
+\`\`YYYY-MM-DD\`\` in the popup's configured timezone so it aligns with the
+frontend's \`\`formatDayKey\`\` helper.`
+} as const;
+
 export const DetachCompanionRequestSchema = {
     properties: {
         popup_id: {
