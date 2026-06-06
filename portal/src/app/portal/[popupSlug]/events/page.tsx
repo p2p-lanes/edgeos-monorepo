@@ -21,6 +21,7 @@ import { useCityProvider } from "@/providers/cityProvider"
 import { CalendarBody } from "./lib/CalendarBody"
 import { DayBody } from "./lib/DayBody"
 import { EventsToolbar, type EventsView } from "./lib/EventsToolbar"
+import { EVENTS_QUERY_LIMIT } from "./lib/eventsQuery"
 import {
   consumeEventsViewState,
   type EventsScrollSnapshot,
@@ -382,7 +383,7 @@ export default function EventsPage() {
         trackIds: selectedTrackIds.length ? selectedTrackIds : undefined,
         startAfter: listWindow.startAfter,
         startBefore: listWindow.startBefore,
-        limit: 200,
+        limit: EVENTS_QUERY_LIMIT,
       }),
     enabled: !!city?.id && moduleEnabled && view === "list" && useAllChannel,
   })
@@ -414,7 +415,7 @@ export default function EventsPage() {
         trackIds: selectedTrackIds.length ? selectedTrackIds : undefined,
         startAfter: listWindow.startAfter,
         startBefore: listWindow.startBefore,
-        limit: 200,
+        limit: EVENTS_QUERY_LIMIT,
       }),
     enabled: !!city?.id && moduleEnabled && view === "list" && useMineChannel,
   })
@@ -442,7 +443,7 @@ export default function EventsPage() {
         trackIds: selectedTrackIds.length ? selectedTrackIds : undefined,
         startAfter: listWindow.startAfter,
         startBefore: listWindow.startBefore,
-        limit: 200,
+        limit: EVENTS_QUERY_LIMIT,
       }),
     enabled: !!city?.id && moduleEnabled && view === "list" && useRsvpedChannel,
   })

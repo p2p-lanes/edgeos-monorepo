@@ -36,6 +36,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover"
 import { cn } from "@/lib/utils"
+import { EVENTS_QUERY_LIMIT } from "./eventsQuery"
 import type { EventsScrollSnapshot } from "./eventsViewState"
 import { summarizeRrule } from "./summarizeRrule"
 import { useEventRsvp } from "./useEventRsvp"
@@ -242,7 +243,7 @@ export function DayBody({
         search: search || undefined,
         tags: tags?.length ? tags : undefined,
         trackIds: trackIds?.length ? trackIds : undefined,
-        limit: 500,
+        limit: EVENTS_QUERY_LIMIT,
       }),
     enabled: isAuthed && !useOverride && !!popupId,
   })

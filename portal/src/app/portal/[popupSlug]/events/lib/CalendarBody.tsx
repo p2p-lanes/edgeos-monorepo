@@ -36,6 +36,7 @@ import { type EventPublic, EventsService, HumansService } from "@/client"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { CoverImage } from "./CoverImage"
+import { EVENTS_QUERY_LIMIT } from "./eventsQuery"
 import type { EventsScrollSnapshot } from "./eventsViewState"
 import { summarizeRrule } from "./summarizeRrule"
 import { useEventRsvp } from "./useEventRsvp"
@@ -178,7 +179,7 @@ export function CalendarBody({
         search: search || undefined,
         tags: tags?.length ? tags : undefined,
         trackIds: trackIds?.length ? trackIds : undefined,
-        limit: 200,
+        limit: EVENTS_QUERY_LIMIT,
       }),
     enabled: isAuthed && !useOverride && !!popupId && !tzLoading,
   })

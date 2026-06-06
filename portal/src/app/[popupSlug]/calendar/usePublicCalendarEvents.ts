@@ -2,6 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query"
 
+import { EVENTS_QUERY_LIMIT } from "@/app/portal/[popupSlug]/events/lib/eventsQuery"
 import { type EventPublicCalendarResponse, EventsService } from "@/client"
 
 interface UsePublicCalendarEventsArgs {
@@ -50,7 +51,7 @@ export function usePublicCalendarEvents({
         search: search || undefined,
         tags: tags?.length ? tags : undefined,
         trackIds: trackIds?.length ? trackIds : undefined,
-        limit: 200,
+        limit: EVENTS_QUERY_LIMIT,
       }),
     enabled: !!popupSlug && !!tenantId,
     staleTime: 60 * 1000,
