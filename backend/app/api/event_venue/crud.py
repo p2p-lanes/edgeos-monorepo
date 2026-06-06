@@ -5,7 +5,11 @@ from sqlalchemy.orm import selectinload
 from sqlmodel import Session, col, func, or_, select
 
 from app.api.event_venue.models import EventVenues
-from app.api.event_venue.schemas import EventVenueCreate, EventVenueUpdate
+from app.api.event_venue.schemas import (
+    EventVenueCreate,
+    EventVenueUpdate,
+    VenueStatus,
+)
 from app.api.shared.crud import BaseCRUD
 
 
@@ -31,8 +35,12 @@ class EventVenuesCRUD(BaseCRUD[EventVenues, EventVenueCreate, EventVenueUpdate])
         skip: int = 0,
         limit: int = 100,
         search: str | None = None,
+        active_only: bool = False,
     ) -> tuple[list[EventVenues], int]:
         statement = select(EventVenues).where(EventVenues.popup_id == popup_id)
+
+        if active_only:
+            statement = statement.where(EventVenues.status == VenueStatus.ACTIVE.value)
 
         if search:
             term = f"%{search}%"

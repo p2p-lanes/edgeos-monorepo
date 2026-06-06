@@ -1,8 +1,9 @@
 """Tests for HumansCRUD.hard_delete_cascade and DELETE /humans/{id}.
 
-Covers superadmin-only hard delete with full cascade across applications,
+Covers admin/superadmin hard delete with full cascade across applications,
 attendees, payments, products, carts, group memberships, and ambassador-owned
-groups.
+groups. Tenant admins are restricted to their own tenant; superadmins are
+cross-tenant.
 """
 
 import uuid
@@ -229,12 +230,8 @@ def test_cascade_removes_group_memberships(
     )
     db.add(group)
     db.flush()
-    db.add(
-        GroupMembers(group_id=group.id, human_id=member.id, tenant_id=tenant_a.id)
-    )
-    db.add(
-        GroupLeaders(group_id=group.id, human_id=member.id, tenant_id=tenant_a.id)
-    )
+    db.add(GroupMembers(group_id=group.id, human_id=member.id, tenant_id=tenant_a.id))
+    db.add(GroupLeaders(group_id=group.id, human_id=member.id, tenant_id=tenant_a.id))
     db.commit()
     group_id = group.id
 
@@ -265,9 +262,7 @@ def test_cascade_drops_ambassador_owned_groups(
     db.add(group)
     db.flush()
     db.add(
-        GroupMembers(
-            group_id=group.id, human_id=other_member.id, tenant_id=tenant_a.id
-        )
+        GroupMembers(group_id=group.id, human_id=other_member.id, tenant_id=tenant_a.id)
     )
     db.commit()
     group_id = group.id
@@ -279,9 +274,7 @@ def test_cascade_drops_ambassador_owned_groups(
     # Other member's human row must survive — only their group_members link died.
     assert db.get(Humans, other_member.id) is not None
     assert (
-        db.exec(
-            select(GroupMembers).where(GroupMembers.group_id == group_id)
-        ).first()
+        db.exec(select(GroupMembers).where(GroupMembers.group_id == group_id)).first()
         is None
     )
 
@@ -291,17 +284,56 @@ def test_cascade_drops_ambassador_owned_groups(
 # ---------------------------------------------------------------------------
 
 
-def test_http_delete_requires_superadmin(
+def test_http_delete_succeeds_for_admin_same_tenant(
     client: TestClient,
     db: Session,
     admin_token_tenant_a: str,
     tenant_a: Tenants,
 ) -> None:
-    """Plain admin token receives 403 (Superadmin access required)."""
-    human = _make_human(db, tenant_a.id, "noaccess")
+    """A tenant admin can hard-delete a human within their own tenant."""
+    human = _make_human(db, tenant_a.id, "adminown")
+    human_id = human.id
+
+    resp = client.delete(
+        f"/api/v1/humans/{human_id}", headers=_auth(admin_token_tenant_a)
+    )
+
+    assert resp.status_code == 200, resp.text
+    db.expire_all()
+    assert db.get(Humans, human_id) is None
+
+
+def test_http_delete_admin_cannot_delete_other_tenant(
+    client: TestClient,
+    db: Session,
+    admin_token_tenant_a: str,
+    tenant_b: Tenants,
+) -> None:
+    """A tenant admin cannot delete a human in another tenant — 404, no delete.
+
+    404 (not 403) avoids revealing that the human exists in another tenant.
+    """
+    human = _make_human(db, tenant_b.id, "crosstenant")
 
     resp = client.delete(
         f"/api/v1/humans/{human.id}", headers=_auth(admin_token_tenant_a)
+    )
+
+    assert resp.status_code == 404, resp.text
+    assert db.get(Humans, human.id) is not None
+
+
+def test_http_delete_rejected_for_operator(
+    client: TestClient,
+    db: Session,
+    operator_token_tenant_a: str,
+    tenant_a: Tenants,
+) -> None:
+    """Operators are below the admin gate → 403, even in their own tenant."""
+    human = _make_human(db, tenant_a.id, "operator")
+
+    resp = client.delete(
+        f"/api/v1/humans/{human.id}", headers=_auth(operator_token_tenant_a)
     )
 
     assert resp.status_code == 403, resp.text
@@ -317,7 +349,9 @@ def test_http_delete_unknown_returns_404(
     assert resp.status_code == 404
 
 
-def test_http_delete_anonymous_rejected(client: TestClient, db: Session, tenant_a: Tenants) -> None:
+def test_http_delete_anonymous_rejected(
+    client: TestClient, db: Session, tenant_a: Tenants
+) -> None:
     human = _make_human(db, tenant_a.id, "anon")
     resp = client.delete(f"/api/v1/humans/{human.id}")
     assert resp.status_code in (401, 403)
@@ -333,9 +367,7 @@ def test_http_delete_succeeds_for_superadmin(
     human = _make_human(db, tenant_a.id, "super")
     human_id = human.id
 
-    resp = client.delete(
-        f"/api/v1/humans/{human_id}", headers=_auth(superadmin_token)
-    )
+    resp = client.delete(f"/api/v1/humans/{human_id}", headers=_auth(superadmin_token))
 
     assert resp.status_code == 200, resp.text
     body = resp.json()

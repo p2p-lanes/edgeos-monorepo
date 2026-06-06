@@ -212,6 +212,9 @@ async def list_portal_participants(
     occurrence; otherwise return every participant row of the event (used
     by the admin/owner participants section that wants the full picture).
     """
+    from app.api.application.crud import applications_crud
+    from app.api.event.crud import events_crud
+
     participants, total = crud.event_participants_crud.find_by_event(
         db,
         event_id=event_id,
@@ -220,6 +223,22 @@ async def list_portal_participants(
         occurrence_start=occurrence_start,
         scope_to_occurrence=occurrence_start is not None,
     )
+
+    # Privacy: drop participants who hid their name (info_not_shared) on their
+    # application for this event's popup. Excluding (not masking) keeps the RSVP
+    # list from leaking a name the attendee chose to hide.
+    event = events_crud.get(db, event_id)
+    if event is not None and participants:
+        hidden = applications_crud.human_ids_hiding_name(
+            db,
+            event.popup_id,
+            [p.profile_id for p in participants],
+        )
+        if hidden:
+            dropped = sum(1 for p in participants if p.profile_id in hidden)
+            participants = [p for p in participants if p.profile_id not in hidden]
+            total = max(total - dropped, len(participants))
+
     return ListModel[EventParticipantPublic](
         results=_participants_with_names(db, participants),
         paging=Paging(offset=skip, limit=limit, total=total),
@@ -341,7 +360,11 @@ async def _notify_rsvp(
             human_id=human.id,
             method=method,
             occurrence_start=occurrence_start,
-            is_self_rsvp=method == "REQUEST",
+            # Always the human acting on their own registration, whether
+            # registering (REQUEST) or withdrawing (CANCEL). On CANCEL this
+            # selects the "registration cancelled" email instead of the
+            # organiser-driven "event cancelled" notice.
+            is_self_rsvp=True,
         )
     except Exception as exc:  # pragma: no cover - defensive
         logger.warning("iTIP {} delivery to {} failed: {}", method, human.email, exc)

@@ -188,9 +188,10 @@ export type ApplicationFeeCreate = {
 export type ApplicationFunnel = {
     draft?: number;
     pending_fee?: number;
+    paid?: number;
     in_review?: number;
     accepted?: number;
-    paid?: number;
+    fee_enabled?: boolean;
 };
 
 /**
@@ -553,6 +554,9 @@ export type AttendeePurchases = {
 
 /**
  * Single entry in the attendees directory.
+ *
+ * The directory is attendee-centric: one entry per ticket-holding attendee
+ * (any category), sourced from that attendee's own human record.
  */
 export type AttendeesDirectoryEntry = {
     id: string;
@@ -566,6 +570,7 @@ export type AttendeesDirectoryEntry = {
     age?: (string | null);
     gender?: (string | null);
     picture_url?: (string | null);
+    category?: (string | null);
     participation?: Array<DirectoryProduct>;
     associated_attendees?: Array<AssociatedAttendee>;
 };
@@ -578,6 +583,16 @@ export type AttendeeStats = {
     main?: number;
     spouse?: number;
     kid?: number;
+};
+
+/**
+ * Request body to add tickets to an attendee (admin panel, bulk).
+ *
+ * Mirrors the bulk-grant shape: N products, each with a quantity. Stock is
+ * validated per product and the whole batch is applied atomically.
+ */
+export type AttendeeTicketAdd = {
+    items: Array<AttendeeTicketLine>;
 };
 
 /**
@@ -601,6 +616,38 @@ export type AttendeeTicketInfo = {
     product_category?: (string | null);
     requires_check_in?: boolean;
     last_scan_at?: (string | null);
+};
+
+/**
+ * One product + quantity line in a bulk ticket add.
+ */
+export type AttendeeTicketLine = {
+    product_id: string;
+    quantity?: number;
+};
+
+/**
+ * Request body to edit a meal-plan ticket's choices post-purchase (portal).
+ *
+ * Replaces the three choice keys inside AttendeeProducts.purchase_metadata:
+ * daily_choices (ISO date -> menu key | "chef"), dietary_restriction, and
+ * special_request. The key/date semantics are NOT validated here — that needs
+ * the meal-plan step's template_config and happens in the CRUD layer via
+ * ticketing_step.meal_plan.validate_daily_choices.
+ */
+export type AttendeeTicketMetadataUpdate = {
+    daily_choices: {
+        [key: string]: (string);
+    };
+    dietary_restriction?: (string | null);
+    special_request?: (string | null);
+};
+
+/**
+ * Request body to change the product of an attendee's ticket (admin panel).
+ */
+export type AttendeeTicketProductSwap = {
+    product_id: string;
 };
 
 /**
@@ -655,6 +702,28 @@ export type AttendeeWithTickets = {
 };
 
 /**
+ * A single audit log entry returned to the backoffice.
+ */
+export type AuditLogPublic = {
+    id: string;
+    source: string;
+    actor_type: string;
+    actor_id?: (string | null);
+    actor_email?: (string | null);
+    actor_name?: (string | null);
+    request_id?: (string | null);
+    action: string;
+    entity_type: string;
+    entity_id?: (string | null);
+    entity_label?: (string | null);
+    popup_id?: (string | null);
+    details?: ({
+    [key: string]: unknown;
+} | null);
+    created_at: string;
+};
+
+/**
  * Response after successfully sending auth code.
  */
 export type AuthCodeSentResponse = {
@@ -698,6 +767,18 @@ export type BaseFieldConfigUpdate = {
     help_text?: (string | null);
     options?: (Array<(string)> | null);
     field_type?: (string | null);
+};
+
+/**
+ * The 'report a bug' payload, open to every backoffice user.
+ *
+ * Always produces an internal bug in the to-do column. Attachments are
+ * optional screenshots / screen-recordings already uploaded to S3.
+ */
+export type BugReportCreate = {
+    title: string;
+    detail?: (string | null);
+    attachments?: Array<TaskAttachmentCreate>;
 };
 
 /**
@@ -1123,7 +1204,7 @@ export type EmailTemplatePublic = {
     updated_at?: (string | null);
 };
 
-export type EmailTemplateType = 'login_code_user' | 'login_code_human' | 'application_received' | 'application_accepted' | 'application_rejected' | 'application_accepted_with_discount' | 'application_accepted_with_incentive' | 'application_accepted_scholarship_rejected' | 'payment_confirmed' | 'abandoned_cart' | 'edit_passes_confirmed' | 'event_invitation' | 'event_updated' | 'event_cancelled' | 'event_approval_approved' | 'event_approval_rejected' | 'check_in_pass';
+export type EmailTemplateType = 'login_code_user' | 'login_code_human' | 'application_received' | 'application_accepted' | 'application_rejected' | 'application_accepted_with_discount' | 'application_accepted_with_incentive' | 'application_accepted_scholarship_rejected' | 'payment_confirmed' | 'abandoned_cart' | 'edit_passes_confirmed' | 'event_invitation' | 'event_updated' | 'event_cancelled' | 'event_rsvp_cancelled' | 'event_approval_approved' | 'event_approval_rejected' | 'check_in_pass';
 
 export type EmailTemplateUpdate = {
     subject?: (string | null);
@@ -1184,6 +1265,7 @@ export type EventCalendarMeta = {
     popup_id: string;
     popup_slug: string;
     popup_name: string;
+    placeholder_url?: (string | null);
 };
 
 /**
@@ -1192,6 +1274,27 @@ export type EventCalendarMeta = {
 export type EventCalendarTrack = {
     id: string;
     name: string;
+};
+
+/**
+ * Slim human projection for an event's collaborator chips in the portal.
+ *
+ * Mirrors ``HumanPortalPublic`` so the same picker/avatar rendering works
+ * for already-saved collaborators. Resolved from ``Events.collaborator_ids``
+ * by the portal get/create/update endpoints (the list endpoints leave it
+ * empty — collaborators aren't shown on cards).
+ *
+ * ``email`` is only populated by the admin (backoffice) endpoints so a chip
+ * for a human with no name can fall back to their email; the portal
+ * endpoints leave it ``None`` to avoid exposing organizer emails to every
+ * viewer of a public event.
+ */
+export type EventCollaboratorPublic = {
+    id: string;
+    first_name?: (string | null);
+    last_name?: (string | null);
+    picture_url?: (string | null);
+    email?: (string | null);
 };
 
 /**
@@ -1216,6 +1319,8 @@ export type EventCreate = {
     require_approval?: boolean;
     kind?: (string | null);
     host_display_name?: (string | null);
+    host_id?: (string | null);
+    collaborator_ids?: Array<(string)>;
     status?: EventStatus;
     highlighted?: boolean;
     recurrence?: (RecurrenceRule | null);
@@ -1320,6 +1425,8 @@ export type EventPublic = {
     require_approval?: boolean;
     kind?: (string | null);
     host_display_name?: (string | null);
+    host_id?: (string | null);
+    collaborator_ids?: Array<(string)>;
     status?: EventStatus;
     highlighted?: boolean;
     rejection_reason?: (string | null);
@@ -1335,8 +1442,10 @@ export type EventPublic = {
     venue_location?: (string | null);
     venue_image_url?: (string | null);
     track_title?: (string | null);
+    collaborators?: Array<EventCollaboratorPublic>;
     hidden?: boolean;
     my_rsvp_status?: (string | null);
+    attendee_count?: (number | null);
 };
 
 /**
@@ -1418,6 +1527,7 @@ export type EventSettingsCreate = {
     allowed_tags?: Array<(string)>;
     allowed_kinds?: Array<(string)>;
     approval_notification_emails?: Array<(string)>;
+    placeholder_url?: (string | null);
 };
 
 /**
@@ -1435,6 +1545,7 @@ export type EventSettingsPublic = {
     allowed_tags?: Array<(string)>;
     allowed_kinds?: Array<(string)>;
     approval_notification_emails?: Array<(string)>;
+    placeholder_url?: (string | null);
     created_at?: string;
     updated_at?: string;
     id: string;
@@ -1453,6 +1564,7 @@ export type EventSettingsUpdate = {
     allowed_tags?: (Array<(string)> | null);
     allowed_kinds?: (Array<(string)> | null);
     approval_notification_emails?: (Array<(string)> | null);
+    placeholder_url?: (string | null);
 };
 
 export type EventStatus = 'draft' | 'published' | 'cancelled' | 'pending_approval' | 'rejected';
@@ -1478,6 +1590,8 @@ export type EventUpdate = {
     require_approval?: (boolean | null);
     kind?: (string | null);
     host_display_name?: (string | null);
+    host_id?: (string | null);
+    collaborator_ids?: (Array<(string)> | null);
     status?: (EventStatus | null);
     highlighted?: (boolean | null);
 };
@@ -1962,6 +2076,7 @@ export type HumanVerify = {
  */
 export type KeyMetrics = {
     people?: number;
+    paying_people?: number;
     total_revenue?: string;
     currency?: string;
     avg_ticket_price?: string;
@@ -2016,6 +2131,11 @@ export type ListModel_AttendeesDirectoryEntry_ = {
 
 export type ListModel_AttendeeWithOriginPublic_ = {
     results: Array<AttendeeWithOriginPublic>;
+    paging: Paging;
+};
+
+export type ListModel_AuditLogPublic_ = {
+    results: Array<AuditLogPublic>;
     paging: Paging;
 };
 
@@ -2091,6 +2211,16 @@ export type ListModel_PopupReviewerPublic_ = {
 
 export type ListModel_ProductPublic_ = {
     results: Array<ProductPublic>;
+    paging: Paging;
+};
+
+export type ListModel_TaskCommentPublic_ = {
+    results: Array<TaskCommentPublic>;
+    paging: Paging;
+};
+
+export type ListModel_TaskPublic_ = {
+    results: Array<TaskPublic>;
     paging: Paging;
 };
 
@@ -2760,10 +2890,9 @@ export type ProductLine = {
 /**
  * Product schema for API responses.
  *
- * Sale window fields are exposed as `date` (inclusive day) even though they
- * are persisted as `datetime` UTC (exclusive instant). `sale_ends_at` is
- * de-bumped by 1 day so the response shows the last day the product is on
- * sale — the canonical "operator-friendly" representation.
+ * Sale window fields are exposed as full ``datetime`` instants (UTC), so the
+ * sale window can express a precise cutoff like "Friday 11:59 PM" rather than
+ * a whole calendar day. Clients render them in the popup's timezone.
  */
 export type ProductPublic = {
     tenant_id: string;
@@ -2988,6 +3117,149 @@ export type SendTestRequest = {
 } | null);
     popup_id?: (string | null);
 };
+
+/**
+ * Which surface a task relates to. Optional (NULL = unspecified).
+ */
+export type TaskApp = 'portal' | 'backoffice';
+
+/**
+ * Count of tasks archived by a bulk operation.
+ */
+export type TaskArchiveResult = {
+    archived: number;
+};
+
+/**
+ * Register an already-uploaded S3 object as a task attachment.
+ *
+ * The file itself is uploaded directly to S3 via POST /uploads/presigned-url;
+ * this just records the resulting key/url against the task.
+ */
+export type TaskAttachmentCreate = {
+    storage_key: string;
+    url: string;
+    media_type: TaskMediaType;
+    filename?: (string | null);
+    size_bytes?: (number | null);
+};
+
+export type TaskAttachmentPublic = {
+    id: string;
+    task_id: string;
+    url: string;
+    media_type: TaskMediaType;
+    filename?: (string | null);
+    size_bytes?: (number | null);
+    created_at: string;
+};
+
+export type TaskCommentCreate = {
+    body: string;
+};
+
+export type TaskCommentPublic = {
+    id: string;
+    task_id: string;
+    author_user_id?: (string | null);
+    author_name?: (string | null);
+    author_email?: (string | null);
+    body: string;
+    created_at: string;
+    edited_at?: (string | null);
+};
+
+export type TaskCommentUpdate = {
+    body: string;
+};
+
+export type TaskCreate = {
+    title: string;
+    detail?: (string | null);
+    status?: TaskStatus;
+    type?: TaskType;
+    priority?: TaskPriority;
+    responsible_user_id?: (string | null);
+    release?: (string | null);
+    app?: (TaskApp | null);
+    visibility?: TaskVisibility;
+    target_tenant_id?: (string | null);
+};
+
+export type TaskDetailPublic = {
+    id: string;
+    title: string;
+    detail?: (string | null);
+    status: TaskStatus;
+    type: TaskType;
+    priority?: TaskPriority;
+    responsible_user_id?: (string | null);
+    responsible_name?: (string | null);
+    responsible_email?: (string | null);
+    release?: (string | null);
+    app?: (TaskApp | null);
+    visibility: TaskVisibility;
+    target_tenant_id?: (string | null);
+    published_at?: (string | null);
+    archived_at?: (string | null);
+    created_by?: (string | null);
+    created_by_name?: (string | null);
+    created_at: string;
+    updated_at: string;
+    attachments?: Array<TaskAttachmentPublic>;
+};
+
+export type TaskMediaType = 'image' | 'video';
+
+export type TaskPriority = 'low' | 'medium' | 'high';
+
+export type TaskPublic = {
+    id: string;
+    title: string;
+    detail?: (string | null);
+    status: TaskStatus;
+    type: TaskType;
+    priority?: TaskPriority;
+    responsible_user_id?: (string | null);
+    responsible_name?: (string | null);
+    responsible_email?: (string | null);
+    release?: (string | null);
+    app?: (TaskApp | null);
+    visibility: TaskVisibility;
+    target_tenant_id?: (string | null);
+    published_at?: (string | null);
+    archived_at?: (string | null);
+    created_by?: (string | null);
+    created_by_name?: (string | null);
+    created_at: string;
+    updated_at: string;
+};
+
+export type TaskStatus = 'to_do' | 'testing' | 'next_release' | 'published' | 'blocked' | 'cancelled';
+
+/**
+ * Lightweight payload for moving a card between Kanban columns.
+ */
+export type TaskStatusUpdate = {
+    status: TaskStatus;
+};
+
+export type TaskType = 'bug' | 'feature';
+
+export type TaskUpdate = {
+    title?: (string | null);
+    detail?: (string | null);
+    status?: (TaskStatus | null);
+    type?: (TaskType | null);
+    priority?: (TaskPriority | null);
+    responsible_user_id?: (string | null);
+    release?: (string | null);
+    app?: (TaskApp | null);
+    visibility?: (TaskVisibility | null);
+    target_tenant_id?: (string | null);
+};
+
+export type TaskVisibility = 'universal' | 'tenant' | 'internal';
 
 export type TemplateScope = 'tenant' | 'popup';
 
@@ -3270,6 +3542,18 @@ export type TrackCreate = {
     name: string;
     description?: (string | null);
     topic?: Array<(string)>;
+};
+
+/**
+ * Number of distinct published events that belong to a track.
+ *
+ * Backs the portal track filter / Tracks section so it can show per-track
+ * counts (and hide empty tracks) without pulling the full event list to the
+ * client just to count.
+ */
+export type TrackEventCount = {
+    track_id: string;
+    event_count: number;
 };
 
 export type TrackPublic = {
@@ -3854,8 +4138,18 @@ export type AttendeesDeleteMyAttendeeForPopupResponse = ({
     [key: string]: unknown;
 });
 
+export type AttendeesUpdateMyMealPlanTicketData = {
+    attendeeId: string;
+    popupId: string;
+    requestBody: AttendeeTicketMetadataUpdate;
+    ticketId: string;
+};
+
+export type AttendeesUpdateMyMealPlanTicketResponse = (AttendeeWithOriginPublic);
+
 export type AttendeesListAttendeesData = {
     applicationId?: (string | null);
+    categoryId?: (string | null);
     email?: (string | null);
     hasTickets?: (boolean | null);
     /**
@@ -3895,6 +4189,31 @@ export type AttendeesDeleteAttendeeData = {
 
 export type AttendeesDeleteAttendeeResponse = (void);
 
+export type AttendeesAddAttendeeTicketData = {
+    attendeeId: string;
+    requestBody: AttendeeTicketAdd;
+    xTenantId?: (string | null);
+};
+
+export type AttendeesAddAttendeeTicketResponse = (AttendeeWithOriginPublic);
+
+export type AttendeesSwapAttendeeTicketProductData = {
+    attendeeId: string;
+    requestBody: AttendeeTicketProductSwap;
+    ticketId: string;
+    xTenantId?: (string | null);
+};
+
+export type AttendeesSwapAttendeeTicketProductResponse = (AttendeeWithOriginPublic);
+
+export type AttendeesRemoveAttendeeTicketData = {
+    attendeeId: string;
+    ticketId: string;
+    xTenantId?: (string | null);
+};
+
+export type AttendeesRemoveAttendeeTicketResponse = (AttendeeWithOriginPublic);
+
 export type AttendeesPostCheckInData = {
     code: string;
     /**
@@ -3913,6 +4232,29 @@ export type AttendeesGetTicketsByEmailData = {
 };
 
 export type AttendeesGetTicketsByEmailResponse = (Array<AttendeeWithTickets>);
+
+export type AuditLogsListAuditLogsData = {
+    action?: (string | null);
+    actorId?: (string | null);
+    entityId?: (string | null);
+    entityType?: (string | null);
+    /**
+     * Maximum number of items to return
+     */
+    limit?: number;
+    popupId?: (string | null);
+    search?: (string | null);
+    /**
+     * Number of items to skip
+     */
+    skip?: number;
+    sortBy?: (string | null);
+    sortOrder?: string;
+    source?: (string | null);
+    xTenantId?: (string | null);
+};
+
+export type AuditLogsListAuditLogsResponse = (ListModel_AuditLogPublic_);
 
 export type AuthUserLoginData = {
     requestBody: UserAuth;
@@ -4298,6 +4640,12 @@ export type EventsListPublicCalendarData = {
 
 export type EventsListPublicCalendarResponse = (EventPublicCalendarResponse);
 
+export type EventsPublicCalendarIcsData = {
+    popupId: string;
+};
+
+export type EventsPublicCalendarIcsResponse = (unknown);
+
 export type EventsListEventsData = {
     eventStatus?: (EventStatus | null);
     kind?: (string | null);
@@ -4505,6 +4853,7 @@ export type EventsListPortalEventsData = {
      * Maximum number of items to return
      */
     limit?: number;
+    managedOnly?: boolean;
     popupId?: (string | null);
     rsvpedOnly?: boolean;
     search?: (string | null);
@@ -4540,6 +4889,12 @@ export type EventsPortalHiddenEventsCountData = {
 export type EventsPortalHiddenEventsCountResponse = ({
     [key: string]: (number);
 });
+
+export type EventsListPortalTrackEventCountsData = {
+    popupId: string;
+};
+
+export type EventsListPortalTrackEventCountsResponse = (Array<TrackEventCount>);
 
 export type EventsGetPortalEventData = {
     eventId: string;
@@ -5067,6 +5422,7 @@ export type HumansSearchHumansPortalData = {
      * Maximum number of items to return
      */
     limit?: number;
+    popupId: string;
     search?: (string | null);
     /**
      * Number of items to skip
@@ -5409,6 +5765,121 @@ export type ProductsListPortalProductsData = {
 };
 
 export type ProductsListPortalProductsResponse = (ListModel_ProductPublic_);
+
+export type TasksReportBugData = {
+    requestBody: BugReportCreate;
+};
+
+export type TasksReportBugResponse = (TaskPublic);
+
+export type TasksListTasksData = {
+    archived?: (boolean | null);
+    /**
+     * Maximum number of items to return
+     */
+    limit?: number;
+    release?: (string | null);
+    responsibleUserId?: (string | null);
+    search?: (string | null);
+    /**
+     * Number of items to skip
+     */
+    skip?: number;
+    status?: (TaskStatus | null);
+    type?: (TaskType | null);
+    visibility?: (TaskVisibility | null);
+    xTenantId?: (string | null);
+};
+
+export type TasksListTasksResponse = (ListModel_TaskPublic_);
+
+export type TasksCreateTaskData = {
+    requestBody: TaskCreate;
+};
+
+export type TasksCreateTaskResponse = (TaskDetailPublic);
+
+export type TasksGetTaskData = {
+    taskId: string;
+};
+
+export type TasksGetTaskResponse = (TaskDetailPublic);
+
+export type TasksUpdateTaskData = {
+    requestBody: TaskUpdate;
+    taskId: string;
+};
+
+export type TasksUpdateTaskResponse = (TaskDetailPublic);
+
+export type TasksDeleteTaskData = {
+    taskId: string;
+};
+
+export type TasksDeleteTaskResponse = (void);
+
+export type TasksUpdateTaskStatusData = {
+    requestBody: TaskStatusUpdate;
+    taskId: string;
+};
+
+export type TasksUpdateTaskStatusResponse = (TaskPublic);
+
+export type TasksArchivePublishedTasksResponse = (TaskArchiveResult);
+
+export type TasksArchiveTaskData = {
+    taskId: string;
+};
+
+export type TasksArchiveTaskResponse = (TaskPublic);
+
+export type TasksUnarchiveTaskData = {
+    taskId: string;
+};
+
+export type TasksUnarchiveTaskResponse = (TaskPublic);
+
+export type TasksAddAttachmentData = {
+    requestBody: TaskAttachmentCreate;
+    taskId: string;
+};
+
+export type TasksAddAttachmentResponse = (TaskAttachmentPublic);
+
+export type TasksDeleteAttachmentData = {
+    attachmentId: string;
+    taskId: string;
+};
+
+export type TasksDeleteAttachmentResponse = (void);
+
+export type TasksListTaskCommentsData = {
+    taskId: string;
+};
+
+export type TasksListTaskCommentsResponse = (ListModel_TaskCommentPublic_);
+
+export type TasksCreateTaskCommentData = {
+    requestBody: TaskCommentCreate;
+    taskId: string;
+};
+
+export type TasksCreateTaskCommentResponse = (TaskCommentPublic);
+
+export type TasksUpdateTaskCommentData = {
+    commentId: string;
+    requestBody: TaskCommentUpdate;
+    taskId: string;
+};
+
+export type TasksUpdateTaskCommentResponse = (TaskCommentPublic);
+
+export type TasksDeleteTaskCommentData = {
+    commentId: string;
+    taskId: string;
+};
+
+export type TasksDeleteTaskCommentResponse = (void);
 
 export type TenantsGetTenantByDomainData = {
     domain: string;

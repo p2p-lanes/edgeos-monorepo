@@ -7,6 +7,7 @@ Scenarios:
 """
 
 import uuid
+from datetime import UTC, datetime
 
 from fastapi.testclient import TestClient
 
@@ -36,7 +37,8 @@ def test_patch_product_sets_sale_window(
     admin_token_tenant_a: str,
     popup_tenant_a: Popups,
 ) -> None:
-    """Admin PATCHes sale_starts_at and sale_ends_at → both returned verbatim."""
+    """Admin PATCHes sale_starts_at and sale_ends_at → both returned as the
+    exact datetime instants (the window now carries a precise time-of-day)."""
     suffix = uuid.uuid4().hex[:8]
 
     # 1. Create product
@@ -48,21 +50,25 @@ def test_patch_product_sets_sale_window(
     assert create_resp.status_code == 201, create_resp.text
     product_id = create_resp.json()["id"]
 
-    # 2. PATCH with sale window (date-only; backend stores datetime internally)
+    # 2. PATCH with a precise sale window (e.g. a Friday 11:59 PM cutoff).
     patch_resp = client.patch(
         f"/api/v1/products/{product_id}",
         headers=_admin_headers(admin_token_tenant_a),
         json={
-            "sale_starts_at": "2026-06-01",
-            "sale_ends_at": "2026-07-01",
+            "sale_starts_at": "2026-06-01T00:00:00Z",
+            "sale_ends_at": "2026-07-01T23:59:59Z",
         },
     )
     assert patch_resp.status_code == 200, patch_resp.text
     data = patch_resp.json()
 
-    # Response exposes the inclusive day the operator picked, verbatim.
-    assert data["sale_starts_at"] == "2026-06-01"
-    assert data["sale_ends_at"] == "2026-07-01"
+    # Response exposes the exact instants the operator set.
+    assert datetime.fromisoformat(data["sale_starts_at"]) == datetime(
+        2026, 6, 1, 0, 0, 0, tzinfo=UTC
+    )
+    assert datetime.fromisoformat(data["sale_ends_at"]) == datetime(
+        2026, 7, 1, 23, 59, 59, tzinfo=UTC
+    )
 
 
 # ---------------------------------------------------------------------------

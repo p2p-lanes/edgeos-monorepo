@@ -18,17 +18,17 @@ import { Skeleton } from "@/components/ui/skeleton"
 const FUNNEL_COLORS = [
   "oklch(0.65 0.15 260)", // draft — blue-ish
   "oklch(0.75 0.18 80)", // pending_fee — amber
+  "oklch(0.55 0.22 160)", // paid — dark green
   "oklch(0.7 0.15 200)", // in_review — teal
   "oklch(0.65 0.2 145)", // accepted — green
-  "oklch(0.55 0.22 160)", // paid — dark green
 ]
 
 const funnelConfig = {
   draft: { label: "Draft", color: FUNNEL_COLORS[0] },
   pending_fee: { label: "Pending Fee", color: FUNNEL_COLORS[1] },
-  in_review: { label: "In Review", color: FUNNEL_COLORS[2] },
-  accepted: { label: "Accepted", color: FUNNEL_COLORS[3] },
-  paid: { label: "Paid", color: FUNNEL_COLORS[4] },
+  paid: { label: "Paid", color: FUNNEL_COLORS[2] },
+  in_review: { label: "In Review", color: FUNNEL_COLORS[3] },
+  accepted: { label: "Accepted", color: FUNNEL_COLORS[4] },
 } satisfies ChartConfig
 
 type ApplicationFunnelChartProps = {
@@ -59,16 +59,19 @@ export function ApplicationFunnelChart({
   const inReview = data.in_review ?? 0
   const accepted = data.accepted ?? 0
   const paid = data.paid ?? 0
+  const feeEnabled = data.fee_enabled ?? false
   const total = draft + pendingFee + inReview + accepted
   const barData = [
-    { stage: "Draft", value: draft },
-    { stage: "Pending Fee", value: pendingFee },
-    { stage: "In Review", value: inReview },
-    { stage: "Accepted", value: accepted },
-    { stage: "Paid", value: paid },
+    { stage: "Draft", value: draft, color: FUNNEL_COLORS[0] },
+    { stage: "Pending Fee", value: pendingFee, color: FUNNEL_COLORS[1] },
+    ...(feeEnabled
+      ? [{ stage: "Paid", value: paid, color: FUNNEL_COLORS[2] }]
+      : []),
+    { stage: "In Review", value: inReview, color: FUNNEL_COLORS[3] },
+    { stage: "Accepted", value: accepted, color: FUNNEL_COLORS[4] },
   ]
 
-  const hasData = total > 0 || paid > 0
+  const hasData = total > 0
 
   return (
     <Card>
@@ -76,7 +79,9 @@ export function ApplicationFunnelChart({
         <CardTitle className="text-base">Application Pipeline</CardTitle>
         <CardDescription>
           {hasData
-            ? `${total} applications, ${paid} paid`
+            ? feeEnabled
+              ? `${total} applications, ${paid} fee paid`
+              : `${total} applications`
             : "No applications yet"}
         </CardDescription>
       </CardHeader>
@@ -98,11 +103,8 @@ export function ApplicationFunnelChart({
               <YAxis tickLine={false} axisLine={false} width={40} />
               <ChartTooltip content={<ChartTooltipContent />} />
               <Bar dataKey="value" radius={[4, 4, 0, 0]}>
-                {barData.map((entry, i) => (
-                  <Cell
-                    key={entry.stage}
-                    fill={FUNNEL_COLORS[i % FUNNEL_COLORS.length]}
-                  />
+                {barData.map((entry) => (
+                  <Cell key={entry.stage} fill={entry.color} />
                 ))}
               </Bar>
             </BarChart>

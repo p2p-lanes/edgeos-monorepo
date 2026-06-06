@@ -64,6 +64,7 @@ export const PopupCheckoutContent = ({
     errorMessage,
     handleSubmit,
     setCheckoutState,
+    joinGroupAsApplicant,
   } = useCheckoutState({
     popupId: popup.id,
     saleType: resolvePopupCheckoutPolicy(popup).saleType,
@@ -190,6 +191,12 @@ export const PopupCheckoutContent = ({
     // so this redirect to /portal is structurally unreachable in checkout mode.
     if (policy.saleType !== "application") return
     if (!existingApplication || checkoutState !== "form") return
+    // In a group flow, wait for participation to resolve and never auto-skip a
+    // companion — the CompanionSwitchPrompt drives that case.
+    if (isGroupFlow) {
+      if (participation === undefined) return
+      if (isCompanion) return
+    }
 
     hasSkippedForm.current = true
 
@@ -202,6 +209,18 @@ export const PopupCheckoutContent = ({
       return
     }
 
+    // Existing applicant clicking a group invite link whose application isn't
+    // accepted yet: persist the group membership so the backend auto-accepts it
+    // before checkout, otherwise the payment step 403s ("Application must be
+    // accepted before purchasing products"). Only attempt it for statuses the
+    // backend allows updating (draft/pending_fee/in review); rejected/withdrawn
+    // fall through unchanged and stay gated at payment.
+    const joinableStatuses = ["draft", "pending_fee", "in review"]
+    if (groupId && joinableStatuses.includes(existingApplication.status)) {
+      joinGroupAsApplicant()
+      return
+    }
+
     setCheckoutState("passes")
   }, [
     policy.saleType,
@@ -210,6 +229,11 @@ export const PopupCheckoutContent = ({
     setCheckoutState,
     getCity,
     router,
+    groupId,
+    isGroupFlow,
+    participation,
+    isCompanion,
+    joinGroupAsApplicant,
   ])
 
   const handleFormSubmit = async (

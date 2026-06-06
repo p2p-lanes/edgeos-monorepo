@@ -1,9 +1,9 @@
-import { CalendarClock, CalendarDays, Table } from "lucide-react"
+import { CalendarClock, CalendarDays, List, Table } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 
-export type EventsView = "table" | "calendar" | "day"
+export type EventsView = "table" | "list" | "calendar" | "day"
 
 interface EventsViewSwitcherProps {
   view: EventsView
@@ -34,6 +34,21 @@ export function EventsViewSwitcher({
         )}
       >
         <Table className="h-4 w-4" />
+      </Button>
+      <Button
+        type="button"
+        variant={view === "list" ? "default" : "ghost"}
+        size="sm"
+        aria-label="List"
+        title="List"
+        aria-pressed={view === "list"}
+        onClick={() => onViewChange("list")}
+        className={cn(
+          "h-7 w-7 rounded-sm p-0",
+          view === "list" && "shadow-none",
+        )}
+      >
+        <List className="h-4 w-4" />
       </Button>
       <Button
         type="button"

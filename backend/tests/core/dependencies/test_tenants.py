@@ -84,6 +84,7 @@ def _make_app() -> FastAPI:
 # Shared patches helper
 # ---------------------------------------------------------------------------
 
+
 def _make_client(
     *,
     cache_return: str | None = None,
@@ -218,9 +219,7 @@ def test_x_tenant_id_fallback_when_origin_absent() -> None:
     ):
         mock_settings.PORTAL_DOMAIN = "dev.edgeos.world"
         client = TestClient(app, raise_server_exceptions=False)
-        response = client.get(
-            "/probe", headers={"X-Tenant-Id": str(_TENANT_A_ID)}
-        )
+        response = client.get("/probe", headers={"X-Tenant-Id": str(_TENANT_A_ID)})
 
     assert response.status_code == 200
     assert response.json()["tenant_id"] == str(_TENANT_A_ID)
@@ -245,9 +244,7 @@ def test_x_tenant_id_unknown_uuid_raises_404() -> None:
     ):
         mock_settings.PORTAL_DOMAIN = "dev.edgeos.world"
         client = TestClient(app, raise_server_exceptions=False)
-        response = client.get(
-            "/probe", headers={"X-Tenant-Id": str(unknown_id)}
-        )
+        response = client.get("/probe", headers={"X-Tenant-Id": str(unknown_id)})
 
     assert response.status_code == 404
 

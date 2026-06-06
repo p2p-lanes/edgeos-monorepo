@@ -31,6 +31,10 @@ export interface UseEditEventFormResult {
   setTags: (next: string[]) => void
   hostDisplayName: string
   setHostDisplayName: (next: string) => void
+  hostId: string | null
+  setHostId: (next: string | null) => void
+  collaboratorIds: string[]
+  setCollaboratorIds: (next: string[]) => void
   buildPayload: (
     timezone: string,
     startIso: string,
@@ -65,6 +69,14 @@ export function useEditEventForm(event: EventPublic): UseEditEventFormResult {
   const [hostDisplayName, setHostDisplayName] = useState(
     () => event.host_display_name ?? "",
   )
+  const [hostId, setHostId] = useState<string | null>(
+    () => event.host_id ?? null,
+  )
+  // Seed from the raw ids; the resolved ``event.collaborators`` (name+avatar)
+  // are passed straight to the field for chip labels.
+  const [collaboratorIds, setCollaboratorIds] = useState<string[]>(
+    () => event.collaborator_ids ?? [],
+  )
 
   const buildPayload = (
     timezone: string,
@@ -90,6 +102,8 @@ export function useEditEventForm(event: EventPublic): UseEditEventFormResult {
       cover_url: coverUrl || null,
       tags,
       host_display_name: hostDisplayName.trim() || null,
+      host_id: hostId,
+      collaborator_ids: collaboratorIds,
     }
   }
 
@@ -118,6 +132,10 @@ export function useEditEventForm(event: EventPublic): UseEditEventFormResult {
     setTags,
     hostDisplayName,
     setHostDisplayName,
+    hostId,
+    setHostId,
+    collaboratorIds,
+    setCollaboratorIds,
     buildPayload,
   }
 }

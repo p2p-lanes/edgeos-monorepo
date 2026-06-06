@@ -198,6 +198,37 @@ export function dayBoundsInTz(
 }
 
 /**
+ * Build the [monthStart, monthEnd) interval that contains `anchor` in the
+ * supplied timezone. The interval starts at 00:00 on the first day of the
+ * month and ends at 00:00 on the first day of the next month, both expressed
+ * as UTC instants.
+ *
+ * Use this for API query bounds when fetching events for a calendar month:
+ * `startOfMonth(anchor).toISOString()` operates in the browser's TZ and
+ * clips events near month boundaries when the popup TZ differs.
+ */
+export function monthBoundsInTz(
+  anchor: Date,
+  timeZone: string,
+): { start: Date; end: Date } {
+  // YYYY-MM of the anchor in the target timezone (not browser local).
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+  }).formatToParts(anchor)
+  const year = Number(parts.find((p) => p.type === "year")?.value)
+  const month = Number(parts.find((p) => p.type === "month")?.value)
+  const firstDay = `${year}-${String(month).padStart(2, "0")}-01`
+  const nextMonth = month === 12 ? 1 : month + 1
+  const nextYear = month === 12 ? year + 1 : year
+  const firstDayNext = `${nextYear}-${String(nextMonth).padStart(2, "0")}-01`
+  const { start } = dayBoundsInTz(firstDay, timeZone)
+  const { start: end } = dayBoundsInTz(firstDayNext, timeZone)
+  return { start, end }
+}
+
+/**
  * Convert a naive wall-clock datetime ("YYYY-MM-DDTHH:MM[:SS]") interpreted
  * as local time in `timeZone` into the UTC instant it denotes. Round-trip
  * inverse of `utcToLocalTzNaive`.

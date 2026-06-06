@@ -39,7 +39,7 @@ describe("getProductAvailability", () => {
         total_stock_cap: 10,
         total_stock_remaining: 10,
       },
-      "2026-02-01",
+      new Date("2026-02-01"),
     )
     expect(av.state).toBe("ended")
     expect(av.canSelect).toBe(false)
@@ -52,7 +52,7 @@ describe("getProductAvailability", () => {
         ...baseProduct,
         sale_starts_at: "2027-01-01",
       },
-      "2026-01-01",
+      new Date("2026-01-01"),
     )
     expect(av.state).toBe("upcoming")
     expect(av.canSelect).toBe(false)

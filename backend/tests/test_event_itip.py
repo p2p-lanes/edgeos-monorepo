@@ -172,6 +172,7 @@ def _patch_email_service():
     service.send_event_invitation = AsyncMock(return_value=True)
     service.send_event_updated = AsyncMock(return_value=True)
     service.send_event_cancelled = AsyncMock(return_value=True)
+    service.send_event_rsvp_cancelled = AsyncMock(return_value=True)
 
     stack = ExitStack()
     stack.enter_context(
@@ -318,6 +319,52 @@ class TestBuildEventIcs:
         # And no RECURRENCE-ID for one-offs.
         assert "RECURRENCE-ID:" not in invite
         assert "RECURRENCE-ID:" not in update
+
+    def test_recurring_master_invite_carries_rrule(self) -> None:
+        """A series-master REQUEST must carry RRULE so the recipient's calendar
+        expands every occurrence and later updates reconcile the whole series.
+        A single-occurrence message (keyed by RECURRENCE-ID) must NOT, so it
+        patches just that instance."""
+        start = datetime(2026, 5, 5, 14, 0, tzinfo=UTC)
+        event = self._minimal_event(start=start, end=start + timedelta(hours=1))
+        event.rrule = "FREQ=WEEKLY;BYDAY=MO"
+
+        master = build_event_ics(
+            event, recipient_email="alice@example.com", method="REQUEST", sequence=1
+        )
+        assert "RRULE:FREQ=WEEKLY;BYDAY=MO" in master
+        assert "RECURRENCE-ID:" not in master
+
+        occ = build_event_ics(
+            event,
+            recipient_email="alice@example.com",
+            method="REQUEST",
+            sequence=1,
+            occurrence_start=start + timedelta(days=7),
+        )
+        assert "RRULE:" not in occ
+        assert "RECURRENCE-ID:" in occ
+
+    def test_add_to_calendar_export_uid_matches_itip_uid(self) -> None:
+        """The "Add to calendar" .ics download and the emailed invite/cancel
+        must share the SAME UID. Calendars key entries on UID, so a mismatch
+        leaves the user with two separate entries for one event — and an
+        organiser CANCEL (which targets the iTIP UID) only removes the invited
+        copy, stranding the downloaded one. That divergence is what made
+        cancellations fail to "stick" on external calendars.
+        """
+        from app.api.event.router import _render_ics
+
+        start = datetime(2026, 5, 5, 14, 0, tzinfo=UTC)
+        event = self._minimal_event(start=start, end=start + timedelta(hours=1))
+
+        download = _render_ics(event)
+        itip = build_event_ics(event, recipient_email="alice@example.com")
+
+        assert f"UID:{event.id}@edgeos" in download
+        assert f"UID:{event.id}@edgeos" in itip
+        # Guard against the old, divergent ``event-``-prefixed UID.
+        assert f"UID:event-{event.id}@edgeos" not in download
 
     def test_recurring_rsvp_uses_recurrence_id(self) -> None:
         """When a participant RSVPs to one instance of a recurring series,
@@ -635,6 +682,8 @@ class TestPatchBumpsSequenceAndDispatches:
         tenant_a: Tenants,
         admin_token_tenant_a: str,
     ) -> None:
+        """A field that doesn't change the calendar entry (e.g. `highlighted`)
+        must not bump SEQUENCE or re-send iTIP."""
         popup = _make_popup(db, tenant_a)
         event = _make_event(db, tenant_a, popup)
         _invite(db, event, _make_human(db, tenant_a))
@@ -645,15 +694,46 @@ class TestPatchBumpsSequenceAndDispatches:
             resp = client.patch(
                 f"/api/v1/events/{event.id}",
                 headers=_auth(admin_token_tenant_a),
-                json={"content": "Completely new description"},
+                json={"highlighted": True},
             )
 
         assert resp.status_code == 200, resp.text
         db.expire_all()
         refreshed = db.get(Events, event.id)
         assert refreshed.ical_sequence == before_sequence
-        assert refreshed.content == "Completely new description"
         assert send_mock.await_count == 0
+
+    def test_description_and_meeting_url_changes_bump_and_dispatch(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+        admin_token_tenant_a: str,
+    ) -> None:
+        """Editing the description or the online join link is material — it must
+        bump SEQUENCE and re-send REQUEST so attendees' calendars update."""
+        popup = _make_popup(db, tenant_a)
+        event = _make_event(db, tenant_a, popup)
+        _invite(db, event, _make_human(db, tenant_a))
+
+        for field, value in (
+            ("content", "Brand new description"),
+            ("meeting_url", "https://meet.example.com/new-link"),
+        ):
+            before_sequence = db.get(Events, event.id).ical_sequence
+            send_mock = AsyncMock(return_value=None)
+            with _patch_send_everywhere(send_mock):
+                resp = client.patch(
+                    f"/api/v1/events/{event.id}",
+                    headers=_auth(admin_token_tenant_a),
+                    json={field: value},
+                )
+            assert resp.status_code == 200, resp.text
+            db.expire_all()
+            refreshed = db.get(Events, event.id)
+            assert refreshed.ical_sequence == before_sequence + 1, field
+            assert send_mock.await_count == 1, field
+            assert send_mock.await_args.kwargs["method"] == "REQUEST"
 
     def test_patch_with_two_recipients_fans_out_once(
         self,
@@ -752,6 +832,44 @@ class TestCancelAndDeleteDispatchCancel:
         assert send_mock.await_count == 1
         assert send_mock.await_args.kwargs["method"] == "CANCEL"
 
+    def test_cancel_cancels_rsvps_after_dispatching_email(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+        admin_token_tenant_a: str,
+    ) -> None:
+        """Cancelling an event flips its RSVPs to CANCELLED.
+
+        Prevents a later re-publish from resurfacing stale registrations
+        (the attendee's calendar entry was already removed). The flip MUST
+        happen after recipients are gathered, so the attendee still receives
+        the iTIP CANCEL.
+        """
+        popup = _make_popup(db, tenant_a)
+        event = _make_event(db, tenant_a, popup)
+        human = _make_human(db, tenant_a, email="attendee@test.com")
+        participant = _register(db, event, human)
+
+        send_mock = AsyncMock(return_value=None)
+        with _patch_send_everywhere(send_mock):
+            resp = client.post(
+                f"/api/v1/events/{event.id}/cancel",
+                headers=_auth(admin_token_tenant_a),
+            )
+
+        assert resp.status_code == 200, resp.text
+        # The attendee was still active when recipients were collected, so the
+        # CANCEL email targets them (dispatch ran before the status flip).
+        recipients = send_mock.await_args.args[2]
+        assert any(r["email"] == human.email for r in recipients)
+        # The RSVP row is now cancelled, so the portal no longer reports the
+        # human as registered after a re-publish.
+        db.expire_all()
+        refreshed = db.get(EventParticipants, participant.id)
+        assert refreshed is not None
+        assert refreshed.status == ParticipantStatus.CANCELLED
+
     def test_cancel_endpoint_routes_to_send_event_cancelled(
         self,
         client: TestClient,
@@ -775,6 +893,9 @@ class TestCancelAndDeleteDispatchCancel:
         service.send_event_cancelled.assert_awaited_once()
         service.send_event_invitation.assert_not_awaited()
         service.send_event_updated.assert_not_awaited()
+        # Organiser cancellation must use the "event cancelled" template, never
+        # the self-service "registration cancelled" one.
+        service.send_event_rsvp_cancelled.assert_not_awaited()
 
     def test_double_cancel_returns_400(
         self,

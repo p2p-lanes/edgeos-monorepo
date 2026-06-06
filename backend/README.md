@@ -222,7 +222,6 @@ bash scripts/lint.sh
 bash scripts/format.sh
 
 # Individual commands
-uv run ty check           # Type check
 uv run ruff check app     # Lint
 uv run ruff format app    # Format
 ```

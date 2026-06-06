@@ -7,6 +7,8 @@ from loguru import logger
 from pydantic import BaseModel
 from sqlmodel import Session
 
+from app.api.audit_log.actor import actor_from_human, actor_from_user
+from app.api.audit_log.snapshot import compute_changes
 from app.api.event import crud
 from app.api.event.recurrence import (
     DEFAULT_MAX_OCCURRENCES,
@@ -20,6 +22,7 @@ from app.api.event.schemas import (
     EventAvailabilityResult,
     EventCalendarMeta,
     EventCalendarTrack,
+    EventCollaboratorPublic,
     EventCreate,
     EventHostOption,
     EventInvitationBulkCreate,
@@ -36,7 +39,10 @@ from app.api.event.schemas import (
     OccurrenceConflict,
     OccurrenceRef,
     RecurrenceUpdate,
+    TrackEventCount,
 )
+from app.api.event_audit.crud import build_event_snapshot, record_event_audit
+from app.api.event_audit.schemas import EventAuditAction
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
 from app.core.dependencies.tenants import PublicTenant
 from app.core.dependencies.users import (
@@ -599,37 +605,103 @@ def _check_recurrence_conflicts(
         )
 
 
-def _render_ics(event) -> str:
-    """Render a minimal, RFC-5545-compliant VCALENDAR string for one event."""
-    dtstamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
-    dtstart = event.start_time.strftime("%Y%m%dT%H%M%SZ")
-    dtend = event.end_time.strftime("%Y%m%dT%H%M%SZ")
+def _ics_utc_stamp(dt: datetime) -> str:
+    """Format a datetime as an RFC-5545 UTC stamp ('...Z').
+
+    Treats naive values as already-UTC for defense-in-depth, but the schema
+    validator now rejects naive inputs so this branch should only trigger for
+    legacy rows.
+    """
+    if dt.tzinfo is None:
+        return dt.strftime("%Y%m%dT%H%M%SZ")
+    return dt.astimezone(UTC).strftime("%Y%m%dT%H%M%SZ")
+
+
+def _ics_vevent_lines(
+    event, dtstamp: str, *, include_recurrence: bool = False
+) -> list[str]:
+    """Render one VEVENT block as RFC-5545 lines.
+
+    ``include_recurrence`` emits RRULE/EXDATE so a recurring master expands
+    natively in the subscriber's calendar — used by the popup feed. The
+    single-event download leaves it off so it adds just that one instance.
+    """
     summary = (event.title or "").replace("\n", " ").replace(",", r"\,")
     description = (event.content or "").replace("\n", r"\n").replace(",", r"\,")
     location = event.meeting_url or ""
 
     lines: list[str] = [
-        "BEGIN:VCALENDAR",
-        "VERSION:2.0",
-        "PRODID:-//EdgeOS//Events//EN",
-        "CALSCALE:GREGORIAN",
-        "METHOD:PUBLISH",
         "BEGIN:VEVENT",
-        f"UID:event-{event.id}@edgeos",
+        f"UID:{event.id}@edgeos",
         f"DTSTAMP:{dtstamp}",
-        f"DTSTART:{dtstart}",
-        f"DTEND:{dtend}",
+        f"DTSTART:{_ics_utc_stamp(event.start_time)}",
+        f"DTEND:{_ics_utc_stamp(event.end_time)}",
         f"SUMMARY:{summary}",
     ]
     if description:
         lines.append(f"DESCRIPTION:{description}")
     if location:
         lines.append(f"LOCATION:{location}")
-    if event.status == EventStatus.CANCELLED:
-        lines.append("STATUS:CANCELLED")
-    else:
-        lines.append("STATUS:CONFIRMED")
-    lines.extend(["END:VEVENT", "END:VCALENDAR"])
+    if include_recurrence and getattr(event, "rrule", None):
+        lines.append(f"RRULE:{event.rrule}")
+        exdates = getattr(event, "recurrence_exdates", None) or []
+        if exdates:
+            lines.append(f"EXDATE:{','.join(_ics_utc_stamp(d) for d in exdates)}")
+    lines.append(
+        "STATUS:CANCELLED"
+        if event.status == EventStatus.CANCELLED
+        else "STATUS:CONFIRMED"
+    )
+    lines.append("END:VEVENT")
+    return lines
+
+
+def _render_ics(event) -> str:
+    """Render a minimal, RFC-5545-compliant VCALENDAR string for one event.
+
+    The UID MUST match the one the iTIP path emits (``{event.id}@edgeos`` —
+    see ``app/services/ical.build_event_ics``). Calendars key entries on UID:
+    if the "Add to calendar" download used a different UID than the
+    invitation / RSVP email, the user would end up with TWO separate entries
+    for the same event, and a later organiser CANCEL (which targets the iTIP
+    UID) could only ever remove one of them — leaving the downloaded copy
+    stranded on their calendar. Keeping a single UID makes the download and
+    the emailed invite the same entry, so a cancellation reconciles it.
+    """
+    dtstamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+    lines: list[str] = [
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "PRODID:-//EdgeOS//Events//EN",
+        "CALSCALE:GREGORIAN",
+        "METHOD:PUBLISH",
+        *_ics_vevent_lines(event, dtstamp),
+        "END:VCALENDAR",
+    ]
+    return "\r\n".join(lines) + "\r\n"
+
+
+def _render_ics_feed(calendar_name: str, events: list) -> str:
+    """Render a VCALENDAR feed of many events (the popup subscription feed).
+
+    Recurring masters carry their RRULE so the calendar app expands them and
+    stays in sync. REFRESH-INTERVAL / X-PUBLISHED-TTL hint a 1h poll.
+    """
+    dtstamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+    name = (calendar_name or "Events").replace("\n", " ").replace(",", r"\,")
+    lines: list[str] = [
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "PRODID:-//EdgeOS//Events//EN",
+        "CALSCALE:GREGORIAN",
+        "METHOD:PUBLISH",
+        f"X-WR-CALNAME:{name}",
+        "REFRESH-INTERVAL;VALUE=DURATION:PT1H",
+        "X-PUBLISHED-TTL:PT1H",
+    ]
+    for event in events:
+        lines.extend(_ics_vevent_lines(event, dtstamp, include_recurrence=True))
+    lines.append("END:VCALENDAR")
     return "\r\n".join(lines) + "\r\n"
 
 
@@ -774,6 +846,7 @@ async def list_public_calendar(
 
     settings = event_settings_crud.get_by_popup_id(db, popup.id)
     timezone = settings.timezone if settings else "UTC"
+    placeholder_url = settings.placeholder_url if settings else None
     # Distinct tags actually present on the popup's published+public events,
     # not the curated ``event_settings.allowed_tags`` list — creators can use
     # tags outside that list, and the filter must surface them.
@@ -793,7 +866,59 @@ async def list_public_calendar(
             popup_id=popup.id,
             popup_slug=popup.slug,
             popup_name=popup.name,
+            placeholder_url=placeholder_url,
         ),
+    )
+
+
+@router.get(
+    "/public/calendar.ics",
+    dependencies=[
+        Depends(
+            RateLimit(limit=120, window_sec=60, key_prefix="rl:events-public-ics")
+        ),
+    ],
+)
+async def public_calendar_ics(
+    db: SessionDep,
+    popup_id: uuid.UUID,
+) -> Response:
+    """Anonymous iCalendar subscription feed of a popup's public events.
+
+    Served by ``popup_id`` (globally unique) so calendar apps — which fetch
+    the feed without Origin/Referer — can subscribe without tenant
+    resolution. Only ``published`` + ``visibility=public`` events are
+    included, matching the public calendar; recurring masters carry their
+    RRULE so the subscription stays in sync.
+    """
+    from app.api.popup.crud import popups_crud
+    from app.api.popup.schemas import PopupStatus
+
+    popup = popups_crud.get(db, popup_id)
+    if not popup or popup.status != PopupStatus.active:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Popup not found"
+        )
+
+    events, _ = crud.events_crud.find_by_popup(
+        db,
+        popup_id=popup.id,
+        skip=0,
+        limit=1000,
+        event_status=EventStatus.PUBLISHED,
+        visibility=EventVisibility.PUBLIC,
+        exclude_statuses=[EventStatus.CANCELLED],
+    )
+    ics = _render_ics_feed(f"{popup.name} — Events", events)
+    # attachment so the portal's "Download .ics" link saves a file even
+    # cross-origin; calendar apps ignore this header when subscribing.
+    return Response(
+        content=ics,
+        media_type="text/calendar; charset=utf-8",
+        headers={
+            "Content-Disposition": f'attachment; filename="{popup.slug or "events"}.ics"',
+            "Cache-Control": "public, max-age=3600",
+        },
     )
 
 
@@ -874,9 +999,7 @@ async def list_event_hosts(
     omitted (they have no host to filter by).
     """
     hosts = crud.events_crud.list_distinct_hosts(db, popup_id=popup_id)
-    return [
-        EventHostOption(id=h.id, name=h.full_name, email=h.email) for h in hosts
-    ]
+    return [EventHostOption(id=h.id, name=h.full_name, email=h.email) for h in hosts]
 
 
 @router.get("/{event_id}", response_model=EventPublic)
@@ -890,7 +1013,7 @@ async def get_event(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Event not found"
         )
-    return _to_public(event)
+    return _with_collaborators(db, _to_public(event), event, include_email=True)
 
 
 # ---------------------------------------------------------------------------
@@ -919,10 +1042,10 @@ async def get_event_admin_notes(
 async def update_event_admin_notes(
     event_id: uuid.UUID,
     payload: EventAdminNotes,
-    db: TenantSession,
-    _: CurrentUser,
+    db: AdminOrApiKeySession_EventsWrite,
+    _: AdminOrApiKey_EventsWrite,
 ) -> EventAdminNotes:
-    """Set an event's staff-only notes (any backoffice user)."""
+    """Set an event's staff-only notes (requires events write access)."""
     event = crud.events_crud.get(db, event_id)
     if not event:
         raise HTTPException(
@@ -942,6 +1065,7 @@ async def create_event(
     current_user: AdminOrApiKey_EventsWrite,
 ) -> EventPublic:
     from app.api.event.models import Events
+    from app.api.human.crud import humans_crud
     from app.api.popup.crud import popups_crud
     from app.api.shared.enums import UserRole
 
@@ -983,7 +1107,20 @@ async def create_event(
         event_data["custom_location_url"] = None
     event_data["rrule"] = rrule_str
     event_data["tenant_id"] = tenant_id
-    event_data["owner_id"] = current_user.id
+    # Map the event owner to the Human sharing the admin's email in this tenant
+    # (creating one if absent) so it resolves a real creator and the host can
+    # edit it from the portal. Admin Users live in a separate table from Humans,
+    # so using ``current_user.id`` (a Users id) would leave the event ownerless
+    # ("Unknown" in the UI) and uneditable through the portal's owner check.
+    first_name, _, last_name = (current_user.full_name or "").strip().partition(" ")
+    owner = humans_crud.get_or_create_by_email(
+        db,
+        email=current_user.email,
+        tenant_id=tenant_id,
+        default_first_name=first_name or None,
+        default_last_name=last_name.strip() or None,
+    )
+    event_data["owner_id"] = owner.id
 
     # Admin-created events trust the requested status — picking "published"
     # in the backoffice publishes immediately, even when the venue is
@@ -997,7 +1134,14 @@ async def create_event(
     db.commit()
     db.refresh(event)
 
-    return _to_public(event)
+    record_event_audit(
+        db,
+        event=event,
+        action=EventAuditAction.CREATED,
+        actor=actor_from_user(current_user),
+    )
+
+    return _with_collaborators(db, _to_public(event), event, include_email=True)
 
 
 @router.patch("/{event_id}", response_model=EventPublic)
@@ -1005,13 +1149,15 @@ async def update_event(
     event_id: uuid.UUID,
     event_in: EventUpdate,
     db: AdminOrApiKeySession_EventsWrite,
-    _: AdminOrApiKey_EventsWrite,
+    current_user: AdminOrApiKey_EventsWrite,
 ) -> EventPublic:
     event = crud.events_crud.get(db, event_id)
     if not event:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Event not found"
         )
+
+    audit_before = build_event_snapshot(db, event)
 
     new_venue_id = (
         event_in.venue_id if event_in.venue_id is not None else event.venue_id
@@ -1056,20 +1202,34 @@ async def update_event(
         "content": event.content,
         "custom_location_name": event.custom_location_name,
         "custom_location_url": event.custom_location_url,
+        "meeting_url": event.meeting_url,
+        "timezone": event.timezone,
+        "rrule": event.rrule,
+        "recurrence_exdates": event.recurrence_exdates,
     }
     updated = crud.events_crud.update(db, event, event_in)
 
     if _event_calendar_fields_changed(before, updated):
         await _bump_and_dispatch_itip_update(db, updated, before=before)
 
-    return _to_public(updated)
+    audit_after = build_event_snapshot(db, updated)
+    record_event_audit(
+        db,
+        event=updated,
+        action=EventAuditAction.UPDATED,
+        actor=actor_from_user(current_user),
+        snapshot=audit_after,
+        changes=compute_changes(audit_before, audit_after),
+    )
+
+    return _with_collaborators(db, _to_public(updated), updated, include_email=True)
 
 
 @router.post("/{event_id}/cancel", response_model=EventPublic)
 async def cancel_event(
     event_id: uuid.UUID,
     db: AdminOrApiKeySession_EventsWrite,
-    _: AdminOrApiKey_EventsWrite,
+    current_user: AdminOrApiKey_EventsWrite,
 ) -> EventPublic:
     event = crud.events_crud.get(db, event_id)
     if not event:
@@ -1084,6 +1244,18 @@ async def cancel_event(
     cancel_update = EventUpdate(status=EventStatus.CANCELLED)
     updated = crud.events_crud.update(db, event, cancel_update)
     await _bump_and_dispatch_itip_cancel(db, updated)
+    # Cancel the RSVPs themselves (after dispatch, so attendees still get the
+    # iTIP CANCEL): otherwise a later re-publish would resurface stale
+    # registrations even though their calendar entry was removed.
+    from app.api.event_participant.crud import event_participants_crud
+
+    event_participants_crud.cancel_all_for_event(db, updated.id)
+    record_event_audit(
+        db,
+        event=updated,
+        action=EventAuditAction.CANCELLED,
+        actor=actor_from_user(current_user),
+    )
     return _to_public(updated)
 
 
@@ -1091,7 +1263,7 @@ async def cancel_event(
 async def delete_event(
     event_id: uuid.UUID,
     db: AdminOrApiKeySession_EventsWrite,
-    _: AdminOrApiKey_EventsWrite,
+    current_user: AdminOrApiKey_EventsWrite,
 ) -> None:
     event = crud.events_crud.get(db, event_id)
     if not event:
@@ -1104,6 +1276,16 @@ async def delete_event(
         await _bump_and_dispatch_itip_cancel(db, event)
     except Exception as exc:  # pragma: no cover - defensive
         logger.warning("iTIP CANCEL on event delete {} failed: {}", event_id, exc)
+    # Stage the audit row *before* dropping the row, while the event (and its
+    # tenant/popup/title) is still readable, but atomically (commit=False): the
+    # delete's commit flushes both, so a failed delete leaves no orphan log.
+    record_event_audit(
+        db,
+        event=event,
+        action=EventAuditAction.DELETED,
+        actor=actor_from_user(current_user),
+        commit=False,
+    )
     crud.events_crud.delete(db, event)
 
 
@@ -1117,7 +1299,7 @@ async def set_recurrence(
     event_id: uuid.UUID,
     payload: RecurrenceUpdate,
     db: AdminOrApiKeySession_EventsWrite,
-    _: AdminOrApiKey_EventsWrite,
+    current_user: AdminOrApiKey_EventsWrite,
 ) -> EventPublic:
     """Set/replace/clear the RRULE on a series master.
 
@@ -1164,6 +1346,15 @@ async def set_recurrence(
     # series.
     if old_rrule != new_rrule:
         await _bump_and_dispatch_itip_update(db, event)
+    record_event_audit(
+        db,
+        event=event,
+        action=EventAuditAction.RECURRENCE_SET,
+        actor=actor_from_user(current_user),
+        changes={"rrule": {"old": old_rrule, "new": new_rrule}}
+        if old_rrule != new_rrule
+        else None,
+    )
     return _to_public(event)
 
 
@@ -1200,7 +1391,7 @@ async def detach_occurrence(
     event_id: uuid.UUID,
     payload: OccurrenceRef,
     db: AdminOrApiKeySession_EventsWrite,
-    _: AdminOrApiKey_EventsWrite,
+    current_user: AdminOrApiKey_EventsWrite,
 ) -> EventPublic:
     """Materialize a single occurrence of a recurring series as its own row.
 
@@ -1289,6 +1480,16 @@ async def detach_occurrence(
             child.id,
             exc,
         )
+    detach_snapshot = build_event_snapshot(db, master)
+    detach_snapshot["occurrence_start"] = occ_start.isoformat()
+    detach_snapshot["detached_child_id"] = str(child.id)
+    record_event_audit(
+        db,
+        event=master,
+        action=EventAuditAction.OCCURRENCE_DETACHED,
+        actor=actor_from_user(current_user),
+        snapshot=detach_snapshot,
+    )
     return _to_public(child)
 
 
@@ -1297,7 +1498,7 @@ async def delete_occurrence(
     event_id: uuid.UUID,
     payload: OccurrenceRef,
     db: AdminOrApiKeySession_EventsWrite,
-    _: AdminOrApiKey_EventsWrite,
+    current_user: AdminOrApiKey_EventsWrite,
 ) -> None:
     """Skip a single occurrence by appending it to the master's EXDATEs.
 
@@ -1333,6 +1534,15 @@ async def delete_occurrence(
             payload.occurrence_start,
             exc,
         )
+    skip_snapshot = build_event_snapshot(db, master)
+    skip_snapshot["occurrence_start"] = payload.occurrence_start.isoformat()
+    record_event_audit(
+        db,
+        event=master,
+        action=EventAuditAction.OCCURRENCE_SKIPPED,
+        actor=actor_from_user(current_user),
+        snapshot=skip_snapshot,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -1714,6 +1924,15 @@ async def bulk_invite(
         raise HTTPException(status_code=404, detail="Event not found")
     result = _run_bulk_invite(db, event, payload.emails, current_user.id)
     await _send_event_invitation_emails(db, event, result.invited)
+    invite_snapshot = build_event_snapshot(db, event)
+    invite_snapshot["invited_emails"] = list(payload.emails)
+    record_event_audit(
+        db,
+        event=event,
+        action=EventAuditAction.INVITATION_ADDED,
+        actor=actor_from_user(current_user),
+        snapshot=invite_snapshot,
+    )
     return result
 
 
@@ -1724,27 +1943,131 @@ async def delete_invitation(
     event_id: uuid.UUID,
     invitation_id: uuid.UUID,
     db: AdminOrApiKeySession_EventsWrite,
-    _: AdminOrApiKey_EventsWrite,
+    current_user: AdminOrApiKey_EventsWrite,
 ) -> None:
     inv = crud.invitations_crud.get(db, invitation_id)
     if not inv or inv.event_id != event_id:
         raise HTTPException(status_code=404, detail="Invitation not found")
+    removed_human_id = getattr(inv, "human_id", None)
     crud.invitations_crud.delete(db, inv)
+    event = crud.events_crud.get(db, event_id)
+    if event is not None:
+        inv_snapshot = build_event_snapshot(db, event)
+        inv_snapshot["removed_invitation_id"] = str(invitation_id)
+        if removed_human_id is not None:
+            inv_snapshot["removed_human_id"] = str(removed_human_id)
+        record_event_audit(
+            db,
+            event=event,
+            action=EventAuditAction.INVITATION_REMOVED,
+            actor=actor_from_user(current_user),
+            snapshot=inv_snapshot,
+        )
 
 
 # ---------------------------------------------------------------------------
-# Portal invitations — event owner only
+# Portal invitations — event owner or host
 # ---------------------------------------------------------------------------
+
+
+def _event_collaborator_ids(event) -> list[uuid.UUID]:
+    """Collaborator ids on an event as real UUIDs.
+
+    The column is a native ``uuid[]`` so values normally arrive as UUIDs, but
+    we coerce defensively (expanded occurrence pseudo-rows / JSON round-trips
+    can surface strings) and drop anything unparseable.
+    """
+    out: list[uuid.UUID] = []
+    for value in getattr(event, "collaborator_ids", None) or []:
+        if isinstance(value, uuid.UUID):
+            out.append(value)
+            continue
+        try:
+            out.append(uuid.UUID(str(value)))
+        except (ValueError, TypeError):
+            continue
+    return out
+
+
+def _human_id_manages_event(event, human_id: uuid.UUID) -> bool:
+    """Whether the human id may manage an event (edit / cancel / invitations).
+
+    True for the event's owner (creator), its designated host, or any of its
+    collaborators — all carry the same responsibility over the event even
+    though they didn't create it. ``host_id`` is NULL when no directory human
+    was assigned; ``collaborator_ids`` is empty when none were added.
+    """
+    if human_id in (event.owner_id, event.host_id):
+        return True
+    return human_id in _event_collaborator_ids(event)
+
+
+def _human_manages_event(event, current_human) -> bool:
+    """``_human_id_manages_event`` for an authenticated human object."""
+    return _human_id_manages_event(event, current_human.id)
+
+
+def _resolve_collaborators(
+    db, event, *, include_email: bool = False
+) -> list[EventCollaboratorPublic]:
+    """Resolve an event's ``collaborator_ids`` to slim human profiles.
+
+    Preserves the stored order and silently skips ids that no longer resolve
+    to a human in the tenant. Returns ``[]`` when there are no collaborators.
+
+    ``include_email`` adds the human's email to each profile so a nameless
+    collaborator chip can fall back to it. Only the admin (backoffice)
+    endpoints set this; the portal leaves it off so organizer emails aren't
+    exposed to every viewer of a public event.
+    """
+    ids = _event_collaborator_ids(event)
+    if not ids:
+        return []
+
+    from sqlmodel import select
+
+    from app.api.human.models import Humans
+
+    rows = db.exec(select(Humans).where(Humans.id.in_(ids))).all()
+    by_id = {h.id: h for h in rows}
+    resolved: list[EventCollaboratorPublic] = []
+    for cid in ids:
+        human = by_id.get(cid)
+        if human is None:
+            continue
+        resolved.append(
+            EventCollaboratorPublic(
+                id=human.id,
+                first_name=human.first_name,
+                last_name=human.last_name,
+                picture_url=human.picture_url,
+                email=human.email if include_email else None,
+            )
+        )
+    return resolved
+
+
+def _with_collaborators(
+    db, public: EventPublic, event, *, include_email: bool = False
+) -> EventPublic:
+    """Attach resolved collaborator profiles to a single-event response."""
+    return public.model_copy(
+        update={
+            "collaborators": _resolve_collaborators(
+                db, event, include_email=include_email
+            )
+        }
+    )
 
 
 def _ensure_portal_event_owner(db, event_id: uuid.UUID, current_human):
     event = crud.events_crud.get(db, event_id)
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
-    if event.owner_id != current_human.id:
+    if not _human_manages_event(event, current_human):
         raise HTTPException(
             status_code=403,
-            detail="Only the event owner can manage invitations",
+            detail="Only the event owner or host can manage invitations",
         )
     return event
 
@@ -1875,7 +2198,7 @@ async def approve_event(
     event_id: uuid.UUID,
     payload: EventApprovalPayload,
     db: AdminOrApiKeySession_EventsWrite,
-    _: AdminOrApiKey_EventsWrite,
+    current_user: AdminOrApiKey_EventsWrite,
 ) -> EventPublic:
     event = crud.events_crud.get(db, event_id)
     if not event:
@@ -1907,6 +2230,13 @@ async def approve_event(
             exc,
         )
 
+    record_event_audit(
+        db,
+        event=event,
+        action=EventAuditAction.APPROVED,
+        actor=actor_from_user(current_user),
+    )
+
     return _to_public(event)
 
 
@@ -1915,7 +2245,7 @@ async def reject_event(
     event_id: uuid.UUID,
     payload: EventApprovalPayload,
     db: AdminOrApiKeySession_EventsWrite,
-    _: AdminOrApiKey_EventsWrite,
+    current_user: AdminOrApiKey_EventsWrite,
 ) -> EventPublic:
     event = crud.events_crud.get(db, event_id)
     if not event:
@@ -1931,6 +2261,15 @@ async def reject_event(
     db.commit()
     db.refresh(event)
     await _send_event_approval_email(db, event, approved=False, reason=payload.reason)
+    reject_snapshot = build_event_snapshot(db, event)
+    reject_snapshot["rejection_reason"] = payload.reason
+    record_event_audit(
+        db,
+        event=event,
+        action=EventAuditAction.REJECTED,
+        actor=actor_from_user(current_user),
+        snapshot=reject_snapshot,
+    )
     return _to_public(event)
 
 
@@ -1948,6 +2287,15 @@ async def bulk_invite_portal(
     event = _ensure_portal_event_owner(db, event_id, current_human)
     result = _run_bulk_invite(db, event, payload.emails, current_human.id)
     await _send_event_invitation_emails(db, event, result.invited)
+    invite_snapshot = build_event_snapshot(db, event)
+    invite_snapshot["invited_emails"] = list(payload.emails)
+    record_event_audit(
+        db,
+        event=event,
+        action=EventAuditAction.INVITATION_ADDED,
+        actor=actor_from_human(current_human),
+        snapshot=invite_snapshot,
+    )
     return result
 
 
@@ -1961,11 +2309,23 @@ async def delete_portal_invitation(
     db: HumanTenantSession,
     current_human: CurrentHuman,
 ) -> None:
-    _ensure_portal_event_owner(db, event_id, current_human)
+    event = _ensure_portal_event_owner(db, event_id, current_human)
     inv = crud.invitations_crud.get(db, invitation_id)
     if not inv or inv.event_id != event_id:
         raise HTTPException(status_code=404, detail="Invitation not found")
+    removed_human_id = getattr(inv, "human_id", None)
     crud.invitations_crud.delete(db, inv)
+    inv_snapshot = build_event_snapshot(db, event)
+    inv_snapshot["removed_invitation_id"] = str(invitation_id)
+    if removed_human_id is not None:
+        inv_snapshot["removed_human_id"] = str(removed_human_id)
+    record_event_audit(
+        db,
+        event=event,
+        action=EventAuditAction.INVITATION_REMOVED,
+        actor=actor_from_human(current_human),
+        snapshot=inv_snapshot,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -2000,10 +2360,11 @@ def _portal_visibility_filter(db, events: list, human_id: uuid.UUID) -> list:
 
     Rules:
     - public: visible to all.
-    - private: only owner + invited humans.
-    - unlisted: hidden from public listings, but the owner still sees their
-      own unlisted events (e.g. pending_approval requests they created).
-      Detail is reachable via direct link for non-owners.
+    - private: only managers (owner / host / collaborators) + invited humans.
+    - unlisted: hidden from public listings, but managers (owner / host /
+      collaborators) still see their own unlisted events (e.g.
+      pending_approval requests they created). Detail is reachable via direct
+      link for non-managers.
     """
     from sqlmodel import select
 
@@ -2029,10 +2390,12 @@ def _portal_visibility_filter(db, events: list, human_id: uuid.UUID) -> list:
         if e.visibility == EventVisibility.PUBLIC:
             visible.append(e)
         elif e.visibility == EventVisibility.UNLISTED:
-            if e.owner_id == human_id:
+            if _human_id_manages_event(e, human_id):
                 visible.append(e)
         elif e.visibility == EventVisibility.PRIVATE:
-            if _invitation_visible_to_human(e, human_id, invited_map.get(e.id, set())):
+            if _human_id_manages_event(e, human_id) or _invitation_visible_to_human(
+                e, human_id, invited_map.get(e.id, set())
+            ):
                 visible.append(e)
     return visible
 
@@ -2051,6 +2414,7 @@ async def list_portal_events(
     start_before: datetime | None = None,
     search: str | None = None,
     rsvped_only: bool = False,
+    managed_only: bool = False,
     include_hidden: bool = False,
     skip: PaginationSkip = 0,
     limit: PaginationLimit = 100,
@@ -2069,6 +2433,10 @@ async def list_portal_events(
             start_after=start_after,
             start_before=start_before,
             search=search,
+            # "My events" channel: restrict to events the caller manages
+            # (owner / host / collaborator) in SQL, so pagination counts the
+            # managed set instead of post-filtering a truncated page.
+            managed_by_human_id=current_human.id if managed_only else None,
         )
     else:
         events, total = crud.events_crud.find(
@@ -2079,7 +2447,13 @@ async def list_portal_events(
             search_fields=["title"],
         )
 
-    visible = _portal_visibility_filter(db, events, current_human.id)
+    # ``managed_only`` already restricted the query to events the caller
+    # manages, which are by definition visible to them — skip the owner/invite
+    # visibility filter so a managed private/unlisted event is never dropped.
+    if managed_only:
+        visible = events
+    else:
+        visible = _portal_visibility_filter(db, events, current_human.id)
     # Cancelled events are removed from every portal listing — owners who want
     # to see them after the fact can still hit the detail URL directly. The
     # ``event_status`` query param can't express "exclude cancelled" alongside
@@ -2252,6 +2626,25 @@ async def portal_hidden_events_count(
     return {"count": int(count or 0)}
 
 
+@router.get("/portal/events/track-counts", response_model=list[TrackEventCount])
+async def list_portal_track_event_counts(
+    db: HumanTenantSession,
+    _: CurrentHuman,
+    popup_id: uuid.UUID,
+) -> list[TrackEventCount]:
+    """Distinct published-event count per track for a popup.
+
+    Lets the portal track filter / Tracks section render counts and hide
+    empty tracks without fetching the whole event list to count on the
+    client (which also capped at the page limit).
+    """
+    counts = crud.events_crud.count_published_events_by_track(db, popup_id=popup_id)
+    return [
+        TrackEventCount(track_id=track_id, event_count=count)
+        for track_id, count in counts.items()
+    ]
+
+
 @router.get("/portal/events/{event_id}", response_model=EventPublic)
 async def get_portal_event(
     event_id: uuid.UUID,
@@ -2281,7 +2674,7 @@ async def get_portal_event(
             .where(EventInvitations.event_id == event_id)
             .where(EventInvitations.human_id == current_human.id)
         ).first()
-        if not invited and event.owner_id != current_human.id:
+        if not invited and not _human_manages_event(event, current_human):
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail="Event not found"
             )
@@ -2309,10 +2702,24 @@ async def get_portal_event(
         rsvp_q = rsvp_q.where(EventParticipants.occurrence_start == occurrence_start)
     rsvp = db.exec(rsvp_q).first()
 
+    # Active-registration count for the capacity badge. Mirrors the "Event is
+    # full" guard exactly: keys on this event's own id (the same path param the
+    # register endpoint counts against, NOT the recurrence master) and the same
+    # occurrence, counting non-cancelled rows with no privacy filtering. Keeps
+    # the badge consistent with what registration actually allows, even for a
+    # detached occurrence that carries its own capacity.
+    from app.api.event_participant.crud import event_participants_crud
+
+    attendee_count = event_participants_crud.count_active_for_event(
+        db, event.id, occurrence_start=occurrence_start
+    )
+
     pub = _to_public(event)
+    updates: dict[str, object] = {"attendee_count": attendee_count}
     if rsvp:
-        pub = pub.model_copy(update={"my_rsvp_status": rsvp})
-    return pub
+        updates["my_rsvp_status"] = rsvp
+    pub = pub.model_copy(update=updates)
+    return _with_collaborators(db, pub, event)
 
 
 # ---------------------------------------------------------------------------
@@ -2324,9 +2731,7 @@ async def get_portal_event(
 # ---------------------------------------------------------------------------
 
 
-@router.get(
-    "/portal/events/{event_id}/admin-notes", response_model=EventAdminNotes
-)
+@router.get("/portal/events/{event_id}/admin-notes", response_model=EventAdminNotes)
 async def get_portal_event_admin_notes(
     event_id: uuid.UUID,
     db: HumanTenantSession,
@@ -2341,9 +2746,7 @@ async def get_portal_event_admin_notes(
     return EventAdminNotes(notes=event.admin_notes)
 
 
-@router.put(
-    "/portal/events/{event_id}/admin-notes", response_model=EventAdminNotes
-)
+@router.put("/portal/events/{event_id}/admin-notes", response_model=EventAdminNotes)
 async def update_portal_event_admin_notes(
     event_id: uuid.UUID,
     payload: EventAdminNotes,
@@ -2389,6 +2792,13 @@ async def hide_portal_event(
         human_id=current_human.id,
         event_id=target_id,
     )
+    record_event_audit(
+        db,
+        event=event,
+        action=EventAuditAction.HIDDEN,
+        actor=actor_from_human(current_human),
+        event_id=target_id,
+    )
 
 
 @router.delete("/portal/events/{event_id}/hide", status_code=status.HTTP_204_NO_CONTENT)
@@ -2405,6 +2815,14 @@ async def unhide_portal_event(
         human_id=current_human.id,
         event_id=target_id,
     )
+    if event is not None:
+        record_event_audit(
+            db,
+            event=event,
+            action=EventAuditAction.UNHIDDEN,
+            actor=actor_from_human(current_human),
+            event_id=target_id,
+        )
 
 
 @router.post(
@@ -2518,7 +2936,14 @@ async def create_portal_event(
             event, popup, settings, reason=approval_reason
         )
 
-    return _to_public(event)
+    record_event_audit(
+        db,
+        event=event,
+        action=EventAuditAction.CREATED,
+        actor=actor_from_human(current_human),
+    )
+
+    return _with_collaborators(db, _to_public(event), event)
 
 
 @router.patch("/portal/events/{event_id}", response_model=EventPublic)
@@ -2533,11 +2958,13 @@ async def update_portal_event(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Event not found"
         )
-    if event.owner_id != current_human.id:
+    if not _human_manages_event(event, current_human):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only the event owner can edit",
+            detail="Only the event owner or host can edit",
         )
+
+    audit_before = build_event_snapshot(db, event)
 
     new_venue_id = (
         event_in.venue_id if event_in.venue_id is not None else event.venue_id
@@ -2585,11 +3012,24 @@ async def update_portal_event(
         "content": event.content,
         "custom_location_name": event.custom_location_name,
         "custom_location_url": event.custom_location_url,
+        "meeting_url": event.meeting_url,
+        "timezone": event.timezone,
+        "rrule": event.rrule,
+        "recurrence_exdates": event.recurrence_exdates,
     }
     updated = crud.events_crud.update(db, event, event_in)
     if _event_calendar_fields_changed(before, updated):
         await _bump_and_dispatch_itip_update(db, updated, before=before)
-    return _to_public(updated)
+    audit_after = build_event_snapshot(db, updated)
+    record_event_audit(
+        db,
+        event=updated,
+        action=EventAuditAction.UPDATED,
+        actor=actor_from_human(current_human),
+        snapshot=audit_after,
+        changes=compute_changes(audit_before, audit_after),
+    )
+    return _with_collaborators(db, _to_public(updated), updated)
 
 
 @router.post("/portal/events/{event_id}/cancel", response_model=EventPublic)
@@ -2603,10 +3043,10 @@ async def cancel_portal_event(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Event not found"
         )
-    if event.owner_id != current_human.id:
+    if not _human_manages_event(event, current_human):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only the event owner can cancel",
+            detail="Only the event owner or host can cancel",
         )
     if event.status == EventStatus.CANCELLED:
         raise HTTPException(
@@ -2617,6 +3057,18 @@ async def cancel_portal_event(
     cancel_update = EventUpdate(status=EventStatus.CANCELLED)
     updated = crud.events_crud.update(db, event, cancel_update)
     await _bump_and_dispatch_itip_cancel(db, updated)
+    # Cancel the RSVPs themselves (after dispatch, so attendees still get the
+    # iTIP CANCEL): otherwise a later re-publish would resurface stale
+    # registrations even though their calendar entry was removed.
+    from app.api.event_participant.crud import event_participants_crud
+
+    event_participants_crud.cancel_all_for_event(db, updated.id)
+    record_event_audit(
+        db,
+        event=updated,
+        action=EventAuditAction.CANCELLED,
+        actor=actor_from_human(current_human),
+    )
     return _to_public(updated)
 
 
@@ -2630,9 +3082,8 @@ async def export_portal_event_ics(
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
     # Re-use the same visibility gate as the detail endpoint.
-    if (
-        event.visibility == EventVisibility.PRIVATE
-        and event.owner_id != current_human.id
+    if event.visibility == EventVisibility.PRIVATE and not _human_manages_event(
+        event, current_human
     ):
         from sqlmodel import select
 

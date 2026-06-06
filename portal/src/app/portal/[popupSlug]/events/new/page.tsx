@@ -36,9 +36,11 @@ import {
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { useCityProvider } from "@/providers/cityProvider"
+import { CollaboratorsField } from "../components/CollaboratorsField"
 import { EventScheduleFields } from "../components/EventScheduleFields"
 import { EventVenueField } from "../components/EventVenueField"
 import { HostDisplayField } from "../components/HostDisplayField"
+import { VisibilityHint } from "../components/VisibilityHint"
 import { todayInTz, useEventScheduling } from "../lib/useEventScheduling"
 import { usePortalEventSettings } from "../lib/useEventTimezone"
 import { useFileUpload } from "../lib/useFileUpload"
@@ -208,6 +210,8 @@ function NewPortalEventForm({
   const [trackId, setTrackId] = useState<string>("")
   const [coverUrl, setCoverUrl] = useState("")
   const [hostDisplayName, setHostDisplayName] = useState("")
+  const [hostId, setHostId] = useState<string | null>(null)
+  const [collaboratorIds, setCollaboratorIds] = useState<string[]>([])
 
   // ---- venue + availability ------------------------------------------
   const {
@@ -283,6 +287,8 @@ function NewPortalEventForm({
           cover_url: coverUrl || null,
           tags,
           host_display_name: hostDisplayName.trim() || null,
+          host_id: hostId,
+          collaborator_ids: collaboratorIds,
           status: "published",
         },
       })
@@ -545,8 +551,15 @@ function NewPortalEventForm({
         <HostDisplayField
           value={hostDisplayName}
           onChange={setHostDisplayName}
+          onHostIdChange={setHostId}
           currentUserName={currentHumanName}
           popupName={city?.name}
+          popupId={popupId}
+        />
+
+        <CollaboratorsField
+          value={collaboratorIds}
+          onChange={setCollaboratorIds}
           popupId={popupId}
         />
 
@@ -687,6 +700,7 @@ function NewPortalEventForm({
             {t("events.form.create_button")}
           </Button>
         </div>
+        <VisibilityHint value={visibility} />
       </form>
 
       {pendingCrop && (

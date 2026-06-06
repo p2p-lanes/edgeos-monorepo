@@ -3,14 +3,16 @@ import { useMemo } from "react"
 
 import { EventSettingsService } from "@/client"
 
-const DEFAULT_TZ =
-  (typeof Intl !== "undefined" &&
-    Intl.DateTimeFormat().resolvedOptions().timeZone) ||
-  "UTC"
+// Calendar surfaces must always render in the popup's timezone. When event
+// settings haven't been created yet, fall back to UTC (the backend default)
+// instead of the browser timezone so the displayed wall-clock matches what
+// the backend stores.
+const FALLBACK_TZ = "UTC"
 
 /**
  * Returns a popup's configured timezone along with reusable formatters.
- * Falls back to the browser timezone when settings are missing.
+ * Falls back to UTC when settings are missing or still loading (browser TZ
+ * is never used — every consumer expects popup-tz wall-clock).
  */
 export function useEventTimezone(popupId: string | undefined) {
   const { data: settings, isLoading: settingsLoading } = useQuery({
@@ -27,7 +29,7 @@ export function useEventTimezone(popupId: string | undefined) {
     staleTime: 5 * 60 * 1000,
   })
 
-  const timezone = settings?.timezone || DEFAULT_TZ
+  const timezone = settings?.timezone || FALLBACK_TZ
   const isLoading = settingsLoading
 
   return useMemo(() => {

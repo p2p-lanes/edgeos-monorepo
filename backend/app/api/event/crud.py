@@ -37,9 +37,11 @@ class EventsCRUD(BaseCRUD[Events, EventCreate, EventUpdate]):
         location_kind: str | None = None,
         track_ids: list[uuid.UUID] | None = None,
         owner_id: uuid.UUID | None = None,
+        managed_by_human_id: uuid.UUID | None = None,
         tags: list[str] | None = None,
         search: str | None = None,
         visibility: EventVisibility | None = None,
+        exclude_visibility: list[EventVisibility] | None = None,
         exclude_statuses: list[EventStatus] | None = None,
         expand_occurrences: bool | None = None,
     ) -> tuple[list[Events], int]:
@@ -58,6 +60,10 @@ class EventsCRUD(BaseCRUD[Events, EventCreate, EventUpdate]):
             statement = statement.where(col(Events.status).not_in(exclude_statuses))
         if visibility is not None:
             statement = statement.where(Events.visibility == visibility)
+        if exclude_visibility:
+            statement = statement.where(
+                col(Events.visibility).not_in(exclude_visibility)
+            )
         if kind is not None:
             statement = statement.where(Events.kind == kind)
         if venue_id is not None:
@@ -74,6 +80,19 @@ class EventsCRUD(BaseCRUD[Events, EventCreate, EventUpdate]):
             statement = statement.where(col(Events.track_id).in_(track_ids))
         if owner_id is not None:
             statement = statement.where(Events.owner_id == owner_id)
+        if managed_by_human_id is not None:
+            # Events the human manages: owner, designated host, or a listed
+            # collaborator. Pushed into SQL so pagination counts the managed
+            # set (not a post-filtered page) — otherwise a managed event past
+            # the limit would never be fetched. ``collaborator_ids`` is a
+            # native uuid[], so ``= ANY(...)`` checks membership.
+            statement = statement.where(
+                or_(
+                    Events.owner_id == managed_by_human_id,
+                    Events.host_id == managed_by_human_id,
+                    col(Events.collaborator_ids).any(managed_by_human_id),
+                )
+            )
         if tags:
             # Postgres JSONB ?| operator: any of the provided tags present.
             # The right operand must be text[] — wrapping with array() makes
@@ -179,6 +198,28 @@ class EventsCRUD(BaseCRUD[Events, EventCreate, EventUpdate]):
         # Dedup again post-trim (DISTINCT didn't see the trim) and sort
         # case-insensitively for stable, human-friendly ordering.
         return sorted(set(tags), key=lambda s: s.casefold())
+
+    def count_published_events_by_track(
+        self, db: Session, *, popup_id: uuid.UUID
+    ) -> dict[uuid.UUID, int]:
+        """Distinct published events per track for a popup, across all history.
+
+        Backs the portal track filter / Tracks section so it can show each
+        track's event count without pulling every event to the client and
+        counting on the front (which also capped at the page limit). Counts
+        distinct event ids so recurring masters aren't inflated. ``status`` is
+        stored as the uppercase Enum name, so filter against that form.
+        """
+        sql = """
+            SELECT track_id, COUNT(DISTINCT id) AS event_count
+            FROM events
+            WHERE popup_id = :popup_id
+              AND track_id IS NOT NULL
+              AND status = 'PUBLISHED'
+            GROUP BY track_id
+        """
+        rows = db.exec(text(sql).bindparams(popup_id=popup_id)).all()
+        return {row[0]: int(row[1]) for row in rows}
 
     def list_distinct_hosts(
         self,

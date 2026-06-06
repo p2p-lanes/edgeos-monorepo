@@ -24,6 +24,6 @@ def test_shared_slug_fixtures_coexist(
     assert popup_tenant_a_summer_fest.slug == "summer-fest"
     assert popup_tenant_b_summer_fest.slug == "summer-fest"
 
-    assert popup_tenant_a_summer_fest.tenant_id != popup_tenant_b_summer_fest.tenant_id, (
-        "Both popups have slug 'summer-fest' but must belong to different tenants"
-    )
+    assert (
+        popup_tenant_a_summer_fest.tenant_id != popup_tenant_b_summer_fest.tenant_id
+    ), "Both popups have slug 'summer-fest' but must belong to different tenants"

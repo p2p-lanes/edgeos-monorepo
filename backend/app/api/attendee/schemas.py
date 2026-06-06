@@ -175,6 +175,53 @@ class AttendeeProductPublic(BaseModel):
     model_config = ConfigDict(from_attributes=True, extra="forbid")
 
 
+class AttendeeTicketLine(BaseModel):
+    """One product + quantity line in a bulk ticket add."""
+
+    product_id: uuid.UUID
+    quantity: int = Field(default=1, ge=1)
+
+
+class AttendeeTicketAdd(BaseModel):
+    """Request body to add tickets to an attendee (admin panel, bulk).
+
+    Mirrors the bulk-grant shape: N products, each with a quantity. Stock is
+    validated per product and the whole batch is applied atomically.
+    """
+
+    items: list[AttendeeTicketLine]
+
+    @field_validator("items")
+    @classmethod
+    def _non_empty(cls, v: list[AttendeeTicketLine]) -> list[AttendeeTicketLine]:
+        if not v:
+            raise ValueError("items must not be empty")
+        return v
+
+
+class AttendeeTicketProductSwap(BaseModel):
+    """Request body to change the product of an attendee's ticket (admin panel)."""
+
+    product_id: uuid.UUID
+
+
+class AttendeeTicketMetadataUpdate(BaseModel):
+    """Request body to edit a meal-plan ticket's choices post-purchase (portal).
+
+    Replaces the three choice keys inside AttendeeProducts.purchase_metadata:
+    daily_choices (ISO date -> menu key | "chef"), dietary_restriction, and
+    special_request. The key/date semantics are NOT validated here — that needs
+    the meal-plan step's template_config and happens in the CRUD layer via
+    ticketing_step.meal_plan.validate_daily_choices.
+    """
+
+    daily_choices: dict[str, str]  # ISO date -> menu key | "chef"
+    dietary_restriction: str | None = None
+    special_request: str | None = None
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+
 class TicketAttendeeSnapshot(BaseModel):
     """Minimal attendee data embedded in a TicketPublic response."""
 

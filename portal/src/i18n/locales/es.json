@@ -1,4 +1,18 @@
 {
+  "cartBadge": {
+    "title": "Tu carrito",
+    "aria_open": "Abrir carrito",
+    "passes_one": "{{count}} pase",
+    "passes_other": "{{count}} pases",
+    "housing": "Alojamiento",
+    "merch_one": "{{count}} producto de merch",
+    "merch_other": "{{count}} productos de merch",
+    "patron": "Contribución patron",
+    "go_to_checkout": "Ir al checkout",
+    "clear": "Vaciar carrito",
+    "clear_confirm": "Confirmar",
+    "clearing": "Vaciando..."
+  },
   "common": {
     "apply": "Aplicar",
     "back": "Volver",
@@ -487,7 +501,7 @@
     "list": {
       "heading": "Eventos",
       "subheading": "Próximos eventos en {{cityName}}",
-      "subheading_with_tz": "Próximos eventos en {{cityName}} — horarios en {{timezone}}",
+      "subheading_with_tz": "Próximos eventos en {{cityName}}, horarios en {{timezone}}",
       "empty_state": "Aún no hay eventos",
       "events_disabled_heading": "Eventos desactivados",
       "events_disabled_message": "El organizador desactivó los eventos para {{cityName}}.",
@@ -499,7 +513,9 @@
       "unhide_title": "Mostrar",
       "highlighted_badge": "Destacado",
       "highlighted_title": "Evento destacado",
-      "owned_title": "Creado por ti"
+      "owned_title": "Creado por ti",
+      "collapse_day_aria": "Colapsar eventos del {{date}}",
+      "expand_day_aria": "Expandir eventos del {{date}}"
     },
     "status": {
       "draft": "Borrador",
@@ -567,12 +583,33 @@
     "rsvp": {
       "going": "Asistiré",
       "rsvp": "Anotarme",
+      "full": "Completo",
       "cancel": "Cancelar RSVP",
       "check_in": "Check-in",
       "check_in_opens_at_start": "El check-in se habilita al comenzar el evento",
       "registered": "Anotado",
       "checked_in": "Check-in realizado",
       "action_error": "No pudimos actualizar tu RSVP. Por favor intentá de nuevo."
+    },
+    "recurrence": {
+      "daily_one": "Se repite diariamente",
+      "daily_other": "Se repite cada {{count}} días",
+      "weekly_one": "Se repite semanalmente",
+      "weekly_other": "Se repite cada {{count}} semanas",
+      "weekly_on_one": "Se repite cada semana el {{days}}",
+      "weekly_on_other": "Se repite cada {{count}} semanas el {{days}}",
+      "monthly_one": "Se repite mensualmente",
+      "monthly_other": "Se repite cada {{count}} meses",
+      "count_suffix_one": ", por {{count}} ocurrencia",
+      "count_suffix_other": ", por {{count}} ocurrencias",
+      "until_suffix": ", hasta el {{date}}",
+      "weekday_MO": "lunes",
+      "weekday_TU": "martes",
+      "weekday_WE": "miércoles",
+      "weekday_TH": "jueves",
+      "weekday_FR": "viernes",
+      "weekday_SA": "sábado",
+      "weekday_SU": "domingo"
     },
     "login_required": {
       "title": "Iniciá sesión para ver el evento",
@@ -585,7 +622,7 @@
       "page_title": "{{popupName}} - Calendario",
       "page_title_fallback": "Calendario",
       "subheading": "Próximos eventos en {{popupName}}",
-      "subheading_with_tz": "Próximos eventos en {{popupName}} — horarios en {{timezone}}"
+      "subheading_with_tz": "Próximos eventos en {{popupName}}, horarios en {{timezone}}"
     },
     "detail": {
       "event_not_found": "Evento no encontrado",
@@ -626,15 +663,25 @@
       "pending_approval_banner_title": "Pendiente de aprobación",
       "pending_approval_banner_message": "Tu evento está pendiente de aprobación y aún no es visible para otros.",
       "open_in_maps": "Abrir en Google Maps",
-      "view_on_geobrowser": "Ver en Geobrowser"
+      "view_on_geobrowser": "Ver en Geobrowser",
+      "share_button": "Compartir evento",
+      "share_link_copied": "Link copiado",
+      "share_link_error": "No se pudo copiar el link",
+      "admin_notes_heading": "Notas de admin",
+      "admin_notes_staff_only": "Interno, solo personal",
+      "admin_notes_placeholder": "Notas sobre este evento, visibles solo para el personal del backoffice",
+      "admin_notes_save_button": "Guardar notas",
+      "admin_notes_saving_button": "Guardando",
+      "admin_notes_saved_toast": "Notas guardadas",
+      "admin_notes_error_toast": "No se pudieron guardar las notas"
     },
     "form": {
       "create_heading": "Crear evento",
       "create_subheading": "Nuevo evento en {{cityName}}",
-      "create_subheading_with_tz": "Nuevo evento en {{cityName}} — horario en {{timezone}}",
+      "create_subheading_with_tz": "Nuevo evento en {{cityName}}, horario en {{timezone}}",
       "edit_heading": "Editar evento",
       "edit_subheading": "Actualizá tu evento en {{cityName}}",
-      "edit_subheading_with_tz": "Actualizá tu evento en {{cityName}} — horario en {{timezone}}",
+      "edit_subheading_with_tz": "Actualizá tu evento en {{cityName}}, horario en {{timezone}}",
       "venue_label": "Lugar",
       "venue_placeholder": "Sin lugar",
       "venue_not_bookable": "Este lugar no es reservable.",
@@ -642,7 +689,7 @@
       "venue_setup_teardown": "Bloqueado {{setupTime}}m antes de inicio y {{teardownTime}}m después del fin para setup/teardown.",
       "venue_closed_warning": "La fecha elegida cae en un día que el lugar está cerrado.",
       "view_pictures_button": "Ver fotos",
-      "venue_pictures_heading": "{{venue}} — fotos",
+      "venue_pictures_heading": "{{venue}}: fotos",
       "no_venue_pictures": "Este lugar todavía no tiene fotos.",
       "title_label": "Título",
       "title_placeholder": "Nombre del evento",
@@ -755,7 +802,7 @@
         "venue_not_available": "La creación de lugares no está disponible",
         "venue_not_available_message": "El organizador no habilitó la creación de lugares para {{cityName}}.",
         "back_to_venues": "Volver a lugares",
-        "venue_submitted_success": "Lugar enviado — esperando aprobación del admin",
+        "venue_submitted_success": "Lugar enviado, esperando aprobación del admin",
         "venue_created_success": "Lugar creado",
         "no_popup_error": "Sin popup",
         "failed_to_create": "No se pudo crear el lugar",

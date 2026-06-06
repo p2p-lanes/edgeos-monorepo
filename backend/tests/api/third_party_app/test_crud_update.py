@@ -65,7 +65,12 @@ class TestPatchThirdPartyApp:
         resp = client.patch(
             f"{BASE_URL}/{app['id']}",
             headers=_auth(admin_token_tenant_a),
-            json={"allowed_token_scopes": ["portal:applications:read", "portal:directory:read"]},
+            json={
+                "allowed_token_scopes": [
+                    "portal:applications:read",
+                    "portal:directory:read",
+                ]
+            },
         )
         assert resp.status_code == 200, resp.text
         assert set(resp.json()["allowed_token_scopes"]) == {
@@ -126,7 +131,9 @@ class TestPatchThirdPartyApp:
     ) -> None:
         """Patching a revoked app → 409."""
         app = _create_app(client, admin_token_tenant_a)
-        del_resp = client.delete(f"{BASE_URL}/{app['id']}", headers=_auth(admin_token_tenant_a))
+        del_resp = client.delete(
+            f"{BASE_URL}/{app['id']}", headers=_auth(admin_token_tenant_a)
+        )
         assert del_resp.status_code == 204
 
         patch_resp = client.patch(

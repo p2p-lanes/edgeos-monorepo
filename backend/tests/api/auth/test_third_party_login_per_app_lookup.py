@@ -121,9 +121,7 @@ class TestThirdPartyLoginWithPerAppLookup:
         # 401 is fine here — it means the key was valid but the human doesn't exist
         assert resp.status_code in (200, 401, 422)
 
-    def test_invalid_key_returns_401_on_login(
-        self, client: TestClient
-    ) -> None:
+    def test_invalid_key_returns_401_on_login(self, client: TestClient) -> None:
         """Invalid key returns 401 on /auth/human/third-party/login."""
         resp = client.post(
             LOGIN_URL,

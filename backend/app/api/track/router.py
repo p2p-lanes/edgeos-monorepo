@@ -222,18 +222,19 @@ async def list_portal_track_events(
             status_code=status.HTTP_404_NOT_FOUND, detail="Track not found"
         )
 
+    # Track views are public — hide private events only. Unlisted events are
+    # visible in the track view because the track itself acts as a soft share.
+    # Filtering in the query (not in Python) keeps the paging total correct.
     events, total = events_crud.find_by_popup(
         db,
         popup_id=track.popup_id,
         track_ids=[track_id],
         event_status=EventStatus.PUBLISHED,
+        exclude_visibility=[EventVisibility.PRIVATE],
         skip=skip,
         limit=limit,
     )
-    # Track views are public — hide private events only. Unlisted events are
-    # visible in the track view because the track itself acts as a soft share.
-    events = [e for e in events if e.visibility != EventVisibility.PRIVATE]
     return ListModel[EventPublic](
         results=[EventPublic.model_validate(e) for e in events],
-        paging=Paging(offset=skip, limit=limit, total=len(events)),
+        paging=Paging(offset=skip, limit=limit, total=total),
     )

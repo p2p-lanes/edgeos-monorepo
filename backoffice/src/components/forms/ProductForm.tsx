@@ -1,3 +1,4 @@
+import { localTzNaiveToUtc, utcToLocalTzNaive } from "@edgeos/shared-events"
 import { useForm } from "@tanstack/react-form"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useNavigate } from "@tanstack/react-router"
@@ -13,7 +14,7 @@ import {
   ShieldCheck,
   TicketPercent,
 } from "lucide-react"
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import {
   PopupsService,
   type ProductCreate,
@@ -32,7 +33,6 @@ import { TranslationManager } from "@/components/translations/TranslationManager
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
-import { DatePicker } from "@/components/ui/date-picker"
 import {
   Dialog,
   DialogContent,
@@ -67,6 +67,7 @@ import {
   UnsavedChangesDialog,
   useUnsavedChanges,
 } from "@/hooks/useUnsavedChanges"
+import { useEventTimezone } from "@/lib/events/useEventTimezone"
 import { createErrorHandler } from "@/utils"
 
 interface ProductFormProps {
@@ -106,6 +107,11 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
   const [customCategories, setCustomCategories] = useState<string[]>([])
 
   const popupId = defaultValues?.popup_id ?? selectedPopupId
+  // The sale window is entered/displayed in the popup's timezone (the same tz
+  // events and other dates use). Falls back to UTC until settings resolve.
+  const { timezone: popupTimezone, isLoading: tzLoading } = useEventTimezone(
+    popupId ?? undefined,
+  )
   const { data: apiCategories } = useQuery({
     queryKey: ["product-categories", popupId],
     queryFn: () => ProductsService.listProductCategories({ popupId: popupId! }),
@@ -203,8 +209,11 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
       exclusive: defaultValues?.exclusive ?? false,
       total_stock_cap: defaultValues?.total_stock_cap?.toString() ?? "",
       max_per_order: defaultValues?.max_per_order?.toString() ?? "",
-      sale_starts_at: defaultValues?.sale_starts_at ?? "",
-      sale_ends_at: defaultValues?.sale_ends_at ?? "",
+      // Held as naive "YYYY-MM-DDTHH:MM" wall-clock in the popup timezone;
+      // pre-filled from the stored UTC instants once the tz resolves (effect
+      // below) and converted back to UTC on submit.
+      sale_starts_at: "",
+      sale_ends_at: "",
       insurance_eligible: defaultValues?.insurance_eligible ?? false,
       discountable: defaultValues?.discountable ?? true,
     },
@@ -228,6 +237,16 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
       const isHousing = value.category === "housing"
       const housingImages = isHousing ? value.images : []
 
+      // Sale window inputs are naive wall-clock in the popup timezone; convert
+      // to a UTC instant for the API (carries a precise cutoff, e.g. a
+      // meal-plan deadline of Friday 11:59 PM). Applies to every category.
+      const saleStartsUtc = value.sale_starts_at
+        ? localTzNaiveToUtc(value.sale_starts_at, popupTimezone).toISOString()
+        : null
+      const saleEndsUtc = value.sale_ends_at
+        ? localTzNaiveToUtc(value.sale_ends_at, popupTimezone).toISOString()
+        : null
+
       if (isEdit) {
         updateMutation.mutate({
           name: value.name,
@@ -238,10 +257,8 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
           images: housingImages,
           category: value.category,
           duration_type: isTicket ? value.duration_type : null,
-          sale_starts_at:
-            isTicket && value.sale_starts_at ? value.sale_starts_at : null,
-          sale_ends_at:
-            isTicket && value.sale_ends_at ? value.sale_ends_at : null,
+          sale_starts_at: saleStartsUtc,
+          sale_ends_at: saleEndsUtc,
           requires_check_in: value.requires_check_in,
           is_active: value.is_active,
           exclusive: value.exclusive,
@@ -265,10 +282,8 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
           images: housingImages,
           category: value.category,
           duration_type: isTicket ? value.duration_type : undefined,
-          sale_starts_at:
-            isTicket && value.sale_starts_at ? value.sale_starts_at : undefined,
-          sale_ends_at:
-            isTicket && value.sale_ends_at ? value.sale_ends_at : undefined,
+          sale_starts_at: saleStartsUtc ?? undefined,
+          sale_ends_at: saleEndsUtc ?? undefined,
           requires_check_in: value.requires_check_in,
           is_active: value.is_active,
           exclusive: value.exclusive,
@@ -282,6 +297,27 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
   })
 
   const blocker = useUnsavedChanges(form)
+
+  // Pre-fill the sale window from the stored UTC instants once the popup
+  // timezone has resolved, converting to popup-local wall-clock for the
+  // datetime-local inputs. One-shot so it never clobbers in-progress edits.
+  const saleWindowPrefilled = useRef(false)
+  useEffect(() => {
+    if (tzLoading || saleWindowPrefilled.current) return
+    saleWindowPrefilled.current = true
+    if (defaultValues?.sale_starts_at) {
+      form.setFieldValue(
+        "sale_starts_at",
+        utcToLocalTzNaive(defaultValues.sale_starts_at, popupTimezone),
+      )
+    }
+    if (defaultValues?.sale_ends_at) {
+      form.setFieldValue(
+        "sale_ends_at",
+        utcToLocalTzNaive(defaultValues.sale_ends_at, popupTimezone),
+      )
+    }
+  }, [tzLoading, popupTimezone, defaultValues, form])
 
   const isPending = createMutation.isPending || updateMutation.isPending
 
@@ -784,51 +820,53 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
                       </InlineRow>
                     )}
                   </form.Field>
-
-                  <form.Field name="sale_starts_at">
-                    {(field) => (
-                      <InlineRow
-                        icon={
-                          <Calendar className="h-4 w-4 text-muted-foreground" />
-                        }
-                        label="Sale Starts At"
-                        description="When the ticket goes on sale"
-                      >
-                        <DatePicker
-                          value={field.state.value}
-                          onChange={(v) => field.handleChange(v)}
-                          disabled={readOnly}
-                          className="max-w-52"
-                          placeholder="Sale start date"
-                        />
-                      </InlineRow>
-                    )}
-                  </form.Field>
-
-                  <form.Field name="sale_ends_at">
-                    {(field) => (
-                      <InlineRow
-                        icon={
-                          <Calendar className="h-4 w-4 text-muted-foreground" />
-                        }
-                        label="Sale Ends At"
-                        description="When the ticket stops being sold"
-                      >
-                        <DatePicker
-                          value={field.state.value}
-                          onChange={(v) => field.handleChange(v)}
-                          disabled={readOnly}
-                          className="max-w-52"
-                          placeholder="Sale end date"
-                        />
-                      </InlineRow>
-                    )}
-                  </form.Field>
                 </InlineSection>
               </>
             )
           }
         </form.Subscribe>
+
+        {/* Sale Window — applies to every product category. Times are entered
+            in the popup's timezone and stored as precise instants, so a cutoff
+            like a meal-plan "Friday 11:59 PM" deadline is enforced exactly. */}
+        <Separator />
+        <InlineSection title="Sale Window">
+          <form.Field name="sale_starts_at">
+            {(field) => (
+              <InlineRow
+                icon={<Calendar className="h-4 w-4 text-muted-foreground" />}
+                label="Sale Starts At"
+                description={`When the product goes on sale (${popupTimezone}). Blank = no limit.`}
+              >
+                <Input
+                  type="datetime-local"
+                  value={field.state.value}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                  disabled={readOnly}
+                  className="max-w-60"
+                />
+              </InlineRow>
+            )}
+          </form.Field>
+
+          <form.Field name="sale_ends_at">
+            {(field) => (
+              <InlineRow
+                icon={<Calendar className="h-4 w-4 text-muted-foreground" />}
+                label="Sale Ends At"
+                description={`Order cutoff — sales close at this exact time (${popupTimezone}).`}
+              >
+                <Input
+                  type="datetime-local"
+                  value={field.state.value}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                  disabled={readOnly}
+                  className="max-w-60"
+                />
+              </InlineRow>
+            )}
+          </form.Field>
+        </InlineSection>
 
         {isEdit && (popupData?.supported_languages?.length ?? 0) > 1 && (
           <>

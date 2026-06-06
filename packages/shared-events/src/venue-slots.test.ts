@@ -5,6 +5,7 @@ import {
   durationFits,
   freeIntervalsForDay,
   localTzNaiveToUtc,
+  monthBoundsInTz,
   tzOffsetMinutes,
   utcToLocalTzNaive,
 } from "./venue-slots"
@@ -38,6 +39,38 @@ describe("dayBoundsInTz", () => {
   it("range is exactly 24h for a non-DST day", () => {
     const { start, end } = dayBoundsInTz("2026-06-04", "America/Los_Angeles")
     expect(end.getTime() - start.getTime()).toBe(24 * 60 * 60 * 1000)
+  })
+})
+
+describe("monthBoundsInTz", () => {
+  it("LA June 2026 → 06-01 07:00Z to 07-01 07:00Z", () => {
+    const anchor = new Date("2026-06-15T12:00:00Z")
+    const { start, end } = monthBoundsInTz(anchor, "America/Los_Angeles")
+    expect(start.toISOString()).toBe("2026-06-01T07:00:00.000Z")
+    expect(end.toISOString()).toBe("2026-07-01T07:00:00.000Z")
+  })
+
+  it("Tokyo June 2026 → 05-31 15:00Z to 06-30 15:00Z", () => {
+    const anchor = new Date("2026-06-15T12:00:00Z")
+    const { start, end } = monthBoundsInTz(anchor, "Asia/Tokyo")
+    expect(start.toISOString()).toBe("2026-05-31T15:00:00.000Z")
+    expect(end.toISOString()).toBe("2026-06-30T15:00:00.000Z")
+  })
+
+  it("wraps year on December anchor", () => {
+    const anchor = new Date("2026-12-20T12:00:00Z")
+    const { start, end } = monthBoundsInTz(anchor, "America/Los_Angeles")
+    expect(start.toISOString()).toBe("2026-12-01T08:00:00.000Z")
+    expect(end.toISOString()).toBe("2027-01-01T08:00:00.000Z")
+  })
+
+  it("uses the popup-tz month even when the anchor instant is in a different month in browser-local time", () => {
+    // 2026-07-01 00:30Z is "2026-06-30 17:30" in LA — the anchor's LA
+    // month is June, so bounds must wrap the June interval (not July).
+    const anchor = new Date("2026-07-01T00:30:00Z")
+    const { start, end } = monthBoundsInTz(anchor, "America/Los_Angeles")
+    expect(start.toISOString()).toBe("2026-06-01T07:00:00.000Z")
+    expect(end.toISOString()).toBe("2026-07-01T07:00:00.000Z")
   })
 })
 

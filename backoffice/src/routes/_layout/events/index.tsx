@@ -1,3 +1,4 @@
+import { dayBoundsInTz } from "@edgeos/shared-events"
 import {
   keepPreviousData,
   useMutation,
@@ -40,6 +41,7 @@ import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
 import { EventsCalendarView } from "@/components/events/EventsCalendarView"
 import { EventsDayView } from "@/components/events/EventsDayView"
+import { EventsListView } from "@/components/events/EventsListView"
 import {
   type EventsView,
   EventsViewSwitcher,
@@ -105,7 +107,23 @@ const EVENT_STATUS_OPTIONS: { value: EventStatus; label: string }[] = [
   { value: "rejected", label: "Rejected" },
 ]
 
-const VALID_EVENT_VIEWS: Set<string> = new Set(["table", "calendar", "day"])
+const VALID_EVENT_VIEWS: Set<string> = new Set([
+  "table",
+  "list",
+  "calendar",
+  "day",
+])
+
+// Remember the last view the user picked so returning to /events (or a fresh
+// session) lands on it. Defaults to the card "list" view when nothing is
+// stored yet.
+const EVENTS_VIEW_STORAGE_KEY = "edgeos:events-view"
+
+function readStoredEventsView(): EventsView | null {
+  if (typeof window === "undefined") return null
+  const v = window.localStorage.getItem(EVENTS_VIEW_STORAGE_KEY)
+  return v && VALID_EVENT_VIEWS.has(v) ? (v as EventsView) : null
+}
 
 type EventsSearchParams = TableSearchParams & {
   status?: EventStatus
@@ -929,6 +947,42 @@ function EventsTableContent({
 
   const hasFilters = !!(status || venueId || creatorId || startDate || endDate)
 
+  // Popup timezone drives display of every start_time in the table so the
+  // "Events" list matches the calendar views. We render a skeleton until
+  // settings resolve to avoid a browser-tz flash on first paint, and we use
+  // popup-tz day boundaries for the date filter so events near midnight in
+  // popup TZ aren't clipped.
+  const { data: popupSettings, isLoading: popupSettingsLoading } = useQuery({
+    queryKey: ["event-settings", selectedPopupId],
+    queryFn: async () => {
+      if (!selectedPopupId) return null
+      try {
+        return await EventSettingsService.getEventSettings({
+          popupId: selectedPopupId,
+        })
+      } catch {
+        return null
+      }
+    },
+    enabled: !!selectedPopupId,
+  })
+  // Fall back to UTC (the backend default for EventSettings.timezone) when
+  // settings haven't been created yet. Never fall back to browser tz — that
+  // would make the list display drift from the calendar/day views and emails.
+  const popupTz = popupSettings?.timezone ?? "UTC"
+
+  const filterStartAfter = useMemo(() => {
+    if (!startDate) return undefined
+    if (popupTz) return dayBoundsInTz(startDate, popupTz).start.toISOString()
+    return `${startDate}T00:00:00Z`
+  }, [startDate, popupTz])
+
+  const filterStartBefore = useMemo(() => {
+    if (!endDate) return undefined
+    if (popupTz) return dayBoundsInTz(endDate, popupTz).end.toISOString()
+    return `${endDate}T23:59:59Z`
+  }, [endDate, popupTz])
+
   const { data: events } = useQuery({
     queryKey: [
       "events",
@@ -942,6 +996,7 @@ function EventsTableContent({
         creatorId,
         startDate,
         endDate,
+        popupTz,
       },
     ],
     queryFn: () =>
@@ -958,10 +1013,10 @@ function EventsTableContent({
         locationKind:
           venueId === "custom" || venueId === "meeting" ? venueId : undefined,
         ownerId: creatorId || undefined,
-        startAfter: startDate ? `${startDate}T00:00:00Z` : undefined,
-        startBefore: endDate ? `${endDate}T23:59:59Z` : undefined,
+        startAfter: filterStartAfter,
+        startBefore: filterStartBefore,
       }),
-    enabled: !!selectedPopupId,
+    enabled: !!selectedPopupId && !popupSettingsLoading,
     placeholderData: keepPreviousData,
   })
 
@@ -993,31 +1048,13 @@ function EventsTableContent({
     return map
   }, [venues])
 
-  // Popup timezone drives display of every start_time in the table so the
-  // "Events" list matches the calendar views. Falls back to browser tz if
-  // settings haven't loaded or aren't configured for this popup.
-  const { data: popupSettings } = useQuery({
-    queryKey: ["event-settings", selectedPopupId],
-    queryFn: async () => {
-      if (!selectedPopupId) return null
-      try {
-        return await EventSettingsService.getEventSettings({
-          popupId: selectedPopupId,
-        })
-      } catch {
-        return null
-      }
-    },
-    enabled: !!selectedPopupId,
-  })
-  const popupTz = popupSettings?.timezone ?? undefined
-
   const columns = useMemo(
     () => buildEventColumns(venueNameById, popupTz),
     [venueNameById, popupTz],
   )
 
-  if (!events) return <Skeleton className="h-64 w-full" />
+  if (!events || popupSettingsLoading)
+    return <Skeleton className="h-64 w-full" />
 
   return (
     <div className="space-y-3">
@@ -1171,7 +1208,7 @@ function EventsPage() {
   const { selectedPopupId } = useWorkspace()
   const navigate = useNavigate()
   const searchParams = Route.useSearch()
-  const view: EventsView = searchParams.view ?? "table"
+  const view: EventsView = searchParams.view ?? readStoredEventsView() ?? "list"
   const selectedDate = parseSelectedDate(searchParams.date)
   // Picking an occurrence row pops a "series or this only" prompt; non-recurring
   // rows skip the dialog and navigate straight to /events/:id/edit.
@@ -1239,13 +1276,16 @@ function EventsPage() {
 
   const setView = useCallback(
     (next: EventsView) => {
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem(EVENTS_VIEW_STORAGE_KEY, next)
+      }
       navigate({
         to: "/events",
         search: (prev: Record<string, unknown>) => {
           const prevDate = typeof prev.date === "string" ? prev.date : undefined
           return {
             ...prev,
-            view: next === "table" ? undefined : next,
+            view: next,
             date: next === "day" ? prevDate : undefined,
           }
         },
@@ -1343,6 +1383,26 @@ function EventsPage() {
           <Suspense fallback={<Skeleton className="h-64 w-full" />}>
             {view === "table" && (
               <EventsTableContent onRowClick={handleRowClick} />
+            )}
+            {view === "list" && (
+              <div className="space-y-3">
+                <CalendarDayToolbar
+                  popupId={selectedPopupId}
+                  status={searchParams.status}
+                  venueId={searchParams.venueId}
+                  search={searchParams.search ?? ""}
+                  setStatus={setStatusGlobal}
+                  setVenueId={setVenueIdGlobal}
+                  setSearch={setSearchGlobal}
+                />
+                <EventsListView
+                  popupId={selectedPopupId}
+                  status={searchParams.status}
+                  venueId={searchParams.venueId}
+                  search={searchParams.search ?? ""}
+                  onEventClick={handleRowClick}
+                />
+              </div>
             )}
             {view === "calendar" && (
               <div className="space-y-3">

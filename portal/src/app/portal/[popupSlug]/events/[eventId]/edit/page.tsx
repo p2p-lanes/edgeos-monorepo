@@ -8,6 +8,7 @@ import { useTranslation } from "react-i18next"
 
 import { EventsService, HumansService } from "@/client"
 import { useCityProvider } from "@/providers/cityProvider"
+import { canManageEvent } from "../../lib/eventPermissions"
 import { EditEventForm } from "./EditEventForm"
 
 export default function EditPortalEventPage() {
@@ -47,7 +48,8 @@ export default function EditPortalEventPage() {
     )
   }
 
-  if (!currentHuman || event.owner_id !== currentHuman.id) {
+  const canManage = canManageEvent(event, currentHuman?.id)
+  if (!canManage) {
     return (
       <div className="max-w-2xl mx-auto p-4 sm:p-6 text-center py-20">
         <h1 className="text-xl font-semibold">

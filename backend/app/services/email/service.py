@@ -34,6 +34,7 @@ from app.services.email.templates import (
     EventApprovalRejectedContext,
     EventCancelledContext,
     EventInvitationContext,
+    EventRsvpCancelledContext,
     EventUpdatedContext,
     LoginCodeHumanContext,
     LoginCodeUserContext,
@@ -744,6 +745,39 @@ class EmailService:
             subject=subject,
             template_type=EmailTemplateType.EVENT_CANCELLED,
             template_name=EmailTemplates.EVENT_CANCELLED,
+            context=context.model_dump(exclude_none=True),
+            from_address=from_address,
+            from_name=from_name,
+            popup_id=popup_id,
+            db_session=db_session,
+            attachments=attachments,
+            ical_body=ical_body,
+            ical_method="CANCEL",
+        )
+
+    async def send_event_rsvp_cancelled(
+        self,
+        to: str,
+        subject: str,
+        context: EventRsvpCancelledContext,
+        from_address: str | None = None,
+        from_name: str | None = None,
+        popup_id: uuid.UUID | None = None,
+        db_session: Session | None = None,
+        attachments: list[EmailAttachment] | None = None,
+        ical_body: str | None = None,
+    ) -> bool:
+        """Send a self-service RSVP cancellation confirmation.
+
+        The recipient cancelled their own registration, so this carries the
+        iTIP CANCEL body to drop the entry from their calendar while the copy
+        makes clear the event itself was not cancelled.
+        """
+        return await self._send_with_fallback(
+            to=to,
+            subject=subject,
+            template_type=EmailTemplateType.EVENT_RSVP_CANCELLED,
+            template_name=EmailTemplates.EVENT_RSVP_CANCELLED,
             context=context.model_dump(exclude_none=True),
             from_address=from_address,
             from_name=from_name,

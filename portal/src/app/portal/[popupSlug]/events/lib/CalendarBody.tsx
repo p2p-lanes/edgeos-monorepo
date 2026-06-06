@@ -1,6 +1,7 @@
 "use client"
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { monthBoundsInTz } from "@edgeos/shared-events"
+import { useQuery } from "@tanstack/react-query"
 import {
   addDays,
   addMonths,
@@ -30,20 +31,14 @@ import {
 import Link from "next/link"
 import { useEffect, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
-import { toast } from "sonner"
 
-import {
-  ApiError,
-  EventParticipantsService,
-  type EventPublic,
-  EventsService,
-  HumansService,
-} from "@/client"
+import { type EventPublic, EventsService, HumansService } from "@/client"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { CoverImage } from "./CoverImage"
 import type { EventsScrollSnapshot } from "./eventsViewState"
 import { summarizeRrule } from "./summarizeRrule"
+import { useEventRsvp } from "./useEventRsvp"
 import { useEventTimezone } from "./useEventTimezone"
 
 interface CalendarBodyProps {
@@ -88,6 +83,8 @@ interface CalendarBodyProps {
   /** Timezone forwarded to ``useEventTimezone`` when settings aren't
    * available (public mode has no authenticated settings endpoint). */
   timezoneOverride?: string
+  /** Popup-scoped fallback image when an event has no cover/venue image. */
+  placeholderUrl?: string | null
 }
 
 /**
@@ -108,11 +105,11 @@ export function CalendarBody({
   eventsOverride,
   onEventClick,
   timezoneOverride,
+  placeholderUrl,
 }: CalendarBodyProps) {
   const isAuthed = mode === "authed"
   const useOverride = eventsOverride !== undefined
   const { t } = useTranslation()
-  const queryClient = useQueryClient()
   const [currentMonth, setCurrentMonth] = useState(
     () => defaultDate ?? new Date(),
   )
@@ -134,8 +131,19 @@ export function CalendarBody({
     formatTime,
     formatDayKey,
     formatGridDayKey,
+    formatMonthHeader,
+    weekdayShortLabels,
+    locale,
+    timezone,
     isLoading: tzLoading,
   } = useEventTimezone(popupId, timezoneOverride)
+
+  const formatSelectedDateHeader = (d: Date) =>
+    new Intl.DateTimeFormat(locale, {
+      weekday: "long",
+      month: "long",
+      day: "numeric",
+    }).format(d)
 
   const { data: currentHuman } = useQuery({
     queryKey: ["current-human"],
@@ -144,11 +152,17 @@ export function CalendarBody({
     enabled: isAuthed,
   })
 
+  // Month bounds anchored to the popup's timezone — otherwise events near
+  // the first/last day of the month (in popup TZ) get clipped from the
+  // query window when the viewer's browser TZ differs.
+  const monthBounds = monthBoundsInTz(currentMonth, timezone)
+
   const { data } = useQuery({
     queryKey: [
       "portal-events-calendar",
       popupId,
       format(currentMonth, "yyyy-MM"),
+      timezone,
       rsvpedOnly,
       search,
       tags,
@@ -158,64 +172,20 @@ export function CalendarBody({
       EventsService.listPortalEvents({
         popupId: popupId!,
         eventStatus: "published",
-        startAfter: startOfMonth(currentMonth).toISOString(),
-        startBefore: endOfMonth(currentMonth).toISOString(),
+        startAfter: monthBounds.start.toISOString(),
+        startBefore: monthBounds.end.toISOString(),
         rsvpedOnly: rsvpedOnly || undefined,
         search: search || undefined,
         tags: tags?.length ? tags : undefined,
         trackIds: trackIds?.length ? trackIds : undefined,
         limit: 200,
       }),
-    enabled: isAuthed && !useOverride && !!popupId,
+    enabled: isAuthed && !useOverride && !!popupId && !tzLoading,
   })
 
-  // Recurring events require occurrence_start so the RSVP targets a single
-  // instance. That includes both expanded pseudo-rows (have occurrence_id)
-  // AND the series master itself, whose start_time IS the first occurrence.
-  // One-off events must not send it.
-  const rsvpBodyFor = (e: EventPublic) =>
-    e.rrule || e.occurrence_id ? { occurrence_start: e.start_time } : undefined
-  const toastRsvpError = (err: unknown) => {
-    const fallback = t("events.rsvp.action_error") as string
-    let detail = fallback
-    if (err instanceof ApiError && err.body && typeof err.body === "object") {
-      const body = err.body as { detail?: unknown }
-      if (typeof body.detail === "string") detail = body.detail
-    }
-    toast.error(detail)
-  }
-  const rsvpMutation = useMutation({
-    mutationFn: (e: EventPublic) =>
-      EventParticipantsService.registerForEvent({
-        eventId: e.id,
-        requestBody: rsvpBodyFor(e),
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["portal-events-calendar"] })
-    },
-    onError: toastRsvpError,
-  })
-  const cancelRsvpMutation = useMutation({
-    mutationFn: (e: EventPublic) =>
-      EventParticipantsService.cancelRegistration({
-        eventId: e.id,
-        requestBody: rsvpBodyFor(e),
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["portal-events-calendar"] })
-    },
-    onError: toastRsvpError,
-  })
-  // Tracks the in-flight RSVP target so we can pin the spinner to the
-  // specific event (and recurring occurrence) the user clicked instead
-  // of flipping every "Going" button on the day.
-  const pendingRsvpKey: string | null = (() => {
-    const pending =
-      (rsvpMutation.isPending && rsvpMutation.variables) ||
-      (cancelRsvpMutation.isPending && cancelRsvpMutation.variables) ||
-      null
-    return pending ? `${pending.id}:${pending.start_time}` : null
-  })()
+  const { rsvpMutation, cancelRsvpMutation, pendingRsvpKey } = useEventRsvp([
+    "portal-events-calendar",
+  ])
 
   const events = useOverride ? (eventsOverride ?? []) : (data?.results ?? [])
 
@@ -236,7 +206,6 @@ export function CalendarBody({
   }
 
   const selectedEvents = selectedDate ? getEventsForDate(selectedDate) : []
-  const dayLabels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 
   // `from` rebuilds the events-page URL state (view + selected day) so
   // the detail page's "Back to events" link returns the user here.
@@ -305,7 +274,7 @@ export function CalendarBody({
             <ChevronLeft className="h-4 w-4" />
           </Button>
           <h2 className="text-sm font-semibold capitalize">
-            {format(currentMonth, "MMMM yyyy")}
+            {formatMonthHeader(currentMonth)}
           </h2>
           <Button
             variant="ghost"
@@ -318,10 +287,10 @@ export function CalendarBody({
         </div>
 
         <div className="grid grid-cols-7 mb-1">
-          {dayLabels.map((d) => (
+          {weekdayShortLabels.map((d) => (
             <div
               key={d}
-              className="text-center text-[10px] font-medium text-muted-foreground py-1"
+              className="text-center text-[10px] font-medium text-muted-foreground py-1 capitalize"
             >
               {d}
             </div>
@@ -369,8 +338,8 @@ export function CalendarBody({
         {selectedDate ? (
           <>
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-semibold">
-                {format(selectedDate, "EEEE, MMMM d")}
+              <h3 className="text-sm font-semibold capitalize">
+                {formatSelectedDateHeader(selectedDate)}
               </h3>
               <span className="text-xs text-muted-foreground">
                 {t("events.calendar.selected_events", {
@@ -389,7 +358,7 @@ export function CalendarBody({
               <div className="space-y-2">
                 {selectedEvents.map((event) => {
                   const recurrenceLabel =
-                    summarizeRrule(event.rrule) ??
+                    summarizeRrule(event.rrule, t) ??
                     (event.recurrence_master_id
                       ? t("events.list.part_of_recurring_series")
                       : null)
@@ -416,18 +385,26 @@ export function CalendarBody({
                         className="block p-3"
                       >
                         <div className="flex items-start gap-3">
-                          {event.venue_image_url && (
-                            <div className="h-12 w-12 rounded-md overflow-hidden shrink-0">
-                              <CoverImage
-                                src={event.venue_image_url}
-                                alt={event.venue_title ?? ""}
-                                className="h-full w-full object-cover"
-                                fallback={
-                                  <MapPin className="h-5 w-5 text-muted-foreground/40" />
-                                }
-                              />
-                            </div>
-                          )}
+                          {(() => {
+                            const thumbUrl =
+                              event.cover_url ||
+                              event.venue_image_url ||
+                              placeholderUrl ||
+                              null
+                            if (!thumbUrl) return null
+                            return (
+                              <div className="h-12 w-12 rounded-md overflow-hidden shrink-0">
+                                <CoverImage
+                                  src={thumbUrl}
+                                  alt={event.venue_title ?? ""}
+                                  className="h-full w-full object-cover"
+                                  fallback={
+                                    <MapPin className="h-5 w-5 text-muted-foreground/40" />
+                                  }
+                                />
+                              </div>
+                            )
+                          })()}
                           <div className="min-w-0 flex-1">
                             <h4 className="text-sm font-medium truncate flex items-center gap-1.5">
                               {isOwner && (

@@ -848,6 +848,11 @@ export const ApplicationFunnelSchema = {
             title: 'Pending Fee',
             default: 0
         },
+        paid: {
+            type: 'integer',
+            title: 'Paid',
+            default: 0
+        },
         in_review: {
             type: 'integer',
             title: 'In Review',
@@ -858,10 +863,10 @@ export const ApplicationFunnelSchema = {
             title: 'Accepted',
             default: 0
         },
-        paid: {
-            type: 'integer',
-            title: 'Paid',
-            default: 0
+        fee_enabled: {
+            type: 'boolean',
+            title: 'Fee Enabled',
+            default: false
         }
     },
     type: 'object',
@@ -2539,6 +2544,25 @@ export const AttendeeStatsSchema = {
     description: 'Statistics for attendees.'
 } as const;
 
+export const AttendeeTicketAddSchema = {
+    properties: {
+        items: {
+            items: {
+                '$ref': '#/components/schemas/AttendeeTicketLine'
+            },
+            type: 'array',
+            title: 'Items'
+        }
+    },
+    type: 'object',
+    required: ['items'],
+    title: 'AttendeeTicketAdd',
+    description: `Request body to add tickets to an attendee (admin panel, bulk).
+
+Mirrors the bulk-grant shape: N products, each with a quantity. Stock is
+validated per product and the whole batch is applied atomically.`
+} as const;
+
 export const AttendeeTicketInfoSchema = {
     properties: {
         id: {
@@ -2605,6 +2629,84 @@ per-ticket QR list the main applicant sees without an extra round-trip.
 \`last_scan_at\` is the most recent occurred_at from check_ins for this
 ticket (None when never scanned). The portal uses it to flag already-used
 QR codes — same behavior as the main applicant's pass view.`
+} as const;
+
+export const AttendeeTicketLineSchema = {
+    properties: {
+        product_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Product Id'
+        },
+        quantity: {
+            type: 'integer',
+            minimum: 1,
+            title: 'Quantity',
+            default: 1
+        }
+    },
+    type: 'object',
+    required: ['product_id'],
+    title: 'AttendeeTicketLine',
+    description: 'One product + quantity line in a bulk ticket add.'
+} as const;
+
+export const AttendeeTicketMetadataUpdateSchema = {
+    properties: {
+        daily_choices: {
+            additionalProperties: {
+                type: 'string'
+            },
+            type: 'object',
+            title: 'Daily Choices'
+        },
+        dietary_restriction: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Dietary Restriction'
+        },
+        special_request: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Special Request'
+        }
+    },
+    type: 'object',
+    required: ['daily_choices'],
+    title: 'AttendeeTicketMetadataUpdate',
+    description: `Request body to edit a meal-plan ticket's choices post-purchase (portal).
+
+Replaces the three choice keys inside AttendeeProducts.purchase_metadata:
+daily_choices (ISO date -> menu key | "chef"), dietary_restriction, and
+special_request. The key/date semantics are NOT validated here — that needs
+the meal-plan step's template_config and happens in the CRUD layer via
+ticketing_step.meal_plan.validate_daily_choices.`
+} as const;
+
+export const AttendeeTicketProductSwapSchema = {
+    properties: {
+        product_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Product Id'
+        }
+    },
+    type: 'object',
+    required: ['product_id'],
+    title: 'AttendeeTicketProductSwap',
+    description: "Request body to change the product of an attendee's ticket (admin panel)."
 } as const;
 
 export const AttendeeUpdateSchema = {
@@ -2984,6 +3086,17 @@ export const AttendeesDirectoryEntrySchema = {
             ],
             title: 'Picture Url'
         },
+        category: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Category'
+        },
         participation: {
             items: {
                 '$ref': '#/components/schemas/DirectoryProduct'
@@ -3004,7 +3117,137 @@ export const AttendeesDirectoryEntrySchema = {
     type: 'object',
     required: ['id'],
     title: 'AttendeesDirectoryEntry',
-    description: 'Single entry in the attendees directory.'
+    description: `Single entry in the attendees directory.
+
+The directory is attendee-centric: one entry per ticket-holding attendee
+(any category), sourced from that attendee's own human record.`
+} as const;
+
+export const AuditLogPublicSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        source: {
+            type: 'string',
+            title: 'Source'
+        },
+        actor_type: {
+            type: 'string',
+            title: 'Actor Type'
+        },
+        actor_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Actor Id'
+        },
+        actor_email: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Actor Email'
+        },
+        actor_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Actor Name'
+        },
+        request_id: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Request Id'
+        },
+        action: {
+            type: 'string',
+            title: 'Action'
+        },
+        entity_type: {
+            type: 'string',
+            title: 'Entity Type'
+        },
+        entity_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Entity Id'
+        },
+        entity_label: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Entity Label'
+        },
+        popup_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Popup Id'
+        },
+        details: {
+            anyOf: [
+                {
+                    additionalProperties: true,
+                    type: 'object'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Details'
+        },
+        created_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Created At'
+        }
+    },
+    type: 'object',
+    required: ['id', 'source', 'actor_type', 'action', 'entity_type', 'created_at'],
+    title: 'AuditLogPublic',
+    description: 'A single audit log entry returned to the backoffice.'
 } as const;
 
 export const AuthCodeSentResponseSchema = {
@@ -3259,6 +3502,42 @@ export const BaseFieldConfigUpdateSchema = {
     },
     type: 'object',
     title: 'BaseFieldConfigUpdate'
+} as const;
+
+export const BugReportCreateSchema = {
+    properties: {
+        title: {
+            type: 'string',
+            maxLength: 200,
+            minLength: 1,
+            title: 'Title'
+        },
+        detail: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Detail'
+        },
+        attachments: {
+            items: {
+                '$ref': '#/components/schemas/TaskAttachmentCreate'
+            },
+            type: 'array',
+            title: 'Attachments'
+        }
+    },
+    type: 'object',
+    required: ['title'],
+    title: 'BugReportCreate',
+    description: `The 'report a bug' payload, open to every backoffice user.
+
+Always produces an internal bug in the to-do column. Attachments are
+optional screenshots / screen-recordings already uploaded to S3.`
 } as const;
 
 export const BuyerInfoSchema = {
@@ -4173,7 +4452,7 @@ export const CheckoutRuntimeProductSchema = {
             anyOf: [
                 {
                     type: 'string',
-                    format: 'date'
+                    format: 'date-time'
                 },
                 {
                     type: 'null'
@@ -4185,7 +4464,7 @@ export const CheckoutRuntimeProductSchema = {
             anyOf: [
                 {
                     type: 'string',
-                    format: 'date'
+                    format: 'date-time'
                 },
                 {
                     type: 'null'
@@ -4918,7 +5197,7 @@ export const EmailTemplatePublicSchema = {
 
 export const EmailTemplateTypeSchema = {
     type: 'string',
-    enum: ['login_code_user', 'login_code_human', 'application_received', 'application_accepted', 'application_rejected', 'application_accepted_with_discount', 'application_accepted_with_incentive', 'application_accepted_scholarship_rejected', 'payment_confirmed', 'abandoned_cart', 'edit_passes_confirmed', 'event_invitation', 'event_updated', 'event_cancelled', 'event_approval_approved', 'event_approval_rejected', 'check_in_pass'],
+    enum: ['login_code_user', 'login_code_human', 'application_received', 'application_accepted', 'application_rejected', 'application_accepted_with_discount', 'application_accepted_with_incentive', 'application_accepted_scholarship_rejected', 'payment_confirmed', 'abandoned_cart', 'edit_passes_confirmed', 'event_invitation', 'event_updated', 'event_cancelled', 'event_rsvp_cancelled', 'event_approval_approved', 'event_approval_rejected', 'check_in_pass'],
     title: 'EmailTemplateType'
 } as const;
 
@@ -5149,6 +5428,17 @@ export const EventCalendarMetaSchema = {
         popup_name: {
             type: 'string',
             title: 'Popup Name'
+        },
+        placeholder_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Placeholder Url'
         }
     },
     type: 'object',
@@ -5173,6 +5463,74 @@ export const EventCalendarTrackSchema = {
     required: ['id', 'name'],
     title: 'EventCalendarTrack',
     description: 'Minimal track projection for the public calendar toolbar.'
+} as const;
+
+export const EventCollaboratorPublicSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        first_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'First Name'
+        },
+        last_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Last Name'
+        },
+        picture_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Picture Url'
+        },
+        email: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Email'
+        }
+    },
+    type: 'object',
+    required: ['id'],
+    title: 'EventCollaboratorPublic',
+    description: `Slim human projection for an event's collaborator chips in the portal.
+
+Mirrors \`\`HumanPortalPublic\`\` so the same picker/avatar rendering works
+for already-saved collaborators. Resolved from \`\`Events.collaborator_ids\`\`
+by the portal get/create/update endpoints (the list endpoints leave it
+empty — collaborators aren't shown on cards).
+
+\`\`email\`\` is only populated by the admin (backoffice) endpoints so a chip
+for a human with no name can fall back to their email; the portal
+endpoints leave it \`\`None\`\` to avoid exposing organizer emails to every
+viewer of a public event.`
 } as const;
 
 export const EventCreateSchema = {
@@ -5329,6 +5687,27 @@ export const EventCreateSchema = {
                 }
             ],
             title: 'Host Display Name'
+        },
+        host_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Host Id'
+        },
+        collaborator_ids: {
+            items: {
+                type: 'string',
+                format: 'uuid'
+            },
+            type: 'array',
+            title: 'Collaborator Ids',
+            default: []
         },
         status: {
             '$ref': '#/components/schemas/EventStatus',
@@ -5853,6 +6232,26 @@ export const EventPublicSchema = {
             ],
             title: 'Host Display Name'
         },
+        host_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Host Id'
+        },
+        collaborator_ids: {
+            items: {
+                type: 'string',
+                format: 'uuid'
+            },
+            type: 'array',
+            title: 'Collaborator Ids'
+        },
         status: {
             '$ref': '#/components/schemas/EventStatus',
             default: 'draft'
@@ -5979,6 +6378,14 @@ export const EventPublicSchema = {
             ],
             title: 'Track Title'
         },
+        collaborators: {
+            items: {
+                '$ref': '#/components/schemas/EventCollaboratorPublic'
+            },
+            type: 'array',
+            title: 'Collaborators',
+            default: []
+        },
         hidden: {
             type: 'boolean',
             title: 'Hidden',
@@ -5994,6 +6401,17 @@ export const EventPublicSchema = {
                 }
             ],
             title: 'My Rsvp Status'
+        },
+        attendee_count: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Attendee Count'
         }
     },
     type: 'object',
@@ -6382,6 +6800,17 @@ export const EventSettingsCreateSchema = {
             type: 'array',
             title: 'Approval Notification Emails',
             default: []
+        },
+        placeholder_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Placeholder Url'
         }
     },
     type: 'object',
@@ -6452,6 +6881,17 @@ export const EventSettingsPublicSchema = {
             },
             type: 'array',
             title: 'Approval Notification Emails'
+        },
+        placeholder_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Placeholder Url'
         },
         created_at: {
             type: 'string',
@@ -6583,6 +7023,17 @@ export const EventSettingsUpdateSchema = {
                 }
             ],
             title: 'Approval Notification Emails'
+        },
+        placeholder_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Placeholder Url'
         }
     },
     type: 'object',
@@ -6790,6 +7241,33 @@ export const EventUpdateSchema = {
                 }
             ],
             title: 'Host Display Name'
+        },
+        host_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Host Id'
+        },
+        collaborator_ids: {
+            anyOf: [
+                {
+                    items: {
+                        type: 'string',
+                        format: 'uuid'
+                    },
+                    type: 'array'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Collaborator Ids'
         },
         status: {
             anyOf: [
@@ -9568,6 +10046,11 @@ export const KeyMetricsSchema = {
             title: 'People',
             default: 0
         },
+        paying_people: {
+            type: 'integer',
+            title: 'Paying People',
+            default: 0
+        },
         total_revenue: {
             type: 'string',
             pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$',
@@ -9760,6 +10243,24 @@ export const ListModel_AttendeesDirectoryEntry_Schema = {
     type: 'object',
     required: ['results', 'paging'],
     title: 'ListModel[AttendeesDirectoryEntry]'
+} as const;
+
+export const ListModel_AuditLogPublic_Schema = {
+    properties: {
+        results: {
+            items: {
+                '$ref': '#/components/schemas/AuditLogPublic'
+            },
+            type: 'array',
+            title: 'Results'
+        },
+        paging: {
+            '$ref': '#/components/schemas/Paging'
+        }
+    },
+    type: 'object',
+    required: ['results', 'paging'],
+    title: 'ListModel[AuditLogPublic]'
 } as const;
 
 export const ListModel_CheckInListItem_Schema = {
@@ -10030,6 +10531,42 @@ export const ListModel_ProductPublic_Schema = {
     type: 'object',
     required: ['results', 'paging'],
     title: 'ListModel[ProductPublic]'
+} as const;
+
+export const ListModel_TaskCommentPublic_Schema = {
+    properties: {
+        results: {
+            items: {
+                '$ref': '#/components/schemas/TaskCommentPublic'
+            },
+            type: 'array',
+            title: 'Results'
+        },
+        paging: {
+            '$ref': '#/components/schemas/Paging'
+        }
+    },
+    type: 'object',
+    required: ['results', 'paging'],
+    title: 'ListModel[TaskCommentPublic]'
+} as const;
+
+export const ListModel_TaskPublic_Schema = {
+    properties: {
+        results: {
+            items: {
+                '$ref': '#/components/schemas/TaskPublic'
+            },
+            type: 'array',
+            title: 'Results'
+        },
+        paging: {
+            '$ref': '#/components/schemas/Paging'
+        }
+    },
+    type: 'object',
+    required: ['results', 'paging'],
+    title: 'ListModel[TaskPublic]'
 } as const;
 
 export const ListModel_TenantPublic_Schema = {
@@ -13205,7 +13742,7 @@ export const ProductBatchItemSchema = {
             anyOf: [
                 {
                     type: 'string',
-                    format: 'date'
+                    format: 'date-time'
                 },
                 {
                     type: 'null'
@@ -13217,7 +13754,7 @@ export const ProductBatchItemSchema = {
             anyOf: [
                 {
                     type: 'string',
-                    format: 'date'
+                    format: 'date-time'
                 },
                 {
                     type: 'null'
@@ -13390,7 +13927,7 @@ export const ProductBatchResultSchema = {
             anyOf: [
                 {
                     type: 'string',
-                    format: 'date'
+                    format: 'date-time'
                 },
                 {
                     type: 'null'
@@ -13402,7 +13939,7 @@ export const ProductBatchResultSchema = {
             anyOf: [
                 {
                     type: 'string',
-                    format: 'date'
+                    format: 'date-time'
                 },
                 {
                     type: 'null'
@@ -13630,7 +14167,7 @@ export const ProductCreateSchema = {
             anyOf: [
                 {
                     type: 'string',
-                    format: 'date'
+                    format: 'date-time'
                 },
                 {
                     type: 'null'
@@ -13642,7 +14179,7 @@ export const ProductCreateSchema = {
             anyOf: [
                 {
                     type: 'string',
-                    format: 'date'
+                    format: 'date-time'
                 },
                 {
                     type: 'null'
@@ -13835,7 +14372,7 @@ export const ProductPublicSchema = {
             anyOf: [
                 {
                     type: 'string',
-                    format: 'date'
+                    format: 'date-time'
                 },
                 {
                     type: 'null'
@@ -13847,7 +14384,7 @@ export const ProductPublicSchema = {
             anyOf: [
                 {
                     type: 'string',
-                    format: 'date'
+                    format: 'date-time'
                 },
                 {
                     type: 'null'
@@ -13924,10 +14461,9 @@ export const ProductPublicSchema = {
     title: 'ProductPublic',
     description: `Product schema for API responses.
 
-Sale window fields are exposed as \`date\` (inclusive day) even though they
-are persisted as \`datetime\` UTC (exclusive instant). \`sale_ends_at\` is
-de-bumped by 1 day so the response shows the last day the product is on
-sale — the canonical "operator-friendly" representation.`
+Sale window fields are exposed as full \`\`datetime\`\` instants (UTC), so the
+sale window can express a precise cutoff like "Friday 11:59 PM" rather than
+a whole calendar day. Clients render them in the popup's timezone.`
 } as const;
 
 export const ProductUpdateSchema = {
@@ -14047,7 +14583,7 @@ export const ProductUpdateSchema = {
             anyOf: [
                 {
                     type: 'string',
-                    format: 'date'
+                    format: 'date-time'
                 },
                 {
                     type: 'null'
@@ -14059,7 +14595,7 @@ export const ProductUpdateSchema = {
             anyOf: [
                 {
                     type: 'string',
-                    format: 'date'
+                    format: 'date-time'
                 },
                 {
                     type: 'null'
@@ -14261,7 +14797,7 @@ export const ProductWithQuantitySchema = {
             anyOf: [
                 {
                     type: 'string',
-                    format: 'date'
+                    format: 'date-time'
                 },
                 {
                     type: 'null'
@@ -14273,7 +14809,7 @@ export const ProductWithQuantitySchema = {
             anyOf: [
                 {
                     type: 'string',
-                    format: 'date'
+                    format: 'date-time'
                 },
                 {
                     type: 'null'
@@ -14880,6 +15416,805 @@ export const SendTestRequestSchema = {
     type: 'object',
     required: ['html_content', 'template_type', 'to_email'],
     title: 'SendTestRequest'
+} as const;
+
+export const TaskAppSchema = {
+    type: 'string',
+    enum: ['portal', 'backoffice'],
+    title: 'TaskApp',
+    description: 'Which surface a task relates to. Optional (NULL = unspecified).'
+} as const;
+
+export const TaskArchiveResultSchema = {
+    properties: {
+        archived: {
+            type: 'integer',
+            title: 'Archived'
+        }
+    },
+    type: 'object',
+    required: ['archived'],
+    title: 'TaskArchiveResult',
+    description: 'Count of tasks archived by a bulk operation.'
+} as const;
+
+export const TaskAttachmentCreateSchema = {
+    properties: {
+        storage_key: {
+            type: 'string',
+            title: 'Storage Key'
+        },
+        url: {
+            type: 'string',
+            title: 'Url'
+        },
+        media_type: {
+            '$ref': '#/components/schemas/TaskMediaType'
+        },
+        filename: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Filename'
+        },
+        size_bytes: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Size Bytes'
+        }
+    },
+    type: 'object',
+    required: ['storage_key', 'url', 'media_type'],
+    title: 'TaskAttachmentCreate',
+    description: `Register an already-uploaded S3 object as a task attachment.
+
+The file itself is uploaded directly to S3 via POST /uploads/presigned-url;
+this just records the resulting key/url against the task.`
+} as const;
+
+export const TaskAttachmentPublicSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        task_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Task Id'
+        },
+        url: {
+            type: 'string',
+            title: 'Url'
+        },
+        media_type: {
+            '$ref': '#/components/schemas/TaskMediaType'
+        },
+        filename: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Filename'
+        },
+        size_bytes: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Size Bytes'
+        },
+        created_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Created At'
+        }
+    },
+    type: 'object',
+    required: ['id', 'task_id', 'url', 'media_type', 'created_at'],
+    title: 'TaskAttachmentPublic'
+} as const;
+
+export const TaskCommentCreateSchema = {
+    properties: {
+        body: {
+            type: 'string',
+            minLength: 1,
+            title: 'Body'
+        }
+    },
+    type: 'object',
+    required: ['body'],
+    title: 'TaskCommentCreate'
+} as const;
+
+export const TaskCommentPublicSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        task_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Task Id'
+        },
+        author_user_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Author User Id'
+        },
+        author_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Author Name'
+        },
+        author_email: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Author Email'
+        },
+        body: {
+            type: 'string',
+            title: 'Body'
+        },
+        created_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Created At'
+        },
+        edited_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Edited At'
+        }
+    },
+    type: 'object',
+    required: ['id', 'task_id', 'body', 'created_at'],
+    title: 'TaskCommentPublic'
+} as const;
+
+export const TaskCommentUpdateSchema = {
+    properties: {
+        body: {
+            type: 'string',
+            minLength: 1,
+            title: 'Body'
+        }
+    },
+    type: 'object',
+    required: ['body'],
+    title: 'TaskCommentUpdate'
+} as const;
+
+export const TaskCreateSchema = {
+    properties: {
+        title: {
+            type: 'string',
+            maxLength: 200,
+            minLength: 1,
+            title: 'Title'
+        },
+        detail: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Detail'
+        },
+        status: {
+            '$ref': '#/components/schemas/TaskStatus',
+            default: 'to_do'
+        },
+        type: {
+            '$ref': '#/components/schemas/TaskType',
+            default: 'feature'
+        },
+        priority: {
+            '$ref': '#/components/schemas/TaskPriority',
+            default: 'medium'
+        },
+        responsible_user_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Responsible User Id'
+        },
+        release: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 50
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Release'
+        },
+        app: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/TaskApp'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        visibility: {
+            '$ref': '#/components/schemas/TaskVisibility',
+            default: 'internal'
+        },
+        target_tenant_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Target Tenant Id'
+        }
+    },
+    type: 'object',
+    required: ['title'],
+    title: 'TaskCreate'
+} as const;
+
+export const TaskDetailPublicSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        title: {
+            type: 'string',
+            title: 'Title'
+        },
+        detail: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Detail'
+        },
+        status: {
+            '$ref': '#/components/schemas/TaskStatus'
+        },
+        type: {
+            '$ref': '#/components/schemas/TaskType'
+        },
+        priority: {
+            '$ref': '#/components/schemas/TaskPriority',
+            default: 'medium'
+        },
+        responsible_user_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Responsible User Id'
+        },
+        responsible_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Responsible Name'
+        },
+        responsible_email: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Responsible Email'
+        },
+        release: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Release'
+        },
+        app: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/TaskApp'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        visibility: {
+            '$ref': '#/components/schemas/TaskVisibility'
+        },
+        target_tenant_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Target Tenant Id'
+        },
+        published_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Published At'
+        },
+        archived_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Archived At'
+        },
+        created_by: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Created By'
+        },
+        created_by_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Created By Name'
+        },
+        created_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Created At'
+        },
+        updated_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Updated At'
+        },
+        attachments: {
+            items: {
+                '$ref': '#/components/schemas/TaskAttachmentPublic'
+            },
+            type: 'array',
+            title: 'Attachments'
+        }
+    },
+    type: 'object',
+    required: ['id', 'title', 'status', 'type', 'visibility', 'created_at', 'updated_at'],
+    title: 'TaskDetailPublic'
+} as const;
+
+export const TaskMediaTypeSchema = {
+    type: 'string',
+    enum: ['image', 'video'],
+    title: 'TaskMediaType'
+} as const;
+
+export const TaskPrioritySchema = {
+    type: 'string',
+    enum: ['low', 'medium', 'high'],
+    title: 'TaskPriority'
+} as const;
+
+export const TaskPublicSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        title: {
+            type: 'string',
+            title: 'Title'
+        },
+        detail: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Detail'
+        },
+        status: {
+            '$ref': '#/components/schemas/TaskStatus'
+        },
+        type: {
+            '$ref': '#/components/schemas/TaskType'
+        },
+        priority: {
+            '$ref': '#/components/schemas/TaskPriority',
+            default: 'medium'
+        },
+        responsible_user_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Responsible User Id'
+        },
+        responsible_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Responsible Name'
+        },
+        responsible_email: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Responsible Email'
+        },
+        release: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Release'
+        },
+        app: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/TaskApp'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        visibility: {
+            '$ref': '#/components/schemas/TaskVisibility'
+        },
+        target_tenant_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Target Tenant Id'
+        },
+        published_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Published At'
+        },
+        archived_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Archived At'
+        },
+        created_by: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Created By'
+        },
+        created_by_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Created By Name'
+        },
+        created_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Created At'
+        },
+        updated_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Updated At'
+        }
+    },
+    type: 'object',
+    required: ['id', 'title', 'status', 'type', 'visibility', 'created_at', 'updated_at'],
+    title: 'TaskPublic'
+} as const;
+
+export const TaskStatusSchema = {
+    type: 'string',
+    enum: ['to_do', 'testing', 'next_release', 'published', 'blocked', 'cancelled'],
+    title: 'TaskStatus'
+} as const;
+
+export const TaskStatusUpdateSchema = {
+    properties: {
+        status: {
+            '$ref': '#/components/schemas/TaskStatus'
+        }
+    },
+    type: 'object',
+    required: ['status'],
+    title: 'TaskStatusUpdate',
+    description: 'Lightweight payload for moving a card between Kanban columns.'
+} as const;
+
+export const TaskTypeSchema = {
+    type: 'string',
+    enum: ['bug', 'feature'],
+    title: 'TaskType'
+} as const;
+
+export const TaskUpdateSchema = {
+    properties: {
+        title: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 200,
+                    minLength: 1
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Title'
+        },
+        detail: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Detail'
+        },
+        status: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/TaskStatus'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        type: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/TaskType'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        priority: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/TaskPriority'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        responsible_user_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Responsible User Id'
+        },
+        release: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 50
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Release'
+        },
+        app: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/TaskApp'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        visibility: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/TaskVisibility'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        target_tenant_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Target Tenant Id'
+        }
+    },
+    type: 'object',
+    title: 'TaskUpdate'
+} as const;
+
+export const TaskVisibilitySchema = {
+    type: 'string',
+    enum: ['universal', 'tenant', 'internal'],
+    title: 'TaskVisibility'
 } as const;
 
 export const TemplateScopeSchema = {
@@ -16273,6 +17608,28 @@ export const TrackCreateSchema = {
     type: 'object',
     required: ['popup_id', 'name'],
     title: 'TrackCreate'
+} as const;
+
+export const TrackEventCountSchema = {
+    properties: {
+        track_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Track Id'
+        },
+        event_count: {
+            type: 'integer',
+            title: 'Event Count'
+        }
+    },
+    type: 'object',
+    required: ['track_id', 'event_count'],
+    title: 'TrackEventCount',
+    description: `Number of distinct published events that belong to a track.
+
+Backs the portal track filter / Tracks section so it can show per-track
+counts (and hide empty tracks) without pulling the full event list to the
+client just to count.`
 } as const;
 
 export const TrackPublicSchema = {

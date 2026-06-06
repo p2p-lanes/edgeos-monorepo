@@ -7,6 +7,7 @@ import { useTranslation } from "react-i18next"
 import type { PopupPublic } from "@/client"
 import { ButtonAnimated } from "@/components/ui/button"
 import { CardAnimation, CardContent } from "@/components/ui/card"
+import { formatDate } from "@/helpers/dates"
 import { EventProgressBar, type EventStatus } from "./EventProgressBar"
 
 const CTA_KEYS: Record<EventStatus, string> = {
@@ -32,13 +33,10 @@ function useEventCard() {
   return ctx
 }
 
-function formatDate(date: string | null | undefined): string {
-  if (!date) return ""
-  return new Date(date).toLocaleDateString("en-EN", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  })
+const POPUP_DATE_FORMAT: Intl.DateTimeFormatOptions = {
+  day: "numeric",
+  month: "long",
+  year: "numeric",
 }
 
 interface RootProps {
@@ -113,8 +111,8 @@ function Location() {
 
 function DateRange() {
   const { popup } = useEventCard()
-  const start = formatDate(popup.start_date)
-  const end = formatDate(popup.end_date)
+  const start = formatDate(popup.start_date ?? undefined, POPUP_DATE_FORMAT)
+  const end = formatDate(popup.end_date ?? undefined, POPUP_DATE_FORMAT)
   if (!start && !end) return null
 
   return (

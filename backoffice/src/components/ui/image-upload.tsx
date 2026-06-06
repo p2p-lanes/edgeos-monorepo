@@ -19,6 +19,13 @@ interface ImageUploadProps {
   cropAspect?: number
   /** When "image+video", also accepts .mp4. Preview switches to <video>. */
   accept?: "image" | "image+video"
+  /**
+   * When set, the filled-state preview renders full-width at this aspect
+   * ratio with overlaid Replace / Remove buttons (the portal cover style)
+   * instead of the compact inline thumbnail. Opt-in — existing callers keep
+   * the thumbnail preview.
+   */
+  displayAspect?: number
 }
 
 const IMAGE_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"]
@@ -36,6 +43,7 @@ export function ImageUpload({
   disabled,
   cropAspect,
   accept = "image",
+  displayAspect,
 }: ImageUploadProps) {
   const allowVideo = accept === "image+video"
   const acceptedTypes = allowVideo
@@ -137,6 +145,64 @@ export function ImageUpload({
       saving={isUploading}
     />
   ) : null
+
+  if (value && displayAspect) {
+    const isVid = isVideoUrl(value)
+    return (
+      <>
+        <div
+          className={cn(
+            "relative mx-auto w-full max-h-72 max-w-xl overflow-hidden rounded-lg border bg-muted",
+            className,
+          )}
+          style={{ aspectRatio: String(displayAspect) }}
+        >
+          {isVid ? (
+            <video
+              src={value}
+              className="h-full w-full object-cover"
+              muted
+              autoPlay
+              loop
+              playsInline
+            />
+          ) : (
+            <img
+              src={value}
+              alt="Uploaded"
+              className="h-full w-full object-cover"
+            />
+          )}
+          {!disabled && (
+            <div className="absolute right-2 top-2 flex items-center gap-1.5">
+              <label className="inline-flex h-8 cursor-pointer items-center gap-1 rounded-md border bg-background/90 px-2.5 text-xs font-medium shadow-sm backdrop-blur transition-colors hover:bg-background">
+                <Upload className="h-3.5 w-3.5" />
+                Replace
+                <input
+                  type="file"
+                  className="hidden"
+                  accept={inputAccept}
+                  onChange={handleChange}
+                  disabled={disabled}
+                />
+              </label>
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                className="h-8 px-2.5 text-xs"
+                onClick={handleRemove}
+              >
+                <X className="mr-1 h-3.5 w-3.5" />
+                Remove
+              </Button>
+            </div>
+          )}
+        </div>
+        {cropper}
+      </>
+    )
+  }
 
   if (value) {
     return (

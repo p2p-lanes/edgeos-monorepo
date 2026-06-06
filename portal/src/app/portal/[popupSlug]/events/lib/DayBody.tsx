@@ -1,7 +1,7 @@
 "use client"
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { addDays, format, startOfDay, subDays } from "date-fns"
+import { useQuery } from "@tanstack/react-query"
+import { addDays, startOfDay, subDays } from "date-fns"
 import {
   CalendarClock,
   CalendarIcon,
@@ -21,11 +21,8 @@ import {
 import Link from "next/link"
 import { Fragment, useEffect, useMemo, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
-import { toast } from "sonner"
 
 import {
-  ApiError,
-  EventParticipantsService,
   type EventPublic,
   EventsService,
   EventVenuesService,
@@ -41,6 +38,7 @@ import {
 import { cn } from "@/lib/utils"
 import type { EventsScrollSnapshot } from "./eventsViewState"
 import { summarizeRrule } from "./summarizeRrule"
+import { useEventRsvp } from "./useEventRsvp"
 import { useEventTimezone } from "./useEventTimezone"
 
 interface DayBodyProps {
@@ -154,7 +152,6 @@ export function DayBody({
   const isAuthed = mode === "authed"
   const useOverride = eventsOverride !== undefined
   const { t } = useTranslation()
-  const queryClient = useQueryClient()
   // Fall back to the popup's first booking day (or today, before the
   // popup record loads) when the parent hasn't set a date yet — no
   // `?date=` in the URL on first visit.
@@ -168,10 +165,22 @@ export function DayBody({
   }
   const {
     timezone,
+    locale,
     formatTime,
     formatDayKey,
     isLoading: tzLoading,
   } = useEventTimezone(popupId, timezoneOverride)
+
+  // Localized "Monday, June 4, 2026" for the date picker trigger. Uses the
+  // selected day's nominal local date (no TZ conversion needed — selectedDate
+  // is already the user-picked wall-clock day).
+  const formatDatePickerLabel = (d: Date) =>
+    new Intl.DateTimeFormat(locale, {
+      weekday: "long",
+      month: "long",
+      day: "numeric",
+      year: "numeric",
+    }).format(d)
   const scrollRef = useRef<HTMLDivElement>(null)
   const mobileScrollRef = useRef<HTMLDivElement>(null)
 
@@ -243,52 +252,9 @@ export function DayBody({
   // (public calendar) the tz is known synchronously, so this stays false.
   const isLoading = useOverride ? false : eventsLoading || tzLoading
 
-  // Recurring events require occurrence_start so the RSVP targets a single
-  // instance. That includes both expanded pseudo-rows (have occurrence_id)
-  // AND the series master itself, whose start_time IS the first occurrence.
-  // One-off events must not send it.
-  const rsvpBodyFor = (e: EventPublic) =>
-    e.rrule || e.occurrence_id ? { occurrence_start: e.start_time } : undefined
-  const toastRsvpError = (err: unknown) => {
-    const fallback = t("events.rsvp.action_error") as string
-    let detail = fallback
-    if (err instanceof ApiError && err.body && typeof err.body === "object") {
-      const body = err.body as { detail?: unknown }
-      if (typeof body.detail === "string") detail = body.detail
-    }
-    toast.error(detail)
-  }
-  const rsvpMutation = useMutation({
-    mutationFn: (e: EventPublic) =>
-      EventParticipantsService.registerForEvent({
-        eventId: e.id,
-        requestBody: rsvpBodyFor(e),
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["portal-events-day"] })
-    },
-    onError: toastRsvpError,
-  })
-  const cancelRsvpMutation = useMutation({
-    mutationFn: (e: EventPublic) =>
-      EventParticipantsService.cancelRegistration({
-        eventId: e.id,
-        requestBody: rsvpBodyFor(e),
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["portal-events-day"] })
-    },
-    onError: toastRsvpError,
-  })
-  // Tracks the in-flight RSVP target so the spinner stays on the
-  // specific event card (and recurring instance) the user clicked.
-  const pendingRsvpKey: string | null = (() => {
-    const pending =
-      (rsvpMutation.isPending && rsvpMutation.variables) ||
-      (cancelRsvpMutation.isPending && cancelRsvpMutation.variables) ||
-      null
-    return pending ? `${pending.id}:${pending.start_time}` : null
-  })()
+  const { rsvpMutation, cancelRsvpMutation, pendingRsvpKey } = useEventRsvp([
+    "portal-events-day",
+  ])
 
   // "HH:MM" in the popup timezone (24h) -> minutes since 00:00.
   const minutesInTz = useMemo(() => {
@@ -484,13 +450,23 @@ export function DayBody({
     if (autoScrolledDayKeyRef.current === dayKey) return
     if (!scrollRef.current && !mobileScrollRef.current) return
     autoScrolledDayKeyRef.current = dayKey
-    let earliest = Number.POSITIVE_INFINITY
+    // When the selected day is today, anchor on the first *upcoming* event
+    // (start at or after now in the popup tz) so the user lands on what's
+    // next instead of the morning's already-finished sessions. Any other
+    // day keeps anchoring on its earliest event.
+    let anchorMin = Number.POSITIVE_INFINITY
     for (const items of columnEvents.values()) {
-      if (items.length > 0 && items[0].startMin < earliest) {
-        earliest = items[0].startMin
+      for (const it of items) {
+        if (isViewingToday && it.startMin < nowMin) continue
+        if (it.startMin < anchorMin) anchorMin = it.startMin
+        break
       }
     }
-    const anchor = Number.isFinite(earliest) ? earliest : 8 * 60
+    const anchor = Number.isFinite(anchorMin)
+      ? anchorMin
+      : isViewingToday
+        ? nowMin
+        : 8 * 60
     if (scrollRef.current) {
       const target = Math.max(0, anchor * MIN_PX - HOUR_PX)
       scrollRef.current.scrollTo({ top: target, behavior: "smooth" })
@@ -499,7 +475,9 @@ export function DayBody({
       const target = Math.max(0, anchor * M_MIN_W - M_HOUR_W)
       mobileScrollRef.current.scrollTo({ left: target, behavior: "smooth" })
     }
-  }, [columnEvents, dayKey])
+    // `isViewingToday`/`nowMin` are read for the upcoming-anchor math; the
+    // once-per-day guard above keeps the minute tick from re-scrolling.
+  }, [columnEvents, dayKey, isViewingToday, nowMin])
 
   const goPrev = () => setSelectedDate((d) => subDays(d, 1))
   const goNext = () => setSelectedDate((d) => addDays(d, 1))
@@ -544,7 +522,7 @@ export function DayBody({
                   title={t("events.day.pick_date")}
                 >
                   <span className="truncate">
-                    {format(selectedDate, "EEEE, MMMM d, yyyy")}
+                    {formatDatePickerLabel(selectedDate)}
                   </span>
                   <CalendarIcon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                 </button>
@@ -616,8 +594,12 @@ export function DayBody({
               isFullscreen ? "max-h-[calc(100vh-9rem)]" : "max-h-[70vh]",
             )}
           >
+            {/* min-w-max makes the grid box span the full content width (not
+              just the scroll viewport). Without it the `1fr` columns overflow
+              a viewport-wide box, so the sticky-left hour column only stays
+              pinned within that first viewport and scrolls away after. */}
             <div
-              className="grid"
+              className="grid min-w-max"
               style={{
                 gridTemplateColumns: `${HOUR_LABEL_COL}px repeat(${venueCount}, minmax(${VENUE_COL_MIN}px, 1fr))`,
               }}
@@ -689,7 +671,7 @@ export function DayBody({
                         const leftPct = laneIndex * widthPct
                         const isShort = endMin - startMin < 60
                         const recurrenceLabel =
-                          summarizeRrule(event.rrule) ??
+                          summarizeRrule(event.rrule, t) ??
                           (event.recurrence_master_id
                             ? t("events.list.part_of_recurring_series")
                             : null)

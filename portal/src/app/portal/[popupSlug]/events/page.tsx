@@ -14,17 +14,9 @@ import {
 } from "react"
 import { createPortal } from "react-dom"
 import { useTranslation } from "react-i18next"
-import { toast } from "sonner"
-
-import {
-  ApiError,
-  EventParticipantsService,
-  type EventPublic,
-  EventsService,
-  HumansService,
-  TracksService,
-} from "@/client"
+import { type EventPublic, EventsService, HumansService } from "@/client"
 import { Button } from "@/components/ui/button"
+import { cn } from "@/lib/utils"
 import { useCityProvider } from "@/providers/cityProvider"
 import { CalendarBody } from "./lib/CalendarBody"
 import { DayBody } from "./lib/DayBody"
@@ -36,11 +28,15 @@ import {
   saveEventsViewState,
 } from "./lib/eventsViewState"
 import { ListBody } from "./lib/ListBody"
+import { eventListWindowForPopup } from "./lib/listWindow"
+import { SubscribeCalendarButton } from "./lib/SubscribeCalendarButton"
+import { useEventRsvp } from "./lib/useEventRsvp"
 import {
   useEventTimezone,
   usePortalEventSettings,
 } from "./lib/useEventTimezone"
 import { usePopupTags } from "./lib/usePopupTags"
+import { usePopupTracks } from "./lib/usePopupTracks"
 
 // useLayoutEffect on the client, useEffect on the server. Lets us restore
 // scroll synchronously before the browser paints (no flash of "first event"
@@ -141,10 +137,39 @@ export default function EventsPage() {
   const [selectedTags, setSelectedTags] = useState<string[]>(
     () => restoredFilters?.selectedTags ?? [],
   )
-  const [selectedTrackIds, setSelectedTrackIds] = useState<string[]>(
-    () => restoredFilters?.selectedTrackIds ?? [],
-  )
+  // The track filter is mirrored in the URL (`?tracks=id1,id2`) so a
+  // track-filtered calendar is shareable: the Tracks section links here
+  // with the param set, and toggling tracks keeps it in sync (see the
+  // effect below). On first render we seed from the URL — falling back to
+  // `window.location.search` if the router hook lags — and only then from
+  // the sessionStorage snapshot restored after an event-detail round-trip.
+  const [selectedTrackIds, setSelectedTrackIds] = useState<string[]>(() => {
+    let raw = searchParams.get("tracks")
+    if (raw == null && typeof window !== "undefined") {
+      raw = new URLSearchParams(window.location.search).get("tracks")
+    }
+    if (raw != null) return raw.split(",").filter(Boolean)
+    return restoredFilters?.selectedTrackIds ?? []
+  })
   const queryClient = useQueryClient()
+
+  // Keep `?tracks=` in lockstep with the filter state. Runs when the user
+  // toggles tracks in the toolbar (publish to URL → shareable) and when
+  // the filter is restored from sessionStorage after returning from a
+  // detail page (the back link only round-trips view/date, so we
+  // re-publish the tracks here). Bases the param edit off the live URL so
+  // it composes with the view/date/focus params other effects manage.
+  useEffect(() => {
+    const current = searchParams.get("tracks")
+    const desired = selectedTrackIds.length ? selectedTrackIds.join(",") : null
+    if ((current ?? null) === desired) return
+    if (typeof window === "undefined") return
+    const params = new URLSearchParams(window.location.search)
+    if (desired) params.set("tracks", desired)
+    else params.delete("tracks")
+    const qs = params.toString()
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false })
+  }, [selectedTrackIds, searchParams, router, pathname])
 
   // The view tab and the day-view/calendar-view selected day are both
   // persisted in the URL. `view` and `selectedDate` are derived from
@@ -295,68 +320,41 @@ export default function EventsPage() {
   // stay browsable so users can review what's already published.
   const creationEnabled = eventSettings?.event_enabled ?? true
 
-  const { data: tracksData } = useQuery({
-    queryKey: ["portal-tracks", city?.id],
-    queryFn: () =>
-      TracksService.listPortalTracks({ popupId: city!.id, limit: 200 }),
-    enabled: !!city?.id,
-    staleTime: 5 * 60 * 1000,
-  })
-  const allowedTracks = tracksData?.results ?? []
+  // Only surface tracks that actually have events in the window — the
+  // curated track list often contains tracks no published event uses yet,
+  // and those would resolve to an empty calendar if shown in the filter.
+  const { tracksWithEvents: allowedTracks } = usePopupTracks(city?.id)
 
   // Expansion window for recurring events. Passing start_after triggers the
   // backend to expand RRULEs into concrete occurrences; without it, recurring
   // events render only at their master's start (hiding the other instances
   // from the list while the calendar still showed them).
   //
-  // Anchored to the popup's booking window so the list view starts on the
-  // popup's first day rather than "today" — if the popup hasn't started or
-  // has already ended, the list still shows its events instead of being
-  // empty. Falls back to a 180-day window from today before the popup
-  // record loads.
+  // Anchored to the popup's booking window, but once the popup is in progress
+  // the list starts at the popup-timezone start of today. That hides prior
+  // days while still keeping same-day events that happened earlier today.
+  // If the popup hasn't started or has already ended, the list still shows
+  // its events instead of being empty. Falls back to a 180-day window from
+  // today before the popup record loads.
   //
-  // Bounds use UTC midnight of the popup's first day and UTC midnight of
-  // the day *after* end_date — independent of the browser's timezone — so
-  // the filter always covers the whole calendar day starting at 00:00Z and
-  // doesn't drift if the user opens the portal from a different region.
-  const listWindow = useMemo(() => {
-    const parseUtcMidnight = (s: string | null | undefined) => {
-      if (!s) return null
-      const m = s.slice(0, 10).match(/^(\d{4})-(\d{2})-(\d{2})$/)
-      if (!m) return null
-      return new Date(
-        Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 0, 0, 0, 0),
-      )
-    }
-    const startUtc = parseUtcMidnight(city?.start_date)
-    const endUtc = parseUtcMidnight(city?.end_date)
-    // For end, advance by one UTC day so events on the last day are included.
-    const endExclusive = endUtc
-      ? new Date(endUtc.getTime() + 24 * 60 * 60 * 1000)
-      : null
-    if (startUtc && endExclusive) {
-      return {
-        startAfter: startUtc.toISOString(),
-        startBefore: endExclusive.toISOString(),
-      }
-    }
-    const start = new Date()
-    start.setUTCHours(0, 0, 0, 0)
-    const end = new Date(start)
-    end.setUTCDate(end.getUTCDate() + 180)
-    return {
-      startAfter: (startUtc ?? start).toISOString(),
-      startBefore: (endExclusive ?? end).toISOString(),
-    }
-  }, [city?.start_date, city?.end_date])
+  // Bounds are anchored to the popup's timezone, not the browser's and not
+  // UTC: the booking dates name calendar days *in the popup's timezone*, so
+  // a UTC-midnight bound would leak the prior local evening and clip the
+  // last local evening (e.g. for a UTC-7 popup, the night of the last day
+  // falls after 00:00Z of the next day and would be dropped).
+  const listWindow = useMemo(
+    () => eventListWindowForPopup(city?.start_date, city?.end_date, timezone),
+    [city?.start_date, city?.end_date, timezone],
+  )
 
   // The list is built from up to three independent "channels" — picking
   // events with OR semantics across the active filters so that toggling
   // "My events" + "My RSVPs" together shows the *union* (everything I
   // own + everything I'm going to) rather than the intersection.
   // - all:    no filter on → published events for everyone
-  // - mine:   "My events" on → events I own (any status, filtered locally
-  //           since the API has no owner filter)
+  // - mine:   "My events" on → events I manage as owner, host, or
+  //           collaborator (any status, filtered locally since the API
+  //           has no owner filter)
   // - rsvped: "My RSVPs" on → published events I'm registered for
   const useAllChannel = !mineOnly && !rsvpedOnly
   const useMineChannel = mineOnly
@@ -407,6 +405,10 @@ export default function EventsPage() {
         search: search || undefined,
         // No status filter: include my drafts / pending / rejected.
         eventStatus: undefined,
+        // Restrict to events I manage (owner / host / collaborator) in the
+        // backend, so pagination counts the managed set instead of dropping
+        // managed events that fall past the page limit by start_time.
+        managedOnly: true,
         includeHidden: showHidden || undefined,
         tags: selectedTags.length ? selectedTags : undefined,
         trackIds: selectedTrackIds.length ? selectedTrackIds : undefined,
@@ -457,55 +459,9 @@ export default function EventsPage() {
     staleTime: 30 * 1000,
   })
 
-  // Recurring events require occurrence_start so the RSVP targets a single
-  // instance. That includes both expanded pseudo-rows (have occurrence_id)
-  // AND the series master itself, whose start_time IS the first occurrence.
-  // One-off events must not send it.
-  const rsvpBodyFor = (e: EventPublic) =>
-    e.rrule || e.occurrence_id ? { occurrence_start: e.start_time } : undefined
-  const toastRsvpError = (err: unknown) => {
-    const fallback = t("events.rsvp.action_error") as string
-    let detail = fallback
-    if (err instanceof ApiError && err.body && typeof err.body === "object") {
-      const body = err.body as { detail?: unknown }
-      if (typeof body.detail === "string") detail = body.detail
-    }
-    toast.error(detail)
-  }
-  const rsvpMutation = useMutation({
-    mutationFn: (e: EventPublic) =>
-      EventParticipantsService.registerForEvent({
-        eventId: e.id,
-        requestBody: rsvpBodyFor(e),
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["portal-events"] })
-    },
-    onError: toastRsvpError,
-  })
-  const cancelRsvpMutation = useMutation({
-    mutationFn: (e: EventPublic) =>
-      EventParticipantsService.cancelRegistration({
-        eventId: e.id,
-        requestBody: rsvpBodyFor(e),
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["portal-events"] })
-    },
-    onError: toastRsvpError,
-  })
-  // The row whose RSVP request is currently in flight, in the
-  // `${id}:${start_time}` format ListBody matches against. Including the
-  // occurrence start in the key keeps the spinner pinned to the specific
-  // recurring instance the user clicked rather than every row sharing
-  // the same event id.
-  const pendingRsvpKey: string | null = (() => {
-    const pending =
-      (rsvpMutation.isPending && rsvpMutation.variables) ||
-      (cancelRsvpMutation.isPending && cancelRsvpMutation.variables) ||
-      null
-    return pending ? `${pending.id}:${pending.start_time}` : null
-  })()
+  const { rsvpMutation, cancelRsvpMutation, pendingRsvpKey } = useEventRsvp([
+    "portal-events",
+  ])
 
   const hideMutation = useMutation({
     mutationFn: (eventId: string) => EventsService.hidePortalEvent({ eventId }),
@@ -534,10 +490,11 @@ export default function EventsPage() {
     // recurring instance and its master don't collapse into one row.
     const byKey = new Map<string, EventPublic>()
     if (useMineChannel) {
-      const mine = (mineQuery.data?.results ?? []).filter(
-        (e) => currentHuman != null && e.owner_id === currentHuman.id,
-      )
-      for (const e of mine) byKey.set(`${e.id}:${e.start_time}`, e)
+      // The backend already restricts this channel to events I manage
+      // (managedOnly), so no front-side filter is needed.
+      for (const e of mineQuery.data?.results ?? []) {
+        byKey.set(`${e.id}:${e.start_time}`, e)
+      }
     }
     if (useRsvpedChannel) {
       for (const e of rsvpedQuery.data?.results ?? []) {
@@ -554,7 +511,6 @@ export default function EventsPage() {
     allQuery.data,
     mineQuery.data,
     rsvpedQuery.data,
-    currentHuman,
   ])
   // Restore outer scroll position once after returning from event
   // detail. List view waits for events to load (so the page has the
@@ -699,21 +655,25 @@ export default function EventsPage() {
           <h1 className="text-2xl font-bold tracking-tight">
             {t("events.list.heading")}
           </h1>
-          {creationEnabled &&
-            (eventSettings?.can_publish_event ?? "everyone") === "everyone" && (
-              <Button asChild size="sm" className="shrink-0 px-2 sm:px-3">
-                <Link
-                  href={`/portal/${city?.slug}/events/new`}
-                  aria-label={t("events.toolbar.create_event")}
-                  title={t("events.toolbar.create_event")}
-                >
-                  <Plus className="h-4 w-4 sm:mr-2" />
-                  <span className="hidden sm:inline">
-                    {t("events.toolbar.create_event")}
-                  </span>
-                </Link>
-              </Button>
-            )}
+          <div className="flex shrink-0 items-center gap-2">
+            {city?.id && <SubscribeCalendarButton popupId={city.id} />}
+            {creationEnabled &&
+              (eventSettings?.can_publish_event ?? "everyone") ===
+                "everyone" && (
+                <Button asChild size="sm" className="shrink-0 px-2 sm:px-3">
+                  <Link
+                    href={`/portal/${city?.slug}/events/new`}
+                    aria-label={t("events.toolbar.create_event")}
+                    title={t("events.toolbar.create_event")}
+                  >
+                    <Plus className="h-4 w-4 sm:mr-2" />
+                    <span className="hidden sm:inline">
+                      {t("events.toolbar.create_event")}
+                    </span>
+                  </Link>
+                </Button>
+              )}
+          </div>
         </div>
         <p className="text-sm text-muted-foreground mt-1">
           {timezone
@@ -726,7 +686,16 @@ export default function EventsPage() {
       </div>
 
       {!isDayFullscreen && (
-        <div className="mb-4">
+        <div
+          className={cn(
+            "mb-4",
+            // Freeze the filters for the list & calendar views (the page
+            // scrolls there). The day grid has its own internal scroll, so
+            // it keeps the toolbar in normal flow.
+            view !== "day" &&
+              "sticky top-0 z-20 -mx-4 bg-background px-4 pb-3 pt-2 sm:-mx-6 sm:px-6",
+          )}
+        >
           <EventsToolbar
             view={view}
             onViewChange={setView}
@@ -760,6 +729,7 @@ export default function EventsPage() {
             trackIds={selectedTrackIds}
             defaultDate={selectedDate}
             onEventLinkClick={handleEventLinkClick}
+            placeholderUrl={eventSettings?.placeholder_url}
           />
         ) : view === "day" ? (
           isDayFullscreen ? null : (
@@ -794,6 +764,10 @@ export default function EventsPage() {
             pendingRsvpKey={pendingRsvpKey}
             onHide={(id) => hideMutation.mutate(id)}
             onUnhide={(id) => unhideMutation.mutate(id)}
+            placeholderUrl={eventSettings?.placeholder_url}
+            autoScrollToUpcoming={
+              !restoredScroll?.outer && !focusEventRef.current?.id
+            }
           />
         )}
       </div>

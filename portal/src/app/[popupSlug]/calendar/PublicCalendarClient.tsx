@@ -55,11 +55,17 @@ export function PublicCalendarClient({ popupSlug }: PublicCalendarClientProps) {
 
   // Default window: 180 days from today. The endpoint expands recurring
   // events server-side when ``start_after`` is set, so we always pass it.
+  //
+  // We pad one day on each side of the UTC window so events near the popup's
+  // local-day boundary are never missed regardless of the popup's UTC offset
+  // (the backend filters in UTC). The list is then trimmed to "today onward"
+  // in popup time once the timezone is known — see ``events`` below.
   const window = useMemo(() => {
     const start = new Date()
     start.setUTCHours(0, 0, 0, 0)
+    start.setUTCDate(start.getUTCDate() - 1)
     const end = new Date(start)
-    end.setUTCDate(end.getUTCDate() + 180)
+    end.setUTCDate(end.getUTCDate() + 182)
     return {
       startAfter: start.toISOString(),
       startBefore: end.toISOString(),
@@ -85,6 +91,11 @@ export function PublicCalendarClient({ popupSlug }: PublicCalendarClientProps) {
   const meta = query.data?.meta
   const timezone = meta?.timezone
 
+  const { formatTime, formatDateShort, formatDayKey } = useEventTimezone(
+    meta?.popup_id,
+    timezone,
+  )
+
   // Override the static "Calendar" title set by generateMetadata once
   // we know the popup name. The server-side metadata can't reach an
   // anonymous "get popup by slug" endpoint, so we patch it here.
@@ -100,7 +111,16 @@ export function PublicCalendarClient({ popupSlug }: PublicCalendarClientProps) {
   // (which our calls pass), so undefined fields never get rendered.
   const events = useMemo<EventPublic[]>(() => {
     const rows = query.data?.results ?? []
-    return rows.map(
+    // The fetch window is padded a day on each side and the backend filters
+    // in UTC, so an event that starts after 00:00Z can still be "yesterday"
+    // in the popup's timezone. Trim to events whose start day is today or
+    // later *in popup time* (day-keys are YYYY-MM-DD, so a string compare is
+    // chronological).
+    const todayKey = timezone ? formatDayKey(new Date().toISOString()) : null
+    const visibleRows = todayKey
+      ? rows.filter((r) => formatDayKey(r.start_time) >= todayKey)
+      : rows
+    return visibleRows.map(
       (r) =>
         ({
           id: r.id,
@@ -143,7 +163,7 @@ export function PublicCalendarClient({ popupSlug }: PublicCalendarClientProps) {
           my_rsvp_status: null,
         }) as unknown as EventPublic,
     )
-  }, [query.data, meta?.popup_id])
+  }, [query.data, meta?.popup_id, timezone, formatDayKey])
 
   const handleEventClick = useCallback(
     (event: EventPublic) => {
@@ -166,11 +186,6 @@ export function PublicCalendarClient({ popupSlug }: PublicCalendarClientProps) {
       return true
     },
     [isAuthenticated, popupSlug, router],
-  )
-
-  const { formatTime, formatDateShort, formatDayKey } = useEventTimezone(
-    meta?.popup_id,
-    timezone,
   )
 
   const allowedTracks = useMemo(
@@ -255,6 +270,7 @@ export function PublicCalendarClient({ popupSlug }: PublicCalendarClientProps) {
             eventsOverride={events}
             onEventClick={handleEventClick}
             timezoneOverride={timezone}
+            placeholderUrl={meta?.placeholder_url}
           />
         ) : view === "day" ? (
           <DayBody
@@ -288,6 +304,7 @@ export function PublicCalendarClient({ popupSlug }: PublicCalendarClientProps) {
             formatDayKey={formatDayKey}
             mode="public"
             onEventClick={handleEventClick}
+            placeholderUrl={meta?.placeholder_url}
           />
         )}
       </div>

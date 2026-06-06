@@ -2,13 +2,30 @@
 
 import { useQuery } from "@tanstack/react-query"
 import { useMemo } from "react"
+import { useTranslation } from "react-i18next"
 
 import { type EventSettingsPublic, EventSettingsService } from "@/client"
 
-const DEFAULT_TZ =
-  (typeof Intl !== "undefined" &&
-    Intl.DateTimeFormat().resolvedOptions().timeZone) ||
-  "UTC"
+// Calendar surfaces must always render in the popup's timezone. When event
+// settings haven't been created yet, fall back to UTC (the backend default)
+// instead of the browser timezone so the displayed wall-clock matches what
+// the backend stores and what emails carry.
+const FALLBACK_TZ = "UTC"
+
+// Maps i18next language codes to BCP-47 tags used by Intl.DateTimeFormat
+// for month/weekday names. Time and day-key formats are locale-independent
+// (numeric only) so they stay anchored to en-GB / en-CA.
+const LOCALE_MAP: Record<string, string> = {
+  en: "en-US",
+  es: "es-ES",
+  zh: "zh-CN",
+  is: "is-IS",
+}
+
+function resolveLocale(lang: string | undefined): string {
+  if (!lang) return "en-US"
+  return LOCALE_MAP[lang] ?? LOCALE_MAP[lang.split("-")[0] ?? ""] ?? "en-US"
+}
 
 /**
  * Single source of truth for the portal-event-settings query. Other hooks
@@ -39,12 +56,14 @@ export function useEventTimezone(
   popupId: string | undefined,
   timezoneOverride?: string,
 ) {
+  const { i18n } = useTranslation()
   const { data: settings, isLoading: settingsLoading } = usePortalEventSettings(
     timezoneOverride ? undefined : popupId,
   )
 
-  const timezone = timezoneOverride || settings?.timezone || DEFAULT_TZ
+  const timezone = timezoneOverride || settings?.timezone || FALLBACK_TZ
   const isLoading = timezoneOverride ? false : settingsLoading
+  const locale = resolveLocale(i18n.language)
 
   return useMemo(() => {
     const formatTime = (dateStr: string) =>
@@ -56,7 +75,7 @@ export function useEventTimezone(
       }).format(new Date(dateStr))
 
     const formatDateShort = (dateStr: string) =>
-      new Intl.DateTimeFormat("en-US", {
+      new Intl.DateTimeFormat(locale, {
         timeZone: timezone,
         weekday: "short",
         month: "short",
@@ -64,7 +83,7 @@ export function useEventTimezone(
       }).format(new Date(dateStr))
 
     const formatDateFull = (dateStr: string) =>
-      new Intl.DateTimeFormat("en-US", {
+      new Intl.DateTimeFormat(locale, {
         timeZone: timezone,
         weekday: "long",
         month: "long",
@@ -73,6 +92,7 @@ export function useEventTimezone(
       }).format(new Date(dateStr))
 
     // YYYY-MM-DD in the popup's timezone (for grouping/keying by day).
+    // Locale-independent: this is a sort key, not displayed text.
     const formatDayKey = (dateStr: string) => {
       return new Intl.DateTimeFormat("en-CA", {
         timeZone: timezone,
@@ -91,14 +111,36 @@ export function useEventTimezone(
       return `${y}-${m}-${day}`
     }
 
+    // Localized "MMMM yyyy" for the calendar header (e.g. "junio de 2026").
+    const formatMonthHeader = (d: Date) =>
+      new Intl.DateTimeFormat(locale, {
+        month: "long",
+        year: "numeric",
+      }).format(d)
+
+    // Localized weekday short labels starting Monday, in the user's locale
+    // (e.g. ["lun", "mar", "mié", ...] for Spanish).
+    const weekdayShortLabels = (() => {
+      // Pick a known Monday (2026-06-01) and walk 7 days in nominal local
+      // time so the labels are independent of timezone.
+      const monday = new Date(2026, 5, 1)
+      const fmt = new Intl.DateTimeFormat(locale, { weekday: "short" })
+      return Array.from({ length: 7 }, (_, i) =>
+        fmt.format(new Date(monday.getTime() + i * 24 * 60 * 60 * 1000)),
+      )
+    })()
+
     return {
       timezone,
+      locale,
       isLoading,
       formatTime,
       formatDateShort,
       formatDateFull,
       formatDayKey,
       formatGridDayKey,
+      formatMonthHeader,
+      weekdayShortLabels,
     }
-  }, [timezone, isLoading])
+  }, [timezone, isLoading, locale])
 }

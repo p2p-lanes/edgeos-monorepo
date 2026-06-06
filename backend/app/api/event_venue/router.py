@@ -744,18 +744,19 @@ async def list_portal_venues(
     skip: PaginationSkip = 0,
     limit: PaginationLimit = 100,
 ) -> ListModel[EventVenuePublic]:
+    # Hide pending venues from portal listings. Filtering in the query (not in
+    # Python) keeps the paging total correct.
     venues, total = crud.event_venues_crud.find_by_popup(
         db,
         popup_id=popup_id,
         skip=skip,
         limit=limit,
         search=search,
+        active_only=True,
     )
-    # Hide pending venues from portal listings.
-    venues = [v for v in venues if v.status == VenueStatus.ACTIVE]
     return ListModel[EventVenuePublic](
         results=[EventVenuePublic.model_validate(v) for v in venues],
-        paging=Paging(offset=skip, limit=limit, total=len(venues)),
+        paging=Paging(offset=skip, limit=limit, total=total),
     )
 
 

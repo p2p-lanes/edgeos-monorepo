@@ -17,11 +17,16 @@ SORT_FIELDS = {"name", "price", "category", "is_active"}
 
 
 def sale_dates_to_persistence(data: dict[str, object]) -> dict[str, object]:
-    """Convert input inclusive `date` fields to UTC `datetime` instants for ORM persistence."""
+    """Normalize sale-window inputs for ORM persistence.
+
+    The sale window is now a precise ``datetime`` instant, so values pass
+    through unchanged. A bare ``date`` (e.g. from a CSV import) is anchored to
+    UTC midnight rather than bumped by a day.
+    """
     if "sale_starts_at" in data:
         data["sale_starts_at"] = date_to_utc_instant(data["sale_starts_at"])
     if "sale_ends_at" in data:
-        data["sale_ends_at"] = date_to_utc_instant(data["sale_ends_at"], day_offset=1)
+        data["sale_ends_at"] = date_to_utc_instant(data["sale_ends_at"])
     return data
 
 
@@ -194,9 +199,7 @@ class ProductsCRUD(BaseCRUD[Products, ProductCreate, ProductUpdate]):
         session.refresh(db_obj)
         return db_obj
 
-    def _count_active_sales(
-        self, session: Session, product_id: uuid.UUID
-    ) -> int:
+    def _count_active_sales(self, session: Session, product_id: uuid.UUID) -> int:
         """Sum quantities of units currently holding stock for this product.
 
         Counts payment_products rows whose payment is in a stock-holding
