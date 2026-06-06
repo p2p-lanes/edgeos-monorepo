@@ -22,12 +22,7 @@ import Link from "next/link"
 import { Fragment, useEffect, useMemo, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 
-import {
-  type EventPublic,
-  EventsService,
-  EventVenuesService,
-  HumansService,
-} from "@/client"
+import { type EventPublic, EventVenuesService, HumansService } from "@/client"
 import { Button } from "@/components/ui/button"
 import { Calendar } from "@/components/ui/calendar"
 import {
@@ -37,6 +32,7 @@ import {
 } from "@/components/ui/popover"
 import { cn } from "@/lib/utils"
 import type { EventsScrollSnapshot } from "./eventsViewState"
+import { fetchAllPortalEvents } from "./fetchAllPortalEvents"
 import { summarizeRrule } from "./summarizeRrule"
 import { useEventRsvp } from "./useEventRsvp"
 import { useEventTimezone } from "./useEventTimezone"
@@ -232,8 +228,10 @@ export function DayBody({
       tags,
       trackIds,
     ],
-    queryFn: () =>
-      EventsService.listPortalEvents({
+    // Fetch every event of the day window across all pages (no cap) so a busy
+    // day never silently truncates. Returns the merged, globally sorted list.
+    queryFn: async () => ({
+      results: await fetchAllPortalEvents({
         popupId: popupId!,
         eventStatus: "published",
         startAfter: window.startAfter,
@@ -242,8 +240,8 @@ export function DayBody({
         search: search || undefined,
         tags: tags?.length ? tags : undefined,
         trackIds: trackIds?.length ? trackIds : undefined,
-        limit: 500,
       }),
+    }),
     enabled: isAuthed && !useOverride && !!popupId,
   })
   // Fold the settings-timezone load into the loading state: rendering the
