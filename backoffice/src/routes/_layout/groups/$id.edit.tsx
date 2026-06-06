@@ -3,12 +3,15 @@ import { createFileRoute } from "@tanstack/react-router"
 import { Suspense } from "react"
 
 import { GroupsService } from "@/client"
+import { CopyLinkButton } from "@/components/Common/CopyLinkButton"
 import { FormPageLayout } from "@/components/Common/FormPageLayout"
 import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
 import { GroupForm } from "@/components/forms/GroupForm"
 import { GroupMembersSection } from "@/components/groups/GroupMembersSection"
 import { Skeleton } from "@/components/ui/skeleton"
+import { useCurrentTenant } from "@/hooks/useCurrentTenant"
 import { useGoBack } from "@/hooks/useGoBack"
+import { getGroupPortalUrl, getPortalBaseUrl } from "@/lib/portal-urls"
 
 export const Route = createFileRoute("/_layout/groups/$id/edit")({
   component: EditGroupPage,
@@ -35,6 +38,15 @@ function EditGroupContent({ groupId }: { groupId: string }) {
   )
 }
 
+function GroupCopyLinkAction({ groupId }: { groupId: string }) {
+  const { data: group } = useSuspenseQuery(getGroupQueryOptions(groupId))
+  const { data: tenant } = useCurrentTenant()
+  const baseUrl = getPortalBaseUrl(tenant)
+  const url =
+    baseUrl && group.slug ? getGroupPortalUrl(baseUrl, group.slug) : null
+  return <CopyLinkButton url={url} iconOnly={false} />
+}
+
 function EditGroupPage() {
   const { id } = Route.useParams()
 
@@ -43,6 +55,11 @@ function EditGroupPage() {
       title="Edit Group"
       description="Update group settings and discounts"
       backTo="/groups"
+      actions={
+        <Suspense fallback={null}>
+          <GroupCopyLinkAction groupId={id} />
+        </Suspense>
+      }
     >
       <QueryErrorBoundary>
         <Suspense fallback={<Skeleton className="h-96 w-full" />}>

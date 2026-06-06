@@ -38,3 +38,7 @@ export function getSelfCheckInUrl(baseUrl: string, popupSlug: string) {
 export function getGroupPortalUrl(baseUrl: string, groupSlug: string) {
   return `${baseUrl}/groups/${groupSlug}`
 }
+
+export function getInvitePortalUrl(baseUrl: string, token: string) {
+  return `${baseUrl}/invite/${token}`
+}

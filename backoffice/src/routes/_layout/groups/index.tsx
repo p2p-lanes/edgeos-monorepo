@@ -1,7 +1,7 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query"
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router"
 import type { ColumnDef } from "@tanstack/react-table"
-import { EllipsisVertical, ExternalLink, Plus, Users } from "lucide-react"
+import { Copy, EllipsisVertical, ExternalLink, Plus, Users } from "lucide-react"
 import { Suspense, useState } from "react"
 
 import { type GroupPublic, GroupsService } from "@/client"
@@ -29,7 +29,9 @@ import {
 import { Skeleton } from "@/components/ui/skeleton"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
 import useAuth from "@/hooks/useAuth"
+import { useCopyToClipboard } from "@/hooks/useCopyToClipboard"
 import { useCurrentTenant } from "@/hooks/useCurrentTenant"
+import useCustomToast from "@/hooks/useCustomToast"
 import {
   useTableSearchParams,
   validateTableSearch,
@@ -143,8 +145,21 @@ function GroupActionsMenu({ group }: { group: GroupPublic }) {
   const [open, setOpen] = useState(false)
   const [membersOpen, setMembersOpen] = useState(false)
   const { data: tenant } = useCurrentTenant()
+  const [, copy] = useCopyToClipboard()
+  const { showSuccessToast } = useCustomToast()
   const baseUrl = getPortalBaseUrl(tenant)
   const hasPortalLink = baseUrl && group.slug
+  const portalUrl = hasPortalLink
+    ? getGroupPortalUrl(baseUrl, group.slug)
+    : null
+
+  const handleCopyLink = async () => {
+    if (!portalUrl) return
+    const ok = await copy(portalUrl)
+    if (ok) {
+      showSuccessToast("Link copied to clipboard")
+    }
+  }
 
   return (
     <>
@@ -166,16 +181,28 @@ function GroupActionsMenu({ group }: { group: GroupPublic }) {
             View Members
           </DropdownMenuItem>
           {hasPortalLink && (
-            <DropdownMenuItem asChild>
-              <a
-                href={getGroupPortalUrl(baseUrl, group.slug)}
-                target="_blank"
-                rel="noopener noreferrer"
+            <>
+              <DropdownMenuItem
+                onSelect={(e) => e.preventDefault()}
+                onClick={() => {
+                  setOpen(false)
+                  handleCopyLink()
+                }}
               >
-                <ExternalLink className="mr-2 h-4 w-4" />
-                Open Portal
-              </a>
-            </DropdownMenuItem>
+                <Copy className="mr-2 h-4 w-4" />
+                Copy link
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <a
+                  href={getGroupPortalUrl(baseUrl, group.slug)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <ExternalLink className="mr-2 h-4 w-4" />
+                  Open Portal
+                </a>
+              </DropdownMenuItem>
+            </>
           )}
         </DropdownMenuContent>
       </DropdownMenu>

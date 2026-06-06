@@ -5,6 +5,7 @@ import { Link2, Plus } from "lucide-react"
 import { Suspense } from "react"
 
 import { type InvitePublic, InvitesService } from "@/client"
+import { CopyLinkButton } from "@/components/Common/CopyLinkButton"
 import { DataTable, SortableHeader } from "@/components/Common/DataTable"
 import { EmptyState } from "@/components/Common/EmptyState"
 import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
@@ -13,10 +14,12 @@ import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
 import useAuth from "@/hooks/useAuth"
+import { useCurrentTenant } from "@/hooks/useCurrentTenant"
 import {
   useTableSearchParams,
   validateTableSearch,
 } from "@/hooks/useTableSearchParams"
+import { getInvitePortalUrl, getPortalBaseUrl } from "@/lib/portal-urls"
 
 function getInvitesQueryOptions(
   popupId: string | null,
@@ -51,6 +54,14 @@ function AddInviteButton() {
       </Link>
     </Button>
   )
+}
+
+function InviteCopyLink({ invite }: { invite: InvitePublic }) {
+  const { data: tenant } = useCurrentTenant()
+  const baseUrl = getPortalBaseUrl(tenant)
+  const url =
+    baseUrl && invite.token ? getInvitePortalUrl(baseUrl, invite.token) : null
+  return <CopyLinkButton url={url} iconOnly />
 }
 
 const columns: ColumnDef<InvitePublic>[] = [
@@ -98,6 +109,15 @@ const columns: ColumnDef<InvitePublic>[] = [
       ) : (
         <span className="text-muted-foreground text-sm">Never</span>
       ),
+  },
+  {
+    id: "actions",
+    header: () => <span className="sr-only">Actions</span>,
+    cell: ({ row }) => (
+      <div className="flex justify-end">
+        <InviteCopyLink invite={row.original} />
+      </div>
+    ),
   },
 ]
 
