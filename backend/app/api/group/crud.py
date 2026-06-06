@@ -192,8 +192,8 @@ class GroupsCRUD(BaseCRUD[Groups, GroupCreate, GroupUpdate]):
 
         if group.max_members is not None and len(group.members) >= group.max_members:
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Group has reached maximum members",
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Group has reached its maximum member limit",
             )
 
     def add_leader(
@@ -216,6 +216,46 @@ class GroupsCRUD(BaseCRUD[Groups, GroupCreate, GroupUpdate]):
             session.delete(leader)
             session.commit()
 
+    def _insert_member_if_allowed(
+        self,
+        session: Session,
+        group: Groups,
+        human_id: uuid.UUID,
+    ) -> bool:
+        """Insert a GroupMembers row respecting idempotency and max_members cap.
+
+        Returns True if the row was inserted, False if skipped (already member
+        or group is full).  Does NOT commit — caller is responsible.
+        """
+        # Idempotency
+        existing = session.exec(
+            select(GroupMembers).where(
+                GroupMembers.group_id == group.id,
+                GroupMembers.human_id == human_id,
+            )
+        ).first()
+        if existing:
+            return False
+
+        # Cap check
+        if group.max_members is not None:
+            current_count = session.exec(
+                select(func.count(GroupMembers.human_id)).where(
+                    GroupMembers.group_id == group.id
+                )
+            ).one()
+            if current_count >= group.max_members:
+                return False
+
+        session.add(
+            GroupMembers(
+                group_id=group.id,
+                human_id=human_id,
+                tenant_id=group.tenant_id,
+            )
+        )
+        return True
+
     def add_member(
         self,
         session: Session,
@@ -223,8 +263,27 @@ class GroupsCRUD(BaseCRUD[Groups, GroupCreate, GroupUpdate]):
         human_id: uuid.UUID,
         tenant_id: uuid.UUID | None = None,
     ) -> None:
-        """Add a member to a group."""
-        member = GroupMembers(group_id=group_id, human_id=human_id, tenant_id=tenant_id)
+        """Add a member to a group (raises 409 if group is full)."""
+        group = session.exec(select(Groups).where(Groups.id == group_id)).first()
+        if group is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Group not found",
+            )
+        if group.max_members is not None:
+            current_count = session.exec(
+                select(func.count(GroupMembers.human_id)).where(
+                    GroupMembers.group_id == group_id
+                )
+            ).one()
+            if current_count >= group.max_members:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="Group has reached its maximum member limit",
+                )
+        member = GroupMembers(
+            group_id=group_id, human_id=human_id, tenant_id=tenant_id or group.tenant_id
+        )
         session.add(member)
         session.commit()
 
@@ -394,19 +453,51 @@ class GroupsCRUD(BaseCRUD[Groups, GroupCreate, GroupUpdate]):
         emails: list[str],
         tenant_id: uuid.UUID,
     ) -> Groups:
-        """Update whitelisted emails for a group (replace all)."""
+        """Update whitelisted emails for a group (replace all).
+
+        After replacing the whitelist, back-resolves existing humans: for each
+        newly whitelisted email that matches an existing human in the same
+        tenant, the human is added to the group's members (idempotent, cap
+        respected) so that admins adding emails retroactively get the same
+        effect as if those humans had signed up after whitelisting.
+        """
+        from app.api.human.models import Humans
+
+        # Collect existing emails (lowercased) to detect new additions
+        existing_emails: set[str] = {
+            wl.email.lower() for wl in group.whitelisted_emails
+        }
+        new_emails_lower: set[str] = {e.lower().strip() for e in emails if e.strip()}
+        newly_added: set[str] = new_emails_lower - existing_emails
+
         # Delete existing whitelisted emails
         for wl in list(group.whitelisted_emails):
             session.delete(wl)
 
         # Add new whitelisted emails
         for email in emails:
+            clean = email.lower().strip()
+            if not clean:
+                continue
             wl_email = GroupWhitelistedEmails(
                 tenant_id=tenant_id,
                 group_id=group.id,
-                email=email.lower().strip(),
+                email=clean,
             )
             session.add(wl_email)
+
+        session.flush()
+
+        # Back-resolve: add existing humans for newly whitelisted emails
+        for email in newly_added:
+            human = session.exec(
+                select(Humans).where(
+                    func.lower(Humans.email) == email,
+                    Humans.tenant_id == tenant_id,
+                )
+            ).first()
+            if human is not None:
+                self._insert_member_if_allowed(session, group, human.id)
 
         session.commit()
         session.refresh(group)

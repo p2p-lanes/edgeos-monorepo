@@ -531,12 +531,13 @@ def resolve_whitelist_memberships(session: Session, human: Humans) -> None:
     Design Decision 1g:
     - Lookup group_whitelisted_emails case-insensitively by human.email
     - For each matching group, insert into group_members if not already present
+      and the group is below its max_members cap.
     - Never touches applications — M:N membership only
     """
     from sqlalchemy import func
     from sqlmodel import select as _select
 
-    from app.api.group.models import GroupMembers, GroupWhitelistedEmails
+    from app.api.group.models import GroupMembers, Groups, GroupWhitelistedEmails
 
     email_lower = human.email.lower()
 
@@ -546,6 +547,7 @@ def resolve_whitelist_memberships(session: Session, human: Humans) -> None:
         )
     ).all()
 
+    added = False
     for wl in matching_wl_rows:
         # Idempotency: skip if already a member
         existing = session.exec(
@@ -557,12 +559,24 @@ def resolve_whitelist_memberships(session: Session, human: Humans) -> None:
         if existing:
             continue
 
+        # Cap check: skip if the group is already full
+        group = session.exec(_select(Groups).where(Groups.id == wl.group_id)).first()
+        if group is not None and group.max_members is not None:
+            current_count = session.exec(
+                _select(func.count(GroupMembers.human_id)).where(
+                    GroupMembers.group_id == wl.group_id
+                )
+            ).one()
+            if current_count >= group.max_members:
+                continue
+
         member_row = GroupMembers(
             tenant_id=wl.tenant_id,
             group_id=wl.group_id,
             human_id=human.id,
         )
         session.add(member_row)
+        added = True
 
-    if matching_wl_rows:
+    if added:
         session.commit()

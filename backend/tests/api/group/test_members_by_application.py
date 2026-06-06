@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import uuid
 
-import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session, select
 
@@ -22,7 +21,6 @@ from app.api.human.models import Humans
 from app.api.popup.models import Popups
 from app.api.tenant.models import Tenants
 from app.api.user.models import Users
-from app.api.shared.enums import UserRole
 from app.core.security import create_access_token
 
 # ---------------------------------------------------------------------------
@@ -129,7 +127,11 @@ class TestMembersByApplication:
     """Verify the M:N membership entry point that does not create a duplicate application."""
 
     def test_admin_adds_approved_human_to_group(
-        self, client: TestClient, db: Session, tenant_a: Tenants, admin_user_tenant_a: Users
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+        admin_user_tenant_a: Users,
     ) -> None:
         """Admin can add an approved human to a group via their application id.
 
@@ -139,7 +141,9 @@ class TestMembersByApplication:
         popup = _make_popup(db, tenant_a)
         human = _make_human(db, tenant_a)
         group = _make_group(db, tenant_a, popup)
-        app = _make_application(db, tenant_a, popup, human, status=ApplicationStatus.ACCEPTED)
+        app = _make_application(
+            db, tenant_a, popup, human, status=ApplicationStatus.ACCEPTED
+        )
 
         token = _user_token(admin_user_tenant_a)
         resp = client.post(
@@ -197,7 +201,11 @@ class TestMembersByApplication:
         assert resp.status_code == 403, resp.json()
 
     def test_404_application_not_found(
-        self, client: TestClient, db: Session, tenant_a: Tenants, admin_user_tenant_a: Users
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+        admin_user_tenant_a: Users,
     ) -> None:
         """Returns 404 when application_id doesn't exist (admin route)."""
         popup = _make_popup(db, tenant_a)
@@ -212,13 +220,19 @@ class TestMembersByApplication:
         assert resp.status_code == 404, resp.json()
 
     def test_422_application_not_accepted(
-        self, client: TestClient, db: Session, tenant_a: Tenants, admin_user_tenant_a: Users
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+        admin_user_tenant_a: Users,
     ) -> None:
         """Returns 422 when application is not in ACCEPTED status (admin route)."""
         popup = _make_popup(db, tenant_a)
         human = _make_human(db, tenant_a)
         group = _make_group(db, tenant_a, popup)
-        app = _make_application(db, tenant_a, popup, human, status=ApplicationStatus.DRAFT)
+        app = _make_application(
+            db, tenant_a, popup, human, status=ApplicationStatus.DRAFT
+        )
 
         token = _user_token(admin_user_tenant_a)
         resp = client.post(
@@ -229,7 +243,11 @@ class TestMembersByApplication:
         assert resp.status_code == 422, resp.json()
 
     def test_422_application_popup_mismatch(
-        self, client: TestClient, db: Session, tenant_a: Tenants, admin_user_tenant_a: Users
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+        admin_user_tenant_a: Users,
     ) -> None:
         """Returns 422 when application belongs to a different popup than the group (admin route)."""
         popup1 = _make_popup(db, tenant_a)
@@ -237,7 +255,9 @@ class TestMembersByApplication:
         human = _make_human(db, tenant_a)
         group = _make_group(db, tenant_a, popup1)
         # Application is for popup2, but group is in popup1
-        app = _make_application(db, tenant_a, popup2, human, status=ApplicationStatus.ACCEPTED)
+        app = _make_application(
+            db, tenant_a, popup2, human, status=ApplicationStatus.ACCEPTED
+        )
 
         token = _user_token(admin_user_tenant_a)
         resp = client.post(
@@ -248,7 +268,11 @@ class TestMembersByApplication:
         assert resp.status_code == 422, resp.json()
 
     def test_idempotent_already_member(
-        self, client: TestClient, db: Session, tenant_a: Tenants, admin_user_tenant_a: Users
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+        admin_user_tenant_a: Users,
     ) -> None:
         """Calling the endpoint for an already-member human returns 200.
 
@@ -260,11 +284,13 @@ class TestMembersByApplication:
         app = _make_application(db, tenant_a, popup, human)
 
         # Pre-add as member
-        db.add(GroupMembers(
-            tenant_id=tenant_a.id,
-            group_id=group.id,
-            human_id=human.id,
-        ))
+        db.add(
+            GroupMembers(
+                tenant_id=tenant_a.id,
+                group_id=group.id,
+                human_id=human.id,
+            )
+        )
         db.commit()
 
         token = _user_token(admin_user_tenant_a)
@@ -279,16 +305,22 @@ class TestMembersByApplication:
         assert body["id"] == str(human.id)
 
         # No duplicate rows
-        rows = list(db.exec(
-            select(GroupMembers).where(
-                GroupMembers.group_id == group.id,
-                GroupMembers.human_id == human.id,
-            )
-        ).all())
+        rows = list(
+            db.exec(
+                select(GroupMembers).where(
+                    GroupMembers.group_id == group.id,
+                    GroupMembers.human_id == human.id,
+                )
+            ).all()
+        )
         assert len(rows) == 1, "Must not create duplicate group_members row"
 
     def test_no_duplicate_application_created(
-        self, client: TestClient, db: Session, tenant_a: Tenants, admin_user_tenant_a: Users
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+        admin_user_tenant_a: Users,
     ) -> None:
         """Adding via by-application must not create a new application row.
 
@@ -299,9 +331,13 @@ class TestMembersByApplication:
         group = _make_group(db, tenant_a, popup)
         app = _make_application(db, tenant_a, popup, human)
 
-        app_count_before = len(list(db.exec(
-            select(Applications).where(Applications.human_id == human.id)
-        ).all()))
+        app_count_before = len(
+            list(
+                db.exec(
+                    select(Applications).where(Applications.human_id == human.id)
+                ).all()
+            )
+        )
 
         token = _user_token(admin_user_tenant_a)
         resp = client.post(
@@ -311,9 +347,57 @@ class TestMembersByApplication:
         )
         assert resp.status_code == 201, resp.json()
 
-        app_count_after = len(list(db.exec(
-            select(Applications).where(Applications.human_id == human.id)
-        ).all()))
+        app_count_after = len(
+            list(
+                db.exec(
+                    select(Applications).where(Applications.human_id == human.id)
+                ).all()
+            )
+        )
         assert app_count_after == app_count_before, (
             "Adding via by-application must not create new Applications rows"
         )
+
+    def test_409_when_group_full_admin(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+        admin_user_tenant_a: Users,
+    ) -> None:
+        """Returns 409 when the group has hit max_members (admin route)."""
+        popup = _make_popup(db, tenant_a)
+
+        # Create a group with max_members=1
+        group = Groups(
+            tenant_id=tenant_a.id,
+            popup_id=popup.id,
+            name=f"Full Group {uuid.uuid4().hex[:6]}",
+            slug=f"full-{uuid.uuid4().hex[:8]}",
+            max_members=1,
+        )
+        db.add(group)
+        db.commit()
+        db.refresh(group)
+
+        # Fill the group
+        blocker = _make_human(db, tenant_a)
+        db.add(
+            GroupMembers(tenant_id=tenant_a.id, group_id=group.id, human_id=blocker.id)
+        )
+        db.commit()
+
+        # Try to add another human
+        target = _make_human(db, tenant_a)
+        app = _make_application(
+            db, tenant_a, popup, target, status=ApplicationStatus.ACCEPTED
+        )
+
+        token = _user_token(admin_user_tenant_a)
+        resp = client.post(
+            f"/api/v1/groups/{group.id}/members/by-application",
+            json={"application_id": str(app.id)},
+            headers={**_auth(token), "X-Tenant-Id": str(tenant_a.id)},
+        )
+        assert resp.status_code == 409, resp.json()
+        assert not _is_member(db, group.id, target.id)

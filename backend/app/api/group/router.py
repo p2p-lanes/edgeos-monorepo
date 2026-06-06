@@ -642,7 +642,23 @@ def _add_member_by_application_logic(
     # Idempotency: if already a member, return current state (200)
     already_member = crud.groups_crud.is_member(db, group.id, human_id)
     if not already_member:
+        from sqlalchemy import func as _func
+        from sqlmodel import select as _select
+
         from app.api.group.models import GroupMembers
+
+        # Cap check: reject if group is full
+        if group.max_members is not None:
+            current_count = db.exec(
+                _select(_func.count(GroupMembers.human_id)).where(
+                    GroupMembers.group_id == group.id
+                )
+            ).one()
+            if current_count >= group.max_members:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="Group has reached its maximum member limit",
+                )
 
         member_row = GroupMembers(
             tenant_id=group.tenant_id,

@@ -6,6 +6,7 @@ import { GroupsService } from "@/client"
 import { FormPageLayout } from "@/components/Common/FormPageLayout"
 import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
 import { GroupForm } from "@/components/forms/GroupForm"
+import { GroupMembersSection } from "@/components/groups/GroupMembersSection"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useGoBack } from "@/hooks/useGoBack"
 
@@ -27,7 +28,12 @@ function EditGroupContent({ groupId }: { groupId: string }) {
   const goBack = useGoBack({ to: "/groups" })
   const { data: group } = useSuspenseQuery(getGroupQueryOptions(groupId))
 
-  return <GroupForm defaultValues={group} onSuccess={goBack} />
+  return (
+    <>
+      <GroupForm defaultValues={group} onSuccess={goBack} />
+      <GroupMembersSection group={group} />
+    </>
+  )
 }
 
 function EditGroupPage() {
