@@ -10,6 +10,7 @@ import {
   ShieldCheck,
   Users,
 } from "lucide-react"
+import type { ReactNode } from "react"
 import {
   type GroupAdminUpdate,
   type GroupCreate,
@@ -44,9 +45,15 @@ import { createErrorHandler } from "@/utils"
 interface GroupFormProps {
   defaultValues?: GroupPublic
   onSuccess: () => void
+  /** Extra content rendered between the form and the Danger Zone (e.g. members). */
+  children?: ReactNode
 }
 
-export function GroupForm({ defaultValues, onSuccess }: GroupFormProps) {
+export function GroupForm({
+  defaultValues,
+  onSuccess,
+  children,
+}: GroupFormProps) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { showSuccessToast, showErrorToast } = useCustomToast()
@@ -443,6 +450,8 @@ export function GroupForm({ defaultValues, onSuccess }: GroupFormProps) {
           )}
         </div>
       </form>
+
+      {children}
 
       {isEdit && !readOnly && (
         <div className="mx-auto max-w-2xl">

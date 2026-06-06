@@ -29,10 +29,9 @@ function EditGroupContent({ groupId }: { groupId: string }) {
   const { data: group } = useSuspenseQuery(getGroupQueryOptions(groupId))
 
   return (
-    <>
-      <GroupForm defaultValues={group} onSuccess={goBack} />
+    <GroupForm defaultValues={group} onSuccess={goBack}>
       <GroupMembersSection group={group} />
-    </>
+    </GroupForm>
   )
 }
 
