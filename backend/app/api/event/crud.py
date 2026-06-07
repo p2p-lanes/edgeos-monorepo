@@ -142,6 +142,75 @@ class EventsCRUD(BaseCRUD[Events, EventCreate, EventUpdate]):
 
         return results, total
 
+    def find_in_range_expanded(
+        self,
+        session: Session,
+        popup_id: uuid.UUID,
+        *,
+        start_after: datetime | None = None,
+        start_before: datetime | None = None,
+        event_status: EventStatus | None = None,
+        search: str | None = None,
+        tags: list[str] | None = None,
+        track_ids: list[uuid.UUID] | None = None,
+        managed_by_human_id: uuid.UUID | None = None,
+    ) -> list[Events]:
+        """Return occurrence-expanded events in a window for a popup.
+
+        Applies the same filters as ``find_by_popup`` (including the
+        recurring-master OR bypass so series starting before the window
+        are still expanded) but without pagination — a month-sized window
+        is naturally bounded.  Results are ordered by ``start_time`` asc
+        and fully expanded via ``_expand_rows_in_window``.
+        """
+        statement = select(Events).where(Events.popup_id == popup_id)
+
+        if event_status is not None:
+            statement = statement.where(Events.status == event_status)
+        if managed_by_human_id is not None:
+            # Events the human manages: owner, designated host, or a listed
+            # collaborator. Pushed into SQL so the "My events" calendar matches
+            # the list view's managed channel.
+            statement = statement.where(
+                or_(
+                    Events.owner_id == managed_by_human_id,
+                    Events.host_id == managed_by_human_id,
+                    col(Events.collaborator_ids).any(managed_by_human_id),
+                )
+            )
+        if track_ids:
+            statement = statement.where(col(Events.track_id).in_(track_ids))
+        if tags:
+            from sqlalchemy.dialects.postgresql import array
+
+            statement = statement.where(Events.tags.op("?|")(array(list(tags))))
+        if start_after is not None:
+            statement = statement.where(
+                or_(
+                    Events.rrule.is_not(None),  # type: ignore[union-attr]
+                    Events.start_time >= start_after,
+                )
+            )
+        if start_before is not None:
+            statement = statement.where(
+                or_(
+                    Events.rrule.is_not(None),  # type: ignore[union-attr]
+                    Events.start_time <= start_before,
+                )
+            )
+        if search:
+            statement = statement.where(col(Events.title).ilike(f"%{search}%"))
+
+        statement = statement.order_by(asc(Events.start_time))
+        results = list(session.exec(statement).all())
+
+        return _expand_rows_in_window(
+            session,
+            results,
+            window_start=start_after,
+            window_end=start_before,
+        )
+
     def find_by_owner(
         self,
         session: Session,

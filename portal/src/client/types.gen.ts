@@ -1147,6 +1147,20 @@ export type DashboardStats = {
 };
 
 /**
+ * Number of occurrence-expanded events that start on a given calendar day.
+ *
+ * Backs the portal calendar grid dots: the frontend can fetch per-day counts
+ * for an entire month without pulling full event payloads, then render a dot
+ * on each day that has at least one event.  ``day`` is formatted as
+ * ``YYYY-MM-DD`` in the popup's configured timezone so it aligns with the
+ * frontend's ``formatDayKey`` helper.
+ */
+export type DayEventCount = {
+    day: string;
+    count: number;
+};
+
+/**
  * Request body for POST /applications/my/detach-companion.
  */
 export type DetachCompanionRequest = {
@@ -4895,6 +4909,19 @@ export type EventsListPortalTrackEventCountsData = {
 };
 
 export type EventsListPortalTrackEventCountsResponse = (Array<TrackEventCount>);
+
+export type EventsPortalCalendarSummaryData = {
+    managedOnly?: boolean;
+    popupId: string;
+    rsvpedOnly?: boolean;
+    search?: (string | null);
+    startAfter?: (string | null);
+    startBefore?: (string | null);
+    tags?: (Array<(string)> | null);
+    trackIds?: (Array<(string)> | null);
+};
+
+export type EventsPortalCalendarSummaryResponse = (Array<DayEventCount>);
 
 export type EventsGetPortalEventData = {
     eventId: string;
