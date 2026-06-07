@@ -4911,6 +4911,7 @@ export type EventsListPortalTrackEventCountsData = {
 export type EventsListPortalTrackEventCountsResponse = (Array<TrackEventCount>);
 
 export type EventsPortalCalendarSummaryData = {
+    managedOnly?: boolean;
     popupId: string;
     rsvpedOnly?: boolean;
     search?: (string | null);

@@ -42,6 +42,8 @@ interface DayBodyProps {
   slug: string | undefined
   search: string
   rsvpedOnly: boolean
+  /** "My events": owner/host/collaborator. Includes the manager's drafts. */
+  mineOnly?: boolean
   tags?: string[]
   trackIds?: string[]
   selectedDate: Date | null
@@ -130,6 +132,7 @@ export function DayBody({
   slug,
   search,
   rsvpedOnly,
+  mineOnly,
   tags,
   trackIds,
   selectedDate: selectedDateProp,
@@ -224,6 +227,7 @@ export function DayBody({
       popupId,
       dayKey,
       rsvpedOnly,
+      mineOnly,
       search,
       tags,
       trackIds,
@@ -233,10 +237,11 @@ export function DayBody({
     queryFn: async () => ({
       results: await fetchAllPortalEvents({
         popupId: popupId!,
-        eventStatus: "published",
+        eventStatus: mineOnly ? undefined : "published",
         startAfter: window.startAfter,
         startBefore: window.startBefore,
         rsvpedOnly: rsvpedOnly || undefined,
+        managedOnly: mineOnly || undefined,
         search: search || undefined,
         tags: tags?.length ? tags : undefined,
         trackIds: trackIds?.length ? trackIds : undefined,

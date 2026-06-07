@@ -3624,6 +3624,7 @@ export class EventsService {
      * @param data.tags
      * @param data.trackIds
      * @param data.rsvpedOnly
+     * @param data.managedOnly
      * @returns DayEventCount Successful Response
      * @throws ApiError
      */
@@ -3638,7 +3639,8 @@ export class EventsService {
                 search: data.search,
                 tags: data.tags,
                 track_ids: data.trackIds,
-                rsvped_only: data.rsvpedOnly
+                rsvped_only: data.rsvpedOnly,
+                managed_only: data.managedOnly
             },
             errors: {
                 422: 'Validation Error'

@@ -153,6 +153,7 @@ class EventsCRUD(BaseCRUD[Events, EventCreate, EventUpdate]):
         search: str | None = None,
         tags: list[str] | None = None,
         track_ids: list[uuid.UUID] | None = None,
+        managed_by_human_id: uuid.UUID | None = None,
     ) -> list[Events]:
         """Return occurrence-expanded events in a window for a popup.
 
@@ -166,6 +167,17 @@ class EventsCRUD(BaseCRUD[Events, EventCreate, EventUpdate]):
 
         if event_status is not None:
             statement = statement.where(Events.status == event_status)
+        if managed_by_human_id is not None:
+            # Events the human manages: owner, designated host, or a listed
+            # collaborator. Pushed into SQL so the "My events" calendar matches
+            # the list view's managed channel.
+            statement = statement.where(
+                or_(
+                    Events.owner_id == managed_by_human_id,
+                    Events.host_id == managed_by_human_id,
+                    col(Events.collaborator_ids).any(managed_by_human_id),
+                )
+            )
         if track_ids:
             statement = statement.where(col(Events.track_id).in_(track_ids))
         if tags:

@@ -49,6 +49,8 @@ interface CalendarBodyProps {
   slug: string | undefined
   search: string
   rsvpedOnly: boolean
+  /** "My events": owner/host/collaborator. Includes the manager's drafts. */
+  mineOnly?: boolean
   tags?: string[]
   trackIds?: string[]
   /** Initial month + selected day. Defaults to today before the popup loads. */
@@ -100,6 +102,7 @@ export function CalendarBody({
   slug,
   search,
   rsvpedOnly,
+  mineOnly,
   tags,
   trackIds,
   defaultDate,
@@ -171,6 +174,7 @@ export function CalendarBody({
       format(currentMonth, "yyyy-MM"),
       timezone,
       rsvpedOnly,
+      mineOnly,
       search,
       tags,
       trackIds,
@@ -181,6 +185,7 @@ export function CalendarBody({
         startAfter: monthBounds.start.toISOString(),
         startBefore: monthBounds.end.toISOString(),
         rsvpedOnly: rsvpedOnly || undefined,
+        managedOnly: mineOnly || undefined,
         search: search || undefined,
         tags: tags?.length ? tags : undefined,
         trackIds: trackIds?.length ? trackIds : undefined,
@@ -222,6 +227,7 @@ export function CalendarBody({
       popupId,
       selectedDayKey,
       rsvpedOnly,
+      mineOnly,
       search,
       tags,
       trackIds,
@@ -229,10 +235,11 @@ export function CalendarBody({
     queryFn: () =>
       fetchAllPortalEvents({
         popupId: popupId!,
-        eventStatus: "published",
+        eventStatus: mineOnly ? undefined : "published",
         startAfter: selectedWindow!.startAfter,
         startBefore: selectedWindow!.startBefore,
         rsvpedOnly: rsvpedOnly || undefined,
+        managedOnly: mineOnly || undefined,
         search: search || undefined,
         tags: tags?.length ? tags : undefined,
         trackIds: trackIds?.length ? trackIds : undefined,

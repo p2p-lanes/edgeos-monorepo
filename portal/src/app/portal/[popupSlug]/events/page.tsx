@@ -725,6 +725,7 @@ export default function EventsPage() {
             slug={city?.slug}
             search={search}
             rsvpedOnly={rsvpedOnly}
+            mineOnly={mineOnly}
             tags={selectedTags}
             trackIds={selectedTrackIds}
             defaultDate={selectedDate}
@@ -738,6 +739,7 @@ export default function EventsPage() {
               slug={city?.slug}
               search={search}
               rsvpedOnly={rsvpedOnly}
+              mineOnly={mineOnly}
               tags={selectedTags}
               trackIds={selectedTrackIds}
               selectedDate={selectedDate}
@@ -805,6 +807,7 @@ export default function EventsPage() {
               slug={city?.slug}
               search={search}
               rsvpedOnly={rsvpedOnly}
+              mineOnly={mineOnly}
               tags={selectedTags}
               trackIds={selectedTrackIds}
               selectedDate={selectedDate}

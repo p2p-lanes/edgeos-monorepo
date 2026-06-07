@@ -2670,6 +2670,7 @@ async def portal_calendar_summary(
     tags: list[str] | None = Query(default=None),
     track_ids: list[uuid.UUID] | None = Query(default=None),
     rsvped_only: bool = False,
+    managed_only: bool = False,
 ) -> list[DayEventCount]:
     """Per-day event counts for a popup's calendar grid.
 
@@ -2686,12 +2687,20 @@ async def portal_calendar_summary(
         popup_id=popup_id,
         start_after=start_after,
         start_before=start_before,
-        event_status=EventStatus.PUBLISHED,
+        # "My events" includes the manager's drafts/pending, matching the list
+        # view's managed channel; otherwise only published events are counted.
+        event_status=None if managed_only else EventStatus.PUBLISHED,
         search=search,
         tags=tags,
         track_ids=track_ids,
+        managed_by_human_id=current_human.id if managed_only else None,
     )
-    visible = _portal_visibility_filter(db, events, current_human.id)
+    # Managed events are visible to the manager by definition, so skip the
+    # owner/invite visibility filter for them (matching list_portal_events).
+    if managed_only:
+        visible = events
+    else:
+        visible = _portal_visibility_filter(db, events, current_human.id)
     visible = [e for e in visible if e.status != EventStatus.CANCELLED]
     if rsvped_only:
         visible = _filter_rsvped_events(db, visible, current_human.id)
