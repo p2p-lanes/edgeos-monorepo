@@ -5218,6 +5218,11 @@ export class HumansService {
      * @param data.search
      * @param data.popupId
      * @param data.incompleteApplication
+     * @param data.email
+     * @param data.telegram
+     * @param data.gender
+     * @param data.age
+     * @param data.residence
      * @param data.skip Number of items to skip
      * @param data.limit Maximum number of items to return
      * @param data.xTenantId
@@ -5235,6 +5240,11 @@ export class HumansService {
                 search: data.search,
                 popup_id: data.popupId,
                 incomplete_application: data.incompleteApplication,
+                email: data.email,
+                telegram: data.telegram,
+                gender: data.gender,
+                age: data.age,
+                residence: data.residence,
                 skip: data.skip,
                 limit: data.limit
             },
