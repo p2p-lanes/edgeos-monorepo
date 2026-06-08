@@ -362,77 +362,6 @@ function EventApprovalActions({ event }: { event: EventPublic }) {
   )
 }
 
-function EditOccurrenceDialog({
-  event,
-  onClose,
-}: {
-  event: EventPublic | null
-  onClose: () => void
-}) {
-  const queryClient = useQueryClient()
-  const navigate = useNavigate()
-  const { showSuccessToast, showErrorToast } = useCustomToast()
-  const occurrenceRef = event ? parseOccurrenceId(event.occurrence_id) : null
-
-  const detachMutation = useMutation({
-    mutationFn: async () => {
-      if (!occurrenceRef) throw new Error("Not an occurrence")
-      return EventsService.detachOccurrence({
-        eventId: occurrenceRef.masterId,
-        requestBody: { occurrence_start: occurrenceRef.start },
-      })
-    },
-    onSuccess: (child) => {
-      showSuccessToast("Detached occurrence for editing")
-      onClose()
-      queryClient.invalidateQueries({ queryKey: ["events"] })
-      navigate({
-        to: "/events/$eventId/edit",
-        params: { eventId: child.id },
-      })
-    },
-    onError: createErrorHandler(showErrorToast),
-  })
-
-  return (
-    <Dialog open={!!event} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Edit recurring event</DialogTitle>
-          <DialogDescription>
-            This is one instance of a recurring series. Would you like to edit
-            only this event, or the entire series?
-          </DialogDescription>
-        </DialogHeader>
-        <DialogFooter>
-          <DialogClose asChild>
-            <Button variant="outline">Cancel</Button>
-          </DialogClose>
-          <Button
-            variant="outline"
-            onClick={() => {
-              if (!occurrenceRef) return
-              onClose()
-              navigate({
-                to: "/events/$eventId/edit",
-                params: { eventId: occurrenceRef.masterId },
-              })
-            }}
-          >
-            Edit series
-          </Button>
-          <LoadingButton
-            loading={detachMutation.isPending}
-            onClick={() => detachMutation.mutate()}
-          >
-            Edit only this event
-          </LoadingButton>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  )
-}
-
 function EventHostCell({ event }: { event: EventPublic }) {
   const ownerId = event.owner_id
   const { data: owner } = useQuery({
@@ -1210,10 +1139,6 @@ function EventsPage() {
   const searchParams = Route.useSearch()
   const view: EventsView = searchParams.view ?? readStoredEventsView() ?? "list"
   const selectedDate = parseSelectedDate(searchParams.date)
-  // Picking an occurrence row pops a "series or this only" prompt; non-recurring
-  // rows skip the dialog and navigate straight to /events/:id/edit.
-  const [occurrenceEditTarget, setOccurrenceEditTarget] =
-    useState<EventPublic | null>(null)
 
   const { data: popup } = useQuery({
     queryKey: ["popup", selectedPopupId],
@@ -1262,13 +1187,14 @@ function EventsPage() {
 
   const handleRowClick = useCallback(
     (event: EventPublic) => {
-      if (parseOccurrenceId(event.occurrence_id)) {
-        setOccurrenceEditTarget(event)
-        return
-      }
+      // Open the read-only view page (which owns the edit/share actions and,
+      // for a recurring instance, the "series vs this occurrence" choice).
+      // Occurrences route to their master id with the instance start in `occ`.
+      const occ = parseOccurrenceId(event.occurrence_id)
       navigate({
-        to: "/events/$eventId/edit",
-        params: { eventId: event.id },
+        to: "/events/$eventId",
+        params: { eventId: occ ? occ.masterId : event.id },
+        search: occ ? { occ: occ.start } : {},
       })
     },
     [navigate],
@@ -1492,10 +1418,6 @@ function EventsPage() {
           </div>,
           document.body,
         )}
-      <EditOccurrenceDialog
-        event={occurrenceEditTarget}
-        onClose={() => setOccurrenceEditTarget(null)}
-      />
     </div>
   )
 }
