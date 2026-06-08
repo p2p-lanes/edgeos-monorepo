@@ -26,6 +26,7 @@ import { Sparkles } from "lucide-react"
 import { Fragment, useMemo, useState } from "react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { deriveProductState, type ProductSaleState } from "@/lib/product-state"
 import { cn } from "@/lib/utils"
 import { useCheckout } from "@/providers/checkoutProvider"
 import { usePassesProvider } from "@/providers/passesProvider"
@@ -41,6 +42,7 @@ import {
   type MealPlanProduct as SharedMealPlanProduct,
   weekdayDates,
 } from "./mealPlanShared"
+import { SaleStateBadge } from "./saleStateBadge"
 
 /** Weekly meal-plan product enriched with template_config metadata, with the
  *  product field narrowed to ProductsPass for this checkout step. */
@@ -103,6 +105,23 @@ function isPrePurchased(
 }
 
 // ---------------------------------------------------------------------------
+// Sale-state detection
+// ---------------------------------------------------------------------------
+
+/** Derive the weekly product's sale state from its pricing/stock window.
+ *  Mirrors VariantTicketSelect — the same backend logic gates payment, so a
+ *  non-`on_sale` week would 422 at checkout. */
+function saleStateOf(product: MealPlanProduct): ProductSaleState {
+  return deriveProductState(product.product)
+}
+
+/** True when the week is not currently on sale (ended / upcoming / sold out)
+ *  and therefore must not be selectable. */
+function isSaleClosed(product: MealPlanProduct): boolean {
+  return saleStateOf(product) !== "on_sale"
+}
+
+// ---------------------------------------------------------------------------
 // Main component
 // ---------------------------------------------------------------------------
 
@@ -154,6 +173,9 @@ export default function VariantMealPlanSelect({
     product: MealPlanProduct,
   ) => {
     if (isPrePurchased(attendee, product.id)) return
+    // Defense in depth: never add a cart line for a week that isn't on sale —
+    // the backend payment gate would reject it with a 422.
+    if (isSaleClosed(product)) return
     const selected = selectedProductIdsFor(cart.mealPlans, attendee.id).has(
       product.id,
     )
@@ -230,6 +252,11 @@ export default function VariantMealPlanSelect({
               <div className="text-[10px] text-muted-foreground">
                 {formatCurrency(p.product.price)} / wk
               </div>
+              {isSaleClosed(p) && (
+                <div className="mt-1 flex justify-center">
+                  <SaleStateBadge state={saleStateOf(p)} />
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -361,6 +388,8 @@ function AttendeeRow({
         {weeklyProducts.map((product) => {
           const isPicked = selectedHere.has(product.id)
           const isLocked = isPrePurchased(attendee, product.id)
+          const saleState = saleStateOf(product)
+          const saleClosed = saleState !== "on_sale"
           const isOpen =
             openCell?.attendeeId === attendee.id &&
             openCell?.productId === product.id
@@ -406,6 +435,8 @@ function AttendeeRow({
                   product={product}
                   isPicked={isPicked}
                   isLocked={isLocked}
+                  saleState={saleState}
+                  saleClosed={saleClosed}
                   isOpen={isOpen}
                   item={item}
                   onClick={() => onCellClick(attendee, product)}
@@ -531,6 +562,8 @@ function WeekCell({
   product,
   isPicked,
   isLocked,
+  saleState,
+  saleClosed,
   isOpen,
   item,
   onClick,
@@ -539,6 +572,8 @@ function WeekCell({
   product: MealPlanProduct
   isPicked: boolean
   isLocked: boolean
+  saleState: ProductSaleState
+  saleClosed: boolean
   isOpen: boolean
   item: SelectedMealPlanItem | undefined
   onClick: () => void
@@ -570,6 +605,37 @@ function WeekCell({
             Purchased
           </span>
         </div>
+        {/* Mobile-only price on the right */}
+        <span className="md:hidden text-[10px] text-muted-foreground shrink-0">
+          {formatCurrency(product.product.price)}/wk
+        </span>
+      </div>
+    )
+  }
+
+  // Sale window closed (ended / upcoming / sold out) and not purchased: render
+  // a disabled cell with a state badge so the week reads as unavailable instead
+  // of clickable. Mirrors VariantTicketSelect's stateBlocked handling.
+  if (saleClosed) {
+    return (
+      <div
+        role="img"
+        aria-label={`${product.weekLabel} sale ${saleState}`}
+        aria-disabled="true"
+        className="h-full flex items-center justify-between md:justify-center gap-2 md:gap-1.5 md:min-h-[60px] min-h-[44px] bg-muted/30 px-3 md:px-2 py-1.5 select-none opacity-70 [background-image:repeating-linear-gradient(45deg,transparent,transparent_6px,rgba(0,0,0,0.03)_6px,rgba(0,0,0,0.03)_12px)]"
+        title={`${product.weekLabel} sale ${saleState}`}
+      >
+        {/* Mobile-only week info on the left */}
+        <div className="md:hidden flex flex-col items-start leading-tight min-w-0">
+          <span className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+            {product.weekLabel}
+          </span>
+          <span className="text-[10px] text-muted-foreground">
+            {formatCoverageRange(product)}
+          </span>
+        </div>
+        {/* Center: sale-state badge */}
+        <SaleStateBadge state={saleState} />
         {/* Mobile-only price on the right */}
         <span className="md:hidden text-[10px] text-muted-foreground shrink-0">
           {formatCurrency(product.product.price)}/wk
