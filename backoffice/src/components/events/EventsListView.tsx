@@ -8,6 +8,7 @@ import {
   Repeat,
   Tag,
 } from "lucide-react"
+import { useEffect, useRef } from "react"
 import { type EventPublic, type EventStatus, EventsService } from "@/client"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -93,6 +94,19 @@ export function EventsListView({
     enabled: !!popupId && !tzLoading,
   })
 
+  // Auto-scroll to today (or the first upcoming day) once the list renders,
+  // so admins land on what's current instead of the oldest past event.
+  const todayAnchorRef = useRef<HTMLDivElement | null>(null)
+  const didAutoScrollRef = useRef(false)
+  useEffect(() => {
+    if (didAutoScrollRef.current) return
+    if (!data) return
+    const el = todayAnchorRef.current
+    if (!el) return
+    didAutoScrollRef.current = true
+    el.scrollIntoView({ block: "start" })
+  }, [data])
+
   if (isLoading || tzLoading) {
     return <Skeleton className="h-64 w-full" />
   }
@@ -109,12 +123,22 @@ export function EventsListView({
   }
 
   const grouped = groupByDate(events, formatDayKey)
+  const todayKey = formatDayKey(new Date().toISOString())
+  // Anchor the auto-scroll on today, or the first day after it when today has
+  // no events (keys are YYYY-MM-DD, so a string compare is chronological).
+  const anchorIdx = grouped.findIndex(([date]) => date >= todayKey)
 
   return (
     <div className="space-y-6">
-      {grouped.map(([date, dayEvents]) => (
-        <div key={date}>
-          <div className="flex items-center gap-3 mb-3">
+      {grouped.map(([date, dayEvents], idx) => (
+        <div
+          key={date}
+          ref={idx === anchorIdx ? todayAnchorRef : undefined}
+          className="scroll-mt-20"
+        >
+          {/* Sticky day header: freezes under the app top bar (h-16) while its
+              day is in view; the next day's header pushes it up on scroll. */}
+          <div className="sticky top-16 z-[5] flex items-center gap-3 bg-background py-2 mb-3">
             <div className="h-2 w-2 rounded-full bg-primary" />
             <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               {formatDateFull(dayEvents[0].start_time)}
