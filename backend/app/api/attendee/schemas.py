@@ -205,6 +205,23 @@ class AttendeeTicketProductSwap(BaseModel):
     product_id: uuid.UUID
 
 
+class AttendeeTicketMetadataUpdate(BaseModel):
+    """Request body to edit a meal-plan ticket's choices post-purchase (portal).
+
+    Replaces the three choice keys inside AttendeeProducts.purchase_metadata:
+    daily_choices (ISO date -> menu key | "chef"), dietary_restriction, and
+    special_request. The key/date semantics are NOT validated here — that needs
+    the meal-plan step's template_config and happens in the CRUD layer via
+    ticketing_step.meal_plan.validate_daily_choices.
+    """
+
+    daily_choices: dict[str, str]  # ISO date -> menu key | "chef"
+    dietary_restriction: str | None = None
+    special_request: str | None = None
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+
 class TicketAttendeeSnapshot(BaseModel):
     """Minimal attendee data embedded in a TicketPublic response."""
 

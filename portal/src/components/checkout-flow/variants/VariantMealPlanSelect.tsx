@@ -16,13 +16,17 @@
  * Ported from `MealPlanGrid.tsx` (approved prototype). State now lives in the
  * checkout provider's meal-plan slice instead of a local useReducer; data
  * (attendees, products, template_config) comes from props + providers.
+ *
+ * The pure planner pieces (parsing/format helpers, DishButton, DayEmojiStrip,
+ * DayPlanEditor) live in `mealPlanShared.tsx` so the post-purchase edit modal
+ * can reuse them without the checkout provider.
  */
 
 import { Sparkles } from "lucide-react"
 import { Fragment, useMemo, useState } from "react"
-import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { deriveProductState, type ProductSaleState } from "@/lib/product-state"
 import { cn } from "@/lib/utils"
 import { useCheckout } from "@/providers/checkoutProvider"
 import { usePassesProvider } from "@/providers/passesProvider"
@@ -30,170 +34,22 @@ import type { AttendeePassState } from "@/types/Attendee"
 import { formatCurrency, type SelectedMealPlanItem } from "@/types/checkout"
 import type { ProductsPass } from "@/types/Products"
 import type { VariantProps } from "../registries/variantRegistry"
+import {
+  DayEmojiStrip,
+  DayPlanEditor,
+  formatCoverageRange,
+  parseMealPlanTemplateConfig,
+  type MealPlanProduct as SharedMealPlanProduct,
+  weekdayDates,
+} from "./mealPlanShared"
+import { SaleStateBadge } from "./saleStateBadge"
 
-// ---------------------------------------------------------------------------
-// Types — local view-model derived from templateConfig + ProductsPass
-// ---------------------------------------------------------------------------
-
-interface MenuOption {
-  key: string
-  icon: string
-  title: string
-  description: string
-  tags: string[]
-}
-
-/** A weekly meal-plan product enriched with its template_config metadata. */
-interface MealPlanProduct {
-  id: string
-  product: ProductsPass
-  weekLabel: string
-  coverageStart: string
-  coverageEnd: string
-  menuOptions: MenuOption[]
-}
+/** Weekly meal-plan product enriched with template_config metadata, with the
+ *  product field narrowed to ProductsPass for this checkout step. */
+type MealPlanProduct = SharedMealPlanProduct<ProductsPass>
 
 /** Identifies which (attendee, product) cell is expanded for editing. */
 type OpenCell = { attendeeId: string; productId: string } | null
-
-// ---------------------------------------------------------------------------
-// templateConfig parsing
-// ---------------------------------------------------------------------------
-
-interface RawSection {
-  key?: string
-  label?: string
-  order?: number
-  description?: string | null
-  products?: RawSectionProduct[]
-}
-
-interface RawSectionProduct {
-  product_id?: string
-  coverage_start?: string
-  coverage_end?: string
-  menu_options?: Array<{
-    key?: string
-    icon?: string | null
-    title?: string
-    description?: string | null
-    tags?: string[]
-  }>
-}
-
-interface MealPlanSection {
-  key: string
-  label: string
-  order: number
-  description: string | null
-  products: MealPlanProduct[]
-}
-
-function parseMealPlanTemplateConfig(
-  templateConfig: VariantProps["templateConfig"],
-  products: ProductsPass[],
-): { sections: MealPlanSection[] } {
-  const productById = new Map(products.map((p) => [p.id, p]))
-
-  const rawSections = (templateConfig?.sections ?? []) as RawSection[]
-
-  const sections: MealPlanSection[] = [...rawSections]
-    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
-    .map((section, sIdx) => {
-      const sectionProducts: MealPlanProduct[] = []
-      const productsRaw = Array.isArray(section.products)
-        ? section.products
-        : []
-      productsRaw.forEach((sp, pIdx) => {
-        if (!sp.product_id) return
-        const product = productById.get(sp.product_id)
-        if (!product) return
-        if (!sp.coverage_start || !sp.coverage_end) return
-        const menuOptions: MenuOption[] = (sp.menu_options ?? []).map(
-          (opt) => ({
-            key: opt.key || "",
-            icon: opt.icon || "🍽️",
-            title: opt.title || "",
-            description: opt.description || "",
-            tags: Array.isArray(opt.tags) ? opt.tags : [],
-          }),
-        )
-        sectionProducts.push({
-          id: product.id,
-          product,
-          weekLabel: product.name || `Week ${pIdx + 1}`,
-          coverageStart: sp.coverage_start,
-          coverageEnd: sp.coverage_end,
-          menuOptions,
-        })
-      })
-      return {
-        key: section.key || `section-${sIdx}`,
-        label: section.label || "",
-        order: section.order ?? sIdx,
-        description: section.description ?? null,
-        products: sectionProducts,
-      }
-    })
-
-  return { sections }
-}
-
-// ---------------------------------------------------------------------------
-// Date / formatting helpers
-// ---------------------------------------------------------------------------
-
-/** Returns Mon–Fri ISO dates for a product's coverage week (inclusive). */
-function weekdayDates(product: MealPlanProduct): string[] {
-  const start = new Date(`${product.coverageStart}T00:00:00`)
-  const end = new Date(`${product.coverageEnd}T00:00:00`)
-  const out: string[] = []
-  for (
-    let d = new Date(start);
-    d.getTime() <= end.getTime();
-    d.setDate(d.getDate() + 1)
-  ) {
-    const day = d.getDay() // 0 Sun, 6 Sat
-    if (day >= 1 && day <= 5) out.push(d.toISOString().slice(0, 10))
-  }
-  return out
-}
-
-const WEEKDAY_LABELS: Record<number, string> = {
-  1: "Mon",
-  2: "Tue",
-  3: "Wed",
-  4: "Thu",
-  5: "Fri",
-}
-
-function formatWeekdayShort(isoDate: string): string {
-  const d = new Date(`${isoDate}T00:00:00`)
-  return WEEKDAY_LABELS[d.getDay()] ?? ""
-}
-
-function formatDayNum(isoDate: string): string {
-  const d = new Date(`${isoDate}T00:00:00`)
-  return String(d.getDate())
-}
-
-function formatCoverageRange(product: MealPlanProduct): string {
-  const start = new Date(`${product.coverageStart}T00:00:00`)
-  const end = new Date(`${product.coverageEnd}T00:00:00`)
-  const monthFmt = new Intl.DateTimeFormat("en-US", { month: "short" })
-  const sameMonth = start.getMonth() === end.getMonth()
-  if (sameMonth) {
-    return `${monthFmt.format(start)} ${start.getDate()}–${end.getDate()}`
-  }
-  return `${monthFmt.format(start)} ${start.getDate()} – ${monthFmt.format(end)} ${end.getDate()}`
-}
-
-function findMenuOption(
-  product: MealPlanProduct,
-  key: string,
-): MenuOption | null {
-  return product.menuOptions.find((o) => o.key === key) ?? null
-}
 
 // ---------------------------------------------------------------------------
 // Cart selectors (operate on SelectedMealPlanItem[] from provider)
@@ -249,6 +105,23 @@ function isPrePurchased(
 }
 
 // ---------------------------------------------------------------------------
+// Sale-state detection
+// ---------------------------------------------------------------------------
+
+/** Derive the weekly product's sale state from its pricing/stock window.
+ *  Mirrors VariantTicketSelect — the same backend logic gates payment, so a
+ *  non-`on_sale` week would 422 at checkout. */
+function saleStateOf(product: MealPlanProduct): ProductSaleState {
+  return deriveProductState(product.product)
+}
+
+/** True when the week is not currently on sale (ended / upcoming / sold out)
+ *  and therefore must not be selectable. */
+function isSaleClosed(product: MealPlanProduct): boolean {
+  return saleStateOf(product) !== "on_sale"
+}
+
+// ---------------------------------------------------------------------------
 // Main component
 // ---------------------------------------------------------------------------
 
@@ -300,6 +173,9 @@ export default function VariantMealPlanSelect({
     product: MealPlanProduct,
   ) => {
     if (isPrePurchased(attendee, product.id)) return
+    // Defense in depth: never add a cart line for a week that isn't on sale —
+    // the backend payment gate would reject it with a 422.
+    if (isSaleClosed(product)) return
     const selected = selectedProductIdsFor(cart.mealPlans, attendee.id).has(
       product.id,
     )
@@ -376,6 +252,11 @@ export default function VariantMealPlanSelect({
               <div className="text-[10px] text-muted-foreground">
                 {formatCurrency(p.product.price)} / wk
               </div>
+              {isSaleClosed(p) && (
+                <div className="mt-1 flex justify-center">
+                  <SaleStateBadge state={saleStateOf(p)} />
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -507,6 +388,8 @@ function AttendeeRow({
         {weeklyProducts.map((product) => {
           const isPicked = selectedHere.has(product.id)
           const isLocked = isPrePurchased(attendee, product.id)
+          const saleState = saleStateOf(product)
+          const saleClosed = saleState !== "on_sale"
           const isOpen =
             openCell?.attendeeId === attendee.id &&
             openCell?.productId === product.id
@@ -552,6 +435,8 @@ function AttendeeRow({
                   product={product}
                   isPicked={isPicked}
                   isLocked={isLocked}
+                  saleState={saleState}
+                  saleClosed={saleClosed}
                   isOpen={isOpen}
                   item={item}
                   onClick={() => onCellClick(attendee, product)}
@@ -563,12 +448,16 @@ function AttendeeRow({
               {isOpen && (
                 <div className="md:hidden border-t border-border bg-muted/30 px-3 py-3 animate-in fade-in slide-in-from-top-2 duration-200">
                   <DayPlanEditor
-                    attendee={attendee}
                     product={product}
-                    item={cartItem(mealPlans, attendee.id, product.id)}
+                    dailyChoices={
+                      cartItem(mealPlans, attendee.id, product.id)?.dailyChoices
+                    }
+                    onSetDay={(d, key) =>
+                      setMealPlanDailyChoice(attendee.id, product.id, d, key)
+                    }
+                    eyebrow={`Planning lunches for ${attendee.name}`}
                     onClose={onCloseEditor}
-                    removeMealPlan={removeMealPlan}
-                    setMealPlanDailyChoice={setMealPlanDailyChoice}
+                    onRemove={() => removeMealPlan(attendee.id, product.id)}
                   />
                 </div>
               )}
@@ -594,12 +483,16 @@ function AttendeeRow({
       {isOpenForThisAttendee && openProduct && (
         <div className="hidden md:block border-t border-border bg-muted/30 px-4 py-4 sm:px-6 sm:py-5 animate-in fade-in slide-in-from-top-2 duration-200">
           <DayPlanEditor
-            attendee={attendee}
             product={openProduct}
-            item={cartItem(mealPlans, attendee.id, openProduct.id)}
+            dailyChoices={
+              cartItem(mealPlans, attendee.id, openProduct.id)?.dailyChoices
+            }
+            onSetDay={(d, key) =>
+              setMealPlanDailyChoice(attendee.id, openProduct.id, d, key)
+            }
+            eyebrow={`Planning lunches for ${attendee.name}`}
             onClose={onCloseEditor}
-            removeMealPlan={removeMealPlan}
-            setMealPlanDailyChoice={setMealPlanDailyChoice}
+            onRemove={() => removeMealPlan(attendee.id, openProduct.id)}
           />
         </div>
       )}
@@ -669,6 +562,8 @@ function WeekCell({
   product,
   isPicked,
   isLocked,
+  saleState,
+  saleClosed,
   isOpen,
   item,
   onClick,
@@ -677,6 +572,8 @@ function WeekCell({
   product: MealPlanProduct
   isPicked: boolean
   isLocked: boolean
+  saleState: ProductSaleState
+  saleClosed: boolean
   isOpen: boolean
   item: SelectedMealPlanItem | undefined
   onClick: () => void
@@ -708,6 +605,37 @@ function WeekCell({
             Purchased
           </span>
         </div>
+        {/* Mobile-only price on the right */}
+        <span className="md:hidden text-[10px] text-muted-foreground shrink-0">
+          {formatCurrency(product.product.price)}/wk
+        </span>
+      </div>
+    )
+  }
+
+  // Sale window closed (ended / upcoming / sold out) and not purchased: render
+  // a disabled cell with a state badge so the week reads as unavailable instead
+  // of clickable. Mirrors VariantTicketSelect's stateBlocked handling.
+  if (saleClosed) {
+    return (
+      <div
+        role="img"
+        aria-label={`${product.weekLabel} sale ${saleState}`}
+        aria-disabled="true"
+        className="h-full flex items-center justify-between md:justify-center gap-2 md:gap-1.5 md:min-h-[60px] min-h-[44px] bg-muted/30 px-3 md:px-2 py-1.5 select-none opacity-70 [background-image:repeating-linear-gradient(45deg,transparent,transparent_6px,rgba(0,0,0,0.03)_6px,rgba(0,0,0,0.03)_12px)]"
+        title={`${product.weekLabel} sale ${saleState}`}
+      >
+        {/* Mobile-only week info on the left */}
+        <div className="md:hidden flex flex-col items-start leading-tight min-w-0">
+          <span className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+            {product.weekLabel}
+          </span>
+          <span className="text-[10px] text-muted-foreground">
+            {formatCoverageRange(product)}
+          </span>
+        </div>
+        {/* Center: sale-state badge */}
+        <SaleStateBadge state={saleState} />
         {/* Mobile-only price on the right */}
         <span className="md:hidden text-[10px] text-muted-foreground shrink-0">
           {formatCurrency(product.product.price)}/wk
@@ -793,204 +721,6 @@ function WeekCell({
             {filled}/{dates.length} days
           </span>
         )}
-      </div>
-    </button>
-  )
-}
-
-/** A row of 5 little emoji slots, one per Mon–Fri, filled with the chosen dish. */
-function DayEmojiStrip({
-  product,
-  dailyChoices,
-}: {
-  product: MealPlanProduct
-  dailyChoices: Record<string, string> | null
-}) {
-  const dates = weekdayDates(product)
-  return (
-    <div className="flex items-center justify-center gap-0.5">
-      {dates.map((d) => {
-        const pick = dailyChoices?.[d] ?? null
-        const opt = pick ? findMenuOption(product, pick) : null
-        return (
-          <div
-            key={d}
-            className={cn(
-              // Slightly smaller boxes + flex-shrink so 5 of them never push the
-              // cell wider than its grid column on desktop.
-              "w-5 h-5 rounded-md flex items-center justify-center text-[13px] leading-none shrink-0 overflow-hidden transition-all",
-              opt
-                ? "bg-white/80 shadow-sm"
-                : "bg-muted-foreground/10 text-muted-foreground/40 text-[10px]",
-            )}
-            title={
-              opt
-                ? `${formatWeekdayShort(d)}: ${opt.title}`
-                : `${formatWeekdayShort(d)}: not set`
-            }
-          >
-            {opt ? opt.icon : "·"}
-          </div>
-        )
-      })}
-    </div>
-  )
-}
-
-// ---------------------------------------------------------------------------
-// Day-plan editor (the inline expansion)
-// ---------------------------------------------------------------------------
-
-function DayPlanEditor({
-  attendee,
-  product,
-  item,
-  onClose,
-  removeMealPlan,
-  setMealPlanDailyChoice,
-}: {
-  attendee: AttendeePassState
-  product: MealPlanProduct
-  item: SelectedMealPlanItem | undefined
-  onClose: () => void
-  removeMealPlan: (attendeeId: string, productId: string) => void
-  setMealPlanDailyChoice: (
-    attendeeId: string,
-    productId: string,
-    date: string,
-    menuKey: string,
-  ) => void
-}) {
-  if (!item) return null
-
-  const dates = weekdayDates(product)
-
-  // Pool of options the buyer can tap for any day this week.
-  const menuPool: MenuOption[] = product.menuOptions
-
-  return (
-    <div className="space-y-3 max-w-4xl mx-auto">
-      {/* Editor header — single row, compact */}
-      <div className="flex items-center justify-between gap-3">
-        <div className="min-w-0">
-          <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-            Planning lunches for {attendee.name}
-          </div>
-          <div className="text-sm font-semibold text-foreground">
-            {product.weekLabel} · {formatCoverageRange(product)}
-          </div>
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() => removeMealPlan(attendee.id, product.id)}
-          >
-            Remove this week
-          </Button>
-          <Button type="button" variant="outline" size="sm" onClick={onClose}>
-            Done
-          </Button>
-        </div>
-      </div>
-
-      {/* Dietary restriction + special request live at the attendee level
-          (rendered by AttendeeMetaSection above the editor) — they apply to
-          every week, so they don't belong inside the per-week editor. */}
-
-      {/* All 5 days always expanded. Desktop: one row per day with the date
-          label inline-left of the dish buttons. Mobile: date label stacks above
-          the buttons (6 columns crush at 390px). No per-day "card" wrapper —
-          the buttons themselves are the visual elements and the row is just
-          flex layout with light separators. */}
-      <div className="rounded-lg border border-border bg-card divide-y divide-border/60">
-        {dates.map((d) => {
-          const dayPick = item.dailyChoices?.[d] ?? null
-          return (
-            <div
-              key={d}
-              className="flex flex-col md:flex-row md:items-center md:gap-2 p-1.5"
-            >
-              {/* Date label — plain inline text, no nested card. */}
-              <div className="md:min-w-[44px] md:text-center px-1 mb-1 md:mb-0">
-                <span className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
-                  {formatWeekdayShort(d)} {formatDayNum(d)}
-                </span>
-              </div>
-              <div
-                className="grid gap-1 md:flex-1"
-                style={{
-                  gridTemplateColumns: `repeat(${menuPool.length},minmax(0,1fr))`,
-                }}
-              >
-                {menuPool.map((opt) => (
-                  <DishButton
-                    key={opt.key}
-                    option={opt}
-                    isActive={dayPick === opt.key}
-                    onClick={() =>
-                      setMealPlanDailyChoice(
-                        attendee.id,
-                        product.id,
-                        d,
-                        opt.key,
-                      )
-                    }
-                  />
-                ))}
-              </div>
-            </div>
-          )
-        })}
-      </div>
-    </div>
-  )
-}
-
-// ---------------------------------------------------------------------------
-// Dish tap-button
-// ---------------------------------------------------------------------------
-
-function DishButton({
-  option,
-  isActive,
-  onClick,
-}: {
-  option: MenuOption
-  isActive: boolean
-  onClick: () => void
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={isActive}
-      title={
-        option.tags.length > 0
-          ? `${option.title} — ${option.tags.join(", ")}. ${option.description}`
-          : `${option.title}. ${option.description}`
-      }
-      className={cn(
-        "group flex items-center md:gap-1.5 justify-center rounded-md border px-1.5 py-1.5 text-center md:text-left transition-all min-h-[44px]",
-        "focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
-        isActive
-          ? "border-primary bg-primary/10 shadow-sm"
-          : "border-border bg-card hover:border-primary/40 hover:bg-muted/40",
-      )}
-    >
-      {/* Colorful emoji from template_config — desktop only because column
-          width is too tight on mobile to fit emoji + title side-by-side. */}
-      <span className="hidden md:inline text-base leading-none shrink-0">
-        {option.icon}
-      </span>
-      <div
-        className={cn(
-          "text-[11px] font-medium leading-tight w-full md:w-auto md:flex-1 md:min-w-0 break-words",
-          isActive ? "text-primary" : "text-foreground",
-        )}
-      >
-        {option.title}
       </div>
     </button>
   )

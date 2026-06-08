@@ -629,6 +629,7 @@
       "pending_approval_banner_title": "等待审批",
       "pending_approval_banner_message": "你的活动正在等待审批,其他人暂时无法查看。",
       "open_in_maps": "在 Google 地图中打开",
+      "view_on_geobrowser": "在 Geobrowser 中查看",
       "share_button": "分享活动",
       "share_link_copied": "链接已复制",
       "share_link_error": "无法复制链接"

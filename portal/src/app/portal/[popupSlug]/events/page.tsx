@@ -35,6 +35,7 @@ import {
   useEventTimezone,
   usePortalEventSettings,
 } from "./lib/useEventTimezone"
+import { useMeasuredHeight } from "./lib/useMeasuredHeight"
 import { usePopupTags } from "./lib/usePopupTags"
 import { usePopupTracks } from "./lib/usePopupTracks"
 
@@ -244,6 +245,11 @@ export default function EventsPage() {
   useEffect(() => {
     if (view !== "day" && isDayFullscreen) setIsDayFullscreen(false)
   }, [view, isDayFullscreen])
+
+  // Measure the sticky toolbar so the list's per-day headers can freeze
+  // right below it. The toolbar's height changes when its filter chips wrap,
+  // so a fixed offset would drift; 112px is a close first-paint estimate.
+  const [toolbarRef, toolbarHeight] = useMeasuredHeight<HTMLDivElement>(112)
   // Lock body scroll while fullscreen so the overlay's inner scroll
   // owns vertical movement; restore prior value on cleanup.
   useEffect(() => {
@@ -687,6 +693,7 @@ export default function EventsPage() {
 
       {!isDayFullscreen && (
         <div
+          ref={toolbarRef}
           className={cn(
             "mb-4",
             // Freeze the filters for the list & calendar views (the page
@@ -725,6 +732,7 @@ export default function EventsPage() {
             slug={city?.slug}
             search={search}
             rsvpedOnly={rsvpedOnly}
+            mineOnly={mineOnly}
             tags={selectedTags}
             trackIds={selectedTrackIds}
             defaultDate={selectedDate}
@@ -738,6 +746,7 @@ export default function EventsPage() {
               slug={city?.slug}
               search={search}
               rsvpedOnly={rsvpedOnly}
+              mineOnly={mineOnly}
               tags={selectedTags}
               trackIds={selectedTrackIds}
               selectedDate={selectedDate}
@@ -768,6 +777,7 @@ export default function EventsPage() {
             autoScrollToUpcoming={
               !restoredScroll?.outer && !focusEventRef.current?.id
             }
+            stickyTop={toolbarHeight}
           />
         )}
       </div>
@@ -805,6 +815,7 @@ export default function EventsPage() {
               slug={city?.slug}
               search={search}
               rsvpedOnly={rsvpedOnly}
+              mineOnly={mineOnly}
               tags={selectedTags}
               trackIds={selectedTrackIds}
               selectedDate={selectedDate}

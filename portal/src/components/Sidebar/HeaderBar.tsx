@@ -2,6 +2,7 @@ import { ChevronRight } from "lucide-react"
 import { usePathname, useRouter } from "next/navigation"
 import { Fragment, useEffect, useState } from "react"
 import { LanguageSwitcher } from "@/components/common/LanguageSwitcher"
+import { MobilePopupSwitcher } from "@/components/MobilePopupSwitcher"
 import { cn } from "@/lib/utils"
 import { useCityProvider } from "@/providers/cityProvider"
 import {
@@ -145,6 +146,7 @@ const HeaderBar = () => {
         </BreadcrumbList>
       </Breadcrumb>
       <div className="ml-auto flex items-center gap-2">
+        <MobilePopupSwitcher />
         <CartBadge />
         <LanguageSwitcher />
       </div>

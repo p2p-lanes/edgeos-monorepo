@@ -42,6 +42,11 @@ async def list_humans(
     search: str | None = None,
     popup_id: uuid.UUID | None = None,
     incomplete_application: bool = False,
+    email: str | None = None,
+    telegram: str | None = None,
+    gender: str | None = None,
+    age: str | None = None,
+    residence: str | None = None,
     skip: PaginationSkip = 0,
     limit: PaginationLimit = 100,
 ) -> ListModel[HumanPublic]:
@@ -59,12 +64,16 @@ async def list_humans(
             popup_id=popup_id,
         )
     else:
-        humans, total = crud.find(
+        humans, total = crud.find_filtered(
             db,
             skip=skip,
             limit=limit,
             search=search,
-            search_fields=["first_name", "last_name", "email"],
+            email=email,
+            telegram=telegram,
+            gender=gender,
+            age=age,
+            residence=residence,
         )
 
     return ListModel[HumanPublic](
