@@ -1326,6 +1326,8 @@ function EventsPage() {
                   status={searchParams.status}
                   venueId={searchParams.venueId}
                   search={searchParams.search ?? ""}
+                  popupStart={popupStart}
+                  popupEnd={popupEnd}
                   onEventClick={handleRowClick}
                 />
               </div>
