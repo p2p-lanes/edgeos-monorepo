@@ -96,7 +96,13 @@ interface DayBodyProps {
 const HOUR_PX = 56
 const MIN_PX = HOUR_PX / 60
 const HOUR_LABEL_COL = 56 // px width of the time-label column
-const VENUE_COL_MIN = 180 // px — readable venue name + event title
+// Venue column sizing. The day view's purpose is to fit as many venues on
+// screen as possible, so columns are denser than a typical agenda: a fixed
+// max (no `1fr`) stops them from stretching to fill the viewport when there
+// are only a few venues, and the lower min lets more columns fit before the
+// grid needs to scroll horizontally.
+const VENUE_COL_MIN = 120 // px floor before horizontal scroll kicks in
+const VENUE_COL_MAX = 160 // px cap so columns stay dense instead of stretching
 
 // --- Mobile transposed layout (REVERTIBLE: see "MOBILE TRANSPOSED" block
 // below; remove the block + this constants group + the mobileScrollRef
@@ -604,7 +610,7 @@ export function DayBody({
             <div
               className="grid min-w-max"
               style={{
-                gridTemplateColumns: `${HOUR_LABEL_COL}px repeat(${venueCount}, minmax(${VENUE_COL_MIN}px, 1fr))`,
+                gridTemplateColumns: `${HOUR_LABEL_COL}px repeat(${venueCount}, minmax(${VENUE_COL_MIN}px, ${VENUE_COL_MAX}px))`,
               }}
             >
               {/* Sticky header row */}

@@ -278,6 +278,7 @@ export default function EventDetailPage() {
 
   const [cancelEventOpen, setCancelEventOpen] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [copyingEmails, setCopyingEmails] = useState(false)
   const cancelEventMutation = useMutation({
     mutationFn: () =>
       EventsService.cancelPortalEvent({ eventId: params.eventId }),
@@ -460,6 +461,32 @@ export default function EventDetailPage() {
       toast.success(t("events.detail.share_link_copied"))
     } catch {
       toast.error(t("events.detail.share_link_error"))
+    }
+  }
+
+  // Managers (owner/host/collaborator) copy every active RSVPer's email in
+  // one click. The endpoint is gated server-side to the same roles and
+  // returns all registrants — including those who hid their name from the
+  // directory — so the organiser can actually reach everyone.
+  const handleCopyAttendeeEmails = async () => {
+    setCopyingEmails(true)
+    try {
+      const res = await EventParticipantsService.listPortalAttendeeEmails({
+        eventId: params.eventId,
+        occurrenceStart: occParam ?? undefined,
+      })
+      if (res.emails.length === 0) {
+        toast.info(t("events.detail.copy_attendee_emails_empty"))
+        return
+      }
+      await navigator.clipboard.writeText(res.emails.join(", "))
+      toast.success(
+        t("events.detail.copy_attendee_emails_done", { count: res.count }),
+      )
+    } catch {
+      toast.error(t("events.detail.copy_attendee_emails_error"))
+    } finally {
+      setCopyingEmails(false)
     }
   }
 
@@ -1031,6 +1058,18 @@ export default function EventDetailPage() {
             {event.max_participant ? ` / ${event.max_participant}` : ""}
           </span>
         </div>
+        {canManage && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleCopyAttendeeEmails}
+            disabled={copyingEmails}
+            className="mb-3 w-full"
+          >
+            <Mail className="mr-2 h-4 w-4" />
+            {t("events.detail.copy_attendee_emails")}
+          </Button>
+        )}
         {activeParticipants.length === 0 ? (
           <p className="text-sm text-muted-foreground">
             {t("events.detail.no_participants_yet")}
