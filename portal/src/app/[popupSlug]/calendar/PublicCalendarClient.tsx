@@ -23,6 +23,7 @@ import {
   type LoginRequiredEvent,
 } from "@/components/LoginRequiredDialog"
 import { useIsAuthenticated } from "@/hooks/useIsAuthenticated"
+import { cn } from "@/lib/utils"
 import { useTenant } from "@/providers/tenantProvider"
 
 import { usePublicCalendarEvents } from "./usePublicCalendarEvents"
@@ -230,7 +231,16 @@ export function PublicCalendarClient({ popupSlug }: PublicCalendarClientProps) {
         </p>
       </div>
 
-      <div className="mb-4">
+      <div
+        className={cn(
+          "mb-4",
+          // Freeze the filters for the list & calendar views (the page
+          // scrolls there). The day grid has its own internal scroll, so
+          // it keeps the toolbar in normal flow.
+          view !== "day" &&
+            "sticky top-0 z-20 -mx-4 bg-background px-4 pb-3 pt-2 sm:-mx-6 sm:px-6",
+        )}
+      >
         <EventsToolbar
           view={view}
           onViewChange={setView}
