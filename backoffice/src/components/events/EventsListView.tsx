@@ -1,3 +1,4 @@
+import { dayBoundsInTz } from "@edgeos/shared-events"
 import { useQuery } from "@tanstack/react-query"
 import {
   CalendarDays,
@@ -8,10 +9,11 @@ import {
   Repeat,
   Tag,
 } from "lucide-react"
-import { useEffect, useRef } from "react"
-import { type EventPublic, type EventStatus, EventsService } from "@/client"
+import { useEffect, useMemo, useRef } from "react"
+import type { EventPublic, EventStatus } from "@/client"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
+import { fetchAllEvents } from "@/lib/events/fetchAllEvents"
 import { summarizeRrule } from "@/lib/events/summarizeRrule"
 import { useEventTimezone } from "@/lib/events/useEventTimezone"
 import { cn } from "@/lib/utils"
@@ -22,6 +24,8 @@ interface EventsListViewProps {
   status: EventStatus | undefined
   venueId: string | undefined
   search: string
+  popupStart?: string | null
+  popupEnd?: string | null
   onEventClick: (event: EventPublic) => void
 }
 
@@ -67,19 +71,46 @@ export function EventsListView({
   status,
   venueId,
   search,
+  popupStart,
+  popupEnd,
   onEventClick,
 }: EventsListViewProps) {
   const {
     formatTime,
     formatDateFull,
     formatDayKey,
+    timezone,
     isLoading: tzLoading,
   } = useEventTimezone(popupId)
 
+  // Bound to the popup's date range (in its timezone). A window makes the
+  // backend expand recurring series into concrete occurrences — matching the
+  // day/calendar views — instead of showing each series once at its master.
+  // Falls back to no window (no expansion) when the popup has no dates.
+  const listWindow = useMemo(() => {
+    const startYmd = popupStart?.slice(0, 10)
+    const endYmd = popupEnd?.slice(0, 10)
+    if (!startYmd || !endYmd || !timezone) return null
+    return {
+      startAfter: dayBoundsInTz(startYmd, timezone).start.toISOString(),
+      startBefore: dayBoundsInTz(endYmd, timezone).end.toISOString(),
+    }
+  }, [popupStart, popupEnd, timezone])
+
   const { data, isLoading } = useQuery({
-    queryKey: ["events", "list", popupId, status, venueId, search],
+    queryKey: [
+      "events",
+      "list",
+      popupId,
+      status,
+      venueId,
+      search,
+      listWindow?.startAfter,
+      listWindow?.startBefore,
+    ],
+    // Walk every page so a dense popup is never truncated at a fixed limit.
     queryFn: () =>
-      EventsService.listEvents({
+      fetchAllEvents({
         popupId,
         eventStatus: status,
         venueId:
@@ -87,9 +118,12 @@ export function EventsListView({
             ? venueId
             : undefined,
         locationKind:
-          venueId === "custom" || venueId === "meeting" ? venueId : undefined,
+          venueId === "custom" || venueId === "meeting"
+            ? (venueId as "custom" | "meeting")
+            : undefined,
         search: search || undefined,
-        limit: 500,
+        startAfter: listWindow?.startAfter,
+        startBefore: listWindow?.startBefore,
       }),
     enabled: !!popupId && !tzLoading,
   })
@@ -111,7 +145,7 @@ export function EventsListView({
     return <Skeleton className="h-64 w-full" />
   }
 
-  const events = data?.results ?? []
+  const events = data ?? []
 
   if (events.length === 0) {
     return (
