@@ -86,3 +86,15 @@ class RegisterRequest(BaseModel):
     message: str | None = None
     # Set when registering for a single occurrence of a recurring event.
     occurrence_start: datetime | None = None
+
+
+class AttendeeEmailsResponse(BaseModel):
+    """Active RSVPers' emails for an event, for its managers (portal).
+
+    Returned only to the event's owner/host/collaborators so they can
+    contact everyone who RSVPed. Emails are deduplicated and ordered by
+    registration order.
+    """
+
+    emails: list[str]
+    count: int

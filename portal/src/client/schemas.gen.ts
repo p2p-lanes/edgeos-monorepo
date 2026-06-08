@@ -2041,6 +2041,30 @@ string field is kept for backward compatibility but the router now validates
 via category_id against the popup's attendee_categories table.`
 } as const;
 
+export const AttendeeEmailsResponseSchema = {
+    properties: {
+        emails: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Emails'
+        },
+        count: {
+            type: 'integer',
+            title: 'Count'
+        }
+    },
+    type: 'object',
+    required: ['emails', 'count'],
+    title: 'AttendeeEmailsResponse',
+    description: `Active RSVPers' emails for an event, for its managers (portal).
+
+Returned only to the event's owner/host/collaborators so they can
+contact everyone who RSVPed. Emails are deduplicated and ordered by
+registration order.`
+} as const;
+
 export const AttendeeInfoSchema = {
     properties: {
         id: {

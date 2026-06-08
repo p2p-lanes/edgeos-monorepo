@@ -6,6 +6,7 @@ from loguru import logger
 
 from app.api.event_participant import crud
 from app.api.event_participant.schemas import (
+    AttendeeEmailsResponse,
     EventParticipantCreate,
     EventParticipantPublic,
     EventParticipantUpdate,
@@ -243,6 +244,64 @@ async def list_portal_participants(
         results=_participants_with_names(db, participants),
         paging=Paging(offset=skip, limit=limit, total=total),
     )
+
+
+@router.get("/portal/attendee-emails", response_model=AttendeeEmailsResponse)
+async def list_portal_attendee_emails(
+    db: HumanTenantSession,
+    current_human: CurrentHuman,
+    event_id: uuid.UUID,
+    occurrence_start: datetime | None = None,
+) -> AttendeeEmailsResponse:
+    """Emails of an event's active RSVPers, for its managers (portal).
+
+    Gated to the event's owner/host/collaborators so they can contact
+    everyone who RSVPed. Unlike the participants list, this includes every
+    active (non-cancelled) registrant regardless of the directory name-hide
+    flag — this is the organiser reaching their own attendees, not a public
+    listing. Emails are deduplicated and kept in registration order.
+    """
+    from sqlmodel import select
+
+    from app.api.event.crud import events_crud
+    from app.api.event.router import _human_id_manages_event
+    from app.api.human.models import Humans
+
+    event = events_crud.get(db, event_id)
+    if not event:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Event not found"
+        )
+    if not _human_id_manages_event(event, current_human.id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the event's host or collaborators can view attendees",
+        )
+
+    participants, _ = crud.event_participants_crud.find_by_event(
+        db,
+        event_id=event_id,
+        skip=0,
+        limit=10000,
+        occurrence_start=occurrence_start,
+        scope_to_occurrence=occurrence_start is not None,
+    )
+    active = [p for p in participants if p.status != ParticipantStatus.CANCELLED]
+    if not active:
+        return AttendeeEmailsResponse(emails=[], count=0)
+
+    profile_ids = {p.profile_id for p in active}
+    rows = db.exec(select(Humans).where(Humans.id.in_(profile_ids))).all()
+    email_by_id = {h.id: h.email for h in rows if h.email}
+
+    seen: set[str] = set()
+    emails: list[str] = []
+    for p in active:
+        email = email_by_id.get(p.profile_id)
+        if email and email not in seen:
+            seen.add(email)
+            emails.append(email)
+    return AttendeeEmailsResponse(emails=emails, count=len(emails))
 
 
 @router.post(
