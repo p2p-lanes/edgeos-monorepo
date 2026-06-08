@@ -214,6 +214,57 @@ class HumansCRUD(BaseCRUD[Humans, HumanCreate, HumanUpdate]):
         results = list(session.exec(statement.offset(skip).limit(limit)).all())
         return results, total
 
+    def find_filtered(
+        self,
+        session: Session,
+        *,
+        skip: int = 0,
+        limit: int = 100,
+        search: str | None = None,
+        email: str | None = None,
+        telegram: str | None = None,
+        gender: str | None = None,
+        age: str | None = None,
+        residence: str | None = None,
+    ) -> tuple[list[Humans], int]:
+        """List humans with optional per-field filters (backoffice).
+
+        ``search`` matches name/email broadly. The per-field args narrow the
+        result further and are AND-combined: ``email``/``telegram``/``residence``
+        match as case-insensitive substrings, while ``gender``/``age`` match
+        the whole value case-insensitively (so "male" doesn't also match
+        "female").
+        """
+        statement = select(Humans)
+
+        if search:
+            term = f"%{search}%"
+            statement = statement.where(
+                or_(
+                    col(Humans.first_name).ilike(term),
+                    col(Humans.last_name).ilike(term),
+                    col(Humans.email).ilike(term),
+                )
+            )
+
+        for column, value in (
+            (Humans.email, email),
+            (Humans.telegram, telegram),
+            (Humans.residence, residence),
+        ):
+            if value:
+                statement = statement.where(col(column).ilike(f"%{value}%"))
+
+        for column, value in ((Humans.gender, gender), (Humans.age, age)):
+            if value:
+                statement = statement.where(col(column).ilike(value))
+
+        count_statement = select(func.count()).select_from(statement.subquery())
+        total = session.exec(count_statement).one()
+
+        results = list(session.exec(statement.offset(skip).limit(limit)).all())
+        return results, total
+
     def get_profile_stats(
         self, session: Session, human_id: uuid.UUID
     ) -> HumanProfileStats:
