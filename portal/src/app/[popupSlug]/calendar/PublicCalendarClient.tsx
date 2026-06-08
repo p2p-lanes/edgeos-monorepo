@@ -17,6 +17,7 @@ import {
 } from "@/app/portal/[popupSlug]/events/lib/EventsToolbar"
 import { ListBody } from "@/app/portal/[popupSlug]/events/lib/ListBody"
 import { useEventTimezone } from "@/app/portal/[popupSlug]/events/lib/useEventTimezone"
+import { useMeasuredHeight } from "@/app/portal/[popupSlug]/events/lib/useMeasuredHeight"
 import { ApiError, type EventPublic } from "@/client"
 import {
   LoginRequiredDialog,
@@ -204,6 +205,10 @@ export function PublicCalendarClient({ popupSlug }: PublicCalendarClientProps) {
   // when the underlying event set actually changes.
   const venuesOverride = useMemo(() => collectVenues(events), [events])
 
+  // Measure the sticky toolbar so the list's per-day headers freeze right
+  // below it (the toolbar grows a row when its filter chips wrap).
+  const [toolbarRef, toolbarHeight] = useMeasuredHeight<HTMLDivElement>(112)
+
   return (
     <div className="max-w-4xl mx-auto p-4 sm:p-6 overflow-x-clip">
       {meta?.popup_name ? (
@@ -232,6 +237,7 @@ export function PublicCalendarClient({ popupSlug }: PublicCalendarClientProps) {
       </div>
 
       <div
+        ref={toolbarRef}
         className={cn(
           "mb-4",
           // Freeze the filters for the list & calendar views (the page
@@ -315,6 +321,7 @@ export function PublicCalendarClient({ popupSlug }: PublicCalendarClientProps) {
             mode="public"
             onEventClick={handleEventClick}
             placeholderUrl={meta?.placeholder_url}
+            stickyTop={toolbarHeight}
           />
         )}
       </div>
