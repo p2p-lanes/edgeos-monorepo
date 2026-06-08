@@ -14,7 +14,9 @@ self.addEventListener("activate", (event) => {
     caches
       .keys()
       .then((keys) =>
-        Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))),
+        Promise.all(
+          keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)),
+        ),
       )
       .then(() => self.clients.claim()),
   )
@@ -31,7 +33,7 @@ self.addEventListener("fetch", (event) => {
     fetch(request)
       .then((response) => {
         // Cache a copy of successful, basic responses for offline fallback.
-        if (response && response.ok && response.type === "basic") {
+        if (response?.ok && response.type === "basic") {
           const copy = response.clone()
           caches
             .open(CACHE)
