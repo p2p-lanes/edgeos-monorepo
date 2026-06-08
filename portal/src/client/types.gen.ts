@@ -449,6 +449,18 @@ export type AttendeeCreate = {
 };
 
 /**
+ * Active RSVPers' emails for an event, for its managers (portal).
+ *
+ * Returned only to the event's owner/host/collaborators so they can
+ * contact everyone who RSVPed. Emails are deduplicated and ordered by
+ * registration order.
+ */
+export type AttendeeEmailsResponse = {
+    emails: Array<(string)>;
+    count: number;
+};
+
+/**
  * Minimal attendee information for participation responses.
  */
 export type AttendeeInfo = {
@@ -4616,6 +4628,13 @@ export type EventParticipantsListPortalParticipantsData = {
 };
 
 export type EventParticipantsListPortalParticipantsResponse = (ListModel_EventParticipantPublic_);
+
+export type EventParticipantsListPortalAttendeeEmailsData = {
+    eventId: string;
+    occurrenceStart?: (string | null);
+};
+
+export type EventParticipantsListPortalAttendeeEmailsResponse = (AttendeeEmailsResponse);
 
 export type EventParticipantsRegisterForEventData = {
     eventId: string;

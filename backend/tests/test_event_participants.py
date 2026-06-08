@@ -191,6 +191,107 @@ class TestPortalAttendeeCount:
 
 
 # ---------------------------------------------------------------------------
+# Portal: copy attendee emails (managers only)
+# ---------------------------------------------------------------------------
+
+
+class TestPortalAttendeeEmails:
+    """GET /event-participants/portal/attendee-emails.
+
+    Managers (owner/host/collaborator) copy every active RSVPer's email,
+    including registrants who hid their name from the directory (unlike the
+    participant list, which drops them). Non-managers are refused.
+    """
+
+    def _seed(
+        self, db: Session, tenant: Tenants
+    ) -> tuple[Events, Humans, dict[str, str]]:
+        popup = _make_popup(db, tenant)
+        event = _make_event(db, tenant, popup)
+        # Unique emails per call — the test DB is shared across tests in this
+        # module, so fixed addresses would collide on the email/tenant unique key.
+        manager = _make_human(db, tenant)
+        event.owner_id = manager.id
+        db.add(event)
+
+        visible = _make_human(db, tenant)
+        hider = _make_human(db, tenant)
+        gone = _make_human(db, tenant)
+        db.add_all(
+            [
+                EventParticipants(
+                    tenant_id=tenant.id,
+                    event_id=event.id,
+                    profile_id=visible.id,
+                    status=ParticipantStatus.REGISTERED,
+                ),
+                EventParticipants(
+                    tenant_id=tenant.id,
+                    event_id=event.id,
+                    profile_id=hider.id,
+                    status=ParticipantStatus.CHECKED_IN,
+                ),
+                EventParticipants(
+                    tenant_id=tenant.id,
+                    event_id=event.id,
+                    profile_id=gone.id,
+                    status=ParticipantStatus.CANCELLED,
+                ),
+            ]
+        )
+        # The hider opted out of showing their name; emails must still include
+        # them since this is the organiser reaching their own attendees.
+        db.add(
+            Applications(
+                id=uuid.uuid4(),
+                tenant_id=tenant.id,
+                popup_id=popup.id,
+                human_id=hider.id,
+                status=ApplicationStatus.ACCEPTED.value,
+                info_not_shared=["first_name"],
+            )
+        )
+        db.commit()
+        emails = {
+            "visible": visible.email,
+            "hider": hider.email,
+            "cancelled": gone.email,
+        }
+        return event, manager, emails
+
+    def test_manager_gets_all_active_emails_including_name_hiders(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+    ) -> None:
+        event, manager, emails = self._seed(db, tenant_a)
+        resp = client.get(
+            f"/api/v1/event-participants/portal/attendee-emails?event_id={event.id}",
+            headers=_human_headers(manager),
+        )
+        assert resp.status_code == 200, resp.text
+        body = resp.json()
+        assert set(body["emails"]) == {emails["visible"], emails["hider"]}
+        assert body["count"] == 2
+        assert emails["cancelled"] not in body["emails"]
+
+    def test_non_manager_is_forbidden(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+    ) -> None:
+        event, _, _ = self._seed(db, tenant_a)
+        outsider = _make_human(db, tenant_a)
+        resp = client.get(
+            f"/api/v1/event-participants/portal/attendee-emails?event_id={event.id}",
+            headers=_human_headers(outsider),
+        )
+        assert resp.status_code == 403, resp.text
+
+
+# ---------------------------------------------------------------------------
 # Portal: register
 # ---------------------------------------------------------------------------
 
