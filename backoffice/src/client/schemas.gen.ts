@@ -2041,6 +2041,30 @@ string field is kept for backward compatibility but the router now validates
 via category_id against the popup's attendee_categories table.`
 } as const;
 
+export const AttendeeEmailsResponseSchema = {
+    properties: {
+        emails: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Emails'
+        },
+        count: {
+            type: 'integer',
+            title: 'Count'
+        }
+    },
+    type: 'object',
+    required: ['emails', 'count'],
+    title: 'AttendeeEmailsResponse',
+    description: `Active RSVPers' emails for an event, for its managers (portal).
+
+Returned only to the event's owner/host/collaborators so they can
+contact everyone who RSVPed. Emails are deduplicated and ordered by
+registration order.`
+} as const;
+
 export const AttendeeInfoSchema = {
     properties: {
         id: {
@@ -2649,6 +2673,50 @@ export const AttendeeTicketLineSchema = {
     required: ['product_id'],
     title: 'AttendeeTicketLine',
     description: 'One product + quantity line in a bulk ticket add.'
+} as const;
+
+export const AttendeeTicketMetadataUpdateSchema = {
+    properties: {
+        daily_choices: {
+            additionalProperties: {
+                type: 'string'
+            },
+            type: 'object',
+            title: 'Daily Choices'
+        },
+        dietary_restriction: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Dietary Restriction'
+        },
+        special_request: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Special Request'
+        }
+    },
+    type: 'object',
+    required: ['daily_choices'],
+    title: 'AttendeeTicketMetadataUpdate',
+    description: `Request body to edit a meal-plan ticket's choices post-purchase (portal).
+
+Replaces the three choice keys inside AttendeeProducts.purchase_metadata:
+daily_choices (ISO date -> menu key | "chef"), dietary_restriction, and
+special_request. The key/date semantics are NOT validated here — that needs
+the meal-plan step's template_config and happens in the CRUD layer via
+ticketing_step.meal_plan.validate_daily_choices.`
 } as const;
 
 export const AttendeeTicketProductSwapSchema = {
@@ -4902,6 +4970,29 @@ export const DashboardStatsSchema = {
     required: ['applications', 'attendees', 'payments'],
     title: 'DashboardStats',
     description: 'Complete dashboard statistics.'
+} as const;
+
+export const DayEventCountSchema = {
+    properties: {
+        day: {
+            type: 'string',
+            title: 'Day'
+        },
+        count: {
+            type: 'integer',
+            title: 'Count'
+        }
+    },
+    type: 'object',
+    required: ['day', 'count'],
+    title: 'DayEventCount',
+    description: `Number of occurrence-expanded events that start on a given calendar day.
+
+Backs the portal calendar grid dots: the frontend can fetch per-day counts
+for an entire month without pulling full event payloads, then render a dot
+on each day that has at least one event.  \`\`day\`\` is formatted as
+\`\`YYYY-MM-DD\`\` in the popup's configured timezone so it aligns with the
+frontend's \`\`formatDayKey\`\` helper.`
 } as const;
 
 export const DetachCompanionRequestSchema = {

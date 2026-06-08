@@ -449,6 +449,18 @@ export type AttendeeCreate = {
 };
 
 /**
+ * Active RSVPers' emails for an event, for its managers (portal).
+ *
+ * Returned only to the event's owner/host/collaborators so they can
+ * contact everyone who RSVPed. Emails are deduplicated and ordered by
+ * registration order.
+ */
+export type AttendeeEmailsResponse = {
+    emails: Array<(string)>;
+    count: number;
+};
+
+/**
  * Minimal attendee information for participation responses.
  */
 export type AttendeeInfo = {
@@ -624,6 +636,23 @@ export type AttendeeTicketInfo = {
 export type AttendeeTicketLine = {
     product_id: string;
     quantity?: number;
+};
+
+/**
+ * Request body to edit a meal-plan ticket's choices post-purchase (portal).
+ *
+ * Replaces the three choice keys inside AttendeeProducts.purchase_metadata:
+ * daily_choices (ISO date -> menu key | "chef"), dietary_restriction, and
+ * special_request. The key/date semantics are NOT validated here — that needs
+ * the meal-plan step's template_config and happens in the CRUD layer via
+ * ticketing_step.meal_plan.validate_daily_choices.
+ */
+export type AttendeeTicketMetadataUpdate = {
+    daily_choices: {
+        [key: string]: (string);
+    };
+    dietary_restriction?: (string | null);
+    special_request?: (string | null);
 };
 
 /**
@@ -1127,6 +1156,20 @@ export type DashboardStats = {
     applications: ApplicationStats;
     attendees: AttendeeStats;
     payments: PaymentStats;
+};
+
+/**
+ * Number of occurrence-expanded events that start on a given calendar day.
+ *
+ * Backs the portal calendar grid dots: the frontend can fetch per-day counts
+ * for an entire month without pulling full event payloads, then render a dot
+ * on each day that has at least one event.  ``day`` is formatted as
+ * ``YYYY-MM-DD`` in the popup's configured timezone so it aligns with the
+ * frontend's ``formatDayKey`` helper.
+ */
+export type DayEventCount = {
+    day: string;
+    count: number;
 };
 
 /**
@@ -4121,6 +4164,15 @@ export type AttendeesDeleteMyAttendeeForPopupResponse = ({
     [key: string]: unknown;
 });
 
+export type AttendeesUpdateMyMealPlanTicketData = {
+    attendeeId: string;
+    popupId: string;
+    requestBody: AttendeeTicketMetadataUpdate;
+    ticketId: string;
+};
+
+export type AttendeesUpdateMyMealPlanTicketResponse = (AttendeeWithOriginPublic);
+
 export type AttendeesListAttendeesData = {
     applicationId?: (string | null);
     categoryId?: (string | null);
@@ -4577,6 +4629,13 @@ export type EventParticipantsListPortalParticipantsData = {
 
 export type EventParticipantsListPortalParticipantsResponse = (ListModel_EventParticipantPublic_);
 
+export type EventParticipantsListPortalAttendeeEmailsData = {
+    eventId: string;
+    occurrenceStart?: (string | null);
+};
+
+export type EventParticipantsListPortalAttendeeEmailsResponse = (AttendeeEmailsResponse);
+
 export type EventParticipantsRegisterForEventData = {
     eventId: string;
     requestBody?: (RegisterRequest | null);
@@ -4869,6 +4928,19 @@ export type EventsListPortalTrackEventCountsData = {
 };
 
 export type EventsListPortalTrackEventCountsResponse = (Array<TrackEventCount>);
+
+export type EventsPortalCalendarSummaryData = {
+    managedOnly?: boolean;
+    popupId: string;
+    rsvpedOnly?: boolean;
+    search?: (string | null);
+    startAfter?: (string | null);
+    startBefore?: (string | null);
+    tags?: (Array<(string)> | null);
+    trackIds?: (Array<(string)> | null);
+};
+
+export type EventsPortalCalendarSummaryResponse = (Array<DayEventCount>);
 
 export type EventsGetPortalEventData = {
     eventId: string;
@@ -5358,17 +5430,22 @@ export type GroupsGetGroupPublicData = {
 export type GroupsGetGroupPublicResponse = (GroupPublic);
 
 export type HumansListHumansData = {
+    age?: (string | null);
+    email?: (string | null);
+    gender?: (string | null);
     incompleteApplication?: boolean;
     /**
      * Maximum number of items to return
      */
     limit?: number;
     popupId?: (string | null);
+    residence?: (string | null);
     search?: (string | null);
     /**
      * Number of items to skip
      */
     skip?: number;
+    telegram?: (string | null);
     xTenantId?: (string | null);
 };
 

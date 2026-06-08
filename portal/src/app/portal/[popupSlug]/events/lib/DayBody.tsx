@@ -22,12 +22,7 @@ import Link from "next/link"
 import { Fragment, useEffect, useMemo, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 
-import {
-  type EventPublic,
-  EventsService,
-  EventVenuesService,
-  HumansService,
-} from "@/client"
+import { type EventPublic, EventVenuesService, HumansService } from "@/client"
 import { Button } from "@/components/ui/button"
 import { Calendar } from "@/components/ui/calendar"
 import {
@@ -37,6 +32,7 @@ import {
 } from "@/components/ui/popover"
 import { cn } from "@/lib/utils"
 import type { EventsScrollSnapshot } from "./eventsViewState"
+import { fetchAllPortalEvents } from "./fetchAllPortalEvents"
 import { summarizeRrule } from "./summarizeRrule"
 import { useEventRsvp } from "./useEventRsvp"
 import { useEventTimezone } from "./useEventTimezone"
@@ -46,6 +42,8 @@ interface DayBodyProps {
   slug: string | undefined
   search: string
   rsvpedOnly: boolean
+  /** "My events": owner/host/collaborator. Includes the manager's drafts. */
+  mineOnly?: boolean
   tags?: string[]
   trackIds?: string[]
   selectedDate: Date | null
@@ -98,7 +96,13 @@ interface DayBodyProps {
 const HOUR_PX = 56
 const MIN_PX = HOUR_PX / 60
 const HOUR_LABEL_COL = 56 // px width of the time-label column
-const VENUE_COL_MIN = 180 // px — readable venue name + event title
+// Venue column sizing. The day view's purpose is to fit as many venues on
+// screen as possible, so columns are denser than a typical agenda: a fixed
+// max (no `1fr`) stops them from stretching to fill the viewport when there
+// are only a few venues, and the lower min lets more columns fit before the
+// grid needs to scroll horizontally.
+const VENUE_COL_MIN = 120 // px floor before horizontal scroll kicks in
+const VENUE_COL_MAX = 160 // px cap so columns stay dense instead of stretching
 
 // --- Mobile transposed layout (REVERTIBLE: see "MOBILE TRANSPOSED" block
 // below; remove the block + this constants group + the mobileScrollRef
@@ -134,6 +138,7 @@ export function DayBody({
   slug,
   search,
   rsvpedOnly,
+  mineOnly,
   tags,
   trackIds,
   selectedDate: selectedDateProp,
@@ -228,22 +233,26 @@ export function DayBody({
       popupId,
       dayKey,
       rsvpedOnly,
+      mineOnly,
       search,
       tags,
       trackIds,
     ],
-    queryFn: () =>
-      EventsService.listPortalEvents({
+    // Fetch every event of the day window across all pages (no cap) so a busy
+    // day never silently truncates. Returns the merged, globally sorted list.
+    queryFn: async () => ({
+      results: await fetchAllPortalEvents({
         popupId: popupId!,
-        eventStatus: "published",
+        eventStatus: mineOnly ? undefined : "published",
         startAfter: window.startAfter,
         startBefore: window.startBefore,
         rsvpedOnly: rsvpedOnly || undefined,
+        managedOnly: mineOnly || undefined,
         search: search || undefined,
         tags: tags?.length ? tags : undefined,
         trackIds: trackIds?.length ? trackIds : undefined,
-        limit: 500,
       }),
+    }),
     enabled: isAuthed && !useOverride && !!popupId,
   })
   // Fold the settings-timezone load into the loading state: rendering the
@@ -601,7 +610,7 @@ export function DayBody({
             <div
               className="grid min-w-max"
               style={{
-                gridTemplateColumns: `${HOUR_LABEL_COL}px repeat(${venueCount}, minmax(${VENUE_COL_MIN}px, 1fr))`,
+                gridTemplateColumns: `${HOUR_LABEL_COL}px repeat(${venueCount}, minmax(${VENUE_COL_MIN}px, ${VENUE_COL_MAX}px))`,
               }}
             >
               {/* Sticky header row */}

@@ -97,6 +97,12 @@ interface ListBodyProps {
    * specific card after returning from event detail.
    */
   autoScrollToUpcoming?: boolean
+  /**
+   * Px offset from the top of the scroll container at which each day header
+   * freezes. Should match the sticky filter toolbar's height so the headers
+   * stack right below it instead of behind it. Defaults to 0.
+   */
+  stickyTop?: number
 }
 
 /**
@@ -124,6 +130,7 @@ export function ListBody({
   onUnhide,
   placeholderUrl,
   autoScrollToUpcoming = false,
+  stickyTop = 0,
 }: ListBodyProps) {
   const { t } = useTranslation()
   const isAuthed = mode === "authed"
@@ -248,7 +255,14 @@ export function ListBody({
                     : "events.list.expand_day_aria",
                   { date: dayLabel },
                 )}
-                className="w-full flex items-center gap-3 mb-3 group cursor-pointer"
+                // Sticky per-day header. Each Collapsible is its own
+                // containing block, so a header only stays frozen while its
+                // own day is in view — the next day's header pushes it up as
+                // it arrives (and pulls it back when scrolling up). `top`
+                // matches the sticky toolbar height; z-10 keeps it under the
+                // toolbar (z-20) so the outgoing header slides beneath it.
+                style={{ top: stickyTop }}
+                className="sticky z-10 w-full flex items-center gap-3 mb-3 py-1.5 bg-background group cursor-pointer"
               >
                 <div className="h-2 w-2 rounded-full bg-primary" />
                 <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">

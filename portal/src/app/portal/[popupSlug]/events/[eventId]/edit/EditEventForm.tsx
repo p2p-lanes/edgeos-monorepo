@@ -160,8 +160,10 @@ export function EditEventForm({
     excludeEventId: event.id,
     isDateOutsidePopupWindow,
     popupStartKey,
-    setDateStr,
-    setTimeStr,
+    // Intentionally omit setDateStr/setTimeStr: on the edit form, changing the
+    // venue must keep the user's saved schedule. Availability is still
+    // re-checked against the new venue (conflict check, withinOpenHours,
+    // selectedDateIsClosed all key off venueId) and surfaced as warnings.
   })
 
   const updateMutation = useMutation({

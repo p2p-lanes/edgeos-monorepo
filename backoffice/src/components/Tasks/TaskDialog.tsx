@@ -178,6 +178,7 @@ export function TaskDialog({ open, onOpenChange, taskId }: TaskDialogProps) {
     onSuccess: () => {
       showSuccessToast("Task updated")
       invalidate()
+      onOpenChange(false)
     },
     onError: createErrorHandler(showErrorToast),
   })
