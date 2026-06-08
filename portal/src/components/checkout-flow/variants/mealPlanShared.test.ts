@@ -130,4 +130,28 @@ describe("read-only week gating (deriveProductState)", () => {
   it("treats a NULL sale_ends_at as editable (on_sale)", () => {
     expect(deriveProductState({ ...base, sale_ends_at: null })).toBe("on_sale")
   })
+
+  // VariantMealPlanSelect disables every non-`on_sale` state (not just ended),
+  // matching VariantTicketSelect and the backend payment gate. These guard the
+  // symmetric upcoming / sold-out variants of the same checkout failure.
+  it("marks a week whose sale_starts_at is in the future as upcoming", () => {
+    expect(
+      deriveProductState({
+        ...base,
+        sale_ends_at: null,
+        sale_starts_at: "2999-01-01T00:00:00Z",
+      }),
+    ).toBe("upcoming")
+  })
+
+  it("marks a week with no remaining stock as sold_out", () => {
+    expect(
+      deriveProductState({
+        ...base,
+        sale_ends_at: null,
+        total_stock_cap: 10,
+        total_stock_remaining: 0,
+      }),
+    ).toBe("sold_out")
+  })
 })
