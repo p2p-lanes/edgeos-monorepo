@@ -1,3 +1,4 @@
+import { dayBoundsInTz } from "@edgeos/shared-events"
 import { useQuery } from "@tanstack/react-query"
 import {
   CalendarDays,
@@ -8,9 +9,11 @@ import {
   Repeat,
   Tag,
 } from "lucide-react"
-import { type EventPublic, type EventStatus, EventsService } from "@/client"
+import { useEffect, useMemo, useRef } from "react"
+import type { EventPublic, EventStatus } from "@/client"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
+import { fetchAllEvents } from "@/lib/events/fetchAllEvents"
 import { summarizeRrule } from "@/lib/events/summarizeRrule"
 import { useEventTimezone } from "@/lib/events/useEventTimezone"
 import { cn } from "@/lib/utils"
@@ -21,6 +24,8 @@ interface EventsListViewProps {
   status: EventStatus | undefined
   venueId: string | undefined
   search: string
+  popupStart?: string | null
+  popupEnd?: string | null
   onEventClick: (event: EventPublic) => void
 }
 
@@ -66,19 +71,46 @@ export function EventsListView({
   status,
   venueId,
   search,
+  popupStart,
+  popupEnd,
   onEventClick,
 }: EventsListViewProps) {
   const {
     formatTime,
     formatDateFull,
     formatDayKey,
+    timezone,
     isLoading: tzLoading,
   } = useEventTimezone(popupId)
 
+  // Bound to the popup's date range (in its timezone). A window makes the
+  // backend expand recurring series into concrete occurrences — matching the
+  // day/calendar views — instead of showing each series once at its master.
+  // Falls back to no window (no expansion) when the popup has no dates.
+  const listWindow = useMemo(() => {
+    const startYmd = popupStart?.slice(0, 10)
+    const endYmd = popupEnd?.slice(0, 10)
+    if (!startYmd || !endYmd || !timezone) return null
+    return {
+      startAfter: dayBoundsInTz(startYmd, timezone).start.toISOString(),
+      startBefore: dayBoundsInTz(endYmd, timezone).end.toISOString(),
+    }
+  }, [popupStart, popupEnd, timezone])
+
   const { data, isLoading } = useQuery({
-    queryKey: ["events", "list", popupId, status, venueId, search],
+    queryKey: [
+      "events",
+      "list",
+      popupId,
+      status,
+      venueId,
+      search,
+      listWindow?.startAfter,
+      listWindow?.startBefore,
+    ],
+    // Walk every page so a dense popup is never truncated at a fixed limit.
     queryFn: () =>
-      EventsService.listEvents({
+      fetchAllEvents({
         popupId,
         eventStatus: status,
         venueId:
@@ -86,18 +118,34 @@ export function EventsListView({
             ? venueId
             : undefined,
         locationKind:
-          venueId === "custom" || venueId === "meeting" ? venueId : undefined,
+          venueId === "custom" || venueId === "meeting"
+            ? (venueId as "custom" | "meeting")
+            : undefined,
         search: search || undefined,
-        limit: 500,
+        startAfter: listWindow?.startAfter,
+        startBefore: listWindow?.startBefore,
       }),
     enabled: !!popupId && !tzLoading,
   })
+
+  // Auto-scroll to today (or the first upcoming day) once the list renders,
+  // so admins land on what's current instead of the oldest past event.
+  const todayAnchorRef = useRef<HTMLDivElement | null>(null)
+  const didAutoScrollRef = useRef(false)
+  useEffect(() => {
+    if (didAutoScrollRef.current) return
+    if (!data) return
+    const el = todayAnchorRef.current
+    if (!el) return
+    didAutoScrollRef.current = true
+    el.scrollIntoView({ block: "start" })
+  }, [data])
 
   if (isLoading || tzLoading) {
     return <Skeleton className="h-64 w-full" />
   }
 
-  const events = data?.results ?? []
+  const events = data ?? []
 
   if (events.length === 0) {
     return (
@@ -109,12 +157,22 @@ export function EventsListView({
   }
 
   const grouped = groupByDate(events, formatDayKey)
+  const todayKey = formatDayKey(new Date().toISOString())
+  // Anchor the auto-scroll on today, or the first day after it when today has
+  // no events (keys are YYYY-MM-DD, so a string compare is chronological).
+  const anchorIdx = grouped.findIndex(([date]) => date >= todayKey)
 
   return (
     <div className="space-y-6">
-      {grouped.map(([date, dayEvents]) => (
-        <div key={date}>
-          <div className="flex items-center gap-3 mb-3">
+      {grouped.map(([date, dayEvents], idx) => (
+        <div
+          key={date}
+          ref={idx === anchorIdx ? todayAnchorRef : undefined}
+          className="scroll-mt-20"
+        >
+          {/* Sticky day header: freezes under the app top bar (h-16) while its
+              day is in view; the next day's header pushes it up on scroll. */}
+          <div className="sticky top-16 z-[5] flex items-center gap-3 bg-background py-2 mb-3">
             <div className="h-2 w-2 rounded-full bg-primary" />
             <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               {formatDateFull(dayEvents[0].start_time)}
