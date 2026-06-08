@@ -166,7 +166,7 @@ function CreatedByCard({ event }: { event: EventPublic }) {
   )
 }
 
-export const Route = createFileRoute("/_layout/events/$eventId/edit")({
+export const Route = createFileRoute("/_layout/events/$eventId_/edit")({
   component: EditEventPage,
   head: () => ({
     meta: [{ title: "Edit Event - EdgeOS" }],

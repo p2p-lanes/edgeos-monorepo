@@ -24,8 +24,9 @@ import {
   Users,
 } from "lucide-react"
 import { useEffect, useRef, useState } from "react"
-import { type EventPublic, type EventStatus, EventsService } from "@/client"
+import type { EventPublic, EventStatus } from "@/client"
 import { Button } from "@/components/ui/button"
+import { fetchAllEvents } from "@/lib/events/fetchAllEvents"
 import { summarizeRrule } from "@/lib/events/summarizeRrule"
 import { useEventTimezone } from "@/lib/events/useEventTimezone"
 import { cn } from "@/lib/utils"
@@ -145,8 +146,10 @@ export function EventsCalendarView({
       venueId,
       search,
     ],
+    // Walk every page so a dense month is never truncated at a fixed limit
+    // (the cause of the calendar showing fewer events than the list/day).
     queryFn: () =>
-      EventsService.listEvents({
+      fetchAllEvents({
         popupId,
         eventStatus: status,
         venueId:
@@ -154,16 +157,17 @@ export function EventsCalendarView({
             ? venueId
             : undefined,
         locationKind:
-          venueId === "custom" || venueId === "meeting" ? venueId : undefined,
+          venueId === "custom" || venueId === "meeting"
+            ? (venueId as "custom" | "meeting")
+            : undefined,
         search: search || undefined,
         startAfter: monthBounds.start.toISOString(),
         startBefore: monthBounds.end.toISOString(),
-        limit: 200,
       }),
     enabled: !!popupId && !tzLoading,
   })
 
-  const events = data?.results ?? []
+  const events = data ?? []
 
   // Grid cells are calendar days (number labels) — match them against
   // events by formatting both sides in the popup's timezone, so an event
