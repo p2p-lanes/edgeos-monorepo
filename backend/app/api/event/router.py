@@ -876,7 +876,9 @@ async def list_public_calendar(
 @router.get(
     "/public/calendar.ics",
     dependencies=[
-        Depends(RateLimit(limit=120, window_sec=60, key_prefix="rl:events-public-ics")),
+        Depends(
+            RateLimit(limit=120, window_sec=60, key_prefix="rl:events-public-ics")
+        ),
     ],
 )
 async def public_calendar_ics(
