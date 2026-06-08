@@ -5430,17 +5430,22 @@ export type GroupsGetGroupPublicData = {
 export type GroupsGetGroupPublicResponse = (GroupPublic);
 
 export type HumansListHumansData = {
+    age?: (string | null);
+    email?: (string | null);
+    gender?: (string | null);
     incompleteApplication?: boolean;
     /**
      * Maximum number of items to return
      */
     limit?: number;
     popupId?: (string | null);
+    residence?: (string | null);
     search?: (string | null);
     /**
      * Number of items to skip
      */
     skip?: number;
+    telegram?: (string | null);
     xTenantId?: (string | null);
 };
 
