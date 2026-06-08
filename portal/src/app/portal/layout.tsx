@@ -3,7 +3,6 @@
 import { usePathname } from "next/navigation"
 import type * as React from "react"
 import Authentication from "@/components/Authentication"
-import { BottomNav } from "@/components/BottomNav"
 import HeaderBar from "@/components/Sidebar/HeaderBar"
 import { BackofficeSidebar } from "@/components/Sidebar/Sidebar"
 import { SidebarInset } from "@/components/Sidebar/SidebarComponents"
@@ -30,13 +29,10 @@ export default function PortalLayout({
               writes are no-ops. Keep this id stable. */}
           <main
             id="portal-scroll"
-            className="flex-1 overflow-y-auto bg-background pb-16 md:pb-0"
+            className="flex-1 overflow-y-auto bg-background"
           >
             {children}
           </main>
-          {/* Mobile-only bottom navigation; content above clears it via the
-              main's pb-16. */}
-          <BottomNav />
         </SidebarInset>
       </Providers>
     </Authentication>
