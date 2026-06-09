@@ -303,7 +303,9 @@ class TestCreateCustomLocation:
         assert resp.status_code == 201, resp.text
         body = resp.json()
         assert body["status"] == EventStatus.PENDING_APPROVAL.value
-        assert body["visibility"] == EventVisibility.UNLISTED.value
+        # Visibility the creator chose (default public) is preserved through
+        # the pending state; the status gate keeps it out of the public feed.
+        assert body["visibility"] == EventVisibility.PUBLIC.value
         assert body["custom_location_name"] == "Mi casa"
 
     def test_create_portal_event_with_custom_location_skips_venue_approval_gate(
