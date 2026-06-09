@@ -184,6 +184,32 @@ def test_report_bug_is_scoped_to_reporter_tenant(
     assert body["type"] == "bug"
     assert body["visibility"] == "tenant"
     assert body["target_tenant_id"] == str(tenant_a.id)
+    # Unspecified classification falls back to sensible defaults.
+    assert body["priority"] == "medium"
+    assert body["app"] is None
+
+
+def test_report_bug_accepts_classification_fields(
+    client, admin_token_tenant_a
+) -> None:
+    """A reporter can classify the report: type / priority / app."""
+    r = client.post(
+        "/api/v1/tasks/report-bug",
+        headers=_auth(admin_token_tenant_a),
+        json={
+            "title": "add dark mode",
+            "type": "feature",
+            "priority": "high",
+            "app": "portal",
+        },
+    )
+    assert r.status_code == 201
+    body = r.json()
+    assert body["type"] == "feature"
+    assert body["priority"] == "high"
+    assert body["app"] == "portal"
+    # Still routed to the to-do column regardless of classification.
+    assert body["status"] == TaskStatus.TO_DO.value
 
 
 def test_app_field_roundtrips_and_clears(client, superadmin_token) -> None:
