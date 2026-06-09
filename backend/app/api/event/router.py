@@ -2211,7 +2211,10 @@ async def approve_event(
             detail=f"Event is not pending approval (status={event.status})",
         )
     event.status = EventStatus.PUBLISHED
-    event.visibility = EventVisibility.PUBLIC
+    # Preserve the visibility the creator chose at submission — approval only
+    # flips the status to published. Pending events are kept out of the public
+    # feed by the status gate in ``_portal_visibility_filter``, not by
+    # overwriting their visibility here.
     db.add(event)
     db.commit()
     db.refresh(event)
@@ -2361,12 +2364,15 @@ def _portal_visibility_filter(db, events: list, human_id: uuid.UUID) -> list:
     """Apply visibility rules to a portal event list.
 
     Rules:
+    - non-published (draft / pending_approval): only managers (owner / host /
+      collaborators) see them in listings, whatever their stored visibility.
+      This keeps a pending event out of the public feed while preserving the
+      visibility the creator chose (restored once approved + published).
     - public: visible to all.
     - private: only managers (owner / host / collaborators) + invited humans.
     - unlisted: hidden from public listings, but managers (owner / host /
-      collaborators) still see their own unlisted events (e.g.
-      pending_approval requests they created). Detail is reachable via direct
-      link for non-managers.
+      collaborators) still see their own unlisted events. Detail is reachable
+      via direct link for non-managers.
     """
     from sqlmodel import select
 
@@ -2389,13 +2395,20 @@ def _portal_visibility_filter(db, events: list, human_id: uuid.UUID) -> list:
 
     visible = []
     for e in events:
+        manages = _human_id_manages_event(e, human_id)
+        # Draft / pending_approval events are never listed to non-managers,
+        # regardless of their stored visibility.
+        if e.status != EventStatus.PUBLISHED:
+            if manages:
+                visible.append(e)
+            continue
         if e.visibility == EventVisibility.PUBLIC:
             visible.append(e)
         elif e.visibility == EventVisibility.UNLISTED:
-            if _human_id_manages_event(e, human_id):
+            if manages:
                 visible.append(e)
         elif e.visibility == EventVisibility.PRIVATE:
-            if _human_id_manages_event(e, human_id) or _invitation_visible_to_human(
+            if manages or _invitation_visible_to_human(
                 e, human_id, invited_map.get(e.id, set())
             ):
                 visible.append(e)
@@ -3018,8 +3031,11 @@ async def create_portal_event(
             )
 
     if requires_approval:
+        # Keep the visibility the creator chose so it survives the pending
+        # state and is honored once approved. Hiding the still-pending event
+        # from the public feed is handled by the status gate in
+        # ``_portal_visibility_filter`` (non-published => managers only).
         event_data["status"] = EventStatus.PENDING_APPROVAL
-        event_data["visibility"] = EventVisibility.UNLISTED
 
     event = Events(**event_data)
 
