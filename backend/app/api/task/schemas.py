@@ -150,15 +150,21 @@ class TaskArchiveResult(BaseModel):
 class BugReportCreate(BaseModel):
     """The 'report a bug' payload, open to every backoffice user.
 
-    Always produces an internal bug in the to-do column. Attachments are
-    optional screenshots / screen-recordings already uploaded to S3.
+    Produces a to-do task in the reporter's tenant scope. The reporter can
+    classify it (type / priority / which app it relates to); type defaults to
+    ``bug`` so the plain "report a bug" flow keeps working unchanged.
+    Attachments are optional screenshots / screen-recordings already uploaded
+    to S3.
     """
 
     title: str = Field(min_length=1, max_length=200)
     detail: str | None = None
+    type: TaskType = TaskType.BUG
+    priority: TaskPriority = TaskPriority.MEDIUM
+    app: TaskApp | None = None
     attachments: list[TaskAttachmentCreate] = Field(default_factory=list)
 
-    model_config = ConfigDict(str_strip_whitespace=True)
+    model_config = ConfigDict(use_enum_values=True, str_strip_whitespace=True)
 
 
 class TaskPublic(BaseModel):
