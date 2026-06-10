@@ -1,3 +1,4 @@
+import re
 import uuid
 from collections.abc import Iterable
 from datetime import UTC, datetime, timedelta
@@ -35,6 +36,7 @@ from app.api.event.schemas import (
     EventPublicCalendarResponse,
     EventRecurringAvailabilityCheck,
     EventRecurringAvailabilityResult,
+    EventShareMeta,
     EventStatus,
     EventUpdate,
     EventVisibility,
@@ -873,12 +875,99 @@ async def list_public_calendar(
     )
 
 
+_SHARE_DESCRIPTION_MAX = 200
+
+
+def _share_description(event) -> str | None:
+    """Derive a short plaintext snippet from ``event.content`` for share previews.
+
+    Strips HTML tags and the most common Markdown syntax, collapses
+    whitespace, and truncates to ~200 chars on a word boundary. Returns
+    ``None`` when there is no usable text.
+    """
+    raw = (event.content or "").strip()
+    if not raw:
+        return None
+    # Drop HTML tags, then strip lightweight Markdown markers (headings,
+    # emphasis, list bullets, links -> keep the link text). Whitespace is
+    # collapsed last so newlines from the original markup don't survive.
+    text = re.sub(r"<[^>]+>", " ", raw)
+    text = re.sub(r"!?\[([^\]]*)\]\([^)]*\)", r"\1", text)  # [label](url) -> label
+    text = re.sub(r"[#>*_`~]+", " ", text)
+    text = re.sub(r"^\s*[-+]\s+", " ", text, flags=re.MULTILINE)  # list bullets
+    text = re.sub(r"\s+", " ", text).strip()
+    if not text:
+        return None
+    if len(text) <= _SHARE_DESCRIPTION_MAX:
+        return text
+    truncated = text[:_SHARE_DESCRIPTION_MAX].rsplit(" ", 1)[0].rstrip()
+    return f"{truncated or text[:_SHARE_DESCRIPTION_MAX].rstrip()}…"
+
+
+@router.get(
+    "/public/events/{event_id}/share",
+    response_model=EventShareMeta,
+    dependencies=[
+        Depends(
+            RateLimit(limit=120, window_sec=60, key_prefix="rl:events-public-share")
+        ),
+    ],
+)
+async def get_public_event_share_meta(
+    event_id: uuid.UUID,
+    db: SessionDep,
+    tenant: PublicTenant,
+) -> EventShareMeta:
+    """Unauthenticated event metadata for social/OpenGraph share previews.
+
+    Social crawlers (WhatsApp, Facebook, X, Slack, iMessage) send no JWT, so
+    this route is intentionally public. It exposes only the title, a short
+    plaintext snippet and a cover image — never ``meeting_url`` or any other
+    sensitive field.
+
+    Tenant is resolved from Origin/Referer (or ``X-Tenant-Id`` as last resort).
+    Only ``published`` events with ``public`` or ``unlisted`` visibility that
+    belong to the resolved tenant are returned; everything else (draft,
+    private, sibling-tenant) gets an opaque 404 so the route can't be used to
+    probe for events.
+    """
+    from app.api.event_settings.crud import event_settings_crud
+
+    event = crud.events_crud.get(db, event_id)
+    allowed = {EventVisibility.PUBLIC, EventVisibility.UNLISTED}
+    if (
+        not event
+        or event.tenant_id != tenant.id
+        or event.status != EventStatus.PUBLISHED
+        or event.visibility not in allowed
+    ):
+        # Opaque 404 — never confirm a draft/private/sibling-tenant event exists.
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Event not found"
+        )
+
+    # Image fallback chain mirrors the portal detail page (page.tsx ~line 440):
+    # event cover -> venue photo -> popup placeholder.
+    venue_image_url = event.venue.image_url if event.venue_id and event.venue else None
+    settings = event_settings_crud.get_by_popup_id(db, event.popup_id)
+    image_url = (
+        event.cover_url
+        or venue_image_url
+        or (settings.placeholder_url if settings else None)
+    )
+
+    return EventShareMeta(
+        id=event.id,
+        title=event.title,
+        description=_share_description(event),
+        image_url=image_url,
+    )
+
+
 @router.get(
     "/public/calendar.ics",
     dependencies=[
-        Depends(
-            RateLimit(limit=120, window_sec=60, key_prefix="rl:events-public-ics")
-        ),
+        Depends(RateLimit(limit=120, window_sec=60, key_prefix="rl:events-public-ics")),
     ],
 )
 async def public_calendar_ics(

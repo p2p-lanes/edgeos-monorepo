@@ -1,5 +1,7 @@
 "use client"
 
+import { utcToLocalTzNaive } from "@edgeos/shared-events"
+import { MarkdownEditor } from "@edgeos/shared-form-ui"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import {
   ArrowLeft,
@@ -34,12 +36,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Textarea } from "@/components/ui/textarea"
 import { useCityProvider } from "@/providers/cityProvider"
 import { CollaboratorsField } from "../components/CollaboratorsField"
 import { EventScheduleFields } from "../components/EventScheduleFields"
 import { EventVenueField } from "../components/EventVenueField"
 import { HostDisplayField } from "../components/HostDisplayField"
+import { VenueDayScheduleDialog } from "../components/VenueDayScheduleDialog"
 import { VisibilityHint } from "../components/VisibilityHint"
 import { todayInTz, useEventScheduling } from "../lib/useEventScheduling"
 import { usePortalEventSettings } from "../lib/useEventTimezone"
@@ -249,6 +251,18 @@ function NewPortalEventForm({
 
   const isCustomLocation = venueId === "__custom__"
   const isMeeting = !venueId && !isCustomLocation
+
+  // Show the day-schedule preview only when a real venue (not the custom-
+  // location / meeting sentinels) and a day are selected.
+  const showSchedule = !!venueId && !isCustomLocation && !!dateStr
+
+  // Clicking a free slot in the preview sets the start time. The form stores
+  // a "HH:mm" wall-clock label in the display tz; convert the UTC instant the
+  // column hands back the same way the nearby-slot pills do.
+  const handlePickScheduleTime = (isoUtc: string) => {
+    setTimeStr(utcToLocalTzNaive(isoUtc, displayTz).slice(11, 16))
+  }
+
   const customLocationMissing =
     isCustomLocation &&
     (!customLocationName.trim() || !customLocationUrl.trim())
@@ -522,6 +536,17 @@ function NewPortalEventForm({
           disabled={venueDisabled}
         />
 
+        {showSchedule && (
+          <VenueDayScheduleDialog
+            availability={availabilityData}
+            timezone={displayTz}
+            dayKey={dateStr}
+            proposedStartIso={startIso || null}
+            proposedEndIso={endIso || null}
+            onPickTime={handlePickScheduleTime}
+          />
+        )}
+
         {/* Visibility */}
         <div className="space-y-2">
           <Label htmlFor="visibility">
@@ -566,12 +591,11 @@ function NewPortalEventForm({
         {/* Description */}
         <div className="space-y-2">
           <Label htmlFor="content">{t("events.form.description_label")}</Label>
-          <Textarea
+          <MarkdownEditor
             id="content"
             value={content}
-            onChange={(e) => setContent(e.target.value)}
+            onChange={setContent}
             placeholder={t("events.form.description_placeholder")}
-            rows={4}
           />
         </div>
 

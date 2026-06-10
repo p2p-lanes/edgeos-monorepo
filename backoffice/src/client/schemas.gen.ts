@@ -3547,6 +3547,24 @@ export const BugReportCreateSchema = {
             ],
             title: 'Detail'
         },
+        type: {
+            '$ref': '#/components/schemas/TaskType',
+            default: 'bug'
+        },
+        priority: {
+            '$ref': '#/components/schemas/TaskPriority',
+            default: 'medium'
+        },
+        app: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/TaskApp'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
         attachments: {
             items: {
                 '$ref': '#/components/schemas/TaskAttachmentCreate'
@@ -3560,8 +3578,11 @@ export const BugReportCreateSchema = {
     title: 'BugReportCreate',
     description: `The 'report a bug' payload, open to every backoffice user.
 
-Always produces an internal bug in the to-do column. Attachments are
-optional screenshots / screen-recordings already uploaded to S3.`
+Produces a to-do task in the reporter's tenant scope. The reporter can
+classify it (type / priority / which app it relates to); type defaults to
+\`\`bug\`\` so the plain "report a bug" flow keeps working unchanged.
+Attachments are optional screenshots / screen-recordings already uploaded
+to S3.`
 } as const;
 
 export const BuyerInfoSchema = {
@@ -7086,6 +7107,52 @@ export const EventSettingsUpdateSchema = {
     type: 'object',
     title: 'EventSettingsUpdate',
     description: 'Event settings schema for updates.'
+} as const;
+
+export const EventShareMetaSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        title: {
+            type: 'string',
+            title: 'Title'
+        },
+        description: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Description'
+        },
+        image_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Image Url'
+        }
+    },
+    type: 'object',
+    required: ['id', 'title'],
+    title: 'EventShareMeta',
+    description: `Tiny, unauthenticated projection for social/OpenGraph share previews.
+
+Returned by the public \`\`/public/events/{id}/share\`\` endpoint so social
+crawlers (which send no JWT) can render the real event title, a short
+plaintext snippet and the cover image. Deliberately minimal — no
+\`\`meeting_url\`\`, \`\`tenant_id\`\`, \`\`owner_id\`\`, \`\`visibility\`\` or any other
+field that could leak through an unauthenticated route.`
 } as const;
 
 export const EventStatusSchema = {
@@ -18202,6 +18269,17 @@ export const VenueBusySlotSchema = {
                 }
             ],
             title: 'Label'
+        },
+        visibility: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Visibility'
         },
         event_id: {
             anyOf: [

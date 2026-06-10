@@ -281,6 +281,10 @@ class VenueBusySlot(BaseModel):
     end: datetime
     source: str  # "event" | "exception"
     label: str | None = None
+    # Mirrors ``Events.visibility`` when ``source == "event"`` (``None`` for
+    # exceptions). Lets calendars flag private/unlisted blocks and lets the
+    # portal redact other people's private titles while keeping them visible.
+    visibility: str | None = None
     # Populated when ``source == "event"``. ``event_start``/``event_end`` are
     # the actual event times inside the block; the padding between those
     # and ``start``/``end`` is setup/teardown and should render as a

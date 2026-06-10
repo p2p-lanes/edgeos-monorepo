@@ -544,6 +544,8 @@ def _compute_availability(
     start: datetime,
     end: datetime,
     exclude_event_id: uuid.UUID | None = None,
+    redact_private: bool = False,
+    viewer_human_id: uuid.UUID | None = None,
 ) -> VenueAvailability:
     """Return open ranges (derived from weekly_hours + open exceptions) and
     busy slots (existing events with setup/teardown + closed exceptions).
@@ -553,9 +555,14 @@ def _compute_availability(
 
     ``exclude_event_id`` drops one event from the busy list — used by edit
     forms so the event being edited doesn't appear to overlap itself.
+
+    ``redact_private`` hides the title of non-public events that the viewer
+    doesn't manage (portal privacy): the slot stays visible as occupied but
+    ``label`` is blanked. ``viewer_human_id`` is the human whose own private
+    events keep their title even when ``redact_private`` is set.
     """
     from app.api.event.models import Events
-    from app.api.event.schemas import EventStatus
+    from app.api.event.schemas import EventStatus, EventVisibility
 
     if end <= start:
         raise HTTPException(status_code=400, detail="end must be after start")
@@ -605,12 +612,22 @@ def _compute_availability(
     for e in events:
         busy_start = e.start_time - timedelta(minutes=venue.setup_time_minutes)
         busy_end = e.end_time + timedelta(minutes=venue.teardown_time_minutes)
+        # Mirror ``_human_id_manages_event`` (event/router.py) inline to avoid a
+        # cross-module import: owner, host, or any collaborator may see titles.
+        is_manager = viewer_human_id is not None and (
+            viewer_human_id in (e.owner_id, e.host_id)
+            or viewer_human_id in (e.collaborator_ids or [])
+        )
+        redacted = (
+            redact_private and e.visibility != EventVisibility.PUBLIC and not is_manager
+        )
         busy.append(
             VenueBusySlot(
                 start=busy_start,
                 end=busy_end,
                 source="event",
-                label=e.title,
+                label=None if redacted else e.title,
+                visibility=e.visibility.value,
                 event_id=e.id,
                 event_start=e.start_time,
                 event_end=e.end_time,
@@ -723,16 +740,27 @@ async def get_availability(
 async def get_portal_availability(
     venue_id: uuid.UUID,
     db: HumanTenantSession,
-    _: CurrentHuman,
+    current_human: CurrentHuman,
     start: datetime = Query(...),
     end: datetime = Query(...),
     exclude_event_id: uuid.UUID | None = Query(default=None),
 ) -> VenueAvailability:
     """Portal-side availability query — same shape as the backoffice one,
     used by the event-creation form to show open/busy slots per day.
+
+    Redacts other humans' private/unlisted event titles to keep the slot
+    visible as occupied without leaking what it is.
     """
     venue = _get_venue_or_404(db, venue_id)
-    return _compute_availability(db, venue, start, end, exclude_event_id)
+    return _compute_availability(
+        db,
+        venue,
+        start,
+        end,
+        exclude_event_id,
+        redact_private=True,
+        viewer_human_id=current_human.id,
+    )
 
 
 @router.get("/portal/venues", response_model=ListModel[EventVenuePublic])

@@ -335,6 +335,22 @@ class EventPublicCalendarItem(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class EventShareMeta(BaseModel):
+    """Tiny, unauthenticated projection for social/OpenGraph share previews.
+
+    Returned by the public ``/public/events/{id}/share`` endpoint so social
+    crawlers (which send no JWT) can render the real event title, a short
+    plaintext snippet and the cover image. Deliberately minimal — no
+    ``meeting_url``, ``tenant_id``, ``owner_id``, ``visibility`` or any other
+    field that could leak through an unauthenticated route.
+    """
+
+    id: uuid.UUID
+    title: str
+    description: str | None = None
+    image_url: str | None = None
+
+
 class EventCalendarTrack(BaseModel):
     """Minimal track projection for the public calendar toolbar."""
 
