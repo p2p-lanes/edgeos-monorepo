@@ -16,10 +16,12 @@ Event creation / approval (events/portal/events + /approve + /reject)
 - ``event_enabled=False`` blocks portal creation.
 - ``can_publish_event=admin_only`` blocks all portal creation (draft or
   published); only admins can create events via the backoffice.
-- A venue with ``booking_mode=approval_required`` forces
-  ``status=PENDING_APPROVAL`` and ``visibility=UNLISTED`` regardless of
-  the payload.
-- POST /events/{id}/approve promotes the event to PUBLISHED + PUBLIC.
+- A venue with ``booking_mode=approval_required`` (or popup-level
+  ``events_require_approval``) forces ``status=PENDING_APPROVAL`` while
+  preserving the creator's chosen visibility; pending events are hidden from
+  non-managers by the status gate, not by overwriting visibility.
+- POST /events/{id}/approve promotes the event to PUBLISHED and keeps the
+  creator's visibility unchanged.
 - POST /events/{id}/reject marks the event as REJECTED.
 - Both endpoints reject non-pending events with 400.
 
@@ -31,6 +33,7 @@ from __future__ import annotations
 
 import uuid
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session, select
 
@@ -353,9 +356,10 @@ class TestEventCreationGate:
 
 
 class TestApprovalRequiredVenue:
-    """`booking_mode=approval_required` forces PENDING_APPROVAL + UNLISTED."""
+    """`booking_mode=approval_required` forces PENDING_APPROVAL but keeps the
+    creator's chosen visibility (hiding is enforced by the status gate)."""
 
-    def test_published_payload_downgraded_to_pending_and_unlisted(
+    def test_published_payload_downgraded_to_pending_keeps_visibility(
         self,
         client: TestClient,
         db: Session,
@@ -385,8 +389,10 @@ class TestApprovalRequiredVenue:
 
         assert resp.status_code == 201, resp.text
         body = resp.json()
+        # Status is downgraded to pending, but the creator's visibility choice
+        # is preserved (status gate keeps it out of the public feed meanwhile).
         assert body["status"] == EventStatus.PENDING_APPROVAL.value
-        assert body["visibility"] == EventVisibility.UNLISTED.value
+        assert body["visibility"] == EventVisibility.PUBLIC.value
 
 
 class TestApproveRejectTransitions:
@@ -414,7 +420,7 @@ class TestApproveRejectTransitions:
         db.refresh(event)
         return event
 
-    def test_approve_promotes_to_published_and_public(
+    def test_approve_promotes_to_published_and_preserves_visibility(
         self,
         client: TestClient,
         db: Session,
@@ -422,7 +428,11 @@ class TestApproveRejectTransitions:
         admin_token_tenant_a: str,
     ) -> None:
         popup = _make_popup(db, tenant_a)
+        # Creator asked for a public event; approval must keep that choice.
         event = self._pending_event(db, tenant_a, popup)
+        event.visibility = EventVisibility.PUBLIC
+        db.add(event)
+        db.commit()
 
         resp = client.post(
             f"/api/v1/events/{event.id}/approve",
@@ -433,7 +443,32 @@ class TestApproveRejectTransitions:
         assert resp.status_code == 200, resp.text
         body = resp.json()
         assert body["status"] == EventStatus.PUBLISHED.value
+        # Approval flips status only; the creator's visibility is preserved.
         assert body["visibility"] == EventVisibility.PUBLIC.value
+
+    def test_approve_preserves_non_public_visibility(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+        admin_token_tenant_a: str,
+    ) -> None:
+        popup = _make_popup(db, tenant_a)
+        # A creator who deliberately chose a private/unlisted event keeps it
+        # after approval — approval no longer forces it public.
+        event = self._pending_event(db, tenant_a, popup)
+        assert event.visibility == EventVisibility.UNLISTED
+
+        resp = client.post(
+            f"/api/v1/events/{event.id}/approve",
+            headers=_auth(admin_token_tenant_a),
+            json={"reason": "Looks good"},
+        )
+
+        assert resp.status_code == 200, resp.text
+        body = resp.json()
+        assert body["status"] == EventStatus.PUBLISHED.value
+        assert body["visibility"] == EventVisibility.UNLISTED.value
 
     def test_reject_sets_status_to_rejected(
         self,
@@ -589,3 +624,90 @@ class TestApproveRejectTransitions:
         )
 
         assert resp.status_code == 400, resp.text
+
+
+class TestEndToEndVisibilityConsistency:
+    """Full portal-create → approve chain over HTTP.
+
+    Validates that the visibility the creator picks survives the whole
+    lifecycle: it is preserved while the event sits in PENDING_APPROVAL, the
+    pending event is hidden from non-managers' listings by the status gate
+    (not by overwriting visibility), and approval flips only the status —
+    never the visibility.
+    """
+
+    def _list_ids(
+        self, client: TestClient, popup: Popups, human: Humans
+    ) -> set[str]:
+        resp = client.get(
+            "/api/v1/events/portal/events",
+            params={"popup_id": str(popup.id)},
+            headers=_human_auth(human),
+        )
+        assert resp.status_code == 200, resp.text
+        return {item["id"] for item in resp.json()["results"]}
+
+    @pytest.mark.parametrize(
+        "chosen",
+        [
+            EventVisibility.PUBLIC,
+            EventVisibility.PRIVATE,
+            EventVisibility.UNLISTED,
+        ],
+    )
+    def test_create_then_approve_preserves_visibility(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+        admin_token_tenant_a: str,
+        chosen: EventVisibility,
+    ) -> None:
+        popup = _make_popup(db, tenant_a)
+        # Default event settings already set events_require_approval=True, so a
+        # portal-created event is routed through the approval gate.
+        _set_event_settings(db, tenant_a, popup)
+        creator = _make_human(db, tenant_a)
+        bystander = _make_human(db, tenant_a)
+
+        # 1. Creator submits a "published" event with their chosen visibility.
+        create = client.post(
+            "/api/v1/events/portal/events",
+            headers=_human_auth(creator),
+            json=_event_payload(
+                popup, status=EventStatus.PUBLISHED, visibility=chosen
+            ),
+        )
+        assert create.status_code == 201, create.text
+        body = create.json()
+        event_id = body["id"]
+        # Routed to pending, but the visibility choice is untouched.
+        assert body["status"] == EventStatus.PENDING_APPROVAL.value
+        assert body["visibility"] == chosen.value
+
+        # 2. While pending, a bystander never sees it (status gate), whatever
+        #    the chosen visibility; the creator (manager) still sees their own.
+        assert event_id not in self._list_ids(client, popup, bystander)
+        assert event_id in self._list_ids(client, popup, creator)
+
+        # 3. Admin approves.
+        approve = client.post(
+            f"/api/v1/events/{event_id}/approve",
+            headers=_auth(admin_token_tenant_a),
+            json={"reason": "ok"},
+        )
+        assert approve.status_code == 200, approve.text
+        approved = approve.json()
+        # 4. Published, with the exact visibility the creator chose at submit.
+        assert approved["status"] == EventStatus.PUBLISHED.value
+        assert approved["visibility"] == chosen.value
+
+        # 5. Post-approval listing matches the chosen visibility: a public
+        #    event now shows to the bystander; private/unlisted stay hidden
+        #    from a non-manager's listing. The creator always sees their own.
+        bystander_ids = self._list_ids(client, popup, bystander)
+        if chosen == EventVisibility.PUBLIC:
+            assert event_id in bystander_ids
+        else:
+            assert event_id not in bystander_ids
+        assert event_id in self._list_ids(client, popup, creator)

@@ -790,6 +790,9 @@ export type BaseFieldConfigUpdate = {
 export type BugReportCreate = {
     title: string;
     detail?: (string | null);
+    type?: TaskType;
+    priority?: TaskPriority;
+    app?: (TaskApp | null);
     attachments?: Array<TaskAttachmentCreate>;
 };
 
