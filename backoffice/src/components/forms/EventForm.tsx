@@ -6,6 +6,7 @@ import {
   localTzNaiveToUtc,
   utcToLocalTzNaive,
 } from "@edgeos/shared-events"
+import { MarkdownEditor } from "@edgeos/shared-form-ui"
 import { useForm, useStore } from "@tanstack/react-form"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Link, useNavigate } from "@tanstack/react-router"
@@ -1783,12 +1784,12 @@ export function EventForm({
         <InlineRow label="Description" description="Details about the event">
           <form.Field name="content">
             {(field) => (
-              <Textarea
-                value={field.state.value}
-                onChange={(e) => field.handleChange(e.target.value)}
+              <MarkdownEditor
+                value={field.state.value ?? ""}
+                onChange={(md) => field.handleChange(md)}
                 placeholder="Describe the event..."
                 disabled={readOnly}
-                className="w-[380px] min-h-20"
+                className="w-[380px]"
               />
             )}
           </form.Field>

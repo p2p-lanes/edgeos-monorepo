@@ -1,5 +1,6 @@
 "use client"
 
+import { MarkdownEditor } from "@edgeos/shared-form-ui"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useRouter } from "next/navigation"
 import { useMemo } from "react"
@@ -17,7 +18,6 @@ import {
 } from "@/client"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
 import { CollaboratorsField } from "../../components/CollaboratorsField"
 import { EventScheduleFields } from "../../components/EventScheduleFields"
 import { HostDisplayField } from "../../components/HostDisplayField"
@@ -304,11 +304,10 @@ export function EditEventForm({
 
         <div className="space-y-2">
           <Label htmlFor="desc">{t("events.form.description_label")}</Label>
-          <Textarea
+          <MarkdownEditor
             id="desc"
-            rows={4}
             value={form.content}
-            onChange={(e) => form.setContent(e.target.value)}
+            onChange={form.setContent}
           />
         </div>
 
