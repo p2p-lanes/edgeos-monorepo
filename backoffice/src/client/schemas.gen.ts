@@ -7088,6 +7088,52 @@ export const EventSettingsUpdateSchema = {
     description: 'Event settings schema for updates.'
 } as const;
 
+export const EventShareMetaSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        title: {
+            type: 'string',
+            title: 'Title'
+        },
+        description: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Description'
+        },
+        image_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Image Url'
+        }
+    },
+    type: 'object',
+    required: ['id', 'title'],
+    title: 'EventShareMeta',
+    description: `Tiny, unauthenticated projection for social/OpenGraph share previews.
+
+Returned by the public \`\`/public/events/{id}/share\`\` endpoint so social
+crawlers (which send no JWT) can render the real event title, a short
+plaintext snippet and the cover image. Deliberately minimal — no
+\`\`meeting_url\`\`, \`\`tenant_id\`\`, \`\`owner_id\`\`, \`\`visibility\`\` or any other
+field that could leak through an unauthenticated route.`
+} as const;
+
 export const EventStatusSchema = {
     type: 'string',
     enum: ['draft', 'published', 'cancelled', 'pending_approval', 'rejected'],

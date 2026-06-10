@@ -1593,6 +1593,22 @@ export type EventSettingsUpdate = {
     placeholder_url?: (string | null);
 };
 
+/**
+ * Tiny, unauthenticated projection for social/OpenGraph share previews.
+ *
+ * Returned by the public ``/public/events/{id}/share`` endpoint so social
+ * crawlers (which send no JWT) can render the real event title, a short
+ * plaintext snippet and the cover image. Deliberately minimal — no
+ * ``meeting_url``, ``tenant_id``, ``owner_id``, ``visibility`` or any other
+ * field that could leak through an unauthenticated route.
+ */
+export type EventShareMeta = {
+    id: string;
+    title: string;
+    description?: (string | null);
+    image_url?: (string | null);
+};
+
 export type EventStatus = 'draft' | 'published' | 'cancelled' | 'pending_approval' | 'rejected';
 
 /**
@@ -4672,6 +4688,13 @@ export type EventsListPublicCalendarData = {
 };
 
 export type EventsListPublicCalendarResponse = (EventPublicCalendarResponse);
+
+export type EventsGetPublicEventShareMetaData = {
+    eventId: string;
+    xTenantId?: (string | null);
+};
+
+export type EventsGetPublicEventShareMetaResponse = (EventShareMeta);
 
 export type EventsPublicCalendarIcsData = {
     popupId: string;
