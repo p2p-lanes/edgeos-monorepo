@@ -784,8 +784,11 @@ export type BaseFieldConfigUpdate = {
 /**
  * The 'report a bug' payload, open to every backoffice user.
  *
- * Always produces an internal bug in the to-do column. Attachments are
- * optional screenshots / screen-recordings already uploaded to S3.
+ * Produces a to-do task in the reporter's tenant scope. The reporter can
+ * classify it (type / priority / which app it relates to); type defaults to
+ * ``bug`` so the plain "report a bug" flow keeps working unchanged.
+ * Attachments are optional screenshots / screen-recordings already uploaded
+ * to S3.
  */
 export type BugReportCreate = {
     title: string;

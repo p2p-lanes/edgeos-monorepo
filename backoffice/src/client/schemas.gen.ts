@@ -3547,6 +3547,24 @@ export const BugReportCreateSchema = {
             ],
             title: 'Detail'
         },
+        type: {
+            '$ref': '#/components/schemas/TaskType',
+            default: 'bug'
+        },
+        priority: {
+            '$ref': '#/components/schemas/TaskPriority',
+            default: 'medium'
+        },
+        app: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/TaskApp'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
         attachments: {
             items: {
                 '$ref': '#/components/schemas/TaskAttachmentCreate'
@@ -3560,8 +3578,11 @@ export const BugReportCreateSchema = {
     title: 'BugReportCreate',
     description: `The 'report a bug' payload, open to every backoffice user.
 
-Always produces an internal bug in the to-do column. Attachments are
-optional screenshots / screen-recordings already uploaded to S3.`
+Produces a to-do task in the reporter's tenant scope. The reporter can
+classify it (type / priority / which app it relates to); type defaults to
+\`\`bug\`\` so the plain "report a bug" flow keeps working unchanged.
+Attachments are optional screenshots / screen-recordings already uploaded
+to S3.`
 } as const;
 
 export const BuyerInfoSchema = {

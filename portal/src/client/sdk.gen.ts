@@ -6624,11 +6624,12 @@ export class TasksService {
      * Report Bug
      * File a bug report (any authenticated backoffice user).
      *
-     * Creates a to-do bug attributed to the reporter, scoped to the reporter's
+     * Creates a to-do task attributed to the reporter, scoped to the reporter's
      * tenant (``visibility='tenant'``) so that tenant's users can see it. A
-     * superadmin reporter (no tenant) falls back to an ``internal`` bug. Optional
-     * attachments are screenshots / screen-recordings already uploaded to S3 via
-     * POST /uploads/presigned-url.
+     * superadmin reporter (no tenant) falls back to an ``internal`` task. The
+     * reporter classifies it via ``type`` (defaults to ``bug``), ``priority``
+     * and ``app``. Optional attachments are screenshots / screen-recordings
+     * already uploaded to S3 via POST /uploads/presigned-url.
      * @param data The data for the request.
      * @param data.requestBody
      * @returns TaskPublic Successful Response
