@@ -1,5 +1,6 @@
 "use client"
 
+import { MarkdownContent } from "@edgeos/shared-form-ui"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import {
   AlertTriangle,
@@ -924,9 +925,10 @@ export default function EventDetailPage() {
           <h2 className="text-sm font-semibold mb-2">
             {t("events.detail.description_heading")}
           </h2>
-          <p className="text-sm text-muted-foreground whitespace-pre-wrap break-words">
-            {event.content}
-          </p>
+          <MarkdownContent
+            source={event.content}
+            className="text-muted-foreground break-words"
+          />
         </div>
       )}
 

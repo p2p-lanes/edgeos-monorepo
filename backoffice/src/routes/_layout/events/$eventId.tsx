@@ -1,3 +1,4 @@
+import { MarkdownContent } from "@edgeos/shared-form-ui"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { createFileRoute, useNavigate } from "@tanstack/react-router"
 import {
@@ -338,9 +339,10 @@ function EventViewContent() {
         {event.content && (
           <div className="rounded-xl border bg-card p-4">
             <h2 className="mb-2 text-sm font-semibold">Description</h2>
-            <p className="whitespace-pre-wrap break-words text-sm text-muted-foreground">
-              {event.content}
-            </p>
+            <MarkdownContent
+              source={event.content}
+              className="break-words text-muted-foreground"
+            />
           </div>
         )}
 

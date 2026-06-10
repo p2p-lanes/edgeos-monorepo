@@ -1,3 +1,4 @@
+import { MarkdownContent } from "@edgeos/shared-form-ui"
 import { useQuery, useSuspenseQuery } from "@tanstack/react-query"
 import { createFileRoute, useNavigate } from "@tanstack/react-router"
 import { CalendarX, Tag, Users } from "lucide-react"
@@ -200,9 +201,10 @@ function VenueScheduleContent({ venueId }: { venueId: string }) {
                 </div>
               )}
               {activeEvent.content && (
-                <p className="whitespace-pre-wrap text-muted-foreground">
-                  {activeEvent.content}
-                </p>
+                <MarkdownContent
+                  source={activeEvent.content}
+                  className="text-muted-foreground"
+                />
               )}
             </div>
           )}

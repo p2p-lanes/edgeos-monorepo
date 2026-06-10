@@ -1,5 +1,6 @@
 "use client"
 
+import { MarkdownEditor } from "@edgeos/shared-form-ui"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import {
   ArrowLeft,
@@ -34,7 +35,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Textarea } from "@/components/ui/textarea"
 import { useCityProvider } from "@/providers/cityProvider"
 import { CollaboratorsField } from "../components/CollaboratorsField"
 import { EventScheduleFields } from "../components/EventScheduleFields"
@@ -566,12 +566,11 @@ function NewPortalEventForm({
         {/* Description */}
         <div className="space-y-2">
           <Label htmlFor="content">{t("events.form.description_label")}</Label>
-          <Textarea
+          <MarkdownEditor
             id="content"
             value={content}
-            onChange={(e) => setContent(e.target.value)}
+            onChange={setContent}
             placeholder={t("events.form.description_placeholder")}
-            rows={4}
           />
         </div>
 
