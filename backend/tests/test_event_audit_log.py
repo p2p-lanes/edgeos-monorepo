@@ -18,8 +18,21 @@ from fastapi.testclient import TestClient
 from sqlmodel import Session, col, select
 
 from app.api.audit_log.models import AuditLog
+from app.api.human.models import Humans
 from app.api.popup.models import Popups
 from app.api.tenant.models import Tenants
+
+
+def _make_human(db: Session, tenant: Tenants) -> Humans:
+    h = Humans(
+        tenant_id=tenant.id,
+        email=f"collab-{uuid.uuid4().hex[:8]}@test.com",
+        first_name="Collab",
+    )
+    db.add(h)
+    db.commit()
+    db.refresh(h)
+    return h
 
 
 def _auth(token: str) -> dict[str, str]:
@@ -129,3 +142,55 @@ class TestBackofficeAuditTrail:
         # The audit row carries the title snapshot even though the event is gone.
         assert deleted.entity_label == "Audited Launch v2"
         assert deleted.entity_id == event_id
+
+
+class TestAuditWithCollaborators:
+    """Regression: deleting an event with collaborators must not crash.
+
+    ``collaborator_ids`` is a ``list[UUID]``; the audit snapshot has to coerce
+    each element to a string, otherwise the JSONB write raises "Object of type
+    UUID is not JSON serializable" on flush (observed in production).
+    """
+
+    def test_delete_event_with_collaborators_is_audited(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+        admin_token_tenant_a: str,
+    ) -> None:
+        popup = _make_popup(db, tenant_a)
+        start = datetime.now(UTC) + timedelta(days=21)
+        collab_a = _make_human(db, tenant_a)
+        collab_b = _make_human(db, tenant_a)
+
+        create = client.post(
+            "/api/v1/events",
+            headers=_auth(admin_token_tenant_a),
+            json={
+                "popup_id": str(popup.id),
+                "title": "Event with collaborators",
+                "start_time": start.isoformat(),
+                "end_time": (start + timedelta(hours=1)).isoformat(),
+                "visibility": "public",
+                "collaborator_ids": [str(collab_a.id), str(collab_b.id)],
+            },
+        )
+        assert create.status_code == 201, create.text
+        event_id = uuid.UUID(create.json()["id"])
+
+        # The crash happened here: staging the delete audit row flushed a
+        # snapshot whose collaborator_ids were raw UUIDs.
+        delete = client.delete(
+            f"/api/v1/events/{event_id}",
+            headers=_auth(admin_token_tenant_a),
+        )
+        assert delete.status_code == 204, delete.text
+
+        rows = _audit_rows(db, event_id)
+        deleted = rows[-1]
+        assert deleted.action == "event.deleted"
+        snapshot_ids = deleted.details["snapshot"]["collaborator_ids"]
+        # Stored as JSON strings, not raw UUID objects.
+        assert set(snapshot_ids) == {str(collab_a.id), str(collab_b.id)}
+        assert all(isinstance(cid, str) for cid in snapshot_ids)
