@@ -1028,6 +1028,7 @@ async def list_events(
     _: AdminOrApiKey_EventsRead,
     popup_id: uuid.UUID | None = None,
     event_status: EventStatus | None = None,
+    visibility: EventVisibility | None = None,
     kind: str | None = None,
     venue_id: uuid.UUID | None = None,
     location_kind: str | None = None,
@@ -1045,6 +1046,8 @@ async def list_events(
     - ``"custom"``  → events with a ``custom_location_name`` set.
     - ``"meeting"`` → online-only events (no venue, no custom location).
 
+    ``visibility`` narrows to a single visibility (public | unlisted | private).
+
     ``owner_id`` filters to events created by a specific host (the Human
     referenced by ``Events.owner_id``).
     """
@@ -1055,6 +1058,7 @@ async def list_events(
             skip=skip,
             limit=limit,
             event_status=event_status,
+            visibility=visibility,
             kind=kind,
             venue_id=venue_id,
             location_kind=location_kind,
