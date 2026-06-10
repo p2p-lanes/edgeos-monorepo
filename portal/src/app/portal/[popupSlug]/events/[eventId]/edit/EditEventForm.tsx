@@ -1,5 +1,6 @@
 "use client"
 
+import { utcToLocalTzNaive } from "@edgeos/shared-events"
 import { MarkdownEditor } from "@edgeos/shared-form-ui"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useRouter } from "next/navigation"
@@ -21,6 +22,7 @@ import { Label } from "@/components/ui/label"
 import { CollaboratorsField } from "../../components/CollaboratorsField"
 import { EventScheduleFields } from "../../components/EventScheduleFields"
 import { HostDisplayField } from "../../components/HostDisplayField"
+import { VenueDayScheduleDialog } from "../../components/VenueDayScheduleDialog"
 import { VisibilityHint } from "../../components/VisibilityHint"
 import {
   formatDateKeyInTz,
@@ -196,6 +198,16 @@ export function EditEventForm({
     (!form.customLocationName.trim() || !form.customLocationUrl.trim())
   const meetingUrlMissing = isMeeting && !form.meetingUrl.trim()
 
+  // Show the day-schedule preview only when a real venue (not the custom-
+  // location / meeting sentinels) and a day are selected.
+  const showSchedule = !!form.venueId && !isCustomLocation && !!dateStr
+
+  // Clicking a free slot in the preview sets the start time. Convert the UTC
+  // instant to the display-tz "HH:mm" wall-clock the time field expects.
+  const handlePickScheduleTime = (isoUtc: string) => {
+    setTimeStr(utcToLocalTzNaive(isoUtc, displayTz).slice(11, 16))
+  }
+
   const canSubmit =
     !!form.title.trim() &&
     !!startIso &&
@@ -280,6 +292,17 @@ export function EditEventForm({
           onSuggestionPick={setTimeStr}
           disabled={venueDisabled}
         />
+
+        {showSchedule && (
+          <VenueDayScheduleDialog
+            availability={availabilityData}
+            timezone={displayTz}
+            dayKey={dateStr}
+            proposedStartIso={startIso || null}
+            proposedEndIso={endIso || null}
+            onPickTime={handlePickScheduleTime}
+          />
+        )}
 
         <VisibilityField
           value={form.visibility}

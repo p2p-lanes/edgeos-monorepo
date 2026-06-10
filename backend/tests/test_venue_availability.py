@@ -455,3 +455,112 @@ class TestVenueAvailability:
         )
 
         assert status_code == 400
+
+
+class TestComputeAvailabilityRedaction:
+    """Privacy behaviour of ``_compute_availability`` (the portal endpoint
+    passes ``redact_private=True`` + the viewer's human id).
+
+    A private event owned by another human must lose its title on the portal
+    while staying visible as occupied; the backoffice (defaults) keeps the
+    title; and a manager's own private event keeps its title even on the
+    portal.
+    """
+
+    def _make_event(
+        self,
+        db: Session,
+        tenant: Tenants,
+        popup: Popups,
+        venue: EventVenues,
+        *,
+        owner_id: uuid.UUID,
+        visibility: EventVisibility,
+        title: str,
+    ) -> Events:
+        ev = Events(
+            tenant_id=tenant.id,
+            popup_id=popup.id,
+            venue_id=venue.id,
+            owner_id=owner_id,
+            title=title,
+            start_time=datetime(2026, 4, 13, 12, 0, tzinfo=UTC),
+            end_time=datetime(2026, 4, 13, 13, 0, tzinfo=UTC),
+            timezone="UTC",
+            visibility=visibility,
+            status=EventStatus.PUBLISHED,
+        )
+        db.add(ev)
+        db.commit()
+        db.refresh(ev)
+        return ev
+
+    def test_private_event_redaction_matrix(
+        self,
+        db: Session,
+        tenant_a: Tenants,
+    ) -> None:
+        from app.api.event_venue.router import _compute_availability
+
+        popup = _make_popup(db, tenant_a, tz="UTC")
+        venue = _make_venue(db, tenant_a, popup)
+        owner = uuid.uuid4()
+        other = uuid.uuid4()
+        self._make_event(
+            db,
+            tenant_a,
+            popup,
+            venue,
+            owner_id=owner,
+            visibility=EventVisibility.PRIVATE,
+            title="Secret Standup",
+        )
+
+        start = datetime(2026, 4, 13, 0, 0, tzinfo=UTC)
+        end = datetime(2026, 4, 14, 0, 0, tzinfo=UTC)
+
+        # Portal view, non-manager: title redacted, slot still visible.
+        portal = _compute_availability(
+            db, venue, start, end, redact_private=True, viewer_human_id=other
+        )
+        assert len(portal.busy) == 1
+        assert portal.busy[0].label is None
+        assert portal.busy[0].visibility == "private"
+
+        # Backoffice defaults: title preserved.
+        backoffice = _compute_availability(db, venue, start, end)
+        assert backoffice.busy[0].label == "Secret Standup"
+        assert backoffice.busy[0].visibility == "private"
+
+        # Portal view, manager (owner): own private event keeps its title.
+        as_owner = _compute_availability(
+            db, venue, start, end, redact_private=True, viewer_human_id=owner
+        )
+        assert as_owner.busy[0].label == "Secret Standup"
+
+    def test_public_event_never_redacted_on_portal(
+        self,
+        db: Session,
+        tenant_a: Tenants,
+    ) -> None:
+        from app.api.event_venue.router import _compute_availability
+
+        popup = _make_popup(db, tenant_a, tz="UTC")
+        venue = _make_venue(db, tenant_a, popup)
+        self._make_event(
+            db,
+            tenant_a,
+            popup,
+            venue,
+            owner_id=uuid.uuid4(),
+            visibility=EventVisibility.PUBLIC,
+            title="Open Mic",
+        )
+
+        start = datetime(2026, 4, 13, 0, 0, tzinfo=UTC)
+        end = datetime(2026, 4, 14, 0, 0, tzinfo=UTC)
+        portal = _compute_availability(
+            db, venue, start, end, redact_private=True, viewer_human_id=uuid.uuid4()
+        )
+        assert portal.busy[0].label == "Open Mic"
+        assert portal.busy[0].visibility == "public"

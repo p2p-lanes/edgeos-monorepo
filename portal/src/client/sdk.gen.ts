@@ -4439,6 +4439,9 @@ export class EventVenuesService {
      * Get Portal Availability
      * Portal-side availability query — same shape as the backoffice one,
      * used by the event-creation form to show open/busy slots per day.
+     *
+     * Redacts other humans' private/unlisted event titles to keep the slot
+     * visible as occupied without leaking what it is.
      * @param data The data for the request.
      * @param data.venueId
      * @param data.start
