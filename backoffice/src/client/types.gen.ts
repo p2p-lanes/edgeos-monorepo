@@ -3714,6 +3714,7 @@ export type VenueBusySlot = {
     end: string;
     source: string;
     label?: (string | null);
+    visibility?: (string | null);
     event_id?: (string | null);
     event_start?: (string | null);
     event_end?: (string | null);

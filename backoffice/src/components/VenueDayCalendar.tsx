@@ -9,6 +9,12 @@ import {
   type VenueBusySlot,
   type VenueOpenRange,
 } from "@/client"
+import {
+  computeClosedBlocks,
+  DAY_MINUTES,
+  HOUR_HEIGHT,
+  slotToBlocks,
+} from "@/components/events/venueDayLayout"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 
@@ -22,8 +28,6 @@ import { cn } from "@/lib/utils"
  * viewport; the hour-labels column stays sticky on the left.
  */
 
-const HOUR_HEIGHT = 44
-const DAY_MINUTES = 24 * 60
 const VENUE_COL_MIN = 160 // px — keeps names readable; below this cols feel squashed
 
 function tzToday(tz: string): Date {
@@ -43,154 +47,6 @@ function addDays(d: Date, n: number): Date {
   return new Date(
     Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + n),
   )
-}
-
-function toLocalDayMinutes(
-  iso: string,
-  tz: string,
-): { dayKey: string; minutes: number } | null {
-  try {
-    const d = new Date(iso)
-    const parts = new Intl.DateTimeFormat("en-CA", {
-      timeZone: tz,
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-    }).formatToParts(d)
-    const get = (t: string) =>
-      Number(parts.find((p) => p.type === t)?.value ?? "0")
-    const dayKey = `${get("year")}-${String(get("month")).padStart(2, "0")}-${String(get("day")).padStart(2, "0")}`
-    const minutes = get("hour") * 60 + get("minute")
-    return { dayKey, minutes }
-  } catch {
-    return null
-  }
-}
-
-type PositionedBlock = {
-  key: string
-  dayKey: string
-  top: number
-  height: number
-  label: string
-  source: "event" | "exception" | string
-  eventId?: string | null
-  setupMinutes?: number
-  teardownMinutes?: number
-  highlighted?: boolean
-}
-
-function slotToBlocks(
-  slot: {
-    start: string
-    end: string
-    source: string
-    label?: string | null
-    event_id?: string | null
-    event_start?: string | null
-    event_end?: string | null
-    highlighted?: boolean
-  },
-  tz: string,
-  idx: number,
-): PositionedBlock[] {
-  const start = toLocalDayMinutes(slot.start, tz)
-  const end = toLocalDayMinutes(slot.end, tz)
-  if (!start || !end) return []
-
-  let setupMinutes = 0
-  let teardownMinutes = 0
-  if (slot.event_start && slot.event_end) {
-    const evStart = new Date(slot.event_start).getTime()
-    const evEnd = new Date(slot.event_end).getTime()
-    const blockStart = new Date(slot.start).getTime()
-    const blockEnd = new Date(slot.end).getTime()
-    setupMinutes = Math.max(0, Math.round((evStart - blockStart) / 60000))
-    teardownMinutes = Math.max(0, Math.round((blockEnd - evEnd) / 60000))
-  }
-
-  const sameDay = start.dayKey === end.dayKey
-  if (sameDay) {
-    return [
-      {
-        key: `${slot.source}-${idx}`,
-        dayKey: start.dayKey,
-        top: (start.minutes / 60) * HOUR_HEIGHT,
-        height: Math.max(
-          ((end.minutes - start.minutes) / 60) * HOUR_HEIGHT,
-          HOUR_HEIGHT / 4,
-        ),
-        label: slot.label ?? "",
-        source: slot.source,
-        eventId: slot.event_id ?? null,
-        setupMinutes,
-        teardownMinutes,
-        highlighted: slot.highlighted ?? false,
-      },
-    ]
-  }
-
-  return [
-    {
-      key: `${slot.source}-${idx}-a`,
-      dayKey: start.dayKey,
-      top: (start.minutes / 60) * HOUR_HEIGHT,
-      height: ((DAY_MINUTES - start.minutes) / 60) * HOUR_HEIGHT,
-      label: slot.label ?? "",
-      source: slot.source,
-    },
-    {
-      key: `${slot.source}-${idx}-b`,
-      dayKey: end.dayKey,
-      top: 0,
-      height: (end.minutes / 60) * HOUR_HEIGHT,
-      label: slot.label ?? "",
-      source: slot.source,
-    },
-  ]
-}
-
-/**
- * Closed bands = complement of open ranges within a full 24h day.
- * Mirrors the helper in VenueWeekCalendar so both calendars apply the
- * same rule.
- */
-function computeClosedBlocks(
-  openBlocks: PositionedBlock[],
-  dayKey: string,
-): PositionedBlock[] {
-  const dayHeight = 24 * HOUR_HEIGHT
-  const sorted = [...openBlocks].sort((a, b) => a.top - b.top)
-  const closed: PositionedBlock[] = []
-  let cursor = 0
-  let i = 0
-  for (const o of sorted) {
-    if (o.top > cursor) {
-      closed.push({
-        key: `closed-${dayKey}-${i++}`,
-        dayKey,
-        top: cursor,
-        height: o.top - cursor,
-        label: "",
-        source: "closed",
-      })
-    }
-    cursor = Math.max(cursor, o.top + o.height)
-  }
-  if (cursor < dayHeight) {
-    closed.push({
-      key: `closed-${dayKey}-${i++}`,
-      dayKey,
-      top: cursor,
-      height: dayHeight - cursor,
-      label: "",
-      source: "closed",
-    })
-  }
-  return closed
 }
 
 function formatDayHeader(date: Date): string {

@@ -75,6 +75,7 @@ import {
   type RepeatState,
 } from "./EventForm/RepeatPicker"
 import { StartTimeCombobox } from "./EventForm/StartTimeCombobox"
+import { VenueDayScheduleDialog } from "./EventForm/VenueDayScheduleDialog"
 import { VenueDetailsDialog } from "./EventForm/VenueDetailsDialog"
 
 interface EventFormProps {
@@ -881,6 +882,20 @@ export function EventForm({
       ? { status: "unavailable", reason: fitnessIssue }
       : availability
 
+  // Show the day-schedule preview only when a real venue is selected (a UUID,
+  // not the "custom location" / "none" sentinels) and we have a day to render.
+  const showSchedule = !!venueIdValue && !!dateStr
+
+  // Clicking a free slot in the schedule preview sets the form's start time.
+  // The form stores naive wall-clock in the popup TZ, so convert the UTC
+  // instant the column hands back the same way every other start setter does.
+  const handlePickScheduleTime = (isoUtc: string) => {
+    form.setFieldValue(
+      "start_time",
+      utcToLocalTzNaive(isoUtc, timezoneValue || popupTz || "UTC"),
+    )
+  }
+
   // When picking a venue (create mode), snap start_time into one of the
   // venue's open slots. Without this, the form keeps whatever default time
   // it had before the venue was chosen — often outside the venue's hours,
@@ -1227,14 +1242,26 @@ export function EventForm({
                 </p>
                 <VenueHoursSummary hours={selectedVenue.weekly_hours} />
               </div>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setVenueDialogOpen(true)}
-              >
-                View details
-              </Button>
+              <div className="flex shrink-0 flex-col items-end gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setVenueDialogOpen(true)}
+                >
+                  View details
+                </Button>
+                {showSchedule && (
+                  <VenueDayScheduleDialog
+                    availability={dayAvailability}
+                    timezone={popupTz}
+                    dayKey={dateStr}
+                    proposedStartIso={startUtc?.toISOString() ?? null}
+                    proposedEndIso={endTimeIso || null}
+                    onPickTime={readOnly ? undefined : handlePickScheduleTime}
+                  />
+                )}
+              </div>
             </div>
 
             {selectedVenue.photos && selectedVenue.photos.length > 0 && (

@@ -18270,6 +18270,17 @@ export const VenueBusySlotSchema = {
             ],
             title: 'Label'
         },
+        visibility: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Visibility'
+        },
         event_id: {
             anyOf: [
                 {
