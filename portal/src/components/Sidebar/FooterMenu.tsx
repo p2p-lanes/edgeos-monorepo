@@ -10,7 +10,7 @@ import {
 } from "./SidebarComponents"
 
 const REPO_URL_SUFFIX = "p2p-lanes/edgeos-monorepo"
-const REPO_URL        = "https://github.com/" + REPO_URL_SUFFIX
+const REPO_URL = "https://github.com/" + REPO_URL_SUFFIX
 
 async function getGitHubStars() {
   try {
