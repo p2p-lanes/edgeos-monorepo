@@ -55,6 +55,30 @@ function groupByDate(
   return Object.entries(groups).sort(([a], [b]) => a.localeCompare(b))
 }
 
+/**
+ * Pick the day-header to scroll to after the user collapses `collapsedDate`:
+ * the first still-open day after it (in render order), or — when no open day
+ * follows — the collapsed day itself, so its own header pins to the top
+ * instead of leaving the viewport stranded in the gap the events left behind.
+ * Returns null only when `collapsedDate` isn't in `orderedDays` (defensive;
+ * the caller then skips scrolling).
+ *
+ * `collapsedDays` is the set BEFORE `collapsedDate` is added; days after it are
+ * unaffected by this toggle, so their membership reflects their open state.
+ */
+export function nextOpenDayTarget(
+  collapsedDate: string,
+  orderedDays: string[],
+  collapsedDays: Set<string>,
+): string | null {
+  const startIdx = orderedDays.indexOf(collapsedDate)
+  if (startIdx === -1) return null
+  return (
+    orderedDays.slice(startIdx + 1).find((d) => !collapsedDays.has(d)) ??
+    collapsedDate
+  )
+}
+
 interface ListBodyProps {
   events: EventPublic[]
   slug: string | undefined
