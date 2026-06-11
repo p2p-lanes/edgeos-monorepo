@@ -27,6 +27,7 @@ import {
   type EventsViewSnapshot,
   saveEventsViewState,
 } from "./lib/eventsViewState"
+import { fetchAllPortalEvents } from "./lib/fetchAllPortalEvents"
 import { ListBody } from "./lib/ListBody"
 import { eventListWindowForPopup } from "./lib/listWindow"
 import { SubscribeCalendarButton } from "./lib/SubscribeCalendarButton"
@@ -378,8 +379,10 @@ export default function EventsPage() {
       listWindow.startAfter,
       listWindow.startBefore,
     ],
-    queryFn: () =>
-      EventsService.listPortalEvents({
+    // fetchAllPortalEvents pages through every row — a single capped request
+    // silently truncates once the window holds more DB rows than the cap.
+    queryFn: async () => ({
+      results: await fetchAllPortalEvents({
         popupId: city!.id,
         search: search || undefined,
         eventStatus: "published",
@@ -388,8 +391,8 @@ export default function EventsPage() {
         trackIds: selectedTrackIds.length ? selectedTrackIds : undefined,
         startAfter: listWindow.startAfter,
         startBefore: listWindow.startBefore,
-        limit: 200,
       }),
+    }),
     enabled: !!city?.id && moduleEnabled && view === "list" && useAllChannel,
   })
 
@@ -405,8 +408,8 @@ export default function EventsPage() {
       listWindow.startAfter,
       listWindow.startBefore,
     ],
-    queryFn: () =>
-      EventsService.listPortalEvents({
+    queryFn: async () => ({
+      results: await fetchAllPortalEvents({
         popupId: city!.id,
         search: search || undefined,
         // No status filter: include my drafts / pending / rejected.
@@ -420,8 +423,8 @@ export default function EventsPage() {
         trackIds: selectedTrackIds.length ? selectedTrackIds : undefined,
         startAfter: listWindow.startAfter,
         startBefore: listWindow.startBefore,
-        limit: 200,
       }),
+    }),
     enabled: !!city?.id && moduleEnabled && view === "list" && useMineChannel,
   })
 
@@ -437,8 +440,8 @@ export default function EventsPage() {
       listWindow.startAfter,
       listWindow.startBefore,
     ],
-    queryFn: () =>
-      EventsService.listPortalEvents({
+    queryFn: async () => ({
+      results: await fetchAllPortalEvents({
         popupId: city!.id,
         search: search || undefined,
         eventStatus: "published",
@@ -448,8 +451,8 @@ export default function EventsPage() {
         trackIds: selectedTrackIds.length ? selectedTrackIds : undefined,
         startAfter: listWindow.startAfter,
         startBefore: listWindow.startBefore,
-        limit: 200,
       }),
+    }),
     enabled: !!city?.id && moduleEnabled && view === "list" && useRsvpedChannel,
   })
 

@@ -41,6 +41,7 @@ def _event(
     visibility: EventVisibility,
     status: EventStatus = EventStatus.PUBLISHED,
     rrule: str | None = None,
+    recurrence_exdates: list[str] | None = None,
 ) -> Events:
     start = datetime.now(UTC) + timedelta(days=3)
     event = Events(
@@ -54,6 +55,7 @@ def _event(
         visibility=visibility,
         status=status,
         rrule=rrule,
+        recurrence_exdates=recurrence_exdates or [],
     )
     db.add(event)
     db.commit()
@@ -99,6 +101,27 @@ def test_feed_emits_rrule_for_recurring(client, db: Session, tenant_a: Tenants):
     r = client.get(f"/api/v1/events/public/calendar.ics?popup_id={popup.id}")
     assert r.status_code == 200
     assert "RRULE:FREQ=WEEKLY;BYDAY=MO" in r.text
+
+
+def test_feed_emits_exdates_for_recurring(client, db: Session, tenant_a: Tenants):
+    """recurrence_exdates is a JSONB array of ISO strings; the feed must
+    stamp them as RFC-5545 UTC values instead of crashing (regression)."""
+    popup = _popup(db, tenant_a)
+    _event(
+        db,
+        tenant_a,
+        popup,
+        title="Weekly with skips",
+        visibility=EventVisibility.PUBLIC,
+        rrule="FREQ=WEEKLY;BYDAY=MO",
+        recurrence_exdates=[
+            "2026-06-15T19:00:00+00:00",
+            "2026-06-22T19:00:00Z",
+        ],
+    )
+    r = client.get(f"/api/v1/events/public/calendar.ics?popup_id={popup.id}")
+    assert r.status_code == 200
+    assert "EXDATE:20260615T190000Z,20260622T190000Z" in r.text
 
 
 def test_feed_404_for_unknown_popup(client):
