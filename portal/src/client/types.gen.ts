@@ -2457,6 +2457,7 @@ export type PaymentPublic = {
     external_id?: (string | null);
     status?: string;
     amount?: string;
+    amount_charged?: (string | null);
     insurance_amount?: string;
     contribution_amount?: string;
     currency?: string;

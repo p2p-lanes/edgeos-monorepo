@@ -18,6 +18,7 @@ from app.api.payment.schemas import (
     PaymentUpdate,
     SimpleFIInstallmentPlanPayload,
     SimpleFIPaymentInfo,
+    SimpleFIPaymentRequest,
     SimpleFIWebhookPayload,
 )
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
@@ -87,6 +88,34 @@ def _extract_settlement_details(
                 break
 
     return settlement_currency, settlement_rate, source
+
+
+def _extract_charged_amount(payment_request: SimpleFIPaymentRequest) -> Decimal:
+    """Total the buyer was actually charged, in the request's fiat currency.
+
+    SimpleFi merchants can configure signed per-rail price adjustments, so this
+    can differ from the quoted Payment.amount. Card payments carry the adjusted
+    fiat total in card_payment.price_details.final_amount; the request's legacy
+    `amount` scalar mirrors the crypto-rail adjusted total. `amount_paid` is NOT
+    usable for card checkouts — SimpleFi normalizes the discount back out of it.
+    """
+    card_payment = payment_request.card_payment
+    if card_payment is not None and card_payment.price_details is not None:
+        return Decimal(str(card_payment.price_details.final_amount))
+    return Decimal(str(payment_request.amount))
+
+
+def _installment_charged_amount(payment_request: SimpleFIPaymentRequest) -> Decimal:
+    """Charged amount for a single installment's payment request.
+
+    Card checkout installments carry the adjusted total in card_payment.price_details;
+    subscription installments (Stripe / Mercado Pago) and crypto installments report
+    the actually-debited amount directly in `amount_paid`.
+    """
+    card_payment = payment_request.card_payment
+    if card_payment is not None and card_payment.price_details is not None:
+        return Decimal(str(card_payment.price_details.final_amount))
+    return Decimal(str(payment_request.amount_paid))
 
 
 def _build_payment_email_products(payment: Payments) -> list[PaymentProductItem]:
@@ -889,6 +918,9 @@ async def _handle_regular_payment(
     if payment_request_status == "approved":
         from app.api.payment.schemas import PaymentType
 
+        # Recorded before approval so it lands in the same commit.
+        payment.amount_charged = _extract_charged_amount(payload.data.payment_request)
+
         if payment.payment_type == PaymentType.APPLICATION_FEE.value:
             await _handle_fee_payment_approved(
                 db,
@@ -1155,6 +1187,13 @@ async def _handle_installment_payment(
     )
     db.add(installment)
 
+    # Accumulate the fiat total actually charged across installments. Uses the
+    # payment request's charged amount, not the raw installment row amount —
+    # the row may be denominated in the paying coin rather than fiat.
+    payment.amount_charged = (
+        payment.amount_charged or Decimal("0")
+    ) + _installment_charged_amount(payment_request)
+
     # First installment: approve payment to assign products
     is_first_installment = (payment.installments_paid or 0) == 0
     if is_first_installment and payment.status != "approved":
@@ -1290,6 +1329,17 @@ async def _handle_installment_plan_activated(
         )
 
     payment.installments_total = new_total
+
+    # SimpleFi creates a "plan" even when the buyer picks pay-in-full
+    # (number_of_installments = 1). Normalize the flag so data consumers
+    # don't need a single-installment special case.
+    if new_total == 1 and payment.is_installment_plan:
+        payment.is_installment_plan = False
+        logger.info(
+            "Payment {}: single-installment plan — is_installment_plan normalized to False",
+            payment.id,
+        )
+
     db.commit()
 
     logger.info(

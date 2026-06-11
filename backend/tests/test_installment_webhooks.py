@@ -389,3 +389,60 @@ def test_activated_first_time_writes_total(monkeypatch) -> None:
     )
     assert payment.installments_total == 3
     assert db.committed == 1
+
+
+def test_activated_single_installment_normalizes_flag(monkeypatch) -> None:
+    """A pay-in-full activation (number_of_installments=1) is not really an
+    installment plan — the flag must be normalized to False so data consumers
+    don't need a single-installment special case."""
+    plan_id = "plan-act-payfull"
+    payment = SimpleNamespace(
+        id="payment-act-payfull",
+        external_id=plan_id,
+        installments_total=None,
+        is_installment_plan=True,
+    )
+
+    class FakePaymentsCRUD:
+        def get_by_external_id(self, _db, _ext_id):
+            return payment
+
+    monkeypatch.setattr(payment_router_module, "payments_crud", FakePaymentsCRUD())
+
+    db = FakeDBSession()
+    asyncio.run(
+        _handle_installment_plan_activated(
+            _make_activated_payload(plan_id, 1),
+            db,
+            FakeWebhookCache(),
+        )
+    )
+    assert payment.installments_total == 1
+    assert payment.is_installment_plan is False
+    assert db.committed == 1
+
+
+def test_activated_multi_installment_keeps_flag(monkeypatch) -> None:
+    plan_id = "plan-act-multi"
+    payment = SimpleNamespace(
+        id="payment-act-multi",
+        external_id=plan_id,
+        installments_total=None,
+        is_installment_plan=True,
+    )
+
+    class FakePaymentsCRUD:
+        def get_by_external_id(self, _db, _ext_id):
+            return payment
+
+    monkeypatch.setattr(payment_router_module, "payments_crud", FakePaymentsCRUD())
+
+    asyncio.run(
+        _handle_installment_plan_activated(
+            _make_activated_payload(plan_id, 6),
+            FakeDBSession(),
+            FakeWebhookCache(),
+        )
+    )
+    assert payment.installments_total == 6
+    assert payment.is_installment_plan is True

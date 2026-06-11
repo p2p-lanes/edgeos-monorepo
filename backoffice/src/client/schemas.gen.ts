@@ -11405,6 +11405,18 @@ export const PaymentPublicSchema = {
             title: 'Amount',
             default: '0'
         },
+        amount_charged: {
+            anyOf: [
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Amount Charged'
+        },
         insurance_amount: {
             type: 'string',
             pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$',
