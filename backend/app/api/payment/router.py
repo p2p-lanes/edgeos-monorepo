@@ -41,6 +41,7 @@ from app.services.email import (
     get_email_service,
 )
 from app.services.email_helpers import send_application_status_email
+from app.services.simplefi import get_simplefi_client, verify_webhook_signature
 
 if TYPE_CHECKING:
     from app.api.human.models import Humans
@@ -782,6 +783,83 @@ async def create_direct_payment_gone() -> None:
     )
 
 
+def _resolve_webhook_popup_secret(db: Session, raw_body: dict) -> str | None:
+    """Resolve the popup's SimpleFI API key (webhook secret) for an incoming payload.
+
+    Every webhook references a local payment via one of a few external ids
+    (the payment-request id, the installment-plan id, or a top-level
+    ``entity_id``). We look the payment up by whichever is present and return
+    its popup's ``simplefi_api_key`` so the body's HMAC signature can be
+    verified. Returns ``None`` when no matching payment/secret is found, in
+    which case signature verification is skipped (matching the existing
+    "no secret configured" behaviour of ``verify_webhook_signature``).
+    """
+    candidate_ids: list[str] = []
+    data = raw_body.get("data") or {}
+    payment_request = data.get("payment_request") or {}
+    for value in (
+        payment_request.get("installment_plan_id"),
+        payment_request.get("id"),
+        raw_body.get("entity_id"),
+    ):
+        if value and str(value) not in candidate_ids:
+            candidate_ids.append(str(value))
+
+    for external_id in candidate_ids:
+        payment = payments_crud.get_by_external_id(db, external_id)
+        if payment and payment.popup and payment.popup.simplefi_api_key:
+            return payment.popup.simplefi_api_key
+    return None
+
+
+def _confirm_simplefi_status(
+    payment: Payments,
+    payment_request_id: str,
+    *,
+    claimed_status: str,
+) -> str:
+    """Return the authoritative payment status, confirmed with SimpleFI.
+
+    The webhook payload is attacker-controllable, so before acting on a
+    high-value ``approved`` transition we re-fetch the real status from
+    SimpleFI server-side (authenticated with the popup's API key). If the
+    provider disagrees we trust the provider. If we cannot reach the provider
+    we fail closed for ``approved`` (raise so SimpleFI retries) and otherwise
+    fall back to the claimed status. When no API key is configured we cannot
+    confirm and return the claimed status unchanged.
+    """
+    from loguru import logger
+
+    popup = getattr(payment, "popup", None)
+    secret = getattr(popup, "simplefi_api_key", None) if popup else None
+    if not secret:
+        return claimed_status
+
+    client = get_simplefi_client(secret)
+    try:
+        authoritative = client.get_payment_request_status(payment_request_id)
+    except Exception as exc:  # pragma: no cover - network/dependency failure
+        logger.warning(
+            "Could not confirm SimpleFI status for {}: {}", payment_request_id, exc
+        )
+        if claimed_status == "approved":
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Could not confirm payment status with provider",
+            ) from exc
+        return claimed_status
+
+    if authoritative.status != claimed_status:
+        logger.warning(
+            "SimpleFI webhook claimed status={} but provider reports status={} "
+            "for payment_request_id={}; trusting provider",
+            claimed_status,
+            authoritative.status,
+            payment_request_id,
+        )
+    return authoritative.status
+
+
 @router.post("/webhook/simplefi", status_code=status.HTTP_200_OK)
 async def simplefi_webhook(
     request: Request,
@@ -793,11 +871,24 @@ async def simplefi_webhook(
     Routes by event_type to handle regular payments, installment payments,
     and installment plan lifecycle events.
     """
+    import json
+
     from loguru import logger
 
     from app.core.redis import webhook_cache
 
-    raw_body = await request.json()
+    # Read the raw bytes (needed for HMAC verification) and parse JSON from
+    # them — `request.json()` would re-read the body and give us no access to
+    # the exact bytes SimpleFI signed.
+    body_bytes = await request.body()
+    signature = request.headers.get("X-SimpleFI-Signature")
+    try:
+        raw_body = json.loads(body_bytes)
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid JSON body"
+        )
+
     event_type = raw_body.get("event_type")
     logger.info(
         "SimpleFI webhook received: event_type={} entity_type={} entity_id={}",
@@ -805,6 +896,25 @@ async def simplefi_webhook(
         raw_body.get("entity_type"),
         raw_body.get("entity_id"),
     )
+
+    # Authenticate the webhook before mutating any state. The signature is an
+    # HMAC-SHA256 of the raw body keyed on the popup's SimpleFI API key, so we
+    # resolve that secret via the payment this webhook references. A
+    # *present-but-invalid* signature is rejected outright; a missing signature
+    # is allowed through so we never break legitimate traffic if SimpleFI is not
+    # configured to sign — the approval paths additionally re-confirm status
+    # with SimpleFI server-side (see `_confirm_simplefi_status`).
+    if signature is not None:
+        secret = _resolve_webhook_popup_secret(db, raw_body)
+        if not verify_webhook_signature(body_bytes, signature, secret):
+            logger.warning(
+                "Rejecting SimpleFI webhook with invalid signature: event_type={}",
+                event_type,
+            )
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid webhook signature",
+            )
 
     if event_type == "installment_plan_completed":
         return await _handle_installment_plan_completed(raw_body, db, webhook_cache)
@@ -844,19 +954,13 @@ async def _handle_regular_payment(
 
     payment_request_id = payload.data.payment_request.id
     event_type = payload.event_type
-
-    fingerprint = f"simplefi:{payment_request_id}:{event_type}"
-    if not webhook_cache.add(fingerprint):
-        logger.info(
-            "Webhook already processed (fingerprint: %s). Skipping...", fingerprint
-        )
-        return {"message": "Webhook already processed"}
+    claimed_status = payload.data.payment_request.status
 
     logger.info(
         "SimpleFI regular payment webhook processing: payment_request_id=%s event_type=%s provider_status=%s",
         payment_request_id,
         event_type,
-        payload.data.payment_request.status,
+        claimed_status,
     )
 
     payment = payments_crud.get_by_external_id(db, payment_request_id)
@@ -867,7 +971,27 @@ async def _handle_regular_payment(
             detail="Payment not found",
         )
 
-    payment_request_status = payload.data.payment_request.status
+    # The payload is unauthenticated; for the high-value `approved` transition
+    # (which issues tickets + confirmation emails) confirm the status with
+    # SimpleFI server-side. Do this BEFORE consuming the idempotency
+    # fingerprint: _confirm_simplefi_status fails closed with 502 when the
+    # provider is unreachable, and SimpleFI retries that — but only if the
+    # fingerprint wasn't already burned. Other transitions trust the payload
+    # (signature-verified at the handler entry when SimpleFI signs).
+    if claimed_status == "approved":
+        payment_request_status = _confirm_simplefi_status(
+            payment, payment_request_id, claimed_status=claimed_status
+        )
+    else:
+        payment_request_status = claimed_status
+
+    # Idempotency: only consume the fingerprint once we're committed to acting.
+    fingerprint = f"simplefi:{payment_request_id}:{event_type}"
+    if not webhook_cache.add(fingerprint):
+        logger.info(
+            "Webhook already processed (fingerprint: %s). Skipping...", fingerprint
+        )
+        return {"message": "Webhook already processed"}
 
     logger.info(
         "SimpleFI payment matched local payment: payment_id={} external_id={} current_status={} provider_status={} payment_type={}",
