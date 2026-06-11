@@ -202,6 +202,8 @@
     },
     "to_pay": "Til greiðslu",
     "credit_label": "Inneign: {{amount}}",
+    "edit_mode_title": "Breytingarhamur",
+    "edit_mode_description": "Veldu keyptan passa til að fá inneign og veldu svo nýjan.",
     "cart": {
       "close_aria": "Loka körfu",
       "empty_title": "Karfan þín er tóm",
