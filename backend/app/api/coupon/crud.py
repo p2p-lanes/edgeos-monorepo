@@ -3,6 +3,7 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from fastapi import HTTPException, status
+from sqlalchemy import or_, update
 from sqlmodel import Session, col, select
 
 from app.api.coupon.models import Coupons
@@ -158,18 +159,57 @@ class CouponsCRUD(BaseCRUD[Coupons, CouponCreate, CouponUpdate]):
         return coupon
 
     def use_coupon(self, session: Session, coupon_id: uuid.UUID) -> Coupons:
-        """Increment the usage count of a coupon."""
-        coupon = self.get(session, coupon_id)
-        if not coupon:
+        """Atomically redeem a coupon, enforcing ``max_uses`` under concurrency.
+
+        Increments ``current_uses`` in a single conditional ``UPDATE`` guarded
+        by ``current_uses < max_uses``. The previous read-modify-write let two
+        concurrent checkouts both pass the earlier ``validate_coupon`` check and
+        both redeem a single-use coupon (and lost-update the counter). With the
+        conditional update, the row lock serialises the two writers and the
+        second one matches zero rows once the cap is reached.
+
+        Commits on success, mirroring the original behaviour: this releases the
+        coupon row lock immediately rather than holding it across the SimpleFI
+        network call that follows in some checkout flows (e.g. open-ticketing),
+        which would otherwise serialise every concurrent redemption of the same
+        code behind a multi-second provider request. On the exhausted/missing
+        path it raises WITHOUT committing, so any half-built payment flushed by
+        the caller is discarded on transaction teardown rather than persisted.
+
+        Raises 400 when the coupon is already exhausted, 404 when it is gone.
+        """
+        result = session.exec(
+            update(Coupons)
+            .where(
+                Coupons.id == coupon_id,
+                or_(
+                    col(Coupons.max_uses).is_(None),
+                    col(Coupons.current_uses) < col(Coupons.max_uses),
+                ),
+            )
+            .values(current_uses=col(Coupons.current_uses) + 1)
+        )
+
+        if result.rowcount == 0:
+            # No commit: leave the caller's transaction untouched so it can roll
+            # back cleanly when the redemption is rejected.
+            coupon = self.get(session, coupon_id)
+            if not coupon:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Coupon not found",
+                )
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Coupon not found",
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Coupon code has reached maximum uses",
             )
 
-        coupon.current_uses += 1
-        session.add(coupon)
         session.commit()
-        session.refresh(coupon)
+        coupon = self.get(session, coupon_id)
+        if coupon is not None:
+            # The increment was a Core UPDATE; sync the ORM instance so callers
+            # see the new current_uses.
+            session.refresh(coupon)
         return coupon
 
     def find_by_popup(
