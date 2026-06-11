@@ -280,6 +280,8 @@ export default function EventDetailPage() {
   const [cancelEventOpen, setCancelEventOpen] = useState(false)
   const [copied, setCopied] = useState(false)
   const [copyingEmails, setCopyingEmails] = useState(false)
+  // Whether the participants list is expanded to show everyone or truncated.
+  const [participantsExpanded, setParticipantsExpanded] = useState(false)
   const cancelEventMutation = useMutation({
     mutationFn: () =>
       EventsService.cancelPortalEvent({ eventId: params.eventId }),
@@ -1078,9 +1080,10 @@ export default function EventDetailPage() {
           </p>
         ) : (
           <div className="space-y-2">
-            {activeParticipants
-              .slice(0, 10)
-              .map((p: EventParticipantPublic) => {
+            {(participantsExpanded
+              ? activeParticipants
+              : activeParticipants.slice(0, 10)
+            ).map((p: EventParticipantPublic) => {
                 const name = [p.first_name, p.last_name]
                   .filter(Boolean)
                   .join(" ")
@@ -1109,11 +1112,18 @@ export default function EventDetailPage() {
                 )
               })}
             {activeParticipants.length > 10 && (
-              <p className="text-xs text-muted-foreground text-center">
-                {t("events.detail.participants_more", {
-                  count: activeParticipants.length - 10,
-                })}
-              </p>
+              <button
+                type="button"
+                aria-expanded={participantsExpanded}
+                onClick={() => setParticipantsExpanded((prev) => !prev)}
+                className="block w-full text-center text-xs text-muted-foreground hover:text-foreground hover:underline cursor-pointer transition-colors"
+              >
+                {participantsExpanded
+                  ? t("events.detail.participants_show_less")
+                  : t("events.detail.participants_more", {
+                      count: activeParticipants.length - 10,
+                    })}
+              </button>
             )}
           </div>
         )}

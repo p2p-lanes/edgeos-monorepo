@@ -645,6 +645,7 @@
       "participants_heading": "Participantes",
       "no_participants_yet": "Aún no hay participantes",
       "participants_more": "+{{count}} más",
+      "participants_show_less": "Mostrar menos",
       "unnamed_participant": "Sin nombre",
       "copy_attendee_emails": "Copiar emails de asistentes",
       "copy_attendee_emails_done": "Se copiaron {{count}} emails de asistentes",
