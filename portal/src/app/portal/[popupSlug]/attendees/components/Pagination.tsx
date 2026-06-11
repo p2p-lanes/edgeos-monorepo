@@ -21,6 +21,23 @@ import {
 // snappy while power users can pull more rows at once.
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100]
 
+/**
+ * 1-based inclusive range of rows shown on the current page, for a
+ * "Showing X–Y of Z" label. Returns {0, 0} when empty and clamps the upper
+ * bound so a short final page reads correctly (e.g. page 25 of 247 → 241–247).
+ */
+export function pageRange(
+  currentPage: number,
+  pageSize: number,
+  totalItems: number,
+): { from: number; to: number } {
+  if (totalItems === 0) return { from: 0, to: 0 }
+  return {
+    from: (currentPage - 1) * pageSize + 1,
+    to: Math.min(currentPage * pageSize, totalItems),
+  }
+}
+
 type PaginationControlsProps = {
   currentPage: number
   totalItems: number
@@ -40,8 +57,11 @@ const PaginationControls = ({
   const totalPages = Math.ceil(totalItems / pageSize)
 
   // 1-based range of the rows currently on screen, e.g. "11–20 of 247".
-  const rangeFrom = totalItems === 0 ? 0 : (currentPage - 1) * pageSize + 1
-  const rangeTo = Math.min(currentPage * pageSize, totalItems)
+  const { from: rangeFrom, to: rangeTo } = pageRange(
+    currentPage,
+    pageSize,
+    totalItems,
+  )
 
   // Generar array de páginas a mostrar
   const getPageNumbers = () => {
