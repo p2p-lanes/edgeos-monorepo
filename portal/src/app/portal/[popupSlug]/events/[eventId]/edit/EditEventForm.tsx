@@ -86,11 +86,10 @@ export function EditEventForm({
 
   const { data: settings } = usePortalEventSettings(popupId)
 
-  const { isDateOutsidePopupWindow, popupStartKey, popupWindowLabel } =
-    usePopupWindow({
-      startDate: cityStartDate,
-      endDate: cityEndDate,
-    })
+  const { isDateOutsidePopupWindow, popupWindowLabel } = usePopupWindow({
+    startDate: cityStartDate,
+    endDate: cityEndDate,
+  })
 
   const { data: tracksData } = useQuery({
     queryKey: ["portal-tracks", popupId],
@@ -140,6 +139,12 @@ export function EditEventForm({
     initialDurationMinutes: initialSchedule.initialDurationMinutes,
   })
 
+  const isCustomLocation = form.venueId === "__custom__"
+  const isMeeting = form.venueId === "__meeting__"
+  // The id of an actual venue — empty for the sentinel options (meeting /
+  // custom location).
+  const realVenueId = isCustomLocation || isMeeting ? "" : form.venueId
+
   const {
     venues,
     selectedVenue,
@@ -153,19 +158,17 @@ export function EditEventForm({
     effectiveBookingMode,
   } = useVenueAvailability({
     popupId,
-    venueId: form.venueId,
+    venueId: realVenueId,
     dateStr,
     displayTz,
     startIso,
     endIso,
     durationMinutes,
     excludeEventId: event.id,
-    isDateOutsidePopupWindow,
-    popupStartKey,
-    // Intentionally omit setDateStr/setTimeStr: on the edit form, changing the
-    // venue must keep the user's saved schedule. Availability is still
-    // re-checked against the new venue (conflict check, withinOpenHours,
-    // selectedDateIsClosed all key off venueId) and surfaced as warnings.
+    // Changing the venue keeps the user's saved schedule. Availability is
+    // still re-checked against the new venue (conflict check,
+    // withinOpenHours, selectedDateIsClosed all key off venueId) and
+    // surfaced as warnings.
   })
 
   const updateMutation = useMutation({
@@ -191,8 +194,6 @@ export function EditEventForm({
 
   const venueMaxCapacity = selectedVenue?.capacity ?? null
   const venueDisabled = selectedVenue?.booking_mode === "unbookable"
-  const isCustomLocation = form.venueId === "__custom__"
-  const isMeeting = !form.venueId && !isCustomLocation
   const customLocationMissing =
     isCustomLocation &&
     (!form.customLocationName.trim() || !form.customLocationUrl.trim())
@@ -200,7 +201,7 @@ export function EditEventForm({
 
   // Show the day-schedule preview only when a real venue (not the custom-
   // location / meeting sentinels) and a day are selected.
-  const showSchedule = !!form.venueId && !isCustomLocation && !!dateStr
+  const showSchedule = !!realVenueId && !!dateStr
 
   // Clicking a free slot in the preview sets the start time. Convert the UTC
   // instant to the display-tz "HH:mm" wall-clock the time field expects.
@@ -212,7 +213,7 @@ export function EditEventForm({
     !!form.title.trim() &&
     !!startIso &&
     !!endIso &&
-    (!form.venueId || isCustomLocation || withinOpenHours) &&
+    (!realVenueId || withinOpenHours) &&
     !customLocationMissing &&
     !meetingUrlMissing &&
     availability !== "conflict" &&
@@ -283,7 +284,7 @@ export function EditEventForm({
             setDurationValue(next.value)
             setDurationUnit(next.unit)
           }}
-          venueId={form.venueId}
+          venueId={realVenueId}
           withinOpenHours={withinOpenHours}
           availability={availability}
           availabilityLoaded={!!availabilityData}

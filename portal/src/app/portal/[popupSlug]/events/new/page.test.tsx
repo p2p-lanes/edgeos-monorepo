@@ -65,9 +65,26 @@ vi.mock("sonner", () => ({
 }))
 
 // Stub the child form/field components — they're rendered but their inner
-// DOM isn't what we're testing.
+// DOM isn't what we're testing. The venue field stub exposes a button that
+// picks the explicit "virtual meeting" option — there is no location
+// default anymore, and `canSubmit` requires a choice.
 vi.mock("../components/EventVenueField", () => ({
-  EventVenueField: () => <div data-testid="venue-field" />,
+  EventVenueField: ({
+    onVenueChange,
+  }: {
+    onVenueChange: (next: string) => void
+  }) => (
+    <button
+      type="button"
+      data-testid="venue-field"
+      onClick={() => onVenueChange("__meeting__")}
+    />
+  ),
+}))
+// MarkdownEditor drags tiptap/prosemirror into jsdom, which can't mount a
+// real contenteditable view — stub it down to a plain textarea.
+vi.mock("@edgeos/shared-form-ui", () => ({
+  MarkdownEditor: ({ id }: { id?: string }) => <textarea id={id} />,
 }))
 vi.mock("../components/EventScheduleFields", () => ({
   EventScheduleFields: () => <div data-testid="schedule-fields" />,
@@ -314,14 +331,16 @@ describe("NewPortalEventPage – wrapper gating + displayTz contract", () => {
       expect(screen.getByTestId("schedule-fields")).toBeTruthy()
     })
 
-    // Fill the title and meeting URL. With no venue selected the form
-    // treats the event as "meeting" mode and requires a meeting URL to
-    // pass `canSubmit`.
+    // Fill the title, pick the explicit "virtual meeting" location (no
+    // location is selected by default), and fill the meeting URL it
+    // requires to pass `canSubmit`.
     const titleInput = container.querySelector(
       "input#title",
     ) as HTMLInputElement
     expect(titleInput).toBeTruthy()
     fireEvent.change(titleInput, { target: { value: "My LA Event" } })
+
+    fireEvent.click(screen.getByTestId("venue-field"))
 
     const meetingInput = container.querySelector(
       "input#meeting",
@@ -351,5 +370,50 @@ describe("NewPortalEventPage – wrapper gating + displayTz contract", () => {
     // resolved — extra sanity check that the wrapper-to-form prop flow is
     // intact.
     expect(payload?.popup_id).toBe(mockCity.id)
+  })
+
+  it("a pending_approval result swaps the form for the success screen instead of redirecting", async () => {
+    mockSettingsResult = {
+      data: {
+        event_enabled: true,
+        can_publish_event: "everyone",
+        timezone: "America/Los_Angeles",
+        allowed_tags: [],
+      },
+      isLoading: false,
+    }
+    mockCreatePortalEvent.mockImplementationOnce(async () => ({
+      id: "evt-2",
+      status: "pending_approval",
+    }))
+
+    const { container } = render(<NewPortalEventPage />)
+
+    await waitFor(() => {
+      expect(screen.getByTestId("schedule-fields")).toBeTruthy()
+    })
+
+    const titleInput = container.querySelector(
+      "input#title",
+    ) as HTMLInputElement
+    fireEvent.change(titleInput, { target: { value: "Needs approval" } })
+    fireEvent.click(screen.getByTestId("venue-field"))
+    fireEvent.change(
+      container.querySelector("input#meeting") as HTMLInputElement,
+      { target: { value: "https://meet.example.com/abc" } },
+    )
+    fireEvent.submit(container.querySelector("form") as HTMLFormElement)
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/events\.form\.pending_success_heading/),
+      ).toBeTruthy()
+    })
+    expect(
+      screen.getByText(/events\.form\.pending_success_message/),
+    ).toBeTruthy()
+    // No redirect — the user stays on the success screen with links out.
+    expect(mockPush).not.toHaveBeenCalled()
+    expect(screen.queryByTestId("schedule-fields")).toBeNull()
   })
 })
