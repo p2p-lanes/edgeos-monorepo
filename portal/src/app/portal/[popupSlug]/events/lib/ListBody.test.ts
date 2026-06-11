@@ -11,9 +11,9 @@ describe("nextOpenDayTarget", () => {
   })
 
   it("skips already-collapsed days to reach the next open one", () => {
-    expect(
-      nextOpenDayTarget("2026-06-10", days, new Set(["2026-06-11"])),
-    ).toBe("2026-06-12")
+    expect(nextOpenDayTarget("2026-06-10", days, new Set(["2026-06-11"]))).toBe(
+      "2026-06-12",
+    )
   })
 
   it("falls back to the collapsed day itself when no open day follows", () => {
