@@ -101,6 +101,27 @@ class EventParticipantsCRUD(
             )
         return session.exec(statement).one()
 
+    def lock_for_capacity(
+        self,
+        session: Session,
+        event_id: uuid.UUID,
+        occurrence_start: datetime | None = None,
+    ) -> None:
+        """Serialize concurrent RSVPs for one event/occurrence.
+
+        Takes a transaction-scoped Postgres advisory lock keyed on the event
+        (and occurrence, for recurring series). Held until the surrounding
+        transaction commits or rolls back, so a capacity ``count`` followed by
+        an ``INSERT`` cannot interleave with another RSVP and oversell the
+        event. The unique indexes on event_participants only prevent the *same*
+        human registering twice — they do not bound total capacity, so this
+        lock is what enforces ``max_participant`` under concurrency.
+        """
+        key = f"rsvp:{event_id}:{occurrence_start.isoformat() if occurrence_start else ''}"
+        session.exec(
+            select(func.pg_advisory_xact_lock(func.hashtextextended(key, 0)))
+        ).one()
+
     def cancel_all_for_event(
         self,
         session: Session,
