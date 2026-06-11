@@ -353,7 +353,9 @@
     "description": "联系您的朋友以计划日程、寻找合住住所或一起组织活动。*此名录仅包含自愿选择分享其信息的人的资料。",
     "search_placeholder": "按姓名、邮箱、组织搜索...",
     "export_csv": "导出参与者CSV",
-    "no_attendees": "未找到参与者"
+    "no_attendees": "未找到参与者",
+    "per_page_label": "每页",
+    "showing_range": "显示 {{from}}–{{to}}，共 {{total}}"
   },
   "checkin": {
     "title": "{{eventName}} 在线签到",

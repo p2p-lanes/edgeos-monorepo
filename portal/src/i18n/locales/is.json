@@ -343,7 +343,9 @@
     "description": "Hafðu samband við vini þína til að skipuleggja stefnumót, finna sameiginlegt húsnæði eða skipuleggja athafnir saman. *Þessi skrá inniheldur aðeins upplýsingar þeirra sem hafa sjálfviljugir samþykkt að deila upplýsingum sínum.",
     "search_placeholder": "Leita eftir nafni, netfangi, stofnun...",
     "export_csv": "Flytja þátttakendur út sem CSV",
-    "no_attendees": "Engir þátttakendur fundust"
+    "no_attendees": "Engir þátttakendur fundust",
+    "per_page_label": "Á síðu",
+    "showing_range": "Sýni {{from}}–{{to}} af {{total}}"
   },
   "checkin": {
     "title": "Innritun á netinu fyrir {{eventName}}",

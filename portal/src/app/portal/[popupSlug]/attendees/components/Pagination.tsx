@@ -1,4 +1,5 @@
 import type React from "react"
+import { useTranslation } from "react-i18next"
 import {
   Pagination,
   PaginationContent,
@@ -8,6 +9,17 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+
+// Page-size choices for the directory. Kept modest so the default (10) stays
+// snappy while power users can pull more rows at once.
+const PAGE_SIZE_OPTIONS = [10, 25, 50, 100]
 
 type PaginationControlsProps = {
   currentPage: number
@@ -22,9 +34,14 @@ const PaginationControls = ({
   totalItems,
   pageSize,
   onPageChange,
-  onPageSizeChange: _onPageSizeChange,
+  onPageSizeChange,
 }: PaginationControlsProps) => {
+  const { t } = useTranslation()
   const totalPages = Math.ceil(totalItems / pageSize)
+
+  // 1-based range of the rows currently on screen, e.g. "11–20 of 247".
+  const rangeFrom = totalItems === 0 ? 0 : (currentPage - 1) * pageSize + 1
+  const rangeTo = Math.min(currentPage * pageSize, totalItems)
 
   // Generar array de páginas a mostrar
   const getPageNumbers = () => {
@@ -50,8 +67,41 @@ const PaginationControls = ({
   }
 
   return (
-    <div className="flex items-center justify-between mt-4">
-      <Pagination>
+    <div className="flex flex-wrap items-center justify-between gap-3 mt-4">
+      {/* Result range + page-size picker. Changing the size resets to page 1
+          upstream (useGetData), so larger pages "just work". */}
+      <div className="flex items-center gap-3 text-sm text-muted-foreground">
+        <span>
+          {t("attendees.showing_range", {
+            from: rangeFrom,
+            to: rangeTo,
+            total: totalItems,
+          })}
+        </span>
+        <div className="flex items-center gap-2">
+          <span>{t("attendees.per_page_label")}</span>
+          <Select
+            value={String(pageSize)}
+            onValueChange={(value) => onPageSizeChange(Number(value))}
+          >
+            <SelectTrigger
+              className="h-8 w-[4.5rem]"
+              aria-label={t("attendees.per_page_label")}
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {PAGE_SIZE_OPTIONS.map((size) => (
+                <SelectItem key={size} value={String(size)}>
+                  {size}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      <Pagination className="mx-0 w-auto">
         <PaginationContent>
           <PaginationItem>
             <PaginationPrevious
