@@ -5,6 +5,7 @@ import { MarkdownEditor } from "@edgeos/shared-form-ui"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import {
   ArrowLeft,
+  CheckCircle2,
   Image as ImageIcon,
   Loader2,
   Plus,
@@ -164,9 +165,17 @@ function NewPortalEventForm({
   const { uploadFile, isUploading } = useFileUpload()
   const fileRef = useRef<HTMLInputElement>(null)
 
+  // When the created event lands in pending_approval, the form is replaced
+  // by a success screen explaining the review flow instead of redirecting.
+  const [pendingCreatedEventId, setPendingCreatedEventId] = useState<
+    string | null
+  >(null)
+
   // ---- form state -----------------------------------------------------
   const [title, setTitle] = useState("")
   const [content, setContent] = useState("")
+  // "" = no location picked yet (the select shows a placeholder). Virtual
+  // meeting is an explicit "__meeting__" choice, never the default.
   const [venueId, setVenueId] = useState<string>("")
   const [customLocationName, setCustomLocationName] = useState("")
   const [customLocationUrl, setCustomLocationUrl] = useState("")
@@ -215,6 +224,12 @@ function NewPortalEventForm({
   const [hostId, setHostId] = useState<string | null>(null)
   const [collaboratorIds, setCollaboratorIds] = useState<string[]>([])
 
+  const isCustomLocation = venueId === "__custom__"
+  const isMeeting = venueId === "__meeting__"
+  // The id of an actual venue — empty for the sentinel options (meeting /
+  // custom location) and while nothing is picked yet.
+  const realVenueId = isCustomLocation || isMeeting ? "" : venueId
+
   // ---- venue + availability ------------------------------------------
   const {
     venues,
@@ -232,7 +247,7 @@ function NewPortalEventForm({
     // time untouched. Availability is still re-checked (withinOpenHours,
     // conflict check, selectedDateIsClosed) and surfaced as a warning.
     popupId,
-    venueId,
+    venueId: realVenueId,
     dateStr,
     displayTz,
     startIso,
@@ -248,12 +263,9 @@ function NewPortalEventForm({
   })
   const tracks: TrackPublic[] = tracksData?.results ?? []
 
-  const isCustomLocation = venueId === "__custom__"
-  const isMeeting = !venueId && !isCustomLocation
-
   // Show the day-schedule preview only when a real venue (not the custom-
   // location / meeting sentinels) and a day are selected.
-  const showSchedule = !!venueId && !isCustomLocation && !!dateStr
+  const showSchedule = !!realVenueId && !!dateStr
 
   // Clicking a free slot in the preview sets the start time. The form stores
   // a "HH:mm" wall-clock label in the display tz; convert the UTC instant the
@@ -284,7 +296,7 @@ function NewPortalEventForm({
           start_time: startIso,
           end_time: endIso,
           timezone: displayTz,
-          venue_id: !isCustomLocation && venueId ? venueId : null,
+          venue_id: realVenueId || null,
           custom_location_name: isCustomLocation
             ? customLocationName.trim() || null
             : null,
@@ -310,11 +322,13 @@ function NewPortalEventForm({
       queryClient.invalidateQueries({ queryKey: ["portal-events"] })
       queryClient.invalidateQueries({ queryKey: ["portal-events-day"] })
       queryClient.invalidateQueries({ queryKey: ["portal-events-calendar"] })
-      const messageKey =
-        event.status === "pending_approval"
-          ? "events.form.event_created_pending_approval_success"
-          : "events.form.event_created_success"
-      toast.success(t(messageKey))
+      if (event.status === "pending_approval") {
+        // Don't bounce to a detail page that looks like nothing happened —
+        // swap the form for a success screen explaining the approval flow.
+        setPendingCreatedEventId(event.id)
+        return
+      }
+      toast.success(t("events.form.event_created_success"))
       router.push(`/portal/${city?.slug}/events/${event.id}`)
     },
     onError: (err) => {
@@ -378,7 +392,9 @@ function NewPortalEventForm({
     !!title.trim() &&
     !!startIso &&
     !!endIso &&
-    (!venueId || isCustomLocation || withinOpenHours) &&
+    // A location choice is required — venue, custom location, or meeting.
+    !!venueId &&
+    (!realVenueId || withinOpenHours) &&
     !customLocationMissing &&
     !meetingUrlMissing &&
     availability !== "conflict" &&
@@ -386,6 +402,34 @@ function NewPortalEventForm({
     !createMutation.isPending
 
   const venueDisabled = selectedVenue?.booking_mode === "unbookable"
+
+  if (pendingCreatedEventId) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 text-center max-w-md mx-auto">
+        <CheckCircle2 className="h-10 w-10 text-green-600 mb-3" />
+        <h1 className="text-xl font-semibold">
+          {t("events.form.pending_success_heading")}
+        </h1>
+        <p className="text-sm text-muted-foreground mt-2">
+          {t("events.form.pending_success_message")}
+        </p>
+        <div className="flex gap-2 mt-6">
+          <Button variant="outline" asChild>
+            <Link href={`/portal/${city?.slug}/events`}>
+              {t("events.common.back_to_events")}
+            </Link>
+          </Button>
+          <Button asChild>
+            <Link
+              href={`/portal/${city?.slug}/events/${pendingCreatedEventId}`}
+            >
+              {t("events.form.pending_success_view_event")}
+            </Link>
+          </Button>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="flex flex-col max-w-2xl mx-auto p-4 sm:p-6 space-y-5">
@@ -525,7 +569,7 @@ function NewPortalEventForm({
             setDurationValue(next.value)
             setDurationUnit(next.unit)
           }}
-          venueId={venueId}
+          venueId={realVenueId}
           withinOpenHours={withinOpenHours}
           availability={availability}
           availabilityLoaded={!!availabilityData}
