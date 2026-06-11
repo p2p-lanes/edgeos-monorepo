@@ -648,7 +648,11 @@ def _ics_vevent_lines(
         lines.append(f"LOCATION:{location}")
     if include_recurrence and getattr(event, "rrule", None):
         lines.append(f"RRULE:{event.rrule}")
-        exdates = getattr(event, "recurrence_exdates", None) or []
+        # recurrence_exdates is a JSONB array, so values arrive as ISO strings.
+        exdates = [
+            datetime.fromisoformat(d) if isinstance(d, str) else d
+            for d in getattr(event, "recurrence_exdates", None) or []
+        ]
         if exdates:
             lines.append(f"EXDATE:{','.join(_ics_utc_stamp(d) for d in exdates)}")
     lines.append(
