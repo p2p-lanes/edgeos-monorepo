@@ -4,6 +4,7 @@ Configure via REDIS_URL environment variable:
 - Local: redis://redis:6379
 """
 
+import hmac
 import uuid
 from datetime import timedelta
 
@@ -233,7 +234,9 @@ class AuthCodeStore:
             if stored_code is None:
                 return False, "No authentication code pending or code has expired"
 
-            if stored_code != code:
+            # Constant-time compare so response latency does not leak how many
+            # leading digits matched. decode_responses=True, so both are str.
+            if not hmac.compare_digest(stored_code, code):
                 # Increment attempts
                 client.incr(attempts_key)
                 return False, "Invalid authentication code"
