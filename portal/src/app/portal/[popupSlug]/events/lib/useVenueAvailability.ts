@@ -8,13 +8,12 @@ import {
   type SlotOption,
 } from "@edgeos/shared-events"
 import { useQuery } from "@tanstack/react-query"
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import {
   EventsService,
   type EventVenuePublic,
   EventVenuesService,
 } from "@/client"
-import { todayInTz } from "./useEventScheduling"
 
 type Availability = "idle" | "checking" | "ok" | "conflict"
 
@@ -32,12 +31,6 @@ interface UseVenueAvailabilityOptions {
    * defence-in-depth on the PATCH route.
    */
   excludeEventId?: string
-  /** Required for the "snap to first open day in window" effect. */
-  isDateOutsidePopupWindow?: (d: Date) => boolean
-  popupStartKey?: string | null
-  /** Setters allow the hook to snap state when the venue changes. */
-  setDateStr?: (next: string) => void
-  setTimeStr?: (next: string) => void
 }
 
 export interface UseVenueAvailabilityResult {
@@ -83,10 +76,6 @@ export function useVenueAvailability(
     endIso,
     durationMinutes,
     excludeEventId,
-    isDateOutsidePopupWindow,
-    popupStartKey,
-    setDateStr,
-    setTimeStr,
   } = options
 
   const { data: venuesData } = useQuery({
@@ -134,44 +123,6 @@ export function useVenueAvailability(
     if (!y || !m || !d) return false
     return isVenueClosedOnDay(new Date(y, m - 1, d))
   }, [isVenueClosedOnDay, dateStr])
-
-  // When the venue changes, if the current date is closed at the new venue
-  // jump to the first open day inside the popup window.
-  const prevVenueIdRef = useRef(venueId)
-  useEffect(() => {
-    if (prevVenueIdRef.current === venueId) return
-    prevVenueIdRef.current = venueId
-    if (!setDateStr) return
-    if (!isVenueClosedOnDay || !dateStr) return
-    const [y, m, d] = dateStr.split("-").map(Number)
-    if (!y || !m || !d) return
-    if (!isVenueClosedOnDay(new Date(y, m - 1, d))) return
-    const todayKey = todayInTz(displayTz)
-    const startKey =
-      popupStartKey && popupStartKey > todayKey ? popupStartKey : todayKey
-    const [sy, sm, sd] = startKey.split("-").map(Number)
-    if (!sy || !sm || !sd) return
-    const cursor = new Date(sy, sm - 1, sd)
-    for (let i = 0; i < 400; i++) {
-      if (isDateOutsidePopupWindow?.(cursor)) return
-      if (!isVenueClosedOnDay(cursor)) {
-        const yy = cursor.getFullYear()
-        const mm = String(cursor.getMonth() + 1).padStart(2, "0")
-        const dd = String(cursor.getDate()).padStart(2, "0")
-        setDateStr(`${yy}-${mm}-${dd}`)
-        return
-      }
-      cursor.setDate(cursor.getDate() + 1)
-    }
-  }, [
-    venueId,
-    isVenueClosedOnDay,
-    isDateOutsidePopupWindow,
-    dateStr,
-    displayTz,
-    popupStartKey,
-    setDateStr,
-  ])
 
   const dayBounds = useMemo(() => {
     if (!dateStr) return null
@@ -223,23 +174,6 @@ export function useVenueAvailability(
       ),
     [freeIntervals, durationMinutes, displayTz],
   )
-
-  // Snap timeStr to the first available slot once availability has loaded
-  // for a newly-selected venue. Seed the ref with the initial venueId so
-  // the edit form (which mounts with the saved venue already populated)
-  // doesn't get its loaded start time clobbered by the venue's open hour.
-  const lastVenueSnapRef = useRef(venueId)
-  useEffect(() => {
-    if (!setTimeStr) return
-    if (!venueId) {
-      lastVenueSnapRef.current = ""
-      return
-    }
-    if (lastVenueSnapRef.current === venueId) return
-    if (startOptions.length === 0) return
-    lastVenueSnapRef.current = venueId
-    setTimeStr(startOptions[0].label)
-  }, [venueId, startOptions, setTimeStr])
 
   const nearbyStartOptions = useMemo(() => {
     if (startOptions.length === 0) return []

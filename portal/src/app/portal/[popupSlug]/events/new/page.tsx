@@ -228,6 +228,9 @@ function NewPortalEventForm({
     availabilityData,
     effectiveBookingMode,
   } = useVenueAvailability({
+    // Selecting or changing the venue keeps the user's chosen date and
+    // time untouched. Availability is still re-checked (withinOpenHours,
+    // conflict check, selectedDateIsClosed) and surfaced as a warning.
     popupId,
     venueId,
     dateStr,
@@ -235,10 +238,6 @@ function NewPortalEventForm({
     startIso,
     endIso,
     durationMinutes,
-    isDateOutsidePopupWindow,
-    popupStartKey,
-    setDateStr,
-    setTimeStr,
   })
 
   // ---- tracks --------------------------------------------------------

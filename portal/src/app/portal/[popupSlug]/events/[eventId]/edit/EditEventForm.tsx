@@ -86,7 +86,7 @@ export function EditEventForm({
 
   const { data: settings } = usePortalEventSettings(popupId)
 
-  const { isDateOutsidePopupWindow, popupStartKey, popupWindowLabel } =
+  const { isDateOutsidePopupWindow, popupWindowLabel } =
     usePopupWindow({
       startDate: cityStartDate,
       endDate: cityEndDate,
@@ -160,12 +160,10 @@ export function EditEventForm({
     endIso,
     durationMinutes,
     excludeEventId: event.id,
-    isDateOutsidePopupWindow,
-    popupStartKey,
-    // Intentionally omit setDateStr/setTimeStr: on the edit form, changing the
-    // venue must keep the user's saved schedule. Availability is still
-    // re-checked against the new venue (conflict check, withinOpenHours,
-    // selectedDateIsClosed all key off venueId) and surfaced as warnings.
+    // Changing the venue keeps the user's saved schedule. Availability is
+    // still re-checked against the new venue (conflict check,
+    // withinOpenHours, selectedDateIsClosed all key off venueId) and
+    // surfaced as warnings.
   })
 
   const updateMutation = useMutation({
