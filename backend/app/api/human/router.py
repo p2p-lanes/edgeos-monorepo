@@ -6,6 +6,7 @@ from fastapi import APIRouter, Header, HTTPException, status
 from app.api.api_key import crud as api_key_crud
 from app.api.api_key.schemas import ApiKeyPublic
 from app.api.human import crud
+from app.api.human.crud import HardDeleteSummary
 from app.api.human.schemas import (
     HumanCreate,
     HumanPortalPublic,
@@ -14,15 +15,18 @@ from app.api.human.schemas import (
     HumanPublic,
     HumanUpdate,
 )
+from app.api.shared.enums import UserRole
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
 from app.core.dependencies.users import (
     AdminOrApiKey_HumansRead,
     AdminOrApiKey_HumansWrite,
     AdminOrApiKeySession_HumansRead,
     AdminOrApiKeySession_HumansWrite,
+    CurrentAdmin,
     CurrentHuman,
     CurrentSuperadmin,
     HumanTenantSession,
+    SessionDep,
     TenantSession,
     needs,
 )
@@ -38,6 +42,11 @@ async def list_humans(
     search: str | None = None,
     popup_id: uuid.UUID | None = None,
     incomplete_application: bool = False,
+    email: str | None = None,
+    telegram: str | None = None,
+    gender: str | None = None,
+    age: str | None = None,
+    residence: str | None = None,
     skip: PaginationSkip = 0,
     limit: PaginationLimit = 100,
 ) -> ListModel[HumanPublic]:
@@ -55,12 +64,16 @@ async def list_humans(
             popup_id=popup_id,
         )
     else:
-        humans, total = crud.find(
+        humans, total = crud.find_filtered(
             db,
             skip=skip,
             limit=limit,
             search=search,
-            search_fields=["first_name", "last_name", "email"],
+            email=email,
+            telegram=telegram,
+            gender=gender,
+            age=age,
+            residence=residence,
         )
 
     return ListModel[HumanPublic](
@@ -171,23 +184,27 @@ async def update_current_human(
 async def search_humans_portal(
     db: HumanTenantSession,
     _: CurrentHuman,
+    popup_id: uuid.UUID,
     search: str | None = None,
     skip: PaginationSkip = 0,
     limit: PaginationLimit = 20,
 ) -> ListModel[HumanPortalPublic]:
-    """Search humans in the current tenant for portal pickers.
+    """Search a popup's attendees who share their name, for portal pickers.
 
     Used by the event-creation Displayed-host field to let a creator pick a
-    participant by name. RLS already scopes to the caller's tenant via
-    HumanTenantSession; the slim response schema omits email so this isn't
-    a wider exposure than the participant lists portal users can already see.
+    host. Scoped to humans who actually attend ``popup_id`` (accepted
+    application with a ticket-holding main/spouse attendee) AND who have not
+    hidden their name via ``info_not_shared`` for that popup. RLS scopes to the
+    caller's tenant; the slim response schema omits email.
     """
-    humans, total = crud.find(
+    from app.api.application.crud import applications_crud
+
+    humans, total = applications_crud.find_directory_humans(
         db,
+        popup_id=popup_id,
+        q=search,
         skip=skip,
         limit=limit,
-        search=search,
-        search_fields=["first_name", "last_name"],
     )
     return ListModel[HumanPortalPublic](
         results=[HumanPortalPublic.model_validate(h) for h in humans],
@@ -272,6 +289,45 @@ async def revoke_human_api_keys(
         )
 
     api_key_crud.revoke_all_for_human(db, human_id)
+
+
+@router.delete(
+    "/{human_id}",
+    summary="Hard-delete a human and all related rows (admin or superadmin)",
+)
+async def delete_human(
+    human_id: uuid.UUID,
+    db: SessionDep,
+    current_user: CurrentAdmin,
+) -> HardDeleteSummary:
+    """Permanently delete a Human with full cascade.
+
+    Removes applications, attendees, payments, products, carts, group
+    memberships, and ambassador-owned groups in a single transaction. Designed
+    for cleaning up test users — destructive and irreversible.
+
+    Superadmins may delete any human; a tenant admin may only delete humans
+    within their own tenant. Both run on the control-plane session (which
+    bypasses RLS), so the tenant ownership check is enforced explicitly here.
+    """
+    human = crud.get(db, human_id)
+    if not human:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Human not found",
+        )
+    # Tenant isolation: non-superadmins can only delete humans in their own
+    # tenant. Respond 404 (not 403) so the existence of other tenants' humans
+    # isn't revealed.
+    if (
+        current_user.role != UserRole.SUPERADMIN
+        and human.tenant_id != current_user.tenant_id
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Human not found",
+        )
+    return crud.hard_delete_cascade(db, human_id)
 
 
 @router.get("/{human_id}/api-keys", response_model=list[ApiKeyPublic])

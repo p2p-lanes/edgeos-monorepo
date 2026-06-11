@@ -4,7 +4,7 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict, field_validator
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PgUUID
-from sqlmodel import Column, Field, SQLModel
+from sqlmodel import Column, DateTime, Field, SQLModel
 
 from app.api.product.schemas import ProductWithQuantity
 
@@ -135,6 +135,13 @@ class AttendeeProductsBase(SQLModel):
         default=None,
         sa_column=Column(JSONB, nullable=True),
     )
+    # Timestamp the scheduled check-in pass email was sent for this ticket.
+    # NULL until sent; stamped by the check-in pass cron dispatcher (after a
+    # successful send) so repeated cron runs don't re-email the same ticket.
+    checkin_pass_sent_at: datetime | None = Field(
+        default=None,
+        sa_column=Column(DateTime(timezone=True), nullable=True),
+    )
 
 
 class AttendeeProductPublic(BaseModel):
@@ -166,6 +173,53 @@ class AttendeeProductPublic(BaseModel):
     purchase_metadata: dict | None = None
 
     model_config = ConfigDict(from_attributes=True, extra="forbid")
+
+
+class AttendeeTicketLine(BaseModel):
+    """One product + quantity line in a bulk ticket add."""
+
+    product_id: uuid.UUID
+    quantity: int = Field(default=1, ge=1)
+
+
+class AttendeeTicketAdd(BaseModel):
+    """Request body to add tickets to an attendee (admin panel, bulk).
+
+    Mirrors the bulk-grant shape: N products, each with a quantity. Stock is
+    validated per product and the whole batch is applied atomically.
+    """
+
+    items: list[AttendeeTicketLine]
+
+    @field_validator("items")
+    @classmethod
+    def _non_empty(cls, v: list[AttendeeTicketLine]) -> list[AttendeeTicketLine]:
+        if not v:
+            raise ValueError("items must not be empty")
+        return v
+
+
+class AttendeeTicketProductSwap(BaseModel):
+    """Request body to change the product of an attendee's ticket (admin panel)."""
+
+    product_id: uuid.UUID
+
+
+class AttendeeTicketMetadataUpdate(BaseModel):
+    """Request body to edit a meal-plan ticket's choices post-purchase (portal).
+
+    Replaces the three choice keys inside AttendeeProducts.purchase_metadata:
+    daily_choices (ISO date -> menu key | "chef"), dietary_restriction, and
+    special_request. The key/date semantics are NOT validated here — that needs
+    the meal-plan step's template_config and happens in the CRUD layer via
+    ticketing_step.meal_plan.validate_daily_choices.
+    """
+
+    daily_choices: dict[str, str]  # ISO date -> menu key | "chef"
+    dietary_restriction: str | None = None
+    special_request: str | None = None
+
+    model_config = ConfigDict(str_strip_whitespace=True)
 
 
 class TicketAttendeeSnapshot(BaseModel):

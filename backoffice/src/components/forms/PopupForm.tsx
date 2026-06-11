@@ -240,6 +240,8 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
         "month") as InstallmentInterval,
       installments_interval_count:
         defaultValues?.installments_interval_count?.toString() ?? "1",
+      checkin_pass_lead_days:
+        defaultValues?.checkin_pass_lead_days?.toString() ?? "",
     },
     onSubmit: ({ value }) => {
       if (readOnly) return
@@ -311,6 +313,9 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
         installments_interval_count: value.installments_interval_count
           ? Number(value.installments_interval_count)
           : 1,
+        checkin_pass_lead_days: value.checkin_pass_lead_days
+          ? Number(value.checkin_pass_lead_days)
+          : null,
       }
       if (isEdit) {
         updateMutation.mutate(payload)
@@ -777,6 +782,28 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
               ) : null
             }
           </form.Subscribe>
+
+          <form.Field name="checkin_pass_lead_days">
+            {(field) => (
+              <InlineRow
+                icon={<QrCode className="h-4 w-4 text-muted-foreground" />}
+                label="Check-in Pass Email"
+                description="Days before the event start to email attendees their check-in QR code. Leave empty to disable."
+              >
+                <Input
+                  id="checkin_pass_lead_days"
+                  type="number"
+                  min="1"
+                  step="1"
+                  placeholder="e.g. 3"
+                  value={field.state.value}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                  disabled={readOnly}
+                  className="max-w-[120px] text-sm"
+                />
+              </InlineRow>
+            )}
+          </form.Field>
         </InlineSection>
 
         <Separator />

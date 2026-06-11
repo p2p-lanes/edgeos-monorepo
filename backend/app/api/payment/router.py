@@ -522,7 +522,10 @@ async def create_my_application_fee(
     return PaymentPublic.model_validate(payment)
 
 
-@router.get("/my/popup/{popup_id}", response_model=ListModel[PaymentPublic], summary="List your payments for a popup",
+@router.get(
+    "/my/popup/{popup_id}",
+    response_model=ListModel[PaymentPublic],
+    summary="List your payments for a popup",
     dependencies=[needs("portal:payments:read")],
 )
 async def list_my_payments_by_popup(
@@ -758,6 +761,9 @@ async def create_my_payment(
         )
 
     payment, _preview = payments_crud.create_payment(db, payment_in)
+
+    if payment.status == PaymentStatus.APPROVED.value:
+        await _send_payment_confirmed_email(payment, db_session=db)
 
     return PaymentPublic.model_validate(payment)
 

@@ -95,42 +95,46 @@ THIRD_PARTY_TOKEN_SCOPES_MAX: tuple[HumanScope, ...] = (
 # Maximum scopes a human may request when minting an API key via the
 # third-party OTP surface. Per-app subsets are drawn from this ceiling.
 # Intentionally narrow — external partners get event-read and rsvp-write only.
-THIRD_PARTY_API_KEY_SCOPES_MAX: frozenset[str] = frozenset({
-    "events:read",
-    "rsvp:write",
-    "venues:read",
-})
+THIRD_PARTY_API_KEY_SCOPES_MAX: frozenset[str] = frozenset(
+    {
+        "events:read",
+        "rsvp:write",
+        "venues:read",
+    }
+)
 
 # Full admin scope universe. Explicitly EXCLUDES: email_templates, users,
 # tenants, tenants:credentials, popup_reviewers, payments:write.
-ADMIN_API_KEY_SCOPES: frozenset[str] = frozenset({
-    "events:read",
-    "events:write",
-    "rsvp:write",
-    "venues:read",
-    "venues:write",
-    "applications:read",
-    "applications:write",
-    "attendees:read",
-    "attendees:write",
-    "humans:read",
-    "humans:write",
-    "groups:read",
-    "groups:write",
-    "products:read",
-    "products:write",
-    "coupons:read",
-    "coupons:write",
-    "forms:read",
-    "forms:write",
-    "payments:read",
-    "tracks:read",
-    "tracks:write",
-    "ticketing_steps:read",
-    "ticketing_steps:write",
-    "translations:read",
-    "translations:write",
-})
+ADMIN_API_KEY_SCOPES: frozenset[str] = frozenset(
+    {
+        "events:read",
+        "events:write",
+        "rsvp:write",
+        "venues:read",
+        "venues:write",
+        "applications:read",
+        "applications:write",
+        "attendees:read",
+        "attendees:write",
+        "humans:read",
+        "humans:write",
+        "groups:read",
+        "groups:write",
+        "products:read",
+        "products:write",
+        "coupons:read",
+        "coupons:write",
+        "forms:read",
+        "forms:write",
+        "payments:read",
+        "tracks:read",
+        "tracks:write",
+        "ticketing_steps:read",
+        "ticketing_steps:write",
+        "translations:read",
+        "translations:write",
+    }
+)
 
 # ---------------------------------------------------------------------------
 # JWT helpers
@@ -190,7 +194,9 @@ _PAT_ROUTE_POLICIES: dict[
         ("/api/v1/popups/portal/", False, ("events:read",)),
     ),
     "POST": (
-        ("/api/v1/events/portal/events", True, ("events:write",)),
+        # Edge City: POST /events disabled for API keys until week 2.
+        # Restore the line below to re-enable agentic event creation:
+        # ("/api/v1/events/portal/events", True, ("events:write",)),
         ("/api/v1/events/portal/events/", False, ("events:write",)),
         ("/api/v1/event-venues/portal/venues", True, ("venues:write",)),
         ("/api/v1/event-participants/portal/register/", False, ("rsvp:write",)),
@@ -211,9 +217,7 @@ _PAT_ROUTE_POLICIES: dict[
 }
 
 
-def _required_scopes_for_pat(
-    method: str, path: str
-) -> tuple[ApiKeyScope, ...] | None:
+def _required_scopes_for_pat(method: str, path: str) -> tuple[ApiKeyScope, ...] | None:
     """Return the tuple of any-of scopes the route requires, or None if the
     route is not in the PAT whitelist."""
     allowed_routes = _PAT_ROUTE_POLICIES.get(method, ())

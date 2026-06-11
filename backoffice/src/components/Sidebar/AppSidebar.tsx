@@ -7,9 +7,11 @@ import {
   CreditCard,
   FileText,
   FormInput,
+  History,
   Home,
   KeyRound,
   LayoutList,
+  ListChecks,
   ListTree,
   Mail,
   MapPin,
@@ -28,6 +30,7 @@ import { useMemo } from "react"
 import { ApplicationReviewsService, PaymentsService } from "@/client"
 import { SidebarAppearance } from "@/components/Common/Appearance"
 import { Logo } from "@/components/Common/Logo"
+import { ReportBugButton } from "@/components/Tasks/ReportBugButton"
 import { Separator } from "@/components/ui/separator"
 import {
   Sidebar,
@@ -100,7 +103,12 @@ const superadminItems: Item[] = [
 ]
 
 export function AppSidebar() {
-  const { user: currentUser, isOperatorOrAbove, isSuperadmin } = useAuth()
+  const {
+    user: currentUser,
+    isAdmin,
+    isOperatorOrAbove,
+    isSuperadmin,
+  } = useAuth()
   const { isContextReady, selectedPopupId } = useWorkspace()
 
   const { data: pendingReviews } = useQuery({
@@ -157,11 +165,20 @@ export function AppSidebar() {
     [pendingReviewCount, pendingPaymentCount],
   )
 
-  // For admins (non-superadmin), get their tenant-specific items
-  const adminNavigationItems =
-    isOperatorOrAbove && !isSuperadmin
+  // For admins (non-superadmin), get their tenant-specific items.
+  // Activity (audit log) and the Tasks board are admin-only — they live under
+  // Administration. Non-superadmins see Tasks read-only (view + comment).
+  const adminNavigationItems: Item[] = [
+    ...(isOperatorOrAbove && !isSuperadmin
       ? getAdminItems(currentUser?.tenant_id)
-      : adminItems
+      : adminItems),
+    ...(isAdmin
+      ? [
+          { icon: History, title: "Activity", path: "/activity" },
+          { icon: ListChecks, title: "Tasks", path: "/tasks" },
+        ]
+      : []),
+  ]
 
   return (
     <Sidebar collapsible="icon">
@@ -222,6 +239,9 @@ export function AppSidebar() {
         )}
       </SidebarContent>
       <SidebarFooter>
+        <div className="px-2 group-data-[collapsible=icon]:px-0">
+          <ReportBugButton />
+        </div>
         <SidebarAppearance />
         <UserComponent user={currentUser} />
       </SidebarFooter>

@@ -3,9 +3,10 @@ from datetime import UTC, datetime
 from enum import Enum
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, model_validator
+from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 from sqlalchemy import Text
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB
+from sqlalchemy.dialects.postgresql import UUID as PgUUID
 from sqlmodel import Column, DateTime, Field, SQLModel
 
 
@@ -93,6 +94,23 @@ class EventBase(SQLModel):
     # event creators choose any of: tenant name, their own name, a participant's
     # name, or a custom value — all stored as plain text.
     host_display_name: str | None = Field(default=None, max_length=255)
+    # Optional human designated as the event's host. Unlike host_display_name
+    # (free text shown on the card), this is a real human id, set only when a
+    # participant is picked from the directory. Grants the host the same manage
+    # rights as the owner (edit / cancel / invitations). NULL when the host is
+    # free text or unset. Modeled like owner_id: indexed uuid, no hard FK.
+    host_id: uuid.UUID | None = Field(default=None, index=True)
+    # Humans who collaborate on the event. Each id grants the SAME manage
+    # rights as the owner / host (edit / cancel / invitations). Stored as a
+    # native ``uuid[]`` (not JSONB) so membership checks and serialization
+    # round-trip as real UUIDs instead of strings. Empty by default; any
+    # collaborator may add or remove others.
+    collaborator_ids: list[uuid.UUID] = Field(
+        default_factory=list,
+        sa_column=Column(
+            ARRAY(PgUUID(as_uuid=True)), nullable=False, server_default="{}"
+        ),
+    )
     status: EventStatus = Field(default=EventStatus.DRAFT)
     # When true, portal clients render the event with a "special" treatment
     # (badge, accent border) so it stands out in the list/day/calendar views.
@@ -128,6 +146,24 @@ class EventBase(SQLModel):
     )
 
 
+def _require_utc_aware(value: datetime | None) -> datetime | None:
+    """Reject naive datetimes and normalize to UTC.
+
+    The ``events.start_time`` / ``events.end_time`` columns are TIMESTAMPTZ, so
+    a naive value would be interpreted as the database server's local time and
+    silently corrupted on the way in. Pydantic accepts ISO strings without an
+    offset as naive, so the schema must enforce this explicitly.
+    """
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        raise ValueError(
+            "Date must include a timezone offset (e.g. '2026-06-04T13:00:00Z' "
+            "or '2026-06-04T13:00:00-07:00')."
+        )
+    return value.astimezone(UTC)
+
+
 def _enforce_custom_location_xor(
     *,
     venue_id: uuid.UUID | None,
@@ -152,6 +188,55 @@ def _enforce_custom_location_xor(
         raise ValueError("venue_id and custom_location_* are mutually exclusive.")
 
 
+class EventCollaboratorPublic(BaseModel):
+    """Slim human projection for an event's collaborator chips in the portal.
+
+    Mirrors ``HumanPortalPublic`` so the same picker/avatar rendering works
+    for already-saved collaborators. Resolved from ``Events.collaborator_ids``
+    by the portal get/create/update endpoints (the list endpoints leave it
+    empty — collaborators aren't shown on cards).
+
+    ``email`` is only populated by the admin (backoffice) endpoints so a chip
+    for a human with no name can fall back to their email; the portal
+    endpoints leave it ``None`` to avoid exposing organizer emails to every
+    viewer of a public event.
+    """
+
+    id: uuid.UUID
+    first_name: str | None = None
+    last_name: str | None = None
+    picture_url: str | None = None
+    email: str | None = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class TrackEventCount(BaseModel):
+    """Number of distinct published events that belong to a track.
+
+    Backs the portal track filter / Tracks section so it can show per-track
+    counts (and hide empty tracks) without pulling the full event list to the
+    client just to count.
+    """
+
+    track_id: uuid.UUID
+    event_count: int
+
+
+class DayEventCount(BaseModel):
+    """Number of occurrence-expanded events that start on a given calendar day.
+
+    Backs the portal calendar grid dots: the frontend can fetch per-day counts
+    for an entire month without pulling full event payloads, then render a dot
+    on each day that has at least one event.  ``day`` is formatted as
+    ``YYYY-MM-DD`` in the popup's configured timezone so it aligns with the
+    frontend's ``formatDayKey`` helper.
+    """
+
+    day: str
+    count: int
+
+
 class EventPublic(EventBase):
     """Event schema for API responses."""
 
@@ -170,6 +255,12 @@ class EventPublic(EventBase):
     # Denormalized track name so portal clients can render the track label
     # without a follow-up call. None when the event has no track.
     track_title: str | None = None
+    # Collaborators resolved to their human profiles (id + name + avatar) so
+    # the edit form can render the saved collaborator chips without a separate
+    # lookup. The raw ``collaborator_ids`` are also present (inherited from
+    # EventBase). Only populated by the single-event get/create/update
+    # endpoints; empty on list responses.
+    collaborators: list[EventCollaboratorPublic] = []
     # True when the current human has hidden this event (per-user marker).
     # Only populated by portal endpoints and only ever True inside responses
     # to ``?include_hidden=true`` — otherwise hidden events are filtered out.
@@ -178,8 +269,36 @@ class EventPublic(EventBase):
     # list/get helpers. None means "not registered"; "registered" /
     # "checked_in" / "cancelled" mirror ParticipantStatus.
     my_rsvp_status: str | None = None
+    # Number of active (non-cancelled) registrations, i.e. the count that
+    # capacity is enforced against. Includes attendees who hid their name, so
+    # the displayed count stays consistent with "Event is full". Populated by
+    # the portal detail endpoint; None when not computed.
+    attendee_count: int | None = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class EventHostOption(BaseModel):
+    """A distinct event host for the backoffice "filter events by creator" picker.
+
+    Resolved from ``Events.owner_id`` joined to ``Humans``. ``name`` is the
+    human's full name when set, otherwise null (the UI falls back to email).
+    """
+
+    id: uuid.UUID
+    name: str | None = None
+    email: str
+
+
+class EventAdminNotes(BaseModel):
+    """Staff-only free-text notes for an event.
+
+    Returned/accepted exclusively by the dedicated admin-notes endpoints — kept
+    out of EventBase/EventPublic so it never leaks into event payloads served to
+    portal humans or the public calendar.
+    """
+
+    notes: str | None = None
 
 
 class EventPublicCalendarItem(BaseModel):
@@ -216,6 +335,22 @@ class EventPublicCalendarItem(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class EventShareMeta(BaseModel):
+    """Tiny, unauthenticated projection for social/OpenGraph share previews.
+
+    Returned by the public ``/public/events/{id}/share`` endpoint so social
+    crawlers (which send no JWT) can render the real event title, a short
+    plaintext snippet and the cover image. Deliberately minimal — no
+    ``meeting_url``, ``tenant_id``, ``owner_id``, ``visibility`` or any other
+    field that could leak through an unauthenticated route.
+    """
+
+    id: uuid.UUID
+    title: str
+    description: str | None = None
+    image_url: str | None = None
+
+
 class EventCalendarTrack(BaseModel):
     """Minimal track projection for the public calendar toolbar."""
 
@@ -234,6 +369,10 @@ class EventCalendarMeta(BaseModel):
     popup_id: uuid.UUID
     popup_slug: str
     popup_name: str
+    # Popup-scoped fallback image used by the portal when an event has no
+    # cover/venue image. Surfaced here so the anonymous calendar can apply
+    # the same fallback without calling the authenticated settings endpoint.
+    placeholder_url: str | None = None
 
 
 class EventPublicCalendarResponse(BaseModel):
@@ -264,11 +403,15 @@ class EventCreate(BaseModel):
     require_approval: bool = False
     kind: str | None = None
     host_display_name: str | None = None
+    host_id: uuid.UUID | None = None
+    collaborator_ids: list[uuid.UUID] = []
     status: EventStatus = EventStatus.DRAFT
     highlighted: bool = False
     recurrence: RecurrenceRule | None = None
 
     model_config = ConfigDict(str_strip_whitespace=True)
+
+    _normalize_datetimes = field_validator("start_time", "end_time")(_require_utc_aware)
 
     @model_validator(mode="after")
     def _validate_custom_location(self) -> "EventCreate":
@@ -300,8 +443,12 @@ class EventUpdate(BaseModel):
     require_approval: bool | None = None
     kind: str | None = None
     host_display_name: str | None = None
+    host_id: uuid.UUID | None = None
+    collaborator_ids: list[uuid.UUID] | None = None
     status: EventStatus | None = None
     highlighted: bool | None = None
+
+    _normalize_datetimes = field_validator("start_time", "end_time")(_require_utc_aware)
 
     @model_validator(mode="after")
     def _validate_custom_location(self) -> "EventUpdate":

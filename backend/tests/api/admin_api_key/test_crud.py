@@ -83,18 +83,26 @@ class TestCreateAdminApiKey:
         )
         assert resp.status_code == 201, resp.text
 
-    def test_write_scope_without_expiry_returns_422(
+    def test_write_scope_without_expiry_defaults_to_policy_lifetime(
         self,
         client: TestClient,
         admin_token_tenant_a: str,
     ) -> None:
-        """Write scope without expires_at returns 422 (schema validation)."""
+        """Write scope without expires_at is created with the server-default
+        lifetime (``now + MAX_WRITE_SCOPE_LIFETIME_DAYS``)."""
+        from app.api.api_key.schemas import MAX_WRITE_SCOPE_LIFETIME_DAYS
+
         resp = client.post(
             BASE_URL,
             headers=_bearer(admin_token_tenant_a),
             json={"name": "write-no-expiry", "scopes": ["attendees:write"]},
         )
-        assert resp.status_code == 422, resp.text
+        assert resp.status_code == 201, resp.text
+        body = resp.json()
+        assert body["expires_at"] is not None
+        expires_at = datetime.fromisoformat(body["expires_at"])
+        expected = datetime.now(UTC) + timedelta(days=MAX_WRITE_SCOPE_LIFETIME_DAYS)
+        assert abs((expires_at - expected).total_seconds()) < 60
 
     def test_viewer_cannot_create_admin_api_key(
         self,
@@ -191,7 +199,9 @@ class TestListAdminApiKeys:
         from sqlmodel import select
 
         for item in items:
-            row = db.exec(select(ApiKeys).where(ApiKeys.id == uuid.UUID(item["id"]))).first()
+            row = db.exec(
+                select(ApiKeys).where(ApiKeys.id == uuid.UUID(item["id"]))
+            ).first()
             assert row is not None
             assert row.user_id == admin_user_tenant_a.id
 
@@ -282,7 +292,9 @@ class TestGetAdminApiKey:
         db.commit()
         db.refresh(row_b)
 
-        resp = client.get(f"{BASE_URL}/{row_b.id}", headers=_bearer(admin_token_tenant_a))
+        resp = client.get(
+            f"{BASE_URL}/{row_b.id}", headers=_bearer(admin_token_tenant_a)
+        )
         assert resp.status_code == 404, resp.text
 
         # Cleanup
@@ -295,7 +307,9 @@ class TestGetAdminApiKey:
         admin_token_tenant_a: str,
     ) -> None:
         """Non-existent key_id returns 404."""
-        resp = client.get(f"{BASE_URL}/{uuid.uuid4()}", headers=_bearer(admin_token_tenant_a))
+        resp = client.get(
+            f"{BASE_URL}/{uuid.uuid4()}", headers=_bearer(admin_token_tenant_a)
+        )
         assert resp.status_code == 404, resp.text
 
 
@@ -313,7 +327,9 @@ class TestRevokeAdminApiKey:
 
         row, _ = admin_api_key_factory(scopes=["events:read"])
 
-        resp = client.delete(f"{BASE_URL}/{row.id}", headers=_bearer(admin_token_tenant_a))
+        resp = client.delete(
+            f"{BASE_URL}/{row.id}", headers=_bearer(admin_token_tenant_a)
+        )
         assert resp.status_code == 204, resp.text
 
         db.refresh(row)
@@ -342,7 +358,9 @@ class TestRevokeAdminApiKey:
         db.commit()
         db.refresh(row_b)
 
-        resp = client.delete(f"{BASE_URL}/{row_b.id}", headers=_bearer(admin_token_tenant_a))
+        resp = client.delete(
+            f"{BASE_URL}/{row_b.id}", headers=_bearer(admin_token_tenant_a)
+        )
         assert resp.status_code in (403, 404), resp.text
 
         # Cleanup
@@ -355,7 +373,9 @@ class TestRevokeAdminApiKey:
         admin_token_tenant_a: str,
     ) -> None:
         """Non-existent key_id returns 404."""
-        resp = client.delete(f"{BASE_URL}/{uuid.uuid4()}", headers=_bearer(admin_token_tenant_a))
+        resp = client.delete(
+            f"{BASE_URL}/{uuid.uuid4()}", headers=_bearer(admin_token_tenant_a)
+        )
         assert resp.status_code == 404, resp.text
 
     def test_viewer_cannot_revoke_key(
@@ -366,7 +386,9 @@ class TestRevokeAdminApiKey:
     ) -> None:
         """VIEWER cannot revoke keys — 403."""
         row, _ = admin_api_key_factory(scopes=["events:read"])
-        resp = client.delete(f"{BASE_URL}/{row.id}", headers=_bearer(viewer_token_tenant_a))
+        resp = client.delete(
+            f"{BASE_URL}/{row.id}", headers=_bearer(viewer_token_tenant_a)
+        )
         assert resp.status_code == 403, resp.text
 
     def test_superadmin_can_revoke_any_key_in_tenant(

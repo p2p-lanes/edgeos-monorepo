@@ -1,3 +1,4 @@
+import { monthBoundsInTz } from "@edgeos/shared-events"
 import { useQuery } from "@tanstack/react-query"
 import {
   addDays,
@@ -23,8 +24,9 @@ import {
   Users,
 } from "lucide-react"
 import { useEffect, useRef, useState } from "react"
-import { type EventPublic, type EventStatus, EventsService } from "@/client"
+import type { EventPublic, EventStatus } from "@/client"
 import { Button } from "@/components/ui/button"
+import { fetchAllEvents } from "@/lib/events/fetchAllEvents"
 import { summarizeRrule } from "@/lib/events/summarizeRrule"
 import { useEventTimezone } from "@/lib/events/useEventTimezone"
 import { cn } from "@/lib/utils"
@@ -121,7 +123,17 @@ export function EventsCalendarView({
     currentMonth.getFullYear() === maxDate.getFullYear() &&
     currentMonth.getMonth() === maxDate.getMonth()
 
-  const { formatTime, formatDayKey } = useEventTimezone(popupId)
+  const {
+    formatTime,
+    formatDayKey,
+    timezone,
+    isLoading: tzLoading,
+  } = useEventTimezone(popupId)
+
+  // Month bounds anchored to the popup's timezone — otherwise events near
+  // the first/last day of the month (in popup TZ) get clipped from the
+  // query window when the browser TZ differs.
+  const monthBounds = monthBoundsInTz(currentMonth, timezone)
 
   const { data } = useQuery({
     queryKey: [
@@ -129,12 +141,15 @@ export function EventsCalendarView({
       "calendar",
       popupId,
       format(currentMonth, "yyyy-MM"),
+      timezone,
       status,
       venueId,
       search,
     ],
+    // Walk every page so a dense month is never truncated at a fixed limit
+    // (the cause of the calendar showing fewer events than the list/day).
     queryFn: () =>
-      EventsService.listEvents({
+      fetchAllEvents({
         popupId,
         eventStatus: status,
         venueId:
@@ -142,16 +157,17 @@ export function EventsCalendarView({
             ? venueId
             : undefined,
         locationKind:
-          venueId === "custom" || venueId === "meeting" ? venueId : undefined,
+          venueId === "custom" || venueId === "meeting"
+            ? (venueId as "custom" | "meeting")
+            : undefined,
         search: search || undefined,
-        startAfter: startOfMonth(currentMonth).toISOString(),
-        startBefore: endOfMonth(currentMonth).toISOString(),
-        limit: 200,
+        startAfter: monthBounds.start.toISOString(),
+        startBefore: monthBounds.end.toISOString(),
       }),
-    enabled: !!popupId,
+    enabled: !!popupId && !tzLoading,
   })
 
-  const events = data?.results ?? []
+  const events = data ?? []
 
   // Grid cells are calendar days (number labels) — match them against
   // events by formatting both sides in the popup's timezone, so an event

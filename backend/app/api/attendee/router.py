@@ -8,6 +8,9 @@ from app.api.attendee.schemas import (
     AttendeeCreate,
     AttendeeListItem,
     AttendeeProductPublic,
+    AttendeeTicketAdd,
+    AttendeeTicketMetadataUpdate,
+    AttendeeTicketProductSwap,
     AttendeeUpdate,
     AttendeeWithOriginPublic,
     AttendeeWithTickets,
@@ -16,6 +19,7 @@ from app.api.attendee.schemas import (
     TicketProductSnapshot,
     TicketPublic,
 )
+from app.api.audit_log.actor import actor_from_user
 from app.api.check_in.crud import (
     get_check_in_summary,
     get_last_scan_by_tickets,
@@ -133,6 +137,24 @@ def _build_attendee_with_origin(
         "updated_at": getattr(attendee, "updated_at", None),
     }
     return AttendeeWithOriginPublic(**base, products=ticket_products, origin=origin)
+
+
+def _attendee_response(db, attendee_id: uuid.UUID) -> AttendeeWithOriginPublic:
+    """Re-fetch an attendee and build its full response after a mutation.
+
+    Used by the admin ticket-management routes so the panel receives the
+    refreshed attendee (with up-to-date tickets) in a single round-trip.
+    """
+    attendee = crud.attendees_crud.get(db, attendee_id)
+    if not attendee:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Attendee not found",
+        )
+    last_scan_by_ticket = get_last_scan_by_tickets(
+        db, [ap.id for ap in attendee.attendee_products]
+    )
+    return _build_attendee_with_origin(attendee, last_scan_by_ticket)
 
 
 # ---------------------------------------------------------------------------
@@ -356,6 +378,66 @@ async def update_my_attendee_for_popup(
     return _build_attendee_with_origin(updated, last_scan_by_ticket)
 
 
+@router.patch(
+    "/my/popup/{popup_id}/{attendee_id}/tickets/{ticket_id}/meal-plan",
+    response_model=AttendeeWithOriginPublic,
+    tags=["portal"],
+    summary="Edit your meal-plan ticket choices",
+    dependencies=[needs("portal:attendees:write")],
+)
+async def update_my_meal_plan_ticket(
+    popup_id: uuid.UUID,
+    attendee_id: uuid.UUID,
+    ticket_id: uuid.UUID,
+    body: AttendeeTicketMetadataUpdate,
+    db: HumanTenantSession,
+    current_human: CurrentHuman,
+) -> AttendeeWithOriginPublic:
+    """Edit a purchased meal-plan ticket's per-day choices (portal, no payment).
+
+    Mutates only AttendeeProducts.purchase_metadata (daily_choices,
+    dietary_restriction, special_request) for a week whose sale window is still
+    open. Does not change products, price, stock, or the payment snapshot.
+
+    Authorization: same dual-path predicate as update_my_attendee_for_popup —
+    attendee.popup_id == popup_id AND (attendee.human_id == current_human.id OR
+    attendee.application.human_id == current_human.id). Returns 404 (never 403)
+    on any failure so existence is not leaked to unauthorized callers.
+
+    Errors from the CRUD layer: 404 (ticket/product not found), 409
+    meal_plan_week_locked (week closed), 422 not_meal_plan_ticket or
+    invalid_meal_plan_choice.
+    """
+    from app.api.application.models import Applications
+
+    attendee = crud.attendees_crud.get(db, attendee_id)
+
+    if attendee is None or attendee.popup_id != popup_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Attendee not found"
+        )
+
+    # Dual-path auth predicate
+    owned = attendee.human_id == current_human.id
+    if not owned and attendee.application_id is not None:
+        application = db.get(Applications, attendee.application_id)
+        owned = application is not None and application.human_id == current_human.id
+
+    if not owned:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Attendee not found"
+        )
+
+    crud.attendees_crud.update_ticket_metadata(
+        db,
+        attendee_id=attendee_id,
+        ticket_id=ticket_id,
+        choices=body,
+    )
+
+    return _attendee_response(db, attendee_id)
+
+
 @router.delete(
     "/my/popup/{popup_id}/{attendee_id}",
     tags=["portal"],
@@ -410,6 +492,8 @@ async def list_attendees(
     popup_id: uuid.UUID | None = None,
     email: str | None = None,
     search: str | None = None,
+    has_tickets: bool | None = None,
+    category_id: uuid.UUID | None = None,
     skip: PaginationSkip = 0,
     limit: PaginationLimit = 100,
 ) -> ListModel[AttendeeListItem]:
@@ -418,6 +502,9 @@ async def list_attendees(
     Returns AttendeeListItem (ProductWithQuantity shape) for compatibility with
     the existing BO list view. Use GET /attendees/{id} for the full
     AttendeePublic shape with typed AttendeeProductPublic tickets.
+
+    has_tickets (only honored on the popup_id path) keeps attendees with at
+    least one purchased/granted ticket when True, those without when False.
     """
     if application_id:
         attendees = crud.attendees_crud.find_by_application(db, application_id)
@@ -425,7 +512,13 @@ async def list_attendees(
         attendees = attendees[skip : skip + limit]
     elif popup_id:
         attendees, total = crud.attendees_crud.find_by_popup(
-            db, popup_id=popup_id, skip=skip, limit=limit, search=search
+            db,
+            popup_id=popup_id,
+            skip=skip,
+            limit=limit,
+            search=search,
+            has_tickets=has_tickets,
+            category_id=category_id,
         )
     elif email:
         attendees, total = crud.attendees_crud.find_by_email(
@@ -534,6 +627,98 @@ async def delete_attendee(
         )
 
     crud.attendees_crud.delete_attendee(db, attendee)
+
+
+@router.post(
+    "/{attendee_id}/tickets",
+    response_model=AttendeeWithOriginPublic,
+    status_code=status.HTTP_201_CREATED,
+    summary="Add a ticket to an attendee",
+)
+async def add_attendee_ticket(
+    attendee_id: uuid.UUID,
+    body: AttendeeTicketAdd,
+    db: AdminOrApiKeySession_AttendeesWrite,
+    current_user: AdminOrApiKey_AttendeesWrite,
+) -> AttendeeWithOriginPublic:
+    """Add tickets (N products × quantity) to an existing attendee (BO only).
+
+    Admin grant with no payment: tickets are materialized with payment_id NULL
+    (manual emission) and stock is decremented like any other purchase path.
+    Each product must be active and belong to the attendee's popup; the batch is
+    applied atomically (a sold-out product rolls the whole add back with 409).
+    """
+    attendee = crud.attendees_crud.get(db, attendee_id)
+    if not attendee:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Attendee not found",
+        )
+
+    crud.attendees_crud.add_products(
+        db,
+        attendee_id=attendee_id,
+        items=[(line.product_id, line.quantity) for line in body.items],
+        tenant_id=attendee.tenant_id,
+        actor=actor_from_user(current_user),
+    )
+
+    return _attendee_response(db, attendee_id)
+
+
+@router.patch(
+    "/{attendee_id}/tickets/{ticket_id}/product",
+    response_model=AttendeeWithOriginPublic,
+    summary="Change the product of an attendee's ticket",
+)
+async def swap_attendee_ticket_product(
+    attendee_id: uuid.UUID,
+    ticket_id: uuid.UUID,
+    body: AttendeeTicketProductSwap,
+    db: AdminOrApiKeySession_AttendeesWrite,
+    current_user: AdminOrApiKey_AttendeesWrite,
+) -> AttendeeWithOriginPublic:
+    """Swap the product of a single ticket (BO only, no payment).
+
+    Restores one unit of the old product's stock and decrements the new one
+    (409 if sold out). The ticket keeps its check_in_code. Cross-popup swaps are
+    rejected with 422.
+    """
+    crud.attendees_crud.swap_ticket_product(
+        db,
+        attendee_id=attendee_id,
+        ticket_id=ticket_id,
+        new_product_id=body.product_id,
+        actor=actor_from_user(current_user),
+    )
+
+    return _attendee_response(db, attendee_id)
+
+
+@router.delete(
+    "/{attendee_id}/tickets/{ticket_id}",
+    response_model=AttendeeWithOriginPublic,
+    summary="Remove a ticket from an attendee",
+)
+async def remove_attendee_ticket(
+    attendee_id: uuid.UUID,
+    ticket_id: uuid.UUID,
+    db: AdminOrApiKeySession_AttendeesWrite,
+    current_user: AdminOrApiKey_AttendeesWrite,
+) -> AttendeeWithOriginPublic:
+    """Remove a single ticket from an attendee (BO only).
+
+    Restores one unit of the product's stock to the pool. Returns the updated
+    attendee so the panel can refresh.
+    """
+    crud.attendees_crud.remove_product(
+        db,
+        attendee_id=attendee_id,
+        ticket_id=ticket_id,
+        actor=actor_from_user(current_user),
+    )
+
+    return _attendee_response(db, attendee_id)
 
 
 @router.post("/check-in/{code}", response_model=TicketPublic)

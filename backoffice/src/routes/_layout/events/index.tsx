@@ -1,3 +1,4 @@
+import { dayBoundsInTz } from "@edgeos/shared-events"
 import {
   keepPreviousData,
   useMutation,
@@ -10,7 +11,9 @@ import { format } from "date-fns"
 import {
   CalendarDays,
   CalendarIcon,
+  Check,
   CheckCircle2,
+  ChevronsUpDown,
   Plus,
   Repeat,
   Search,
@@ -22,6 +25,7 @@ import { Suspense, useCallback, useEffect, useMemo, useState } from "react"
 import { createPortal } from "react-dom"
 
 import {
+  type EventHostOption,
   type EventPublic,
   EventSettingsService,
   type EventStatus,
@@ -37,6 +41,7 @@ import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
 import { EventsCalendarView } from "@/components/events/EventsCalendarView"
 import { EventsDayView } from "@/components/events/EventsDayView"
+import { EventsListView } from "@/components/events/EventsListView"
 import {
   type EventsView,
   EventsViewSwitcher,
@@ -44,6 +49,14 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Calendar } from "@/components/ui/calendar"
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command"
 import {
   Dialog,
   DialogClose,
@@ -94,11 +107,28 @@ const EVENT_STATUS_OPTIONS: { value: EventStatus; label: string }[] = [
   { value: "rejected", label: "Rejected" },
 ]
 
-const VALID_EVENT_VIEWS: Set<string> = new Set(["table", "calendar", "day"])
+const VALID_EVENT_VIEWS: Set<string> = new Set([
+  "table",
+  "list",
+  "calendar",
+  "day",
+])
+
+// Remember the last view the user picked so returning to /events (or a fresh
+// session) lands on it. Defaults to the card "list" view when nothing is
+// stored yet.
+const EVENTS_VIEW_STORAGE_KEY = "edgeos:events-view"
+
+function readStoredEventsView(): EventsView | null {
+  if (typeof window === "undefined") return null
+  const v = window.localStorage.getItem(EVENTS_VIEW_STORAGE_KEY)
+  return v && VALID_EVENT_VIEWS.has(v) ? (v as EventsView) : null
+}
 
 type EventsSearchParams = TableSearchParams & {
   status?: EventStatus
   venueId?: string
+  creatorId?: string
   startDate?: string
   endDate?: string
   view?: EventsView
@@ -114,6 +144,9 @@ export const Route = createFileRoute("/_layout/events/")({
       : {}),
     ...(typeof raw.venueId === "string" && raw.venueId
       ? { venueId: raw.venueId }
+      : {}),
+    ...(typeof raw.creatorId === "string" && raw.creatorId
+      ? { creatorId: raw.creatorId }
       : {}),
     ...(typeof raw.startDate === "string" &&
     /^\d{4}-\d{2}-\d{2}$/.test(raw.startDate)
@@ -329,77 +362,6 @@ function EventApprovalActions({ event }: { event: EventPublic }) {
   )
 }
 
-function EditOccurrenceDialog({
-  event,
-  onClose,
-}: {
-  event: EventPublic | null
-  onClose: () => void
-}) {
-  const queryClient = useQueryClient()
-  const navigate = useNavigate()
-  const { showSuccessToast, showErrorToast } = useCustomToast()
-  const occurrenceRef = event ? parseOccurrenceId(event.occurrence_id) : null
-
-  const detachMutation = useMutation({
-    mutationFn: async () => {
-      if (!occurrenceRef) throw new Error("Not an occurrence")
-      return EventsService.detachOccurrence({
-        eventId: occurrenceRef.masterId,
-        requestBody: { occurrence_start: occurrenceRef.start },
-      })
-    },
-    onSuccess: (child) => {
-      showSuccessToast("Detached occurrence for editing")
-      onClose()
-      queryClient.invalidateQueries({ queryKey: ["events"] })
-      navigate({
-        to: "/events/$eventId/edit",
-        params: { eventId: child.id },
-      })
-    },
-    onError: createErrorHandler(showErrorToast),
-  })
-
-  return (
-    <Dialog open={!!event} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Edit recurring event</DialogTitle>
-          <DialogDescription>
-            This is one instance of a recurring series. Would you like to edit
-            only this event, or the entire series?
-          </DialogDescription>
-        </DialogHeader>
-        <DialogFooter>
-          <DialogClose asChild>
-            <Button variant="outline">Cancel</Button>
-          </DialogClose>
-          <Button
-            variant="outline"
-            onClick={() => {
-              if (!occurrenceRef) return
-              onClose()
-              navigate({
-                to: "/events/$eventId/edit",
-                params: { eventId: occurrenceRef.masterId },
-              })
-            }}
-          >
-            Edit series
-          </Button>
-          <LoadingButton
-            loading={detachMutation.isPending}
-            onClick={() => detachMutation.mutate()}
-          >
-            Edit only this event
-          </LoadingButton>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  )
-}
-
 function EventHostCell({ event }: { event: EventPublic }) {
   const ownerId = event.owner_id
   const { data: owner } = useQuery({
@@ -612,6 +574,91 @@ function EventVenueFilter({
   )
 }
 
+function EventCreatorFilter({
+  hosts,
+  selected,
+  onSelect,
+}: {
+  hosts: EventHostOption[]
+  selected: string | undefined
+  onSelect: (value: string | undefined) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const selectedHost = hosts.find((h) => h.id === selected)
+  const label = selected
+    ? selectedHost?.name?.trim() || selectedHost?.email || "Selected creator"
+    : "All creators"
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          className="h-9 w-[200px] justify-between font-normal"
+        >
+          <span
+            className={`truncate ${selected ? "" : "text-muted-foreground"}`}
+          >
+            {label}
+          </span>
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[260px] p-0" align="start">
+        <Command>
+          <CommandInput placeholder="Search by name or email..." />
+          <CommandList>
+            <CommandEmpty>No creators found.</CommandEmpty>
+            <CommandGroup>
+              <CommandItem
+                value="all creators"
+                onSelect={() => {
+                  onSelect(undefined)
+                  setOpen(false)
+                }}
+              >
+                <Check
+                  className={`mr-2 h-4 w-4 ${selected ? "opacity-0" : "opacity-100"}`}
+                />
+                All creators
+              </CommandItem>
+              {hosts.map((host) => {
+                const name = host.name?.trim() || null
+                return (
+                  <CommandItem
+                    key={host.id}
+                    // cmdk matches the typed query against this string, so
+                    // include both name and email to make the picker searchable.
+                    value={`${name ?? ""} ${host.email}`}
+                    onSelect={() => {
+                      onSelect(host.id)
+                      setOpen(false)
+                    }}
+                  >
+                    <Check
+                      className={`mr-2 h-4 w-4 shrink-0 ${selected === host.id ? "opacity-100" : "opacity-0"}`}
+                    />
+                    <span className="flex min-w-0 flex-col">
+                      <span className="truncate">{name ?? host.email}</span>
+                      {name && (
+                        <span className="truncate text-xs text-muted-foreground">
+                          {host.email}
+                        </span>
+                      )}
+                    </span>
+                  </CommandItem>
+                )
+              })}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  )
+}
+
 function parseYmd(value: string | undefined): Date | undefined {
   if (!value) return undefined
   const [y, m, d] = value.split("-").map(Number)
@@ -734,7 +781,7 @@ function EventsTableContent({
     searchParams,
     "/events",
   )
-  const { status, venueId, startDate, endDate } = searchParams
+  const { status, venueId, creatorId, startDate, endDate } = searchParams
 
   const setStatus = useCallback(
     (value: EventStatus | undefined) => {
@@ -758,6 +805,21 @@ function EventsTableContent({
         search: (prev: Record<string, unknown>) => ({
           ...prev,
           venueId: value,
+          page: 0,
+        }),
+        replace: true,
+      })
+    },
+    [navigate],
+  )
+
+  const setCreatorId = useCallback(
+    (value: string | undefined) => {
+      navigate({
+        to: "/events",
+        search: (prev: Record<string, unknown>) => ({
+          ...prev,
+          creatorId: value,
           page: 0,
         }),
         replace: true,
@@ -803,6 +865,7 @@ function EventsTableContent({
         ...prev,
         status: undefined,
         venueId: undefined,
+        creatorId: undefined,
         startDate: undefined,
         endDate: undefined,
         page: 0,
@@ -811,7 +874,43 @@ function EventsTableContent({
     })
   }, [navigate])
 
-  const hasFilters = !!(status || venueId || startDate || endDate)
+  const hasFilters = !!(status || venueId || creatorId || startDate || endDate)
+
+  // Popup timezone drives display of every start_time in the table so the
+  // "Events" list matches the calendar views. We render a skeleton until
+  // settings resolve to avoid a browser-tz flash on first paint, and we use
+  // popup-tz day boundaries for the date filter so events near midnight in
+  // popup TZ aren't clipped.
+  const { data: popupSettings, isLoading: popupSettingsLoading } = useQuery({
+    queryKey: ["event-settings", selectedPopupId],
+    queryFn: async () => {
+      if (!selectedPopupId) return null
+      try {
+        return await EventSettingsService.getEventSettings({
+          popupId: selectedPopupId,
+        })
+      } catch {
+        return null
+      }
+    },
+    enabled: !!selectedPopupId,
+  })
+  // Fall back to UTC (the backend default for EventSettings.timezone) when
+  // settings haven't been created yet. Never fall back to browser tz — that
+  // would make the list display drift from the calendar/day views and emails.
+  const popupTz = popupSettings?.timezone ?? "UTC"
+
+  const filterStartAfter = useMemo(() => {
+    if (!startDate) return undefined
+    if (popupTz) return dayBoundsInTz(startDate, popupTz).start.toISOString()
+    return `${startDate}T00:00:00Z`
+  }, [startDate, popupTz])
+
+  const filterStartBefore = useMemo(() => {
+    if (!endDate) return undefined
+    if (popupTz) return dayBoundsInTz(endDate, popupTz).end.toISOString()
+    return `${endDate}T23:59:59Z`
+  }, [endDate, popupTz])
 
   const { data: events } = useQuery({
     queryKey: [
@@ -823,8 +922,10 @@ function EventsTableContent({
         search,
         status,
         venueId,
+        creatorId,
         startDate,
         endDate,
+        popupTz,
       },
     ],
     queryFn: () =>
@@ -840,11 +941,18 @@ function EventsTableContent({
             : undefined,
         locationKind:
           venueId === "custom" || venueId === "meeting" ? venueId : undefined,
-        startAfter: startDate ? `${startDate}T00:00:00Z` : undefined,
-        startBefore: endDate ? `${endDate}T23:59:59Z` : undefined,
+        ownerId: creatorId || undefined,
+        startAfter: filterStartAfter,
+        startBefore: filterStartBefore,
       }),
-    enabled: !!selectedPopupId,
+    enabled: !!selectedPopupId && !popupSettingsLoading,
     placeholderData: keepPreviousData,
+  })
+
+  const { data: hosts } = useQuery({
+    queryKey: ["event-hosts", selectedPopupId],
+    queryFn: () => EventsService.listEventHosts({ popupId: selectedPopupId! }),
+    enabled: !!selectedPopupId,
   })
 
   const { data: venues } = useQuery({
@@ -869,31 +977,13 @@ function EventsTableContent({
     return map
   }, [venues])
 
-  // Popup timezone drives display of every start_time in the table so the
-  // "Events" list matches the calendar views. Falls back to browser tz if
-  // settings haven't loaded or aren't configured for this popup.
-  const { data: popupSettings } = useQuery({
-    queryKey: ["event-settings", selectedPopupId],
-    queryFn: async () => {
-      if (!selectedPopupId) return null
-      try {
-        return await EventSettingsService.getEventSettings({
-          popupId: selectedPopupId,
-        })
-      } catch {
-        return null
-      }
-    },
-    enabled: !!selectedPopupId,
-  })
-  const popupTz = popupSettings?.timezone ?? undefined
-
   const columns = useMemo(
     () => buildEventColumns(venueNameById, popupTz),
     [venueNameById, popupTz],
   )
 
-  if (!events) return <Skeleton className="h-64 w-full" />
+  if (!events || popupSettingsLoading)
+    return <Skeleton className="h-64 w-full" />
 
   return (
     <div className="space-y-3">
@@ -917,6 +1007,11 @@ function EventsTableContent({
               venues={venues?.results ?? []}
               selected={venueId}
               onSelect={setVenueId}
+            />
+            <EventCreatorFilter
+              hosts={hosts ?? []}
+              selected={creatorId}
+              onSelect={setCreatorId}
             />
             <EventDateRangeFilter
               startDate={startDate}
@@ -1042,12 +1137,8 @@ function EventsPage() {
   const { selectedPopupId } = useWorkspace()
   const navigate = useNavigate()
   const searchParams = Route.useSearch()
-  const view: EventsView = searchParams.view ?? "table"
+  const view: EventsView = searchParams.view ?? readStoredEventsView() ?? "list"
   const selectedDate = parseSelectedDate(searchParams.date)
-  // Picking an occurrence row pops a "series or this only" prompt; non-recurring
-  // rows skip the dialog and navigate straight to /events/:id/edit.
-  const [occurrenceEditTarget, setOccurrenceEditTarget] =
-    useState<EventPublic | null>(null)
 
   const { data: popup } = useQuery({
     queryKey: ["popup", selectedPopupId],
@@ -1096,13 +1187,14 @@ function EventsPage() {
 
   const handleRowClick = useCallback(
     (event: EventPublic) => {
-      if (parseOccurrenceId(event.occurrence_id)) {
-        setOccurrenceEditTarget(event)
-        return
-      }
+      // Open the read-only view page (which owns the edit/share actions and,
+      // for a recurring instance, the "series vs this occurrence" choice).
+      // Occurrences route to their master id with the instance start in `occ`.
+      const occ = parseOccurrenceId(event.occurrence_id)
       navigate({
-        to: "/events/$eventId/edit",
-        params: { eventId: event.id },
+        to: "/events/$eventId",
+        params: { eventId: occ ? occ.masterId : event.id },
+        search: occ ? { occ: occ.start } : {},
       })
     },
     [navigate],
@@ -1110,13 +1202,16 @@ function EventsPage() {
 
   const setView = useCallback(
     (next: EventsView) => {
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem(EVENTS_VIEW_STORAGE_KEY, next)
+      }
       navigate({
         to: "/events",
         search: (prev: Record<string, unknown>) => {
           const prevDate = typeof prev.date === "string" ? prev.date : undefined
           return {
             ...prev,
-            view: next === "table" ? undefined : next,
+            view: next,
             date: next === "day" ? prevDate : undefined,
           }
         },
@@ -1215,6 +1310,28 @@ function EventsPage() {
             {view === "table" && (
               <EventsTableContent onRowClick={handleRowClick} />
             )}
+            {view === "list" && (
+              <div className="space-y-3">
+                <CalendarDayToolbar
+                  popupId={selectedPopupId}
+                  status={searchParams.status}
+                  venueId={searchParams.venueId}
+                  search={searchParams.search ?? ""}
+                  setStatus={setStatusGlobal}
+                  setVenueId={setVenueIdGlobal}
+                  setSearch={setSearchGlobal}
+                />
+                <EventsListView
+                  popupId={selectedPopupId}
+                  status={searchParams.status}
+                  venueId={searchParams.venueId}
+                  search={searchParams.search ?? ""}
+                  popupStart={popupStart}
+                  popupEnd={popupEnd}
+                  onEventClick={handleRowClick}
+                />
+              </div>
+            )}
             {view === "calendar" && (
               <div className="space-y-3">
                 <CalendarDayToolbar
@@ -1303,10 +1420,6 @@ function EventsPage() {
           </div>,
           document.body,
         )}
-      <EditOccurrenceDialog
-        event={occurrenceEditTarget}
-        onClose={() => setOccurrenceEditTarget(null)}
-      />
     </div>
   )
 }

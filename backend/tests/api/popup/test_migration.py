@@ -20,10 +20,7 @@ from sqlmodel import Session
 
 def _load_migration_module():
     migration_path = (
-        Path(__file__).resolve().parents[3]
-        / "app"
-        / "alembic"
-        / "versions"
+        Path(__file__).resolve().parents[3] / "app" / "alembic" / "versions"
     )
     matches = list(migration_path.glob("0043_tenant_scoped_popup_slug.py"))
     assert matches, "0043_tenant_scoped_popup_slug migration file not found"

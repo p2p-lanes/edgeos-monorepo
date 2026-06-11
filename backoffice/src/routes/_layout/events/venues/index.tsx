@@ -20,9 +20,11 @@ import {
   Check,
   CheckCircle2,
   GripVertical,
+  LayoutGrid,
   MapPin,
   Plus,
   Search,
+  Table as TableIcon,
   X,
 } from "lucide-react"
 import { Suspense, useEffect, useMemo, useState } from "react"
@@ -37,6 +39,8 @@ import { EmptyState } from "@/components/Common/EmptyState"
 import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
 import { StatusBadge } from "@/components/Common/StatusBadge"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
+import { OrderVenuesDialog } from "@/components/events/OrderVenuesDialog"
+import { VenuesGridView } from "@/components/events/VenuesGridView"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -65,13 +69,121 @@ const BOOKING_MODE_LABELS: Record<VenueBookingMode, string> = {
   unbookable: "Unbookable",
 }
 
+type VenuesView = "table" | "grid"
+
+const VALID_VENUES_VIEWS: Set<string> = new Set(["table", "grid"])
+
+// Remember the last venues view; defaults to the card "grid" when unset.
+const VENUES_VIEW_STORAGE_KEY = "edgeos:venues-view"
+
+function readStoredVenuesView(): VenuesView | null {
+  if (typeof window === "undefined") return null
+  const v = window.localStorage.getItem(VENUES_VIEW_STORAGE_KEY)
+  return v && VALID_VENUES_VIEWS.has(v) ? (v as VenuesView) : null
+}
+
+type VenuesSearchParams = ReturnType<typeof validateTableSearch> & {
+  view?: VenuesView
+}
+
 export const Route = createFileRoute("/_layout/events/venues/")({
   component: VenuesPage,
-  validateSearch: validateTableSearch,
+  validateSearch: (raw: Record<string, unknown>): VenuesSearchParams => ({
+    ...validateTableSearch(raw),
+    ...(typeof raw.view === "string" && VALID_VENUES_VIEWS.has(raw.view)
+      ? { view: raw.view as VenuesView }
+      : {}),
+  }),
   head: () => ({
     meta: [{ title: "Venues - EdgeOS" }],
   }),
 })
+
+function VenuesViewSwitcher({
+  view,
+  onViewChange,
+}: {
+  view: VenuesView
+  onViewChange: (view: VenuesView) => void
+}) {
+  return (
+    <div className="inline-flex rounded-md border bg-card p-0.5">
+      <Button
+        type="button"
+        variant={view === "table" ? "default" : "ghost"}
+        size="sm"
+        aria-label="Table"
+        title="Table"
+        aria-pressed={view === "table"}
+        onClick={() => onViewChange("table")}
+        className={cn(
+          "h-7 w-7 rounded-sm p-0",
+          view === "table" && "shadow-none",
+        )}
+      >
+        <TableIcon className="h-4 w-4" />
+      </Button>
+      <Button
+        type="button"
+        variant={view === "grid" ? "default" : "ghost"}
+        size="sm"
+        aria-label="Grid"
+        title="Grid"
+        aria-pressed={view === "grid"}
+        onClick={() => onViewChange("grid")}
+        className={cn(
+          "h-7 w-7 rounded-sm p-0",
+          view === "grid" && "shadow-none",
+        )}
+      >
+        <LayoutGrid className="h-4 w-4" />
+      </Button>
+    </div>
+  )
+}
+
+function VenuesGridContent() {
+  const searchParams = Route.useSearch()
+  const { selectedPopupId } = useWorkspace()
+  const { search, setSearch } = useTableSearchParams(
+    searchParams,
+    "/events/venues/",
+  )
+  const [localSearch, setLocalSearch] = useState(search)
+  useEffect(() => setLocalSearch(search), [search])
+  useEffect(() => {
+    if (localSearch === search) return
+    const t = setTimeout(() => setSearch(localSearch), 300)
+    return () => clearTimeout(t)
+  }, [localSearch, search, setSearch])
+
+  if (!selectedPopupId) return null
+
+  return (
+    <div className="space-y-3">
+      <div className="relative w-full min-w-0 sm:max-w-xs">
+        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          placeholder="Search venues..."
+          value={localSearch}
+          onChange={(e) => setLocalSearch(e.target.value)}
+          className="pl-9 pr-8"
+        />
+        {localSearch && (
+          <button
+            type="button"
+            onClick={() => setLocalSearch("")}
+            className="absolute right-2 top-1/2 -translate-y-1/2 rounded-sm p-0.5 text-muted-foreground transition-colors hover:text-foreground"
+            aria-label="Clear search"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        )}
+      </div>
+      <VenuesGridView popupId={selectedPopupId} search={search} />
+    </div>
+  )
+}
 
 function VenueRowActions({ venue }: { venue: EventVenuePublic }) {
   const navigate = useNavigate()
@@ -409,6 +521,23 @@ function VenuesTableContent() {
 
 function VenuesPage() {
   const { selectedPopupId } = useWorkspace()
+  const navigate = useNavigate()
+  const searchParams = Route.useSearch()
+  const view: VenuesView = searchParams.view ?? readStoredVenuesView() ?? "grid"
+
+  const setView = (next: VenuesView) => {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(VENUES_VIEW_STORAGE_KEY, next)
+    }
+    navigate({
+      to: "/events/venues",
+      search: (prev: Record<string, unknown>) => ({
+        ...prev,
+        view: next,
+      }),
+      replace: true,
+    })
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -420,18 +549,22 @@ function VenuesPage() {
           </p>
         </div>
         {selectedPopupId && (
-          <Button asChild>
-            <Link to="/events/venues/new">
-              <Plus className="mr-2 h-4 w-4" />
-              Add Venue
-            </Link>
-          </Button>
+          <div className="flex items-center gap-2">
+            <VenuesViewSwitcher view={view} onViewChange={setView} />
+            <OrderVenuesDialog popupId={selectedPopupId} />
+            <Button asChild>
+              <Link to="/events/venues/new">
+                <Plus className="mr-2 h-4 w-4" />
+                Add Venue
+              </Link>
+            </Button>
+          </div>
         )}
       </div>
       {selectedPopupId ? (
         <QueryErrorBoundary>
           <Suspense fallback={<Skeleton className="h-64 w-full" />}>
-            <VenuesTableContent />
+            {view === "grid" ? <VenuesGridContent /> : <VenuesTableContent />}
           </Suspense>
         </QueryErrorBoundary>
       ) : (

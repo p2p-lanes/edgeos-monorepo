@@ -1,5 +1,6 @@
 "use client"
 
+import { MarkdownContent } from "@edgeos/shared-form-ui"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import {
   AlertTriangle,
@@ -8,16 +9,20 @@ import {
   CalendarCheck,
   CalendarDays,
   CalendarPlus,
+  Check,
   CheckCircle,
   Clock,
+  Globe,
   Home,
   Layers,
+  Lock,
   Mail,
   Map as MapIcon,
   MapPin,
   Pencil,
   Repeat,
   Send,
+  Share2,
   Tag,
   Trash2,
   User,
@@ -28,7 +33,7 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { useParams, useRouter, useSearchParams } from "next/navigation"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 import {
@@ -58,9 +63,83 @@ import { cn } from "@/lib/utils"
 import { useCityProvider } from "@/providers/cityProvider"
 import { AddToCalendarModal } from "../lib/AddToCalendarModal"
 import { CoverImage } from "../lib/CoverImage"
+import { canManageEvent } from "../lib/eventPermissions"
 import { summarizeRrule } from "../lib/summarizeRrule"
 import { useCalendarAddedFlag } from "../lib/useCalendarAddedFlag"
-import { useEventTimezone } from "../lib/useEventTimezone"
+import {
+  useEventTimezone,
+  usePortalEventSettings,
+} from "../lib/useEventTimezone"
+
+function AdminNotesSection({ eventId }: { eventId: string }) {
+  const { t } = useTranslation()
+  const queryClient = useQueryClient()
+  const [value, setValue] = useState("")
+  const [dirty, setDirty] = useState(false)
+
+  // Staff-only: this endpoint 403s for regular humans, so a non-staff user
+  // never reaches isSuccess and the section stays hidden. retry:false keeps the
+  // expected 403 from being retried.
+  const { data, isSuccess } = useQuery({
+    queryKey: ["portal-event-admin-notes", eventId],
+    queryFn: () => EventsService.getPortalEventAdminNotes({ eventId }),
+    retry: false,
+  })
+
+  useEffect(() => {
+    if (data && !dirty) setValue(data.notes ?? "")
+  }, [data, dirty])
+
+  const saveMutation = useMutation({
+    mutationFn: () =>
+      EventsService.updatePortalEventAdminNotes({
+        eventId,
+        requestBody: { notes: value.trim() ? value : null },
+      }),
+    onSuccess: (res) => {
+      setDirty(false)
+      queryClient.setQueryData(["portal-event-admin-notes", eventId], res)
+      toast.success(t("events.detail.admin_notes_saved_toast"))
+    },
+    onError: () => toast.error(t("events.detail.admin_notes_error_toast")),
+  })
+
+  if (!isSuccess) return null
+
+  return (
+    <div className="rounded-xl border bg-card p-4 space-y-3">
+      <div className="flex items-center gap-2">
+        <Lock className="h-4 w-4 text-muted-foreground" />
+        <h3 className="text-sm font-semibold">
+          {t("events.detail.admin_notes_heading")}
+        </h3>
+        <span className="text-xs text-muted-foreground">
+          {t("events.detail.admin_notes_staff_only")}
+        </span>
+      </div>
+      <Textarea
+        value={value}
+        rows={4}
+        placeholder={t("events.detail.admin_notes_placeholder") as string}
+        onChange={(e) => {
+          setValue(e.target.value)
+          setDirty(true)
+        }}
+      />
+      <div className="flex justify-end">
+        <Button
+          size="sm"
+          disabled={!dirty || saveMutation.isPending}
+          onClick={() => saveMutation.mutate()}
+        >
+          {saveMutation.isPending
+            ? t("events.detail.admin_notes_saving_button")
+            : t("events.detail.admin_notes_save_button")}
+        </Button>
+      </div>
+    </div>
+  )
+}
 
 export default function EventDetailPage() {
   const { t } = useTranslation()
@@ -91,7 +170,13 @@ export default function EventDetailPage() {
     ? `/portal/${city?.slug}/events?${fromSearch}&${focusQs}`
     : `/portal/${city?.slug}/events?${focusQs}`
   const queryClient = useQueryClient()
-  const { timezone, formatTime, formatDateFull } = useEventTimezone(city?.id)
+  const {
+    timezone,
+    formatTime,
+    formatDateFull,
+    isLoading: tzLoading,
+  } = useEventTimezone(city?.id)
+  const { data: eventSettings } = usePortalEventSettings(city?.id)
 
   const {
     data: event,
@@ -136,8 +221,7 @@ export default function EventDetailPage() {
     (p: EventParticipantPublic) => p.status !== "cancelled",
   )
 
-  const isOwner =
-    !!event && !!currentHuman && event.owner_id === currentHuman.id
+  const canManage = !!event && canManageEvent(event, currentHuman?.id)
 
   // RSVP state is sourced from the event's own `my_rsvp_status` field so
   // this page agrees with the list/day/calendar views (which read the
@@ -145,6 +229,14 @@ export default function EventDetailPage() {
   // attendee roster / count, not for deciding the caller's own status.
   const myRsvpStatus = event?.my_rsvp_status ?? null
   const isRsvped = !!myRsvpStatus && myRsvpStatus !== "cancelled"
+
+  // Capacity is enforced server-side against every active registration,
+  // including attendees who hid their name (and are therefore absent from
+  // the roster above). Prefer the backend count so the badge and the "full"
+  // state stay consistent with what registration actually allows.
+  const goingCount = event?.attendee_count ?? activeParticipants.length
+  const isFull =
+    event?.max_participant != null && goingCount >= event.max_participant
 
   // Recurring events require occurrence_start so the RSVP targets a single
   // instance; one-off events must not send it (the backend rejects mixing
@@ -186,6 +278,8 @@ export default function EventDetailPage() {
   })
 
   const [cancelEventOpen, setCancelEventOpen] = useState(false)
+  const [copied, setCopied] = useState(false)
+  const [copyingEmails, setCopyingEmails] = useState(false)
   const cancelEventMutation = useMutation({
     mutationFn: () =>
       EventsService.cancelPortalEvent({ eventId: params.eventId }),
@@ -221,7 +315,7 @@ export default function EventDetailPage() {
     queryKey: ["portal-event-invitations", params.eventId],
     queryFn: () =>
       EventsService.listPortalInvitations({ eventId: params.eventId }),
-    enabled: !!params.eventId && isOwner,
+    enabled: !!params.eventId && canManage,
   })
 
   const [emailsInput, setEmailsInput] = useState("")
@@ -290,7 +384,7 @@ export default function EventDetailPage() {
     },
   })
 
-  if (isLoading) {
+  if (isLoading || tzLoading) {
     return (
       <div className="flex items-center justify-center py-20">
         <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
@@ -344,9 +438,58 @@ export default function EventDetailPage() {
   })()
   const eventStarted = new Date(effectiveStartTime) <= new Date()
 
-  const coverUrl = event.cover_url || event.venue_image_url || null
+  const coverUrl =
+    event.cover_url ||
+    event.venue_image_url ||
+    eventSettings?.placeholder_url ||
+    null
   const coverCredit =
     !event.cover_url && event.venue_image_url ? event.venue_title : null
+
+  const sharePath = `/portal/${city?.slug}/events/${params.eventId}${
+    occParam ? `?occ=${encodeURIComponent(occParam)}` : ""
+  }`
+  const shareUrl =
+    typeof window !== "undefined"
+      ? `${window.location.origin}${sharePath}`
+      : sharePath
+
+  const handleShare = async () => {
+    try {
+      await navigator.clipboard.writeText(shareUrl)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+      toast.success(t("events.detail.share_link_copied"))
+    } catch {
+      toast.error(t("events.detail.share_link_error"))
+    }
+  }
+
+  // Managers (owner/host/collaborator) copy every active RSVPer's email in
+  // one click. The endpoint is gated server-side to the same roles and
+  // returns all registrants — including those who hid their name from the
+  // directory — so the organiser can actually reach everyone.
+  const handleCopyAttendeeEmails = async () => {
+    setCopyingEmails(true)
+    try {
+      const res = await EventParticipantsService.listPortalAttendeeEmails({
+        eventId: params.eventId,
+        occurrenceStart: occParam ?? undefined,
+      })
+      if (res.emails.length === 0) {
+        toast.info(t("events.detail.copy_attendee_emails_empty"))
+        return
+      }
+      await navigator.clipboard.writeText(res.emails.join(", "))
+      toast.success(
+        t("events.detail.copy_attendee_emails_done", { count: res.count }),
+      )
+    } catch {
+      toast.error(t("events.detail.copy_attendee_emails_error"))
+    } finally {
+      setCopyingEmails(false)
+    }
+  }
 
   return (
     <div className="max-w-2xl mx-auto p-4 sm:p-6 space-y-4">
@@ -368,7 +511,18 @@ export default function EventDetailPage() {
           <ArrowLeft className="h-4 w-4" /> {t("events.common.back_to_events")}
         </Link>
         <div className="flex items-center gap-2 shrink-0">
-          {isOwner && event.status !== "cancelled" && (
+          <Button asChild variant="outline" size="sm">
+            <a
+              href={`https://ee26.geobrowser.io/events/${event.id}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label={t("events.detail.view_on_geobrowser")}
+            >
+              <Globe className="mr-2 h-3.5 w-3.5" />
+              {t("events.detail.view_on_geobrowser")}
+            </a>
+          </Button>
+          {canManage && event.status !== "cancelled" && (
             <Dialog open={cancelEventOpen} onOpenChange={setCancelEventOpen}>
               <DialogTrigger asChild>
                 <Button
@@ -412,7 +566,7 @@ export default function EventDetailPage() {
               </DialogContent>
             </Dialog>
           )}
-          {isOwner && (
+          {canManage && (
             <Button asChild variant="outline" size="sm">
               <Link
                 href={`/portal/${city?.slug}/events/${event.id}/edit`}
@@ -440,7 +594,7 @@ export default function EventDetailPage() {
         </div>
       )}
 
-      {isOwner && event.status === "rejected" && event.rejection_reason && (
+      {canManage && event.status === "rejected" && event.rejection_reason && (
         <div className="flex items-start gap-2.5 rounded-xl border border-red-300 bg-red-50 p-3 text-red-900 dark:border-red-500/40 dark:bg-red-950/40 dark:text-red-100">
           <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0 text-red-600 dark:text-red-400" />
           <div className="text-sm">
@@ -508,7 +662,24 @@ export default function EventDetailPage() {
             </Badge>
           )}
         </div>
-        <h1 className="text-xl sm:text-2xl font-bold">{event.title}</h1>
+        <div className="flex items-start justify-between gap-3">
+          <h1 className="text-xl sm:text-2xl font-bold">{event.title}</h1>
+          {event.status === "published" && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleShare}
+              aria-label={t("events.detail.share_button")}
+              className="shrink-0"
+            >
+              {copied ? (
+                <Check className="h-4 w-4" />
+              ) : (
+                <Share2 className="h-4 w-4" />
+              )}
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Details card */}
@@ -533,6 +704,15 @@ export default function EventDetailPage() {
                   </Button>
                 )}
               </>
+            ) : isFull ? (
+              <Button
+                disabled
+                variant="secondary"
+                className="inline-flex items-center gap-2"
+              >
+                <Users className="h-4 w-4" />
+                {t("events.rsvp.full")}
+              </Button>
             ) : (
               <Button
                 onClick={() => registerMutation.mutate()}
@@ -558,7 +738,7 @@ export default function EventDetailPage() {
             </p>
             {timezone && (
               <p className="text-[11px] text-muted-foreground/80 mt-0.5">
-                — {t("events.common.in_timezone_time", { timezone })}
+                {t("events.common.in_timezone_time", { timezone })}
               </p>
             )}
           </div>
@@ -590,7 +770,7 @@ export default function EventDetailPage() {
               <Repeat className="h-4 w-4 text-blue-600" />
             </div>
             <p className="text-sm text-muted-foreground">
-              {summarizeRrule(event.rrule)}
+              {summarizeRrule(event.rrule, t)}
             </p>
           </div>
         )}
@@ -745,9 +925,10 @@ export default function EventDetailPage() {
           <h2 className="text-sm font-semibold mb-2">
             {t("events.detail.description_heading")}
           </h2>
-          <p className="text-sm text-muted-foreground whitespace-pre-wrap break-words">
-            {event.content}
-          </p>
+          <MarkdownContent
+            source={event.content}
+            className="text-muted-foreground break-words"
+          />
         </div>
       )}
 
@@ -790,8 +971,8 @@ export default function EventDetailPage() {
         </div>
       )}
 
-      {/* Owner-only: Paste attendees to invite */}
-      {isOwner && (
+      {/* Managers only (owner / host / collaborators): paste attendees to invite */}
+      {canManage && (
         <div className="rounded-xl border bg-card p-4 space-y-3">
           <div className="flex items-center gap-2">
             <Mail className="h-4 w-4 text-primary" />
@@ -866,6 +1047,8 @@ export default function EventDetailPage() {
         </div>
       )}
 
+      <AdminNotesSection eventId={event.id} />
+
       {/* Participants */}
       <div className="rounded-xl border bg-card p-4">
         <div className="flex items-center justify-between mb-3">
@@ -873,10 +1056,22 @@ export default function EventDetailPage() {
             {t("events.detail.participants_heading")}
           </h3>
           <span className="text-sm text-muted-foreground">
-            {activeParticipants.length}
+            {goingCount}
             {event.max_participant ? ` / ${event.max_participant}` : ""}
           </span>
         </div>
+        {canManage && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleCopyAttendeeEmails}
+            disabled={copyingEmails}
+            className="mb-3 w-full"
+          >
+            <Mail className="mr-2 h-4 w-4" />
+            {t("events.detail.copy_attendee_emails")}
+          </Button>
+        )}
         {activeParticipants.length === 0 ? (
           <p className="text-sm text-muted-foreground">
             {t("events.detail.no_participants_yet")}

@@ -83,10 +83,7 @@ def _require_third_party_session(
             raise
         if payload.issued_by_app_id is not None:
             return payload
-        if (
-            payload.issued_via == "third_party"
-            and payload.token_type == "human"
-        ):
+        if payload.issued_via == "third_party" and payload.token_type == "human":
             return payload
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

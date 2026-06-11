@@ -14,9 +14,14 @@ from loguru import logger
 
 from app.core.config import settings
 from app.services.email import (
+    EventCancelledContext,
     EventInvitationContext,
+    EventRsvpCancelledContext,
+    EventUpdatedContext,
     get_email_service,
 )
+from app.services.email.templates import EventChangeRow
+from app.services.event_datetime import format_event_when, format_event_when_range
 from app.services.ical import build_event_ics
 
 
@@ -163,10 +168,25 @@ async def send_event_itip(
     service = get_email_service()
     from_address = popup.tenant.sender_email if popup and popup.tenant else None
     from_name = popup.tenant.sender_name if popup and popup.tenant else None
+    # ORGANIZER must always be present and match the actual From, or clients
+    # (Gmail especially) treat the REQUEST as malformed / from a different
+    # organiser and silently refuse to update the existing entry. The email
+    # service sends from ``from_address or settings.SENDER_EMAIL``, so mirror
+    # that exact resolution so ORGANIZER == From in every case.
+    organizer_email = from_address or settings.SENDER_EMAIL
     organizer_name = from_name or popup_name or None
 
     is_cancelled = method == "CANCEL"
-    if is_cancelled:
+    # A self-RSVP cancellation reuses the iTIP CANCEL method (so the entry
+    # leaves the recipient's calendar) but must NOT read as an event
+    # cancellation — the event still exists, only this registration was
+    # withdrawn. Organiser-driven cancellations leave is_self_rsvp False.
+    is_self_cancel = is_cancelled and is_self_rsvp
+    if is_self_cancel:
+        subject = f"Your registration was cancelled: {event.title or 'an event'}"
+        if popup_name:
+            subject += f" — {popup_name}"
+    elif is_cancelled:
         subject = f"Event cancelled: {event.title or 'an event'}"
         if popup_name:
             subject += f" — {popup_name}"
@@ -190,32 +210,25 @@ async def send_event_itip(
         if recipient_occurrence and event.start_time and event.end_time:
             # For one occurrence of a recurring series, mirror what the ICS
             # does: shift the master duration onto the occurrence start.
+            # The occurrence instant is UTC; the master's tz localizes it.
             duration = event.end_time - event.start_time
-            when = _format_time_range(
-                recipient_occurrence, recipient_occurrence + duration
+            when = format_event_when_range(
+                recipient_occurrence,
+                recipient_occurrence + duration,
+                event.timezone,
             )
         elif recipient_occurrence:
-            when = _format_when(recipient_occurrence)
+            when = format_event_when(recipient_occurrence, event.timezone)
         else:
-            when = _format_time_range(event.start_time, event.end_time)
-        context = EventInvitationContext(
-            first_name=r["first_name"],
-            event_title=event.title or "",
-            popup_name=popup_name,
-            event_when=when,
-            venue_title=venue_title,
-            event_url=event_url,
-            is_self_rsvp=is_self_rsvp,
-            is_update=is_update,
-            is_cancelled=is_cancelled,
-            changes=changes or {},
-        )
+            when = format_event_when_range(
+                event.start_time, event.end_time, event.timezone
+            )
         try:
             ics_body = build_event_ics(
                 event,
                 recipient_email=r["email"],
                 recipient_name=r["first_name"] or None,
-                organizer_email=from_address,
+                organizer_email=organizer_email,
                 organizer_name=organizer_name,
                 event_url=event_url or None,
                 method=method,
@@ -232,17 +245,81 @@ async def send_event_itip(
             ics_body = None
 
         try:
-            await service.send_event_invitation(
-                to=r["email"],
-                subject=subject,
-                context=context,
-                from_address=from_address,
-                from_name=from_name,
-                popup_id=event.popup_id,
-                db_session=db,
-                ical_body=ics_body,
-                ical_method=method,
-            )
+            if is_self_cancel:
+                await service.send_event_rsvp_cancelled(
+                    to=r["email"],
+                    subject=subject,
+                    context=EventRsvpCancelledContext(
+                        first_name=r["first_name"],
+                        event_title=event.title or "",
+                        popup_name=popup_name,
+                        event_when=when,
+                        venue_title=venue_title,
+                        event_url=event_url,
+                    ),
+                    from_address=from_address,
+                    from_name=from_name,
+                    popup_id=event.popup_id,
+                    db_session=db,
+                    ical_body=ics_body,
+                )
+            elif is_cancelled:
+                await service.send_event_cancelled(
+                    to=r["email"],
+                    subject=subject,
+                    context=EventCancelledContext(
+                        first_name=r["first_name"],
+                        event_title=event.title or "",
+                        popup_name=popup_name,
+                        event_when=when,
+                        venue_title=venue_title,
+                    ),
+                    from_address=from_address,
+                    from_name=from_name,
+                    popup_id=event.popup_id,
+                    db_session=db,
+                    ical_body=ics_body,
+                )
+            elif is_update:
+                await service.send_event_updated(
+                    to=r["email"],
+                    subject=subject,
+                    context=EventUpdatedContext(
+                        first_name=r["first_name"],
+                        event_title=event.title or "",
+                        popup_name=popup_name,
+                        event_when=when,
+                        venue_title=venue_title,
+                        event_url=event_url,
+                        changes={
+                            k: EventChangeRow(**v) for k, v in (changes or {}).items()
+                        },
+                    ),
+                    from_address=from_address,
+                    from_name=from_name,
+                    popup_id=event.popup_id,
+                    db_session=db,
+                    ical_body=ics_body,
+                )
+            else:
+                await service.send_event_invitation(
+                    to=r["email"],
+                    subject=subject,
+                    context=EventInvitationContext(
+                        first_name=r["first_name"],
+                        event_title=event.title or "",
+                        popup_name=popup_name,
+                        event_when=when,
+                        venue_title=venue_title,
+                        event_url=event_url,
+                    ),
+                    from_address=from_address,
+                    from_name=from_name,
+                    popup_id=event.popup_id,
+                    db_session=db,
+                    ical_body=ics_body,
+                    ical_method=method,
+                )
         except Exception as exc:  # pragma: no cover - defensive
             logger.warning("Failed to send iTIP {} to {}: {}", method, r["email"], exc)
 
@@ -273,27 +350,6 @@ async def bump_and_dispatch_update(
         is_update=True,
         changes=changes,
     )
-
-
-def _format_when(dt: datetime | None) -> str:
-    return dt.strftime("%b %d, %Y at %H:%M") if dt else "—"
-
-
-def _format_time_range(start: datetime | None, end: datetime | None) -> str:
-    """Render a "Mon, May 5, 2026 at 14:00 – 15:00" style time range.
-
-    Falls back to start-only when end is missing or equal to start, and
-    expands to a full "<start> – <end-date end-time>" form when the event
-    spans multiple days.
-    """
-    if not start:
-        return "—"
-    start_str = _format_when(start)
-    if not end or end == start:
-        return start_str
-    if end.date() == start.date():
-        return f"{start_str} – {end.strftime('%H:%M')}"
-    return f"{start_str} – {_format_when(end)}"
 
 
 def _venue_name(db, venue_id) -> str:
@@ -334,9 +390,10 @@ def summarize_event_changes(db, before: dict, after) -> dict[str, dict[str, str]
         new_start = getattr(after, "start_time", None)
         new_end = getattr(after, "end_time", None)
         if old_start != new_start or old_end != new_end:
+            tz = getattr(after, "timezone", None)
             changes["time"] = {
-                "before": _format_time_range(old_start, old_end),
-                "after": _format_time_range(new_start, new_end),
+                "before": format_event_when_range(old_start, old_end, tz),
+                "after": format_event_when_range(new_start, new_end, tz),
             }
 
     if "venue_id" in before:
@@ -390,9 +447,17 @@ def calendar_fields_changed(before: dict, after) -> bool:
         "venue_id",
         "custom_location_name",
         "custom_location_url",
+        # Also material for what the calendar entry shows / when it recurs:
+        "meeting_url",  # the join link for online events (rendered as LOCATION)
+        "content",  # description
+        "timezone",
+        "rrule",
+        "recurrence_exdates",
     )
     for f in fields:
-        if before.get(f) != getattr(after, f, None):
+        # Only compare fields the caller actually snapshotted, so a partial
+        # ``before`` dict never reports a spurious change.
+        if f in before and before[f] != getattr(after, f, None):
             return True
     return False
 

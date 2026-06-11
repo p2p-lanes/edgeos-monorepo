@@ -67,7 +67,7 @@ export function TagsPopover({
             </button>
           )}
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2 max-h-64 overflow-y-auto pr-1">
           {sortedTags.map((tag) => {
             const isActive = selectedTags.includes(tag)
             return (

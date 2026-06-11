@@ -229,6 +229,39 @@ const useCheckoutState = ({
     },
   })
 
+  // Existing applicant arriving through a group invite link. Persists the
+  // group membership on their current application so the backend auto-accepts
+  // it (mirrors the form-submit path, which also sends group_id). Without this
+  // the payment step 403s with "Application must be accepted before purchasing
+  // products" because the reused draft/in-review application is never accepted.
+  const joinGroupMutation = useMutation({
+    mutationFn: async () => {
+      if (!popupId) throw new Error("No popup selected")
+      if (!groupId) throw new Error("No group selected")
+      return ApplicationsService.updateMyApplication({
+        popupId,
+        requestBody: { group_id: groupId },
+      })
+    },
+    onMutate: () => {
+      setCheckoutState("processing")
+      setErrorMessage(null)
+    },
+    onSuccess: (application) => {
+      queryClient.setQueryData(queryKeys.applications.mine(), [application])
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.attendees.byHumanPopup(popupId),
+      })
+      setCheckoutState("passes")
+      setErrorMessage(null)
+    },
+    onError: (error: unknown) => {
+      const detail = error instanceof ApiError ? getApiErrorDetail(error) : null
+      setErrorMessage(detail ?? "Something went wrong. Please try again.")
+      setCheckoutState("form")
+    },
+  })
+
   const handleSubmit = async (
     formData: DefaultCheckoutFormData | CheckoutApplicationValues,
   ): Promise<void> => {
@@ -241,6 +274,8 @@ const useCheckoutState = ({
     errorMessage,
     handleSubmit,
     setCheckoutState,
+    joinGroupAsApplicant: joinGroupMutation.mutate,
+    isJoiningGroup: joinGroupMutation.isPending,
   }
 }
 

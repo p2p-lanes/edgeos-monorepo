@@ -8,6 +8,8 @@ interface FormPageLayoutProps {
   description: string
   backTo: string
   onBack?: () => void
+  /** Optional header actions rendered on the right of the title row. */
+  actions?: React.ReactNode
   children: React.ReactNode
 }
 
@@ -16,6 +18,7 @@ export function FormPageLayout({
   description,
   backTo,
   onBack,
+  actions,
   children,
 }: FormPageLayoutProps) {
   const goBack = useGoBack({ to: backTo })
@@ -35,6 +38,9 @@ export function FormPageLayout({
           <h1 className="text-2xl font-bold tracking-tight">{title}</h1>
           <p className="text-muted-foreground">{description}</p>
         </div>
+        {actions && (
+          <div className="ml-auto flex items-center gap-2">{actions}</div>
+        )}
       </div>
       {children}
     </div>

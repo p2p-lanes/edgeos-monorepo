@@ -21,6 +21,7 @@ from app.api.tenant.models import Tenants
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _superadmin_headers(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
@@ -29,7 +30,13 @@ def _admin_headers(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
-def _make_tenant(db: Session, *, suffix: str, custom_domain: str | None = None, custom_domain_active: bool = False) -> Tenants:
+def _make_tenant(
+    db: Session,
+    *,
+    suffix: str,
+    custom_domain: str | None = None,
+    custom_domain_active: bool = False,
+) -> Tenants:
     t = Tenants(
         name=f"LM Tenant {suffix}",
         slug=f"lm-tenant-{suffix}",
@@ -59,6 +66,7 @@ def _make_active_direct_popup(db: Session, tenant: Tenants, *, slug: str) -> Pop
 # ---------------------------------------------------------------------------
 # 5.2 — router PATCH role-gate and merged-state validation
 # ---------------------------------------------------------------------------
+
 
 def test_admin_cannot_set_landing_mode(
     client: TestClient,
@@ -155,6 +163,7 @@ def test_superadmin_rejected_checkout_when_no_custom_domain(
 # 5.3 — GET /by-domain response shape (T-7, T-8, T-9)
 # ---------------------------------------------------------------------------
 
+
 def test_by_domain_checkout_with_active_popup(
     client: TestClient,
     db: Session,
@@ -222,6 +231,7 @@ def test_by_domain_portal_mode_no_popup_slug(
 # 5.6 — Cache invalidation on landing_mode change (T-6)
 # ---------------------------------------------------------------------------
 
+
 def test_cache_invalidated_on_landing_mode_change(
     client: TestClient,
     db: Session,
@@ -239,13 +249,17 @@ def test_cache_invalidated_on_landing_mode_change(
 
     invalidate_calls: list[str] = []
 
-    original_invalidate = __import__("app.core.redis", fromlist=["domain_cache"]).domain_cache.invalidate
+    original_invalidate = __import__(
+        "app.core.redis", fromlist=["domain_cache"]
+    ).domain_cache.invalidate
 
     def capture_invalidate(d: str) -> None:
         invalidate_calls.append(d)
         original_invalidate(d)
 
-    with patch("app.core.redis.domain_cache.invalidate", side_effect=capture_invalidate):
+    with patch(
+        "app.core.redis.domain_cache.invalidate", side_effect=capture_invalidate
+    ):
         resp = client.patch(
             f"/api/v1/tenants/{t.id}",
             # Flip from checkout → portal (an actual landing_mode change)
@@ -265,16 +279,22 @@ def test_cache_also_invalidated_on_custom_domain_active_flip(
     """ADR-2 latent gap fix: cache invalidated when custom_domain_active flips."""
     suffix = uuid.uuid4().hex[:6]
     domain = f"t6b-{suffix}.example.com"
-    t = _make_tenant(db, suffix=suffix, custom_domain=domain, custom_domain_active=False)
+    t = _make_tenant(
+        db, suffix=suffix, custom_domain=domain, custom_domain_active=False
+    )
 
     invalidate_calls: list[str] = []
-    original_invalidate = __import__("app.core.redis", fromlist=["domain_cache"]).domain_cache.invalidate
+    original_invalidate = __import__(
+        "app.core.redis", fromlist=["domain_cache"]
+    ).domain_cache.invalidate
 
     def capture_invalidate(d: str) -> None:
         invalidate_calls.append(d)
         original_invalidate(d)
 
-    with patch("app.core.redis.domain_cache.invalidate", side_effect=capture_invalidate):
+    with patch(
+        "app.core.redis.domain_cache.invalidate", side_effect=capture_invalidate
+    ):
         resp = client.patch(
             f"/api/v1/tenants/{t.id}",
             json={"custom_domain_active": True},

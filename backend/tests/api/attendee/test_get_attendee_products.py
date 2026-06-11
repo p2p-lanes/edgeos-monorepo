@@ -134,7 +134,9 @@ class TestGetAttendeeDetail:
         )
         data = response.json()
         products = data.get("products", [])
-        assert len(products) >= 1, "Attendee with one ticket must have products[] non-empty"
+        assert len(products) >= 1, (
+            "Attendee with one ticket must have products[] non-empty"
+        )
         assert products[0]["check_in_code"] == code, (
             f"Expected check_in_code='{code}', got {products[0].get('check_in_code')!r}"
         )

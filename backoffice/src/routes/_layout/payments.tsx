@@ -261,6 +261,24 @@ function InvoiceButton({ paymentId }: { paymentId: string }) {
 function getColumns(hasInvoice: boolean): ColumnDef<PaymentPublic>[] {
   const cols: ColumnDef<PaymentPublic>[] = [
     {
+      id: "buyer",
+      header: "Buyer",
+      cell: ({ row }) => {
+        const email = row.original.buyer_email
+        const name = row.original.buyer_name
+        if (!email && !name)
+          return <span className="text-muted-foreground">—</span>
+        return (
+          <div className="flex flex-col">
+            <span className="font-medium">{email ?? name}</span>
+            {email && name ? (
+              <span className="text-xs text-muted-foreground">{name}</span>
+            ) : null}
+          </div>
+        )
+      },
+    },
+    {
       accessorKey: "amount",
       header: ({ column }) => <SortableHeader label="Amount" column={column} />,
       cell: ({ row }) => (
@@ -453,6 +471,7 @@ function PaymentSubRow({ row }: { row: Row<PaymentPublic> }) {
       <table className="w-full">
         <thead>
           <tr className="text-xs text-muted-foreground">
+            <th className="pb-2 text-left font-medium">Attendee</th>
             <th className="pb-2 text-left font-medium">Product</th>
             <th className="pb-2 text-left font-medium">Type</th>
             <th className="pb-2 text-right font-medium">Qty</th>
@@ -463,22 +482,22 @@ function PaymentSubRow({ row }: { row: Row<PaymentPublic> }) {
         <tbody className="text-sm">
           {entries.map(([attendeeId, { name, items }], groupIdx) => (
             <Fragment key={attendeeId}>
-              <tr>
-                <td
-                  colSpan={5}
-                  className={`pb-1 text-xs font-semibold tracking-wide text-muted-foreground ${groupIdx > 0 ? "pt-3" : ""}`}
-                >
-                  {name}
-                </td>
-              </tr>
               {items.map((item, i) => {
                 const unitPrice = resolveLineUnitPrice(item)
                 const lineTotal = unitPrice * item.quantity
                 return (
                   <tr
                     key={`${attendeeId}-${item.product_name}-${i}`}
-                    className="border-b border-border/40 last:border-0"
+                    className={`border-b border-border/40 last:border-0 ${i === 0 && groupIdx > 0 ? "border-t border-border/60" : ""}`}
                   >
+                    {i === 0 ? (
+                      <td
+                        rowSpan={items.length}
+                        className="py-1.5 pr-4 align-top text-xs font-semibold tracking-wide text-muted-foreground"
+                      >
+                        {name}
+                      </td>
+                    ) : null}
                     <td className="py-1.5 pr-4">{item.product_name}</td>
                     <td className="py-1.5 pr-4 text-muted-foreground">
                       {categoryLabels[item.product_category] ??
@@ -502,7 +521,7 @@ function PaymentSubRow({ row }: { row: Row<PaymentPublic> }) {
         <tfoot className="text-sm">
           {hasBreakdown && (
             <tr className="border-t border-border/40">
-              <td colSpan={4} className="pt-2 text-right text-muted-foreground">
+              <td colSpan={5} className="pt-2 text-right text-muted-foreground">
                 Subtotal
               </td>
               <td className="pt-2 pl-4 text-right font-mono tabular-nums text-muted-foreground">
@@ -513,7 +532,7 @@ function PaymentSubRow({ row }: { row: Row<PaymentPublic> }) {
           {hasDiscount && (
             <tr>
               <td
-                colSpan={4}
+                colSpan={5}
                 className="py-0.5 text-right text-muted-foreground"
               >
                 {discountLabel}
@@ -526,7 +545,7 @@ function PaymentSubRow({ row }: { row: Row<PaymentPublic> }) {
           {hasInsurance && (
             <tr>
               <td
-                colSpan={4}
+                colSpan={5}
                 className="py-0.5 text-right text-muted-foreground"
               >
                 Insurance
@@ -539,7 +558,7 @@ function PaymentSubRow({ row }: { row: Row<PaymentPublic> }) {
           {hasContribution && (
             <tr>
               <td
-                colSpan={4}
+                colSpan={5}
                 className="py-0.5 text-right text-muted-foreground"
               >
                 Contribution
@@ -550,7 +569,7 @@ function PaymentSubRow({ row }: { row: Row<PaymentPublic> }) {
             </tr>
           )}
           <tr className={hasBreakdown ? "" : "border-t border-border/40"}>
-            <td colSpan={4} className="pt-1.5 text-right font-semibold">
+            <td colSpan={5} className="pt-1.5 text-right font-semibold">
               Total
             </td>
             <td className="pt-1.5 pl-4 text-right font-mono font-semibold tabular-nums">

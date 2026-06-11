@@ -112,9 +112,9 @@ class TestMaxPerOrderVsTotalStockCap:
                 total_stock_cap=5,
             )
         errors = exc_info.value.errors()
-        assert any("max_per_order" in str(e) or "total_stock_cap" in str(e) for e in errors), (
-            f"expected cross-field error in errors, got: {errors}"
-        )
+        assert any(
+            "max_per_order" in str(e) or "total_stock_cap" in str(e) for e in errors
+        ), f"expected cross-field error in errors, got: {errors}"
 
     def test_product_create_max_per_order_equals_stock_cap_accepted(self) -> None:
         """ProductCreate with max_per_order == total_stock_cap → allowed."""
@@ -159,9 +159,9 @@ class TestMaxPerOrderVsTotalStockCap:
         with pytest.raises(ValidationError) as exc_info:
             ProductUpdate(max_per_order=10, total_stock_cap=5)
         errors = exc_info.value.errors()
-        assert any("max_per_order" in str(e) or "total_stock_cap" in str(e) for e in errors), (
-            f"expected cross-field error in errors, got: {errors}"
-        )
+        assert any(
+            "max_per_order" in str(e) or "total_stock_cap" in str(e) for e in errors
+        ), f"expected cross-field error in errors, got: {errors}"
 
     def test_product_update_max_per_order_valid_combination_accepted(self) -> None:
         """ProductUpdate with max_per_order <= total_stock_cap → allowed."""

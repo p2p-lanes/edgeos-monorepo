@@ -1,8 +1,7 @@
-import ReactMarkdown from "react-markdown"
-import remarkGfm from "remark-gfm"
 import type { RichTextConfig } from "../../types"
 import { Checkbox } from "../Checkbox"
 import { FormInputWrapper } from "../FormInputWrapper"
+import { MarkdownRenderer } from "../MarkdownContent"
 
 export interface RichTextFormProps {
   id: string
@@ -27,39 +26,6 @@ const markdownClass =
   "[&>ul]:my-1 [&>ul]:list-disc [&>ul]:pl-5 " +
   "[&>ol]:my-1 [&>ol]:list-decimal [&>ol]:pl-5 " +
   "[&_strong]:font-semibold [&_em]:italic"
-
-function Markdown({
-  source,
-  stopAnchorPropagation,
-}: {
-  source: string
-  stopAnchorPropagation?: boolean
-}) {
-  return (
-    <ReactMarkdown
-      remarkPlugins={[remarkGfm]}
-      components={{
-        a: ({ children, ...props }) => (
-          <a
-            {...props}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-primary underline"
-            // Prevent the surrounding <label> from toggling the checkbox when
-            // the user actually intends to follow the link.
-            onClick={
-              stopAnchorPropagation ? (e) => e.stopPropagation() : undefined
-            }
-          >
-            {children}
-          </a>
-        ),
-      }}
-    >
-      {source}
-    </ReactMarkdown>
-  )
-}
 
 export function RichTextForm({
   id,
@@ -98,7 +64,7 @@ export function RichTextForm({
               disabled ? "cursor-not-allowed" : "cursor-pointer"
             }`}
           >
-            <Markdown source={content} stopAnchorPropagation />
+            <MarkdownRenderer source={content} stopAnchorPropagation />
           </label>
         </div>
         {error && <p className="text-red-500 text-sm">{error}</p>}
@@ -109,7 +75,7 @@ export function RichTextForm({
   return (
     <FormInputWrapper>
       <div className={markdownClass}>
-        <Markdown source={content} />
+        <MarkdownRenderer source={content} />
       </div>
     </FormInputWrapper>
   )

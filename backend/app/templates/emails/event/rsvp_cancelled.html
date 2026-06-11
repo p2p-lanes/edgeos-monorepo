@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+
+{% block title %}Your registration was cancelled: {{ event_title }}{% endblock %}
+
+{% block content %}
+<h1>Your registration was cancelled</h1>
+
+<p>Hi {{ first_name or "there" }},</p>
+
+<p>
+    You have cancelled your registration for the event below, and the entry has been removed from your calendar. The event itself is still taking place.
+</p>
+
+<div style="background-color: #f8f9fa; border-radius: 8px; padding: 20px; margin: 20px 0;">
+    <table style="width: 100%; border-collapse: collapse;">
+        <tr>
+            <td style="padding: 8px 12px; color: #666; vertical-align: top; width: 110px;">Event:</td>
+            <td style="padding: 8px 12px; font-weight: 600;">{{ event_title }}</td>
+        </tr>
+        {% if event_when %}
+        <tr>
+            <td style="padding: 8px 12px; color: #666; vertical-align: top;">Time:</td>
+            <td style="padding: 8px 12px; font-weight: 600;">{{ event_when }}</td>
+        </tr>
+        {% endif %}
+        {% if venue_title %}
+        <tr>
+            <td style="padding: 8px 12px; color: #666; vertical-align: top;">Location:</td>
+            <td style="padding: 8px 12px; font-weight: 600;">{{ venue_title }}</td>
+        </tr>
+        {% endif %}
+    </table>
+</div>
+
+{% if event_url %}
+<p class="text-center">
+    <a href="{{ event_url }}" class="button">View event &amp; RSVP again</a>
+</p>
+{% endif %}
+{% endblock %}

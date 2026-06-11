@@ -475,6 +475,34 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             "sections": sections_snapshot,
         }
 
+    def _finalize_zero_amount_payment(
+        self,
+        session: Session,
+        payment: Payments,
+        products: list[PaymentProductRequest],
+        *,
+        granted_by_user_id: uuid.UUID | None = None,
+    ) -> Payments:
+        """Auto-approve a $0 payment and materialize tickets, flush-only.
+
+        Used by three flows that all converge on the same write:
+        - authenticated application checkout when discounts zero the cart
+        - anonymous open-ticketing checkout when a 100% coupon zeroes it
+        - admin bulk grant ($0 comps).
+
+        Sets status=APPROVED, optionally records `granted_by_user_id` (admin
+        grant only), and INSERTs AttendeeProducts for the given line items.
+        Does NOT commit — callers own the transaction boundary so this helper
+        can participate in a larger atomic batch (admin grant) or be paired
+        with caller-side commit + email dispatch (self-service flows).
+        """
+        payment.status = PaymentStatus.APPROVED.value
+        if granted_by_user_id is not None:
+            payment.granted_by_user_id = granted_by_user_id
+        self._add_products_to_attendees(session, products, payment_id=payment.id)
+        session.flush()
+        return payment
+
     def create_open_ticketing_payment(
         self,
         session: Session,
@@ -592,6 +620,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             # don't appear in this flow today) bypass any coupon discount.
             discountable_amount = Decimal("0")
             non_discountable_amount = Decimal("0")
+            payment_products: list[PaymentProducts] = []
             for line in obj.products:
                 product = products_map[line.product_id]
                 line_total = product.price * line.quantity
@@ -601,33 +630,24 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                     discountable_amount += line_total
 
                 for _ in range(line.quantity):
-                    # One AttendeeProducts row per ticket — Design §2.2
-                    session.add(
-                        AttendeeProducts(
-                            id=uuid.uuid4(),
-                            tenant_id=tenant.id,
-                            attendee_id=attendee.id,
-                            product_id=product.id,
-                            check_in_code=generate_check_in_code(
-                                (popup.slug or "")[:3].upper()
-                            ),
-                            payment_id=payment.id,
-                        )
+                    # PaymentProducts snapshot only — AttendeeProducts are created
+                    # by approve_payment via _add_products_to_attendees when the
+                    # webhook confirms the payment. Pre-creating them here caused
+                    # duplicates (double the tickets) on every approved checkout.
+                    pp = PaymentProducts(
+                        tenant_id=tenant.id,
+                        payment_id=payment.id,
+                        product_id=product.id,
+                        attendee_id=attendee.id,
+                        quantity=1,
+                        product_name=product.name,
+                        product_description=product.description,
+                        product_price=product.price,
+                        product_category=product.category or "",
+                        product_currency=popup.currency,
                     )
-                    session.add(
-                        PaymentProducts(
-                            tenant_id=tenant.id,
-                            payment_id=payment.id,
-                            product_id=product.id,
-                            attendee_id=attendee.id,
-                            quantity=1,
-                            product_name=product.name,
-                            product_description=product.description,
-                            product_price=product.price,
-                            product_category=product.category or "",
-                            product_currency=popup.currency,
-                        )
-                    )
+                    session.add(pp)
+                    payment_products.append(pp)
 
             discountable_amount = discountable_amount.quantize(
                 MONEY_PRECISION, rounding=ROUND_HALF_UP
@@ -653,6 +673,31 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 coupons_crud.use_coupon(session, coupon.id)
 
             payment.amount = discountable_amount + non_discountable_amount
+
+            # Zero-amount short-circuit: a 100% coupon zeroed the cart, so
+            # SimpleFI has nothing to charge and would either reject or auto-
+            # approve without firing the webhook. Share the auto-approval path
+            # with the authenticated flow so both stay in lock-step (without
+            # this, the open-ticketing buyer never received tickets nor the
+            # confirmation email).
+            if payment.amount == Decimal("0"):
+                self._finalize_zero_amount_payment(
+                    session,
+                    payment,
+                    [
+                        PaymentProductRequest(
+                            product_id=pp.product_id,
+                            attendee_id=pp.attendee_id,
+                            quantity=pp.quantity,
+                        )
+                        for pp in payment_products
+                    ],
+                )
+                # Helper is flush-only — own the commit here so the router
+                # can fire the confirmation email against the persisted row.
+                session.commit()
+                session.refresh(payment)
+                return payment, ""
 
             if not popup.simplefi_api_key:
                 raise HTTPException(
@@ -1107,8 +1152,11 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         statement = self._apply_sorting(statement, validated_sort, sort_order)
         statement = statement.offset(skip).limit(limit)
         statement = statement.options(
-            selectinload(Payments.products_snapshot).selectinload(  # ty: ignore[invalid-argument-type]
-                PaymentProducts.attendee  # ty: ignore[invalid-argument-type]
+            selectinload(Payments.products_snapshot)  # ty: ignore[invalid-argument-type]
+            .selectinload(PaymentProducts.attendee)  # ty: ignore[invalid-argument-type]
+            .selectinload(Attendees.human),  # ty: ignore[invalid-argument-type]
+            selectinload(Payments.application).selectinload(  # ty: ignore[invalid-argument-type]
+                Applications.human  # ty: ignore[invalid-argument-type]
             ),
         )
         results = list(session.exec(statement).all())
@@ -1143,8 +1191,11 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         statement = self._apply_sorting(statement, validated_sort, sort_order)
         statement = statement.offset(skip).limit(limit)
         statement = statement.options(
-            selectinload(Payments.products_snapshot).selectinload(  # ty: ignore[invalid-argument-type]
-                PaymentProducts.attendee  # ty: ignore[invalid-argument-type]
+            selectinload(Payments.products_snapshot)  # ty: ignore[invalid-argument-type]
+            .selectinload(PaymentProducts.attendee)  # ty: ignore[invalid-argument-type]
+            .selectinload(Attendees.human),  # ty: ignore[invalid-argument-type]
+            selectinload(Payments.application).selectinload(  # ty: ignore[invalid-argument-type]
+                Applications.human  # ty: ignore[invalid-argument-type]
             ),
         )
         results = list(session.exec(statement).all())
@@ -1195,6 +1246,24 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Some products are not available or inactive",
             )
+
+        # Reject products outside their sale window. The portal renders the
+        # cart client-side, so this is the authoritative gate that closes the
+        # stale-tab loophole — and it enforces precise cutoffs such as
+        # meal-plan order deadlines (``sale_ends_at`` carries a full datetime).
+        # Only the time window is checked here; ``sold_out`` is left to the
+        # atomic stock decrement downstream (which raises 409), preserving the
+        # existing out-of-stock contract.
+        for product in valid_products:
+            state = derive_product_state(product)
+            if state in (ProductSaleState.ended, ProductSaleState.upcoming):
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=(
+                        f"Product '{product.name}' is not on sale "
+                        f"(state: {state.value})"
+                    ),
+                )
 
         return valid_products
 
@@ -1700,12 +1769,8 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             session.add(payment)
             session.flush()
 
-            # Auto-approve and add products directly
-            self._add_products_to_attendees(
-                session, obj.products, payment_id=payment.id
-            )
-
-            # Get product details for snapshot
+            # Build product snapshots before approval so they're available
+            # when AttendeeProducts are materialized in the finalizer.
             product_ids = [p.product_id for p in obj.products]
             prod_statement = select(Products).where(
                 Products.id.in_(product_ids),  # type: ignore[attr-defined]
@@ -1713,7 +1778,6 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             )
             products_map = {p.id: p for p in session.exec(prod_statement).all()}
 
-            # Create product snapshots
             for req_prod in obj.products:
                 product = products_map.get(req_prod.product_id)
                 if product:
@@ -1748,6 +1812,11 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             )
 
             session.add(application)
+
+            # Shared finalizer: materializes AttendeeProducts and flushes.
+            # Same code path as the anonymous open-ticketing flow and the
+            # admin bulk-grant flow so they can't drift again.
+            self._finalize_zero_amount_payment(session, payment, obj.products)
             session.commit()
             session.refresh(payment)
 

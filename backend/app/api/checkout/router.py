@@ -14,6 +14,8 @@ from app.api.checkout.schemas import (
     OpenTicketingPurchaseResponse,
 )
 from app.api.payment.crud import payments_crud
+from app.api.payment.router import _send_payment_confirmed_email
+from app.api.payment.schemas import PaymentStatus
 from app.core.dependencies.tenants import PublicTenant
 from app.core.dependencies.users import SessionDep
 from app.core.rate_limit import RateLimit
@@ -65,6 +67,9 @@ async def purchase_open_ticketing(
         popup=popup,
         tenant=tenant,
     )
+
+    if payment.status == PaymentStatus.APPROVED.value:
+        await _send_payment_confirmed_email(payment, db_session=db)
 
     return OpenTicketingPurchaseResponse(
         payment_id=payment.id,

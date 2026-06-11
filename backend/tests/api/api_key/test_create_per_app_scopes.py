@@ -123,7 +123,11 @@ class TestPerAppScopeSubset:
         resp = client.post(
             CREATE_URL,
             headers=_bearer(token),
-            json={"name": "rsvp-key", "scopes": ["rsvp:write"], "expires_at": _expiry()},
+            json={
+                "name": "rsvp-key",
+                "scopes": ["rsvp:write"],
+                "expires_at": _expiry(),
+            },
         )
         assert resp.status_code == 403, resp.text
         assert "rsvp:write" in resp.json()["detail"]
@@ -238,7 +242,11 @@ class TestLegacyJwtFallback:
         resp = client.post(
             CREATE_URL,
             headers=_bearer(token),
-            json={"name": "legacy-rsvp-key", "scopes": ["rsvp:write"], "expires_at": _expiry()},
+            json={
+                "name": "legacy-rsvp-key",
+                "scopes": ["rsvp:write"],
+                "expires_at": _expiry(),
+            },
         )
         assert resp.status_code == 201, resp.text
 
@@ -264,6 +272,10 @@ class TestLegacyJwtFallback:
         resp = client.post(
             CREATE_URL,
             headers=_bearer(token),
-            json={"name": "legacy-venues-key", "scopes": ["venues:write"], "expires_at": _expiry()},
+            json={
+                "name": "legacy-venues-key",
+                "scopes": ["venues:write"],
+                "expires_at": _expiry(),
+            },
         )
         assert resp.status_code == 403, resp.text

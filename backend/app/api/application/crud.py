@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 
 from fastapi import HTTPException, status
 from sqlalchemy import desc, exists, or_
+from sqlalchemy.dialects import postgresql
 from sqlalchemy.orm import selectinload
 from sqlmodel import Session, col, func, select
 
@@ -26,6 +27,12 @@ from app.api.shared.crud import BaseCRUD
 
 if TYPE_CHECKING:
     from app.api.human.models import Humans
+
+
+# Attendee categories shown in the Portal attendee directory. Kids (and any
+# other non-adult categories) are intentionally excluded — only the main
+# applicant and their spouse appear.
+DIRECTORY_VISIBLE_CATEGORY_KEYS = ("main", "spouse")
 
 
 def _is_draft_status(status_value: object) -> bool:
@@ -80,6 +87,9 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
                 selectinload(Applications.attendees)  # type: ignore[arg-type]
                 .selectinload(Attendees.attendee_products)  # type: ignore[arg-type]
                 .selectinload(AttendeeProducts.product),  # type: ignore[arg-type]
+                selectinload(Applications.attendees).selectinload(  # type: ignore[arg-type]
+                    Attendees.category_ref  # type: ignore[arg-type]
+                ),
                 selectinload(Applications.human),  # type: ignore[arg-type]
             )
             .order_by(desc(Applications.created_at))  # type: ignore[arg-type]
@@ -139,6 +149,9 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
                 selectinload(Applications.attendees)  # type: ignore[arg-type]
                 .selectinload(Attendees.attendee_products)  # type: ignore[arg-type]
                 .selectinload(AttendeeProducts.product),  # type: ignore[arg-type]
+                selectinload(Applications.attendees).selectinload(  # type: ignore[arg-type]
+                    Attendees.category_ref  # type: ignore[arg-type]
+                ),
                 selectinload(Applications.human),  # type: ignore[arg-type]
             )
             .order_by(desc(Applications.created_at))  # type: ignore[arg-type]
@@ -173,6 +186,9 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
                 selectinload(Applications.attendees)  # type: ignore[arg-type]
                 .selectinload(Attendees.attendee_products)  # type: ignore[arg-type]
                 .selectinload(AttendeeProducts.product),  # type: ignore[arg-type]
+                selectinload(Applications.attendees).selectinload(  # type: ignore[arg-type]
+                    Attendees.category_ref  # type: ignore[arg-type]
+                ),
                 selectinload(Applications.human),  # type: ignore[arg-type]
             )
             .order_by(desc(Applications.created_at))  # type: ignore[arg-type]
@@ -190,45 +206,50 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         skip: int = 0,
         limit: int = 100,
         q: str | None = None,
-    ) -> tuple[list[Applications], int]:
-        """Find applications for the attendees directory.
+    ) -> tuple[list[Attendees], int]:
+        """Find attendees for the attendees directory.
 
-        Returns accepted applications whose main attendee has at least one
-        product assigned. Supports text search across human fields.
+        Returns ticket-holding attendees whose parent application is accepted —
+        one entry per person, sourced from that attendee's own Human record.
+        Only the main applicant and spouse categories are listed; kids (and any
+        other categories) are excluded. Supports text search across the
+        attendee's own human fields.
         """
+        # Root on attendees so the spouse appears as their own row, not just
+        # nested under the main applicant. Gate on an accepted parent
+        # application, on the attendee holding at least one product, and on the
+        # category being directory-visible (main/spouse — kids are excluded).
+        has_products = exists().where(AttendeeProducts.attendee_id == Attendees.id)
         base_statement = (
-            select(Applications)
-            .where(Applications.popup_id == popup_id)
-            .where(
-                Applications.status.in_(  # type: ignore[union-attr]
-                    [
-                        ApplicationStatus.ACCEPTED.value,
-                    ]
-                )
+            select(Attendees)
+            .join(Applications, Attendees.application_id == Applications.id)  # type: ignore[arg-type]
+            .join(
+                AttendeeCategories,
+                Attendees.category_id == AttendeeCategories.id,  # type: ignore[arg-type]
             )
+            .where(Attendees.popup_id == popup_id)
+            .where(Applications.status == ApplicationStatus.ACCEPTED.value)
+            .where(has_products)
+            .where(col(AttendeeCategories.key).in_(DIRECTORY_VISIBLE_CATEGORY_KEYS))
         )
 
-        # Primary attendee must have at least one product
-        # Attendees.category column was dropped in PR 2 — filter via category_id FK
-        has_products = (
-            exists()
-            .where(Attendees.application_id == Applications.id)
-            .where(Attendees.category_id == AttendeeCategories.id)
-            .where(AttendeeCategories.is_primary.is_(True))  # type: ignore[union-attr]
-            .where(AttendeeProducts.attendee_id == Attendees.id)
-        )
-        base_statement = base_statement.where(has_products)
-
-        # Text search across human fields
+        # Text search across the attendee's OWN human fields, so companions are
+        # searchable by their own name/email — not the main applicant's.
         if q:
             search_term = f"%{q}%"
             base_statement = base_statement.join(
                 Humans,
-                Applications.human_id == Humans.id,  # type: ignore[arg-type]
+                Attendees.human_id == Humans.id,  # type: ignore[arg-type]
             ).where(
                 or_(
                     col(Humans.first_name).ilike(search_term),
                     col(Humans.last_name).ilike(search_term),
+                    # Full name ("first last") so a query spanning both fields —
+                    # e.g. "eva shang" — matches; the per-field checks above only
+                    # catch a term that fits within a single column.
+                    func.concat_ws(
+                        " ", Humans.first_name, Humans.last_name
+                    ).ilike(search_term),
                     col(Humans.email).ilike(search_term),
                     col(Humans.telegram).ilike(search_term),
                 )
@@ -238,21 +259,124 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         count_statement = select(func.count()).select_from(base_statement.subquery())
         total = session.exec(count_statement).one()
 
-        # Eager load
+        # Eager load: the attendee's tickets+products, its category, the parent
+        # application (for main-applicant masking/custom_fields). human is
+        # already selectin-loaded on the relationship.
         statement = (
             base_statement.options(
-                selectinload(Applications.attendees)  # type: ignore[arg-type]
-                .selectinload(Attendees.attendee_products)  # type: ignore[arg-type]
-                .selectinload(AttendeeProducts.product),  # type: ignore[arg-type]
-                selectinload(Applications.human),  # type: ignore[arg-type]
+                selectinload(Attendees.attendee_products).selectinload(  # type: ignore[arg-type]
+                    AttendeeProducts.product  # type: ignore[arg-type]
+                ),
+                selectinload(Attendees.category_ref),  # type: ignore[arg-type]
+                selectinload(Attendees.application),  # type: ignore[arg-type]
+                selectinload(Attendees.human),  # type: ignore[arg-type]
             )
-            .order_by(desc(Applications.created_at))  # type: ignore[arg-type]
+            .order_by(desc(Attendees.created_at))  # type: ignore[arg-type]
             .offset(skip)
             .limit(limit)
         )
         results = list(session.exec(statement).all())
 
         return results, total
+
+    def find_directory_humans(
+        self,
+        session: Session,
+        popup_id: uuid.UUID,
+        q: str | None = None,
+        skip: int = 0,
+        limit: int = 20,
+    ) -> tuple[list["Humans"], int]:
+        """Find humans in the Portal attendee directory who share their name.
+
+        Same population as ``find_directory`` (accepted application, the attendee
+        holds at least one product, directory-visible main/spouse category) but
+        returns the distinct underlying Humans instead of Attendee rows. Powers
+        the event host picker: a creator may only pick a host who actually
+        attends this popup AND has not hidden their name for it.
+
+        Applications that listed "first_name" or "last_name" in
+        ``info_not_shared`` are excluded — picking them would surface a name the
+        attendee chose to hide. Humans with no usable name are also excluded so
+        the picker never renders a blank entry. Optional ``q`` does an ilike
+        match on the human's first/last name.
+        """
+        has_products = exists().where(AttendeeProducts.attendee_id == Attendees.id)
+        # info_not_shared is a Postgres text[] column, so name-hiding is detected
+        # with the array-overlap operator (&&): true when the list shares any
+        # element with {first_name, last_name}. (?| is a JSONB operator and does
+        # NOT apply to a real array column.) Negated to EXCLUDE those rows.
+        hides_name = col(Applications.info_not_shared).op("&&")(
+            postgresql.array(("first_name", "last_name"))
+        )
+        has_name = or_(
+            func.trim(func.coalesce(col(Humans.first_name), "")) != "",
+            func.trim(func.coalesce(col(Humans.last_name), "")) != "",
+        )
+
+        base_statement = (
+            select(Humans)
+            .join(Attendees, Attendees.human_id == Humans.id)  # type: ignore[arg-type]
+            .join(Applications, Attendees.application_id == Applications.id)  # type: ignore[arg-type]
+            .join(
+                AttendeeCategories,
+                Attendees.category_id == AttendeeCategories.id,  # type: ignore[arg-type]
+            )
+            .where(Attendees.popup_id == popup_id)
+            .where(Applications.status == ApplicationStatus.ACCEPTED.value)
+            .where(has_products)
+            .where(col(AttendeeCategories.key).in_(DIRECTORY_VISIBLE_CATEGORY_KEYS))
+            .where(~hides_name)
+            .where(has_name)
+        )
+
+        if q:
+            search_term = f"%{q}%"
+            base_statement = base_statement.where(
+                or_(
+                    col(Humans.first_name).ilike(search_term),
+                    col(Humans.last_name).ilike(search_term),
+                    # Full name so "first last" queries match (see find_directory).
+                    func.concat_ws(
+                        " ", Humans.first_name, Humans.last_name
+                    ).ilike(search_term),
+                )
+            )
+
+        distinct_statement = base_statement.distinct()
+        count_statement = select(func.count()).select_from(
+            distinct_statement.subquery()
+        )
+        total = session.exec(count_statement).one()
+
+        results = list(session.exec(distinct_statement.offset(skip).limit(limit)).all())
+        return results, total
+
+    def human_ids_hiding_name(
+        self,
+        session: Session,
+        popup_id: uuid.UUID,
+        human_ids: list[uuid.UUID],
+    ) -> set[uuid.UUID]:
+        """Return the subset of ``human_ids`` who hid their name for ``popup_id``.
+
+        A human hides their name when their Application for the popup lists
+        "first_name" or "last_name" in ``info_not_shared``. Used to drop those
+        people from portal-facing participant/RSVP lists.
+        """
+        if not human_ids:
+            return set()
+
+        hides_name = col(Applications.info_not_shared).op("&&")(
+            postgresql.array(("first_name", "last_name"))
+        )
+        statement = (
+            select(Applications.human_id)
+            .where(Applications.popup_id == popup_id)
+            .where(col(Applications.human_id).in_(human_ids))
+            .where(hides_name)
+        )
+        return set(session.exec(statement).all())
 
     def create_internal(
         self,
@@ -815,6 +939,85 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         session.add(snapshot)
         session.flush()
         return snapshot
+
+    def promote_to_accepted(
+        self,
+        session: Session,
+        application: Applications,
+    ) -> Applications:
+        """Flush-only flip of an existing Application to ACCEPTED.
+
+        Used by the admin bulk-grant endpoint when a Human already has an
+        application for the popup but it is still in draft/in-review/etc.
+        Sets `accepted_at`, writes an audit snapshot, and flushes — the
+        caller owns the transaction so the entire grant batch stays atomic.
+
+        Idempotent: a no-op when the application is already accepted.
+        """
+        if application.status == ApplicationStatus.ACCEPTED.value:
+            return application
+
+        application.status = ApplicationStatus.ACCEPTED.value
+        application.accepted_at = datetime.now(UTC)
+        session.add(application)
+        self.create_snapshot(session, application, "admin_grant_accepted")
+        return application
+
+    def create_for_admin_grant(
+        self,
+        session: Session,
+        *,
+        tenant_id: uuid.UUID,
+        popup_id: uuid.UUID,
+        human: "Humans",
+    ) -> Applications:
+        """Flush-only minimal Application + main Attendee for admin bulk grants.
+
+        Skips custom_fields validation, approval strategy, group whitelisting,
+        and the form-section fee gate — admin grants bypass user-facing checks
+        because they are the staff-side equivalent of marking a ticket as comp.
+        Status is hard-set to ACCEPTED and `accepted_at`/`submitted_at` are
+        stamped to now.
+
+        Caller owns the transaction boundary so a sold-out failure mid-batch
+        rolls back every Human/Application/Attendee created in this run.
+        """
+        from app.api.attendee_category.crud import attendee_categories_crud
+        from app.api.form_field.crud import form_fields_crud
+
+        now = datetime.now(UTC)
+        application = Applications(
+            tenant_id=tenant_id,
+            popup_id=popup_id,
+            human_id=human.id,
+            status=ApplicationStatus.ACCEPTED.value,
+            submitted_at=now,
+            accepted_at=now,
+            custom_fields_schema=form_fields_crud.build_schema_for_popup(
+                session, popup_id
+            ),
+        )
+        session.add(application)
+        session.flush()
+
+        main_cat = attendee_categories_crud.get_primary_for_popup(session, popup_id)
+        name = (
+            f"{human.first_name or ''} {human.last_name or ''}".strip() or human.email
+        )
+        attendee = Attendees(
+            tenant_id=tenant_id,
+            application_id=application.id,
+            popup_id=popup_id,
+            name=name,
+            email=human.email,
+            gender=human.gender,
+            human_id=human.id,
+            category_id=main_cat.id if main_cat else None,
+        )
+        session.add(attendee)
+        self.create_snapshot(session, application, "admin_grant_created")
+        session.flush()
+        return application
 
     def accept(
         self,

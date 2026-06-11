@@ -14,6 +14,7 @@ from loguru import logger
 
 from app.core.config import settings as app_settings
 from app.services.email import get_email_service
+from app.services.event_datetime import format_event_when_range
 
 if TYPE_CHECKING:
     from app.api.event.models import Events
@@ -70,8 +71,9 @@ async def notify_event_pending_approval(
         f"<p>A new event has been submitted and is pending approval.</p>"
         f"<ul>"
         f"<li><b>Title:</b> {event.title}</li>"
-        f"<li><b>When:</b> {event.start_time.isoformat()} "
-        f"→ {event.end_time.isoformat()}</li>"
+        f"<li><b>When:</b> "
+        f"{format_event_when_range(event.start_time, event.end_time, event.timezone)}"
+        f"</li>"
         f"<li><b>Reason:</b> {reason}</li>"
         f"<li><b>Event ID:</b> {event.id}</li>"
         f"</ul>"

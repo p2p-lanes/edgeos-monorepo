@@ -1,4 +1,5 @@
 import uuid
+from datetime import UTC, datetime
 
 from sqlalchemy.orm import selectinload
 from sqlmodel import Session, func, select
@@ -82,11 +83,17 @@ class CartsCRUD:
         cart: Carts,
         items: CartState,
     ) -> Carts:
-        """Replace cart items."""
+        """Replace cart items.
+
+        Sets updated_at client-side instead of reloading from the DB after
+        commit: the committed row is authoritative and a post-commit reload
+        races with concurrent deletes (DELETE /my/{popup_id}, checkout cleanup),
+        which under RLS surfaces as "Could not refresh instance".
+        """
         cart.items = items.model_dump()
+        cart.updated_at = datetime.now(UTC)
         session.add(cart)
         session.commit()
-        session.refresh(cart)
         return cart
 
     def delete_by_human_popup(

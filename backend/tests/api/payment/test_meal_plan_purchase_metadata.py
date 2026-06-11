@@ -221,7 +221,9 @@ class TestSimpleFiPaidPath:
                     AttendeeProducts.product_id == product.id,
                 )
             ).first()
-            assert ap is not None, "approve_payment did not materialize attendee_products"
+            assert ap is not None, (
+                "approve_payment did not materialize attendee_products"
+            )
             assert ap.purchase_metadata == SAMPLE_METADATA, (
                 "approve_payment dropped purchase_metadata when rebuilding from "
                 "products_snapshot (regression of PR-#179 fix)"

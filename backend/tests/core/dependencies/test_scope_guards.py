@@ -266,7 +266,11 @@ class TestBackwardsCompatibility:
         assert "portal:*" in payload.scopes
 
         # Must pass all three guards.
-        for scope in ("portal:applications:read", "portal:directory:read", "portal:api_keys:manage"):
+        for scope in (
+            "portal:applications:read",
+            "portal:directory:read",
+            "portal:api_keys:manage",
+        ):
             guard = require_human_scope(scope)  # type: ignore[arg-type]
             guard(payload)  # Should not raise
 

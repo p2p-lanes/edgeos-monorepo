@@ -27,11 +27,15 @@ from app.services.email.templates import (
     ApplicationAcceptedWithIncentiveContext,
     ApplicationReceivedContext,
     ApplicationRejectedContext,
+    CheckInPassContext,
     EditPassesConfirmedContext,
     EmailTemplates,
     EventApprovalApprovedContext,
     EventApprovalRejectedContext,
+    EventCancelledContext,
     EventInvitationContext,
+    EventRsvpCancelledContext,
+    EventUpdatedContext,
     LoginCodeHumanContext,
     LoginCodeUserContext,
     PaymentConfirmedContext,
@@ -695,6 +699,95 @@ class EmailService:
             ical_method=ical_method,
         )
 
+    async def send_event_updated(
+        self,
+        to: str,
+        subject: str,
+        context: EventUpdatedContext,
+        from_address: str | None = None,
+        from_name: str | None = None,
+        popup_id: uuid.UUID | None = None,
+        db_session: Session | None = None,
+        attachments: list[EmailAttachment] | None = None,
+        ical_body: str | None = None,
+    ) -> bool:
+        """Send event update notification with optional inline iTIP body."""
+        return await self._send_with_fallback(
+            to=to,
+            subject=subject,
+            template_type=EmailTemplateType.EVENT_UPDATED,
+            template_name=EmailTemplates.EVENT_UPDATED,
+            context=context.model_dump(exclude_none=True),
+            from_address=from_address,
+            from_name=from_name,
+            popup_id=popup_id,
+            db_session=db_session,
+            attachments=attachments,
+            ical_body=ical_body,
+            ical_method="REQUEST",
+        )
+
+    async def send_event_cancelled(
+        self,
+        to: str,
+        subject: str,
+        context: EventCancelledContext,
+        from_address: str | None = None,
+        from_name: str | None = None,
+        popup_id: uuid.UUID | None = None,
+        db_session: Session | None = None,
+        attachments: list[EmailAttachment] | None = None,
+        ical_body: str | None = None,
+    ) -> bool:
+        """Send event cancellation notice with optional inline iTIP body."""
+        return await self._send_with_fallback(
+            to=to,
+            subject=subject,
+            template_type=EmailTemplateType.EVENT_CANCELLED,
+            template_name=EmailTemplates.EVENT_CANCELLED,
+            context=context.model_dump(exclude_none=True),
+            from_address=from_address,
+            from_name=from_name,
+            popup_id=popup_id,
+            db_session=db_session,
+            attachments=attachments,
+            ical_body=ical_body,
+            ical_method="CANCEL",
+        )
+
+    async def send_event_rsvp_cancelled(
+        self,
+        to: str,
+        subject: str,
+        context: EventRsvpCancelledContext,
+        from_address: str | None = None,
+        from_name: str | None = None,
+        popup_id: uuid.UUID | None = None,
+        db_session: Session | None = None,
+        attachments: list[EmailAttachment] | None = None,
+        ical_body: str | None = None,
+    ) -> bool:
+        """Send a self-service RSVP cancellation confirmation.
+
+        The recipient cancelled their own registration, so this carries the
+        iTIP CANCEL body to drop the entry from their calendar while the copy
+        makes clear the event itself was not cancelled.
+        """
+        return await self._send_with_fallback(
+            to=to,
+            subject=subject,
+            template_type=EmailTemplateType.EVENT_RSVP_CANCELLED,
+            template_name=EmailTemplates.EVENT_RSVP_CANCELLED,
+            context=context.model_dump(exclude_none=True),
+            from_address=from_address,
+            from_name=from_name,
+            popup_id=popup_id,
+            db_session=db_session,
+            attachments=attachments,
+            ical_body=ical_body,
+            ical_method="CANCEL",
+        )
+
     async def send_event_approval_approved(
         self,
         to: str,
@@ -734,6 +827,29 @@ class EmailService:
             subject=subject,
             template_type=EmailTemplateType.EVENT_APPROVAL_REJECTED,
             template_name=EmailTemplates.EVENT_APPROVAL_REJECTED,
+            context=context.model_dump(exclude_none=True),
+            from_address=from_address,
+            from_name=from_name,
+            popup_id=popup_id,
+            db_session=db_session,
+        )
+
+    async def send_check_in_pass(
+        self,
+        to: str,
+        subject: str,
+        context: CheckInPassContext,
+        from_address: str | None = None,
+        from_name: str | None = None,
+        popup_id: uuid.UUID | None = None,
+        db_session: Session | None = None,
+    ) -> bool:
+        """Send the scheduled check-in pass email (with check-in QR codes)."""
+        return await self._send_with_fallback(
+            to=to,
+            subject=subject,
+            template_type=EmailTemplateType.CHECK_IN_PASS,
+            template_name=EmailTemplates.CHECK_IN_PASS,
             context=context.model_dump(exclude_none=True),
             from_address=from_address,
             from_name=from_name,

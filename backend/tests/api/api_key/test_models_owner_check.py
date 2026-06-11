@@ -44,9 +44,7 @@ def _make_api_key_row(
 class TestApiKeysOwnerXorConstraint:
     """Four-way matrix: both-null, both-set, human-only, user-only."""
 
-    def test_insert_with_both_null_fails(
-        self, db: Session, tenant_a: Tenants
-    ) -> None:
+    def test_insert_with_both_null_fails(self, db: Session, tenant_a: Tenants) -> None:
         """DB must reject a row where both human_id and user_id are NULL."""
         row = _make_api_key_row(
             tenant_id=tenant_a.id,

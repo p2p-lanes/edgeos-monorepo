@@ -1,16 +1,91 @@
-import { useQuery, useSuspenseQuery } from "@tanstack/react-query"
+import {
+  useMutation,
+  useQuery,
+  useQueryClient,
+  useSuspenseQuery,
+} from "@tanstack/react-query"
 import { createFileRoute } from "@tanstack/react-router"
-import { CalendarClock } from "lucide-react"
-import { Suspense } from "react"
+import { CalendarClock, Lock } from "lucide-react"
+import { Suspense, useEffect, useState } from "react"
 
 import { type EventPublic, EventsService, HumansService } from "@/client"
 import { FormPageLayout } from "@/components/Common/FormPageLayout"
 import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
 import { EventForm } from "@/components/forms/EventForm"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Button } from "@/components/ui/button"
+import { Label } from "@/components/ui/label"
 import { Skeleton } from "@/components/ui/skeleton"
+import { Textarea } from "@/components/ui/textarea"
 import useAuth from "@/hooks/useAuth"
+import useCustomToast from "@/hooks/useCustomToast"
 import { useGoBack } from "@/hooks/useGoBack"
+
+function AdminNotesCard({ eventId }: { eventId: string }) {
+  const queryClient = useQueryClient()
+  const { showSuccessToast, showErrorToast } = useCustomToast()
+  const [value, setValue] = useState("")
+  const [dirty, setDirty] = useState(false)
+
+  const { data, isLoading } = useQuery({
+    queryKey: ["event-admin-notes", eventId],
+    queryFn: () => EventsService.getEventAdminNotes({ eventId }),
+  })
+
+  // Seed the textarea from the server once (and on refetch) unless the user
+  // has started editing, so we don't clobber in-progress typing.
+  useEffect(() => {
+    if (data && !dirty) setValue(data.notes ?? "")
+  }, [data, dirty])
+
+  const saveMutation = useMutation({
+    mutationFn: () =>
+      EventsService.updateEventAdminNotes({
+        eventId,
+        requestBody: { notes: value.trim() ? value : null },
+      }),
+    onSuccess: (res) => {
+      setDirty(false)
+      queryClient.setQueryData(["event-admin-notes", eventId], res)
+      showSuccessToast("Notes saved")
+    },
+    onError: () => showErrorToast("Could not save notes"),
+  })
+
+  return (
+    <div className="mx-auto max-w-2xl space-y-2 rounded-xl border bg-muted/30 p-4">
+      <div className="flex items-center gap-2">
+        <Lock className="h-3.5 w-3.5 text-muted-foreground" />
+        <Label htmlFor="admin-notes" className="text-sm font-medium">
+          Admin notes
+        </Label>
+        <span className="text-xs text-muted-foreground">
+          Internal — visible only to staff
+        </span>
+      </div>
+      <Textarea
+        id="admin-notes"
+        rows={4}
+        value={value}
+        disabled={isLoading}
+        placeholder="Notes about this event, visible only to backoffice staff…"
+        onChange={(e) => {
+          setValue(e.target.value)
+          setDirty(true)
+        }}
+      />
+      <div className="flex justify-end">
+        <Button
+          size="sm"
+          disabled={!dirty || saveMutation.isPending}
+          onClick={() => saveMutation.mutate()}
+        >
+          {saveMutation.isPending ? "Saving…" : "Save notes"}
+        </Button>
+      </div>
+    </div>
+  )
+}
 
 function getInitials(
   firstName: string | null | undefined,
@@ -91,7 +166,7 @@ function CreatedByCard({ event }: { event: EventPublic }) {
   )
 }
 
-export const Route = createFileRoute("/_layout/events/$eventId/edit")({
+export const Route = createFileRoute("/_layout/events/$eventId_/edit")({
   component: EditEventPage,
   head: () => ({
     meta: [{ title: "Edit Event - EdgeOS" }],
@@ -118,6 +193,7 @@ function EditEventContent({ eventId }: { eventId: string }) {
         popupTimezone={popupTimezone}
         onSuccess={goBack}
       />
+      <AdminNotesCard eventId={eventId} />
     </div>
   )
 }

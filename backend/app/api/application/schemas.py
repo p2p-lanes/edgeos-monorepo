@@ -259,6 +259,73 @@ class ApplicationAdminCreate(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
 
+class GrantProductItem(BaseModel):
+    """One product line in the admin bulk-grant request."""
+
+    product_id: uuid.UUID
+    quantity: int = 1
+
+    @field_validator("quantity")
+    @classmethod
+    def validate_quantity(cls, v: int) -> int:
+        if v < 1:
+            raise ValueError("quantity must be >= 1")
+        return v
+
+
+class PersonGrantItem(BaseModel):
+    """One row of the admin bulk-grant CSV: a person to grant tickets to."""
+
+    email: str
+    first_name: str | None = None
+    last_name: str | None = None
+    products: list[GrantProductItem]
+
+    @field_validator("email")
+    @classmethod
+    def clean_email(cls, v: str) -> str:
+        return v.lower().strip()
+
+    @field_validator("products")
+    @classmethod
+    def _non_empty(cls, v: list[GrantProductItem]) -> list[GrantProductItem]:
+        if not v:
+            raise ValueError("each person needs at least one product")
+        return v
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+
+class AdminGrantTicketsRequest(BaseModel):
+    """Admin bulk-grant request: assign N free tickets to M people for a popup."""
+
+    popup_id: uuid.UUID
+    people: list[PersonGrantItem]
+
+    @field_validator("people")
+    @classmethod
+    def validate_people(cls, v: list[PersonGrantItem]) -> list[PersonGrantItem]:
+        if not v:
+            raise ValueError("At least one person is required")
+        return v
+
+
+class GrantedPaymentInfo(BaseModel):
+    """One $0 payment created by the admin bulk-grant flow."""
+
+    payment_id: uuid.UUID
+    application_id: uuid.UUID
+    human_id: uuid.UUID
+    email: str
+    tickets_created: int
+
+
+class AdminGrantTicketsResponse(BaseModel):
+    """Response payload from POST /applications/admin/grant-tickets."""
+
+    granted: list[GrantedPaymentInfo]
+
+
 class ApplicationFilter(BaseModel):
     """Filters for application queries."""
 
@@ -469,11 +536,15 @@ class PopupAccessResponse(BaseModel):
 
 
 class AttendeesDirectoryEntry(BaseModel):
-    """Single entry in the attendees directory."""
+    """Single entry in the attendees directory.
 
-    id: uuid.UUID  # application id
+    The directory is attendee-centric: one entry per ticket-holding attendee
+    (any category), sourced from that attendee's own human record.
+    """
 
-    # Human profile (from application.human)
+    id: uuid.UUID  # attendee id
+
+    # Human profile (from attendee.human)
     first_name: str | None = None
     last_name: str | None = None
     email: str | None = None
@@ -485,10 +556,14 @@ class AttendeesDirectoryEntry(BaseModel):
     gender: str | None = None
     picture_url: str | None = None
 
+    # Attendee category key (main/spouse/kid/...) so the UI can badge companions
+    category: str | None = None
+
     # Participation
     participation: list[DirectoryProduct] = []
 
-    # Associated attendees (spouse/kids)
+    # Deprecated: the directory is now attendee-centric, so each person is their
+    # own entry. Kept (always empty) for backward-compatible client typing.
     associated_attendees: list[AssociatedAttendee] = []
 
     model_config = ConfigDict(from_attributes=True)

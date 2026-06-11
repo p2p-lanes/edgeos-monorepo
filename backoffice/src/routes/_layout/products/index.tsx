@@ -2,7 +2,7 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query"
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router"
 import type { ColumnDef } from "@tanstack/react-table"
 import { Package, Plus, QrCode, ShieldCheck } from "lucide-react"
-import { Suspense } from "react"
+import { Suspense, useCallback } from "react"
 
 import { type ProductPublic, ProductsService } from "@/client"
 import { DataTable, SortableHeader } from "@/components/Common/DataTable"
@@ -11,10 +11,18 @@ import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
 import { StatusBadge } from "@/components/Common/StatusBadge"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
 import { Button } from "@/components/ui/button"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
 import useAuth from "@/hooks/useAuth"
 import {
+  type TableSearchParams,
   useTableSearchParams,
   validateTableSearch,
 } from "@/hooks/useTableSearchParams"
@@ -32,6 +40,7 @@ function getProductsQueryOptions(
   page: number,
   pageSize: number,
   search?: string,
+  category?: string,
   sortBy?: string,
   sortOrder?: "asc" | "desc",
 ) {
@@ -42,20 +51,30 @@ function getProductsQueryOptions(
         limit: pageSize,
         popupId: popupId || undefined,
         search: search || undefined,
+        category: category || undefined,
         sortBy: sortBy || undefined,
         sortOrder: sortOrder || undefined,
       }),
     queryKey: [
       "products",
       popupId,
-      { page, pageSize, search, sortBy, sortOrder },
+      { page, pageSize, search, category, sortBy, sortOrder },
     ],
   }
 }
 
+type ProductsSearchParams = TableSearchParams & {
+  category?: string
+}
+
 export const Route = createFileRoute("/_layout/products/")({
   component: Products,
-  validateSearch: validateTableSearch,
+  validateSearch: (raw: Record<string, unknown>): ProductsSearchParams => ({
+    ...validateTableSearch(raw),
+    ...(typeof raw.category === "string" && raw.category
+      ? { category: raw.category }
+      : {}),
+  }),
   head: () => ({
     meta: [{ title: "Products - EdgeOS" }],
   }),
@@ -119,8 +138,8 @@ const columns: ColumnDef<ProductPublic>[] = [
     ),
   },
   {
-    accessorKey: "attendee_category",
-    header: "Category",
+    accessorKey: "category",
+    header: ({ column }) => <SortableHeader label="Category" column={column} />,
     cell: ({ row }) => <StatusBadge status={row.original.category || "N/A"} />,
   },
   {
@@ -184,6 +203,35 @@ const columns: ColumnDef<ProductPublic>[] = [
   },
 ]
 
+function ProductCategoryFilter({
+  categories,
+  selected,
+  onSelect,
+}: {
+  categories: string[]
+  selected: string | undefined
+  onSelect: (value: string | undefined) => void
+}) {
+  return (
+    <Select
+      value={selected ?? "all"}
+      onValueChange={(v) => onSelect(v === "all" ? undefined : v)}
+    >
+      <SelectTrigger className="h-9 w-[170px]">
+        <SelectValue placeholder="All categories" />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="all">All categories</SelectItem>
+        {categories.map((c) => (
+          <SelectItem key={c} value={c}>
+            {c}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  )
+}
+
 function ProductsTableContent() {
   const navigate = useNavigate()
   const { selectedPopupId } = useWorkspace()
@@ -198,6 +246,22 @@ function ProductsTableContent() {
     setPagination,
     setSorting,
   } = useTableSearchParams(searchParams, "/products")
+  const { category } = searchParams
+
+  const setCategory = useCallback(
+    (value: string | undefined) => {
+      navigate({
+        to: "/products",
+        search: (prev: Record<string, unknown>) => ({
+          ...prev,
+          category: value,
+          page: 0,
+        }),
+        replace: true,
+      })
+    },
+    [navigate],
+  )
 
   const { data: products } = useQuery({
     ...getProductsQueryOptions(
@@ -205,10 +269,18 @@ function ProductsTableContent() {
       pagination.pageIndex,
       pagination.pageSize,
       search,
+      category,
       sortBy,
       sortOrder,
     ),
     placeholderData: keepPreviousData,
+  })
+
+  const { data: categories } = useQuery({
+    queryKey: ["product-categories", selectedPopupId],
+    queryFn: () =>
+      ProductsService.listProductCategories({ popupId: selectedPopupId! }),
+    enabled: !!selectedPopupId,
   })
 
   if (!products) return <Skeleton className="h-64 w-full" />
@@ -220,7 +292,7 @@ function ProductsTableContent() {
       searchPlaceholder="Search by name..."
       hiddenOnMobile={[
         "description",
-        "attendee_category",
+        "category",
         "duration_type",
         "exclusive",
         "insurance_eligible",
@@ -240,8 +312,32 @@ function ProductsTableContent() {
         sorting: sorting,
         onSortingChange: setSorting,
       }}
+      filterBar={
+        <div className="flex flex-wrap items-center gap-2">
+          <ProductCategoryFilter
+            categories={categories ?? []}
+            selected={category}
+            onSelect={setCategory}
+          />
+          {category && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setCategory(undefined)}
+            >
+              Clear
+            </Button>
+          )}
+        </div>
+      }
       emptyState={
-        !search ? (
+        category ? (
+          <EmptyState
+            icon={Package}
+            title="No products match this category"
+            description="Try a different category or clear the filter above."
+          />
+        ) : !search ? (
           <EmptyState
             icon={Package}
             title="No products yet"

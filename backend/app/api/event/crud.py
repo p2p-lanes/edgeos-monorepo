@@ -2,7 +2,7 @@ import uuid
 from collections.abc import Iterable
 from datetime import datetime, timedelta
 
-from sqlalchemy import asc, or_
+from sqlalchemy import asc, or_, text
 from sqlmodel import Session, col, delete, func, select
 
 from app.api.event.models import EventHiddenByHuman, EventInvitations, Events
@@ -36,9 +36,12 @@ class EventsCRUD(BaseCRUD[Events, EventCreate, EventUpdate]):
         venue_id: uuid.UUID | None = None,
         location_kind: str | None = None,
         track_ids: list[uuid.UUID] | None = None,
+        owner_id: uuid.UUID | None = None,
+        managed_by_human_id: uuid.UUID | None = None,
         tags: list[str] | None = None,
         search: str | None = None,
         visibility: EventVisibility | None = None,
+        exclude_visibility: list[EventVisibility] | None = None,
         exclude_statuses: list[EventStatus] | None = None,
         expand_occurrences: bool | None = None,
     ) -> tuple[list[Events], int]:
@@ -57,6 +60,10 @@ class EventsCRUD(BaseCRUD[Events, EventCreate, EventUpdate]):
             statement = statement.where(col(Events.status).not_in(exclude_statuses))
         if visibility is not None:
             statement = statement.where(Events.visibility == visibility)
+        if exclude_visibility:
+            statement = statement.where(
+                col(Events.visibility).not_in(exclude_visibility)
+            )
         if kind is not None:
             statement = statement.where(Events.kind == kind)
         if venue_id is not None:
@@ -71,6 +78,21 @@ class EventsCRUD(BaseCRUD[Events, EventCreate, EventUpdate]):
             statement = statement.where(Events.custom_location_name.is_(None))  # type: ignore[union-attr]
         if track_ids:
             statement = statement.where(col(Events.track_id).in_(track_ids))
+        if owner_id is not None:
+            statement = statement.where(Events.owner_id == owner_id)
+        if managed_by_human_id is not None:
+            # Events the human manages: owner, designated host, or a listed
+            # collaborator. Pushed into SQL so pagination counts the managed
+            # set (not a post-filtered page) — otherwise a managed event past
+            # the limit would never be fetched. ``collaborator_ids`` is a
+            # native uuid[], so ``= ANY(...)`` checks membership.
+            statement = statement.where(
+                or_(
+                    Events.owner_id == managed_by_human_id,
+                    Events.host_id == managed_by_human_id,
+                    col(Events.collaborator_ids).any(managed_by_human_id),
+                )
+            )
         if tags:
             # Postgres JSONB ?| operator: any of the provided tags present.
             # The right operand must be text[] — wrapping with array() makes
@@ -120,6 +142,75 @@ class EventsCRUD(BaseCRUD[Events, EventCreate, EventUpdate]):
 
         return results, total
 
+    def find_in_range_expanded(
+        self,
+        session: Session,
+        popup_id: uuid.UUID,
+        *,
+        start_after: datetime | None = None,
+        start_before: datetime | None = None,
+        event_status: EventStatus | None = None,
+        search: str | None = None,
+        tags: list[str] | None = None,
+        track_ids: list[uuid.UUID] | None = None,
+        managed_by_human_id: uuid.UUID | None = None,
+    ) -> list[Events]:
+        """Return occurrence-expanded events in a window for a popup.
+
+        Applies the same filters as ``find_by_popup`` (including the
+        recurring-master OR bypass so series starting before the window
+        are still expanded) but without pagination — a month-sized window
+        is naturally bounded.  Results are ordered by ``start_time`` asc
+        and fully expanded via ``_expand_rows_in_window``.
+        """
+        statement = select(Events).where(Events.popup_id == popup_id)
+
+        if event_status is not None:
+            statement = statement.where(Events.status == event_status)
+        if managed_by_human_id is not None:
+            # Events the human manages: owner, designated host, or a listed
+            # collaborator. Pushed into SQL so the "My events" calendar matches
+            # the list view's managed channel.
+            statement = statement.where(
+                or_(
+                    Events.owner_id == managed_by_human_id,
+                    Events.host_id == managed_by_human_id,
+                    col(Events.collaborator_ids).any(managed_by_human_id),
+                )
+            )
+        if track_ids:
+            statement = statement.where(col(Events.track_id).in_(track_ids))
+        if tags:
+            from sqlalchemy.dialects.postgresql import array
+
+            statement = statement.where(Events.tags.op("?|")(array(list(tags))))
+        if start_after is not None:
+            statement = statement.where(
+                or_(
+                    Events.rrule.is_not(None),  # type: ignore[union-attr]
+                    Events.start_time >= start_after,
+                )
+            )
+        if start_before is not None:
+            statement = statement.where(
+                or_(
+                    Events.rrule.is_not(None),  # type: ignore[union-attr]
+                    Events.start_time <= start_before,
+                )
+            )
+        if search:
+            statement = statement.where(col(Events.title).ilike(f"%{search}%"))
+
+        statement = statement.order_by(asc(Events.start_time))
+        results = list(session.exec(statement).all())
+
+        return _expand_rows_in_window(
+            session,
+            results,
+            window_start=start_after,
+            window_end=start_before,
+        )
+
     def find_by_owner(
         self,
         session: Session,
@@ -136,6 +227,96 @@ class EventsCRUD(BaseCRUD[Events, EventCreate, EventUpdate]):
             sort_order="asc",
             owner_id=owner_id,
             popup_id=popup_id,
+        )
+
+    def list_distinct_tags(
+        self,
+        db: Session,
+        *,
+        popup_id: uuid.UUID,
+        only_published_public: bool = False,
+    ) -> list[str]:
+        """Distinct event tags within a popup, sorted case-insensitive.
+
+        ``only_published_public=True`` matches the public-calendar visibility
+        so anonymous users don't see tags that only exist in drafts.
+        """
+        # ``status`` and ``visibility`` are stored as the Python ``Enum``
+        # NAMES (uppercase) via SQLAlchemy's native Enum, not the lowercase
+        # values exposed in the schema. Filter against the stored form.
+        sql = """
+            SELECT DISTINCT btrim(tag) AS tag
+            FROM events,
+                 jsonb_array_elements_text(events.tags) AS tag
+            WHERE events.popup_id = :popup_id
+              AND events.status != 'CANCELLED'
+        """
+        if only_published_public:
+            sql += " AND events.status = 'PUBLISHED' AND events.visibility = 'PUBLIC'"
+        rows = db.exec(text(sql).bindparams(popup_id=popup_id)).all()
+        tags: list[str] = []
+        for row in rows:
+            # SQLAlchemy 2.x ``Row`` is tuple-like but not a ``tuple``
+            # subclass; index the first column directly.
+            value = row[0]
+            if value is None:
+                continue
+            cleaned = str(value).strip()
+            if cleaned:
+                tags.append(cleaned)
+        # Dedup again post-trim (DISTINCT didn't see the trim) and sort
+        # case-insensitively for stable, human-friendly ordering.
+        return sorted(set(tags), key=lambda s: s.casefold())
+
+    def count_published_events_by_track(
+        self, db: Session, *, popup_id: uuid.UUID
+    ) -> dict[uuid.UUID, int]:
+        """Distinct published events per track for a popup, across all history.
+
+        Backs the portal track filter / Tracks section so it can show each
+        track's event count without pulling every event to the client and
+        counting on the front (which also capped at the page limit). Counts
+        distinct event ids so recurring masters aren't inflated. ``status`` is
+        stored as the uppercase Enum name, so filter against that form.
+        """
+        sql = """
+            SELECT track_id, COUNT(DISTINCT id) AS event_count
+            FROM events
+            WHERE popup_id = :popup_id
+              AND track_id IS NOT NULL
+              AND status = 'PUBLISHED'
+            GROUP BY track_id
+        """
+        rows = db.exec(text(sql).bindparams(popup_id=popup_id)).all()
+        return {row[0]: int(row[1]) for row in rows}
+
+    def list_distinct_hosts(
+        self,
+        session: Session,
+        *,
+        popup_id: uuid.UUID,
+    ) -> list[Humans]:
+        """Distinct hosts (Humans referenced by ``Events.owner_id``) within a popup.
+
+        Joins ``Events.owner_id`` to ``Humans.id`` so events whose owner is not
+        a human (e.g. backoffice-created events owned by a staff User) are
+        naturally excluded — those have no host to filter by. Sorted by name
+        then email for a stable, human-friendly picker.
+        """
+        statement = (
+            select(Humans)
+            .join(Events, Events.owner_id == Humans.id)  # type: ignore[arg-type]
+            .where(Events.popup_id == popup_id)
+            .distinct()
+        )
+        humans = list(session.exec(statement).all())
+        return sorted(
+            humans,
+            key=lambda h: (
+                f"{h.first_name or ''} {h.last_name or ''}".strip().casefold()
+                or h.email.casefold(),
+                h.email.casefold(),
+            ),
         )
 
     def find_venue_conflicts(

@@ -34,6 +34,9 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 8
     BACKOFFICE_URL: str = "http://localhost:5173"
     ENVIRONMENT: Environment = Environment.DEV
+    # Minimum level emitted by the loguru stdout sink. Set to DEBUG for verbose
+    # local debugging; INFO keeps production logs to signal + request lines.
+    LOG_LEVEL: str = "INFO"
 
     PROJECT_NAME: str = Field(...)
     SENTRY_DSN: HttpUrl | None = None

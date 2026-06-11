@@ -1,14 +1,22 @@
-import { useSuspenseQuery } from "@tanstack/react-query"
+import {
+  useMutation,
+  useQueryClient,
+  useSuspenseQuery,
+} from "@tanstack/react-query"
 import { createFileRoute, useNavigate } from "@tanstack/react-router"
 import { Suspense } from "react"
 
 import { HumansService } from "@/client"
+import { DangerZone } from "@/components/Common/DangerZone"
 import { FormPageLayout } from "@/components/Common/FormPageLayout"
 import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
 import { HumanForm } from "@/components/forms/HumanForm"
 import { Skeleton } from "@/components/ui/skeleton"
+import useAuth from "@/hooks/useAuth"
+import useCustomToast from "@/hooks/useCustomToast"
 import { useGoBack } from "@/hooks/useGoBack"
 import { getHumansNavigationTarget } from "@/routes/_layout/humans/navigation"
+import { createErrorHandler } from "@/utils"
 
 export const Route = createFileRoute("/_layout/humans/$id/edit")({
   component: EditHumanPage,
@@ -28,8 +36,45 @@ function EditHumanContent({ humanId }: { humanId: string }) {
   const navigate = useNavigate()
   const goBack = useGoBack(() => navigate(getHumansNavigationTarget()))
   const { data: human } = useSuspenseQuery(getHumanQueryOptions(humanId))
+  const { isAdmin } = useAuth()
+  const queryClient = useQueryClient()
+  const { showSuccessToast, showErrorToast } = useCustomToast()
 
-  return <HumanForm defaultValues={human} onSuccess={goBack} />
+  const deleteMutation = useMutation({
+    mutationFn: () => HumansService.deleteHuman({ humanId }),
+    onSuccess: () => {
+      showSuccessToast("Human deleted")
+      // Drop cached detail + api-keys subqueries first so the list invalidation
+      // below doesn't refetch the now-deleted human and 404.
+      queryClient.removeQueries({ queryKey: ["humans", humanId] })
+      queryClient.invalidateQueries({ queryKey: ["humans"] })
+      navigate(getHumansNavigationTarget())
+    },
+    onError: createErrorHandler(showErrorToast),
+  })
+
+  const displayName =
+    [human.first_name, human.last_name].filter(Boolean).join(" ") ||
+    human.email ||
+    humanId
+
+  return (
+    <div className="space-y-8">
+      <HumanForm defaultValues={human} onSuccess={goBack} />
+      {isAdmin && (
+        <div className="mx-auto max-w-2xl">
+          <DangerZone
+            description="Permanently delete this human and every related row — applications, attendees, payments, products, carts, group memberships, and any group this human owns as ambassador. Intended for cleaning up test users."
+            onDelete={() => deleteMutation.mutate()}
+            isDeleting={deleteMutation.isPending}
+            confirmText="Delete Human"
+            resourceName={displayName}
+            variant="inline"
+          />
+        </div>
+      )}
+    </div>
+  )
 }
 
 function EditHumanPage() {

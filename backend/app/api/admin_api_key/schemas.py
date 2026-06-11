@@ -4,13 +4,14 @@ from typing import get_args
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from app.api.api_key.schemas import MAX_WRITE_SCOPE_LIFETIME_DAYS
 from app.core.security import ApiKeyScope
 
 # All scope values valid in the ApiKeyScope Literal — used for schema-level
 # validation (unknown scope string → 422 before router-level universe check).
 _ALL_API_KEY_SCOPES: frozenset[str] = frozenset(get_args(ApiKeyScope))
 
-MAX_WRITE_SCOPE_LIFETIME_DAYS = 30
+__all__ = ["MAX_WRITE_SCOPE_LIFETIME_DAYS"]
 
 
 class AdminApiKeyCreate(BaseModel):
@@ -50,10 +51,15 @@ class AdminApiKeyCreate(BaseModel):
         return expires_at
 
     @model_validator(mode="after")
-    def require_expiry_for_write_scope(self) -> "AdminApiKeyCreate":
+    def default_expiry_for_write_scope(self) -> "AdminApiKeyCreate":
+        # Same server-owned lifetime contract as ``ApiKeyCreate``: a write
+        # scope without an explicit ``expires_at`` is defaulted to
+        # ``now + MAX_WRITE_SCOPE_LIFETIME_DAYS``.
         write_scopes = {s for s in self.scopes if s.endswith(":write")}
         if write_scopes and self.expires_at is None:
-            raise ValueError("Write-capable API keys require an expiry date")
+            self.expires_at = datetime.now(UTC) + timedelta(
+                days=MAX_WRITE_SCOPE_LIFETIME_DAYS
+            )
         return self
 
 

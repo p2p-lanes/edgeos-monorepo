@@ -31,6 +31,10 @@ export interface UseEditEventFormResult {
   setTags: (next: string[]) => void
   hostDisplayName: string
   setHostDisplayName: (next: string) => void
+  hostId: string | null
+  setHostId: (next: string | null) => void
+  collaboratorIds: string[]
+  setCollaboratorIds: (next: string[]) => void
   buildPayload: (
     timezone: string,
     startIso: string,
@@ -41,10 +45,15 @@ export interface UseEditEventFormResult {
 export function useEditEventForm(event: EventPublic): UseEditEventFormResult {
   const [title, setTitle] = useState(() => event.title ?? "")
   const [content, setContent] = useState(() => event.content ?? "")
-  // Seed the dropdown with the custom-location sentinel when the event was
-  // created with one — keeps the inputs visible and editable on first paint.
+  // Seed the dropdown with the matching sentinel when the event has no real
+  // venue: "__custom__" keeps the custom-location inputs visible on first
+  // paint, "__meeting__" marks a virtual event (an empty value would render
+  // the "Where will it happen?" placeholder, which only the create form —
+  // where nothing is picked yet — should show).
   const [venueId, setVenueId] = useState(() =>
-    event.custom_location_name ? "__custom__" : (event.venue_id ?? ""),
+    event.custom_location_name
+      ? "__custom__"
+      : (event.venue_id ?? "__meeting__"),
   )
   const [customLocationName, setCustomLocationName] = useState(
     () => event.custom_location_name ?? "",
@@ -65,6 +74,14 @@ export function useEditEventForm(event: EventPublic): UseEditEventFormResult {
   const [hostDisplayName, setHostDisplayName] = useState(
     () => event.host_display_name ?? "",
   )
+  const [hostId, setHostId] = useState<string | null>(
+    () => event.host_id ?? null,
+  )
+  // Seed from the raw ids; the resolved ``event.collaborators`` (name+avatar)
+  // are passed straight to the field for chip labels.
+  const [collaboratorIds, setCollaboratorIds] = useState<string[]>(
+    () => event.collaborator_ids ?? [],
+  )
 
   const buildPayload = (
     timezone: string,
@@ -72,13 +89,14 @@ export function useEditEventForm(event: EventPublic): UseEditEventFormResult {
     endIso: string,
   ): EventUpdate => {
     const isCustom = venueId === "__custom__"
+    const isMeeting = venueId === "__meeting__"
     return {
       title: title.trim(),
       content: content.trim() || null,
       start_time: startIso,
       end_time: endIso,
       timezone: timezone || "UTC",
-      venue_id: !isCustom && venueId ? venueId : null,
+      venue_id: !isCustom && !isMeeting && venueId ? venueId : null,
       custom_location_name: isCustom ? customLocationName.trim() || null : null,
       custom_location_url: isCustom ? customLocationUrl.trim() || null : null,
       track_id: trackId || null,
@@ -86,10 +104,12 @@ export function useEditEventForm(event: EventPublic): UseEditEventFormResult {
       max_participant: maxParticipants
         ? Math.max(0, Number.parseInt(maxParticipants, 10))
         : null,
-      meeting_url: !isCustom && !venueId ? meetingUrl || null : null,
+      meeting_url: isMeeting ? meetingUrl || null : null,
       cover_url: coverUrl || null,
       tags,
       host_display_name: hostDisplayName.trim() || null,
+      host_id: hostId,
+      collaborator_ids: collaboratorIds,
     }
   }
 
@@ -118,6 +138,10 @@ export function useEditEventForm(event: EventPublic): UseEditEventFormResult {
     setTags,
     hostDisplayName,
     setHostDisplayName,
+    hostId,
+    setHostId,
+    collaboratorIds,
+    setCollaboratorIds,
     buildPayload,
   }
 }

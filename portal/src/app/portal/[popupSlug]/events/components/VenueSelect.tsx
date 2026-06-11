@@ -27,7 +27,9 @@ interface VenueSelectProps {
   selectedVenueLabel?: string
 }
 
-const NONE_VALUE = "__none__"
+// Virtual meeting is an explicit choice, not the default: an empty
+// `venueId` means "nothing picked yet" and renders the placeholder.
+const MEETING_VALUE = "__meeting__"
 const CUSTOM_VALUE = "__custom__"
 
 function VenueSelectImpl({
@@ -46,7 +48,7 @@ function VenueSelectImpl({
   // the list query is still resolving.
   const venueItems = useMemo(() => {
     const out: { value: string; label: string }[] = []
-    const seen = new Set<string>([NONE_VALUE, CUSTOM_VALUE])
+    const seen = new Set<string>([MEETING_VALUE, CUSTOM_VALUE])
 
     const formatVenueLabel = (v: EventVenuePublic) => {
       const title = v.title || t("events.venues.list.untitled_venue")
@@ -60,6 +62,7 @@ function VenueSelectImpl({
     if (
       venueId &&
       venueId !== CUSTOM_VALUE &&
+      venueId !== MEETING_VALUE &&
       !venues.some((v) => v.id === venueId)
     ) {
       out.push({
@@ -89,22 +92,28 @@ function VenueSelectImpl({
   const triggerLabel =
     venueId === CUSTOM_VALUE
       ? t("events.form.custom_location_option")
-      : !venueId
+      : venueId === MEETING_VALUE
         ? t("events.form.no_venue_option")
-        : (venueItems.find((i) => i.value === venueId)?.label ??
-          t("events.form.venue_placeholder"))
+        : !venueId
+          ? t("events.form.venue_where_placeholder")
+          : (venueItems.find((i) => i.value === venueId)?.label ??
+            t("events.form.venue_placeholder"))
 
   return (
-    <Select
-      value={venueId || NONE_VALUE}
-      onValueChange={(v) => onVenueChange(v === NONE_VALUE ? "" : v)}
-    >
+    <Select value={venueId} onValueChange={onVenueChange}>
       <SelectTrigger className="w-full">
-        <span className="truncate text-left">{triggerLabel}</span>
+        <span
+          className={cn(
+            "truncate text-left",
+            !venueId && "text-muted-foreground",
+          )}
+        >
+          {triggerLabel}
+        </span>
       </SelectTrigger>
       <SelectContent className="max-h-[min(20rem,60svh)]">
         <SelectItem
-          value={NONE_VALUE}
+          value={MEETING_VALUE}
           className={cn(
             "data-[highlighted]:bg-muted",
             "bg-muted/40 text-foreground",

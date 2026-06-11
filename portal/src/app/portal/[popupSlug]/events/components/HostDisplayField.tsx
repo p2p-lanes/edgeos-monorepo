@@ -17,6 +17,13 @@ import {
 interface HostDisplayFieldProps {
   value: string
   onChange: (next: string) => void
+  /**
+   * Reports the picked human's id, or null when the host is free text. Set
+   * only when a participant is chosen from the directory; typing into the
+   * field or using the quick-fill buttons clears it. The id is what grants
+   * that human edit rights over the event.
+   */
+  onHostIdChange?: (next: string | null) => void
   currentUserName?: string | null
   popupName?: string | null
   /** Required for the participant picker; when missing, the button is disabled. */
@@ -31,6 +38,7 @@ function humanName(h: HumanPortalPublic): string {
 export function HostDisplayField({
   value,
   onChange,
+  onHostIdChange,
   currentUserName,
   popupName,
   popupId,
@@ -49,13 +57,14 @@ export function HostDisplayField({
   const trimmedSearch = debouncedSearch.trim()
 
   const { data: results, isFetching } = useQuery({
-    queryKey: ["host-picker-humans", trimmedSearch],
+    queryKey: ["host-picker-humans", popupId, trimmedSearch],
     queryFn: () =>
       HumansService.searchHumansPortal({
+        popupId: popupId as string,
         search: trimmedSearch || null,
         limit: 10,
       }),
-    enabled: pickerOpen,
+    enabled: pickerOpen && !!popupId,
   })
 
   return (
@@ -65,7 +74,10 @@ export function HostDisplayField({
         id="host"
         value={value}
         maxLength={255}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={(e) => {
+          onChange(e.target.value)
+          onHostIdChange?.(null)
+        }}
         placeholder={
           trimmedPopup
             ? t("events.form.host_placeholder_default", { name: trimmedPopup })
@@ -79,7 +91,10 @@ export function HostDisplayField({
             variant="ghost"
             size="sm"
             className="h-7 px-2 text-xs"
-            onClick={() => onChange(trimmedPopup)}
+            onClick={() => {
+              onChange(trimmedPopup)
+              onHostIdChange?.(null)
+            }}
           >
             {t("events.form.host_use_popup", { name: trimmedPopup })}
           </Button>
@@ -90,7 +105,10 @@ export function HostDisplayField({
             variant="ghost"
             size="sm"
             className="h-7 px-2 text-xs"
-            onClick={() => onChange(trimmedUser)}
+            onClick={() => {
+              onChange(trimmedUser)
+              onHostIdChange?.(null)
+            }}
           >
             {t("events.form.host_use_me")}
           </Button>
@@ -135,6 +153,7 @@ export function HostDisplayField({
                       className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-muted"
                       onClick={() => {
                         onChange(name)
+                        onHostIdChange?.(h.id)
                         setPickerOpen(false)
                         setSearchInput("")
                       }}

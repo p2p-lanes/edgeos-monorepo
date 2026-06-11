@@ -1,8 +1,10 @@
 import datetime
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
 from jinja2 import Environment, FileSystemLoader, Undefined
+from jinja2.sandbox import SandboxedEnvironment
 from loguru import logger
 from pydantic import BaseModel
 
@@ -184,20 +186,11 @@ class EditPassesConfirmedContext(BaseModel):
     portal_url: str | None = None
 
 
-class EventChangeRow(BaseModel):
-    """Before/after pair surfaced as an inline diff in update emails."""
-
-    before: str
-    after: str
-
-
 class EventInvitationContext(BaseModel):
     """Context for event/invitation.html template.
 
-    Re-used for four flows: organiser-side invitations (default),
-    self-RSVP confirmations (``is_self_rsvp``), event-update
-    notifications (``is_update`` + ``changes``), and cancellations
-    (``is_cancelled``).
+    Used for organiser-side invitations and self-RSVP confirmations.
+    Update/cancel flows have their own dedicated templates.
     """
 
     first_name: str = ""
@@ -208,13 +201,51 @@ class EventInvitationContext(BaseModel):
     event_when: str = ""
     venue_title: str = ""
     event_url: str = ""
-    is_self_rsvp: bool = False
-    is_update: bool = False
-    is_cancelled: bool = False
-    # Mapping from canonical row key ("event", "time", "location") to the
-    # before/after pair, populated only on update emails so the matching
-    # row in the metadata block renders the inline diff.
+
+
+class EventChangeRow(BaseModel):
+    """Before/after pair surfaced as an inline diff in update emails."""
+
+    before: str
+    after: str
+
+
+class EventUpdatedContext(BaseModel):
+    """Context for event/updated.html — change notification with before/after diff."""
+
+    first_name: str = ""
+    event_title: str
+    popup_name: str = ""
+    event_when: str = ""
+    venue_title: str = ""
+    event_url: str = ""
     changes: dict[str, EventChangeRow] = {}
+
+
+class EventCancelledContext(BaseModel):
+    """Context for event/cancelled.html — cancellation notice."""
+
+    first_name: str = ""
+    event_title: str
+    popup_name: str = ""
+    event_when: str = ""
+    venue_title: str = ""
+
+
+class EventRsvpCancelledContext(BaseModel):
+    """Context for event/rsvp_cancelled.html — self-service RSVP cancellation.
+
+    Sent when a human cancels their own registration. The event itself is not
+    cancelled, so the copy confirms the registration was removed rather than
+    announcing an event cancellation.
+    """
+
+    first_name: str = ""
+    event_title: str
+    popup_name: str = ""
+    event_when: str = ""
+    venue_title: str = ""
+    event_url: str = ""
 
 
 class EventApprovalApprovedContext(BaseModel):
@@ -246,6 +277,36 @@ class EventApprovalRejectedContext(BaseModel):
     reason: str = ""
 
 
+class CheckInQrItem(BaseModel):
+    """A single check-in QR entry for the check-in pass email.
+
+    One per scannable ticket (``AttendeeProducts`` row where the product has
+    ``requires_check_in``). ``qr_url`` points at the hosted PNG; it may be
+    ``None`` if storage is unavailable when the email is built.
+    """
+
+    attendee_name: str
+    product_name: str
+    check_in_code: str
+    qr_url: str | None = None
+
+
+class CheckInPassContext(BaseModel):
+    """Context for check_in/pass.html template.
+
+    Sent on a schedule before the popup start_date to the buyer, carrying the
+    check-in QR codes for every scannable ticket they purchased.
+    """
+
+    first_name: str
+    popup_name: str = ""
+    # One entry per scannable ticket. Loop over this in the template.
+    checkin_qrs: list[CheckInQrItem] = []
+    # Convenience for the common single-ticket case: the first ticket's QR URL.
+    checkin_qr_url: str | None = None
+    portal_url: str | None = None
+
+
 class EmailTemplates:
     # Auth
     LOGIN_CODE_USER = "auth/login_code_user.html"
@@ -268,8 +329,14 @@ class EmailTemplates:
 
     # Event
     EVENT_INVITATION = "event/invitation.html"
+    EVENT_UPDATED = "event/updated.html"
+    EVENT_CANCELLED = "event/cancelled.html"
+    EVENT_RSVP_CANCELLED = "event/rsvp_cancelled.html"
     EVENT_APPROVAL_APPROVED = "event/approval_approved.html"
     EVENT_APPROVAL_REJECTED = "event/approval_rejected.html"
+
+    # Check-in
+    CHECK_IN_PASS = "check_in/pass.html"
 
 
 TEMPLATE_TYPE_TO_FILE: dict[EmailTemplateType, str] = {
@@ -285,8 +352,12 @@ TEMPLATE_TYPE_TO_FILE: dict[EmailTemplateType, str] = {
     EmailTemplateType.ABANDONED_CART: "payment/abandoned_cart.html",
     EmailTemplateType.EDIT_PASSES_CONFIRMED: "payment/edit_passes_confirmed.html",
     EmailTemplateType.EVENT_INVITATION: "event/invitation.html",
+    EmailTemplateType.EVENT_UPDATED: "event/updated.html",
+    EmailTemplateType.EVENT_CANCELLED: "event/cancelled.html",
+    EmailTemplateType.EVENT_RSVP_CANCELLED: "event/rsvp_cancelled.html",
     EmailTemplateType.EVENT_APPROVAL_APPROVED: "event/approval_approved.html",
     EmailTemplateType.EVENT_APPROVAL_REJECTED: "event/approval_rejected.html",
+    EmailTemplateType.CHECK_IN_PASS: "check_in/pass.html",
 }
 
 
@@ -974,27 +1045,53 @@ POPUP_TEMPLATE_METADATA: list[dict[str, Any]] = [
                 "required": False,
                 "group": "Event",
             },
+            *_POPUP_EVENT_VARIABLES,
+        ],
+    },
+    {
+        "type": EmailTemplateType.EVENT_UPDATED,
+        "label": "Event Updated",
+        "description": "Sent when an event the recipient is invited to or RSVPd to is updated.",
+        "category": "Event",
+        "default_subject": "The event has been updated: {{ event_title }}",
+        "variables": [
             {
-                "name": "is_self_rsvp",
-                "label": "Self-RSVP confirmation",
-                "type": "boolean",
-                "description": "True when this is the confirmation sent after the recipient RSVPed themselves (not an organiser invitation)",
+                "name": "first_name",
+                "label": "First Name",
+                "type": "string",
+                "description": "Recipient's first name",
+                "required": False,
+                "group": "Recipient",
+            },
+            {
+                "name": "event_title",
+                "label": "Event Title",
+                "type": "string",
+                "description": "Title of the event",
+                "required": True,
+                "group": "Event",
+            },
+            {
+                "name": "event_when",
+                "label": "When",
+                "type": "string",
+                "description": "Formatted start date/time",
                 "required": False,
                 "group": "Event",
             },
             {
-                "name": "is_update",
-                "label": "Event update notification",
-                "type": "boolean",
-                "description": "True when this email is announcing a change to an existing event",
+                "name": "venue_title",
+                "label": "Venue",
+                "type": "string",
+                "description": "Venue name (may be empty)",
                 "required": False,
                 "group": "Event",
             },
             {
-                "name": "is_cancelled",
-                "label": "Event cancellation notification",
-                "type": "boolean",
-                "description": "True when this email is announcing that the event was cancelled",
+                "name": "event_url",
+                "label": "Event URL",
+                "type": "string",
+                "description": "Deep link to the event page in the portal",
                 "required": False,
                 "group": "Event",
             },
@@ -1002,7 +1099,99 @@ POPUP_TEMPLATE_METADATA: list[dict[str, Any]] = [
                 "name": "changes",
                 "label": "Changes",
                 "type": "object",
-                "description": "Mapping from row key ('event', 'time', 'location') to {before, after} describing what changed (only set when is_update=true)",
+                "description": "Mapping from row key ('event', 'time', 'location') to {before, after} describing what changed",
+                "required": False,
+                "group": "Event",
+            },
+            *_POPUP_EVENT_VARIABLES,
+        ],
+    },
+    {
+        "type": EmailTemplateType.EVENT_CANCELLED,
+        "label": "Event Cancelled",
+        "description": "Sent when an event the recipient is invited to or RSVPd to is cancelled.",
+        "category": "Event",
+        "default_subject": "Event cancelled: {{ event_title }}",
+        "variables": [
+            {
+                "name": "first_name",
+                "label": "First Name",
+                "type": "string",
+                "description": "Recipient's first name",
+                "required": False,
+                "group": "Recipient",
+            },
+            {
+                "name": "event_title",
+                "label": "Event Title",
+                "type": "string",
+                "description": "Title of the event",
+                "required": True,
+                "group": "Event",
+            },
+            {
+                "name": "event_when",
+                "label": "When",
+                "type": "string",
+                "description": "Formatted start date/time",
+                "required": False,
+                "group": "Event",
+            },
+            {
+                "name": "venue_title",
+                "label": "Venue",
+                "type": "string",
+                "description": "Venue name (may be empty)",
+                "required": False,
+                "group": "Event",
+            },
+            *_POPUP_EVENT_VARIABLES,
+        ],
+    },
+    {
+        "type": EmailTemplateType.EVENT_RSVP_CANCELLED,
+        "label": "Registration Cancelled",
+        "description": "Sent to a recipient who cancels their own registration to an event.",
+        "category": "Event",
+        "default_subject": "Your registration was cancelled: {{ event_title }}",
+        "variables": [
+            {
+                "name": "first_name",
+                "label": "First Name",
+                "type": "string",
+                "description": "Recipient's first name",
+                "required": False,
+                "group": "Recipient",
+            },
+            {
+                "name": "event_title",
+                "label": "Event Title",
+                "type": "string",
+                "description": "Title of the event",
+                "required": True,
+                "group": "Event",
+            },
+            {
+                "name": "event_when",
+                "label": "When",
+                "type": "string",
+                "description": "Formatted start date/time",
+                "required": False,
+                "group": "Event",
+            },
+            {
+                "name": "venue_title",
+                "label": "Venue",
+                "type": "string",
+                "description": "Venue name (may be empty)",
+                "required": False,
+                "group": "Event",
+            },
+            {
+                "name": "event_url",
+                "label": "Event URL",
+                "type": "string",
+                "description": "Link back to the event in the portal",
                 "required": False,
                 "group": "Event",
             },
@@ -1113,6 +1302,58 @@ POPUP_TEMPLATE_METADATA: list[dict[str, Any]] = [
                 "description": "Optional explanation from the admin",
                 "required": False,
                 "group": "Decision",
+            },
+            *_POPUP_EVENT_VARIABLES,
+        ],
+    },
+    {
+        "type": EmailTemplateType.CHECK_IN_PASS,
+        "label": "Check-in Pass",
+        "description": (
+            "Sent on a schedule before the event with the attendee's check-in "
+            "QR code(s). Sent to the buyer with all the check-in codes they "
+            "purchased."
+        ),
+        "category": "Check-in",
+        "default_subject": "Your check-in pass for {{ popup_name }}",
+        "variables": [
+            {
+                "name": "first_name",
+                "label": "First Name",
+                "type": "string",
+                "description": "Buyer's first name",
+                "required": True,
+                "group": "Recipient",
+            },
+            {
+                "name": "checkin_qrs",
+                "label": "Check-in QR codes",
+                "type": "array",
+                "description": (
+                    "One entry per scannable ticket, each with attendee_name, "
+                    "product_name, check_in_code and qr_url. Loop over this."
+                ),
+                "required": False,
+                "group": "Check-in",
+            },
+            {
+                "name": "checkin_qr_url",
+                "label": "Check-in QR URL (first ticket)",
+                "type": "string",
+                "description": (
+                    "Convenience for the single-ticket case: the hosted QR "
+                    "image URL for the first ticket."
+                ),
+                "required": False,
+                "group": "Check-in",
+            },
+            {
+                "name": "portal_url",
+                "label": "Portal URL",
+                "type": "string",
+                "description": "Link to the attendee portal",
+                "required": False,
+                "group": "General",
             },
             *_POPUP_EVENT_VARIABLES,
         ],
@@ -1260,11 +1501,20 @@ def flatten_template(template_type: EmailTemplateType) -> str:
 
     Resolves {% extends %} and {% include %} but preserves {{ variable }}
     placeholders so users can edit them in the Monaco editor.
+
+    Templates that are already self-contained (no inheritance) are returned
+    verbatim — rendering them would *execute* their control structures, e.g.
+    dropping a ``{% for %}`` loop over data that isn't present at flatten time
+    (the check-in pass QR loop). Returning the raw source keeps those loops.
     """
     from app.core.config import settings
 
     template_dir = Path("app/templates/emails")
     file_path = TEMPLATE_TYPE_TO_FILE[template_type]
+
+    source = (template_dir / file_path).read_text(encoding="utf-8")
+    if "{% extends" not in source and "{% include" not in source:
+        return source
 
     env = Environment(
         loader=FileSystemLoader(str(template_dir)),
@@ -1294,3 +1544,22 @@ CUSTOMIZABLE_TEMPLATE_TYPES = {meta["type"] for meta in TEMPLATE_TYPE_METADATA}
 
 def is_customizable_template_type(template_type: EmailTemplateType | str) -> bool:
     return coerce_email_template_type(template_type) in CUSTOMIZABLE_TEMPLATE_TYPES
+
+
+def render_default_subject(
+    template_type: EmailTemplateType | str,
+    context: Mapping[str, Any],
+) -> str:
+    """Render the metadata ``default_subject`` for *template_type* against *context*.
+
+    Single source of truth for the default subject used when a popup has no
+    custom template (or its custom template has no subject override). Keeps the
+    English default colocated with the rest of the template metadata instead of
+    hardcoded at each caller.
+    """
+    coerced = coerce_email_template_type(template_type)
+    meta = next((m for m in TEMPLATE_TYPE_METADATA if m["type"] == coerced), None)
+    if meta is None:
+        return ""
+    env = SandboxedEnvironment(undefined=SilentUndefined)
+    return env.from_string(meta["default_subject"]).render(**context)

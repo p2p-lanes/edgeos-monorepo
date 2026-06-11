@@ -13,7 +13,7 @@ Existing popups become installments-disabled with month/1 defaults; no behavior
 change until an operator turns the feature on.
 
 Revision ID: e09ad276878b
-Revises: 377c2c02fe74
+Revises: d1f6b8a3c925
 """
 
 from collections.abc import Sequence
@@ -22,7 +22,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = "e09ad276878b"
-down_revision: str | Sequence[str] | None = "377c2c02fe74"
+down_revision: str | Sequence[str] | None = "d1f6b8a3c925"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

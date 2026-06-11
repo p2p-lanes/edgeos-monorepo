@@ -29,6 +29,7 @@ dependencies = [
     "redis>=7.1.0",
     "reportlab>=4.0",
     "google-genai>=1.0.0",
+    "segno>=1.6.6",
 ]
 
 [dependency-groups]
@@ -38,7 +39,6 @@ dev = [
     "pre-commit<4.0.0,>=3.6.2",
     "types-passlib<2.0.0.0,>=1.7.7.20240106",
     "coverage<8.0.0,>=7.4.3",
-    "ty>=0.0.13",
     "testcontainers>=4.14.0",
 ]
 

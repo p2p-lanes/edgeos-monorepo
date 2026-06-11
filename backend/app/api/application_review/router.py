@@ -270,13 +270,12 @@ async def list_pending_reviews(
             limit=1000,
         )
 
-    pending_apps = []
-    for app in candidates:
-        existing_review = application_reviews_crud.get_by_application_reviewer(
-            db, app.id, current_user.id
+    reviewed_ids = set(
+        application_reviews_crud.get_decisions_by_reviewer_for_applications(
+            db, current_user.id, [c.id for c in candidates]
         )
-        if not existing_review:
-            pending_apps.append(app)
+    )
+    pending_apps = [a for a in candidates if a.id not in reviewed_ids]
 
     total = len(pending_apps)
     paginated = pending_apps[skip : skip + limit]
