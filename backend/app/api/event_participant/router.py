@@ -348,6 +348,12 @@ async def register_for_event(
         )
 
     if event.max_participant:
+        # Serialize concurrent RSVPs for this event/occurrence so the capacity
+        # check and the insert below cannot interleave and oversell the event.
+        # The lock is transaction-scoped and released on commit/rollback.
+        crud.event_participants_crud.lock_for_capacity(
+            db, event_id, occurrence_start=occ_start
+        )
         active_count = crud.event_participants_crud.count_active_for_event(
             db, event_id, occurrence_start=occ_start
         )
