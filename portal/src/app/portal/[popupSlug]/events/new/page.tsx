@@ -215,6 +215,21 @@ function NewPortalEventForm({
   const [hostId, setHostId] = useState<string | null>(null)
   const [collaboratorIds, setCollaboratorIds] = useState<string[]>([])
 
+  // Default the Displayed-host field to the creator (the logged-in human),
+  // mirroring the field's "Use my name" quick-fill, so a freshly created event
+  // reads "Hosted by <creator>" instead of falling back to the popup name.
+  // One-shot and guarded on an untouched field, so a manual edit — even one
+  // typed before `currentHuman` resolved — is never clobbered. host_id is left
+  // null exactly like "Use my name": the creator is already the owner and
+  // carries full manage rights without it.
+  const didDefaultHostRef = useRef(false)
+  useEffect(() => {
+    if (didDefaultHostRef.current) return
+    if (!currentHumanName) return
+    didDefaultHostRef.current = true
+    setHostDisplayName((prev) => (prev.trim() ? prev : currentHumanName))
+  }, [currentHumanName])
+
   // ---- venue + availability ------------------------------------------
   const {
     venues,
