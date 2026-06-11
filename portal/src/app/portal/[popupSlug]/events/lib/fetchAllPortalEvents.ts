@@ -18,6 +18,7 @@ export interface FetchAllPortalEventsParams {
   trackIds?: string[]
   rsvpedOnly?: boolean
   managedOnly?: boolean
+  includeHidden?: boolean
 }
 
 /**
@@ -51,6 +52,7 @@ export async function fetchAllPortalEvents(
       startBefore: params.startBefore,
       rsvpedOnly: params.rsvpedOnly,
       managedOnly: params.managedOnly,
+      includeHidden: params.includeHidden,
       search: params.search,
       tags: params.tags,
       trackIds: params.trackIds,
