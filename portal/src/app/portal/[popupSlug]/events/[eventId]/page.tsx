@@ -1084,33 +1084,33 @@ export default function EventDetailPage() {
               ? activeParticipants
               : activeParticipants.slice(0, 10)
             ).map((p: EventParticipantPublic) => {
-                const name = [p.first_name, p.last_name]
-                  .filter(Boolean)
-                  .join(" ")
-                  .trim()
-                return (
-                  <div key={p.id} className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="h-7 w-7 rounded-full bg-muted flex items-center justify-center">
-                        <Users className="h-3 w-3 text-muted-foreground" />
-                      </div>
-                      <span className="text-sm">
-                        {name || t("events.detail.unnamed_participant")}
-                      </span>
+              const name = [p.first_name, p.last_name]
+                .filter(Boolean)
+                .join(" ")
+                .trim()
+              return (
+                <div key={p.id} className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="h-7 w-7 rounded-full bg-muted flex items-center justify-center">
+                      <Users className="h-3 w-3 text-muted-foreground" />
                     </div>
-                    <div className="flex items-center gap-1.5">
-                      {p.role !== "attendee" && (
-                        <Badge variant="outline" className="text-xs">
-                          {p.role}
-                        </Badge>
-                      )}
-                      {p.status === "checked_in" && (
-                        <CheckCircle className="h-3 w-3 text-green-500" />
-                      )}
-                    </div>
+                    <span className="text-sm">
+                      {name || t("events.detail.unnamed_participant")}
+                    </span>
                   </div>
-                )
-              })}
+                  <div className="flex items-center gap-1.5">
+                    {p.role !== "attendee" && (
+                      <Badge variant="outline" className="text-xs">
+                        {p.role}
+                      </Badge>
+                    )}
+                    {p.status === "checked_in" && (
+                      <CheckCircle className="h-3 w-3 text-green-500" />
+                    )}
+                  </div>
+                </div>
+              )
+            })}
             {activeParticipants.length > 10 && (
               <button
                 type="button"
