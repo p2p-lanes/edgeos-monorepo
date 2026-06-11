@@ -9,6 +9,7 @@ from pydantic import ValidationError
 from sqlalchemy.exc import IntegrityError, ProgrammingError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.cors import CORSMiddleware
+from starlette.middleware.gzip import GZipMiddleware
 
 import app.models  # noqa: F401 - Register all models with SQLAlchemy
 from app.api.router import api_router
@@ -138,6 +139,25 @@ application.add_middleware(
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "X-Tenant-Id", "Accept-Language"],
+)
+
+# Compress responses for clients that advertise gzip support. Event/calendar
+# payloads are large and highly repetitive JSON/ICS — e.g. a popup's public
+# .ics feed measured ~310 KB uncompressed, ~100 KB gzipped (~68% smaller) — and
+# the API previously sent everything uncompressed, so transfer time dominated
+# page load on slower connections. ``minimum_size`` skips tiny responses
+# (health checks, CORS preflights, error bodies) where compression isn't worth
+# the overhead; ``compresslevel=6`` is the usual ratio/CPU sweet spot (vs
+# Starlette's default 9). Starlette adds ``Vary: Accept-Encoding``, rewrites
+# Content-Length, and skips responses that already carry ``Content-Encoding``
+# or are Server-Sent Events (``text/event-stream``). Note: it does not skip by
+# content type otherwise, so already-compressed binaries (e.g. the invoice PDF
+# download) get re-gzipped — wasteful but harmless, and those endpoints are
+# rare. Added before RequestContextMiddleware so that middleware stays outermost.
+application.add_middleware(
+    GZipMiddleware,  # type: ignore[arg-type]
+    minimum_size=1000,
+    compresslevel=6,
 )
 
 # Outermost middleware: assigns a request_id, binds it to all logs in the
