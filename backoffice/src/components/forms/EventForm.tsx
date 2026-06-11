@@ -896,74 +896,34 @@ export function EventForm({
     )
   }
 
-  // When picking a venue (create mode), snap start_time into one of the
-  // venue's open slots. Without this, the form keeps whatever default time
-  // it had before the venue was chosen — often outside the venue's hours,
-  // which then either gets rejected by the backend or, worse, slips through
-  // when no weekly_hours are configured. Two-step: seed a date first so the
-  // availability query can fire, then snap to the first available slot.
-  const venueAutoInitRef = useRef<string | null>(null)
+  // Seed a usable default date (create mode): when the date is unset, not
+  // parseable, or outside the popup window — those days are disabled in the
+  // picker, so they're never the user's choice — move it to the first open
+  // day, keeping any time already typed. Never adjust the time and never
+  // move a date the user picked (e.g. a day the venue is closed): the
+  // existing validation (fitnessIssue → effectiveAvailability, the "Nearby
+  // open times" pills, the Publish gate) surfaces it, and the backend
+  // rejects out-of-hours times.
   useEffect(() => {
     if (isEdit) return
-
-    // When no venue is selected, just ensure the date sits inside the
-    // popup window — every day outside it is disabled in the picker, so
-    // an empty/out-of-window default would force the user to navigate
-    // there manually.
-    if (!venueIdValue) {
-      venueAutoInitRef.current = null
-      const dateInvalid = (() => {
-        if (!dateStr) return true
-        const [y, m, d] = dateStr.split("-").map(Number)
-        if (!y || !m || !d) return true
-        const date = new Date(y, m - 1, d, 12, 0, 0)
-        return isDateOutsidePopupWindow?.(date) ?? false
-      })()
-      if (dateInvalid && firstOpenDayKey) {
-        form.setFieldValue("start_time", `${firstOpenDayKey}T09:00`)
-      }
-      return
-    }
-
-    // If the current date is unset, closed for this venue, or outside the
-    // popup window, snap to the first day the venue is open. Covers both
-    // "no date yet" and "switched venues — old date is now closed".
-    const currentDateInvalid = (() => {
+    const dateInvalid = (() => {
       if (!dateStr) return true
       const [y, m, d] = dateStr.split("-").map(Number)
       if (!y || !m || !d) return true
       const date = new Date(y, m - 1, d, 12, 0, 0)
-      if (isDateOutsidePopupWindow?.(date)) return true
-      if (isClosedOnDate?.(date)) return true
-      return false
+      return isDateOutsidePopupWindow?.(date) ?? false
     })()
-
-    if (currentDateInvalid) {
-      const target = firstOpenDayKey ?? new Date().toISOString().slice(0, 10)
-      form.setFieldValue("start_time", `${target}T09:00`)
-      return
-    }
-
-    if (venueAutoInitRef.current === venueIdValue) return
-    if (startSlotOptions.length === 0) return
-    venueAutoInitRef.current = venueIdValue
-    if (!startTimeValue || !startFits) {
-      form.setFieldValue(
-        "start_time",
-        `${dateStr}T${startSlotOptions[0].label}`,
-      )
+    if (dateInvalid && firstOpenDayKey) {
+      const hhmm = startTimeValue?.slice(11, 16) || "09:00"
+      form.setFieldValue("start_time", `${firstOpenDayKey}T${hhmm}`)
     }
   }, [
     isEdit,
-    venueIdValue,
     dateStr,
-    startSlotOptions,
-    startFits,
     startTimeValue,
-    form,
     firstOpenDayKey,
-    isClosedOnDate,
     isDateOutsidePopupWindow,
+    form,
   ])
 
   // --- Max participant warning -------------------------------------------
