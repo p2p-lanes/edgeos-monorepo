@@ -135,6 +135,9 @@ export function ListBody({
   const { t } = useTranslation()
   const isAuthed = mode === "authed"
   const [collapsedDays, setCollapsedDays] = useState<Set<string>>(new Set())
+  // Day-header elements keyed by day key, so collapsing a day can scroll the
+  // next still-open day's header to the top of the viewport.
+  const dayHeaderRefs = useRef<Map<string, HTMLElement>>(new Map())
 
   // "Now" reference for the today divider + auto-scroll. Ticks once a
   // minute so the divider creeps down as events start, without re-rendering
@@ -199,6 +202,31 @@ export function ListBody({
     })
   }
 
+  // Collapsing a day strands the viewport in the gap its removed events left
+  // behind. Toggle as usual, but on collapse snap to the top of the next
+  // still-open day (or this day's own header when nothing open follows) so the
+  // next day reads from the start. `orderedDays` is the rendered day order;
+  // `willBeOpen` is Radix's next open state (false ⇒ we're collapsing). The
+  // collapse is instant (no height animation), so one rAF after the commit is
+  // enough for layout to settle before we scroll.
+  const handleDayToggle = (
+    date: string,
+    willBeOpen: boolean,
+    orderedDays: string[],
+  ) => {
+    toggleDay(date)
+    if (willBeOpen) return
+    const startIdx = orderedDays.indexOf(date)
+    if (startIdx === -1) return
+    const targetDate =
+      orderedDays.slice(startIdx + 1).find((d) => !collapsedDays.has(d)) ?? date
+    requestAnimationFrame(() => {
+      dayHeaderRefs.current
+        .get(targetDate)
+        ?.scrollIntoView({ block: "start", behavior: "auto" })
+    })
+  }
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -217,6 +245,7 @@ export function ListBody({
   }
 
   const grouped = groupByDate(events, formatDayKey)
+  const orderedDays = grouped.map(([day]) => day)
 
   return (
     <div className="space-y-6">
@@ -244,7 +273,7 @@ export function ListBody({
           <Collapsible
             key={date}
             open={isOpen}
-            onOpenChange={() => toggleDay(date)}
+            onOpenChange={(open) => handleDayToggle(date, open, orderedDays)}
           >
             <CollapsibleTrigger asChild>
               <button
@@ -261,7 +290,11 @@ export function ListBody({
                 // it arrives (and pulls it back when scrolling up). `top`
                 // matches the sticky toolbar height; z-10 keeps it under the
                 // toolbar (z-20) so the outgoing header slides beneath it.
-                style={{ top: stickyTop }}
+                ref={(el) => {
+                  if (el) dayHeaderRefs.current.set(date, el)
+                  else dayHeaderRefs.current.delete(date)
+                }}
+                style={{ top: stickyTop, scrollMarginTop: stickyTop }}
                 className="sticky z-10 w-full flex items-center gap-3 mb-3 py-1.5 bg-background group cursor-pointer"
               >
                 <div className="h-2 w-2 rounded-full bg-primary" />
