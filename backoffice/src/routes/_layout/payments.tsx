@@ -300,23 +300,29 @@ function getColumns(hasInvoice: boolean): ColumnDef<PaymentPublic>[] {
         }
         // In-flight installment plans accumulate per settlement, so this is
         // what's been collected so far, not the final adjusted total.
-        const total = row.original.installments_total
-        const paid = row.original.installments_paid ?? 0
-        const inFlight =
-          row.original.is_installment_plan &&
-          total != null &&
-          total >= 2 &&
-          paid < total
+        const adj = getRailAdjustment(row.original)
+        const showReason = adj?.final && Math.abs(adj.delta) > 0.01
         return (
-          <span className="font-mono">
-            ${val} {row.original.currency}
-            {inFlight ? (
-              <span className="font-sans text-xs text-muted-foreground">
-                {" "}
-                so far
+          <div className="flex flex-col">
+            <span className="font-mono">
+              ${val} {row.original.currency}
+              {adj && !adj.final ? (
+                <span className="font-sans text-xs text-muted-foreground">
+                  {" "}
+                  so far
+                </span>
+              ) : null}
+            </span>
+            {showReason && adj ? (
+              <span
+                className={`text-xs ${adj.isDiscount ? "text-green-600" : "text-amber-600"}`}
+              >
+                {adj.railLabel} {adj.isDiscount ? "discount" : "surcharge"}{" "}
+                {adj.isDiscount ? "−" : "+"}
+                {adj.pct}%
               </span>
             ) : null}
-          </span>
+          </div>
         )
       },
     },
@@ -461,6 +467,47 @@ const categoryLabels: Record<string, string> = {
   patreon: "Patron",
 }
 
+// SimpleFi merchants may configure a signed per-rail (card/crypto) price
+// adjustment, so the settled total can differ from the quoted amount. EdgeOS
+// only stores the outcome (amount vs amount_charged); the percentage is
+// derived and the rail inferred from `source`. Card checkouts carry the
+// provider name (Stripe, ...) and one-shot crypto settlements keep
+// "SimpleFI" — but installment plans charged via card subscriptions ALSO
+// report "SimpleFI" (their webhooks have no card_payment object), so for
+// plans with that source the rail is genuinely unknown and we fall back to
+// a generic label. `final` is false while a plan is still collecting, where
+// amount_charged is a running partial and the percentage can't be derived.
+function getRailAdjustment(payment: PaymentPublic): {
+  railLabel: "card" | "crypto" | "payment method"
+  pct: string
+  isDiscount: boolean
+  delta: number
+  final: boolean
+} | null {
+  const amount = Number(payment.amount)
+  if (payment.amount_charged == null || amount <= 0) return null
+  const total = payment.installments_total
+  const isPlan =
+    payment.is_installment_plan === true && total != null && total >= 2
+  const final = !isPlan || (payment.installments_paid ?? 0) >= (total ?? 0)
+  const delta = Number(payment.amount_charged) - amount
+  const rawPct = (delta / amount) * 100
+  const rounded = Math.round(rawPct)
+  // Installment cycles round per charge, so a completed plan lands within a
+  // few cents of the exact rail percentage — snap to the integer when close.
+  const pct =
+    Math.abs(rawPct - rounded) < 0.1
+      ? String(Math.abs(rounded))
+      : Math.abs(rawPct).toFixed(1)
+  let railLabel: "card" | "crypto" | "payment method"
+  if (payment.source !== "SimpleFI") {
+    railLabel = "card"
+  } else {
+    railLabel = isPlan ? "payment method" : "crypto"
+  }
+  return { railLabel, pct, isDiscount: delta < 0, delta, final }
+}
+
 function PaymentSubRow({ row }: { row: Row<PaymentPublic> }) {
   const payment = row.original
   const products = payment.products_snapshot ?? []
@@ -489,6 +536,8 @@ function PaymentSubRow({ row }: { row: Row<PaymentPublic> }) {
   const hasInsurance = insuranceAmount > 0.01
   const hasContribution = contributionAmount > 0.01
   const hasBreakdown = hasDiscount || hasInsurance || hasContribution
+
+  const railAdj = getRailAdjustment(payment)
 
   let discountLabel = "Discount"
   if (payment.coupon_code) {
@@ -609,6 +658,48 @@ function PaymentSubRow({ row }: { row: Row<PaymentPublic> }) {
               ${total.toFixed(2)} {payment.currency}
             </td>
           </tr>
+          {railAdj?.final && Math.abs(railAdj.delta) > 0.01 ? (
+            <>
+              <tr>
+                <td
+                  colSpan={5}
+                  className="py-0.5 text-right text-muted-foreground"
+                >
+                  {railAdj.railLabel.charAt(0).toUpperCase() +
+                    railAdj.railLabel.slice(1)}{" "}
+                  {railAdj.isDiscount ? "discount" : "surcharge"} (
+                  {railAdj.isDiscount ? "−" : "+"}
+                  {railAdj.pct}%)
+                </td>
+                <td
+                  className={`py-0.5 pl-4 text-right font-mono tabular-nums ${railAdj.isDiscount ? "text-green-600" : "text-amber-600"}`}
+                >
+                  {railAdj.isDiscount ? "−" : "+"}$
+                  {Math.abs(railAdj.delta).toFixed(2)}
+                </td>
+              </tr>
+              <tr>
+                <td colSpan={5} className="pt-0.5 text-right font-semibold">
+                  Charged
+                </td>
+                <td className="pt-0.5 pl-4 text-right font-mono font-semibold tabular-nums">
+                  ${Number(payment.amount_charged).toFixed(2)}{" "}
+                  {payment.currency}
+                </td>
+              </tr>
+            </>
+          ) : null}
+          {railAdj && !railAdj.final ? (
+            <tr>
+              <td colSpan={5} className="py-0.5 text-right text-muted-foreground">
+                Collected so far ({payment.installments_paid ?? 0}/
+                {payment.installments_total} installments)
+              </td>
+              <td className="py-0.5 pl-4 text-right font-mono tabular-nums text-muted-foreground">
+                ${Number(payment.amount_charged).toFixed(2)} {payment.currency}
+              </td>
+            </tr>
+          ) : null}
         </tfoot>
       </table>
     </div>
