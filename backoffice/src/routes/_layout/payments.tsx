@@ -288,6 +288,39 @@ function getColumns(hasInvoice: boolean): ColumnDef<PaymentPublic>[] {
       ),
     },
     {
+      accessorKey: "amount_charged",
+      header: ({ column }) => <SortableHeader label="Charged" column={column} />,
+      cell: ({ row }) => {
+        // Settled total from SimpleFi — differs from Amount when the merchant
+        // applies a per-rail (card/crypto) discount or surcharge. NULL until
+        // settlement and for non-SimpleFi payments.
+        const val = row.original.amount_charged
+        if (val == null) {
+          return <span className="text-muted-foreground">—</span>
+        }
+        // In-flight installment plans accumulate per settlement, so this is
+        // what's been collected so far, not the final adjusted total.
+        const total = row.original.installments_total
+        const paid = row.original.installments_paid ?? 0
+        const inFlight =
+          row.original.is_installment_plan &&
+          total != null &&
+          total >= 2 &&
+          paid < total
+        return (
+          <span className="font-mono">
+            ${val} {row.original.currency}
+            {inFlight ? (
+              <span className="font-sans text-xs text-muted-foreground">
+                {" "}
+                so far
+              </span>
+            ) : null}
+          </span>
+        )
+      },
+    },
+    {
       accessorKey: "status",
       header: ({ column }) => <SortableHeader label="Status" column={column} />,
       cell: ({ row }) => <StatusBadge status={row.original.status ?? ""} />,
@@ -629,6 +662,7 @@ function PaymentsTableContent() {
       searchPlaceholder="Search by external ID, attendee email, or attendee name..."
       hiddenOnMobile={[
         "source",
+        "amount_charged",
         "installments",
         "insurance_amount",
         "contribution_amount",
