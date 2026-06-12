@@ -26,7 +26,7 @@ def _install_capture(monkeypatch, response_payload: dict) -> dict:
     """Patch the client's HTTP call and return a dict that captures invocations."""
     captured: dict = {}
 
-    def fake_make_request(self, method: str, endpoint: str, json=None):
+    def fake_make_request(_self, method: str, endpoint: str, json=None):
         captured["method"] = method
         captured["endpoint"] = endpoint
         captured["body"] = json
@@ -148,7 +148,7 @@ def test_create_payment_installment_branch_hits_installment_plans(
 
 def test_create_payment_installment_branch_requires_user_email(monkeypatch) -> None:
     # Should fail before any HTTP call, so install a stub that raises on call.
-    def fail(*args, **kwargs):  # pragma: no cover
+    def fail(*_args, **_kwargs):  # pragma: no cover
         raise AssertionError("HTTP should not be called when validation fails")
 
     monkeypatch.setattr(SimpleFIClient, "_make_request", fail)

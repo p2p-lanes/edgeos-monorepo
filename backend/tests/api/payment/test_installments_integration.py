@@ -16,7 +16,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
-from sqlmodel import Session, select
+from sqlmodel import Session
 
 from app.api.application.models import Applications
 from app.api.application.schemas import ApplicationStatus
@@ -29,7 +29,6 @@ from app.api.popup.models import Popups
 from app.api.product.models import Products
 from app.api.shared.enums import InstallmentInterval, SaleType
 from app.api.tenant.models import Tenants
-
 
 # ---- Helpers ----------------------------------------------------------------
 
