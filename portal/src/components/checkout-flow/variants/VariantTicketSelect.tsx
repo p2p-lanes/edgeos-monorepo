@@ -43,7 +43,10 @@ interface TemplateSection {
 
 /** True when the section's visible_if matches the application's form answers.
  *  No visible_if → always visible. Missing custom_fields → visible (open-ticketing
- *  fallback: the form hasn't been answered yet, treat as no-gate). */
+ *  fallback: the form hasn't been answered yet, treat as no-gate). An application
+ *  that never answered the gating field (applied before the field existed, or the
+ *  question isn't in its form) also passes: hiding every gated section would leave
+ *  the attendee unable to buy those passes at all. */
 export function isSectionVisibleForApp(
   section: TemplateSection,
   customFields: Record<string, unknown> | null | undefined,
@@ -52,6 +55,7 @@ export function isSectionVisibleForApp(
   if (!cond?.field_id) return true
   if (!customFields) return true
   const answer = customFields[cond.field_id]
+  if (answer == null || answer === "") return true
   const expected = Array.isArray(cond.value) ? cond.value : [cond.value]
   return expected.includes(answer as string)
 }

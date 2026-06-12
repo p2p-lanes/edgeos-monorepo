@@ -4759,6 +4759,7 @@ export type EventsListEventsData = {
     startBefore?: (string | null);
     trackIds?: (Array<(string)> | null);
     venueId?: (string | null);
+    visibility?: (EventVisibility | null);
     xTenantId?: (string | null);
 };
 

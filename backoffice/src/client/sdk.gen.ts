@@ -2891,6 +2891,7 @@ export class EventsService {
             query: {
                 popup_id: data.popupId,
                 event_status: data.eventStatus,
+                visibility: data.visibility,
                 kind: data.kind,
                 venue_id: data.venueId,
                 location_kind: data.locationKind,

@@ -561,7 +561,9 @@ def _compute_availability(
     ``label`` is blanked. ``viewer_human_id`` is the human whose own private
     events keep their title even when ``redact_private`` is set.
     """
+    from app.api.event.crud import _strip_tz
     from app.api.event.models import Events
+    from app.api.event.recurrence import expand, parse_rrule
     from app.api.event.schemas import EventStatus, EventVisibility
 
     if end <= start:
@@ -574,20 +576,31 @@ def _compute_availability(
     # Drafts, cancelled and rejected events no longer hold their slot; treat
     # them as freed availability so calendars don't show ghost blocks and
     # draft proposals don't lock the venue against other bookings.
+    # Recurring masters are handled separately: their start/end only describe
+    # the first occurrence, so the window filter below would miss (or
+    # misplace) every later instance.
+    freed_statuses = [EventStatus.DRAFT, EventStatus.CANCELLED, EventStatus.REJECTED]
     events_query = (
         select(Events)
         .where(Events.venue_id == venue.id)
-        .where(
-            Events.status.notin_(
-                [EventStatus.DRAFT, EventStatus.CANCELLED, EventStatus.REJECTED]
-            )
-        )
+        .where(Events.status.notin_(freed_statuses))
+        .where(Events.rrule.is_(None))
         .where(Events.start_time < end)
         .where(Events.end_time > start)
     )
     if exclude_event_id is not None:
         events_query = events_query.where(Events.id != exclude_event_id)
     events = list(db.exec(events_query).all())
+
+    recurring_query = (
+        select(Events)
+        .where(Events.venue_id == venue.id)
+        .where(Events.status.notin_(freed_statuses))
+        .where(Events.rrule.is_not(None))
+    )
+    if exclude_event_id is not None:
+        recurring_query = recurring_query.where(Events.id != exclude_event_id)
+    recurring_masters = list(db.exec(recurring_query).all())
 
     closed_exceptions = list(
         db.exec(
@@ -609,9 +622,10 @@ def _compute_availability(
     )
 
     busy: list[VenueBusySlot] = []
-    for e in events:
-        busy_start = e.start_time - timedelta(minutes=venue.setup_time_minutes)
-        busy_end = e.end_time + timedelta(minutes=venue.teardown_time_minutes)
+
+    def _append_event_busy(e: Events, ev_start: datetime, ev_end: datetime) -> None:
+        busy_start = ev_start - timedelta(minutes=venue.setup_time_minutes)
+        busy_end = ev_end + timedelta(minutes=venue.teardown_time_minutes)
         # Mirror ``_human_id_manages_event`` (event/router.py) inline to avoid a
         # cross-module import: owner, host, or any collaborator may see titles.
         is_manager = viewer_human_id is not None and (
@@ -629,11 +643,60 @@ def _compute_availability(
                 label=None if redacted else e.title,
                 visibility=e.visibility.value,
                 event_id=e.id,
-                event_start=e.start_time,
-                event_end=e.end_time,
+                event_start=ev_start,
+                event_end=ev_end,
                 highlighted=bool(e.highlighted),
             )
         )
+
+    for e in events:
+        _append_event_busy(e, e.start_time, e.end_time)
+
+    # Expand recurring masters into per-occurrence busy slots. Materialized
+    # override children (rows with recurrence_master_id) are plain rows and
+    # already came through ``events``; suppress the generated occurrence at
+    # the same start so the instance isn't double-counted — mirrors
+    # ``_expand_rows_in_window`` (event/crud.py).
+    if recurring_masters:
+        override_keys: set[tuple[uuid.UUID, datetime]] = set()
+        for child in db.exec(
+            select(Events).where(
+                Events.recurrence_master_id.in_([m.id for m in recurring_masters])
+            )
+        ).all():
+            if child.recurrence_master_id is not None:
+                override_keys.add(
+                    (child.recurrence_master_id, _strip_tz(child.start_time))
+                )
+        for master in recurring_masters:
+            try:
+                rule = parse_rrule(master.rrule)
+            except ValueError:
+                rule = None
+            if rule is None:
+                # Unparseable/absent rule: fall back to the master's own slot
+                # so the event at least blocks its first occurrence.
+                if master.start_time < end and master.end_time > start:
+                    _append_event_busy(master, master.start_time, master.end_time)
+                continue
+            duration = master.end_time - master.start_time
+            occurrences = expand(
+                dtstart=master.start_time,
+                rule=rule,
+                # Pad left so occurrences that start before the window but
+                # still overlap it are kept (same trick as _series_overlaps).
+                window_start=start - duration,
+                window_end=end,
+                exdates=list(master.recurrence_exdates or []),
+                timezone=master.timezone,
+            )
+            for occ_start in occurrences:
+                occ_end = occ_start + duration
+                if not (occ_start < end and occ_end > start):
+                    continue
+                if (master.id, _strip_tz(occ_start)) in override_keys:
+                    continue
+                _append_event_busy(master, occ_start, occ_end)
     for exc in closed_exceptions:
         busy.append(
             VenueBusySlot(

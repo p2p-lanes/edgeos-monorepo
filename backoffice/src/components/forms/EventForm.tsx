@@ -367,6 +367,11 @@ export function EventForm({
   const [customSelected, setCustomSelected] = useState<boolean>(
     Boolean(defaultValues?.custom_location_name),
   )
+  // Venue (or custom location) is mandatory for events. The online-only
+  // "Meeting" option survives solely while editing an event that is already
+  // a meeting, so legacy data stays editable without forcing a venue pick.
+  const allowMeeting =
+    isEdit && !defaultValues?.venue_id && !defaultValues?.custom_location_name
   const durationMinutes = Math.max(
     1,
     Math.round(durationUnit === "hours" ? durationValue * 60 : durationValue),
@@ -427,6 +432,10 @@ export function EventForm({
       // no custom physical location). When the Meeting option is selected
       // it is required — there's nowhere else for attendees to go.
       const isMeeting = !value.venue_id && !customSelected
+      if (isMeeting && !allowMeeting) {
+        showErrorToast("Select a venue or a custom location.")
+        return
+      }
       const meetingUrl = isMeeting ? value.meeting_url.trim() || null : null
       if (isMeeting && !meetingUrl) {
         showErrorToast("Meeting URL is required for Meeting events.")
@@ -1095,7 +1104,10 @@ export function EventForm({
                 value={
                   customSelected
                     ? "__custom__"
-                    : field.state.value || "__none__"
+                    : // With the Meeting option hidden, an empty venue must
+                      // fall back to the placeholder ("__none__" would point
+                      // at a non-rendered item and paint an empty trigger).
+                      field.state.value || (allowMeeting ? "__none__" : "")
                 }
                 onValueChange={(v) => {
                   if (v === "__custom__") {
@@ -1112,18 +1124,22 @@ export function EventForm({
                 disabled={readOnly}
               >
                 <SelectTrigger className="w-[240px]">
-                  <SelectValue placeholder="Meeting" />
+                  <SelectValue
+                    placeholder={allowMeeting ? "Meeting" : "Select a venue"}
+                  />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem
-                    value="__none__"
-                    className="bg-muted/40 text-foreground data-[highlighted]:bg-muted"
-                  >
-                    <span className="inline-flex items-center gap-2">
-                      <Video className="h-3.5 w-3.5 text-muted-foreground" />
-                      Meeting
-                    </span>
-                  </SelectItem>
+                  {allowMeeting && (
+                    <SelectItem
+                      value="__none__"
+                      className="bg-muted/40 text-foreground data-[highlighted]:bg-muted"
+                    >
+                      <span className="inline-flex items-center gap-2">
+                        <Video className="h-3.5 w-3.5 text-muted-foreground" />
+                        Meeting
+                      </span>
+                    </SelectItem>
+                  )}
                   <SelectItem
                     value="__custom__"
                     className="bg-muted/40 text-foreground data-[highlighted]:bg-muted"
@@ -1251,7 +1267,7 @@ export function EventForm({
           </div>
         )}
 
-        {!venueIdValue && !customSelected && (
+        {allowMeeting && !venueIdValue && !customSelected && (
           <InlineRow
             label="Meeting URL"
             description="Virtual meeting link — required for Meeting events."

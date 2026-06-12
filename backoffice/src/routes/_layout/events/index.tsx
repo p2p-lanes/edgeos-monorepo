@@ -32,6 +32,7 @@ import {
   EventsService,
   type EventVenuePublic,
   EventVenuesService,
+  type EventVisibility,
   HumansService,
   PopupsService,
 } from "@/client"
@@ -107,6 +108,18 @@ const EVENT_STATUS_OPTIONS: { value: EventStatus; label: string }[] = [
   { value: "rejected", label: "Rejected" },
 ]
 
+const VALID_EVENT_VISIBILITIES: Set<string> = new Set([
+  "public",
+  "unlisted",
+  "private",
+])
+
+const EVENT_VISIBILITY_OPTIONS: { value: EventVisibility; label: string }[] = [
+  { value: "public", label: "Public" },
+  { value: "unlisted", label: "Unlisted" },
+  { value: "private", label: "Private" },
+]
+
 const VALID_EVENT_VIEWS: Set<string> = new Set([
   "table",
   "list",
@@ -127,6 +140,7 @@ function readStoredEventsView(): EventsView | null {
 
 type EventsSearchParams = TableSearchParams & {
   status?: EventStatus
+  visibility?: EventVisibility
   venueId?: string
   creatorId?: string
   startDate?: string
@@ -141,6 +155,10 @@ export const Route = createFileRoute("/_layout/events/")({
     ...validateTableSearch(raw),
     ...(typeof raw.status === "string" && VALID_EVENT_STATUSES.has(raw.status)
       ? { status: raw.status as EventStatus }
+      : {}),
+    ...(typeof raw.visibility === "string" &&
+    VALID_EVENT_VISIBILITIES.has(raw.visibility)
+      ? { visibility: raw.visibility as EventVisibility }
       : {}),
     ...(typeof raw.venueId === "string" && raw.venueId
       ? { venueId: raw.venueId }
@@ -543,6 +561,35 @@ function EventStatusFilter({
   )
 }
 
+function EventVisibilityFilter({
+  selected,
+  onSelect,
+}: {
+  selected: EventVisibility | undefined
+  onSelect: (value: EventVisibility | undefined) => void
+}) {
+  return (
+    <Select
+      value={selected ?? "all"}
+      onValueChange={(v) =>
+        onSelect(v === "all" ? undefined : (v as EventVisibility))
+      }
+    >
+      <SelectTrigger className="h-9 w-[150px]">
+        <SelectValue placeholder="All visibilities" />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="all">All visibilities</SelectItem>
+        {EVENT_VISIBILITY_OPTIONS.map((opt) => (
+          <SelectItem key={opt.value} value={opt.value}>
+            {opt.label}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  )
+}
+
 function EventVenueFilter({
   venues,
   selected,
@@ -781,7 +828,8 @@ function EventsTableContent({
     searchParams,
     "/events",
   )
-  const { status, venueId, creatorId, startDate, endDate } = searchParams
+  const { status, visibility, venueId, creatorId, startDate, endDate } =
+    searchParams
 
   const setStatus = useCallback(
     (value: EventStatus | undefined) => {
@@ -790,6 +838,21 @@ function EventsTableContent({
         search: (prev: Record<string, unknown>) => ({
           ...prev,
           status: value,
+          page: 0,
+        }),
+        replace: true,
+      })
+    },
+    [navigate],
+  )
+
+  const setVisibility = useCallback(
+    (value: EventVisibility | undefined) => {
+      navigate({
+        to: "/events",
+        search: (prev: Record<string, unknown>) => ({
+          ...prev,
+          visibility: value,
           page: 0,
         }),
         replace: true,
@@ -864,6 +927,7 @@ function EventsTableContent({
       search: (prev: Record<string, unknown>) => ({
         ...prev,
         status: undefined,
+        visibility: undefined,
         venueId: undefined,
         creatorId: undefined,
         startDate: undefined,
@@ -874,7 +938,14 @@ function EventsTableContent({
     })
   }, [navigate])
 
-  const hasFilters = !!(status || venueId || creatorId || startDate || endDate)
+  const hasFilters = !!(
+    status ||
+    visibility ||
+    venueId ||
+    creatorId ||
+    startDate ||
+    endDate
+  )
 
   // Popup timezone drives display of every start_time in the table so the
   // "Events" list matches the calendar views. We render a skeleton until
@@ -921,6 +992,7 @@ function EventsTableContent({
         pageSize: pagination.pageSize,
         search,
         status,
+        visibility,
         venueId,
         creatorId,
         startDate,
@@ -935,6 +1007,7 @@ function EventsTableContent({
         skip: pagination.pageIndex * pagination.pageSize,
         limit: pagination.pageSize,
         eventStatus: status,
+        visibility,
         venueId:
           venueId && venueId !== "custom" && venueId !== "meeting"
             ? venueId
@@ -1003,6 +1076,10 @@ function EventsTableContent({
         filterBar={
           <div className="flex flex-wrap items-center gap-2">
             <EventStatusFilter selected={status} onSelect={setStatus} />
+            <EventVisibilityFilter
+              selected={visibility}
+              onSelect={setVisibility}
+            />
             <EventVenueFilter
               venues={venues?.results ?? []}
               selected={venueId}

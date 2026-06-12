@@ -34,6 +34,21 @@ if TYPE_CHECKING:
 # applicant and their spouse appear.
 DIRECTORY_VISIBLE_CATEGORY_KEYS = ("main", "spouse")
 
+# Default ``info_not_shared`` for applications materialized by an admin grant
+# (comped/gifted tickets): every field the directory can mask. The recipient
+# never filled the form, so nothing is shared until they opt in themselves.
+GRANTED_DEFAULT_INFO_NOT_SHARED = (
+    "first_name",
+    "last_name",
+    "email",
+    "telegram",
+    "role",
+    "organization",
+    "residence",
+    "age",
+    "gender",
+)
+
 
 def _is_draft_status(status_value: object) -> bool:
     """True when an application is being created/saved as a draft.
@@ -247,9 +262,9 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
                     # Full name ("first last") so a query spanning both fields —
                     # e.g. "eva shang" — matches; the per-field checks above only
                     # catch a term that fits within a single column.
-                    func.concat_ws(
-                        " ", Humans.first_name, Humans.last_name
-                    ).ilike(search_term),
+                    func.concat_ws(" ", Humans.first_name, Humans.last_name).ilike(
+                        search_term
+                    ),
                     col(Humans.email).ilike(search_term),
                     col(Humans.telegram).ilike(search_term),
                 )
@@ -337,9 +352,9 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
                     col(Humans.first_name).ilike(search_term),
                     col(Humans.last_name).ilike(search_term),
                     # Full name so "first last" queries match (see find_directory).
-                    func.concat_ws(
-                        " ", Humans.first_name, Humans.last_name
-                    ).ilike(search_term),
+                    func.concat_ws(" ", Humans.first_name, Humans.last_name).ilike(
+                        search_term
+                    ),
                 )
             )
 
@@ -996,6 +1011,12 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
             custom_fields_schema=form_fields_crud.build_schema_for_popup(
                 session, popup_id
             ),
+            # Granted (comped/gifted) people never filled the application
+            # form, so they never consented to sharing anything: default the
+            # attendee-directory privacy to fully hidden. They can opt in
+            # later by editing their privacy preferences. Grants to people
+            # with an EXISTING application keep whatever they chose.
+            info_not_shared=list(GRANTED_DEFAULT_INFO_NOT_SHARED),
         )
         session.add(application)
         session.flush()

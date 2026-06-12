@@ -251,6 +251,9 @@ export function EditEventForm({
           customLocationUrl={form.customLocationUrl}
           onCustomLocationUrlChange={form.setCustomLocationUrl}
           effectiveBookingMode={effectiveBookingMode}
+          // Venue is mandatory for events; the meeting option survives only
+          // while editing an event that is already a meeting (legacy data).
+          allowMeeting={!event.venue_id && !event.custom_location_name}
         />
         {customLocationMissing && (
           <p className="text-xs text-destructive">
