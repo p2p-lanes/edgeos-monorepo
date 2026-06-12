@@ -735,6 +735,24 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 ],
             }
 
+            # Same installment-plan eligibility as the pass-purchase path —
+            # open-ticketing buyers are anonymous but provide an email, which
+            # is all SimpleFi needs to create a plan.
+            max_installments: int | None = None
+            if (
+                popup.installments_enabled
+                and popup.installments_deadline is not None
+                and popup.installments_max is not None
+            ):
+                computed = _calculate_max_installments(
+                    popup.installments_deadline,
+                    popup.installments_max,
+                    popup.installments_interval,
+                    popup.installments_interval_count,
+                )
+                if computed >= 2:
+                    max_installments = computed
+
             simplefi_response = simplefi_client.create_payment(
                 amount=payment.amount,
                 popup_slug=popup.slug,
@@ -745,11 +763,23 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 portal_base_override=portal_base,
                 success_path=success_url,
                 cancel_path=cancel_url,
+                max_installments=max_installments,
+                installment_interval=popup.installments_interval,
+                installment_interval_count=popup.installments_interval_count,
+                user_email=buyer.email,
+                plan_name=popup.name,
             )
 
             payment.external_id = simplefi_response.id
             payment.status = simplefi_response.status
             payment.checkout_url = simplefi_response.checkout_url
+            # When the response signals an installment plan, external_id is an
+            # installment_plan_id and installments_total stays NULL until the
+            # installment_plan_activated webhook delivers the buyer's pick.
+            payment.is_installment_plan = simplefi_response.is_installment_plan
+            payment.installments_paid = (
+                0 if simplefi_response.is_installment_plan else None
+            )
             session.add(payment)
             session.commit()
             session.refresh(payment)

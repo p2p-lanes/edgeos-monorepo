@@ -119,6 +119,7 @@ def test_purchase_happy_path_creates_payment_and_attendees(
             id="sf_purchase_1",
             status="pending",
             checkout_url="https://simplefi.test/checkout/happy",
+            is_installment_plan=False,
         )
 
         response = client.post(
@@ -386,6 +387,7 @@ def test_purchase_resolves_per_tenant(
             id="sf_per_tenant_1",
             status="pending",
             checkout_url="https://simplefi.test/checkout/per-tenant",
+            is_installment_plan=False,
         )
 
         response = client.post(
@@ -424,3 +426,105 @@ def test_purchase_unknown_origin_returns_404(
         },
     )
     assert response.status_code == 404, response.text
+
+
+def test_purchase_creates_installment_plan_when_popup_enabled(
+    client: TestClient,
+    db: Session,
+    tenant_a: Tenants,
+) -> None:
+    """Open-ticketing checkout must honor the popup's installments config —
+    the same eligibility the pass-purchase path applies."""
+    popup = _make_popup(db, tenant_a, slug_prefix="instplan")
+    popup.installments_enabled = True
+    popup.installments_deadline = datetime.now(UTC) + timedelta(days=365)
+    popup.installments_max = 6
+    popup.installments_interval = "month"
+    popup.installments_interval_count = 1
+    product = _make_product(db, popup, price="300.00")
+    db.commit()
+
+    with patch("app.services.simplefi.get_simplefi_client") as mock_get_client:
+        mock_get_client.return_value.create_payment.return_value = SimpleNamespace(
+            id="sf_plan_1",
+            status="pending",
+            checkout_url="https://simplefi.test/plan/sf_plan_1",
+            is_installment_plan=True,
+        )
+
+        response = client.post(
+            f"/api/v1/checkout/{popup.slug}/purchase",
+            json={
+                "products": [{"product_id": str(product.id), "quantity": 1}],
+                "buyer": {
+                    "email": "plan-buyer@test.com",
+                    "first_name": "Plan",
+                    "last_name": "Buyer",
+                    "form_data": {},
+                },
+            },
+            headers={"X-Tenant-Id": str(tenant_a.id)},
+        )
+
+    assert response.status_code == 200, response.text
+
+    call_kwargs = mock_get_client.return_value.create_payment.call_args.kwargs
+    assert call_kwargs["max_installments"] is not None
+    assert call_kwargs["max_installments"] >= 2
+    assert call_kwargs["user_email"] == "plan-buyer@test.com"
+    assert call_kwargs["plan_name"] == popup.name
+
+    payment = db.exec(select(Payments).where(Payments.popup_id == popup.id)).first()
+    assert payment is not None
+    assert payment.is_installment_plan is True
+    assert payment.installments_paid == 0
+    assert payment.external_id == "sf_plan_1"
+
+
+def test_purchase_one_shot_when_installments_deadline_too_close(
+    client: TestClient,
+    db: Session,
+    tenant_a: Tenants,
+) -> None:
+    """Installments enabled but fewer than 2 monthly cycles fit before the
+    deadline — fall back to a one-shot payment request."""
+    popup = _make_popup(db, tenant_a, slug_prefix="instclose")
+    popup.installments_enabled = True
+    popup.installments_deadline = datetime.now(UTC) + timedelta(days=20)
+    popup.installments_max = 6
+    popup.installments_interval = "month"
+    popup.installments_interval_count = 1
+    product = _make_product(db, popup, price="300.00")
+    db.commit()
+
+    with patch("app.services.simplefi.get_simplefi_client") as mock_get_client:
+        mock_get_client.return_value.create_payment.return_value = SimpleNamespace(
+            id="sf_oneshot_1",
+            status="pending",
+            checkout_url="https://simplefi.test/checkout/sf_oneshot_1",
+            is_installment_plan=False,
+        )
+
+        response = client.post(
+            f"/api/v1/checkout/{popup.slug}/purchase",
+            json={
+                "products": [{"product_id": str(product.id), "quantity": 1}],
+                "buyer": {
+                    "email": "oneshot-buyer@test.com",
+                    "first_name": "One",
+                    "last_name": "Shot",
+                    "form_data": {},
+                },
+            },
+            headers={"X-Tenant-Id": str(tenant_a.id)},
+        )
+
+    assert response.status_code == 200, response.text
+
+    call_kwargs = mock_get_client.return_value.create_payment.call_args.kwargs
+    assert call_kwargs["max_installments"] is None
+
+    payment = db.exec(select(Payments).where(Payments.popup_id == popup.id)).first()
+    assert payment is not None
+    assert payment.is_installment_plan is False
+    assert payment.installments_paid is None
