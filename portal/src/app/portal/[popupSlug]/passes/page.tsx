@@ -11,6 +11,7 @@ import { Button, ButtonAnimated } from "@/components/ui/button"
 import { Loader } from "@/components/ui/Loader"
 import useHumanAttendeesQuery from "@/hooks/useHumanAttendeesQuery"
 import { useHumanPopupAccess } from "@/hooks/useHumanPopupAccess"
+import { useProductsQuery } from "@/hooks/useProductsQuery"
 import { useApplication } from "@/providers/applicationProvider"
 import { useCityProvider } from "@/providers/cityProvider"
 import { usePassesProvider } from "@/providers/passesProvider"
@@ -37,6 +38,12 @@ export default function HomePasses() {
   // Disabled for direct-sale popups (matches useResolvedAttendees behavior).
   const popupId = city?.id ? String(city.id) : null
   const attendeesQuery = useHumanAttendeesQuery(isDirectSale ? null : popupId)
+
+  // Track the products query loading state so the page can distinguish
+  // "still loading" from "loaded but empty". Without this, an empty products
+  // list (or empty attendees) renders an infinite loader instead of an empty
+  // state. This subscribes to the same cached query PassesProvider reads.
+  const productsQuery = useProductsQuery(popupId)
 
   useEffect(() => {
     // For direct-sale popups we keep /passes accessible even when the human
@@ -103,37 +110,60 @@ export default function HomePasses() {
     )
   }
 
-  // Direct-sale users without purchases land here via the sidebar — show an
-  // empty state instead of an infinite loader, with a CTA back to /checkout.
-  if (isDirectSale && (access.state === "denied" || !attendees.length)) {
-    return (
-      <div className="w-full md:mt-0 mx-auto items-center max-w-3xl p-6 bg-transparent">
-        <div className="flex flex-col items-center justify-center rounded-2xl border bg-card p-10 text-center shadow-sm">
-          <Ticket className="size-10 text-muted-foreground mb-4" />
-          <h2 className="text-xl font-semibold">
-            {t("passes.empty_title", { defaultValue: "No tickets yet" })}
-          </h2>
-          <p className="mt-2 text-sm text-muted-foreground">
-            {t("passes.empty_description", {
-              defaultValue:
-                "You haven't purchased any tickets for this event yet.",
-            })}
-          </p>
+  // Empty state shared by both flows. The buy CTA is hidden when there are no
+  // products to sell, so it never becomes a dead-end button.
+  const buyHref = isDirectSale
+    ? `/checkout/${params.popupSlug}`
+    : `/portal/${params.popupSlug}/passes/buy`
+  const emptyState = (
+    <div className="w-full md:mt-0 mx-auto items-center max-w-3xl p-6 bg-transparent">
+      <div className="flex flex-col items-center justify-center rounded-2xl border bg-card p-10 text-center shadow-sm">
+        <Ticket className="size-10 text-muted-foreground mb-4" />
+        <h2 className="text-xl font-semibold">
+          {t("passes.empty_title", { defaultValue: "No tickets yet" })}
+        </h2>
+        <p className="mt-2 text-sm text-muted-foreground">
+          {t("passes.empty_description", {
+            defaultValue:
+              "You haven't purchased any tickets for this event yet.",
+          })}
+        </p>
+        {products.length > 0 && (
           <div className="mt-6">
             <ButtonAnimated
-              onClick={() => router.push(`/checkout/${params.popupSlug}`)}
+              onClick={() => router.push(buyHref)}
               className="px-9"
             >
               {t("cta.buy_tickets")}
             </ButtonAnimated>
           </div>
-        </div>
+        )}
       </div>
-    )
-  }
+    </div>
+  )
 
-  if (!attendees.length || !products.length) return <Loader />
-  if (access.state !== "allowed") return <Loader />
+  // Once access resolves, surface explicit empty states instead of an infinite
+  // loader. We only render the loader while a query is genuinely in-flight;
+  // after queries resolve we render either the passes or the empty state.
+  if (isDirectSale) {
+    // Direct-sale attendeePasses only build once products exist, so an empty
+    // `attendees` here means "no purchases yet" (or the popup has no products).
+    if (access.state === "denied" || !attendees.length) {
+      if (productsQuery.isLoading) return <Loader />
+      return emptyState
+    }
+  } else {
+    if (access.state !== "allowed") return <Loader />
+    // Wait for the underlying queries before deciding empty vs ready.
+    if (attendeesQuery.isLoading || productsQuery.isLoading) return <Loader />
+    // Loaded: the human owns no attendees, or the popup has no products. Either
+    // way there is nothing to render — show the empty state, not a loader.
+    const ownsNoAttendees = (attendeesQuery.data?.length ?? 0) === 0
+    if (ownsNoAttendees || products.length === 0) return emptyState
+    // Inputs are non-empty; PassesProvider may still be assembling
+    // attendeePasses for a tick. This loader is finite.
+    if (!attendees.length) return <Loader />
+  }
 
   return (
     <div className="w-full md:mt-0 mx-auto items-center max-w-3xl p-6 bg-transparent">
