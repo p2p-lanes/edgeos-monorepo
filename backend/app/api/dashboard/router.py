@@ -163,7 +163,12 @@ def _get_payment_stats(db: TenantSession, popup_id: uuid.UUID) -> PaymentStats:
         select(
             Payments.status,
             func.count(Payments.id),
-            func.coalesce(func.sum(Payments.amount), Decimal("0")),
+            # amount_charged is the settled total when SimpleFi applied a
+            # per-rail price adjustment; fall back to the quoted amount.
+            func.coalesce(
+                func.sum(func.coalesce(Payments.amount_charged, Payments.amount)),
+                Decimal("0"),
+            ),
             func.coalesce(func.sum(Payments.discount_value), Decimal("0")),
         )
         .where(
@@ -340,7 +345,13 @@ def _get_cumulative_trends(
 
     # Revenue: approved pass_purchase amount on the same payment-date axis
     revenue_rows = db.exec(
-        select(bucket, func.coalesce(func.sum(Payments.amount), Decimal("0")))
+        select(
+            bucket,
+            func.coalesce(
+                func.sum(func.coalesce(Payments.amount_charged, Payments.amount)),
+                Decimal("0"),
+            ),
+        )
         .where(
             Payments.popup_id == popup_id,
             Payments.status == PaymentStatus.APPROVED.value,
@@ -369,8 +380,10 @@ def _get_revenue_breakdown(db: TenantSession, popup_id: uuid.UUID) -> RevenueBre
     """Net revenue and quantity breakdown by product and category.
 
     Revenue here is the money actually collected per line, so the categories
-    reconcile with the Total Revenue KPI (sum of Payments.amount) rather than
-    inflating it with pre-discount list prices. Per-line net revenue mirrors the
+    reconcile with the Total Revenue KPI (sum of COALESCE(amount_charged, amount))
+    rather than inflating it with pre-discount list prices. When SimpleFi applies
+    a per-rail price adjustment the per-line breakdown can't see it (it's a
+    payment-level adjustment), so categories may drift from the KPI by that delta. Per-line net revenue mirrors the
     pricing logic in payment.crud._calculate_price:
       - patreon donations carry their amount on effective_unit_price
         (product_price is always 0 for patreon);

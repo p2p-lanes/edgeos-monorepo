@@ -2120,6 +2120,11 @@ export type HumanVerify = {
 };
 
 /**
+ * Billing interval for installment plans (mirrors SimpleFi's InstallmentInterval).
+ */
+export type InstallmentInterval = 'day' | 'week' | 'month' | 'year';
+
+/**
  * Top-level KPI cards with derived metrics.
  */
 export type KeyMetrics = {
@@ -2452,6 +2457,7 @@ export type PaymentPublic = {
     external_id?: (string | null);
     status?: string;
     amount?: string;
+    amount_charged?: (string | null);
     insurance_amount?: string;
     contribution_amount?: string;
     currency?: string;
@@ -2482,8 +2488,13 @@ export type PaymentPublic = {
 
 /**
  * Settlement rail/provider shown to users.
+ *
+ * SIMPLEFI is the residual value: settlement webhooks that don't expose a
+ * card provider. CRYPTO is written at installment-plan activation, where
+ * the rail is explicit — so a plan with SIMPLEFI source predates that
+ * logic and its rail is unknown.
  */
-export type PaymentSource = 'SimpleFI' | 'Stripe' | 'MercadoPago';
+export type PaymentSource = 'SimpleFI' | 'Stripe' | 'MercadoPago' | 'Crypto';
 
 /**
  * Statistics for payments.
@@ -2601,6 +2612,11 @@ export type PopupAdmin = {
     checkin_pass_lead_days?: (number | null);
     show_attendee_directory?: boolean;
     credits_enabled?: boolean;
+    installments_enabled?: boolean;
+    installments_deadline?: (string | null);
+    installments_max?: (number | null);
+    installments_interval?: InstallmentInterval;
+    installments_interval_count?: number;
     id: string;
 };
 
@@ -2649,6 +2665,11 @@ export type PopupCreate = {
     self_check_in_enabled?: boolean;
     show_attendee_directory?: boolean;
     credits_enabled?: boolean;
+    installments_enabled?: boolean;
+    installments_deadline?: (string | null);
+    installments_max?: (number | null);
+    installments_interval?: InstallmentInterval;
+    installments_interval_count?: number;
     checkin_pass_lead_days?: (number | null);
 };
 
@@ -2695,6 +2716,11 @@ export type PopupPublic = {
     events_enabled?: boolean;
     show_attendee_directory?: boolean;
     credits_enabled?: boolean;
+    installments_enabled?: boolean;
+    installments_deadline?: (string | null);
+    installments_max?: (number | null);
+    installments_interval?: InstallmentInterval;
+    installments_interval_count?: number;
 };
 
 /**
@@ -2775,6 +2801,11 @@ export type PopupUpdate = {
     self_check_in_enabled?: (boolean | null);
     show_attendee_directory?: (boolean | null);
     credits_enabled?: (boolean | null);
+    installments_enabled?: (boolean | null);
+    installments_deadline?: (string | null);
+    installments_max?: (number | null);
+    installments_interval?: (InstallmentInterval | null);
+    installments_interval_count?: (number | null);
     checkin_pass_lead_days?: (number | null);
 };
 

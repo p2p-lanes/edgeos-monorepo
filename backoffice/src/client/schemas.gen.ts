@@ -10153,6 +10153,13 @@ export const HumanVerifySchema = {
     description: 'Request to verify human authentication code.'
 } as const;
 
+export const InstallmentIntervalSchema = {
+    type: 'string',
+    enum: ['day', 'week', 'month', 'year'],
+    title: 'InstallmentInterval',
+    description: "Billing interval for installment plans (mirrors SimpleFi's InstallmentInterval)."
+} as const;
+
 export const KeyMetricsSchema = {
     properties: {
         people: {
@@ -11398,6 +11405,18 @@ export const PaymentPublicSchema = {
             title: 'Amount',
             default: '0'
         },
+        amount_charged: {
+            anyOf: [
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Amount Charged'
+        },
         insurance_amount: {
             type: 'string',
             pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$',
@@ -11637,9 +11656,14 @@ export const PaymentPublicSchema = {
 
 export const PaymentSourceSchema = {
     type: 'string',
-    enum: ['SimpleFI', 'Stripe', 'MercadoPago'],
+    enum: ['SimpleFI', 'Stripe', 'MercadoPago', 'Crypto'],
     title: 'PaymentSource',
-    description: 'Settlement rail/provider shown to users.'
+    description: `Settlement rail/provider shown to users.
+
+SIMPLEFI is the residual value: settlement webhooks that don't expose a
+card provider. CRYPTO is written at installment-plan activation, where
+the rail is explicit — so a plan with SIMPLEFI source predates that
+logic and its rail is unknown.`
 } as const;
 
 export const PaymentStatsSchema = {
@@ -12268,6 +12292,43 @@ export const PopupAdminSchema = {
             title: 'Credits Enabled',
             default: false
         },
+        installments_enabled: {
+            type: 'boolean',
+            title: 'Installments Enabled',
+            default: false
+        },
+        installments_deadline: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Installments Deadline'
+        },
+        installments_max: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Installments Max'
+        },
+        installments_interval: {
+            '$ref': '#/components/schemas/InstallmentInterval',
+            default: 'month'
+        },
+        installments_interval_count: {
+            type: 'integer',
+            title: 'Installments Interval Count',
+            default: 1
+        },
         id: {
             type: 'string',
             format: 'uuid',
@@ -12673,6 +12734,43 @@ export const PopupCreateSchema = {
             title: 'Credits Enabled',
             default: false
         },
+        installments_enabled: {
+            type: 'boolean',
+            title: 'Installments Enabled',
+            default: false
+        },
+        installments_deadline: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Installments Deadline'
+        },
+        installments_max: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Installments Max'
+        },
+        installments_interval: {
+            '$ref': '#/components/schemas/InstallmentInterval',
+            default: 'month'
+        },
+        installments_interval_count: {
+            type: 'integer',
+            title: 'Installments Interval Count',
+            default: 1
+        },
         checkin_pass_lead_days: {
             anyOf: [
                 {
@@ -13000,6 +13098,43 @@ export const PopupPublicSchema = {
             type: 'boolean',
             title: 'Credits Enabled',
             default: false
+        },
+        installments_enabled: {
+            type: 'boolean',
+            title: 'Installments Enabled',
+            default: false
+        },
+        installments_deadline: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Installments Deadline'
+        },
+        installments_max: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Installments Max'
+        },
+        installments_interval: {
+            '$ref': '#/components/schemas/InstallmentInterval',
+            default: 'month'
+        },
+        installments_interval_count: {
+            type: 'integer',
+            title: 'Installments Interval Count',
+            default: 1
         }
     },
     type: 'object',
@@ -13606,6 +13741,61 @@ export const PopupUpdateSchema = {
                 }
             ],
             title: 'Credits Enabled'
+        },
+        installments_enabled: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Installments Enabled'
+        },
+        installments_deadline: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Installments Deadline'
+        },
+        installments_max: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Installments Max'
+        },
+        installments_interval: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/InstallmentInterval'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        installments_interval_count: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Installments Interval Count'
         },
         checkin_pass_lead_days: {
             anyOf: [

@@ -5,6 +5,7 @@ import {
   Building2,
   Calendar,
   CalendarDays,
+  CreditCard,
   DollarSign,
   FileText,
   Globe,
@@ -27,6 +28,7 @@ import {
 import {
   ApprovalStrategiesService,
   type CheckoutMode,
+  type InstallmentInterval,
   type PopupAdmin,
   type PopupCreate,
   PopupsService,
@@ -229,6 +231,15 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
       events_enabled: defaultValues?.events_enabled ?? true,
       self_check_in_enabled: defaultValues?.self_check_in_enabled ?? false,
       show_attendee_directory: defaultValues?.show_attendee_directory ?? false,
+      installments_enabled: defaultValues?.installments_enabled ?? false,
+      installments_deadline: formatDateForInput(
+        defaultValues?.installments_deadline,
+      ),
+      installments_max: defaultValues?.installments_max?.toString() ?? "",
+      installments_interval: (defaultValues?.installments_interval ??
+        "month") as InstallmentInterval,
+      installments_interval_count:
+        defaultValues?.installments_interval_count?.toString() ?? "1",
       checkin_pass_lead_days:
         defaultValues?.checkin_pass_lead_days?.toString() ?? "",
     },
@@ -286,6 +297,22 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
         self_check_in_enabled: value.self_check_in_enabled,
         show_attendee_directory:
           value.sale_type === "application" && value.show_attendee_directory,
+        installments_enabled: value.installments_enabled,
+        // Deadline / max are only meaningful when the feature is enabled; when
+        // disabled we send null/null so accidental orphaned values don't trip
+        // the backend cross-field validator on a future save.
+        installments_deadline: value.installments_enabled
+          ? toUTCDate(value.installments_deadline)
+          : null,
+        installments_max: value.installments_enabled
+          ? value.installments_max
+            ? Number(value.installments_max)
+            : null
+          : null,
+        installments_interval: value.installments_interval,
+        installments_interval_count: value.installments_interval_count
+          ? Number(value.installments_interval_count)
+          : 1,
         checkin_pass_lead_days: value.checkin_pass_lead_days
           ? Number(value.checkin_pass_lead_days)
           : null,
@@ -1245,6 +1272,189 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
                 </form.Field>
               </>
             )}
+          </form.Subscribe>
+        </InlineSection>
+
+        <Separator />
+
+        {/* Installment plans (SimpleFi) */}
+        <InlineSection title="Installment plans">
+          <form.Field name="installments_enabled">
+            {(field) => (
+              <InlineRow
+                icon={<CreditCard className="h-4 w-4 text-muted-foreground" />}
+                label="Enable installment plans"
+                description="Offer buyers the option to pay in scheduled installments. SimpleFi renders the per-cycle selector at checkout."
+              >
+                <Switch
+                  id="installments_enabled"
+                  checked={field.state.value}
+                  onCheckedChange={(checked) => field.handleChange(checked)}
+                  disabled={readOnly}
+                />
+              </InlineRow>
+            )}
+          </form.Field>
+
+          <form.Subscribe
+            selector={(state) => state.values.installments_enabled}
+          >
+            {(installmentsEnabled) =>
+              installmentsEnabled ? (
+                <>
+                  <form.Field
+                    name="installments_deadline"
+                    validators={{
+                      onBlur: ({ value }) => {
+                        if (readOnly) return undefined
+                        if (!value) {
+                          return "Deadline is required when installments are enabled"
+                        }
+                        return undefined
+                      },
+                    }}
+                  >
+                    {(field) => (
+                      <div>
+                        <InlineRow
+                          icon={
+                            <Calendar className="h-4 w-4 text-muted-foreground" />
+                          }
+                          label="Deadline"
+                          description="All installments must be paid by this date. New plans created after the deadline fall back to one-shot payment."
+                        >
+                          <DatePicker
+                            id="installments_deadline"
+                            value={field.state.value}
+                            onChange={field.handleChange}
+                            disabled={readOnly}
+                            placeholder="Select date"
+                            className="w-auto"
+                          />
+                        </InlineRow>
+                        <FieldError errors={field.state.meta.errors} />
+                      </div>
+                    )}
+                  </form.Field>
+
+                  <form.Field
+                    name="installments_max"
+                    validators={{
+                      onBlur: ({ value }) => {
+                        if (readOnly) return undefined
+                        if (!value) {
+                          return "Max installments is required when installments are enabled"
+                        }
+                        const num = Number.parseInt(value, 10)
+                        if (Number.isNaN(num) || num < 2 || num > 12) {
+                          return "Max installments must be between 2 and 12 (SimpleFi limit)"
+                        }
+                        return undefined
+                      },
+                    }}
+                  >
+                    {(field) => (
+                      <div>
+                        <InlineRow
+                          icon={
+                            <Ticket className="h-4 w-4 text-muted-foreground" />
+                          }
+                          label="Max installments"
+                          description="Ceiling shown to buyers. SimpleFi accepts 2–12; the actual number is picked by the buyer at checkout."
+                        >
+                          <Input
+                            id="installments_max"
+                            type="number"
+                            min="2"
+                            max="12"
+                            step="1"
+                            placeholder="e.g. 6"
+                            value={field.state.value}
+                            onBlur={field.handleBlur}
+                            onChange={(e) => field.handleChange(e.target.value)}
+                            disabled={readOnly}
+                            className="max-w-[120px] text-sm"
+                          />
+                        </InlineRow>
+                        <FieldError errors={field.state.meta.errors} />
+                      </div>
+                    )}
+                  </form.Field>
+
+                  <form.Field name="installments_interval">
+                    {(field) => (
+                      <InlineRow
+                        icon={
+                          <CalendarDays className="h-4 w-4 text-muted-foreground" />
+                        }
+                        label="Billing interval"
+                        description="Cadence between installments."
+                      >
+                        <Select
+                          value={field.state.value}
+                          onValueChange={(v) =>
+                            field.handleChange(v as InstallmentInterval)
+                          }
+                          disabled={readOnly}
+                        >
+                          <SelectTrigger
+                            id="installments_interval"
+                            className="w-[140px]"
+                          >
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="day">Day</SelectItem>
+                            <SelectItem value="week">Week</SelectItem>
+                            <SelectItem value="month">Month</SelectItem>
+                            <SelectItem value="year">Year</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </InlineRow>
+                    )}
+                  </form.Field>
+
+                  <form.Field
+                    name="installments_interval_count"
+                    validators={{
+                      onBlur: ({ value }) => {
+                        if (readOnly) return undefined
+                        const num = Number.parseInt(value, 10)
+                        if (!value || Number.isNaN(num) || num < 1) {
+                          return "Interval count must be at least 1"
+                        }
+                        return undefined
+                      },
+                    }}
+                  >
+                    {(field) => (
+                      <div>
+                        <InlineRow
+                          icon={
+                            <CalendarDays className="h-4 w-4 text-muted-foreground" />
+                          }
+                          label="Interval count"
+                          description="Multiplier on the interval (e.g. interval = week + count = 2 → bi-weekly)."
+                        >
+                          <Input
+                            id="installments_interval_count"
+                            type="number"
+                            min="1"
+                            step="1"
+                            value={field.state.value}
+                            onBlur={field.handleBlur}
+                            onChange={(e) => field.handleChange(e.target.value)}
+                            disabled={readOnly}
+                            className="max-w-[120px] text-sm"
+                          />
+                        </InlineRow>
+                        <FieldError errors={field.state.meta.errors} />
+                      </div>
+                    )}
+                  </form.Field>
+                </>
+              ) : null
+            }
           </form.Subscribe>
         </InlineSection>
 
