@@ -3115,6 +3115,17 @@ async def create_portal_event(
         popup, start_time=event_in.start_time, end_time=event_in.end_time
     )
 
+    # Portal events need a physical location: a venue or a custom location.
+    # Online-only (meeting) events can no longer be created — existing ones
+    # remain editable, and admin/backoffice creation stays unrestricted.
+    if event_in.venue_id is None and not (
+        event_in.custom_location_name and event_in.custom_location_name.strip()
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Events must have a venue or a custom location.",
+        )
+
     rrule_str = format_rrule(event_in.recurrence) if event_in.recurrence else None
 
     if event_in.venue_id is not None:
@@ -3270,6 +3281,27 @@ async def update_portal_event(
         patch_dict["custom_location_url"] = None
     elif patch_dict.get("custom_location_name") is not None:
         patch_dict["venue_id"] = None
+
+    # Venue/custom location is mandatory: block edits that would strip the
+    # location from an event that has one. Events that are ALREADY
+    # online-only (legacy meetings) stay editable as-is.
+    if "venue_id" in patch_dict or "custom_location_name" in patch_dict:
+        new_venue_id = patch_dict.get("venue_id", event.venue_id)
+        new_custom_name = patch_dict.get(
+            "custom_location_name", event.custom_location_name
+        )
+        had_location = (
+            event.venue_id is not None or event.custom_location_name is not None
+        )
+        if (
+            had_location
+            and new_venue_id is None
+            and not (new_custom_name and new_custom_name.strip())
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Events must have a venue or a custom location.",
+            )
 
     # Portal edits have no approval gate for capacity (creation does), so
     # default unset capacity to the venue's AND clamp explicit values that

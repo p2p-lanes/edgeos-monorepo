@@ -25,6 +25,12 @@ interface VenueSelectProps {
    * this we fall back to `events.venues.list.untitled_venue`.
    */
   selectedVenueLabel?: string
+  /**
+   * Offer the virtual-meeting option. Venue selection is mandatory for new
+   * events, so this is only enabled when editing an event that is already a
+   * meeting (legacy data keeps working; nothing new can become one).
+   */
+  allowMeeting?: boolean
 }
 
 // Virtual meeting is an explicit choice, not the default: an empty
@@ -37,6 +43,7 @@ function VenueSelectImpl({
   onVenueChange,
   venues,
   selectedVenueLabel,
+  allowMeeting = false,
 }: VenueSelectProps) {
   const { t } = useTranslation()
 
@@ -112,18 +119,20 @@ function VenueSelectImpl({
         </span>
       </SelectTrigger>
       <SelectContent className="max-h-[min(20rem,60svh)]">
-        <SelectItem
-          value={MEETING_VALUE}
-          className={cn(
-            "data-[highlighted]:bg-muted",
-            "bg-muted/40 text-foreground",
-          )}
-        >
-          <span className="inline-flex items-center gap-2">
-            <Video className="h-3.5 w-3.5 text-muted-foreground" />
-            {t("events.form.no_venue_option")}
-          </span>
-        </SelectItem>
+        {allowMeeting && (
+          <SelectItem
+            value={MEETING_VALUE}
+            className={cn(
+              "data-[highlighted]:bg-muted",
+              "bg-muted/40 text-foreground",
+            )}
+          >
+            <span className="inline-flex items-center gap-2">
+              <Video className="h-3.5 w-3.5 text-muted-foreground" />
+              {t("events.form.no_venue_option")}
+            </span>
+          </SelectItem>
+        )}
         <SelectItem
           value={CUSTOM_VALUE}
           className={cn(

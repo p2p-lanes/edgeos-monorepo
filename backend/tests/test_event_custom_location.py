@@ -471,3 +471,111 @@ class TestIcsRendering:
         ics = build_event_ics(event, recipient_email="alice@example.com")
 
         assert "LOCATION:Mi casa — https://maps.app.goo.gl/abc" in ics
+
+
+class TestPortalLocationRequired:
+    """Portal events must have a venue or a custom location.
+
+    Online-only (meeting) events can no longer be created or converted to
+    via the portal; pre-existing meetings stay editable. Admin endpoints
+    remain unrestricted (legacy data management).
+    """
+
+    def test_portal_create_without_location_rejected(
+        self, client: TestClient, db: Session, tenant_a: Tenants
+    ) -> None:
+        popup = _make_popup(db, tenant_a)
+        _set_settings(db, tenant_a, popup)
+        human = _make_human(db, tenant_a)
+
+        resp = client.post(
+            "/api/v1/events/portal/events",
+            headers=_human_auth(human),
+            json=_payload(popup),
+        )
+        assert resp.status_code == 422, resp.text
+        assert "venue or a custom location" in resp.json()["detail"]
+
+    def test_portal_create_with_venue_ok(
+        self, client: TestClient, db: Session, tenant_a: Tenants
+    ) -> None:
+        popup = _make_popup(db, tenant_a)
+        _set_settings(db, tenant_a, popup)
+        venue = _make_venue(db, tenant_a, popup)
+        human = _make_human(db, tenant_a)
+
+        resp = client.post(
+            "/api/v1/events/portal/events",
+            headers=_human_auth(human),
+            json=_payload(popup, venue_id=venue.id),
+        )
+        assert resp.status_code == 201, resp.text
+
+    def test_portal_update_cannot_strip_location(
+        self, client: TestClient, db: Session, tenant_a: Tenants
+    ) -> None:
+        popup = _make_popup(db, tenant_a)
+        _set_settings(db, tenant_a, popup)
+        venue = _make_venue(db, tenant_a, popup)
+        human = _make_human(db, tenant_a)
+
+        create = client.post(
+            "/api/v1/events/portal/events",
+            headers=_human_auth(human),
+            json=_payload(popup, venue_id=venue.id),
+        )
+        assert create.status_code == 201, create.text
+        event_id = create.json()["id"]
+
+        patch = client.patch(
+            f"/api/v1/events/portal/events/{event_id}",
+            headers=_human_auth(human),
+            json={
+                "venue_id": None,
+                "custom_location_name": None,
+                "custom_location_url": None,
+                "meeting_url": "https://meet.google.com/abc",
+            },
+        )
+        assert patch.status_code == 422, patch.text
+        assert "venue or a custom location" in patch.json()["detail"]
+
+    def test_portal_update_legacy_meeting_event_still_editable(
+        self, client: TestClient, db: Session, tenant_a: Tenants
+    ) -> None:
+        popup = _make_popup(db, tenant_a)
+        _set_settings(db, tenant_a, popup)
+        human = _make_human(db, tenant_a)
+
+        # Seed a legacy online-only event directly (portal can't create one).
+        event = Events(
+            tenant_id=tenant_a.id,
+            popup_id=popup.id,
+            owner_id=human.id,
+            title="Legacy Meeting",
+            start_time=datetime(2026, 5, 5, 14, tzinfo=UTC),
+            end_time=datetime(2026, 5, 5, 15, tzinfo=UTC),
+            timezone="UTC",
+            visibility=EventVisibility.PUBLIC,
+            status=EventStatus.PUBLISHED,
+            meeting_url="https://meet.google.com/abc",
+        )
+        db.add(event)
+        db.commit()
+        db.refresh(event)
+
+        # The edit form always sends the full location triplet; a meeting
+        # event keeps venue/custom null — that must stay allowed.
+        patch = client.patch(
+            f"/api/v1/events/portal/events/{event.id}",
+            headers=_human_auth(human),
+            json={
+                "title": "Legacy Meeting (renamed)",
+                "venue_id": None,
+                "custom_location_name": None,
+                "custom_location_url": None,
+                "meeting_url": "https://meet.google.com/abc",
+            },
+        )
+        assert patch.status_code == 200, patch.text
+        assert patch.json()["title"] == "Legacy Meeting (renamed)"
