@@ -11656,9 +11656,14 @@ export const PaymentPublicSchema = {
 
 export const PaymentSourceSchema = {
     type: 'string',
-    enum: ['SimpleFI', 'Stripe', 'MercadoPago'],
+    enum: ['SimpleFI', 'Stripe', 'MercadoPago', 'Crypto'],
     title: 'PaymentSource',
-    description: 'Settlement rail/provider shown to users.'
+    description: `Settlement rail/provider shown to users.
+
+SIMPLEFI is the residual value: settlement webhooks that don't expose a
+card provider. CRYPTO is written at installment-plan activation, where
+the rail is explicit — so a plan with SIMPLEFI source predates that
+logic and its rail is unknown.`
 } as const;
 
 export const PaymentStatsSchema = {

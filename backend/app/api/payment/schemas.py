@@ -18,11 +18,18 @@ class PaymentType(str, Enum):
 
 
 class PaymentSource(str, Enum):
-    """Settlement rail/provider shown to users."""
+    """Settlement rail/provider shown to users.
+
+    SIMPLEFI is the residual value: settlement webhooks that don't expose a
+    card provider. CRYPTO is written at installment-plan activation, where
+    the rail is explicit — so a plan with SIMPLEFI source predates that
+    logic and its rail is unknown.
+    """
 
     SIMPLEFI = "SimpleFI"
     STRIPE = "Stripe"
     MERCADOPAGO = "MercadoPago"
+    CRYPTO = "Crypto"
 
 
 class PaymentStatus(str, Enum):
@@ -382,7 +389,13 @@ class SimpleFIInstallmentPlan(BaseModel):
     paid_installments_count: int
     number_of_installments: int
     user_email: str
+    # CARD | CRYPTO. Locked once the first payment is made — SimpleFi does
+    # not allow switching afterwards, so the value seen at activation holds
+    # for the plan's lifetime.
     payment_method: str | None = None
+    # Exactly one is set for CARD plans; identifies the charging provider.
+    stripe_subscription_id: str | None = None
+    mercadopago_preapproval_id: str | None = None
     reference: dict | None = None
 
     model_config = ConfigDict(extra="allow")

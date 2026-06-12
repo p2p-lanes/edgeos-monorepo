@@ -2488,8 +2488,13 @@ export type PaymentPublic = {
 
 /**
  * Settlement rail/provider shown to users.
+ *
+ * SIMPLEFI is the residual value: settlement webhooks that don't expose a
+ * card provider. CRYPTO is written at installment-plan activation, where
+ * the rail is explicit — so a plan with SIMPLEFI source predates that
+ * logic and its rail is unknown.
  */
-export type PaymentSource = 'SimpleFI' | 'Stripe' | 'MercadoPago';
+export type PaymentSource = 'SimpleFI' | 'Stripe' | 'MercadoPago' | 'Crypto';
 
 /**
  * Statistics for payments.

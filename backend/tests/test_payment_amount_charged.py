@@ -287,6 +287,7 @@ def test_installment_payments_accumulate_amount_charged(monkeypatch) -> None:
         installments_paid=0,
         installments_total=6,
         amount_charged=None,
+        source="SimpleFI",
     )
 
     class FakePaymentsCRUD:

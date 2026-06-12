@@ -13,9 +13,11 @@ from app.api.payment.schemas import (
     PaymentFilter,
     PaymentPreview,
     PaymentPublic,
+    PaymentSource,
     PaymentStatus,
     PaymentStatusCheck,
     PaymentUpdate,
+    SimpleFIInstallmentPlan,
     SimpleFIInstallmentPlanPayload,
     SimpleFIPaymentInfo,
     SimpleFIPaymentRequest,
@@ -103,6 +105,27 @@ def _extract_charged_amount(payment_request: SimpleFIPaymentRequest) -> Decimal:
     if card_payment is not None and card_payment.price_details is not None:
         return Decimal(str(card_payment.price_details.final_amount))
     return Decimal(str(payment_request.amount))
+
+
+def _plan_payment_source(plan: SimpleFIInstallmentPlan) -> str | None:
+    """Settlement provider for an installment plan, from the activation payload.
+
+    Subscription-charged installments never carry a card_payment object on
+    their settlement webhooks, so activation is the only point where the
+    rail/provider is visible. SimpleFi locks the payment method after the
+    first charge, so the value stays accurate for the plan's lifetime.
+    Returns None when the payload doesn't identify the rail (leave source
+    untouched rather than guessing).
+    """
+    method = (plan.payment_method or "").upper()
+    if method == "CRYPTO":
+        return PaymentSource.CRYPTO.value
+    if method == "CARD":
+        if plan.stripe_subscription_id:
+            return PaymentSource.STRIPE.value
+        if plan.mercadopago_preapproval_id:
+            return PaymentSource.MERCADOPAGO.value
+    return None
 
 
 def _installment_charged_amount(payment_request: SimpleFIPaymentRequest) -> Decimal:
@@ -1165,6 +1188,13 @@ async def _handle_installment_payment(
     # Extract payment details
     settlement_currency, settlement_rate, source = _extract_settlement_details(payload)
 
+    # Subscription-charged installments carry no card_payment object, so the
+    # extracted source falls back to the residual "SimpleFI". If activation
+    # already recorded the plan's provider (Stripe/MercadoPago/Crypto), keep
+    # it — never downgrade to the residual. Webhook ordering isn't guaranteed.
+    if payment.source and payment.source != PaymentSource.SIMPLEFI.value:
+        source = payment.source
+
     if isinstance(new_payment, SimpleFIPaymentInfo):
         amount = Decimal(str(new_payment.amount))
         currency = new_payment.coin
@@ -1339,6 +1369,13 @@ async def _handle_installment_plan_activated(
             "Payment {}: single-installment plan — is_installment_plan normalized to False",
             payment.id,
         )
+
+    # Activation is the only webhook that exposes the plan's rail/provider,
+    # so record it here. Settlement must not downgrade it later (see
+    # _handle_installment_payment).
+    plan_source = _plan_payment_source(installment_plan)
+    if plan_source is not None:
+        payment.source = plan_source
 
     db.commit()
 

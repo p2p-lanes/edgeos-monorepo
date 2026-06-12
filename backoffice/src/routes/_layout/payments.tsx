@@ -289,7 +289,9 @@ function getColumns(hasInvoice: boolean): ColumnDef<PaymentPublic>[] {
     },
     {
       accessorKey: "amount_charged",
-      header: ({ column }) => <SortableHeader label="Charged" column={column} />,
+      header: ({ column }) => (
+        <SortableHeader label="Charged" column={column} />
+      ),
       cell: ({ row }) => {
         // Settled total from SimpleFi — differs from Amount when the merchant
         // applies a per-rail (card/crypto) discount or surcharge. NULL until
@@ -470,13 +472,13 @@ const categoryLabels: Record<string, string> = {
 // SimpleFi merchants may configure a signed per-rail (card/crypto) price
 // adjustment, so the settled total can differ from the quoted amount. EdgeOS
 // only stores the outcome (amount vs amount_charged); the percentage is
-// derived and the rail inferred from `source`. Card checkouts carry the
-// provider name (Stripe, ...) and one-shot crypto settlements keep
-// "SimpleFI" — but installment plans charged via card subscriptions ALSO
-// report "SimpleFI" (their webhooks have no card_payment object), so for
-// plans with that source the rail is genuinely unknown and we fall back to
-// a generic label. `final` is false while a plan is still collecting, where
-// amount_charged is a running partial and the percentage can't be derived.
+// derived and the rail read from `source`: provider names (Stripe, ...) mean
+// card, "Crypto" is written at plan activation, and one-shot settlements
+// keep the residual "SimpleFI" only for crypto checkouts. A *plan* whose
+// source is still "SimpleFI" predates the activation-source logic — its rail
+// is unknown, so it gets a generic label rather than a guess. `final` is
+// false while a plan is still collecting, where amount_charged is a running
+// partial and the percentage can't be derived.
 function getRailAdjustment(payment: PaymentPublic): {
   railLabel: "card" | "crypto" | "payment method"
   pct: string
@@ -500,7 +502,9 @@ function getRailAdjustment(payment: PaymentPublic): {
       ? String(Math.abs(rounded))
       : Math.abs(rawPct).toFixed(1)
   let railLabel: "card" | "crypto" | "payment method"
-  if (payment.source !== "SimpleFI") {
+  if (payment.source === "Crypto") {
+    railLabel = "crypto"
+  } else if (payment.source !== "SimpleFI") {
     railLabel = "card"
   } else {
     railLabel = isPlan ? "payment method" : "crypto"
@@ -691,7 +695,10 @@ function PaymentSubRow({ row }: { row: Row<PaymentPublic> }) {
           ) : null}
           {railAdj && !railAdj.final ? (
             <tr>
-              <td colSpan={5} className="py-0.5 text-right text-muted-foreground">
+              <td
+                colSpan={5}
+                className="py-0.5 text-right text-muted-foreground"
+              >
                 Collected so far ({payment.installments_paid ?? 0}/
                 {payment.installments_total} installments)
               </td>

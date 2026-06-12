@@ -291,7 +291,14 @@ def test_installment_payment_dedupes_by_external_payment_id(monkeypatch) -> None
 # ----------------------------------------------------------------------------
 
 
-def _make_activated_payload(plan_id: str, number: int) -> dict:
+def _make_activated_payload(
+    plan_id: str,
+    number: int,
+    *,
+    payment_method: str | None = None,
+    stripe_subscription_id: str | None = None,
+    mercadopago_preapproval_id: str | None = None,
+) -> dict:
     return {
         "id": "evt-activated-1",
         "event_type": "installment_plan_activated",
@@ -304,6 +311,9 @@ def _make_activated_payload(plan_id: str, number: int) -> dict:
                 "paid_installments_count": 0,
                 "number_of_installments": number,
                 "user_email": "buyer@example.com",
+                "payment_method": payment_method,
+                "stripe_subscription_id": stripe_subscription_id,
+                "mercadopago_preapproval_id": mercadopago_preapproval_id,
             }
         },
     }
@@ -420,6 +430,132 @@ def test_activated_single_installment_normalizes_flag(monkeypatch) -> None:
     assert payment.installments_total == 1
     assert payment.is_installment_plan is False
     assert db.committed == 1
+
+
+def test_activated_card_stripe_plan_sets_source(monkeypatch) -> None:
+    """Activation is the only webhook that exposes the plan's rail/provider —
+    card plans charged via Stripe subscriptions must land as source=Stripe."""
+    plan_id = "plan-act-src-stripe"
+    payment = SimpleNamespace(
+        id="payment-act-src-stripe",
+        external_id=plan_id,
+        installments_total=None,
+        is_installment_plan=True,
+        source="SimpleFI",
+    )
+
+    class FakePaymentsCRUD:
+        def get_by_external_id(self, _db, _ext_id):
+            return payment
+
+    monkeypatch.setattr(payment_router_module, "payments_crud", FakePaymentsCRUD())
+
+    asyncio.run(
+        _handle_installment_plan_activated(
+            _make_activated_payload(
+                plan_id,
+                6,
+                payment_method="CARD",
+                stripe_subscription_id="sub_123",
+            ),
+            FakeDBSession(),
+            FakeWebhookCache(),
+        )
+    )
+    assert payment.source == "Stripe"
+
+
+def test_activated_crypto_plan_sets_source(monkeypatch) -> None:
+    plan_id = "plan-act-src-crypto"
+    payment = SimpleNamespace(
+        id="payment-act-src-crypto",
+        external_id=plan_id,
+        installments_total=None,
+        is_installment_plan=True,
+        source="SimpleFI",
+    )
+
+    class FakePaymentsCRUD:
+        def get_by_external_id(self, _db, _ext_id):
+            return payment
+
+    monkeypatch.setattr(payment_router_module, "payments_crud", FakePaymentsCRUD())
+
+    asyncio.run(
+        _handle_installment_plan_activated(
+            _make_activated_payload(plan_id, 6, payment_method="CRYPTO"),
+            FakeDBSession(),
+            FakeWebhookCache(),
+        )
+    )
+    assert payment.source == "Crypto"
+
+
+def test_activated_without_payment_method_leaves_source(monkeypatch) -> None:
+    """Older/partial payloads without a rail must not clobber source."""
+    plan_id = "plan-act-src-none"
+    payment = SimpleNamespace(
+        id="payment-act-src-none",
+        external_id=plan_id,
+        installments_total=None,
+        is_installment_plan=True,
+        source="SimpleFI",
+    )
+
+    class FakePaymentsCRUD:
+        def get_by_external_id(self, _db, _ext_id):
+            return payment
+
+    monkeypatch.setattr(payment_router_module, "payments_crud", FakePaymentsCRUD())
+
+    asyncio.run(
+        _handle_installment_plan_activated(
+            _make_activated_payload(plan_id, 6),
+            FakeDBSession(),
+            FakeWebhookCache(),
+        )
+    )
+    assert payment.source == "SimpleFI"
+
+
+def test_installment_settlement_does_not_downgrade_source(monkeypatch) -> None:
+    """Webhook ordering isn't guaranteed: if activation already recorded the
+    plan's provider, a later settlement (whose payload can't see the card)
+    must not downgrade source back to the residual SimpleFI."""
+    plan_id = "plan-src-race"
+    payment = SimpleNamespace(
+        id="payment-src-race",
+        external_id=plan_id,
+        status=PaymentStatus.PENDING.value,
+        tenant_id="tenant-x",
+        installments=[],
+        installments_paid=0,
+        installments_total=6,
+        amount_charged=None,
+        source="Stripe",  # set by activation, which arrived first
+    )
+
+    captured: dict = {}
+
+    class FakePaymentsCRUD:
+        def get_by_external_id(self, _db, _ext_id):
+            return payment
+
+        def approve_payment(self, _db, _payment_id, **kw):
+            captured.update(kw)
+            payment.status = PaymentStatus.APPROVED.value
+            return payment
+
+    monkeypatch.setattr(payment_router_module, "payments_crud", FakePaymentsCRUD())
+
+    asyncio.run(
+        _handle_installment_payment(
+            _make_installment_payload(plan_id, "pr-src-race-1"),
+            FakeDBSession(),
+            FakeWebhookCache(),
+        )
+    )
+    assert captured["source"] == "Stripe"
 
 
 def test_activated_multi_installment_keeps_flag(monkeypatch) -> None:
