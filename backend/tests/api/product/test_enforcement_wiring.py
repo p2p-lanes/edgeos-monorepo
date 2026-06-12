@@ -453,6 +453,7 @@ class TestOpenTicketingPaymentEnforcement:
             id=f"sf-{uuid.uuid4().hex[:8]}",
             status="pending",
             checkout_url="https://simplefi.test/checkout/enf",
+            is_installment_plan=False,
         )
 
         with patch("app.services.simplefi.get_simplefi_client") as mock_get_client:
@@ -489,6 +490,7 @@ class TestOpenTicketingPaymentEnforcement:
             id=f"sf-{uuid.uuid4().hex[:8]}",
             status="pending",
             checkout_url="https://simplefi.test/checkout/unlimited",
+            is_installment_plan=False,
         )
 
         with patch("app.services.simplefi.get_simplefi_client") as mock_get_client:
@@ -557,6 +559,7 @@ class TestOpenTicketingPaymentEnforcement:
                 id=f"sf-{uuid.uuid4().hex[:8]}",
                 status="pending",
                 checkout_url="https://simplefi.test/checkout/conc",
+                is_installment_plan=False,
             )
             with SyncSession(test_engine) as session:
                 with patch(
