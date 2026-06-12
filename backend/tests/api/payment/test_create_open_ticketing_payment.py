@@ -193,6 +193,7 @@ def test_create_open_ticketing_payment_one_attendee_n_tickets(
         id="sf_open_ticketing_1",
         status="pending",
         checkout_url="https://simplefi.test/checkout/1",
+        is_installment_plan=False,
     )
 
     with patch("app.services.simplefi.get_simplefi_client") as mock_get_client:
@@ -272,10 +273,16 @@ def test_create_open_ticketing_payment_second_purchase_reuses_attendee(
     )
 
     sf_resp1 = SimpleNamespace(
-        id="sf_reuse_1", status="pending", checkout_url="https://sf.test/1"
+        id="sf_reuse_1",
+        status="pending",
+        checkout_url="https://sf.test/1",
+        is_installment_plan=False,
     )
     sf_resp2 = SimpleNamespace(
-        id="sf_reuse_2", status="pending", checkout_url="https://sf.test/2"
+        id="sf_reuse_2",
+        status="pending",
+        checkout_url="https://sf.test/2",
+        is_installment_plan=False,
     )
 
     with patch("app.services.simplefi.get_simplefi_client") as mock_get_client:
@@ -339,6 +346,7 @@ def test_create_open_ticketing_payment_does_not_overwrite_existing_human(
             id="sf_open_ticketing_3",
             status="pending",
             checkout_url="https://simplefi.test/checkout/3",
+            is_installment_plan=False,
         )
 
         payments_crud.create_open_ticketing_payment(
@@ -437,6 +445,7 @@ def test_create_open_ticketing_payment_applies_coupon_discount(
             id="sf_open_ticketing_coupon",
             status="pending",
             checkout_url="https://simplefi.test/checkout/coupon",
+            is_installment_plan=False,
         )
 
         payment, _ = payments_crud.create_open_ticketing_payment(
