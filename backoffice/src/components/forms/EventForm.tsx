@@ -4,6 +4,7 @@ import {
   durationFits,
   freeIntervalsForDay,
   localTzNaiveToUtc,
+  slotOptionsForDay,
   utcToLocalTzNaive,
 } from "@edgeos/shared-events"
 import { MarkdownEditor } from "@edgeos/shared-form-ui"
@@ -74,7 +75,7 @@ import {
   RepeatPicker,
   type RepeatState,
 } from "./EventForm/RepeatPicker"
-import { StartTimeCombobox } from "./EventForm/StartTimeCombobox"
+import { StartTimeSelect, type TimeOption } from "./EventForm/StartTimeSelect"
 import { VenueDayScheduleDialog } from "./EventForm/VenueDayScheduleDialog"
 import { VenueDetailsDialog } from "./EventForm/VenueDetailsDialog"
 
@@ -834,6 +835,35 @@ export function EventForm({
     [freeIntervals, durationMinutes, popupTz],
   )
 
+  // Options offered by the start-time dropdown. With a venue: every slot
+  // inside the venue's open hours, occupied ones flagged so the picker
+  // renders them grayed out. Without a venue (or while availability loads):
+  // a generic all-day 30-minute grid.
+  const startTimeOptions = useMemo<TimeOption[]>(() => {
+    if (venueIdValue && dayAvailability && dayBounds) {
+      return slotOptionsForDay(
+        dayAvailability.open_ranges ?? [],
+        freeIntervals,
+        dayBounds.start,
+        dayBounds.end,
+        durationMinutes,
+        30,
+        popupTz,
+      ).map((o) => ({ label: o.label, free: o.free }))
+    }
+    return Array.from({ length: 48 }, (_, i) => ({
+      label: `${String(Math.floor(i / 2)).padStart(2, "0")}:${i % 2 ? "30" : "00"}`,
+      free: true,
+    }))
+  }, [
+    venueIdValue,
+    dayAvailability,
+    dayBounds,
+    freeIntervals,
+    durationMinutes,
+    popupTz,
+  ])
+
   // Does the typed start + duration fit a free window? Returns the reason
   // it does NOT fit (so the indicator and submit gate share a single source
   // of truth and a precise message), or null when the slot is fine /
@@ -1422,7 +1452,7 @@ export function EventForm({
 
         <InlineRow label="Start time" description="Pick or type a time">
           <div className="flex flex-col items-end gap-1 w-[240px]">
-            <StartTimeCombobox
+            <StartTimeSelect
               value={startTimeValue ? startTimeValue.slice(11, 16) : ""}
               onChange={(hhmm) => {
                 if (!hhmm) {
@@ -1432,12 +1462,13 @@ export function EventForm({
                 const date = dateStr || new Date().toISOString().slice(0, 10)
                 form.setFieldValue("start_time", `${date}T${hhmm}`)
               }}
+              options={startTimeOptions}
               disabled={readOnly}
               fits={venueIdValue ? startFits : true}
               placeholder={
-                venueIdValue && startSlotOptions.length === 0
+                venueIdValue && startTimeOptions.length === 0
                   ? "No open hours"
-                  : "HH:mm"
+                  : "Pick a time"
               }
             />
             <AvailabilityIndicator availability={effectiveAvailability} />
