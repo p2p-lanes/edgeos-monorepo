@@ -18,11 +18,18 @@ class PaymentType(str, Enum):
 
 
 class PaymentSource(str, Enum):
-    """Settlement rail/provider shown to users."""
+    """Settlement rail/provider shown to users.
+
+    SIMPLEFI is the residual value: settlement webhooks that don't expose a
+    card provider. CRYPTO is written at installment-plan activation, where
+    the rail is explicit — so a plan with SIMPLEFI source predates that
+    logic and its rail is unknown.
+    """
 
     SIMPLEFI = "SimpleFI"
     STRIPE = "Stripe"
     MERCADOPAGO = "MercadoPago"
+    CRYPTO = "Crypto"
 
 
 class PaymentStatus(str, Enum):
@@ -90,6 +97,13 @@ class PaymentBase(SQLModel):
     status: str = Field(default=PaymentStatus.PENDING.value, index=True)
     amount: Decimal = Field(
         default=Decimal("0"), sa_column=Column(Numeric(10, 2), nullable=False)
+    )
+    # Total actually charged to the buyer, in the payment's fiat currency.
+    # SimpleFi merchants can configure per-rail (card/crypto) price adjustments,
+    # so this can differ from `amount` (the quoted total). NULL until settlement
+    # and for non-SimpleFi payments — reporting reads COALESCE(amount_charged, amount).
+    amount_charged: Decimal | None = Field(
+        default=None, sa_column=Column(Numeric(10, 2), nullable=True)
     )
     insurance_amount: Decimal = Field(
         default=Decimal("0"),
@@ -292,20 +306,23 @@ class ApplicationFeeCreate(BaseModel):
     application_id: uuid.UUID
 
 
-class SimpleFICardPayment(BaseModel):
-    """Card payment info from SimpleFI."""
-
-    provider: str
-    status: str
-    coin: str = "USD"
-
-
 class SimpleFIPriceDetails(BaseModel):
     """Price details for a SimpleFI transaction."""
 
     currency: str
     final_amount: float
     rate: float
+
+
+class SimpleFICardPayment(BaseModel):
+    """Card payment info from SimpleFI."""
+
+    provider: str
+    status: str
+    coin: str = "USD"
+    # final_amount here is the card-rail adjusted fiat total — the amount the
+    # buyer is actually charged when the merchant has card pricing configured.
+    price_details: SimpleFIPriceDetails | None = None
 
 
 class SimpleFITransaction(BaseModel):
@@ -372,7 +389,13 @@ class SimpleFIInstallmentPlan(BaseModel):
     paid_installments_count: int
     number_of_installments: int
     user_email: str
+    # CARD | CRYPTO. Locked once the first payment is made — SimpleFi does
+    # not allow switching afterwards, so the value seen at activation holds
+    # for the plan's lifetime.
     payment_method: str | None = None
+    # Exactly one is set for CARD plans; identifies the charging provider.
+    stripe_subscription_id: str | None = None
+    mercadopago_preapproval_id: str | None = None
     reference: dict | None = None
 
     model_config = ConfigDict(extra="allow")
