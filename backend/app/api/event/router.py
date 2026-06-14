@@ -428,6 +428,30 @@ def _track_map_for_events(db, events: list) -> dict[uuid.UUID, str]:
     return {t.id: t.name for t in rows}
 
 
+def _effective_max_participant(
+    venue,
+    requested: int | None,
+    *,
+    clamp: bool = False,
+) -> int | None:
+    """Default (and optionally clamp) an event's capacity to its venue's.
+
+    ``None`` means the organizer left capacity unset; on a capacity-bound
+    venue that must not mean unlimited RSVPs (a 10-seat room collected 39
+    registrations this way). Venues without a configured capacity leave the
+    requested value untouched. ``clamp`` additionally caps explicit values
+    that exceed the venue — used by portal edits, which (unlike portal
+    creation) have no approval gate for over-capacity requests.
+    """
+    if venue is None or not venue.capacity:
+        return requested
+    if requested is None:
+        return venue.capacity
+    if clamp and requested > venue.capacity:
+        return venue.capacity
+    return requested
+
+
 def _check_event_within_popup_window(
     popup,
     *,
@@ -1028,6 +1052,7 @@ async def list_events(
     _: AdminOrApiKey_EventsRead,
     popup_id: uuid.UUID | None = None,
     event_status: EventStatus | None = None,
+    visibility: EventVisibility | None = None,
     kind: str | None = None,
     venue_id: uuid.UUID | None = None,
     location_kind: str | None = None,
@@ -1045,6 +1070,8 @@ async def list_events(
     - ``"custom"``  → events with a ``custom_location_name`` set.
     - ``"meeting"`` → online-only events (no venue, no custom location).
 
+    ``visibility`` narrows to a single visibility (public | unlisted | private).
+
     ``owner_id`` filters to events created by a specific host (the Human
     referenced by ``Events.owner_id``).
     """
@@ -1055,6 +1082,7 @@ async def list_events(
             skip=skip,
             limit=limit,
             event_status=event_status,
+            visibility=visibility,
             kind=kind,
             venue_id=venue_id,
             location_kind=location_kind,
@@ -1223,6 +1251,18 @@ async def create_event(
     # The portal create endpoint still enforces its own approval gate for
     # non-admin submissions.
 
+    # Capacity left empty defaults to the venue's (the backoffice field
+    # already promises "leave empty to use the venue capacity"). Explicit
+    # admin values are trusted, even above the venue's.
+    if (
+        event_data.get("venue_id") is not None
+        and event_data.get("max_participant") is None
+    ):
+        from app.api.event_venue import crud as venue_crud
+
+        venue = venue_crud.event_venues_crud.get(db, event_data["venue_id"])
+        event_data["max_participant"] = _effective_max_participant(venue, None)
+
     event = Events(**event_data)
 
     db.add(event)
@@ -1287,6 +1327,20 @@ async def update_event(
         patch_dict["custom_location_url"] = None
     elif patch_dict.get("custom_location_name") is not None:
         patch_dict["venue_id"] = None
+
+    # When the venue or capacity is touched and capacity ends up unset,
+    # default it to the venue's. Explicit admin values are trusted.
+    if "venue_id" in patch_dict or "max_participant" in patch_dict:
+        effective_venue_id = patch_dict.get("venue_id", event.venue_id)
+        requested = patch_dict.get("max_participant", event.max_participant)
+        if effective_venue_id is not None and requested is None:
+            from app.api.event_venue import crud as venue_crud
+
+            venue = venue_crud.event_venues_crud.get(db, effective_venue_id)
+            capped = _effective_max_participant(venue, None)
+            if capped is not None:
+                patch_dict["max_participant"] = capped
+
     event_in = EventUpdate(**patch_dict)
 
     before = {
@@ -3061,6 +3115,17 @@ async def create_portal_event(
         popup, start_time=event_in.start_time, end_time=event_in.end_time
     )
 
+    # Portal events need a physical location: a venue or a custom location.
+    # Online-only (meeting) events can no longer be created — existing ones
+    # remain editable, and admin/backoffice creation stays unrestricted.
+    if event_in.venue_id is None and not (
+        event_in.custom_location_name and event_in.custom_location_name.strip()
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Events must have a venue or a custom location.",
+        )
+
     rrule_str = format_rrule(event_in.recurrence) if event_in.recurrence else None
 
     if event_in.venue_id is not None:
@@ -3122,6 +3187,11 @@ async def create_portal_event(
                 f"Requested max_participant ({event_in.max_participant}) "
                 f"exceeds venue capacity ({venue.capacity})."
             )
+        # Capacity left unset must not mean unlimited RSVPs on a
+        # capacity-bound venue: default it to the venue's capacity.
+        event_data["max_participant"] = _effective_max_participant(
+            venue, event_data.get("max_participant")
+        )
 
     if requires_approval:
         # Keep the visibility the creator chose so it survives the pending
@@ -3211,6 +3281,43 @@ async def update_portal_event(
         patch_dict["custom_location_url"] = None
     elif patch_dict.get("custom_location_name") is not None:
         patch_dict["venue_id"] = None
+
+    # Venue/custom location is mandatory: block edits that would strip the
+    # location from an event that has one. Events that are ALREADY
+    # online-only (legacy meetings) stay editable as-is.
+    if "venue_id" in patch_dict or "custom_location_name" in patch_dict:
+        new_venue_id = patch_dict.get("venue_id", event.venue_id)
+        new_custom_name = patch_dict.get(
+            "custom_location_name", event.custom_location_name
+        )
+        had_location = (
+            event.venue_id is not None or event.custom_location_name is not None
+        )
+        if (
+            had_location
+            and new_venue_id is None
+            and not (new_custom_name and new_custom_name.strip())
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Events must have a venue or a custom location.",
+            )
+
+    # Portal edits have no approval gate for capacity (creation does), so
+    # default unset capacity to the venue's AND clamp explicit values that
+    # exceed it — otherwise an organizer could create within capacity and
+    # silently raise it afterwards.
+    if "venue_id" in patch_dict or "max_participant" in patch_dict:
+        effective_venue_id = patch_dict.get("venue_id", event.venue_id)
+        if effective_venue_id is not None:
+            from app.api.event_venue import crud as venue_crud
+
+            venue = venue_crud.event_venues_crud.get(db, effective_venue_id)
+            requested = patch_dict.get("max_participant", event.max_participant)
+            effective = _effective_max_participant(venue, requested, clamp=True)
+            if effective != requested or "max_participant" in patch_dict:
+                patch_dict["max_participant"] = effective
+
     event_in = EventUpdate(**patch_dict)
 
     before = {

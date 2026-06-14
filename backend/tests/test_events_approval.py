@@ -667,6 +667,7 @@ class TestEndToEndVisibilityConsistency:
         # Default event settings already set events_require_approval=True, so a
         # portal-created event is routed through the approval gate.
         _set_event_settings(db, tenant_a, popup)
+        venue = _make_venue(db, tenant_a, popup)
         creator = _make_human(db, tenant_a)
         bystander = _make_human(db, tenant_a)
 
@@ -675,7 +676,10 @@ class TestEndToEndVisibilityConsistency:
             "/api/v1/events/portal/events",
             headers=_human_auth(creator),
             json=_event_payload(
-                popup, status=EventStatus.PUBLISHED, visibility=chosen
+                popup,
+                venue_id=venue.id,
+                status=EventStatus.PUBLISHED,
+                visibility=chosen,
             ),
         )
         assert create.status_code == 201, create.text

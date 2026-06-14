@@ -210,12 +210,18 @@ describe("isSectionVisibleForApp — visible_if gating", () => {
     expect(isSectionVisibleForApp(section, { tier: "No" })).toBe(false)
   })
 
-  it("hides section when the field has no answer for the application", () => {
+  it("shows section when the field has no answer for the application", () => {
+    // An application that never answered the gating field (applied before the
+    // field existed, or its form doesn't include it) must NOT lose every gated
+    // section — otherwise those passes are unbuyable (prod bug: attendee with
+    // no local_resident answer saw no WEEKLY/MONTH sections at all).
     const section = {
       ...baseSection,
       visible_if: { field_id: "local_resident", value: "Yes" },
     }
-    expect(isSectionVisibleForApp(section, { unrelated: "x" })).toBe(false)
+    expect(isSectionVisibleForApp(section, { unrelated: "x" })).toBe(true)
+    expect(isSectionVisibleForApp(section, { local_resident: null })).toBe(true)
+    expect(isSectionVisibleForApp(section, { local_resident: "" })).toBe(true)
   })
 
   it("treats missing custom_fields as no-gate (open-ticketing fallback)", () => {
