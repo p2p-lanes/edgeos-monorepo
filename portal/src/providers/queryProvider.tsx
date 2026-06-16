@@ -16,6 +16,7 @@ function handleApiError(error: Error) {
       const isPublicRoute =
         window.location.pathname.startsWith("/checkout") ||
         window.location.pathname.startsWith("/groups/") ||
+        window.location.pathname.startsWith("/r/") ||
         window.location.pathname.includes("/invite/")
       if (!isPublicRoute) {
         window.location.href = "/auth"
