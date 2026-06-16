@@ -27,6 +27,7 @@ interface UseCheckoutStateProps {
   saleType: "application" | "direct"
   groupId?: string | null
   inviteId?: string | null
+  referralId?: string | null
   schema?: ApplicationFormSchema
 }
 
@@ -82,6 +83,7 @@ const useCheckoutState = ({
   saleType,
   groupId,
   inviteId,
+  referralId,
   schema,
 }: UseCheckoutStateProps) => {
   const queryClient = useQueryClient()
@@ -154,6 +156,7 @@ const useCheckoutState = ({
             ...mutationPayload.payload,
             group_id: groupId ?? undefined,
             invite_id: inviteId ?? undefined,
+            referral_id: referralId ?? undefined,
           },
         })
       }

@@ -46,11 +46,13 @@ export const PopupCheckoutContent = ({
   background,
   groupId = null,
   inviteId = null,
+  referralId = null,
 }: {
   popup: PopupPublic
   background: { className: string; style?: CSSProperties }
   groupId?: string | null
   inviteId?: string | null
+  referralId?: string | null
 }) => {
   const policy = resolvePopupCheckoutPolicy(popup)
   const isAuthenticated = useIsAuthenticated()
@@ -72,6 +74,7 @@ export const PopupCheckoutContent = ({
     saleType: resolvePopupCheckoutPolicy(popup).saleType,
     groupId,
     inviteId,
+    referralId,
     schema: applicationSchema,
   })
   const queryClient = useQueryClient()

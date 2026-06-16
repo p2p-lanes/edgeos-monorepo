@@ -1,30 +1,39 @@
 "use client"
 
 import { useQuery } from "@tanstack/react-query"
-import { Loader2, Lock } from "lucide-react"
-import { useParams, useRouter } from "next/navigation"
+import { Lock } from "lucide-react"
+import { useParams } from "next/navigation"
 import { useEffect } from "react"
 import { useTranslation } from "react-i18next"
+import { PopupCheckoutContent } from "@/app/checkout/components/PopupCheckoutContent"
 import { ApiError, ReferralsService } from "@/client"
+import { CheckoutBackgroundVideo } from "@/components/CheckoutBackgroundVideo"
+import { getCheckoutBackground } from "@/lib/background-image"
 import { useCityProvider } from "@/providers/cityProvider"
+import { useDiscount } from "@/providers/discountProvider"
+
+const LoadingFallback = () => (
+  <div className="flex items-center justify-center h-screen">
+    <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500" />
+  </div>
+)
 
 /**
- * Top-level referral consumption page — reached via /r/{code}.
+ * Public referral checkout page — /r/[code]
  *
- * Flow:
- * 1. Fetch GET /referrals/r/{code} → ReferralPublicPreview (includes `id` and `popup_id`).
- * 2. If not found / expired / exhausted → show a friendly i18n error state.
- * 3. Resolve the popup from popup_id, then redirect to the portal application
- *    page carrying referral_id as a URL search param so the application form
- *    can pass it to ApplicationsService.createMyApplication.
+ * Mirrors /invite/[token]/page.tsx exactly:
+ * - No login gate (authentication happens inside PopupCheckoutContent)
+ * - Seeds discount from referral.discount_percentage
+ * - Preselects the popup so DiscountProvider settles before discount seed
+ * - Renders PopupCheckoutContent with referralId (no groupId → no membership)
  *
- * REQ-GR-009: Referral attribution on application.
+ * The resulting application carries referral_id for attribution (REQ-GR-009).
  */
 export default function ReferralCodePage() {
   const { t } = useTranslation()
   const { code } = useParams<{ code: string }>()
-  const router = useRouter()
-  const { getPopups, popupsLoaded } = useCityProvider()
+  const { getPopups, popupsLoaded, setCityPreselected } = useCityProvider()
+  const { setDiscount, discountApplied } = useDiscount()
 
   const {
     data: preview,
@@ -45,29 +54,46 @@ export default function ReferralCodePage() {
     },
   })
 
+  // Pre-select the popup so DiscountProvider's city-reset settles on this
+  // popup's id BEFORE we seed the discount (mirrors invite page).
   useEffect(() => {
-    if (!preview || !popupsLoaded) return
-    const popup = getPopups().find((p) => p.id === preview.popup_id)
-    if (popup) {
-      // Carry the referral UUID to the application form via URL param.
-      // The application page and use-submit-application hook read this param
-      // and include it in the ApplicationCreate payload (referral_id field).
-      router.replace(
-        `/portal/${popup.slug}/application?referral_id=${preview.id}`,
-      )
+    if (preview?.popup_id) {
+      setCityPreselected(preview.popup_id)
     }
-  }, [preview, popupsLoaded, router, getPopups])
+  }, [preview?.popup_id, setCityPreselected])
 
-  if (isLoading || (preview && !error)) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-      </div>
-    )
+  // Seed discount from the referral payload — the portal DiscountProvider does
+  // not know about referral discounts, so we push it explicitly (mirrors invite page).
+  const currentCity = getPopups().find((p) => p.id === preview?.popup_id)
+  useEffect(() => {
+    if (!preview?.discount_percentage) return
+    if (currentCity?.id !== preview.popup_id) return
+    if (discountApplied.city_id !== currentCity.id) return
+    const discountValue = Number(preview.discount_percentage)
+    if (!Number.isFinite(discountValue) || discountValue <= 0) return
+    if (discountApplied.discount_value >= discountValue) return
+    setDiscount({
+      discount_value: discountValue,
+      discount_type: "percentage",
+      discount_code: null,
+      city_id: currentCity.id,
+    })
+  }, [
+    preview?.discount_percentage,
+    preview?.popup_id,
+    currentCity?.id,
+    discountApplied.discount_value,
+    discountApplied.city_id,
+    setDiscount,
+  ])
+
+  if (isLoading || !popupsLoaded) {
+    return <LoadingFallback />
   }
 
+  const popup = getPopups().find((p) => p.id === preview?.popup_id)
+
   const isExhausted = error instanceof ApiError && error.status === 410
-  const isNotFound = error instanceof ApiError && error.status === 404
 
   if (isExhausted) {
     return (
@@ -85,7 +111,7 @@ export default function ReferralCodePage() {
     )
   }
 
-  if (isNotFound || !preview) {
+  if (error || !preview || !popup) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-neutral-100 p-6">
         <div className="max-w-md rounded-2xl bg-white p-8 text-center shadow-sm">
@@ -100,10 +126,22 @@ export default function ReferralCodePage() {
     )
   }
 
-  // Loading state — should rarely be reached
+  const background = getCheckoutBackground(popup, "groups")
+  const contentBackground =
+    background.type === "image"
+      ? { className: "", style: background.style }
+      : { className: background.type === "none" ? "bg-background" : "" }
+
   return (
-    <div className="flex items-center justify-center h-screen">
-      <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-    </div>
+    <>
+      {background.type === "video" && (
+        <CheckoutBackgroundVideo url={background.url} />
+      )}
+      <PopupCheckoutContent
+        popup={popup}
+        background={contentBackground}
+        referralId={preview.id}
+      />
+    </>
   )
 }
