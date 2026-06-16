@@ -101,6 +101,33 @@ class EventParticipantsCRUD(
             )
         return session.exec(statement).one()
 
+    def count_active_for_events(
+        self,
+        session: Session,
+        event_ids: list[uuid.UUID],
+    ) -> dict[uuid.UUID, int]:
+        """Active (non-cancelled) RSVP counts for many events in one query.
+
+        Returns a ``{event_id: count}`` map; event_ids with no active
+        participants are omitted (callers should default missing keys to 0).
+        Used by the backoffice event list so operators can see RSVP counts
+        without opening each event, avoiding an N+1 of ``count_active_for_event``.
+        """
+        if not event_ids:
+            return {}
+        statement = (
+            select(
+                EventParticipants.event_id,
+                func.count().label("count"),
+            )
+            .where(
+                EventParticipants.event_id.in_(event_ids),  # type: ignore[attr-defined]
+                EventParticipants.status != ParticipantStatus.CANCELLED,
+            )
+            .group_by(EventParticipants.event_id)
+        )
+        return {row[0]: int(row[1]) for row in session.exec(statement).all()}
+
     def cancel_all_for_event(
         self,
         session: Session,

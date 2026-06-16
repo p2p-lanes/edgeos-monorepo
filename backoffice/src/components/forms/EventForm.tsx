@@ -429,6 +429,17 @@ export function EventForm({
       const startDate = localTzNaiveToUtc(value.start_time, value.timezone)
       const endDate = new Date(startDate.getTime() + durationMinutes * 60_000)
 
+      // Block creating an event that starts in the past. Hosts have repeatedly
+      // booked events on a past date by mistake (e.g. created Jun 15, scheduled
+      // Jun 14), which is time-consuming for organizers to clean up. Editing an
+      // existing event is still allowed so a past event can be fixed/cancelled.
+      if (!isEdit && startDate.getTime() < Date.now()) {
+        showErrorToast(
+          "Event start time can't be in the past. Pick a future date and time.",
+        )
+        return
+      }
+
       // meeting_url only applies for online-only Meeting events (no venue,
       // no custom physical location). When the Meeting option is selected
       // it is required — there's nowhere else for attendees to go.

@@ -288,6 +288,11 @@ function NewPortalEventForm({
       if (!displayTz) {
         throw new Error(t("events.form.no_timezone_error"))
       }
+      if (startIso && new Date(startIso).getTime() < Date.now()) {
+        throw new Error(
+          "Start time is in the past. Pick a future date and time.",
+        )
+      }
       return EventsService.createPortalEvent({
         requestBody: {
           popup_id: popupId,
@@ -388,10 +393,17 @@ function NewPortalEventForm({
     maxParticipants !== "" &&
     parseInt(maxParticipants, 10) > venueMaxCapacity
 
+  // Block scheduling an event in the past. Hosts have repeatedly booked events
+  // on a past date by mistake (e.g. created Jun 15 for Jun 14), which is
+  // time-consuming for organizers to clean up. ``startIso`` is a UTC instant,
+  // so a direct comparison against the current instant is correct.
+  const startInPast = !!startIso && new Date(startIso).getTime() < Date.now()
+
   const canSubmit =
     !!title.trim() &&
     !!startIso &&
     !!endIso &&
+    !startInPast &&
     // A location choice is required — venue, custom location, or meeting.
     !!venueId &&
     (!realVenueId || withinOpenHours) &&
@@ -748,6 +760,12 @@ function NewPortalEventForm({
               </p>
             )}
           </div>
+        )}
+
+        {startInPast && (
+          <p className="text-sm text-destructive text-right">
+            Start time is in the past. Pick a future date and time.
+          </p>
         )}
 
         <div className="flex justify-end gap-2 pt-2">

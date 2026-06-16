@@ -31,6 +31,7 @@ import { summarizeRrule } from "@/lib/events/summarizeRrule"
 import { useEventTimezone } from "@/lib/events/useEventTimezone"
 import { cn } from "@/lib/utils"
 import { CoverImage } from "./CoverImage"
+import { EventBadges } from "./EventBadges"
 
 interface EventsCalendarViewProps {
   popupId: string
@@ -327,7 +328,13 @@ export function EventsCalendarView({
                             </div>
                           )}
                           <div className="min-w-0 flex-1">
-                            <h4 className="text-sm font-medium truncate">
+                            <h4
+                              className={cn(
+                                "text-sm font-medium truncate",
+                                event.status === "cancelled" &&
+                                  "line-through text-muted-foreground",
+                              )}
+                            >
                               {event.title}
                             </h4>
                             {event.kind && (
@@ -335,6 +342,11 @@ export function EventsCalendarView({
                                 {event.kind}
                               </p>
                             )}
+                            <EventBadges
+                              status={event.status}
+                              visibility={event.visibility}
+                              className="mt-1"
+                            />
                             <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-1">
                               <Clock className="h-3 w-3" />
                               {formatTime(event.start_time)} –{" "}
