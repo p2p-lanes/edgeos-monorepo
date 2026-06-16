@@ -51,8 +51,8 @@ function ReferralRow({
 
   const referralUrl =
     typeof window !== "undefined"
-      ? `${window.location.origin}/groups/${referral.code}`
-      : `/groups/${referral.code}`
+      ? `${window.location.origin}/r/${referral.code}`
+      : `/r/${referral.code}`
 
   const handleCopy = () => {
     navigator.clipboard.writeText(referralUrl).then(() => {

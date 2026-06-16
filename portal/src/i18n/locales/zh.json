@@ -471,7 +471,9 @@
     "member_add_failed": "添加成员失败。请重试。",
     "role_ambassador": "大使",
     "role_leader": "领导者",
-    "role_member": "成员"
+    "role_member": "成员",
+    "not_found_title": "找不到团体",
+    "not_found_description": "团体链接无效或此活动不再可用。"
   },
   "referrals": {
     "title": "Referrals",
@@ -497,7 +499,21 @@
     "copy_link": "Copy link",
     "link_copied": "Link copied to clipboard.",
     "referrals_disabled": "Referrals are not enabled for this popup.",
-    "not_accepted": "Referral links are available once your application is accepted."
+    "not_accepted": "Referral links are available once your application is accepted.",
+    "preview_loading": "正在加载推荐...",
+    "preview_not_found_title": "推荐链接未找到",
+    "preview_not_found_description": "此推荐链接无效、已过期或不再可用。",
+    "preview_exhausted_title": "推荐链接已不可用",
+    "preview_exhausted_description": "此推荐链接已达到使用上限。",
+    "preview_heading": "您已被推荐",
+    "preview_discount_label": "包含折扣",
+    "preview_discount_value": "{{percent}}% 折扣",
+    "preview_no_discount": "无折扣",
+    "preview_expires_label": "到期时间",
+    "preview_no_expiry": "无到期时间",
+    "preview_apply_button": "立即申请",
+    "preview_login_required_title": "请登录以申请",
+    "preview_login_required_description": "您需要登录才能通过此推荐链接申请。"
   },
   "invite": {
     "loading": "Loading invite...",

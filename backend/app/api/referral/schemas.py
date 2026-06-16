@@ -102,8 +102,11 @@ class ReferralPublicPreview(BaseModel):
     """Public lookup — GET /referrals/r/{code}.
 
     Spec: Design API surface table — returns no PII of referrer.
+    id is included so the portal can pass referral_id on application create
+    (REQ-GR-009 — attribution on application).
     """
 
+    id: uuid.UUID
     popup_id: uuid.UUID
     code: str
     discount_percentage: Decimal

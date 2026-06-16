@@ -700,9 +700,16 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         # still validate types/constraints on any values the user did provide.
         is_draft = _is_draft_status(getattr(app_data, "status", None))
 
-        # Group applications use the Express Checkout reduced form on the
-        # portal; mirror that scope here when the admin creates one too.
-        is_express_checkout = bool(getattr(app_data, "group_id", None))
+        # Resolve group to read its explicit express_checkout flag.
+        # The presence of group_id alone MUST NOT trigger express checkout
+        # (REQ-GR-014). Mirror the portal path (create_internal ~line 436).
+        _admin_group_id = getattr(app_data, "group_id", None)
+        _admin_group = None
+        if _admin_group_id:
+            from app.api.group.crud import groups_crud as _groups_crud
+
+            _admin_group = _groups_crud.get(session, _admin_group_id)
+        is_express_checkout = bool(_admin_group and _admin_group.express_checkout)
 
         # Validate custom_fields against form field definitions
         if validate_custom_fields and app_data.custom_fields:

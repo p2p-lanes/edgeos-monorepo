@@ -21,6 +21,8 @@ interface SplitCreateParams {
   popupId: string
   status: UserSettableStatus
   schema: ApplicationFormSchema
+  /** Referral UUID to attribute this application — passed from /r/{code} flow (REQ-GR-009). */
+  referralId?: string | null
 }
 
 export function splitForCreate({
@@ -28,6 +30,7 @@ export function splitForCreate({
   popupId,
   status,
   schema,
+  referralId,
 }: SplitCreateParams): ApplicationCreate {
   const targetMap = buildTargetMap(schema)
   const profile: Record<string, unknown> = {}
@@ -85,6 +88,8 @@ export function splitForCreate({
     custom_fields:
       Object.keys(customFields).length > 0 ? customFields : undefined,
     status,
+    // Referral attribution — set when user arrived via /r/{code} (REQ-GR-009)
+    referral_id: referralId ?? undefined,
     // Application-target base fields from the schema (scholarship, etc.)
     // Only fields present in the current popup's schema are included —
     // fields from a previous popup that don't exist here are already

@@ -134,9 +134,7 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
             )
 
         if category_id is not None:
-            base_statement = base_statement.where(
-                Attendees.category_id == category_id
-            )
+            base_statement = base_statement.where(Attendees.category_id == category_id)
 
         # Use proper count query instead of fetching all rows
         count_statement = select(func.count()).select_from(base_statement.subquery())

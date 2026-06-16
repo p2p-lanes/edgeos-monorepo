@@ -66,6 +66,8 @@ export default function FormPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const isReturnFromCheckout = searchParams.has("checkout", "success")
+  // Referral UUID carried from /r/{code} consumption page (REQ-GR-009)
+  const referralId = searchParams.get("referral_id")
 
   const {
     data: schema,
@@ -177,6 +179,7 @@ export default function FormPage() {
           schema={schema}
           existingApplication={prefillData}
           popup={city}
+          referralId={referralId}
         />
       </FileUploadProvider>
     </main>

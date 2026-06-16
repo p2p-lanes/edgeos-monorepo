@@ -3,6 +3,7 @@
 import { useQuery } from "@tanstack/react-query"
 import { useParams, useRouter } from "next/navigation"
 import { useEffect } from "react"
+import { useTranslation } from "react-i18next"
 import { PopupCheckoutContent } from "@/app/checkout/components/PopupCheckoutContent"
 import { ApiError, InvitesService, PortalService } from "@/client"
 import { CheckoutBackgroundVideo } from "@/components/CheckoutBackgroundVideo"
@@ -19,6 +20,7 @@ const LoadingFallback = () => (
 )
 
 const GroupCheckoutPage = () => {
+  const { t } = useTranslation()
   const params = useParams<{ groupSlug: string }>()
   const router = useRouter()
   const { getCity, getPopups, popupsLoaded, setCityPreselected } =
@@ -159,10 +161,10 @@ const GroupCheckoutPage = () => {
       <div className="flex min-h-screen items-center justify-center bg-neutral-100 p-6">
         <div className="max-w-md rounded-2xl bg-white p-8 text-center shadow-sm">
           <h1 className="text-2xl font-bold text-neutral-900">
-            Group not found
+            {t("groups.not_found_title")}
           </h1>
           <p className="mt-3 text-sm text-neutral-600">
-            The group link is invalid or this event is no longer available.
+            {t("groups.not_found_description")}
           </p>
         </div>
       </div>

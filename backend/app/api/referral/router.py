@@ -180,8 +180,11 @@ async def get_referral_preview(code: str, db: SessionDep) -> ReferralPublicPrevi
         )
 
     # Surface guard state but do NOT raise — let the portal decide how to present
-    # (the apply endpoint enforces hard errors; preview is informational only)
+    # (the apply endpoint enforces hard errors; preview is informational only).
+    # id is included so the portal can pass referral_id on application create
+    # (REQ-GR-009).
     return ReferralPublicPreview(
+        id=referral.id,
         popup_id=referral.popup_id,
         code=referral.code,
         discount_percentage=referral.discount_percentage,

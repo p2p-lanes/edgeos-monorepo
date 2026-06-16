@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query"
 import { Loader2 } from "lucide-react"
 import { useParams, useRouter } from "next/navigation"
 import { useEffect } from "react"
+import { useTranslation } from "react-i18next"
 import { ApiError, InvitesService } from "@/client"
 import { useCityProvider } from "@/providers/cityProvider"
 
@@ -13,6 +14,7 @@ import { useCityProvider } from "@/providers/cityProvider"
  * then redirects to the portal-scoped invite page.
  */
 export default function TopLevelInvitePage() {
+  const { t } = useTranslation()
   const { token } = useParams<{ token: string }>()
   const router = useRouter()
   const { getPopups, popupsLoaded } = useCityProvider()
@@ -57,10 +59,10 @@ export default function TopLevelInvitePage() {
     <div className="flex min-h-screen items-center justify-center bg-neutral-100 p-6">
       <div className="max-w-md rounded-2xl bg-white p-8 text-center shadow-sm">
         <h1 className="text-2xl font-bold text-neutral-900">
-          Invite not found
+          {t("invite.not_found_title")}
         </h1>
         <p className="mt-3 text-sm text-neutral-600">
-          This invite link is invalid, expired, or no longer available.
+          {t("invite.not_found_description")}
         </p>
       </div>
     </div>

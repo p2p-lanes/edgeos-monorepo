@@ -16150,6 +16150,11 @@ export const ReferralPublicSchema = {
 
 export const ReferralPublicPreviewSchema = {
     properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
         popup_id: {
             type: 'string',
             format: 'uuid',
@@ -16193,11 +16198,13 @@ export const ReferralPublicPreviewSchema = {
         }
     },
     type: 'object',
-    required: ['popup_id', 'code', 'discount_percentage', 'current_uses'],
+    required: ['id', 'popup_id', 'code', 'discount_percentage', 'current_uses'],
     title: 'ReferralPublicPreview',
     description: `Public lookup — GET /referrals/r/{code}.
 
-Spec: Design API surface table — returns no PII of referrer.`
+Spec: Design API surface table — returns no PII of referrer.
+id is included so the portal can pass referral_id on application create
+(REQ-GR-009 — attribution on application).`
 } as const;
 
 export const ReferralUpdateSchema = {

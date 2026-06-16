@@ -487,7 +487,9 @@
     "member_add_failed": "Failed to add member. Please try again.",
     "role_ambassador": "Ambassador",
     "role_leader": "Leader",
-    "role_member": "Member"
+    "role_member": "Member",
+    "not_found_title": "Group not found",
+    "not_found_description": "The group link is invalid or this event is no longer available."
   },
   "referrals": {
     "title": "Referrals",
@@ -513,7 +515,21 @@
     "copy_link": "Copy link",
     "link_copied": "Link copied to clipboard.",
     "referrals_disabled": "Referrals are not enabled for this popup.",
-    "not_accepted": "Referral links are available once your application is accepted."
+    "not_accepted": "Referral links are available once your application is accepted.",
+    "preview_loading": "Loading referral...",
+    "preview_not_found_title": "Referral not found",
+    "preview_not_found_description": "This referral link is invalid, expired, or no longer available.",
+    "preview_exhausted_title": "Referral no longer available",
+    "preview_exhausted_description": "This referral link has reached its usage limit.",
+    "preview_heading": "You have been referred",
+    "preview_discount_label": "Discount included",
+    "preview_discount_value": "{{percent}}% off",
+    "preview_no_discount": "No discount",
+    "preview_expires_label": "Expires",
+    "preview_no_expiry": "No expiry",
+    "preview_apply_button": "Apply now",
+    "preview_login_required_title": "Sign in to apply",
+    "preview_login_required_description": "You need to be signed in to apply via this referral link."
   },
   "invite": {
     "loading": "Loading invite...",

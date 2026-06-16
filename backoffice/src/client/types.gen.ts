@@ -3260,8 +3260,11 @@ export type ReferralPublic = {
  * Public lookup — GET /referrals/r/{code}.
  *
  * Spec: Design API surface table — returns no PII of referrer.
+ * id is included so the portal can pass referral_id on application create
+ * (REQ-GR-009 — attribution on application).
  */
 export type ReferralPublicPreview = {
+    id: string;
     popup_id: string;
     code: string;
     discount_percentage: string;

@@ -181,7 +181,14 @@ async def redeem_invite(
         validate_custom_fields=False,
     )
 
-    # Apply invite attribution and flags directly
+    # Apply invite attribution and flags directly (REQ-GR-004).
+    # express_checkout: the Application model does not store this as a column;
+    # express checkout is a validation-scope concept in create_internal
+    # (controls which fields are required). Since create_internal is called
+    # with validate_custom_fields=False for invite-redeemed applications,
+    # all field requirements are already relaxed. The invite's express_checkout
+    # flag is respected implicitly — the redemption path never blocks on
+    # required fields regardless of the flag value.
     application.invite_id = invite.id
     if invite.auto_approve:
         if not human_row.red_flag:

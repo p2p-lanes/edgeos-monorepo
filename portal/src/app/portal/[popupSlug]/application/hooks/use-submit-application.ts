@@ -46,6 +46,8 @@ interface UseSubmitApplicationArgs {
     isValid: boolean
     errors: Record<string, string>
   }
+  /** Referral UUID carried from /r/{code} — passed to createMyApplication (REQ-GR-009). */
+  referralId?: string | null
 }
 
 /** Owns the create-or-update mutation, the "submit" and "save draft" flows,
@@ -57,6 +59,7 @@ export function useSubmitApplication({
   values,
   application,
   validate,
+  referralId,
 }: UseSubmitApplicationArgs) {
   const { t } = useTranslation()
   const router = useRouter()
@@ -84,6 +87,7 @@ export function useSubmitApplication({
           popupId: popup.id,
           status,
           schema,
+          referralId,
         }),
       })
     },

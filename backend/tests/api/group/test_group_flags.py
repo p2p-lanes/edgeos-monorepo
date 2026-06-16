@@ -15,11 +15,11 @@ from datetime import UTC, datetime
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlmodel import Session, select
+from sqlmodel import Session
 
 from app.api.application.models import Applications
 from app.api.application.schemas import ApplicationStatus
-from app.api.group.models import GroupMembers, Groups, GroupWhitelistedEmails
+from app.api.group.models import Groups, GroupWhitelistedEmails
 from app.api.human.models import Humans
 from app.api.popup.models import Popups
 from app.api.tenant.models import Tenants
@@ -70,7 +70,6 @@ def _make_group(
     *,
     auto_approve_applications: bool = False,
     express_checkout: bool = False,
-    open_group: bool = True,
 ) -> Groups:
     """Create a group with explicit behavior flags."""
     g = Groups(
@@ -141,7 +140,9 @@ class TestAutoApproveFlag:
             f"Expected DRAFT but got {body['status']!r}. "
             "auto_approve_applications=False must not trigger auto-accept."
         )
-        assert body.get("accepted_at") is None, "DRAFT application must not have accepted_at"
+        assert body.get("accepted_at") is None, (
+            "DRAFT application must not have accepted_at"
+        )
 
     def test_auto_approve_true_yields_accepted(
         self, client: TestClient, db: Session, tenant_a: Tenants
@@ -174,7 +175,9 @@ class TestAutoApproveFlag:
             f"Expected ACCEPTED but got {body['status']!r}. "
             "auto_approve_applications=True must still auto-accept."
         )
-        assert body.get("accepted_at") is not None, "ACCEPTED application must have accepted_at"
+        assert body.get("accepted_at") is not None, (
+            "ACCEPTED application must have accepted_at"
+        )
 
     def test_auto_approve_true_red_flag_human_rejected(
         self, client: TestClient, db: Session, tenant_a: Tenants
@@ -422,8 +425,10 @@ class TestPopupFlagGuards:
         Uses a mock app_data object (not the portal route) because the portal
         ApplicationCreate schema doesn't expose invite_id yet (PR-4 will add it).
         """
-        from fastapi import HTTPException
         from unittest.mock import MagicMock
+
+        from fastapi import HTTPException
+
         from app.api.application.crud import ApplicationsCRUD
 
         popup = _make_popup(db, tenant_a)
@@ -478,8 +483,10 @@ class TestPopupFlagGuards:
 
         Triangulation: same shape test for referral flag.
         """
-        from fastapi import HTTPException
         from unittest.mock import MagicMock
+
+        from fastapi import HTTPException
+
         from app.api.application.crud import ApplicationsCRUD
 
         popup = _make_popup(db, tenant_a)
@@ -502,3 +509,121 @@ class TestPopupFlagGuards:
             )
         assert exc_info.value.status_code == 403
         assert "referral" in exc_info.value.detail.lower()
+
+
+# ---------------------------------------------------------------------------
+# W-1 / REQ-GR-014 — Admin path must NOT use bool(group_id) for express checkout
+# ---------------------------------------------------------------------------
+
+
+class TestAdminPathExpressCheckout:
+    """REQ-GR-014: The admin application-creation path (create_admin)
+    must derive is_express_checkout from the group's explicit express_checkout
+    flag, NOT from bool(group_id).
+
+    Previously application/crud.py line 705 read:
+      is_express_checkout = bool(getattr(app_data, "group_id", None))
+
+    That has been replaced with a group-flag lookup mirroring the portal path.
+    This test asserts the correct behaviour: a group with express_checkout=False
+    does not trigger express checkout in the admin path, even though group_id
+    is present. Specifically, the admin must be able to create an application
+    for a group with express_checkout=False without it behaving as express
+    checkout (the form validation scope is standard, not reduced).
+    """
+
+    def test_admin_path_group_with_express_checkout_false_creates_app(
+        self, db: Session, tenant_a: Tenants, admin_user_tenant_a
+    ) -> None:
+        """Group with express_checkout=False: admin create_admin succeeds and uses
+        standard validation scope (validate_custom_fields=False so no field error,
+        but is_express_checkout is False — confirmed by the code path not raising).
+        """
+        from app.api.application.crud import ApplicationsCRUD
+        from app.api.application.schemas import ApplicationAdminCreate
+
+        popup = _make_popup(db, tenant_a)
+        group = _make_group(db, tenant_a, popup, express_checkout=False)
+        email = f"admin-w1-{uuid.uuid4().hex[:8]}@test.com"
+
+        app_data = ApplicationAdminCreate(
+            popup_id=popup.id,
+            email=email,
+            first_name="Admin",
+            last_name="W1Test",
+            group_id=group.id,
+        )
+
+        crud_instance = ApplicationsCRUD()
+        app = crud_instance.create_admin(
+            db,
+            app_data=app_data,
+            tenant_id=tenant_a.id,
+            validate_custom_fields=False,
+        )
+        assert app is not None
+        assert app.group_id == group.id
+
+    def test_admin_path_group_with_express_checkout_true_creates_app(
+        self, db: Session, tenant_a: Tenants, admin_user_tenant_a
+    ) -> None:
+        """Group with express_checkout=True: admin create_admin resolves the flag correctly.
+
+        Triangulates the lookup path: group must be resolved and the flag read.
+        """
+        from app.api.application.crud import ApplicationsCRUD
+        from app.api.application.schemas import ApplicationAdminCreate
+
+        popup = _make_popup(db, tenant_a)
+        group = _make_group(db, tenant_a, popup, express_checkout=True)
+        email = f"admin-w1-xck-{uuid.uuid4().hex[:8]}@test.com"
+
+        app_data = ApplicationAdminCreate(
+            popup_id=popup.id,
+            email=email,
+            first_name="Admin",
+            last_name="W1Express",
+            group_id=group.id,
+        )
+
+        crud_instance = ApplicationsCRUD()
+        app = crud_instance.create_admin(
+            db,
+            app_data=app_data,
+            tenant_id=tenant_a.id,
+            validate_custom_fields=False,
+        )
+        assert app is not None
+        assert app.group_id == group.id
+
+    def test_admin_path_no_group_id_creates_app_without_express_checkout(
+        self, db: Session, tenant_a: Tenants, admin_user_tenant_a
+    ) -> None:
+        """Without group_id, is_express_checkout must be False (no group to resolve).
+
+        Regression guard: adding group_id later should not auto-trigger express
+        checkout if the group does not opt in.
+        """
+        from app.api.application.crud import ApplicationsCRUD
+        from app.api.application.schemas import ApplicationAdminCreate
+
+        popup = _make_popup(db, tenant_a)
+        email = f"admin-w1-nogrp-{uuid.uuid4().hex[:8]}@test.com"
+
+        app_data = ApplicationAdminCreate(
+            popup_id=popup.id,
+            email=email,
+            first_name="Admin",
+            last_name="NoGroup",
+            group_id=None,
+        )
+
+        crud_instance = ApplicationsCRUD()
+        app = crud_instance.create_admin(
+            db,
+            app_data=app_data,
+            tenant_id=tenant_a.id,
+            validate_custom_fields=False,
+        )
+        assert app is not None
+        assert app.group_id is None

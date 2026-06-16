@@ -485,7 +485,9 @@
     "member_add_failed": "Error al agregar el miembro. Por favor intentá de nuevo.",
     "role_ambassador": "Embajador",
     "role_leader": "Lider",
-    "role_member": "Miembro"
+    "role_member": "Miembro",
+    "not_found_title": "Grupo no encontrado",
+    "not_found_description": "El enlace del grupo no es válido o este evento ya no está disponible."
   },
   "referrals": {
     "title": "Referidos",
@@ -511,7 +513,21 @@
     "copy_link": "Copiar enlace",
     "link_copied": "Enlace copiado al portapapeles.",
     "referrals_disabled": "Los referidos no están habilitados para este popup.",
-    "not_accepted": "Los enlaces de referido están disponibles una vez que tu solicitud sea aceptada."
+    "not_accepted": "Los enlaces de referido están disponibles una vez que tu solicitud sea aceptada.",
+    "preview_loading": "Cargando referido...",
+    "preview_not_found_title": "Referido no encontrado",
+    "preview_not_found_description": "Este enlace de referido no es válido, ha vencido o ya no está disponible.",
+    "preview_exhausted_title": "Referido ya no disponible",
+    "preview_exhausted_description": "Este enlace de referido ha alcanzado su limite de usos.",
+    "preview_heading": "Fuiste referido",
+    "preview_discount_label": "Descuento incluido",
+    "preview_discount_value": "{{percent}}% de descuento",
+    "preview_no_discount": "Sin descuento",
+    "preview_expires_label": "Vence",
+    "preview_no_expiry": "Sin vencimiento",
+    "preview_apply_button": "Aplicar ahora",
+    "preview_login_required_title": "Ingresa para aplicar",
+    "preview_login_required_description": "Necesitas iniciar sesión para aplicar a través de este enlace de referido."
   },
   "invite": {
     "loading": "Cargando invitación...",

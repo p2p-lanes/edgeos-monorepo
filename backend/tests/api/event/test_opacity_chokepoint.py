@@ -717,7 +717,12 @@ class TestPortalVenueAvailabilityLeakage:
         self.group = _make_group(db, tenant_a, self.popup)
         _make_member(db, self.group, self.member)
         self.event = _make_private_group_event(
-            db, tenant_a, self.popup, self.group, self.owner, self.venue,
+            db,
+            tenant_a,
+            self.popup,
+            self.group,
+            self.owner,
+            self.venue,
             start=datetime(2030, 10, 1, 14, 0, 0, tzinfo=UTC),
             end=datetime(2030, 10, 1, 15, 0, 0, tzinfo=UTC),
         )
@@ -755,9 +760,7 @@ class TestPortalVenueAvailabilityLeakage:
         slot = self._find_event_busy_slot(busy)
         # The slot must exist (venue IS busy) but the label must be masked.
         assert slot is not None, "Busy slot for the PRIVATE event was not returned"
-        assert slot["label"] is None, (
-            f"Label leaked for non-member: {slot['label']!r}"
-        )
+        assert slot["label"] is None, f"Label leaked for non-member: {slot['label']!r}"
 
     def test_member_busy_slot_shows_full_label(self, client: TestClient) -> None:
         """Member: venue is busy and full event title is visible."""
@@ -809,3 +812,110 @@ class TestPortalVenueAvailabilityLeakage:
         assert slot is not None
         assert slot["event_start"] is not None
         assert slot["event_end"] is not None
+
+
+# ---------------------------------------------------------------------------
+# W-3 / REQ-GR-029: Public calendar leakage test
+# ---------------------------------------------------------------------------
+
+
+class TestPublicCalendarLeakage:
+    """GET /public/calendar must NOT expose group-scoped PRIVATE events.
+
+    The implementation already filters to visibility=PUBLIC at the query level
+    (event/router.py list_public_calendar), so PRIVATE events never reach the
+    response. This class verifies that property explicitly — a group-scoped
+    PRIVATE event must be absent from the public calendar regardless of whether
+    the requesting client is a group member or an admin.
+
+    Spec: REQ-GR-029 — per-endpoint leakage test for list_public_calendar.
+    """
+
+    @pytest.fixture(autouse=True)
+    def _setup(self, db: Session, tenant_a: Tenants) -> None:
+        from app.api.popup.schemas import PopupStatus
+
+        self.db = db
+        self.tenant = tenant_a
+        self.popup = _make_popup(db, tenant_a)
+        # Public calendar requires popup.status == active
+        self.popup.status = PopupStatus.active
+        db.add(self.popup)
+        db.commit()
+        db.refresh(self.popup)
+        self.owner = _make_human(db, tenant_a)
+        self.member = _make_human(db, tenant_a)
+        self.group = _make_group(db, tenant_a, self.popup)
+        _make_member(db, self.group, self.member)
+        # Private group-scoped event — must NEVER appear in public calendar
+        self.private_event = _make_private_group_event(
+            db,
+            tenant_a,
+            self.popup,
+            self.group,
+            self.owner,
+            start=datetime(2030, 11, 1, 14, 0, 0, tzinfo=UTC),
+            end=datetime(2030, 11, 1, 15, 0, 0, tzinfo=UTC),
+        )
+
+    def _get_public_calendar(self, client: TestClient) -> tuple[int, dict]:
+        resp = client.get(
+            "/api/v1/events/public/calendar",
+            headers={"X-Tenant-Id": str(self.tenant.id)},
+            params={
+                "popup_slug": self.popup.slug,
+                "start_after": "2030-10-31T00:00:00Z",
+                "start_before": "2030-11-30T00:00:00Z",
+            },
+        )
+        try:
+            body = resp.json()
+        except Exception:
+            body = {}
+        return resp.status_code, body
+
+    def _event_ids_in_results(self, body: dict) -> set[str]:
+        return {str(e["id"]) for e in body.get("results", []) if "id" in e}
+
+    def test_private_group_event_absent_for_anonymous(self, client: TestClient) -> None:
+        """Anonymous public calendar must not include a PRIVATE group event."""
+        status_code, body = self._get_public_calendar(client)
+        assert status_code == 200
+        ids = self._event_ids_in_results(body)
+        assert str(self.private_event.id) not in ids, (
+            "Group-scoped PRIVATE event leaked in public calendar for anonymous user"
+        )
+
+    def test_private_group_event_absent_regardless_of_membership(
+        self, client: TestClient
+    ) -> None:
+        """Public calendar is unauthenticated — group membership cannot help;
+        the PRIVATE event must still be absent from the response."""
+        # The endpoint is unauthenticated; membership is irrelevant.
+        # This test exists to document that the filter is unconditional.
+        status_code, body = self._get_public_calendar(client)
+        assert status_code == 200
+        ids = self._event_ids_in_results(body)
+        assert str(self.private_event.id) not in ids, (
+            "Group-scoped PRIVATE event leaked in public calendar "
+            "(membership should not bypass the public filter)"
+        )
+
+    def test_private_event_metadata_not_present_in_response(
+        self, client: TestClient
+    ) -> None:
+        """Even if filtering ever regresses, assert that sensitive metadata
+        belonging to the private event does not appear anywhere in the
+        public calendar response body."""
+        status_code, body = self._get_public_calendar(client)
+        assert status_code == 200
+        private_event_id = str(self.private_event.id)
+        for event in body.get("results", []):
+            if str(event.get("id")) == private_event_id:
+                # If somehow the event leaked, it must at least have no
+                # sensitive metadata (defense-in-depth assertion).
+                _assert_no_sensitive_fields(event)
+                # The primary assertion should have caught the leak:
+                pytest.fail(
+                    "Group-scoped PRIVATE event appeared in public calendar response"
+                )
