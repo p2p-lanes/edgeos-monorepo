@@ -22,24 +22,27 @@ const statusLabels: Record<string, string> = {
 
 const visibilityConfig: Record<
   string,
-  { label: string; icon: typeof Eye; className: string }
+  { label: string; icon: typeof Eye; className: string; iconColor: string }
 > = {
   private: {
     label: "Private",
     icon: Lock,
     className:
       "border-red-300 text-red-700 bg-red-50 dark:border-red-700 dark:text-red-300 dark:bg-red-950/30",
+    iconColor: "text-red-600 dark:text-red-400",
   },
   unlisted: {
     label: "Unlisted",
     icon: EyeOff,
     className:
       "border-amber-300 text-amber-700 bg-amber-50 dark:border-amber-700 dark:text-amber-300 dark:bg-amber-950/30",
+    iconColor: "text-amber-600 dark:text-amber-400",
   },
   public: {
     label: "Public",
     icon: Eye,
     className: "",
+    iconColor: "",
   },
 }
 
@@ -98,5 +101,32 @@ export function EventBadges({
         </Badge>
       )}
     </div>
+  )
+}
+
+interface EventVisibilityIconProps {
+  visibility?: EventPublic["visibility"]
+  className?: string
+}
+
+/**
+ * Icon-only visibility indicator for space-constrained cards (e.g. the day
+ * timeline) where the full {@link EventBadges} text badge would overflow.
+ * Renders a colored lock (private) / eye-off (unlisted) glyph and nothing at
+ * all for public events, mirroring the badge's "only non-public" behavior.
+ */
+export function EventVisibilityIcon({
+  visibility,
+  className,
+}: EventVisibilityIconProps) {
+  const visKey = visibility as string | undefined
+  const vis = visKey && visKey !== "public" ? visibilityConfig[visKey] : null
+  if (!vis) return null
+  const Icon = vis.icon
+  return (
+    <Icon
+      className={cn("shrink-0", vis.iconColor, className)}
+      aria-label={vis.label}
+    />
   )
 }

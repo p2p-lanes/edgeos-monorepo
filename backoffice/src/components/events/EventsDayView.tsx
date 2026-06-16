@@ -32,6 +32,7 @@ import {
 import { summarizeRrule } from "@/lib/events/summarizeRrule"
 import { useEventTimezone } from "@/lib/events/useEventTimezone"
 import { cn } from "@/lib/utils"
+import { EventVisibilityIcon } from "./EventBadges"
 
 interface EventsDayViewProps {
   popupId: string
@@ -538,6 +539,10 @@ export function EventsDayView({
                                     aria-hidden="true"
                                   />
                                 )}
+                              <EventVisibilityIcon
+                                visibility={event.visibility}
+                                className="h-3 w-3"
+                              />
                               <span
                                 className={cn(
                                   isShort ? "truncate" : "line-clamp-2",
@@ -708,6 +713,10 @@ export function EventsDayView({
                                     aria-hidden="true"
                                   />
                                 )}
+                              <EventVisibilityIcon
+                                visibility={event.visibility}
+                                className="h-2.5 w-2.5"
+                              />
                               <span className="truncate">{event.title}</span>
                             </div>
                             <div className="flex items-center gap-1 text-[9px] text-muted-foreground mt-0.5">
