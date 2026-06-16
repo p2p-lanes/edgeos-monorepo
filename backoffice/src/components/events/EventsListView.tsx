@@ -8,16 +8,17 @@ import {
   MapPin,
   Repeat,
   Tag,
+  Users,
 } from "lucide-react"
 import { useEffect, useMemo, useRef } from "react"
 import type { EventPublic, EventStatus } from "@/client"
-import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { fetchAllEvents } from "@/lib/events/fetchAllEvents"
 import { summarizeRrule } from "@/lib/events/summarizeRrule"
 import { useEventTimezone } from "@/lib/events/useEventTimezone"
 import { cn } from "@/lib/utils"
 import { CoverImage } from "./CoverImage"
+import { EventBadges } from "./EventBadges"
 
 interface EventsListViewProps {
   popupId: string
@@ -27,23 +28,6 @@ interface EventsListViewProps {
   popupStart?: string | null
   popupEnd?: string | null
   onEventClick: (event: EventPublic) => void
-}
-
-const statusColors: Record<string, string> = {
-  published: "bg-primary/10 text-primary",
-  draft: "bg-muted text-muted-foreground",
-  cancelled: "bg-destructive/10 text-destructive",
-  pending_approval:
-    "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200",
-  rejected: "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-200",
-}
-
-const statusLabels: Record<string, string> = {
-  published: "Public",
-  draft: "Draft",
-  cancelled: "Cancelled",
-  pending_approval: "Pending approval",
-  rejected: "Rejected",
 }
 
 function groupByDate(
@@ -218,15 +202,12 @@ export function EventsListView({
                           <h3 className="font-medium text-sm sm:text-base">
                             {event.title}
                           </h3>
-                          <Badge
-                            variant="secondary"
-                            className={
-                              statusColors[event.status as string] ?? ""
-                            }
-                          >
-                            {statusLabels[event.status as string] ??
-                              event.status}
-                          </Badge>
+                          <EventBadges
+                            status={event.status}
+                            visibility={event.visibility}
+                            showPublishedStatus
+                            className="shrink-0 justify-end"
+                          />
                         </div>
                         <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                           <Clock className="h-3 w-3" />
@@ -257,6 +238,15 @@ export function EventsListView({
                             <Layers className="h-3 w-3" />
                             <span className="truncate">
                               {event.track_title}
+                            </span>
+                          </div>
+                        )}
+                        {event.attendee_count != null && (
+                          <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5">
+                            <Users className="h-3 w-3" />
+                            <span>
+                              {event.attendee_count}{" "}
+                              {event.attendee_count === 1 ? "RSVP" : "RSVPs"}
                             </span>
                           </div>
                         )}

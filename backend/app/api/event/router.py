@@ -366,6 +366,7 @@ def _to_public(
     event,
     venue_map: dict[uuid.UUID, VenueInfo] | None = None,
     track_map: dict[uuid.UUID, str] | None = None,
+    count_map: dict[uuid.UUID, int] | None = None,
 ) -> EventPublic:
     """Convert an Events row (or expanded pseudo-row) to EventPublic.
 
@@ -373,7 +374,8 @@ def _to_public(
     :func:`app.api.event.crud._clone_as_occurrence`.
 
     ``venue_map``/``track_map`` let callers pre-fetch venues/tracks in a
-    single query and avoid N+1 when serializing a list.
+    single query and avoid N+1 when serializing a list. ``count_map`` does the
+    same for the RSVP ``attendee_count`` shown in the backoffice event list.
     """
     # ``custom_location_name``/``custom_location_url`` live on EventBase and
     # are picked up automatically by ``model_validate`` — no extra plumbing.
@@ -397,6 +399,8 @@ def _to_public(
             updates["track_title"] = track_map[event.track_id]
         elif track_map is None and getattr(event, "track", None) is not None:
             updates["track_title"] = event.track.name
+    if count_map is not None:
+        updates["attendee_count"] = count_map.get(event.id, 0)
     if updates:
         data = data.model_copy(update=updates)
     return data
@@ -1103,8 +1107,13 @@ async def list_events(
 
     venue_map = _venue_map_for_events(db, events)
     track_map = _track_map_for_events(db, events)
+    from app.api.event_participant.crud import event_participants_crud
+
+    count_map = event_participants_crud.count_active_for_events(
+        db, [e.id for e in events]
+    )
     return ListModel[EventPublic](
-        results=[_to_public(e, venue_map, track_map) for e in events],
+        results=[_to_public(e, venue_map, track_map, count_map) for e in events],
         paging=Paging(offset=skip, limit=limit, total=total),
     )
 
