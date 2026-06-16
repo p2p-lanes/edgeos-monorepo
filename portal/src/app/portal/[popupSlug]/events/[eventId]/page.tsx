@@ -59,6 +59,12 @@ import {
 } from "@/components/ui/dialog"
 import { Pill } from "@/components/ui/pill"
 import { Textarea } from "@/components/ui/textarea"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
 import { useCityProvider } from "@/providers/cityProvider"
 import { AddToCalendarModal } from "../lib/AddToCalendarModal"
@@ -511,17 +517,6 @@ export default function EventDetailPage() {
           <ArrowLeft className="h-4 w-4" /> {t("events.common.back_to_events")}
         </Link>
         <div className="flex items-center gap-2 shrink-0">
-          <Button asChild variant="outline" size="sm">
-            <a
-              href={`https://ee26.geobrowser.io/events/${event.id}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label={t("events.detail.view_on_geobrowser")}
-            >
-              <Globe className="mr-2 h-3.5 w-3.5" />
-              {t("events.detail.view_on_geobrowser")}
-            </a>
-          </Button>
           {canManage && event.status !== "cancelled" && (
             <Dialog open={cancelEventOpen} onOpenChange={setCancelEventOpen}>
               <DialogTrigger asChild>
@@ -685,47 +680,69 @@ export default function EventDetailPage() {
       {/* Details card */}
       <div className="relative rounded-xl border bg-card p-4 space-y-3">
         {event.status === "published" && (
-          <div className="absolute top-3 right-3 flex flex-col items-end gap-1.5">
-            {isRsvped ? (
-              <>
-                <div className="inline-flex items-center gap-1.5 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-sm font-medium text-emerald-700 dark:border-emerald-500/40 dark:bg-emerald-950/40 dark:text-emerald-300">
-                  <CheckCircle className="h-4 w-4" />
-                  {myRsvpStatus === "checked_in"
-                    ? t("events.rsvp.checked_in")
-                    : t("events.rsvp.going")}
-                </div>
-                {myRsvpStatus === "registered" && eventStarted && (
-                  <Button
-                    size="sm"
-                    onClick={() => checkInMutation.mutate()}
-                    disabled={isPending}
-                  >
-                    {t("events.rsvp.check_in")}
+          <div className="absolute top-3 right-3 flex items-start gap-2">
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button asChild variant="outline" size="sm">
+                    <a
+                      href={`https://ee26.geobrowser.io/events/${event.id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label={t("events.detail.join_on_geo")}
+                    >
+                      <Globe className="mr-2 h-3.5 w-3.5" />
+                      {t("events.detail.join_on_geo")}
+                    </a>
                   </Button>
-                )}
-              </>
-            ) : isFull ? (
-              <Button
-                disabled
-                variant="secondary"
-                className="inline-flex items-center gap-2"
-              >
-                <Users className="h-4 w-4" />
-                {t("events.rsvp.full")}
-              </Button>
-            ) : (
-              <Button
-                onClick={() => registerMutation.mutate()}
-                disabled={isPending}
-                className="inline-flex items-center gap-2"
-              >
-                <UserPlus className="h-4 w-4" />
-                {t("events.rsvp.rsvp")}
-              </Button>
-            )}
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>{t("events.detail.join_on_geo_tooltip")}</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+            <div className="flex flex-col items-end gap-1.5">
+              {isRsvped ? (
+                <>
+                  <div className="inline-flex items-center gap-1.5 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-sm font-medium text-emerald-700 dark:border-emerald-500/40 dark:bg-emerald-950/40 dark:text-emerald-300">
+                    <CheckCircle className="h-4 w-4" />
+                    {myRsvpStatus === "checked_in"
+                      ? t("events.rsvp.checked_in")
+                      : t("events.rsvp.going")}
+                  </div>
+                  {myRsvpStatus === "registered" && eventStarted && (
+                    <Button
+                      size="sm"
+                      onClick={() => checkInMutation.mutate()}
+                      disabled={isPending}
+                    >
+                      {t("events.rsvp.check_in")}
+                    </Button>
+                  )}
+                </>
+              ) : isFull ? (
+                <Button
+                  disabled
+                  variant="secondary"
+                  className="inline-flex items-center gap-2"
+                >
+                  <Users className="h-4 w-4" />
+                  {t("events.rsvp.full")}
+                </Button>
+              ) : (
+                <Button
+                  onClick={() => registerMutation.mutate()}
+                  disabled={isPending}
+                  className="inline-flex items-center gap-2"
+                >
+                  <UserPlus className="h-4 w-4" />
+                  {t("events.rsvp.rsvp")}
+                </Button>
+              )}
+            </div>
           </div>
         )}
-        <div className="flex items-center gap-2.5 pr-36">
+        <div className="flex items-center gap-2.5 pr-44 sm:pr-56">
           <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
             <Clock className="h-4 w-4 text-primary" />
           </div>
@@ -751,7 +768,7 @@ export default function EventDetailPage() {
             event.host_display_name?.trim() || city?.name?.trim() || null
           if (!hostName) return null
           return (
-            <div className="flex items-center gap-2.5 pr-36">
+            <div className="flex items-center gap-2.5 pr-44 sm:pr-56">
               <div className="h-8 w-8 rounded-lg bg-amber-500/10 flex items-center justify-center shrink-0">
                 <User className="h-4 w-4 text-amber-600" />
               </div>
@@ -765,7 +782,7 @@ export default function EventDetailPage() {
           )
         })()}
         {event.rrule && (
-          <div className="flex items-center gap-2.5 pr-36">
+          <div className="flex items-center gap-2.5 pr-44 sm:pr-56">
             <div className="h-8 w-8 rounded-lg bg-blue-500/10 flex items-center justify-center shrink-0">
               <Repeat className="h-4 w-4 text-blue-600" />
             </div>

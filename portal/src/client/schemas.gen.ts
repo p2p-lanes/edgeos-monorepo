@@ -18557,6 +18557,33 @@ export const VenueBusySlotSchema = {
     title: 'VenueBusySlot'
 } as const;
 
+export const VenueEventCountSchema = {
+    properties: {
+        venue_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Venue Id'
+        },
+        venue_title: {
+            type: 'string',
+            title: 'Venue Title'
+        },
+        event_count: {
+            type: 'integer',
+            title: 'Event Count'
+        }
+    },
+    type: 'object',
+    required: ['venue_id', 'venue_title', 'event_count'],
+    title: 'VenueEventCount',
+    description: `Number of distinct published events that belong to a venue.
+
+Backs the portal venue filter so it can show per-venue counts (and hide
+venues with no events) without pulling the full event list to the client
+just to count. \`\`venue_title\`\` is included so the filter has a label
+without a second lookup.`
+} as const;
+
 export const VenueExceptionCreateSchema = {
     properties: {
         start_datetime: {

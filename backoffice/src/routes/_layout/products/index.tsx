@@ -1,7 +1,7 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query"
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router"
 import type { ColumnDef } from "@tanstack/react-table"
-import { Package, Plus, QrCode, ShieldCheck } from "lucide-react"
+import { Check, Package, Plus, QrCode, ShieldCheck } from "lucide-react"
 import { Suspense, useCallback } from "react"
 
 import { type ProductPublic, ProductsService } from "@/client"
@@ -157,7 +157,9 @@ const columns: ColumnDef<ProductPublic>[] = [
     accessorKey: "exclusive",
     header: "Exclusive",
     cell: ({ row }) =>
-      row.original.exclusive ? <StatusBadge status="active" /> : null,
+      row.original.exclusive ? (
+        <Check className="h-4 w-4 text-muted-foreground" aria-label="Yes" />
+      ) : null,
   },
   {
     accessorKey: "insurance_eligible",
@@ -175,7 +177,7 @@ const columns: ColumnDef<ProductPublic>[] = [
     cell: ({ row }) => (
       <div className="flex items-center justify-center">
         {row.original.insurance_eligible ? (
-          <StatusBadge status="active" />
+          <Check className="h-4 w-4 text-muted-foreground" aria-label="Yes" />
         ) : null}
       </div>
     ),
@@ -196,7 +198,7 @@ const columns: ColumnDef<ProductPublic>[] = [
     cell: ({ row }) => (
       <div className="flex items-center justify-center">
         {row.original.requires_check_in ? (
-          <StatusBadge status="active" />
+          <Check className="h-4 w-4 text-muted-foreground" aria-label="Yes" />
         ) : null}
       </div>
     ),

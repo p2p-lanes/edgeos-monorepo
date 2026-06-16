@@ -34,6 +34,7 @@ class EventsCRUD(BaseCRUD[Events, EventCreate, EventUpdate]):
         start_after: datetime | None = None,
         start_before: datetime | None = None,
         venue_id: uuid.UUID | None = None,
+        venue_ids: list[uuid.UUID] | None = None,
         location_kind: str | None = None,
         track_ids: list[uuid.UUID] | None = None,
         owner_id: uuid.UUID | None = None,
@@ -68,6 +69,8 @@ class EventsCRUD(BaseCRUD[Events, EventCreate, EventUpdate]):
             statement = statement.where(Events.kind == kind)
         if venue_id is not None:
             statement = statement.where(Events.venue_id == venue_id)
+        if venue_ids:
+            statement = statement.where(col(Events.venue_id).in_(venue_ids))
         if location_kind == "custom":
             # No venue + a custom_location_name (e.g. a Google Maps link).
             statement = statement.where(Events.venue_id.is_(None))  # type: ignore[union-attr]
@@ -153,6 +156,7 @@ class EventsCRUD(BaseCRUD[Events, EventCreate, EventUpdate]):
         search: str | None = None,
         tags: list[str] | None = None,
         track_ids: list[uuid.UUID] | None = None,
+        venue_ids: list[uuid.UUID] | None = None,
         managed_by_human_id: uuid.UUID | None = None,
     ) -> list[Events]:
         """Return occurrence-expanded events in a window for a popup.
@@ -180,6 +184,8 @@ class EventsCRUD(BaseCRUD[Events, EventCreate, EventUpdate]):
             )
         if track_ids:
             statement = statement.where(col(Events.track_id).in_(track_ids))
+        if venue_ids:
+            statement = statement.where(col(Events.venue_id).in_(venue_ids))
         if tags:
             from sqlalchemy.dialects.postgresql import array
 
@@ -289,6 +295,31 @@ class EventsCRUD(BaseCRUD[Events, EventCreate, EventUpdate]):
         """
         rows = db.exec(text(sql).bindparams(popup_id=popup_id)).all()
         return {row[0]: int(row[1]) for row in rows}
+
+    def count_published_events_by_venue(
+        self, db: Session, *, popup_id: uuid.UUID
+    ) -> list[tuple[uuid.UUID, str, int]]:
+        """Distinct published events per venue for a popup, across all history.
+
+        Backs the portal venue filter so it can show each venue's event count
+        and hide venues with no events without pulling the full event list to
+        the client. Joins ``event_venues`` for the title so the filter has a
+        label without a second query. Counts distinct event ids so recurring
+        masters aren't inflated. ``status`` is stored as the uppercase Enum
+        name, so filter against that form.
+        """
+        sql = """
+            SELECT e.venue_id, v.title AS venue_title,
+                   COUNT(DISTINCT e.id) AS event_count
+            FROM events e
+            JOIN event_venues v ON v.id = e.venue_id
+            WHERE e.popup_id = :popup_id
+              AND e.venue_id IS NOT NULL
+              AND e.status = 'PUBLISHED'
+            GROUP BY e.venue_id, v.title
+        """
+        rows = db.exec(text(sql).bindparams(popup_id=popup_id)).all()
+        return [(row[0], row[1], int(row[2])) for row in rows]
 
     def list_distinct_hosts(
         self,

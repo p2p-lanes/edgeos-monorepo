@@ -767,6 +767,37 @@ export function EventForm({
     }
   }, [popup?.start_date, popup?.end_date])
 
+  // Past days are unselectable when creating a new event: the backend rejects
+  // a past start time and the form already blocks submit (see the validator's
+  // `!isEdit && startDate < now` guard), so greying them out in the picker
+  // stops the user from picking a day they can't use. Editing an existing
+  // event still allows past dates so a past/mis-scheduled event can be fixed
+  // or cancelled — mirrors the submit-time guard's `!isEdit` condition.
+  const isDateInPast = useMemo(() => {
+    if (isEdit) return undefined
+    const today = new Date()
+    const todayKey = `${today.getFullYear()}-${String(
+      today.getMonth() + 1,
+    ).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`
+    return (d: Date) => {
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(
+        2,
+        "0",
+      )}-${String(d.getDate()).padStart(2, "0")}`
+      return key < todayKey
+    }
+  }, [isEdit])
+
+  // The picker's "disabled" matcher folds together both reasons a day is
+  // unselectable: outside the popup booking window, or in the past (new
+  // events only). Either one greys the day out and blocks selection.
+  const isDateUnselectable = useMemo(() => {
+    if (isDateOutsidePopupWindow && isDateInPast) {
+      return (d: Date) => isDateOutsidePopupWindow(d) || isDateInPast(d)
+    }
+    return isDateOutsidePopupWindow ?? isDateInPast
+  }, [isDateOutsidePopupWindow, isDateInPast])
+
   // First day within the popup window where the venue is open. Used to
   // default the date picker when a user picks a venue with no date set
   // yet — and to recover when the previously selected date becomes a
@@ -1399,12 +1430,11 @@ export function EventForm({
           <DatePicker
             value={dateStr}
             disabled={readOnly}
-            disabledDays={isDateOutsidePopupWindow}
+            disabledDays={isDateUnselectable}
             closedDays={
               isClosedOnDate
                 ? (d) =>
-                    !(isDateOutsidePopupWindow?.(d) ?? false) &&
-                    isClosedOnDate(d)
+                    !(isDateUnselectable?.(d) ?? false) && isClosedOnDate(d)
                 : undefined
             }
             onChange={(newDate) => {

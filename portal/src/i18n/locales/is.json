@@ -514,6 +514,9 @@
       "filter_by_tracks": "Sía eftir brautum",
       "tracks_label": "Brautir",
       "filter_by_track_label": "Sía eftir braut",
+      "filter_by_venues": "Sía eftir stöðum",
+      "venues_label": "Staðir",
+      "filter_by_venue_label": "Sía eftir stað",
       "clear_filters": "Hreinsa",
       "list_view_label": "Listasýn",
       "calendar_view_label": "Dagatalssýn",
@@ -620,6 +623,8 @@
       "pending_approval_banner_message": "Viðburðurinn þinn bíður samþykkis og er ekki enn sýnilegur öðrum.",
       "open_in_maps": "Opna í Google kortum",
       "view_on_geobrowser": "Skoða á Geobrowser",
+      "join_on_geo": "Taka þátt á Geo",
+      "join_on_geo_tooltip": "Samantekt, kannanir og efni",
       "share_button": "Deila viðburði",
       "share_link_copied": "Hlekkur afritaður",
       "share_link_error": "Mistókst að afrita hlekk"
