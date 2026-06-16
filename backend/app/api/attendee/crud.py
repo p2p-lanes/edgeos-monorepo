@@ -138,9 +138,7 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
             )
 
         if category_id is not None:
-            base_statement = base_statement.where(
-                Attendees.category_id == category_id
-            )
+            base_statement = base_statement.where(Attendees.category_id == category_id)
 
         # Use proper count query instead of fetching all rows
         count_statement = select(func.count()).select_from(base_statement.subquery())
@@ -173,6 +171,7 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
         gender: str | None = None,
         human_id: uuid.UUID | None = None,
         category_id: uuid.UUID | None = None,
+        additional_data: dict | None = None,
     ) -> Attendees:
         """Create an attendee with internal fields.
 
@@ -201,6 +200,7 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
             email=email,
             gender=gender,
             human_id=human_id,
+            additional_data=additional_data or {},
         )
         session.add(attendee)
         session.commit()

@@ -183,6 +183,7 @@ const AttendeeTicket = ({
           name: data.name ?? "",
           email: data.email ?? "",
           gender: data.gender ?? "",
+          additional_data: data.additional_data,
         })
       }
     } catch (_error) {

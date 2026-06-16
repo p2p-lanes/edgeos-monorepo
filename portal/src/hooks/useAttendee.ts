@@ -52,6 +52,7 @@ const useAttendee = () => {
           category: data.category,
           category_id: data.category_id,
           gender: data.gender,
+          additional_data: data.additional_data,
         },
       })
     },
@@ -101,6 +102,7 @@ const useAttendee = () => {
           name: data.name,
           email: data.email,
           gender: data.gender,
+          additional_data: data.additional_data,
         },
       })
     },

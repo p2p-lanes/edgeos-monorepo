@@ -446,6 +446,9 @@ export type AttendeeCreate = {
     category?: (string | null);
     email?: (string | null);
     gender?: (string | null);
+    additional_data?: ({
+    [key: string]: unknown;
+} | null);
 };
 
 /**
@@ -487,6 +490,9 @@ export type AttendeeListItem = {
     email?: (string | null);
     gender?: (string | null);
     poap_url?: (string | null);
+    additional_data?: {
+        [key: string]: unknown;
+    };
     id: string;
     category?: (string | null);
     created_at?: (string | null);
@@ -547,6 +553,9 @@ export type AttendeePublic = {
     email?: (string | null);
     gender?: (string | null);
     poap_url?: (string | null);
+    additional_data?: {
+        [key: string]: unknown;
+    };
     id: string;
     category?: (string | null);
     created_at?: (string | null);
@@ -669,6 +678,9 @@ export type AttendeeUpdate = {
     name?: (string | null);
     email?: (string | null);
     gender?: (string | null);
+    additional_data?: ({
+    [key: string]: unknown;
+} | null);
 };
 
 /**
@@ -691,6 +703,9 @@ export type AttendeeWithOriginPublic = {
     email?: (string | null);
     gender?: (string | null);
     poap_url?: (string | null);
+    additional_data?: {
+        [key: string]: unknown;
+    };
     id: string;
     category?: (string | null);
     created_at?: (string | null);
@@ -4759,6 +4774,7 @@ export type EventsListEventsData = {
     startBefore?: (string | null);
     trackIds?: (Array<(string)> | null);
     venueId?: (string | null);
+    visibility?: (EventVisibility | null);
     xTenantId?: (string | null);
 };
 

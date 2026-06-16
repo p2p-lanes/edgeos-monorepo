@@ -31,6 +31,14 @@ class AttendeeBase(SQLModel):
     email: str | None = Field(default=None, nullable=True)
     gender: str | None = Field(default=None, nullable=True)
     poap_url: str | None = Field(default=None, nullable=True)
+    # Free-form blob for declarative `required_fields` collected per attendee
+    # (e.g. a kid's date_of_birth). Mirrors Applications.custom_fields but at the
+    # per-attendee level so each kid row carries its own answers. Persists ALL
+    # dynamic required_fields, not just a single typed column.
+    additional_data: dict = Field(
+        default_factory=dict,
+        sa_column=Column(JSONB, nullable=False, server_default="{}"),
+    )
 
 
 class AttendeePublic(AttendeeBase):
@@ -70,6 +78,8 @@ class AttendeeCreate(BaseModel):
     category: str | None = None
     email: str | None = None
     gender: str | None = None
+    # Declarative required_fields answers (e.g. {"date_of_birth": "2018-05-01"}).
+    additional_data: dict | None = None
 
     @field_validator("email")
     @classmethod
@@ -87,6 +97,8 @@ class AttendeeUpdate(BaseModel):
     name: str | None = None
     email: str | None = None
     gender: str | None = None
+    # Replaces the whole additional_data blob when provided (not a partial merge).
+    additional_data: dict | None = None
     # Category cannot be changed once set if products exist
 
     @field_validator("email")
