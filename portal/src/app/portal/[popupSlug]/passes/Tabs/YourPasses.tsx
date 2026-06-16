@@ -100,6 +100,7 @@ const YourPasses = ({ access: _access, onSwitchToBuy }: YourPassesProps) => {
         email: data.email ?? "",
         category_id: modal.category.id,
         gender: data.gender ?? "",
+        additional_data: data.additional_data,
       })
     }
     handleCloseModal()

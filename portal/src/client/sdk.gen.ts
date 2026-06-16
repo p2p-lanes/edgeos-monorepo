@@ -2862,11 +2862,14 @@ export class EventsService {
      * - ``"custom"``  → events with a ``custom_location_name`` set.
      * - ``"meeting"`` → online-only events (no venue, no custom location).
      *
+     * ``visibility`` narrows to a single visibility (public | unlisted | private).
+     *
      * ``owner_id`` filters to events created by a specific host (the Human
      * referenced by ``Events.owner_id``).
      * @param data The data for the request.
      * @param data.popupId
      * @param data.eventStatus
+     * @param data.visibility
      * @param data.kind
      * @param data.venueId
      * @param data.locationKind
@@ -2891,6 +2894,7 @@ export class EventsService {
             query: {
                 popup_id: data.popupId,
                 event_status: data.eventStatus,
+                visibility: data.visibility,
                 kind: data.kind,
                 venue_id: data.venueId,
                 location_kind: data.locationKind,

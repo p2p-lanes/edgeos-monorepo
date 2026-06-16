@@ -2029,6 +2029,18 @@ export const AttendeeCreateSchema = {
                 }
             ],
             title: 'Gender'
+        },
+        additional_data: {
+            anyOf: [
+                {
+                    additionalProperties: true,
+                    type: 'object'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Additional Data'
         }
     },
     type: 'object',
@@ -2186,6 +2198,11 @@ export const AttendeeListItemSchema = {
                 }
             ],
             title: 'Poap Url'
+        },
+        additional_data: {
+            additionalProperties: true,
+            type: 'object',
+            title: 'Additional Data'
         },
         id: {
             type: 'string',
@@ -2445,6 +2462,11 @@ export const AttendeePublicSchema = {
                 }
             ],
             title: 'Poap Url'
+        },
+        additional_data: {
+            additionalProperties: true,
+            type: 'object',
+            title: 'Additional Data'
         },
         id: {
             type: 'string',
@@ -2767,6 +2789,18 @@ export const AttendeeUpdateSchema = {
                 }
             ],
             title: 'Gender'
+        },
+        additional_data: {
+            anyOf: [
+                {
+                    additionalProperties: true,
+                    type: 'object'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Additional Data'
         }
     },
     type: 'object',
@@ -2858,6 +2892,11 @@ export const AttendeeWithOriginPublicSchema = {
                 }
             ],
             title: 'Poap Url'
+        },
+        additional_data: {
+            additionalProperties: true,
+            type: 'object',
+            title: 'Additional Data'
         },
         id: {
             type: 'string',
