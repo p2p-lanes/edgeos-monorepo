@@ -464,18 +464,6 @@ export type AttendeeEmailsResponse = {
 };
 
 /**
- * Active RSVPers' emails for an event, for its managers (portal).
- *
- * Returned only to the event's owner/host/collaborators so they can
- * contact everyone who RSVPed. Emails are deduplicated and ordered by
- * registration order.
- */
-export type AttendeeEmailsResponse = {
-    emails: Array<(string)>;
-    count: number;
-};
-
-/**
  * Minimal attendee information for participation responses.
  */
 export type AttendeeInfo = {
