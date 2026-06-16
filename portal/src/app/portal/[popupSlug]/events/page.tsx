@@ -865,6 +865,9 @@ export default function EventsPage() {
               allowedTracks={allowedTracks}
               selectedTrackIds={selectedTrackIds}
               onSelectedTrackIdsChange={setSelectedTrackIds}
+              allowedVenues={allowedVenues}
+              selectedVenueIds={selectedVenueIds}
+              onSelectedVenueIdsChange={setSelectedVenueIds}
             />
             <DayBody
               popupId={city?.id}
