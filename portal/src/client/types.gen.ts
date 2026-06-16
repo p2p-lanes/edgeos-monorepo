@@ -221,6 +221,9 @@ export type ApplicationPublic = {
     human_id: string;
     group_id?: (string | null);
     referral?: (string | null);
+    invite_id?: (string | null);
+    referral_id?: (string | null);
+    referred_by_name?: (string | null);
     info_not_shared?: Array<(string)>;
     status: string;
     custom_fields?: {

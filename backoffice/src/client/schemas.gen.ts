@@ -967,6 +967,41 @@ export const ApplicationPublicSchema = {
             ],
             title: 'Referral'
         },
+        invite_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Invite Id'
+        },
+        referral_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Referral Id'
+        },
+        referred_by_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Referred By Name'
+        },
         info_not_shared: {
             items: {
                 type: 'string'

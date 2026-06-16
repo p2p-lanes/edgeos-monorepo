@@ -131,6 +131,11 @@ class ApplicationPublic(BaseModel):
 
     # Popup-specific
     referral: str | None = None
+    # Attribution (groups-rework): which invite/referral this application came
+    # through, plus a resolved display name of the referrer for the BO.
+    invite_id: uuid.UUID | None = None
+    referral_id: uuid.UUID | None = None
+    referred_by_name: str | None = None
     info_not_shared: list[str] = []
     status: str
     custom_fields: dict = {}

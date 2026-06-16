@@ -60,6 +60,7 @@ portal_router = APIRouter(prefix="/portal", tags=["portal"])
 def _build_application_public(
     application,
     review_decision=None,
+    referred_by_name=None,
 ) -> ApplicationPublic:
     """Build ApplicationPublic with attendees and products."""
     from app.api.attendee.schemas import AttendeeProductPublic
@@ -115,6 +116,9 @@ def _build_application_public(
         human_id=application.human_id,
         group_id=application.group_id,
         referral=application.referral,
+        invite_id=application.invite_id,
+        referral_id=application.referral_id,
+        referred_by_name=referred_by_name,
         info_not_shared=application.info_not_shared or [],
         status=application.status,
         custom_fields=application.custom_fields or {},
@@ -540,7 +544,23 @@ async def get_application(
             detail="Application not found",
         )
 
-    return _build_application_public(application)
+    # Resolve the referrer's display name (referral_id → referral →
+    # referrer_human_id → human) so the BO can show "Referred by ...".
+    referred_by_name = None
+    if application.referral_id:
+        from app.api.human.models import Humans
+        from app.api.referral.models import Referrals
+
+        referral = db.get(Referrals, application.referral_id)
+        if referral:
+            referrer = db.get(Humans, referral.referrer_human_id)
+            if referrer:
+                referred_by_name = (
+                    f"{referrer.first_name or ''} {referrer.last_name or ''}".strip()
+                    or referrer.email
+                )
+
+    return _build_application_public(application, referred_by_name=referred_by_name)
 
 
 @router.get(
