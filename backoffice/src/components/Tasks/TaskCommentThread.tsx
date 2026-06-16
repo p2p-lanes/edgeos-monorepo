@@ -28,12 +28,16 @@ function CommentRow({
   comment: TaskCommentPublic
 }) {
   const queryClient = useQueryClient()
-  const { user } = useAuth()
+  const { user, isSuperadmin } = useAuth()
   const { showSuccessToast, showErrorToast } = useCustomToast()
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(comment.body)
 
   const isOwn = !!user && comment.author_user_id === user.id
+  // Editing stays author-only (the backend rejects editing others' comments),
+  // but superadmins can delete any comment for moderation — mirrors the
+  // backend's delete-comment policy (author OR superadmin).
+  const canDelete = isOwn || isSuperadmin
 
   const invalidate = () =>
     queryClient.invalidateQueries({ queryKey: commentsQueryKey(taskId) })
@@ -124,24 +128,34 @@ function CommentRow({
         </div>
       )}
 
-      {isOwn && !editing && (
+      {canDelete && !editing && (
         <div className="mt-2 flex gap-1">
-          <Button
-            size="sm"
-            variant="ghost"
-            className="h-7 px-2 text-muted-foreground"
-            onClick={() => setEditing(true)}
-          >
-            <Pencil className="mr-1 h-3 w-3" /> Edit
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            className="h-7 px-2 text-muted-foreground"
-            onClick={() => deleteMutation.mutate()}
-          >
-            <Trash2 className="mr-1 h-3 w-3" /> Delete
-          </Button>
+          {isOwn && (
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-7 px-2 text-muted-foreground"
+              onClick={() => setEditing(true)}
+            >
+              <Pencil className="mr-1 h-3 w-3" /> Edit
+            </Button>
+          )}
+          {canDelete && (
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-7 px-2 text-muted-foreground"
+              onClick={() => {
+                // A superadmin deleting someone else's comment is a moderation
+                // action — confirm so it isn't a stray click. Deleting your own
+                // stays one-click, matching the prior behavior.
+                if (!isOwn && !window.confirm("Delete this comment?")) return
+                deleteMutation.mutate()
+              }}
+            >
+              <Trash2 className="mr-1 h-3 w-3" /> Delete
+            </Button>
+          )}
         </div>
       )}
     </div>
