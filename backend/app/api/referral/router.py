@@ -13,7 +13,7 @@ Spec: REQ-GR-008..011 (referrals), REQ-GR-026 (popup.referrals_enabled gate).
 
 import uuid
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Response, status
 
 from app.api.referral.crud import referrals_crud
 from app.api.referral.schemas import (
@@ -179,16 +179,23 @@ async def delete_my_referral(
     response_model=ReferralPublicPreview,
     summary="Public referral lookup (no auth)",
 )
-async def get_referral_preview(code: str, db: SessionDep) -> ReferralPublicPreview:
+async def get_referral_preview(
+    code: str, db: SessionDep, response: Response
+) -> ReferralPublicPreview:
     """Public lookup — returns ReferralPublicPreview with no PII of the referrer.
 
     Spec: Design API surface (public GET /referrals/r/{code}).
     Validates expiry and use limits so the portal can show an appropriate error.
     """
+    # Never cache — reflects mutable referral state (current_uses, max_uses, expiry).
+    response.headers["Cache-Control"] = "no-store"
+
     referral = referrals_crud.get_by_code_any_popup(db, code)
     if not referral:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Referral not found"
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Referral not found",
+            headers={"Cache-Control": "no-store"},
         )
 
     # Surface guard state but do NOT raise — let the portal decide how to present

@@ -150,11 +150,18 @@ class InvitesCRUD(BaseCRUD[Invites, InviteCreate, InviteUpdate]):
         """
         now = datetime.now(UTC)
 
+        # Cache-Control: no-store on the 410s so browsers never cache an
+        # invite's exhausted/expired state — an admin can raise max_uses or
+        # extend expiry and the link must work again immediately (a cached 410
+        # Gone, which is cacheable by default, would otherwise stick).
+        _no_store = {"Cache-Control": "no-store"}
+
         # Step 1: expiration
         if invite.expires_at is not None and invite.expires_at < now:
             raise HTTPException(
                 status_code=status.HTTP_410_GONE,
                 detail="This invite has expired",
+                headers=_no_store,
             )
 
         # Step 2: use limit
@@ -162,6 +169,7 @@ class InvitesCRUD(BaseCRUD[Invites, InviteCreate, InviteUpdate]):
             raise HTTPException(
                 status_code=status.HTTP_410_GONE,
                 detail="This invite has reached its maximum number of uses",
+                headers=_no_store,
             )
 
     def increment_uses(

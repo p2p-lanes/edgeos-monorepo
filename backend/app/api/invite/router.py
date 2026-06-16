@@ -10,7 +10,7 @@ Spec: REQ-GR-001..007 (invites), REQ-GR-026 (popup.invites_enabled gate).
 
 import uuid
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Response, status
 
 from app.api.invite.crud import invites_crud
 from app.api.invite.schemas import (
@@ -41,17 +41,25 @@ router = APIRouter(prefix="/invites", tags=["invites"])
     response_model=InvitePublicPreview,
     summary="Preview invite (unauthenticated)",
 )
-async def preview_invite(token: str, db: SessionDep) -> InvitePublicPreview:
+async def preview_invite(
+    token: str, db: SessionDep, response: Response
+) -> InvitePublicPreview:
     """Unauthenticated preview — returns inviter_name and is_email_restricted.
 
     Spec: REQ-GR-005.
     Guard order checked here for preview: expired → 410, exhausted → 410.
     recipient_email is NEVER returned.
     """
+    # Never cache the preview — it reflects mutable invite state (max_uses,
+    # current_uses, expiry) that an admin can change at any time.
+    response.headers["Cache-Control"] = "no-store"
+
     invite = invites_crud.get_by_token_any_popup(db, token)
     if not invite:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Invite not found"
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Invite not found",
+            headers={"Cache-Control": "no-store"},
         )
 
     # Apply guard chain for preview as well (expired/exhausted → 410)
