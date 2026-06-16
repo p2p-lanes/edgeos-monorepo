@@ -106,12 +106,10 @@ function InviteCard({ preview }: { preview: InvitePublicPreview }) {
         {preview.max_uses != null && (
           <div className="flex justify-between">
             <span className="text-muted-foreground">
-              {t("invite.uses_remaining")}
+              {t("invite.uses_remaining_label")}
             </span>
             <span className="font-medium">
-              {t("invite.uses_remaining", {
-                count: preview.max_uses - preview.current_uses,
-              })}
+              {preview.max_uses - preview.current_uses}
             </span>
           </div>
         )}

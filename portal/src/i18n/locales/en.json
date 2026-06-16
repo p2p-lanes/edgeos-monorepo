@@ -544,6 +544,7 @@
     "discount_value": "{{percent}}% off",
     "no_discount": "No discount",
     "uses_remaining": "{{count}} uses remaining",
+    "uses_remaining_label": "Uses remaining",
     "unlimited_uses": "Unlimited uses",
     "expires_label": "Expires",
     "no_expiry": "No expiry",
