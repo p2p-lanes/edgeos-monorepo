@@ -671,6 +671,8 @@
       "pending_approval_banner_message": "Your event is pending approval and not yet visible to others.",
       "open_in_maps": "Open in Google Maps",
       "view_on_geobrowser": "View on Geobrowser",
+      "join_on_geo": "Join on Geo",
+      "join_on_geo_tooltip": "Recap, polls and resources",
       "share_button": "Share event",
       "share_link_copied": "Link copied",
       "share_link_error": "Couldn't copy link",
