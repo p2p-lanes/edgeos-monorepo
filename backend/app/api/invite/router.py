@@ -68,6 +68,7 @@ async def preview_invite(token: str, db: SessionDep) -> InvitePublicPreview:
         inviter_name = creator.full_name or creator.email
 
     return InvitePublicPreview(
+        id=invite.id,
         popup_id=invite.popup_id,
         token=invite.token,
         inviter_name=inviter_name,

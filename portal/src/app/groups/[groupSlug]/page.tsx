@@ -62,45 +62,25 @@ const GroupCheckoutPage = () => {
     },
   })
 
-  // Redirect: slug resolved to an invite — send to the checkout invite page.
-  // We find the popup slug from the loaded popups list using invite.popup_id.
+  // Redirect: slug resolved to an invite — send to the public checkout invite page.
+  // The /invite/[token] page now renders PopupCheckoutContent directly (no portal scoping).
   useEffect(() => {
     if (!resolution) return
     if (resolution.kind !== "invite") return
     const invite = resolution.invite as {
-      popup_id?: string
       token?: string
     } | null
     if (!invite) return
-    const popupId = invite.popup_id ?? group?.popup_id
     const token = invite.token ?? params.groupSlug
-    if (!popupId) {
-      // Fallback: redirect to invite page without popup context
-      router.replace(`/invite/${token}`)
-      return
-    }
-    const popupsList = getPopups()
-    const popup = popupsList.find((p) => p.id === popupId)
-    if (popup) {
-      router.replace(`/portal/${popup.slug}/invite/${token}`)
-    } else {
-      router.replace(`/invite/${token}`)
-    }
-  }, [resolution, group?.popup_id, params.groupSlug, router, getPopups])
+    router.replace(`/invite/${token}`)
+  }, [resolution, params.groupSlug, router])
 
-  // Redirect: group 404 but invite preview found
+  // Redirect: group 404 but invite preview found — send to public checkout invite page.
   useEffect(() => {
     if (!groupNotFound) return
     if (!invitePreview) return
-    const token = params.groupSlug
-    const popupsList = getPopups()
-    const popup = popupsList.find((p) => p.id === invitePreview.popup_id)
-    if (popup) {
-      router.replace(`/portal/${popup.slug}/invite/${token}`)
-    } else {
-      router.replace(`/invite/${token}`)
-    }
-  }, [groupNotFound, invitePreview, params.groupSlug, router, getPopups])
+    router.replace(`/invite/${params.groupSlug}`)
+  }, [groupNotFound, invitePreview, params.groupSlug, router])
 
   // Pre-select the popup as soon as we know it so the DiscountProvider's
   // city-reset effect settles on this popup's id BEFORE we seed the discount.

@@ -109,8 +109,11 @@ class InvitePublicPreview(BaseModel):
 
     Spec: REQ-GR-005 — exposes inviter_name and is_email_restricted.
     recipient_email is intentionally ABSENT to prevent harvesting.
+    id is included so the portal can pass invite_id on application create
+    (the checkout flow needs the UUID, not the token string).
     """
 
+    id: uuid.UUID
     popup_id: uuid.UUID
     token: str
     inviter_name: str | None = None

@@ -2164,8 +2164,11 @@ export type InvitePublic = {
  *
  * Spec: REQ-GR-005 — exposes inviter_name and is_email_restricted.
  * recipient_email is intentionally ABSENT to prevent harvesting.
+ * id is included so the portal can pass invite_id on application create
+ * (the checkout flow needs the UUID, not the token string).
  */
 export type InvitePublicPreview = {
+    id: string;
     popup_id: string;
     token: string;
     inviter_name?: (string | null);

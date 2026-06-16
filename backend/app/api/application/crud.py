@@ -433,7 +433,29 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         # Express Checkout ONLY when the group explicitly opts in via the
         # express_checkout flag. Previously this was implicit (bool(group_id));
         # now it requires the flag to be True. Design Decision 1f.
-        is_express_checkout = bool(_group and _group.express_checkout)
+        # Invite express_checkout flag works the same way: when the invite
+        # opts in, required fields are relaxed (shared behavior with group flow).
+        # REQ-GR-003 guard chain: expiry + use-limit checked here (before
+        # express_checkout is read). Email match is deferred until after
+        # human is fetched below.
+        _invite_id = getattr(app_data, "invite_id", None)
+        _invite = None
+        if _invite_id:
+            from app.api.invite.crud import invites_crud as _invites_crud
+
+            _invite = _invites_crud.get(session, _invite_id)
+            if not _invite:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Invite not found",
+                )
+            # Steps 1 + 2: expiry → max_uses (reuse shared validate_for_redemption)
+            _invites_crud.validate_for_redemption(_invite)
+
+        is_express_checkout = bool(
+            (_group and _group.express_checkout)
+            or (_invite and _invite.express_checkout)
+        )
 
         # Validate custom_fields against form field definitions
         if validate_custom_fields and app_data.custom_fields:
@@ -471,6 +493,16 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail={"message": "Invalid base fields", "errors": errors},
+                )
+
+        # Step 3 of REQ-GR-003: recipient_email match (case-insensitive).
+        # Deferred here so we have human.email available. Open invites (no
+        # recipient_email) skip this check entirely.
+        if _invite and _invite.recipient_email is not None:
+            if _invite.recipient_email.lower() != human.email.lower():
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="This invite is restricted to a different email address",
                 )
 
         # Validate group whitelist if group_id provided.
@@ -556,12 +588,13 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
             _referrals_crud.validate_for_use(_referral)
 
         # Auto-accept only when the group explicitly enables it via the
-        # auto_approve_applications flag, or when the referral enables it.
+        # auto_approve_applications flag, or when the referral/invite enables it.
         # Previously this triggered for any application with a group_id (implicit);
         # now the flag must be True. Design Decision 1f: NO retroactive changes.
         should_auto_accept = bool(
             (_group and _group.auto_approve_applications)
             or (_referral and _referral.auto_approve)
+            or (_invite and _invite.auto_approve)
         )
         if should_auto_accept:
             if human.red_flag:
@@ -641,6 +674,16 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
             )
             self.create_snapshot(session, application, event)
 
+        # Create snapshot for invite auto-accept/reject (mirrors group snapshot).
+        # No group membership is added — invite flow is purchase-only.
+        if _invite is not None and should_auto_accept:
+            event = (
+                "auto_rejected"
+                if application.status == ApplicationStatus.REJECTED.value
+                else "auto_accepted"
+            )
+            self.create_snapshot(session, application, event)
+
         # Sync membership junction: Application.group_id records origin (historical),
         # GroupMembers records currently-active membership. Keep them aligned on creation
         # so max_members validation and is_member() reflect the new application.
@@ -667,6 +710,21 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         if _referral is not None:
             _referral.current_uses += 1
             session.add(_referral)
+
+        # Apply invite discount and increment uses (REQ-GR-004).
+        # Membership side-effect is GROUP-only — invite NEVER adds to group_members.
+        # Inline the uses increment (mirror referral pattern) so all writes
+        # commit in a single transaction boundary via the session.commit() below.
+        if _invite is not None:
+            if _invite.discount_percentage:
+                application.discount_percentage = _invite.discount_percentage
+                session.add(application)
+            _invite.current_uses += 1
+            if _invite.used_at is None:
+                _invite.used_at = datetime.now(UTC)
+            if _invite.max_uses == 1:
+                _invite.redeemed_by_human_id = human_id
+            session.add(_invite)
 
         session.commit()
         session.refresh(application)
