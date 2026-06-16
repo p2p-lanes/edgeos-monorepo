@@ -2,6 +2,11 @@ import type { TenantPublic } from "@/client"
 
 const PORTAL_DOMAIN = import.meta.env.VITE_PORTAL_DOMAIN ?? ""
 
+/** http for localhost dev domains, https otherwise. */
+function schemeFor(host: string): string {
+  return host.includes("localhost") ? "http" : "https"
+}
+
 /** Returns the portal base URL for a tenant, or null if it can't be built. */
 export function getPortalBaseUrl(
   tenant:
@@ -11,10 +16,10 @@ export function getPortalBaseUrl(
 ): string | null {
   if (!tenant) return null
   if (tenant.custom_domain_active && tenant.custom_domain) {
-    return `https://${tenant.custom_domain}`
+    return `${schemeFor(tenant.custom_domain)}://${tenant.custom_domain}`
   }
   if (tenant.slug && PORTAL_DOMAIN) {
-    return `https://${tenant.slug}.${PORTAL_DOMAIN}`
+    return `${schemeFor(PORTAL_DOMAIN)}://${tenant.slug}.${PORTAL_DOMAIN}`
   }
   return null
 }
