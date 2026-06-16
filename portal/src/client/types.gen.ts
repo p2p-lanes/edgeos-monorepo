@@ -2761,6 +2761,7 @@ export type PopupAdmin = {
     invites_enabled?: boolean;
     referrals_enabled?: boolean;
     group_private_events_enabled?: boolean;
+    max_referrals_per_attendee?: (number | null);
     id: string;
 };
 
@@ -2858,6 +2859,7 @@ export type PopupPublic = {
     invites_enabled?: boolean;
     referrals_enabled?: boolean;
     group_private_events_enabled?: boolean;
+    max_referrals_per_attendee?: (number | null);
 };
 
 /**
@@ -2942,6 +2944,7 @@ export type PopupUpdate = {
     invites_enabled?: (boolean | null);
     referrals_enabled?: (boolean | null);
     group_private_events_enabled?: (boolean | null);
+    max_referrals_per_attendee?: (number | null);
 };
 
 /**

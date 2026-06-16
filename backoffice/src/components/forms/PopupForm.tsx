@@ -238,6 +238,8 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
       referrals_enabled: defaultValues?.referrals_enabled ?? false,
       group_private_events_enabled:
         defaultValues?.group_private_events_enabled ?? false,
+      max_referrals_per_attendee:
+        defaultValues?.max_referrals_per_attendee?.toString() ?? "10",
     },
     onSubmit: ({ value }) => {
       if (readOnly) return
@@ -299,6 +301,9 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
         invites_enabled: value.invites_enabled,
         referrals_enabled: value.referrals_enabled,
         group_private_events_enabled: value.group_private_events_enabled,
+        max_referrals_per_attendee: value.max_referrals_per_attendee
+          ? Number(value.max_referrals_per_attendee)
+          : null,
       }
       if (isEdit) {
         updateMutation.mutate(payload)
@@ -1375,6 +1380,36 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
               </InlineRow>
             )}
           </form.Field>
+
+          <form.Subscribe selector={(state) => state.values.referrals_enabled}>
+            {(referralsEnabled) =>
+              referralsEnabled ? (
+                <form.Field name="max_referrals_per_attendee">
+                  {(field) => (
+                    <InlineRow
+                      icon={
+                        <Share2 className="h-4 w-4 text-muted-foreground" />
+                      }
+                      label="Max referrals per attendee"
+                      description="How many people each attendee can refer (their referral link's use limit). Leave empty for unlimited."
+                    >
+                      <Input
+                        id="max_referrals_per_attendee"
+                        type="number"
+                        min="1"
+                        step="1"
+                        placeholder="e.g. 10"
+                        value={field.state.value}
+                        onChange={(e) => field.handleChange(e.target.value)}
+                        disabled={readOnly}
+                        className="max-w-[120px] text-sm"
+                      />
+                    </InlineRow>
+                  )}
+                </form.Field>
+              ) : null
+            }
+          </form.Subscribe>
 
           <form.Field name="group_private_events_enabled">
             {(field) => (

@@ -13094,6 +13094,18 @@ export const PopupAdminSchema = {
             title: 'Group Private Events Enabled',
             default: false
         },
+        max_referrals_per_attendee: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Max Referrals Per Attendee',
+            default: 10
+        },
         id: {
             type: 'string',
             format: 'uuid',
@@ -13841,6 +13853,18 @@ export const PopupPublicSchema = {
             type: 'boolean',
             title: 'Group Private Events Enabled',
             default: false
+        },
+        max_referrals_per_attendee: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Max Referrals Per Attendee',
+            default: 10
         }
     },
     type: 'object',
@@ -14491,6 +14515,17 @@ export const PopupUpdateSchema = {
                 }
             ],
             title: 'Group Private Events Enabled'
+        },
+        max_referrals_per_attendee: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Max Referrals Per Attendee'
         }
     },
     additionalProperties: false,

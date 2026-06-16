@@ -670,3 +670,166 @@ class TestReferralRLS:
         assert fetched_a.popup_id != fetched_b.popup_id
         assert fetched_a.tenant_id == tenant_a.id
         assert fetched_b.tenant_id == tenant_b.id
+
+
+# ---------------------------------------------------------------------------
+# Per-popup referral limit (1-link rule + max_uses from popup config)
+# ---------------------------------------------------------------------------
+
+
+class TestPerPopupReferralLimit:
+    """Per-popup 1-link-per-attendee rule and max_uses from popup config.
+
+    Product model: each attendee gets exactly ONE referral link per popup.
+    max_uses on that link = popup.max_referrals_per_attendee (default 10, null = unlimited).
+    """
+
+    def test_second_referral_by_same_human_returns_409(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+    ) -> None:
+        """1-link rule: second POST by same human in same popup → 409 Conflict."""
+        popup = _make_popup(db, tenant_a)
+        human = _make_human(db, tenant_a)
+        # Create first referral directly in DB
+        _make_referral(db, popup, human, code=f"first-{uuid.uuid4().hex[:8]}")
+        htok = _human_token(human)
+
+        resp = client.post(
+            "/api/v1/portal/referrals",
+            json={"popup_id": str(popup.id)},
+            headers=_auth(htok),
+        )
+        assert resp.status_code == 409, resp.json()
+        assert "already have a referral" in resp.json()["detail"]
+
+    def test_created_referral_gets_max_uses_from_popup_config(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+    ) -> None:
+        """Popup config max_referrals_per_attendee=5 sets max_uses=5 on the new referral."""
+        popup = _make_popup(db, tenant_a)
+        popup.max_referrals_per_attendee = 5
+        db.add(popup)
+        db.commit()
+        db.refresh(popup)
+
+        human = _make_human(db, tenant_a)
+        htok = _human_token(human)
+
+        resp = client.post(
+            "/api/v1/portal/referrals",
+            json={"popup_id": str(popup.id)},
+            headers=_auth(htok),
+        )
+        assert resp.status_code in (200, 201), resp.json()
+        assert resp.json()["max_uses"] == 5
+
+    def test_null_popup_config_creates_unlimited_referral(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+    ) -> None:
+        """Popup max_referrals_per_attendee=null → max_uses=null (unlimited)."""
+        popup = _make_popup(db, tenant_a)
+        popup.max_referrals_per_attendee = None
+        db.add(popup)
+        db.commit()
+        db.refresh(popup)
+
+        human = _make_human(db, tenant_a)
+        htok = _human_token(human)
+
+        resp = client.post(
+            "/api/v1/portal/referrals",
+            json={"popup_id": str(popup.id)},
+            headers=_auth(htok),
+        )
+        assert resp.status_code in (200, 201), resp.json()
+        assert resp.json()["max_uses"] is None
+
+    def test_popup_config_wins_over_body_max_uses(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+    ) -> None:
+        """Popup config max_uses=3 overrides any body-provided max_uses."""
+        popup = _make_popup(db, tenant_a)
+        popup.max_referrals_per_attendee = 3
+        db.add(popup)
+        db.commit()
+        db.refresh(popup)
+
+        human = _make_human(db, tenant_a)
+        htok = _human_token(human)
+
+        # Even if body passes max_uses=100, popup config (3) wins
+        resp = client.post(
+            "/api/v1/portal/referrals",
+            json={"popup_id": str(popup.id), "max_uses": 100},
+            headers=_auth(htok),
+        )
+        assert resp.status_code in (200, 201), resp.json()
+        assert resp.json()["max_uses"] == 3
+
+    def test_popup_update_accepts_max_referrals_per_attendee(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+        admin_user_tenant_a: Users,
+    ) -> None:
+        """PopupUpdate schema accepts max_referrals_per_attendee field."""
+        popup = _make_popup(db, tenant_a)
+        atk = _admin_token(admin_user_tenant_a)
+
+        resp = client.patch(
+            f"/api/v1/popups/{popup.id}",
+            json={"max_referrals_per_attendee": 15},
+            headers={**_auth(atk), "X-Tenant-Id": str(tenant_a.id)},
+        )
+        assert resp.status_code == 200, resp.json()
+        assert resp.json()["max_referrals_per_attendee"] == 15
+
+    def test_popup_update_rejects_zero_max_referrals(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+        admin_user_tenant_a: Users,
+    ) -> None:
+        """PopupUpdate validator rejects max_referrals_per_attendee < 1."""
+        popup = _make_popup(db, tenant_a)
+        atk = _admin_token(admin_user_tenant_a)
+
+        resp = client.patch(
+            f"/api/v1/popups/{popup.id}",
+            json={"max_referrals_per_attendee": 0},
+            headers={**_auth(atk), "X-Tenant-Id": str(tenant_a.id)},
+        )
+        assert resp.status_code == 422, resp.json()
+
+    def test_popup_update_accepts_null_max_referrals(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+        admin_user_tenant_a: Users,
+    ) -> None:
+        """PopupUpdate accepts null max_referrals_per_attendee (unlimited escape hatch)."""
+        popup = _make_popup(db, tenant_a)
+        atk = _admin_token(admin_user_tenant_a)
+
+        resp = client.patch(
+            f"/api/v1/popups/{popup.id}",
+            json={"max_referrals_per_attendee": None},
+            headers={**_auth(atk), "X-Tenant-Id": str(tenant_a.id)},
+        )
+        assert resp.status_code == 200, resp.json()
+        assert resp.json()["max_referrals_per_attendee"] is None

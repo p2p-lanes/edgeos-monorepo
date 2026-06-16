@@ -21,6 +21,13 @@ from app.api.referral.schemas import (
 from app.api.shared.crud import BaseCRUD
 
 
+class _UnsetType:
+    """Sentinel for distinguishing 'not passed' from None in max_uses_override."""
+
+
+_UNSET = _UnsetType()
+
+
 class ReferralsCRUD(BaseCRUD[Referrals, ReferralCreate, ReferralUpdate]):
     """CRUD operations for Referrals."""
 
@@ -97,10 +104,14 @@ class ReferralsCRUD(BaseCRUD[Referrals, ReferralCreate, ReferralUpdate]):
         *,
         tenant_id: uuid.UUID,
         referrer_human_id: uuid.UUID,
+        max_uses_override: int | None | type[_UNSET] = _UNSET,
     ) -> Referrals:
         """Create a referral, auto-generating code when not provided.
 
         Raises 409 if (popup_id, code) already exists.
+        When max_uses_override is provided (from popup.max_referrals_per_attendee),
+        it takes precedence over any value in obj_in.max_uses.
+        Pass None explicitly to mean unlimited (popup config says unlimited).
         """
         code = obj_in.code or generate_referral_code()
 
@@ -112,12 +123,18 @@ class ReferralsCRUD(BaseCRUD[Referrals, ReferralCreate, ReferralUpdate]):
                 detail="A referral with this code already exists for this popup",
             )
 
+        # Popup config wins when explicitly passed (even if None = unlimited).
+        # Falls back to obj_in.max_uses only when no override is given.
+        effective_max_uses = (
+            obj_in.max_uses if max_uses_override is _UNSET else max_uses_override
+        )
+
         referral = Referrals(
             tenant_id=tenant_id,
             popup_id=obj_in.popup_id,
             referrer_human_id=referrer_human_id,
             code=code,
-            max_uses=obj_in.max_uses,
+            max_uses=effective_max_uses,
             expires_at=obj_in.expires_at,
         )
         session.add(referral)

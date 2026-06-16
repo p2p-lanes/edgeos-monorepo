@@ -194,6 +194,9 @@ class PopupBase(SQLModel):
         default=False,
         sa_column=Column(Boolean, nullable=False, server_default="false"),
     )
+    # Per-attendee referral limit: max_uses applied to each referral link.
+    # null = unlimited. Default 10.
+    max_referrals_per_attendee: int | None = Field(default=10, nullable=True)
 
     @field_validator("currency")
     @classmethod
@@ -328,6 +331,7 @@ class PopupUpdate(SQLModel):
     invites_enabled: bool | None = None
     referrals_enabled: bool | None = None
     group_private_events_enabled: bool | None = None
+    max_referrals_per_attendee: int | None = None
 
     @field_validator("currency")
     @classmethod
@@ -339,6 +343,15 @@ class PopupUpdate(SQLModel):
     def validate_checkin_pass_lead_days(cls, value: int | None) -> int | None:
         if value is not None and value <= 0:
             raise ValueError("checkin_pass_lead_days must be a positive number of days")
+        return value
+
+    @field_validator("max_referrals_per_attendee")
+    @classmethod
+    def validate_max_referrals_per_attendee(cls, value: int | None) -> int | None:
+        if value is not None and value < 1:
+            raise ValueError(
+                "max_referrals_per_attendee must be a positive integer or null (unlimited)"
+            )
         return value
 
     @model_validator(mode="after")
@@ -411,6 +424,7 @@ class PopupPublic(SQLModel):
     invites_enabled: bool = False
     referrals_enabled: bool = False
     group_private_events_enabled: bool = False
+    max_referrals_per_attendee: int | None = 10
 
 
 class PopupAdmin(PopupBase):

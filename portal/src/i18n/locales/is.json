@@ -503,7 +503,8 @@
     "preview_no_expiry": "Engin gildistími",
     "preview_apply_button": "Sækja um",
     "preview_login_required_title": "Skráðu þig inn til að sækja um",
-    "preview_login_required_description": "Þu þarft að vera skráð/ur inn til að sækja um í gegnum þennan tilmælatengil."
+    "preview_login_required_description": "Þu þarft að vera skráð/ur inn til að sækja um í gegnum þennan tilmælatengil.",
+    "one_link_notice": "Þú ert nú þegar með tilmælatengil. Hver gestur fær einn tengil — deildu honum til að bjóða öðrum."
   },
   "invite": {
     "loading": "Loading invite...",

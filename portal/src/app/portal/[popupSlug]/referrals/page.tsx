@@ -186,6 +186,8 @@ const ReferralsPage = () => {
   }
 
   const referrals = data?.results ?? []
+  // 1-link-per-attendee rule: hide Create once the human has a referral
+  const hasReferral = referrals.length > 0
 
   return (
     <div className="max-w-2xl mx-auto p-6 space-y-6">
@@ -198,17 +200,19 @@ const ReferralsPage = () => {
             {t("referrals.description")}
           </p>
         </div>
-        <Button
-          onClick={() => createMutation.mutate()}
-          disabled={createMutation.isPending}
-        >
-          {createMutation.isPending ? (
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-          ) : null}
-          {createMutation.isPending
-            ? t("referrals.creating")
-            : t("referrals.create_referral")}
-        </Button>
+        {!hasReferral && (
+          <Button
+            onClick={() => createMutation.mutate()}
+            disabled={createMutation.isPending}
+          >
+            {createMutation.isPending ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : null}
+            {createMutation.isPending
+              ? t("referrals.creating")
+              : t("referrals.create_referral")}
+          </Button>
+        )}
       </div>
 
       {isLoading ? (
@@ -222,19 +226,26 @@ const ReferralsPage = () => {
           </p>
         </div>
       ) : (
-        <div className="space-y-2">
-          {referrals.map((ref) => (
-            <ReferralRow
-              key={ref.id}
-              referral={ref}
-              onDeleted={() =>
-                queryClient.invalidateQueries({
-                  queryKey: ["referrals", "mine", city?.id ?? ""],
-                })
-              }
-            />
-          ))}
-        </div>
+        <>
+          {hasReferral && (
+            <p className="text-sm text-muted-foreground">
+              {t("referrals.one_link_notice")}
+            </p>
+          )}
+          <div className="space-y-2">
+            {referrals.map((ref) => (
+              <ReferralRow
+                key={ref.id}
+                referral={ref}
+                onDeleted={() =>
+                  queryClient.invalidateQueries({
+                    queryKey: ["referrals", "mine", city?.id ?? ""],
+                  })
+                }
+              />
+            ))}
+          </div>
+        </>
       )}
     </div>
   )

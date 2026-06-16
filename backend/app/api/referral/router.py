@@ -97,11 +97,23 @@ async def create_referral(
             detail="Referral-based applications are not enabled for this popup",
         )
 
+    # 1-link-per-attendee rule: reject if the human already has a referral
+    _, existing_count = referrals_crud.find_by_human(
+        db, current_human.id, body.popup_id, limit=1
+    )
+    if existing_count >= 1:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="You already have a referral link for this popup.",
+        )
+
+    # popup config always sets max_uses (even None = unlimited overrides body)
     referral = referrals_crud.create_referral(
         db,
         body,
         tenant_id=popup.tenant_id,
         referrer_human_id=current_human.id,
+        max_uses_override=popup.max_referrals_per_attendee,
     )
     return ReferralPublic.model_validate(referral)
 

@@ -527,7 +527,8 @@
     "preview_no_expiry": "Sin vencimiento",
     "preview_apply_button": "Aplicar ahora",
     "preview_login_required_title": "Ingresa para aplicar",
-    "preview_login_required_description": "Necesitas iniciar sesión para aplicar a través de este enlace de referido."
+    "preview_login_required_description": "Necesitas iniciar sesión para aplicar a través de este enlace de referido.",
+    "one_link_notice": "Ya tienes un enlace de referido. Cada asistente obtiene un enlace: compártelo para invitar a otros."
   },
   "invite": {
     "loading": "Cargando invitación...",
