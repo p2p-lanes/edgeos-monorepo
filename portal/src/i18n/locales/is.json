@@ -490,6 +490,7 @@
     "link_copied": "Link copied to clipboard.",
     "referrals_disabled": "Referrals are not enabled for this popup.",
     "not_accepted": "Referral links are available once your application is accepted.",
+    "needs_ticket": "Tilvísunartenglar verða aðgengilegir þegar þú ert með miða á þennan viðburð.",
     "preview_loading": "Hleð tilmæli...",
     "preview_not_found_title": "Tilmæli fannst ekki",
     "preview_not_found_description": "Þessi tengill er ekki gildur, útrunninn eða ekki lengur tiltækur.",

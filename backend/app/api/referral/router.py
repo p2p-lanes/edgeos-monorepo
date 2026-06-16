@@ -97,6 +97,20 @@ async def create_referral(
             detail="Referral-based applications are not enabled for this popup",
         )
 
+    # Anti-abuse gate: only confirmed attendees who actually hold a ticket for
+    # this popup may create a referral link. Prevents someone who just arrived
+    # via an invite/referral link (and was auto-approved) from immediately
+    # spawning their own referrals without committing to an entry.
+    from app.api.attendee.crud import attendees_crud
+
+    if not attendees_crud.human_has_ticket_in_popup(
+        db, current_human.id, body.popup_id
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You need a ticket for this popup to create a referral link.",
+        )
+
     # 1-link-per-attendee rule: reject if the human already has a referral
     _, existing_count = referrals_crud.find_by_human(
         db, current_human.id, body.popup_id, limit=1

@@ -516,6 +516,7 @@
     "link_copied": "Link copied to clipboard.",
     "referrals_disabled": "Referrals are not enabled for this popup.",
     "not_accepted": "Referral links are available once your application is accepted.",
+    "needs_ticket": "Referral links are available once you have a ticket for this event.",
     "preview_loading": "Loading referral...",
     "preview_not_found_title": "Referral not found",
     "preview_not_found_description": "This referral link is invalid, expired, or no longer available.",

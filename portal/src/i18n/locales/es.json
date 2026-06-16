@@ -514,6 +514,7 @@
     "link_copied": "Enlace copiado al portapapeles.",
     "referrals_disabled": "Los referidos no están habilitados para este popup.",
     "not_accepted": "Los enlaces de referido están disponibles una vez que tu solicitud sea aceptada.",
+    "needs_ticket": "Los enlaces de referido están disponibles una vez que tengas una entrada para este evento.",
     "preview_loading": "Cargando referido...",
     "preview_not_found_title": "Referido no encontrado",
     "preview_not_found_description": "Este enlace de referido no es válido, ha vencido o ya no está disponible.",

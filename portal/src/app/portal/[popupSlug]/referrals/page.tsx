@@ -144,13 +144,18 @@ const ReferralsPage = () => {
   const queryClient = useQueryClient()
   const { getRelevantApplication } = useApplication()
   const application = getRelevantApplication()
-  const isAccepted = application?.status === "accepted"
+  // Only attendees who actually hold a ticket for this popup may create a
+  // referral link (anti-abuse — mirrors the backend gate). Acceptance alone is
+  // not enough: invite/referral arrivals are auto-accepted without committing.
+  const hasTicket = !!application?.attendees?.some(
+    (a) => ((a.products as unknown[] | undefined) ?? []).length > 0,
+  )
 
   const { data, isLoading } = useQuery({
     queryKey: ["referrals", "mine", city?.id ?? ""],
     queryFn: () =>
       ReferralsService.listMyReferrals({ popupId: city!.id, limit: 100 }),
-    enabled: !!city?.id && isAccepted,
+    enabled: !!city?.id && hasTicket,
   })
 
   const createMutation = useMutation({
@@ -175,11 +180,11 @@ const ReferralsPage = () => {
     },
   })
 
-  if (!isAccepted) {
+  if (!hasTicket) {
     return (
       <div className="max-w-2xl mx-auto p-6">
         <p className="text-sm text-muted-foreground">
-          {t("referrals.not_accepted")}
+          {t("referrals.needs_ticket")}
         </p>
       </div>
     )

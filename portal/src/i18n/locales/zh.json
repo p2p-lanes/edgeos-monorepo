@@ -500,6 +500,7 @@
     "link_copied": "Link copied to clipboard.",
     "referrals_disabled": "Referrals are not enabled for this popup.",
     "not_accepted": "Referral links are available once your application is accepted.",
+    "needs_ticket": "拥有本活动门票后即可使用推荐链接。",
     "preview_loading": "正在加载推荐...",
     "preview_not_found_title": "推荐链接未找到",
     "preview_not_found_description": "此推荐链接无效、已过期或不再可用。",

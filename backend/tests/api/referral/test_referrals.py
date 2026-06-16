@@ -22,8 +22,10 @@ from decimal import Decimal
 from fastapi.testclient import TestClient
 from sqlmodel import Session
 
+from app.api.attendee.models import AttendeeProducts, Attendees
 from app.api.human.models import Humans
 from app.api.popup.models import Popups
+from app.api.product.models import Products
 from app.api.referral.models import Referrals
 from app.api.tenant.models import Tenants
 from app.api.user.models import Users
@@ -75,6 +77,42 @@ def _make_human(db: Session, tenant: Tenants, email: str | None = None) -> Human
     db.commit()
     db.refresh(human)
     return human
+
+
+def _give_ticket(db: Session, popup: Popups, human: Humans) -> AttendeeProducts:
+    """Give `human` a ticket (attendee_product) in `popup`.
+
+    Referral creation is gated on the human actually holding a ticket, so tests
+    that exercise the create flow must seed one first.
+    """
+    product = Products(
+        tenant_id=popup.tenant_id,
+        popup_id=popup.id,
+        name="Ticket",
+        slug=f"tkt-{uuid.uuid4().hex[:8]}",
+        price=Decimal("0"),
+        category="ticket",
+    )
+    db.add(product)
+    db.flush()
+    attendee = Attendees(
+        tenant_id=popup.tenant_id,
+        popup_id=popup.id,
+        human_id=human.id,
+        name="Ref Tester",
+        email=human.email,
+    )
+    db.add(attendee)
+    db.flush()
+    ap = AttendeeProducts(
+        tenant_id=popup.tenant_id,
+        attendee_id=attendee.id,
+        product_id=product.id,
+        check_in_code=uuid.uuid4().hex[:8].upper(),
+    )
+    db.add(ap)
+    db.commit()
+    return ap
 
 
 def _make_referral(
@@ -168,6 +206,7 @@ class TestReferralPortalCRUD:
         """REQ-GR-008: Human creates referral; code auto-generated when omitted."""
         popup = _make_popup(db, tenant_a)
         human = _make_human(db, tenant_a)
+        _give_ticket(db, popup, human)
         htok = _human_token(human)
 
         resp = client.post(
@@ -182,6 +221,24 @@ class TestReferralPortalCRUD:
         assert body["popup_id"] == str(popup.id)
         assert body["referrer_human_id"] == str(human.id)
 
+    def test_human_without_ticket_cannot_create_referral(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+    ) -> None:
+        """Anti-abuse gate: no ticket in the popup → 403 (cannot create referral)."""
+        popup = _make_popup(db, tenant_a)
+        human = _make_human(db, tenant_a)  # no _give_ticket
+        htok = _human_token(human)
+
+        resp = client.post(
+            "/api/v1/portal/referrals",
+            json={"popup_id": str(popup.id)},
+            headers=_auth(htok),
+        )
+        assert resp.status_code == 403, resp.json()
+
     def test_human_can_create_referral_with_explicit_code(
         self,
         client: TestClient,
@@ -191,6 +248,7 @@ class TestReferralPortalCRUD:
         """Custom code accepted when provided and unique."""
         popup = _make_popup(db, tenant_a)
         human = _make_human(db, tenant_a)
+        _give_ticket(db, popup, human)
         htok = _human_token(human)
         explicit_code = f"custom-{uuid.uuid4().hex[:12]}"
 
@@ -211,6 +269,7 @@ class TestReferralPortalCRUD:
         """REQ-GR-008 scenario: duplicate code within popup → 409 Conflict."""
         popup = _make_popup(db, tenant_a)
         human = _make_human(db, tenant_a)
+        _give_ticket(db, popup, human)
         dup_code = f"dup-{uuid.uuid4().hex[:12]}"
         _make_referral(db, popup, human, code=dup_code)
 
@@ -693,6 +752,7 @@ class TestPerPopupReferralLimit:
         """1-link rule: second POST by same human in same popup → 409 Conflict."""
         popup = _make_popup(db, tenant_a)
         human = _make_human(db, tenant_a)
+        _give_ticket(db, popup, human)
         # Create first referral directly in DB
         _make_referral(db, popup, human, code=f"first-{uuid.uuid4().hex[:8]}")
         htok = _human_token(human)
@@ -719,6 +779,7 @@ class TestPerPopupReferralLimit:
         db.refresh(popup)
 
         human = _make_human(db, tenant_a)
+        _give_ticket(db, popup, human)
         htok = _human_token(human)
 
         resp = client.post(
@@ -743,6 +804,7 @@ class TestPerPopupReferralLimit:
         db.refresh(popup)
 
         human = _make_human(db, tenant_a)
+        _give_ticket(db, popup, human)
         htok = _human_token(human)
 
         resp = client.post(
@@ -767,6 +829,7 @@ class TestPerPopupReferralLimit:
         db.refresh(popup)
 
         human = _make_human(db, tenant_a)
+        _give_ticket(db, popup, human)
         htok = _human_token(human)
 
         # Even if body passes max_uses=100, popup config (3) wins
