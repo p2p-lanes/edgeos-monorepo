@@ -46,6 +46,7 @@ interface DayBodyProps {
   mineOnly?: boolean
   tags?: string[]
   trackIds?: string[]
+  venueIds?: string[]
   selectedDate: Date | null
   onSelectedDateChange: (date: Date) => void
   /** Fallback when no `?date=` URL param is present. Defaults to today. */
@@ -141,6 +142,7 @@ export function DayBody({
   mineOnly,
   tags,
   trackIds,
+  venueIds,
   selectedDate: selectedDateProp,
   onSelectedDateChange,
   defaultDate,
@@ -237,6 +239,7 @@ export function DayBody({
       search,
       tags,
       trackIds,
+      venueIds,
     ],
     // Fetch every event of the day window across all pages (no cap) so a busy
     // day never silently truncates. Returns the merged, globally sorted list.
@@ -251,6 +254,7 @@ export function DayBody({
         search: search || undefined,
         tags: tags?.length ? tags : undefined,
         trackIds: trackIds?.length ? trackIds : undefined,
+        venueIds: venueIds?.length ? venueIds : undefined,
       }),
     }),
     enabled: isAuthed && !useOverride && !!popupId,

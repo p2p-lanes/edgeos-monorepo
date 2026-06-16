@@ -53,6 +53,7 @@ interface CalendarBodyProps {
   mineOnly?: boolean
   tags?: string[]
   trackIds?: string[]
+  venueIds?: string[]
   /** Initial month + selected day. Defaults to today before the popup loads. */
   defaultDate?: Date | null
   /**
@@ -105,6 +106,7 @@ export function CalendarBody({
   mineOnly,
   tags,
   trackIds,
+  venueIds,
   defaultDate,
   onEventLinkClick,
   mode = "authed",
@@ -178,6 +180,7 @@ export function CalendarBody({
       search,
       tags,
       trackIds,
+      venueIds,
     ],
     queryFn: () =>
       EventsService.portalCalendarSummary({
@@ -189,6 +192,7 @@ export function CalendarBody({
         search: search || undefined,
         tags: tags?.length ? tags : undefined,
         trackIds: trackIds?.length ? trackIds : undefined,
+        venueIds: venueIds?.length ? venueIds : undefined,
       }),
     enabled: isAuthed && !useOverride && !!popupId && !tzLoading,
   })
@@ -231,6 +235,7 @@ export function CalendarBody({
       search,
       tags,
       trackIds,
+      venueIds,
     ],
     queryFn: () =>
       fetchAllPortalEvents({
@@ -243,6 +248,7 @@ export function CalendarBody({
         search: search || undefined,
         tags: tags?.length ? tags : undefined,
         trackIds: trackIds?.length ? trackIds : undefined,
+        venueIds: venueIds?.length ? venueIds : undefined,
       }),
     enabled:
       isAuthed && !useOverride && !!popupId && !tzLoading && !!selectedWindow,
