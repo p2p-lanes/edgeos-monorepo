@@ -4757,6 +4757,7 @@ export type EventsPublicCalendarIcsResponse = (unknown);
 
 export type EventsListEventsData = {
     eventStatus?: (EventStatus | null);
+    excludeStatuses?: (Array<EventStatus> | null);
     kind?: (string | null);
     /**
      * Maximum number of items to return

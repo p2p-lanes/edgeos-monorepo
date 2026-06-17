@@ -90,15 +90,12 @@ import {
   useTableSearchParams,
   validateTableSearch,
 } from "@/hooks/useTableSearchParams"
+import {
+  type EventStatusFilter,
+  resolveStatusFilter,
+  VALID_EVENT_STATUS_FILTERS,
+} from "@/lib/events/statusFilter"
 import { createErrorHandler } from "@/utils"
-
-const VALID_EVENT_STATUSES: Set<string> = new Set([
-  "draft",
-  "published",
-  "cancelled",
-  "pending_approval",
-  "rejected",
-])
 
 const EVENT_STATUS_OPTIONS: { value: EventStatus; label: string }[] = [
   { value: "draft", label: "Draft" },
@@ -139,7 +136,7 @@ function readStoredEventsView(): EventsView | null {
 }
 
 type EventsSearchParams = TableSearchParams & {
-  status?: EventStatus
+  status?: EventStatusFilter
   visibility?: EventVisibility
   venueId?: string
   creatorId?: string
@@ -153,8 +150,9 @@ export const Route = createFileRoute("/_layout/events/")({
   component: EventsPage,
   validateSearch: (raw: Record<string, unknown>): EventsSearchParams => ({
     ...validateTableSearch(raw),
-    ...(typeof raw.status === "string" && VALID_EVENT_STATUSES.has(raw.status)
-      ? { status: raw.status as EventStatus }
+    ...(typeof raw.status === "string" &&
+    VALID_EVENT_STATUS_FILTERS.has(raw.status)
+      ? { status: raw.status as EventStatusFilter }
       : {}),
     ...(typeof raw.visibility === "string" &&
     VALID_EVENT_VISIBILITIES.has(raw.visibility)
@@ -532,24 +530,23 @@ function buildEventColumns(
   ]
 }
 
-function EventStatusFilter({
+function EventStatusSelect({
   selected,
   onSelect,
 }: {
-  selected: EventStatus | undefined
-  onSelect: (value: EventStatus | undefined) => void
+  selected: EventStatusFilter | undefined
+  onSelect: (value: EventStatusFilter | undefined) => void
 }) {
   return (
     <Select
-      value={selected ?? "all"}
-      onValueChange={(v) =>
-        onSelect(v === "all" ? undefined : (v as EventStatus))
-      }
+      value={selected ?? "active"}
+      onValueChange={(v) => onSelect(v as EventStatusFilter)}
     >
       <SelectTrigger className="h-9 w-[150px]">
-        <SelectValue placeholder="All statuses" />
+        <SelectValue placeholder="Active Events" />
       </SelectTrigger>
       <SelectContent>
+        <SelectItem value="active">Active Events</SelectItem>
         <SelectItem value="all">All statuses</SelectItem>
         {EVENT_STATUS_OPTIONS.map((opt) => (
           <SelectItem key={opt.value} value={opt.value}>
@@ -832,12 +829,13 @@ function EventsTableContent({
     searchParams
 
   const setStatus = useCallback(
-    (value: EventStatus | undefined) => {
+    (value: EventStatusFilter | undefined) => {
       navigate({
         to: "/events",
         search: (prev: Record<string, unknown>) => ({
           ...prev,
-          status: value,
+          // "active" is the default preset, so keep it out of the URL.
+          status: value === "active" ? undefined : value,
           page: 0,
         }),
         replace: true,
@@ -1000,13 +998,15 @@ function EventsTableContent({
         popupTz,
       },
     ],
-    queryFn: () =>
-      EventsService.listEvents({
+    queryFn: () => {
+      const { eventStatus, excludeStatuses } = resolveStatusFilter(status)
+      return EventsService.listEvents({
         popupId: selectedPopupId!,
         search: search || undefined,
         skip: pagination.pageIndex * pagination.pageSize,
         limit: pagination.pageSize,
-        eventStatus: status,
+        eventStatus,
+        excludeStatuses,
         visibility,
         venueId:
           venueId && venueId !== "custom" && venueId !== "meeting"
@@ -1017,7 +1017,8 @@ function EventsTableContent({
         ownerId: creatorId || undefined,
         startAfter: filterStartAfter,
         startBefore: filterStartBefore,
-      }),
+      })
+    },
     enabled: !!selectedPopupId && !popupSettingsLoading,
     placeholderData: keepPreviousData,
   })
@@ -1075,7 +1076,7 @@ function EventsTableContent({
         }}
         filterBar={
           <div className="flex flex-wrap items-center gap-2">
-            <EventStatusFilter selected={status} onSelect={setStatus} />
+            <EventStatusSelect selected={status} onSelect={setStatus} />
             <EventVisibilityFilter
               selected={visibility}
               onSelect={setVisibility}
@@ -1143,10 +1144,10 @@ function CalendarDayToolbar({
   setSearch,
 }: {
   popupId: string
-  status: EventStatus | undefined
+  status: EventStatusFilter | undefined
   venueId: string | undefined
   search: string
-  setStatus: (value: EventStatus | undefined) => void
+  setStatus: (value: EventStatusFilter | undefined) => void
   setVenueId: (value: string | undefined) => void
   setSearch: (value: string) => void
 }) {
@@ -1192,7 +1193,7 @@ function CalendarDayToolbar({
         )}
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        <EventStatusFilter selected={status} onSelect={setStatus} />
+        <EventStatusSelect selected={status} onSelect={setStatus} />
         <EventVenueFilter
           venues={venues?.results ?? []}
           selected={venueId}
@@ -1316,12 +1317,13 @@ function EventsPage() {
   )
 
   const setStatusGlobal = useCallback(
-    (value: EventStatus | undefined) => {
+    (value: EventStatusFilter | undefined) => {
       navigate({
         to: "/events",
         search: (prev: Record<string, unknown>) => ({
           ...prev,
-          status: value,
+          // "active" is the default preset, so keep it out of the URL.
+          status: value === "active" ? undefined : value,
           page: 0,
         }),
         replace: true,
@@ -1389,15 +1391,20 @@ function EventsPage() {
             )}
             {view === "list" && (
               <div className="space-y-3">
-                <CalendarDayToolbar
-                  popupId={selectedPopupId}
-                  status={searchParams.status}
-                  venueId={searchParams.venueId}
-                  search={searchParams.search ?? ""}
-                  setStatus={setStatusGlobal}
-                  setVenueId={setVenueIdGlobal}
-                  setSearch={setSearchGlobal}
-                />
+                {/* Keep the search + filters pinned under the app top bar
+                    (h-16) so they stay reachable while scrolling a long list.
+                    Frosted white background covers the cards passing beneath. */}
+                <div className="sticky top-16 z-10 -mx-6 border-b bg-background/95 px-6 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/80 md:-mx-8 md:px-8">
+                  <CalendarDayToolbar
+                    popupId={selectedPopupId}
+                    status={searchParams.status}
+                    venueId={searchParams.venueId}
+                    search={searchParams.search ?? ""}
+                    setStatus={setStatusGlobal}
+                    setVenueId={setVenueIdGlobal}
+                    setSearch={setSearchGlobal}
+                  />
+                </div>
                 <EventsListView
                   popupId={selectedPopupId}
                   status={searchParams.status}

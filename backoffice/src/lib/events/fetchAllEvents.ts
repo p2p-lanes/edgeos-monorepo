@@ -7,6 +7,8 @@ export interface FetchAllEventsParams {
   popupId: string
   /** Omit for all statuses (backoffice default). */
   eventStatus?: EventStatus
+  /** Statuses to exclude (e.g. the "Active Events" preset drops terminal ones). */
+  excludeStatuses?: EventStatus[]
   venueId?: string
   locationKind?: "custom" | "meeting"
   startAfter?: string
@@ -39,6 +41,7 @@ export async function fetchAllEvents(
     const { results, paging } = await EventsService.listEvents({
       popupId: params.popupId,
       eventStatus: params.eventStatus,
+      excludeStatuses: params.excludeStatuses,
       venueId: params.venueId,
       locationKind: params.locationKind,
       startAfter: params.startAfter,

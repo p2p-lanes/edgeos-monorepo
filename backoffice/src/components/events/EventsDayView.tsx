@@ -16,12 +16,7 @@ import {
 } from "lucide-react"
 import { Fragment, useEffect, useMemo, useRef, useState } from "react"
 
-import {
-  type EventPublic,
-  type EventStatus,
-  EventsService,
-  EventVenuesService,
-} from "@/client"
+import { type EventPublic, EventsService, EventVenuesService } from "@/client"
 import { Button } from "@/components/ui/button"
 import { Calendar } from "@/components/ui/calendar"
 import {
@@ -29,13 +24,17 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover"
+import {
+  type EventStatusFilter,
+  resolveStatusFilter,
+} from "@/lib/events/statusFilter"
 import { summarizeRrule } from "@/lib/events/summarizeRrule"
 import { useEventTimezone } from "@/lib/events/useEventTimezone"
 import { cn } from "@/lib/utils"
 
 interface EventsDayViewProps {
   popupId: string
-  status: EventStatus | undefined
+  status: EventStatusFilter | undefined
   venueId: string | undefined
   search: string
   selectedDate: Date | null
@@ -168,7 +167,7 @@ export function EventsDayView({
     queryFn: () =>
       EventsService.listEvents({
         popupId,
-        eventStatus: status,
+        ...resolveStatusFilter(status),
         venueId:
           venueId && venueId !== "custom" && venueId !== "meeting"
             ? venueId
