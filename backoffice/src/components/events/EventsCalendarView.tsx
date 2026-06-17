@@ -24,9 +24,13 @@ import {
   Users,
 } from "lucide-react"
 import { useEffect, useRef, useState } from "react"
-import type { EventPublic, EventStatus } from "@/client"
+import type { EventPublic } from "@/client"
 import { Button } from "@/components/ui/button"
 import { fetchAllEvents } from "@/lib/events/fetchAllEvents"
+import {
+  type EventStatusFilter,
+  resolveStatusFilter,
+} from "@/lib/events/statusFilter"
 import { summarizeRrule } from "@/lib/events/summarizeRrule"
 import { useEventTimezone } from "@/lib/events/useEventTimezone"
 import { cn } from "@/lib/utils"
@@ -35,7 +39,7 @@ import { EventBadges } from "./EventBadges"
 
 interface EventsCalendarViewProps {
   popupId: string
-  status: EventStatus | undefined
+  status: EventStatusFilter | undefined
   venueId: string | undefined
   search: string
   defaultDate?: Date | null
@@ -152,7 +156,7 @@ export function EventsCalendarView({
     queryFn: () =>
       fetchAllEvents({
         popupId,
-        eventStatus: status,
+        ...resolveStatusFilter(status),
         venueId:
           venueId && venueId !== "custom" && venueId !== "meeting"
             ? venueId

@@ -10,6 +10,7 @@ from app.api.event_settings.schemas import (
 )
 from app.core.dependencies.users import (
     CurrentHuman,
+    CurrentUser,
     CurrentWriter,
     HumanTenantSession,
     TenantSession,
@@ -22,7 +23,7 @@ router = APIRouter(prefix="/event-settings", tags=["event-settings"])
 async def get_event_settings(
     popup_id: uuid.UUID,
     db: TenantSession,
-    _: CurrentWriter,
+    _: CurrentUser,
 ) -> EventSettingsPublic:
     """Get event settings for a popup (backoffice)."""
     settings = crud.event_settings_crud.get_by_popup_id(db, popup_id)

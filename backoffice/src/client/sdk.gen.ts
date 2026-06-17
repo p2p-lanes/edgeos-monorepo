@@ -2869,6 +2869,7 @@ export class EventsService {
      * @param data The data for the request.
      * @param data.popupId
      * @param data.eventStatus
+     * @param data.excludeStatuses
      * @param data.visibility
      * @param data.kind
      * @param data.venueId
@@ -2894,6 +2895,7 @@ export class EventsService {
             query: {
                 popup_id: data.popupId,
                 event_status: data.eventStatus,
+                exclude_statuses: data.excludeStatuses,
                 visibility: data.visibility,
                 kind: data.kind,
                 venue_id: data.venueId,
