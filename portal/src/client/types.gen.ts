@@ -21,6 +21,21 @@ export type AddMemberByApplicationRequest = {
 };
 
 /**
+ * Result of a leader adding a member by email (Portal).
+ *
+ * - status="added": the email belonged to an existing human, now a member.
+ * - status="invited": the email is not registered yet, so it was whitelisted.
+ * The human auto-joins the group when they sign up.
+ */
+export type AddMemberResult = {
+    status: 'added' | 'invited';
+    email: string;
+    member?: (GroupMemberPublic | null);
+};
+
+export type status = 'added' | 'invited';
+
+/**
  * Request body for minting a new admin API key.
  */
 export type AdminApiKeyCreate = {
@@ -1811,8 +1826,6 @@ export type GroupAdminUpdate = {
     discount_percentage?: (number | string | null);
     max_members?: (number | null);
     welcome_message?: (string | null);
-    is_ambassador_group?: (boolean | null);
-    ambassador_id?: (string | null);
     whitelisted_emails?: (Array<(string)> | null);
     auto_approve_applications?: (boolean | null);
     express_checkout?: (boolean | null);
@@ -1830,9 +1843,14 @@ export type GroupCreate = {
     discount_percentage?: (number | string);
     max_members?: (number | null);
     welcome_message?: (string | null);
-    is_ambassador_group?: boolean;
-    ambassador_id?: (string | null);
     whitelisted_emails?: (Array<(string)> | null);
+};
+
+/**
+ * Request body for POST /groups/{id}/leaders (BO admin).
+ */
+export type GroupLeaderAssign = {
+    human_id: string;
 };
 
 /**
@@ -1856,6 +1874,7 @@ export type GroupMemberBatchResult = {
     role?: (string | null);
     gender?: (string | null);
     local_resident?: (boolean | null);
+    is_leader?: boolean;
     products?: Array<unknown>;
     success: boolean;
     err_msg?: (string | null);
@@ -1874,6 +1893,16 @@ export type GroupMemberCreate = {
 };
 
 /**
+ * Schema for inviting a member to a group by email (Portal leader).
+ *
+ * Only the email is needed: an existing human is added using their own
+ * profile (never overwritten); an unregistered email is whitelisted.
+ */
+export type GroupMemberInvite = {
+    email: string;
+};
+
+/**
  * Schema for member response with products.
  */
 export type GroupMemberPublic = {
@@ -1886,6 +1915,7 @@ export type GroupMemberPublic = {
     role?: (string | null);
     gender?: (string | null);
     local_resident?: (boolean | null);
+    is_leader?: boolean;
     products?: Array<unknown>;
 };
 
@@ -1913,8 +1943,6 @@ export type GroupPublic = {
     discount_percentage?: string;
     max_members?: (number | null);
     welcome_message?: (string | null);
-    is_ambassador_group?: boolean;
-    ambassador_id?: (string | null);
     auto_approve_applications?: boolean;
     express_checkout?: boolean;
     enable_private_events?: boolean;
@@ -1980,8 +2008,6 @@ export type GroupWithMembers = {
     discount_percentage?: string;
     max_members?: (number | null);
     welcome_message?: (string | null);
-    is_ambassador_group?: boolean;
-    ambassador_id?: (string | null);
     auto_approve_applications?: boolean;
     express_checkout?: boolean;
     enable_private_events?: boolean;
@@ -2003,7 +2029,6 @@ export type HardDeleteSummary = {
     application_snapshots: number;
     carts: number;
     group_memberships: number;
-    ambassador_groups: number;
 };
 
 export type HTTPValidationError = {
@@ -2427,8 +2452,6 @@ export type MyGroupPublic = {
     discount_percentage?: string;
     max_members?: (number | null);
     welcome_message?: (string | null);
-    is_ambassador_group?: boolean;
-    ambassador_id?: (string | null);
     auto_approve_applications?: boolean;
     express_checkout?: boolean;
     enable_private_events?: boolean;
@@ -2452,8 +2475,6 @@ export type MyGroupWithMembers = {
     discount_percentage?: string;
     max_members?: (number | null);
     welcome_message?: (string | null);
-    is_ambassador_group?: boolean;
-    ambassador_id?: (string | null);
     auto_approve_applications?: boolean;
     express_checkout?: boolean;
     enable_private_events?: boolean;
@@ -5604,6 +5625,22 @@ export type GroupsDeleteGroupData = {
 
 export type GroupsDeleteGroupResponse = (void);
 
+export type GroupsAssignGroupLeaderData = {
+    groupId: string;
+    requestBody: GroupLeaderAssign;
+    xTenantId?: (string | null);
+};
+
+export type GroupsAssignGroupLeaderResponse = (GroupWithMembers);
+
+export type GroupsRemoveGroupLeaderData = {
+    groupId: string;
+    humanId: string;
+    xTenantId?: (string | null);
+};
+
+export type GroupsRemoveGroupLeaderResponse = (GroupWithMembers);
+
 export type GroupsListMyGroupsData = {
     /**
      * Maximum number of items to return
@@ -5632,10 +5669,10 @@ export type GroupsUpdateMyGroupResponse = (GroupPublic);
 
 export type GroupsAddGroupMemberData = {
     groupId: string;
-    requestBody: GroupMemberCreate;
+    requestBody: GroupMemberInvite;
 };
 
-export type GroupsAddGroupMemberResponse = (GroupMemberPublic);
+export type GroupsAddGroupMemberResponse = (AddMemberResult);
 
 export type GroupsAddGroupMembersBatchData = {
     groupId: string;

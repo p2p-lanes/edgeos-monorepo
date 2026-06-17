@@ -81,14 +81,11 @@ const TeamHeader = ({
     }
   }
 
-  const isAmbassadorGroup = group.is_ambassador_group
   const isLeader = group.is_leader ?? false
 
-  const roleBadgeLabel = isAmbassadorGroup
-    ? t("groups.role_ambassador")
-    : isLeader
-      ? t("groups.role_leader")
-      : t("groups.role_member")
+  const roleBadgeLabel = isLeader
+    ? t("groups.role_leader")
+    : t("groups.role_member")
 
   return (
     <div className="space-y-6">
@@ -115,7 +112,7 @@ const TeamHeader = ({
         </div>
 
         <div className="flex gap-3 flex-wrap">
-          {!isAmbassadorGroup && isLeader && (
+          {isLeader && (
             <>
               <Button
                 variant="outline"
@@ -146,16 +143,6 @@ const TeamHeader = ({
               </>
             )}
           </Button>
-
-          {/* {isAmbassadorGroup && (
-            <Button
-              variant="outline"
-              className="bg-white"
-              onClick={() => setIsWelcomeMessageModalOpen(true)}
-            >
-              <Edit className="w-4 h-4" /> Edit Welcome Message
-            </Button>
-          )} */}
         </div>
       </div>
 

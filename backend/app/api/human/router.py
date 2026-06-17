@@ -293,9 +293,9 @@ async def delete_human(
 ) -> HardDeleteSummary:
     """Permanently delete a Human with full cascade.
 
-    Removes applications, attendees, payments, products, carts, group
-    memberships, and ambassador-owned groups in a single transaction. Designed
-    for cleaning up test users — destructive and irreversible.
+    Removes applications, attendees, payments, products, carts, and group
+    memberships in a single transaction. Designed for cleaning up test users —
+    destructive and irreversible.
 
     Superadmins may delete any human; a tenant admin may only delete humans
     within their own tenant. Both run on the control-plane session (which

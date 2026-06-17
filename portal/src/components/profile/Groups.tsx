@@ -26,7 +26,6 @@ const Groups = () => {
   if (groups.length === 0) return null
 
   const getRoleBadgeLabel = (group: MyGroupPublic): string => {
-    if (group.is_ambassador_group) return t("groups.role_ambassador")
     if (group.is_leader) return t("groups.role_leader")
     return t("groups.role_member")
   }

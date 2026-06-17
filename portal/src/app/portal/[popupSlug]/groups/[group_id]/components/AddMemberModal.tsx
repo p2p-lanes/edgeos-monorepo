@@ -85,13 +85,15 @@ const MemberFormModal = ({
   const validateForm = () => {
     const newErrors: Record<string, string> = {}
 
-    // Validate required fields
-    if (!formData.first_name.trim()) {
-      newErrors.first_name = t("form.first_name_required")
-    }
-
-    if (!formData.last_name.trim()) {
-      newErrors.last_name = t("form.last_name_required")
+    // In edit mode the full profile is editable; in add mode it is an email
+    // invitation, so only the email matters.
+    if (isEditMode) {
+      if (!formData.first_name.trim()) {
+        newErrors.first_name = t("form.first_name_required")
+      }
+      if (!formData.last_name.trim()) {
+        newErrors.last_name = t("form.last_name_required")
+      }
     }
 
     if (!formData.email.trim()) {
@@ -134,17 +136,17 @@ const MemberFormModal = ({
         })
         toast.success(t("groups.member_updated"))
       } else {
-        await GroupsService.addGroupMember({
+        const result = await GroupsService.addGroupMember({
           groupId: group_id,
           requestBody: {
-            first_name: processedData.first_name ?? "",
-            last_name: processedData.last_name ?? "",
             email: processedData.email ?? "",
-            telegram: processedData.telegram,
-            gender: processedData.gender,
           },
         })
-        toast.success(t("groups.member_added"))
+        if (result.status === "invited") {
+          toast.success(t("groups.member_invited"))
+        } else {
+          toast.success(t("groups.member_added"))
+        }
       }
 
       // Reset form
@@ -183,52 +185,56 @@ const MemberFormModal = ({
     <Modal
       open={open}
       onClose={onClose}
-      title={isEditMode ? "Edit Member" : "Add New Member"}
+      title={isEditMode ? t("groups.edit_member") : t("groups.invite_member")}
       description={
         isEditMode
-          ? "Update the member information below."
-          : "Fill in the details to add a new member to your group."
+          ? t("groups.edit_member_description")
+          : t("groups.invite_member_description")
       }
     >
       <form noValidate onSubmit={handleSubmit} className="space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* First Name */}
-          <FormInputWrapper>
-            <LabelRequired htmlFor="first_name" isRequired={true}>
-              First Name
-            </LabelRequired>
-            <Input
-              id="first_name"
-              value={formData.first_name}
-              onChange={(e) => handleInputChange("first_name", e.target.value)}
-              error={errors.first_name}
-            />
-            {errors.first_name && (
-              <p className="text-red-500 text-sm">{errors.first_name}</p>
-            )}
-          </FormInputWrapper>
+        {isEditMode && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* First Name */}
+            <FormInputWrapper>
+              <LabelRequired htmlFor="first_name" isRequired={true}>
+                {t("groups.first_name")}
+              </LabelRequired>
+              <Input
+                id="first_name"
+                value={formData.first_name}
+                onChange={(e) =>
+                  handleInputChange("first_name", e.target.value)
+                }
+                error={errors.first_name}
+              />
+              {errors.first_name && (
+                <p className="text-red-500 text-sm">{errors.first_name}</p>
+              )}
+            </FormInputWrapper>
 
-          {/* Last Name */}
-          <FormInputWrapper>
-            <LabelRequired htmlFor="last_name" isRequired={true}>
-              Last Name
-            </LabelRequired>
-            <Input
-              id="last_name"
-              value={formData.last_name}
-              onChange={(e) => handleInputChange("last_name", e.target.value)}
-              error={errors.last_name}
-            />
-            {errors.last_name && (
-              <p className="text-red-500 text-sm">{errors.last_name}</p>
-            )}
-          </FormInputWrapper>
-        </div>
+            {/* Last Name */}
+            <FormInputWrapper>
+              <LabelRequired htmlFor="last_name" isRequired={true}>
+                {t("groups.last_name")}
+              </LabelRequired>
+              <Input
+                id="last_name"
+                value={formData.last_name}
+                onChange={(e) => handleInputChange("last_name", e.target.value)}
+                error={errors.last_name}
+              />
+              {errors.last_name && (
+                <p className="text-red-500 text-sm">{errors.last_name}</p>
+              )}
+            </FormInputWrapper>
+          </div>
+        )}
 
         {/* Email */}
         <FormInputWrapper>
           <LabelRequired htmlFor="email" isRequired={true}>
-            Email
+            {t("groups.email")}
           </LabelRequired>
           <Input
             id="email"
@@ -241,41 +247,50 @@ const MemberFormModal = ({
           {errors.email && (
             <p className="text-red-500 text-sm">{errors.email}</p>
           )}
+          {!isEditMode && (
+            <p className="text-muted-foreground text-sm">
+              {t("groups.invite_email_help")}
+            </p>
+          )}
         </FormInputWrapper>
 
-        {/* Telegram */}
-        <FormInputWrapper>
-          <LabelRequired htmlFor="telegram" isRequired={false}>
-            Telegram
-          </LabelRequired>
-          <Input
-            id="telegram"
-            value={formData.telegram || ""}
-            onChange={(e) => handleInputChange("telegram", e.target.value)}
-          />
-        </FormInputWrapper>
+        {isEditMode && (
+          <>
+            {/* Telegram */}
+            <FormInputWrapper>
+              <LabelRequired htmlFor="telegram" isRequired={false}>
+                {t("groups.telegram")}
+              </LabelRequired>
+              <Input
+                id="telegram"
+                value={formData.telegram || ""}
+                onChange={(e) => handleInputChange("telegram", e.target.value)}
+              />
+            </FormInputWrapper>
 
-        {/* Gender */}
-        <FormInputWrapper>
-          <LabelRequired htmlFor="gender" isRequired={false}>
-            Gender
-          </LabelRequired>
-          <Select
-            value={formData.gender || ""}
-            onValueChange={(value) => handleInputChange("gender", value)}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Select gender" />
-            </SelectTrigger>
-            <SelectContent>
-              {GENDER_OPTIONS.map((option) => (
-                <SelectItem key={option.value} value={option.value}>
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </FormInputWrapper>
+            {/* Gender */}
+            <FormInputWrapper>
+              <LabelRequired htmlFor="gender" isRequired={false}>
+                {t("groups.gender")}
+              </LabelRequired>
+              <Select
+                value={formData.gender || ""}
+                onValueChange={(value) => handleInputChange("gender", value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={t("groups.select_gender")} />
+                </SelectTrigger>
+                <SelectContent>
+                  {GENDER_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </FormInputWrapper>
+          </>
+        )}
 
         <div className="flex justify-end space-x-2 pt-4">
           <Button
@@ -284,16 +299,16 @@ const MemberFormModal = ({
             onClick={onClose}
             disabled={isSubmitting}
           >
-            Cancel
+            {t("groups.cancel")}
           </Button>
           <Button type="submit" disabled={isSubmitting}>
             {isSubmitting
               ? isEditMode
-                ? "Updating..."
-                : "Adding..."
+                ? t("groups.updating")
+                : t("groups.sending")
               : isEditMode
-                ? "Update Member"
-                : "Add Member"}
+                ? t("groups.update_member")
+                : t("groups.send_invitation")}
           </Button>
         </div>
       </form>

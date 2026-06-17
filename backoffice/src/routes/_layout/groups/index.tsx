@@ -8,7 +8,6 @@ import { type GroupPublic, GroupsService } from "@/client"
 import { DataTable, SortableHeader } from "@/components/Common/DataTable"
 import { EmptyState } from "@/components/Common/EmptyState"
 import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
-import { StatusBadge } from "@/components/Common/StatusBadge"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
 import { Button } from "@/components/ui/button"
 import {
@@ -232,15 +231,6 @@ const columns: ColumnDef<GroupPublic>[] = [
     cell: ({ row }) => <span>{row.original.max_members ?? "Unlimited"}</span>,
   },
   {
-    accessorKey: "is_ambassador_group",
-    header: "Type",
-    cell: ({ row }) => (
-      <StatusBadge
-        status={row.original.is_ambassador_group ? "ambassador" : "regular"}
-      />
-    ),
-  },
-  {
     id: "actions",
     header: () => <span className="sr-only">Actions</span>,
     cell: ({ row }) => (
@@ -277,7 +267,7 @@ function GroupsTableContent() {
       columns={columns}
       data={groups.results}
       searchPlaceholder="Search by name..."
-      hiddenOnMobile={["max_members", "is_ambassador_group"]}
+      hiddenOnMobile={["max_members"]}
       searchValue={search}
       onSearchChange={setSearch}
       onRowClick={(group) =>

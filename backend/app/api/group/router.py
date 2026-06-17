@@ -12,11 +12,13 @@ from app.api.group import crud
 from app.api.group.models import Groups
 from app.api.group.schemas import (
     AddMemberByApplicationRequest,
+    AddMemberResult,
     GroupAdminUpdate,
     GroupCreate,
+    GroupLeaderAssign,
     GroupMemberBatch,
     GroupMemberBatchResult,
-    GroupMemberCreate,
+    GroupMemberInvite,
     GroupMemberPublic,
     GroupMemberUpdate,
     GroupPublic,
@@ -59,6 +61,7 @@ def _build_members(group: Groups) -> list[GroupMemberPublic]:
     one exists (it should, given the sync in application creation).
     """
     apps_by_human = {app.human_id: app for app in group.applications}
+    leader_ids = {leader.id for leader in group.leaders}
 
     members: list[GroupMemberPublic] = []
     for human in group.members:
@@ -87,6 +90,7 @@ def _build_members(group: Groups) -> list[GroupMemberPublic]:
                 role=custom.get("role"),
                 gender=human.gender,
                 local_resident=None,
+                is_leader=human.id in leader_ids,
                 products=products,
             )
         )
@@ -237,6 +241,68 @@ async def delete_group(
     crud.groups_crud.delete(db, group)
 
 
+@router.post(
+    "/{group_id}/leaders",
+    response_model=GroupWithMembers,
+    status_code=status.HTTP_201_CREATED,
+)
+async def assign_group_leader(
+    group_id: uuid.UUID,
+    body: GroupLeaderAssign,
+    db: AdminOrApiKeySession_GroupsWrite,
+    _current_user: AdminOrApiKey_GroupsWrite,
+) -> GroupWithMembers:
+    """Promote a group member to leader (BO admin only)."""
+    group = crud.groups_crud.get_with_members(db, group_id)
+    if not group:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Group not found",
+        )
+
+    # A leader must be a current member of the group.
+    if not any(member.id == body.human_id for member in group.members):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Only group members can be promoted to leader",
+        )
+
+    crud.groups_crud.add_leader(db, group_id, body.human_id, tenant_id=group.tenant_id)
+
+    group = crud.groups_crud.get_with_members(db, group_id)
+    return GroupWithMembers(
+        **GroupPublic.model_validate(group).model_dump(),
+        members=_build_members(group),
+    )
+
+
+@router.delete(
+    "/{group_id}/leaders/{human_id}",
+    response_model=GroupWithMembers,
+)
+async def remove_group_leader(
+    group_id: uuid.UUID,
+    human_id: uuid.UUID,
+    db: AdminOrApiKeySession_GroupsWrite,
+    _current_user: AdminOrApiKey_GroupsWrite,
+) -> GroupWithMembers:
+    """Demote a group leader back to a regular member (BO admin only)."""
+    group = crud.groups_crud.get(db, group_id)
+    if not group:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Group not found",
+        )
+
+    crud.groups_crud.remove_leader(db, group_id, human_id)
+
+    group = crud.groups_crud.get_with_members(db, group_id)
+    return GroupWithMembers(
+        **GroupPublic.model_validate(group).model_dump(),
+        members=_build_members(group),
+    )
+
+
 @router.get("/my/groups", response_model=ListModel[MyGroupPublic])
 async def list_my_groups(
     db: SessionDep,
@@ -318,16 +384,21 @@ async def update_my_group(
 
 @router.post(
     "/my/{group_id}/members",
-    response_model=GroupMemberPublic,
+    response_model=AddMemberResult,
     status_code=status.HTTP_201_CREATED,
 )
 async def add_group_member(
     group_id: uuid.UUID,
-    member_in: GroupMemberCreate,
+    member_in: GroupMemberInvite,
     db: SessionDep,
     current_human: CurrentHuman,
-) -> GroupMemberPublic:
-    """Add a member to a group (Portal - leader only)."""
+) -> AddMemberResult:
+    """Add a member to a group by email (Portal - leader only).
+
+    If the email belongs to an existing human, they are added to the group
+    immediately. If the email is not registered yet, it is whitelisted so the
+    human auto-joins the group when they sign up.
+    """
     from app.api.application.crud import applications_crud
     from app.api.application.schemas import ApplicationAdminCreate, ApplicationStatus
     from app.api.human.crud import humans_crud
@@ -341,14 +412,15 @@ async def add_group_member(
 
     _check_leader_permission(group, current_human.id)
 
-    # Get or create human (Human stores identity only, profile goes in Application)
+    # Human stores identity only; profile data goes in the Application.
     human = humans_crud.get_by_email(db, member_in.email, group.tenant_id)
     if not human:
-        from app.api.human.models import Humans
-
-        human = Humans(tenant_id=group.tenant_id, email=member_in.email)
-        db.add(human)
-        db.flush()
+        # Email not registered yet → whitelist it. The human auto-joins via
+        # resolve_whitelist_memberships when they eventually sign up.
+        crud.groups_crud.add_whitelisted_email(
+            db, group, member_in.email, group.tenant_id
+        )
+        return AddMemberResult(status="invited", email=member_in.email)
 
     # Validate member addition
     crud.groups_crud.validate_member_addition(group, human.id, update_existing=False)
@@ -364,17 +436,16 @@ async def add_group_member(
     application = applications_crud.get_by_human_popup(db, human.id, group.popup_id)
 
     if not application:
-        # Create new application with ACCEPTED status
-        # Note: local_resident and created_by_leader are not on ApplicationAdminCreate
-        # These would need schema changes to support
+        # Create an ACCEPTED application from the human's OWN profile — an
+        # email invite never carries (or overwrites) name/profile data.
         app_data = ApplicationAdminCreate(
             popup_id=group.popup_id,
             group_id=group.id,
-            first_name=member_in.first_name,
-            last_name=member_in.last_name,
-            email=member_in.email,
-            telegram=member_in.telegram,
-            gender=member_in.gender,
+            first_name=human.first_name or "",
+            last_name=human.last_name or "",
+            email=human.email,
+            telegram=human.telegram,
+            gender=human.gender,
             status=ApplicationStatus.ACCEPTED,
         )
         application = applications_crud.create_internal(
@@ -384,7 +455,8 @@ async def add_group_member(
             human.id,
         )
     else:
-        # Update existing application and human profile
+        # Attach the existing application to this group and accept it. The
+        # human's profile is left untouched — they own their own data.
         application.group_id = group.id
         try:
             applications_crud.accept(db, application)
@@ -393,12 +465,6 @@ async def add_group_member(
                 status_code=400,
                 detail="Cannot accept application from a red-flagged human.",
             )
-        # Update human profile
-        human.first_name = member_in.first_name
-        human.last_name = member_in.last_name
-        human.telegram = member_in.telegram
-        human.gender = member_in.gender
-        db.add(human)
 
     # Add to group members
     if not crud.groups_crud.is_member(db, group.id, human.id):
@@ -414,7 +480,7 @@ async def add_group_member(
         products.extend(attendee.products)
 
     custom = application.custom_fields or {}
-    return GroupMemberPublic(
+    member = GroupMemberPublic(
         id=human.id,
         first_name=human.first_name or "",
         last_name=human.last_name or "",
@@ -424,8 +490,10 @@ async def add_group_member(
         role=custom.get("role"),
         gender=human.gender,
         local_resident=None,
+        is_leader=group.is_leader(human.id),
         products=products,
     )
+    return AddMemberResult(status="added", email=human.email, member=member)
 
 
 @router.post(

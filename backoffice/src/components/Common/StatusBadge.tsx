@@ -24,7 +24,6 @@ const statusMap: Record<
   cancelled: { variant: "destructive" },
   flagged: { variant: "destructive" },
   deleted: { variant: "destructive" },
-  ambassador: { variant: "default" },
   regular: { variant: "outline" },
   strong_yes: { variant: "default", label: "Strong Yes" },
   yes: { variant: "default", label: "Yes" },

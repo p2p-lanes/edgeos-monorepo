@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { Loader2, Trash2, UserPlus } from "lucide-react"
+import { Loader2, Shield, ShieldOff, Trash2, UserPlus } from "lucide-react"
 import { useRef, useState } from "react"
 
 import {
@@ -9,6 +9,7 @@ import {
   GroupsService,
   type GroupWithMembers,
 } from "@/client"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -78,6 +79,29 @@ export function GroupMembersSection({ group }: GroupMembersSectionProps) {
       setPickerOpen(false)
       setSearch("")
       setDebouncedSearch("")
+      queryClient.invalidateQueries({ queryKey: ["groups", group.id] })
+    },
+    onError: createErrorHandler(showErrorToast),
+  })
+
+  const assignLeaderMutation = useMutation({
+    mutationFn: (humanId: string) =>
+      GroupsService.assignGroupLeader({
+        groupId: group.id,
+        requestBody: { human_id: humanId },
+      }),
+    onSuccess: () => {
+      showSuccessToast("Leader assigned")
+      queryClient.invalidateQueries({ queryKey: ["groups", group.id] })
+    },
+    onError: createErrorHandler(showErrorToast),
+  })
+
+  const removeLeaderMutation = useMutation({
+    mutationFn: (humanId: string) =>
+      GroupsService.removeGroupLeader({ groupId: group.id, humanId }),
+    onSuccess: () => {
+      showSuccessToast("Leader removed")
       queryClient.invalidateQueries({ queryKey: ["groups", group.id] })
     },
     onError: createErrorHandler(showErrorToast),
@@ -193,31 +217,67 @@ export function GroupMembersSection({ group }: GroupMembersSectionProps) {
               .filter(Boolean)
               .join(" ")
               .trim()
+            const leaderPending =
+              assignLeaderMutation.isPending || removeLeaderMutation.isPending
             return (
               <div
                 key={member.id}
                 className="flex items-center justify-between px-4 py-2.5"
               >
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium">
-                    {name || member.email}
-                  </p>
-                  {name && (
-                    <p className="truncate text-xs text-muted-foreground">
-                      {member.email}
+                <div className="min-w-0 flex items-center gap-2">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium">
+                      {name || member.email}
                     </p>
+                    {name && (
+                      <p className="truncate text-xs text-muted-foreground">
+                        {member.email}
+                      </p>
+                    )}
+                  </div>
+                  {member.is_leader && (
+                    <Badge variant="secondary" className="shrink-0 text-xs">
+                      Leader
+                    </Badge>
                   )}
                 </div>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive"
-                  disabled={removeMutation.isPending}
-                  onClick={() => removeMutation.mutate(member.id)}
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </Button>
+                <div className="flex shrink-0 items-center gap-1">
+                  {member.is_leader ? (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                      disabled={leaderPending}
+                      title="Remove leader role"
+                      onClick={() => removeLeaderMutation.mutate(member.id)}
+                    >
+                      <ShieldOff className="h-3.5 w-3.5" />
+                    </Button>
+                  ) : (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                      disabled={leaderPending}
+                      title="Promote to leader"
+                      onClick={() => assignLeaderMutation.mutate(member.id)}
+                    >
+                      <Shield className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive"
+                    disabled={removeMutation.isPending}
+                    onClick={() => removeMutation.mutate(member.id)}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
               </div>
             )
           })}

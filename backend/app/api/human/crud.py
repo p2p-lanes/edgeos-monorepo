@@ -2,7 +2,7 @@ import uuid
 from typing import TypedDict
 
 from loguru import logger
-from sqlalchemy import delete, exists, or_, update
+from sqlalchemy import delete, exists, or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import selectinload
 from sqlmodel import Session, col, func, select
@@ -28,7 +28,6 @@ class HardDeleteSummary(TypedDict):
     application_snapshots: int
     carts: int
     group_memberships: int
-    ambassador_groups: int
 
 
 class HumansCRUD(BaseCRUD[Humans, HumanCreate, HumanUpdate]):
@@ -306,10 +305,9 @@ class HumansCRUD(BaseCRUD[Humans, HumanCreate, HumanUpdate]):
         """Permanently delete a Human and every row reachable from them.
 
         Runs as a single transaction. Iterates from leaves up to roots so each
-        DELETE leaves no dangling RESTRICT FKs. Ambassador-owned groups are
-        deleted along with the human; foreign references from other humans'
-        applications/payments to those groups are nulled (group_id is
-        nullable).
+        DELETE leaves no dangling RESTRICT FKs. The human's leader/member rows
+        are removed, but the groups themselves (admin-managed, shared) are left
+        intact.
         """
         from app.api.application.models import Applications, ApplicationSnapshots
         from app.api.attendee.models import AttendeeProducts, Attendees
@@ -317,9 +315,6 @@ class HumansCRUD(BaseCRUD[Humans, HumanCreate, HumanUpdate]):
         from app.api.group.models import (
             GroupLeaders,
             GroupMembers,
-            GroupProducts,
-            Groups,
-            GroupWhitelistedEmails,
         )
         from app.api.payment.models import (
             PaymentInstallments,
@@ -349,12 +344,6 @@ class HumansCRUD(BaseCRUD[Humans, HumanCreate, HumanUpdate]):
             if application_ids
             else []
         )
-        ambassador_group_ids = list(
-            session.exec(
-                select(Groups.id).where(Groups.ambassador_id == human_id)
-            ).all()
-        )
-
         summary: HardDeleteSummary = {
             "applications": len(application_ids),
             "attendees": len(attendee_ids),
@@ -365,7 +354,6 @@ class HumansCRUD(BaseCRUD[Humans, HumanCreate, HumanUpdate]):
             "application_snapshots": 0,
             "carts": 0,
             "group_memberships": 0,
-            "ambassador_groups": len(ambassador_group_ids),
         }
 
         try:
@@ -431,44 +419,6 @@ class HumansCRUD(BaseCRUD[Humans, HumanCreate, HumanUpdate]):
             summary["group_memberships"] = (gm_result.rowcount or 0) + (
                 gl_result.rowcount or 0
             )
-
-            if ambassador_group_ids:
-                # Null group_id on rows owned by other humans before dropping
-                # the groups (groups.id is RESTRICT-referenced by applications
-                # and payments via nullable group_id columns).
-                session.execute(
-                    update(Applications)
-                    .where(col(Applications.group_id).in_(ambassador_group_ids))
-                    .values(group_id=None)
-                )
-                session.execute(
-                    update(Payments)
-                    .where(col(Payments.group_id).in_(ambassador_group_ids))
-                    .values(group_id=None)
-                )
-                session.execute(
-                    delete(GroupMembers).where(
-                        col(GroupMembers.group_id).in_(ambassador_group_ids)
-                    )
-                )
-                session.execute(
-                    delete(GroupLeaders).where(
-                        col(GroupLeaders.group_id).in_(ambassador_group_ids)
-                    )
-                )
-                session.execute(
-                    delete(GroupProducts).where(
-                        col(GroupProducts.group_id).in_(ambassador_group_ids)
-                    )
-                )
-                session.execute(
-                    delete(GroupWhitelistedEmails).where(
-                        col(GroupWhitelistedEmails.group_id).in_(ambassador_group_ids)
-                    )
-                )
-                session.execute(
-                    delete(Groups).where(col(Groups.id).in_(ambassador_group_ids))
-                )
 
             result = session.execute(delete(Carts).where(Carts.human_id == human_id))
             summary["carts"] = result.rowcount or 0

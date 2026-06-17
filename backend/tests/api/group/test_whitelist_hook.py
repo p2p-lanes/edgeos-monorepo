@@ -387,3 +387,50 @@ class TestWhitelistBackResolve:
             ).all()
         )
         assert len(rows) == 1, "No duplicate GroupMembers rows after back-resolve"
+
+    def test_resave_same_whitelist_is_idempotent(
+        self, db: Session, tenant_a: Tenants
+    ) -> None:
+        """Re-saving an unchanged whitelist must not raise a duplicate-key error.
+
+        Regression: deleting and re-inserting the same (group_id, email) in one
+        flush violated uq_group_whitelisted_email because SQLAlchemy emits the
+        INSERTs before the DELETEs.
+        """
+        from app.api.group.crud import groups_crud
+
+        popup = _make_popup(db, tenant_a)
+        group = _make_group(db, tenant_a, popup)
+        emails = [
+            f"a-{uuid.uuid4().hex[:8]}@test.com",
+            f"b-{uuid.uuid4().hex[:8]}@test.com",
+        ]
+
+        groups_crud.update_whitelisted_emails(db, group, emails, tenant_a.id)
+        db.refresh(group)
+        # Re-save the exact same set — previously raised IntegrityError.
+        groups_crud.update_whitelisted_emails(db, group, emails, tenant_a.id)
+        db.refresh(group)
+
+        stored = {wl.email for wl in group.whitelisted_emails}
+        assert stored == {e.lower() for e in emails}
+
+    def test_update_whitelist_diff_add_and_remove(
+        self, db: Session, tenant_a: Tenants
+    ) -> None:
+        """Changing the set removes dropped emails and adds the new ones."""
+        from app.api.group.crud import groups_crud
+
+        popup = _make_popup(db, tenant_a)
+        group = _make_group(db, tenant_a, popup)
+        a = f"a-{uuid.uuid4().hex[:8]}@test.com"
+        b = f"b-{uuid.uuid4().hex[:8]}@test.com"
+        c = f"c-{uuid.uuid4().hex[:8]}@test.com"
+
+        groups_crud.update_whitelisted_emails(db, group, [a, b], tenant_a.id)
+        db.refresh(group)
+        groups_crud.update_whitelisted_emails(db, group, [a, c], tenant_a.id)
+        db.refresh(group)
+
+        stored = {wl.email for wl in group.whitelisted_emails}
+        assert stored == {a.lower(), c.lower()}

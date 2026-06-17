@@ -64,7 +64,7 @@ function EditHumanContent({ humanId }: { humanId: string }) {
       {isAdmin && (
         <div className="mx-auto max-w-2xl">
           <DangerZone
-            description="Permanently delete this human and every related row — applications, attendees, payments, products, carts, group memberships, and any group this human owns as ambassador. Intended for cleaning up test users."
+            description="Permanently delete this human and every related row: applications, attendees, payments, products, carts, and group memberships. Intended for cleaning up test users."
             onDelete={() => deleteMutation.mutate()}
             isDeleting={deleteMutation.isPending}
             confirmText="Delete Human"

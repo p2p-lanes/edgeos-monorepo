@@ -1,6 +1,7 @@
 import uuid
 from datetime import datetime
 from decimal import Decimal
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, field_validator
 from sqlalchemy import Numeric, Text
@@ -20,10 +21,6 @@ class GroupBase(SQLModel):
     )
     max_members: int | None = Field(default=None, nullable=True)
     welcome_message: str | None = Field(default=None, nullable=True, sa_type=Text())
-    is_ambassador_group: bool = Field(default=False)
-    ambassador_id: uuid.UUID | None = Field(
-        default=None, foreign_key="humans.id", nullable=True, index=True
-    )
     # Groups-rework: explicit behaviour flags replacing implicit bool(group_id) logic
     auto_approve_applications: bool = Field(default=False)
     express_checkout: bool = Field(default=False)
@@ -52,8 +49,6 @@ class GroupCreate(BaseModel):
     discount_percentage: Decimal = Decimal("0")
     max_members: int | None = None
     welcome_message: str | None = None
-    is_ambassador_group: bool = False
-    ambassador_id: uuid.UUID | None = None
     whitelisted_emails: list[str] | None = None  # List of email strings to whitelist
 
     @field_validator("discount_percentage")
@@ -83,8 +78,6 @@ class GroupAdminUpdate(BaseModel):
     discount_percentage: Decimal | None = None
     max_members: int | None = None
     welcome_message: str | None = None
-    is_ambassador_group: bool | None = None
-    ambassador_id: uuid.UUID | None = None
     whitelisted_emails: list[str] | None = None  # List of email strings to whitelist
     # Groups-rework: explicit behaviour flags (T-gr-020)
     auto_approve_applications: bool | None = None
@@ -123,6 +116,26 @@ class GroupMemberCreate(BaseModel):
         if not v or not v.strip():
             raise ValueError("This field cannot be empty")
         return v.strip()
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+
+class GroupMemberInvite(BaseModel):
+    """Schema for inviting a member to a group by email (Portal leader).
+
+    Only the email is needed: an existing human is added using their own
+    profile (never overwritten); an unregistered email is whitelisted.
+    """
+
+    email: str
+
+    @field_validator("email")
+    @classmethod
+    def clean_email(cls, v: str) -> str:
+        cleaned = v.lower().strip()
+        if not cleaned:
+            raise ValueError("Email cannot be empty")
+        return cleaned
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
@@ -171,6 +184,7 @@ class GroupMemberPublic(BaseModel):
     role: str | None = None
     gender: str | None = None
     local_resident: bool | None = None
+    is_leader: bool = False
     products: list = []  # List of ProductPublic
 
     model_config = ConfigDict(from_attributes=True)
@@ -181,6 +195,19 @@ class GroupMemberBatchResult(GroupMemberPublic):
 
     success: bool
     err_msg: str | None = None
+
+
+class AddMemberResult(BaseModel):
+    """Result of a leader adding a member by email (Portal).
+
+    - status="added": the email belonged to an existing human, now a member.
+    - status="invited": the email is not registered yet, so it was whitelisted.
+      The human auto-joins the group when they sign up.
+    """
+
+    status: Literal["added", "invited"]
+    email: str
+    member: GroupMemberPublic | None = None
 
 
 class MyGroupPublic(GroupPublic):
@@ -221,6 +248,12 @@ class AddMemberByApplicationRequest(BaseModel):
     """Request body for POST /groups/{id}/members/by-application."""
 
     application_id: uuid.UUID
+
+
+class GroupLeaderAssign(BaseModel):
+    """Request body for POST /groups/{id}/leaders (BO admin)."""
+
+    human_id: uuid.UUID
 
 
 class GroupProductsBase(SQLModel):

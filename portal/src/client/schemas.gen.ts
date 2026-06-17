@@ -90,6 +90,38 @@ export const AddMemberByApplicationRequestSchema = {
     description: 'Request body for POST /groups/{id}/members/by-application.'
 } as const;
 
+export const AddMemberResultSchema = {
+    properties: {
+        status: {
+            type: 'string',
+            enum: ['added', 'invited'],
+            title: 'Status'
+        },
+        email: {
+            type: 'string',
+            title: 'Email'
+        },
+        member: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/GroupMemberPublic'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        }
+    },
+    type: 'object',
+    required: ['status', 'email'],
+    title: 'AddMemberResult',
+    description: `Result of a leader adding a member by email (Portal).
+
+- status="added": the email belonged to an existing human, now a member.
+- status="invited": the email is not registered yet, so it was whitelisted.
+  The human auto-joins the group when they sign up.`
+} as const;
+
 export const AdminApiKeyCreateSchema = {
     properties: {
         name: {
@@ -8716,29 +8748,6 @@ export const GroupAdminUpdateSchema = {
             ],
             title: 'Welcome Message'
         },
-        is_ambassador_group: {
-            anyOf: [
-                {
-                    type: 'boolean'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Is Ambassador Group'
-        },
-        ambassador_id: {
-            anyOf: [
-                {
-                    type: 'string',
-                    format: 'uuid'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Ambassador Id'
-        },
         whitelisted_emails: {
             anyOf: [
                 {
@@ -8860,23 +8869,6 @@ export const GroupCreateSchema = {
             ],
             title: 'Welcome Message'
         },
-        is_ambassador_group: {
-            type: 'boolean',
-            title: 'Is Ambassador Group',
-            default: false
-        },
-        ambassador_id: {
-            anyOf: [
-                {
-                    type: 'string',
-                    format: 'uuid'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Ambassador Id'
-        },
         whitelisted_emails: {
             anyOf: [
                 {
@@ -8896,6 +8888,20 @@ export const GroupCreateSchema = {
     required: ['popup_id', 'name'],
     title: 'GroupCreate',
     description: 'Group schema for creation.'
+} as const;
+
+export const GroupLeaderAssignSchema = {
+    properties: {
+        human_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Human Id'
+        }
+    },
+    type: 'object',
+    required: ['human_id'],
+    title: 'GroupLeaderAssign',
+    description: 'Request body for POST /groups/{id}/leaders (BO admin).'
 } as const;
 
 export const GroupMemberBatchSchema = {
@@ -8993,6 +8999,11 @@ export const GroupMemberBatchResultSchema = {
             ],
             title: 'Local Resident'
         },
+        is_leader: {
+            type: 'boolean',
+            title: 'Is Leader',
+            default: false
+        },
         products: {
             items: {},
             type: 'array',
@@ -9075,6 +9086,22 @@ export const GroupMemberCreateSchema = {
     description: 'Schema for adding a member to a group.'
 } as const;
 
+export const GroupMemberInviteSchema = {
+    properties: {
+        email: {
+            type: 'string',
+            title: 'Email'
+        }
+    },
+    type: 'object',
+    required: ['email'],
+    title: 'GroupMemberInvite',
+    description: `Schema for inviting a member to a group by email (Portal leader).
+
+Only the email is needed: an existing human is added using their own
+profile (never overwritten); an unregistered email is whitelisted.`
+} as const;
+
 export const GroupMemberPublicSchema = {
     properties: {
         id: {
@@ -9148,6 +9175,11 @@ export const GroupMemberPublicSchema = {
                 }
             ],
             title: 'Local Resident'
+        },
+        is_leader: {
+            type: 'boolean',
+            title: 'Is Leader',
+            default: false
         },
         products: {
             items: {},
@@ -9294,23 +9326,6 @@ export const GroupPublicSchema = {
                 }
             ],
             title: 'Welcome Message'
-        },
-        is_ambassador_group: {
-            type: 'boolean',
-            title: 'Is Ambassador Group',
-            default: false
-        },
-        ambassador_id: {
-            anyOf: [
-                {
-                    type: 'string',
-                    format: 'uuid'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Ambassador Id'
         },
         auto_approve_applications: {
             type: 'boolean',
@@ -9548,23 +9563,6 @@ export const GroupWithMembersSchema = {
             ],
             title: 'Welcome Message'
         },
-        is_ambassador_group: {
-            type: 'boolean',
-            title: 'Is Ambassador Group',
-            default: false
-        },
-        ambassador_id: {
-            anyOf: [
-                {
-                    type: 'string',
-                    format: 'uuid'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Ambassador Id'
-        },
         auto_approve_applications: {
             type: 'boolean',
             title: 'Auto Approve Applications',
@@ -9688,14 +9686,10 @@ export const HardDeleteSummarySchema = {
         group_memberships: {
             type: 'integer',
             title: 'Group Memberships'
-        },
-        ambassador_groups: {
-            type: 'integer',
-            title: 'Ambassador Groups'
         }
     },
     type: 'object',
-    required: ['applications', 'attendees', 'payments', 'attendee_products', 'payment_products', 'payment_installments', 'application_snapshots', 'carts', 'group_memberships', 'ambassador_groups'],
+    required: ['applications', 'attendees', 'payments', 'attendee_products', 'payment_products', 'payment_installments', 'application_snapshots', 'carts', 'group_memberships'],
     title: 'HardDeleteSummary'
 } as const;
 
@@ -11407,23 +11401,6 @@ export const MyGroupPublicSchema = {
             ],
             title: 'Welcome Message'
         },
-        is_ambassador_group: {
-            type: 'boolean',
-            title: 'Is Ambassador Group',
-            default: false
-        },
-        ambassador_id: {
-            anyOf: [
-                {
-                    type: 'string',
-                    format: 'uuid'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Ambassador Id'
-        },
         auto_approve_applications: {
             type: 'boolean',
             title: 'Auto Approve Applications',
@@ -11551,23 +11528,6 @@ export const MyGroupWithMembersSchema = {
                 }
             ],
             title: 'Welcome Message'
-        },
-        is_ambassador_group: {
-            type: 'boolean',
-            title: 'Is Ambassador Group',
-            default: false
-        },
-        ambassador_id: {
-            anyOf: [
-                {
-                    type: 'string',
-                    format: 'uuid'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Ambassador Id'
         },
         auto_approve_applications: {
             type: 'boolean',

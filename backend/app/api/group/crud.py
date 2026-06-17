@@ -62,6 +62,7 @@ class GroupsCRUD(BaseCRUD[Groups, GroupCreate, GroupUpdate]):
             .where(Groups.id == group_id)
             .options(
                 selectinload(Groups.members),  # type: ignore[arg-type]
+                selectinload(Groups.leaders),  # type: ignore[arg-type]
                 selectinload(Groups.applications)  # type: ignore[arg-type]
                 .selectinload(Applications.attendees)  # ty: ignore[invalid-argument-type]
                 .selectinload(Attendees.attendee_products)  # ty: ignore[invalid-argument-type]
@@ -249,10 +250,32 @@ class GroupsCRUD(BaseCRUD[Groups, GroupCreate, GroupUpdate]):
             )
 
     def add_leader(
-        self, session: Session, group_id: uuid.UUID, human_id: uuid.UUID
+        self,
+        session: Session,
+        group_id: uuid.UUID,
+        human_id: uuid.UUID,
+        tenant_id: uuid.UUID | None = None,
     ) -> None:
-        """Add a leader to a group."""
-        leader = GroupLeaders(group_id=group_id, human_id=human_id)
+        """Add a leader to a group (idempotent)."""
+        existing = session.exec(
+            select(GroupLeaders).where(
+                GroupLeaders.group_id == group_id,
+                GroupLeaders.human_id == human_id,
+            )
+        ).first()
+        if existing:
+            return
+        group = session.exec(select(Groups).where(Groups.id == group_id)).first()
+        if group is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Group not found",
+            )
+        leader = GroupLeaders(
+            group_id=group_id,
+            human_id=human_id,
+            tenant_id=tenant_id or group.tenant_id,
+        )
         session.add(leader)
         session.commit()
 
@@ -369,70 +392,6 @@ class GroupsCRUD(BaseCRUD[Groups, GroupCreate, GroupUpdate]):
             slug = f"{prefix}-{generate_random_slug()}"
         return slug
 
-    def create_ambassador_group(
-        self,
-        session: Session,
-        *,
-        tenant_id: uuid.UUID,
-        popup_id: uuid.UUID,
-        popup_slug: str,
-        human_id: uuid.UUID,
-        human_name: str,
-    ) -> Groups:
-        """Create an ambassador group for a human.
-
-        Args:
-            session: Database session
-            tenant_id: Tenant ID
-            popup_id: Popup ID
-            popup_slug: Popup slug (used as prefix for group slug)
-            human_id: Human ID (ambassador)
-            human_name: Human's full name
-
-        Returns:
-            Created Groups model
-        """
-        from loguru import logger
-
-        # Generate unique slug using popup slug as prefix
-        slug = f"{popup_slug}-{generate_random_slug()}"
-        while self.get_by_slug(session, slug, popup_id):
-            logger.info("Ambassador group slug already exists: {}", slug)
-            slug = f"{popup_slug}-{generate_random_slug()}"
-
-        description = (
-            "You're invited to skip the application process and proceed directly to checkout. "
-            "Provide your information below to secure your ticket(s)!"
-        )
-        welcome_message = f"This is a personal invite link from {human_name}."
-
-        group = Groups(
-            tenant_id=tenant_id,
-            popup_id=popup_id,
-            name=f"{human_name} Invite List",
-            slug=slug,
-            description=description,
-            discount_percentage=0,
-            max_members=None,
-            welcome_message=welcome_message,
-            is_ambassador_group=True,
-            ambassador_id=human_id,
-        )
-        session.add(group)
-        session.flush()  # Get group ID
-
-        # Add human as leader
-        leader = GroupLeaders(
-            tenant_id=tenant_id,
-            group_id=group.id,
-            human_id=human_id,
-        )
-        session.add(leader)
-
-        logger.info("Ambassador group created: {} {}", group.id, group.slug)
-
-        return group
-
     def get_human_group_ids(
         self,
         session: Session,
@@ -455,19 +414,6 @@ class GroupsCRUD(BaseCRUD[Groups, GroupCreate, GroupUpdate]):
         )
         rows = session.exec(statement).all()
         return set(rows)
-
-    def get_ambassador_group(
-        self,
-        session: Session,
-        popup_id: uuid.UUID,
-        human_id: uuid.UUID,
-    ) -> Groups | None:
-        """Get existing ambassador group for a human in a popup."""
-        statement = select(Groups).where(
-            Groups.popup_id == popup_id,
-            Groups.ambassador_id == human_id,
-        )
-        return session.exec(statement).first()
 
     def create(
         self,
@@ -522,19 +468,19 @@ class GroupsCRUD(BaseCRUD[Groups, GroupCreate, GroupUpdate]):
         new_emails_lower: set[str] = {e.lower().strip() for e in emails if e.strip()}
         newly_added: set[str] = new_emails_lower - existing_emails
 
-        # Delete existing whitelisted emails
+        # Diff-based update: remove only emails dropped from the set and insert
+        # only the new ones. Deleting and re-inserting an unchanged email in the
+        # same flush would violate uq_group_whitelisted_email (SQLAlchemy emits
+        # INSERTs before DELETEs for the same table).
         for wl in list(group.whitelisted_emails):
-            session.delete(wl)
+            if wl.email.lower() not in new_emails_lower:
+                session.delete(wl)
 
-        # Add new whitelisted emails
-        for email in emails:
-            clean = email.lower().strip()
-            if not clean:
-                continue
+        for email in newly_added:
             wl_email = GroupWhitelistedEmails(
                 tenant_id=tenant_id,
                 group_id=group.id,
-                email=clean,
+                email=email,
             )
             session.add(wl_email)
 
@@ -590,6 +536,30 @@ class GroupsCRUD(BaseCRUD[Groups, GroupCreate, GroupUpdate]):
             func.lower(GroupWhitelistedEmails.email) == email.lower(),
         )
         return session.exec(stmt).first() is not None
+
+    def add_whitelisted_email(
+        self,
+        session: Session,
+        group: Groups,
+        email: str,
+        tenant_id: uuid.UUID,
+    ) -> None:
+        """Whitelist a single email for a group (idempotent).
+
+        Used when a leader invites an email that has no registered human yet:
+        the human auto-joins via resolve_whitelist_memberships when they sign up.
+        """
+        email_lc = email.lower().strip()
+        if self.is_email_whitelisted(session, group.id, email_lc):
+            return
+        session.add(
+            GroupWhitelistedEmails(
+                tenant_id=tenant_id,
+                group_id=group.id,
+                email=email_lc,
+            )
+        )
+        session.commit()
 
 
 groups_crud = GroupsCRUD()
