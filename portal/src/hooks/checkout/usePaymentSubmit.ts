@@ -6,6 +6,7 @@ import { useCallback, useEffect, useState } from "react"
 import { toast } from "sonner"
 import type { CheckoutMode } from "@/checkout/popupCheckoutPolicy"
 import { CheckoutService, PaymentsService } from "@/client"
+import { getMetaAttribution, trackMetaPurchase } from "@/lib/meta-pixel"
 import { queryKeys } from "@/lib/query-keys"
 import type { AttendeePassState } from "@/types/Attendee"
 import type {
@@ -49,6 +50,7 @@ interface UsePaymentSubmitParams {
     formData: Record<string, unknown>
   } | null
   creditsEnabled: boolean
+  popupName?: string | null
 }
 
 interface PaymentSubmitResult {
@@ -81,6 +83,7 @@ export function usePaymentSubmit({
   submitMode,
   buyerData,
   creditsEnabled,
+  popupName,
 }: UsePaymentSubmitParams) {
   const queryClient = useQueryClient()
   const router = useRouter()
@@ -164,6 +167,7 @@ export function usePaymentSubmit({
           ? await CheckoutService.purchaseOpenTicketing({
               slug: popupSlug!,
               requestBody: {
+                ...getMetaAttribution(),
                 products: Object.values(
                   productsToSend.reduce<
                     Record<string, { product_id: string; quantity: number }>
@@ -213,6 +217,8 @@ export function usePaymentSubmit({
         payment_id?: string
         status?: string
         checkout_url?: string | null
+        amount?: string
+        currency?: string
       }
 
       if (data.status === "pending" && data.checkout_url) {
@@ -221,6 +227,25 @@ export function usePaymentSubmit({
       }
 
       if (data.status === "approved") {
+        const paymentId = data.id ?? data.payment_id
+        if (
+          submitMode === "open-ticketing" &&
+          popupId &&
+          popupSlug &&
+          paymentId
+        ) {
+          trackMetaPurchase({
+            paymentId,
+            popup: {
+              id: popupId,
+              slug: popupSlug,
+              name: popupName,
+            },
+            amount: data.amount ?? 0,
+            currency: data.currency ?? "USD",
+            products: productsToSend,
+          })
+        }
         toast.success(
           isEditing
             ? "Your passes have been updated successfully!"
@@ -263,7 +288,6 @@ export function usePaymentSubmit({
           if (isEditing) {
             router.replace(`/portal/${popupSlug}/passes`)
           } else {
-            const paymentId = data.id ?? data.payment_id
             const qs = paymentId ? `?payment_id=${paymentId}` : ""
             router.replace(`/checkout/${popupSlug}/thank-you${qs}`)
           }
@@ -312,6 +336,7 @@ export function usePaymentSubmit({
     popupId,
     popupSlug,
     submitMode,
+    popupName,
     router,
     creditsEnabled,
     isSubmitting,
