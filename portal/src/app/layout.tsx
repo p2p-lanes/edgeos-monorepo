@@ -4,6 +4,7 @@ import type { Metadata, Viewport } from "next"
 import { headers } from "next/headers"
 import "./globals.css"
 import { Toaster } from "sonner"
+import { MetaPixel } from "@/components/MetaPixel"
 import { ServiceWorkerRegistrar } from "@/components/ServiceWorkerRegistrar"
 import GoogleAnalytics from "@/components/utils/GoogleAnalytics"
 import { fetchTenantBySlug } from "@/lib/tenant"
@@ -122,6 +123,7 @@ export default async function RootLayout({
             initialLandingMode={middlewareLandingMode}
             initialActivePopupSlug={middlewareActivePopupSlug}
           >
+            <MetaPixel />
             <div className="w-full">{children}</div>
           </TenantProvider>
         </QueryProvider>

@@ -204,12 +204,22 @@ def test_create_open_ticketing_payment_one_attendee_n_tickets(
             obj=obj,
             popup=popup,
             tenant=tenant_a,
+            attribution={
+                "fbc": "fb.1.1710000000.click",
+                "fbp": "fb.1.1710000000.browser",
+                "client_ip": "203.0.113.10",
+                "client_user_agent": "Mozilla/5.0 Test",
+            },
         )
 
     assert checkout_url == "https://simplefi.test/checkout/1"
     assert payment.status == "pending"
     assert payment.amount == Decimal("360.00")
     assert payment.external_id == "sf_open_ticketing_1"
+    assert payment.meta_fbc == "fb.1.1710000000.click"
+    assert payment.meta_fbp == "fb.1.1710000000.browser"
+    assert payment.meta_client_ip == "203.0.113.10"
+    assert payment.meta_client_user_agent == "Mozilla/5.0 Test"
 
     # New design: 1 attendee for 3 tickets (not 3 attendees)
     attendees = list(

@@ -509,6 +509,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         obj: "OpenTicketingPurchaseCreate",
         popup: "Popups",
         tenant: "Tenants",
+        attribution: dict[str, str | None] | None = None,
     ) -> tuple[Payments, str]:
         """Create an anonymous open-ticketing payment with per-ticket attendees."""
         from app.api.popup.schemas import PopupStatus
@@ -600,6 +601,10 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             currency=popup.currency,
             source=PaymentSource.SIMPLEFI.value,
             buyer_snapshot=buyer_snapshot,
+            meta_fbc=(attribution or {}).get("fbc"),
+            meta_fbp=(attribution or {}).get("fbp"),
+            meta_client_ip=(attribution or {}).get("client_ip"),
+            meta_client_user_agent=(attribution or {}).get("client_user_agent"),
         )
         session.add(payment)
         session.flush()
@@ -1621,6 +1626,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         self,
         session: Session,
         obj: PaymentCreate,
+        attribution: dict[str, str | None] | None = None,
     ) -> tuple[Payments, PaymentPreview]:
         """
         Create a payment with all validations and discount calculations.
@@ -1795,6 +1801,10 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 edit_passes=obj.edit_passes,
                 group_id=preview.group_id,
                 source=None,
+                meta_fbc=(attribution or {}).get("fbc"),
+                meta_fbp=(attribution or {}).get("fbp"),
+                meta_client_ip=(attribution or {}).get("client_ip"),
+                meta_client_user_agent=(attribution or {}).get("client_user_agent"),
             )
             session.add(payment)
             session.flush()
@@ -1984,6 +1994,10 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             source=PaymentSource.SIMPLEFI.value,
             is_installment_plan=simplefi_response.is_installment_plan,
             installments_paid=0 if simplefi_response.is_installment_plan else None,
+            meta_fbc=(attribution or {}).get("fbc"),
+            meta_fbp=(attribution or {}).get("fbp"),
+            meta_client_ip=(attribution or {}).get("client_ip"),
+            meta_client_user_agent=(attribution or {}).get("client_user_agent"),
         )
 
         session.add(payment)

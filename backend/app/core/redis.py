@@ -436,7 +436,7 @@ webhook_cache = WebhookCache(ttl_seconds=3600)
 class DomainCache:
     """Cache for tenant-by-domain lookups.
 
-    Stores serialized TenantPublic JSON (or the sentinel string ``"null"``
+    Stores serialized anonymous public tenant JSON (or the sentinel string ``"null"``
     for non-existent / inactive domains) with a 5-minute TTL.
 
     All methods are silent no-ops when Redis is unavailable so that the

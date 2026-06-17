@@ -127,7 +127,6 @@ class PaymentBase(SQLModel):
         default=None,
         sa_column=Column(JSONB, nullable=True),
     )
-
     # Discount tracking
     coupon_id: uuid.UUID | None = Field(
         default=None, foreign_key="coupons.id", nullable=True, index=True
