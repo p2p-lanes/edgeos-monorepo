@@ -1,0 +1,36 @@
+{
+  "doc": "roadmap-edgeos-2026",
+  "version": 2,
+  "exportedAt": "2026-05-23T23:50:43.780Z",
+  "summary": {
+    "edits": 6,
+    "deletedSections": 0
+  },
+  "edits": {
+    "e11": {
+      "tag": "p",
+      "content": "\n      <strong>EdgeOS es el sistema operativo del programa anual de\n      gatherings curados.</strong> No competimos contra Luma ni Eventbrite\n      — competimos contra el stack DIY de Typeform + Notion + Stripe +\n      Mailchimp + planilla. El que organiza un retreat de 200 personas,\n      una pop-up city de cuatro semanas o un fellowship con aplicación\n      curada está hoy pegando cinco herramientas distintas y perdiendo\n      30–60 horas semanales en operación."
+    },
+    "e12": {
+      "tag": "p",
+      "content": "En un año de trabajo deberíamos poder disponibilizar un producto que se\n      vende sin necesidad de contactar 1 a 1 a los decision makers, tener una marca propia separada\n      de Simplefi, y un equipo capaz de absorber el crecimiento."
+    },
+    "e13": {
+      "tag": "h3",
+      "content": "El objetivo del año — tres prioridades"
+    },
+    "e18": {
+      "tag": "p",
+      "content": "\n          EdgeOS necesita identidad y página institucional propias,\n          separadas de Simplefi. Esto incluye decidir si seguimos\n          ofreciendo el procesador de pagos cripto de Simplefi (hoy\n          <strong>2% de tickets de Edge</strong> se venden con cripto)\n          o lo reemplazamos por un procesador externo. La marca propia\n          es condición para vender pricing público y para que el\n          producto pueda salir a buscar clientes más agresivamente."
+    },
+    "e25": {
+      "tag": "li",
+      "content": "Priorización trimestral basada en señales reales + norte claro del producto."
+    },
+    "e27": {
+      "tag": "li",
+      "content": "Rechazar explícitamente requerimientos de clientes actuales cuando algo no nos posiciona."
+    }
+  },
+  "deletedSections": []
+}

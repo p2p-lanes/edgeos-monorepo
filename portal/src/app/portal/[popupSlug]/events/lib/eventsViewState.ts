@@ -26,6 +26,7 @@ export interface EventsListFilters {
   showHidden: boolean
   selectedTags: string[]
   selectedTrackIds: string[]
+  selectedVenueIds: string[]
 }
 
 export interface EventsViewSnapshot {

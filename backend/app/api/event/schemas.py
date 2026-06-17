@@ -223,6 +223,20 @@ class TrackEventCount(BaseModel):
     event_count: int
 
 
+class VenueEventCount(BaseModel):
+    """Number of distinct published events that belong to a venue.
+
+    Backs the portal venue filter so it can show per-venue counts (and hide
+    venues with no events) without pulling the full event list to the client
+    just to count. ``venue_title`` is included so the filter has a label
+    without a second lookup.
+    """
+
+    venue_id: uuid.UUID
+    venue_title: str
+    event_count: int
+
+
 class DayEventCount(BaseModel):
     """Number of occurrence-expanded events that start on a given calendar day.
 

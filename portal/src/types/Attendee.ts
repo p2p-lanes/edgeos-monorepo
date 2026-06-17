@@ -63,4 +63,6 @@ export interface CreateAttendee {
   /** UUID of the attendee category row */
   category_id?: string
   gender: string
+  /** Declarative required_fields answers (e.g. { age_group: "kid" }) */
+  additional_data?: Record<string, unknown>
 }

@@ -4,6 +4,7 @@ import {
   durationFits,
   freeIntervalsForDay,
   localTzNaiveToUtc,
+  slotOptionsForDay,
   utcToLocalTzNaive,
 } from "@edgeos/shared-events"
 import { MarkdownEditor } from "@edgeos/shared-form-ui"
@@ -74,7 +75,7 @@ import {
   RepeatPicker,
   type RepeatState,
 } from "./EventForm/RepeatPicker"
-import { StartTimeCombobox } from "./EventForm/StartTimeCombobox"
+import { StartTimeSelect, type TimeOption } from "./EventForm/StartTimeSelect"
 import { VenueDayScheduleDialog } from "./EventForm/VenueDayScheduleDialog"
 import { VenueDetailsDialog } from "./EventForm/VenueDetailsDialog"
 
@@ -428,6 +429,17 @@ export function EventForm({
       const startDate = localTzNaiveToUtc(value.start_time, value.timezone)
       const endDate = new Date(startDate.getTime() + durationMinutes * 60_000)
 
+      // Block creating an event that starts in the past. Hosts have repeatedly
+      // booked events on a past date by mistake (e.g. created Jun 15, scheduled
+      // Jun 14), which is time-consuming for organizers to clean up. Editing an
+      // existing event is still allowed so a past event can be fixed/cancelled.
+      if (!isEdit && startDate.getTime() < Date.now()) {
+        showErrorToast(
+          "Event start time can't be in the past. Pick a future date and time.",
+        )
+        return
+      }
+
       // meeting_url only applies for online-only Meeting events (no venue,
       // no custom physical location). When the Meeting option is selected
       // it is required — there's nowhere else for attendees to go.
@@ -755,6 +767,37 @@ export function EventForm({
     }
   }, [popup?.start_date, popup?.end_date])
 
+  // Past days are unselectable when creating a new event: the backend rejects
+  // a past start time and the form already blocks submit (see the validator's
+  // `!isEdit && startDate < now` guard), so greying them out in the picker
+  // stops the user from picking a day they can't use. Editing an existing
+  // event still allows past dates so a past/mis-scheduled event can be fixed
+  // or cancelled — mirrors the submit-time guard's `!isEdit` condition.
+  const isDateInPast = useMemo(() => {
+    if (isEdit) return undefined
+    const today = new Date()
+    const todayKey = `${today.getFullYear()}-${String(
+      today.getMonth() + 1,
+    ).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`
+    return (d: Date) => {
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(
+        2,
+        "0",
+      )}-${String(d.getDate()).padStart(2, "0")}`
+      return key < todayKey
+    }
+  }, [isEdit])
+
+  // The picker's "disabled" matcher folds together both reasons a day is
+  // unselectable: outside the popup booking window, or in the past (new
+  // events only). Either one greys the day out and blocks selection.
+  const isDateUnselectable = useMemo(() => {
+    if (isDateOutsidePopupWindow && isDateInPast) {
+      return (d: Date) => isDateOutsidePopupWindow(d) || isDateInPast(d)
+    }
+    return isDateOutsidePopupWindow ?? isDateInPast
+  }, [isDateOutsidePopupWindow, isDateInPast])
+
   // First day within the popup window where the venue is open. Used to
   // default the date picker when a user picks a venue with no date set
   // yet — and to recover when the previously selected date becomes a
@@ -833,6 +876,35 @@ export function EventForm({
       ),
     [freeIntervals, durationMinutes, popupTz],
   )
+
+  // Options offered by the start-time dropdown. With a venue: every slot
+  // inside the venue's open hours, occupied ones flagged so the picker
+  // renders them grayed out. Without a venue (or while availability loads):
+  // a generic all-day 30-minute grid.
+  const startTimeOptions = useMemo<TimeOption[]>(() => {
+    if (venueIdValue && dayAvailability && dayBounds) {
+      return slotOptionsForDay(
+        dayAvailability.open_ranges ?? [],
+        freeIntervals,
+        dayBounds.start,
+        dayBounds.end,
+        durationMinutes,
+        30,
+        popupTz,
+      ).map((o) => ({ label: o.label, free: o.free }))
+    }
+    return Array.from({ length: 48 }, (_, i) => ({
+      label: `${String(Math.floor(i / 2)).padStart(2, "0")}:${i % 2 ? "30" : "00"}`,
+      free: true,
+    }))
+  }, [
+    venueIdValue,
+    dayAvailability,
+    dayBounds,
+    freeIntervals,
+    durationMinutes,
+    popupTz,
+  ])
 
   // Does the typed start + duration fit a free window? Returns the reason
   // it does NOT fit (so the indicator and submit gate share a single source
@@ -1358,12 +1430,11 @@ export function EventForm({
           <DatePicker
             value={dateStr}
             disabled={readOnly}
-            disabledDays={isDateOutsidePopupWindow}
+            disabledDays={isDateUnselectable}
             closedDays={
               isClosedOnDate
                 ? (d) =>
-                    !(isDateOutsidePopupWindow?.(d) ?? false) &&
-                    isClosedOnDate(d)
+                    !(isDateUnselectable?.(d) ?? false) && isClosedOnDate(d)
                 : undefined
             }
             onChange={(newDate) => {
@@ -1422,7 +1493,7 @@ export function EventForm({
 
         <InlineRow label="Start time" description="Pick or type a time">
           <div className="flex flex-col items-end gap-1 w-[240px]">
-            <StartTimeCombobox
+            <StartTimeSelect
               value={startTimeValue ? startTimeValue.slice(11, 16) : ""}
               onChange={(hhmm) => {
                 if (!hhmm) {
@@ -1432,12 +1503,13 @@ export function EventForm({
                 const date = dateStr || new Date().toISOString().slice(0, 10)
                 form.setFieldValue("start_time", `${date}T${hhmm}`)
               }}
+              options={startTimeOptions}
               disabled={readOnly}
               fits={venueIdValue ? startFits : true}
               placeholder={
-                venueIdValue && startSlotOptions.length === 0
+                venueIdValue && startTimeOptions.length === 0
                   ? "No open hours"
-                  : "HH:mm"
+                  : "Pick a time"
               }
             />
             <AvailabilityIndicator availability={effectiveAvailability} />

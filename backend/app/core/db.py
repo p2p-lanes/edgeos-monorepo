@@ -231,6 +231,7 @@ def _seed_attendee_categories(
                 "type": "select",
                 "required": True,
                 "options": ["baby", "kid", "teen"],
+                "label": "Age group",
                 "display_as_subtitle": True,
             }
         ],

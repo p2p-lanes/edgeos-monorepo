@@ -25,4 +25,7 @@ export interface EventsToolbarProps {
   allowedTracks?: { id: string; name: string }[]
   selectedTrackIds?: string[]
   onSelectedTrackIdsChange?: (ids: string[]) => void
+  allowedVenues?: { id: string; name: string }[]
+  selectedVenueIds?: string[]
+  onSelectedVenueIdsChange?: (ids: string[]) => void
 }

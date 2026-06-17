@@ -524,6 +524,9 @@
       "filter_by_tracks": "按赛道筛选",
       "tracks_label": "赛道",
       "filter_by_track_label": "按赛道筛选",
+      "filter_by_venues": "按场地筛选",
+      "venues_label": "场地",
+      "filter_by_venue_label": "按场地筛选",
       "clear_filters": "清除",
       "list_view_label": "列表视图",
       "calendar_view_label": "日历视图",
@@ -630,6 +633,8 @@
       "pending_approval_banner_message": "你的活动正在等待审批,其他人暂时无法查看。",
       "open_in_maps": "在 Google 地图中打开",
       "view_on_geobrowser": "在 Geobrowser 中查看",
+      "join_on_geo": "加入 Geo",
+      "join_on_geo_tooltip": "回顾、投票和资源",
       "share_button": "分享活动",
       "share_link_copied": "链接已复制",
       "share_link_error": "无法复制链接"

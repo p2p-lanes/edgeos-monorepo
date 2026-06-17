@@ -39,6 +39,7 @@ import {
 import { useMeasuredHeight } from "./lib/useMeasuredHeight"
 import { usePopupTags } from "./lib/usePopupTags"
 import { usePopupTracks } from "./lib/usePopupTracks"
+import { usePopupVenues } from "./lib/usePopupVenues"
 
 // useLayoutEffect on the client, useEffect on the server. Lets us restore
 // scroll synchronously before the browser paints (no flash of "first event"
@@ -153,6 +154,18 @@ export default function EventsPage() {
     if (raw != null) return raw.split(",").filter(Boolean)
     return restoredFilters?.selectedTrackIds ?? []
   })
+  // The venue filter mirrors the track filter: persisted in the URL
+  // (`?venues=id1,id2`) so a venue-filtered list/calendar is shareable, seeded
+  // first from the URL (with a window.location fallback for the router lag) and
+  // then from the restored sessionStorage snapshot.
+  const [selectedVenueIds, setSelectedVenueIds] = useState<string[]>(() => {
+    let raw = searchParams.get("venues")
+    if (raw == null && typeof window !== "undefined") {
+      raw = new URLSearchParams(window.location.search).get("venues")
+    }
+    if (raw != null) return raw.split(",").filter(Boolean)
+    return restoredFilters?.selectedVenueIds ?? []
+  })
   const queryClient = useQueryClient()
 
   // Keep `?tracks=` in lockstep with the filter state. Runs when the user
@@ -172,6 +185,21 @@ export default function EventsPage() {
     const qs = params.toString()
     router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false })
   }, [selectedTrackIds, searchParams, router, pathname])
+
+  // Keep `?venues=` in lockstep with the venue filter state, mirroring the
+  // track-sync effect above (publish to URL on toggle → shareable; re-publish
+  // after a sessionStorage restore that only round-trips view/date).
+  useEffect(() => {
+    const current = searchParams.get("venues")
+    const desired = selectedVenueIds.length ? selectedVenueIds.join(",") : null
+    if ((current ?? null) === desired) return
+    if (typeof window === "undefined") return
+    const params = new URLSearchParams(window.location.search)
+    if (desired) params.set("venues", desired)
+    else params.delete("venues")
+    const qs = params.toString()
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false })
+  }, [selectedVenueIds, searchParams, router, pathname])
 
   // The view tab and the day-view/calendar-view selected day are both
   // persisted in the URL. `view` and `selectedDate` are derived from
@@ -300,10 +328,19 @@ export default function EventsPage() {
           showHidden,
           selectedTags,
           selectedTrackIds,
+          selectedVenueIds,
         },
       })
     },
-    [search, rsvpedOnly, mineOnly, showHidden, selectedTags, selectedTrackIds],
+    [
+      search,
+      rsvpedOnly,
+      mineOnly,
+      showHidden,
+      selectedTags,
+      selectedTrackIds,
+      selectedVenueIds,
+    ],
   )
 
   const { data: currentHuman } = useQuery({
@@ -331,6 +368,11 @@ export default function EventsPage() {
   // curated track list often contains tracks no published event uses yet,
   // and those would resolve to an empty calendar if shown in the filter.
   const { tracksWithEvents: allowedTracks } = usePopupTracks(city?.id)
+
+  // Only surface venues that actually host events — the venue-counts endpoint
+  // already returns only venues with at least one published event, so an empty
+  // venue never shows up in the filter.
+  const { venuesWithEvents: allowedVenues } = usePopupVenues(city?.id)
 
   // Expansion window for recurring events. Passing start_after triggers the
   // backend to expand RRULEs into concrete occurrences; without it, recurring
@@ -376,6 +418,7 @@ export default function EventsPage() {
       showHidden,
       selectedTags,
       selectedTrackIds,
+      selectedVenueIds,
       listWindow.startAfter,
       listWindow.startBefore,
     ],
@@ -389,6 +432,7 @@ export default function EventsPage() {
         includeHidden: showHidden || undefined,
         tags: selectedTags.length ? selectedTags : undefined,
         trackIds: selectedTrackIds.length ? selectedTrackIds : undefined,
+        venueIds: selectedVenueIds.length ? selectedVenueIds : undefined,
         startAfter: listWindow.startAfter,
         startBefore: listWindow.startBefore,
       }),
@@ -405,6 +449,7 @@ export default function EventsPage() {
       showHidden,
       selectedTags,
       selectedTrackIds,
+      selectedVenueIds,
       listWindow.startAfter,
       listWindow.startBefore,
     ],
@@ -421,6 +466,7 @@ export default function EventsPage() {
         includeHidden: showHidden || undefined,
         tags: selectedTags.length ? selectedTags : undefined,
         trackIds: selectedTrackIds.length ? selectedTrackIds : undefined,
+        venueIds: selectedVenueIds.length ? selectedVenueIds : undefined,
         startAfter: listWindow.startAfter,
         startBefore: listWindow.startBefore,
       }),
@@ -437,6 +483,7 @@ export default function EventsPage() {
       showHidden,
       selectedTags,
       selectedTrackIds,
+      selectedVenueIds,
       listWindow.startAfter,
       listWindow.startBefore,
     ],
@@ -449,6 +496,7 @@ export default function EventsPage() {
         includeHidden: showHidden || undefined,
         tags: selectedTags.length ? selectedTags : undefined,
         trackIds: selectedTrackIds.length ? selectedTrackIds : undefined,
+        venueIds: selectedVenueIds.length ? selectedVenueIds : undefined,
         startAfter: listWindow.startAfter,
         startBefore: listWindow.startBefore,
       }),
@@ -724,6 +772,9 @@ export default function EventsPage() {
             allowedTracks={allowedTracks}
             selectedTrackIds={selectedTrackIds}
             onSelectedTrackIdsChange={setSelectedTrackIds}
+            allowedVenues={allowedVenues}
+            selectedVenueIds={selectedVenueIds}
+            onSelectedVenueIdsChange={setSelectedVenueIds}
           />
         </div>
       )}
@@ -738,6 +789,7 @@ export default function EventsPage() {
             mineOnly={mineOnly}
             tags={selectedTags}
             trackIds={selectedTrackIds}
+            venueIds={selectedVenueIds}
             defaultDate={selectedDate}
             onEventLinkClick={handleEventLinkClick}
             placeholderUrl={eventSettings?.placeholder_url}
@@ -752,6 +804,7 @@ export default function EventsPage() {
               mineOnly={mineOnly}
               tags={selectedTags}
               trackIds={selectedTrackIds}
+              venueIds={selectedVenueIds}
               selectedDate={selectedDate}
               onSelectedDateChange={setSelectedDate}
               restoredScroll={restoredScroll}
@@ -812,6 +865,9 @@ export default function EventsPage() {
               allowedTracks={allowedTracks}
               selectedTrackIds={selectedTrackIds}
               onSelectedTrackIdsChange={setSelectedTrackIds}
+              allowedVenues={allowedVenues}
+              selectedVenueIds={selectedVenueIds}
+              onSelectedVenueIdsChange={setSelectedVenueIds}
             />
             <DayBody
               popupId={city?.id}
@@ -821,6 +877,7 @@ export default function EventsPage() {
               mineOnly={mineOnly}
               tags={selectedTags}
               trackIds={selectedTrackIds}
+              venueIds={selectedVenueIds}
               selectedDate={selectedDate}
               onSelectedDateChange={setSelectedDate}
               restoredScroll={restoredScroll}

@@ -446,6 +446,9 @@ export type AttendeeCreate = {
     category?: (string | null);
     email?: (string | null);
     gender?: (string | null);
+    additional_data?: ({
+    [key: string]: unknown;
+} | null);
 };
 
 /**
@@ -487,6 +490,9 @@ export type AttendeeListItem = {
     email?: (string | null);
     gender?: (string | null);
     poap_url?: (string | null);
+    additional_data?: {
+        [key: string]: unknown;
+    };
     id: string;
     category?: (string | null);
     created_at?: (string | null);
@@ -547,6 +553,9 @@ export type AttendeePublic = {
     email?: (string | null);
     gender?: (string | null);
     poap_url?: (string | null);
+    additional_data?: {
+        [key: string]: unknown;
+    };
     id: string;
     category?: (string | null);
     created_at?: (string | null);
@@ -669,6 +678,9 @@ export type AttendeeUpdate = {
     name?: (string | null);
     email?: (string | null);
     gender?: (string | null);
+    additional_data?: ({
+    [key: string]: unknown;
+} | null);
 };
 
 /**
@@ -691,6 +703,9 @@ export type AttendeeWithOriginPublic = {
     email?: (string | null);
     gender?: (string | null);
     poap_url?: (string | null);
+    additional_data?: {
+        [key: string]: unknown;
+    };
     id: string;
     category?: (string | null);
     created_at?: (string | null);
@@ -3752,6 +3767,20 @@ export type VenueBusySlot = {
     highlighted?: boolean;
 };
 
+/**
+ * Number of distinct published events that belong to a venue.
+ *
+ * Backs the portal venue filter so it can show per-venue counts (and hide
+ * venues with no events) without pulling the full event list to the client
+ * just to count. ``venue_title`` is included so the filter has a label
+ * without a second lookup.
+ */
+export type VenueEventCount = {
+    venue_id: string;
+    venue_title: string;
+    event_count: number;
+};
+
 export type VenueExceptionCreate = {
     start_datetime: string;
     end_datetime: string;
@@ -4759,6 +4788,7 @@ export type EventsListEventsData = {
     startBefore?: (string | null);
     trackIds?: (Array<(string)> | null);
     venueId?: (string | null);
+    visibility?: (EventVisibility | null);
     xTenantId?: (string | null);
 };
 
@@ -4960,6 +4990,7 @@ export type EventsListPortalEventsData = {
     tags?: (Array<(string)> | null);
     trackIds?: (Array<(string)> | null);
     venueId?: (string | null);
+    venueIds?: (Array<(string)> | null);
 };
 
 export type EventsListPortalEventsResponse = (ListModel_EventPublic_);
@@ -4990,6 +5021,12 @@ export type EventsListPortalTrackEventCountsData = {
 
 export type EventsListPortalTrackEventCountsResponse = (Array<TrackEventCount>);
 
+export type EventsListPortalVenueEventCountsData = {
+    popupId: string;
+};
+
+export type EventsListPortalVenueEventCountsResponse = (Array<VenueEventCount>);
+
 export type EventsPortalCalendarSummaryData = {
     managedOnly?: boolean;
     popupId: string;
@@ -4999,6 +5036,7 @@ export type EventsPortalCalendarSummaryData = {
     startBefore?: (string | null);
     tags?: (Array<(string)> | null);
     trackIds?: (Array<(string)> | null);
+    venueIds?: (Array<(string)> | null);
 };
 
 export type EventsPortalCalendarSummaryResponse = (Array<DayEventCount>);

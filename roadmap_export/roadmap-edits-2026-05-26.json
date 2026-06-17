@@ -1,0 +1,203 @@
+{
+  "doc": "roadmap-edgeos-2026",
+  "version": 3,
+  "exportedAt": "2026-05-26T16:10:10.475Z",
+  "summary": {
+    "edits": 31,
+    "deletedSections": 0,
+    "comments": 8
+  },
+  "edits": {
+    "e25": {
+      "tag": "li",
+      "content": "<br>"
+    },
+    "e22": {
+      "tag": "p",
+      "content": "Esto se manifiesta en outputs concretos:"
+    },
+    "e16": {
+      "tag": "h4",
+      "content": "Marca y branding&nbsp;adecuados al producto"
+    },
+    "e17": {
+      "tag": "p",
+      "content": "\n          EdgeOS necesita identidad y página institucional propias,\n          separadas de Simplefi.&nbsp;El branding es condición para vender pricing público y para que el\n          producto pueda salir a buscar clientes más agresivamente.\n        "
+    },
+    "e34": {
+      "tag": "li",
+      "content": "<mark data-comment-id=\"c-mpmpj1rv-njvkf\">Marketplace de side-events</mark> / community-driven sessions"
+    },
+    "e36": {
+      "tag": "li",
+      "content": "RLS multi-tenant + <mark data-comment-id=\"c-mpmpjw3d-up5dq\">theming</mark> por tenant"
+    },
+    "e41": {
+      "tag": "li",
+      "content": "<strong>Grupos</strong> — tablas correctas, pero hoy solo\n          whitelistean. No hay dashboard del leader, comms por grupo,\n          métricas de cohorte, pricing grupal, visibilidad de eventos para grupo (en desarrollo)."
+    },
+    "e58": {
+      "tag": "p",
+      "content": "<br>"
+    },
+    "e63": {
+      "tag": "li",
+      "content": "<strong>Referrals </strong>— flujo\n          de invitación nativo, tracking de chain, rewards configurables\n          por tenant.<div>- Task manager propio dentro de backoffice de edge-os. Acá gestionamos nuestras tasks pudiendo seleccionar visibilidad - clientes pueden ver las tareas que decidimos publicar.</div>"
+    },
+    "e64": {
+      "tag": "li",
+      "content": "<strong>Feedback portal embebido en el portal</strong>\n          (ver anexo A) — feature board público con prioridad, bug tracker\n          visible al cliente reporter, changelog auto-publicado."
+    },
+    "e70": {
+      "tag": "p",
+      "content": "<br>"
+    },
+    "e69": {
+      "tag": "p",
+      "content": "<br>"
+    },
+    "e82": {
+      "tag": "p",
+      "content": "\n        Self-serve mata el techo de \"no podemos servir más de 20 cuentas\n        con este equipo\". La marca propia y el\n        pricing público vuelven al producto vendible sin que Tule\n        intervenga en cada deal. Sin estos cuatro pilares juntos no\n        hay forma de pasar de 4 cuentas a 20.\n      "
+    },
+    "e86": {
+      "tag": "li",
+      "content": "<strong>Attendee Passport en <mark data-comment-id=\"c-mpmqy15m-uax8s\">GA</mark></strong>\n          — perfil cross-popup del attendee dentro del tenant.\n          Historial, preferencias, identidad verificada una sola vez.\n          Construye sobre el spike de Q3 y la versión inicial que ya existe."
+    },
+    "e68": {
+      "tag": "li",
+      "content": "<strong>Decisión Infinita</strong> — cerrar el formato en\n          que EdgeOS se ofrece a Infinita y delegar la wallet PWA.<div><br></div>"
+    },
+    "e79": {
+      "tag": "li",
+      "content": "<strong>Decisión sobre el procesador cripto</strong> —\n          hoy solo 2% de tickets de Edge usan cripto. Cripto pasa a\n          ser un tab más dentro del checkout nativo (no una salida a\n          otro sitio). La decisión es si ese tab lo sirve Simplefi o un procesador externo\n          (Coinbase Commerce, BitPay). - Mantener simplefi conlleva costo y riesgo que puede no valer la pena para este 2%."
+    },
+    "e88": {
+      "tag": "li",
+      "content": "<strong></strong><mark data-comment-id=\"c-mpms4fpd-s2dyr\"><strong>MCP server oficial de EdgeOS</strong> — agentes\n          externos (Claude Desktop, Cursor, ChatGPT) hablan con el evento\n          via el mismo API + OTP que ya existe.</mark>"
+    },
+    "e90": {
+      "tag": "li",
+      "content": "<strong>Modo \"Agent\" embebido en el portal</strong>&nbsp;/app — chat\n          lateral con scope automático según rol del usuario."
+    },
+    "e99": {
+      "tag": "li",
+      "content": "<strong>Sponsor portal</strong> — l<mark data-comment-id=\"c-mpms7a19-kte6c\">eads scanning, materials,\n          contracts, scheduling con attendees, ROI dashboard.</mark>"
+    },
+    "e105": {
+      "tag": "p",
+      "content": "\n        Para mediados de 2027 hay tres caminos abiertos según cómo haya\n        salido el año: si llegamos al stretch (USD 70–80k/mes\n        MRR), hay\n        conversación de ronda con bargaining real; si llegamos a la\n        base (USD 35–45k/mes), sigue bootstrappable y rentable; si\n        quedamos por debajo (USD 20–25k/mes) es momento de reordenar."
+    },
+    "e92": {
+      "tag": "li",
+      "content": "<strong>Credentials v1</strong> — KYC via Persona/Stripe\n          Identity para retreats con compliance + POAP emission para\n          tenants cripto. Mismo modelo, dos backends.<div>- Suite de Marketing en Backoffice - creación y gestión de campañas push, AB testing, recurrencia y motor de reglas</div>"
+    },
+    "e133": {
+      "tag": "p",
+      "content": "\n      <strong>ARPU promedio objetivo del mix Growth + Enterprise:\n      USD 3.000 / mes por cliente pago.</strong> Community no entra al\n      ARPU; entra al funnel como adquisición.\n    "
+    },
+    "e126": {
+      "tag": "td",
+      "content": "USD 1.000 – 3.000 / mes"
+    },
+    "e135": {
+      "tag": "li",
+      "content": "<strong>Community es abierto, sin aprobación previa.</strong>\n        Cualquier org que respete los constraints entra sola via\n        self-serve. Los constraints técnicos ya filtran\n        al ICP serio."
+    },
+    "e137": {
+      "tag": "li",
+      "content": "<strong>No hay Starter pago entre Community y Growth.</strong>\n        El salto de USD 0 a USD 1.000/mes es deliberadamente grande\n        porque solo se justifica cuando la org factura revenue real\n        por tickets o tiene presupuesto institucional. Un tier\n        intermedio canibalizaría Growth."
+    },
+    "e138": {
+      "tag": "h3",
+      "content": "<br>"
+    },
+    "e139": {
+      "tag": "p",
+      "content": "<br>"
+    },
+    "e140": {
+      "tag": "p",
+      "content": "\n      Próximo paso concreto sobre pricing: validar los rangos Growth\n      (USD 1–3k/mes) y Enterprise (USD 4–10k/mes) con 3–5\n      conversaciones de discovery durante Q3 antes de publicar pricing\n      en sitio en Q4. Los rangos están basados en benchmarks de\n      Cvent / Bizzabo descontados por el factor \"challenger\" y nuestro\n      target de ARPU — pero benchmark no es validación.\n    "
+    },
+    "e146": {
+      "tag": "p",
+      "content": "<br>"
+    },
+    "e163": {
+      "tag": "p",
+      "content": "\n      Cálculo: cada capa se multiplica por el ARPU promedio objetivo de\n      <strong>USD 2.000 / mes por cliente pago</strong>.&nbsp;"
+    },
+    "e168": {
+      "tag": "h4",
+      "content": "Base"
+    }
+  },
+  "deletedSections": [],
+  "comments": {
+    "c-mpmpj1rv-njvkf": {
+      "id": "c-mpmpj1rv-njvkf",
+      "author": "n",
+      "text": "a que llamas 'marketplace' de side events. no lo veo como un marketplace, los eventos son siempre gratuitos ahora, no ? podría ser una feature para adelante crear eventos con inscripción paga.",
+      "anchorText": "Marketplace de side-events",
+      "anchorEditId": "e34",
+      "createdAt": "2026-05-26T14:05:03.548Z"
+    },
+    "c-mpmpjw3d-up5dq": {
+      "id": "c-mpmpjw3d-up5dq",
+      "author": "n",
+      "text": "esto es bastante basico no? revisemos qué se puede themear hoy, y pensemos qué más tendría sentido permitir",
+      "anchorText": "theming",
+      "anchorEditId": "e36",
+      "createdAt": "2026-05-26T14:05:42.842Z"
+    },
+    "c-mpmqgply-uer7f": {
+      "id": "c-mpmqgply-uer7f",
+      "author": "n",
+      "text": "esto entiendo que ya está resuelto",
+      "anchorText": "Stripe Connect (que el tenant cobre directo — backend del checkout nativo)",
+      "anchorEditId": null,
+      "createdAt": "2026-05-26T14:31:14.087Z"
+    },
+    "c-mpmqhi0w-ghmf7": {
+      "id": "c-mpmqhi0w-ghmf7",
+      "author": "n",
+      "text": "como sería esto distinto de lo que ya tenemos con acceso agéntico para eventos?",
+      "anchorText": "Capa agéntica (MCP server + scopes + audit log)",
+      "anchorEditId": null,
+      "createdAt": "2026-05-26T14:31:50.913Z"
+    },
+    "c-mpmqy15m-uax8s": {
+      "id": "c-mpmqy15m-uax8s",
+      "author": "n",
+      "text": "Agrega tooltip explicando que es General Availability",
+      "anchorText": "GA",
+      "anchorEditId": "e86",
+      "createdAt": "2026-05-26T14:44:42.203Z"
+    },
+    "c-mpms4fpd-s2dyr": {
+      "id": "c-mpms4fpd-s2dyr",
+      "author": "n",
+      "text": "esto entiendo que ya está",
+      "anchorText": "MCP server oficial de EdgeOS — agentes externos (Claude Desktop, Cursor, ChatGPT) hablan con el evento via el mismo API + OTP que ya existe.",
+      "anchorEditId": "e88",
+      "createdAt": "2026-05-26T15:17:40.609Z"
+    },
+    "c-mpms7a19-kte6c": {
+      "id": "c-mpms7a19-kte6c",
+      "author": "n",
+      "text": "interesante, necesito más data de esto",
+      "anchorText": "eads scanning, materials, contracts, scheduling con attendees, ROI dashboard.",
+      "anchorEditId": "e99",
+      "createdAt": "2026-05-26T15:19:53.230Z"
+    },
+    "c-mpms7xdb-qr1k2": {
+      "id": "c-mpms7xdb-qr1k2",
+      "author": "n",
+      "text": "necesito mas detalle de esto",
+      "anchorText": "AI Application Triage en GA — clasificación + draft de respuesta + clustering + duplicate detection.",
+      "anchorEditId": null,
+      "createdAt": "2026-05-26T15:20:23.471Z"
+    }
+  }
+}

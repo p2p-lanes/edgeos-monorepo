@@ -39,6 +39,7 @@ import {
   useTableSearchParams,
   validateTableSearch,
 } from "@/hooks/useTableSearchParams"
+import { readAgeGroup } from "@/lib/age-group"
 import { exportToCsv, fetchAllPages } from "@/lib/export"
 
 // ── CSV flattening helper ─────────────────────────────────────────────────────
@@ -48,6 +49,7 @@ type FlatAttendeeRow = {
   email: string | null | undefined
   category: string
   gender: string | null | undefined
+  age_group: string
   product_id: string
 }
 
@@ -57,30 +59,26 @@ type FlatAttendeeRow = {
  * they still appear in the CSV. Per-ticket check_in_codes are not exported
  * here — the list endpoint does not carry them; staff can read them from
  * the attendee edit page.
+ *
+ * age_group (baby/kid/teen) is read from additional_data for "kid" attendees;
+ * blank for everyone else.
  */
 export function flattenAttendeesForCsv(
   attendees: AttendeeListItem[],
 ): FlatAttendeeRow[] {
   return attendees.flatMap((att) => {
-    const products = att.products ?? []
-    if (products.length === 0) {
-      return [
-        {
-          name: att.name,
-          email: att.email,
-          category: att.category ?? "",
-          gender: att.gender,
-          product_id: "",
-        },
-      ]
-    }
-    return products.map((p) => ({
+    const base = {
       name: att.name,
       email: att.email,
       category: att.category ?? "",
       gender: att.gender,
-      product_id: String(p.id),
-    }))
+      age_group: readAgeGroup(att) ?? "",
+    }
+    const products = att.products ?? []
+    if (products.length === 0) {
+      return [{ ...base, product_id: "" }]
+    }
+    return products.map((p) => ({ ...base, product_id: String(p.id) }))
   })
 }
 
@@ -196,6 +194,19 @@ const columns: ColumnDef<AttendeeListItem>[] = [
     ),
   },
   {
+    id: "age_group",
+    header: "Age group",
+    meta: { label: "Age group" },
+    cell: ({ row }) => {
+      const ageGroup = readAgeGroup(row.original)
+      return (
+        <span className="capitalize text-muted-foreground">
+          {ageGroup || "N/A"}
+        </span>
+      )
+    },
+  },
+  {
     id: "actions",
     header: () => <span className="sr-only">Actions</span>,
     cell: ({ row }) => (
@@ -272,7 +283,7 @@ function AttendeesTableContent() {
       columns={columns}
       data={attendees.results}
       searchPlaceholder="Search by name or email..."
-      hiddenOnMobile={["gender", "category"]}
+      hiddenOnMobile={["gender", "category", "age_group"]}
       searchValue={search}
       onSearchChange={setSearch}
       onRowClick={(row) =>
@@ -355,6 +366,7 @@ function Attendees() {
         { key: "email", label: "Email" },
         { key: "category", label: "Category" },
         { key: "gender", label: "Gender" },
+        { key: "age_group", label: "Age group" },
         { key: "product_id", label: "Product ID" },
       ])
     } finally {

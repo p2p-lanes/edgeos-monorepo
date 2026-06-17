@@ -63,7 +63,10 @@ export function freeIntervalsForDay(
   const busyIvs: Interval[] = busy
     .map(toInterval)
     .filter((b) => b.end > dayS && b.start < dayE)
-    .map((b) => ({ start: Math.max(b.start, dayS), end: Math.min(b.end, dayE) }))
+    .map((b) => ({
+      start: Math.max(b.start, dayS),
+      end: Math.min(b.end, dayE),
+    }))
     .sort((a, b) => a.start - b.start)
 
   const result: Interval[] = []
@@ -136,6 +139,49 @@ export function availableStartOptionsForDuration(
       options.push({
         label: formatInTz(t, timeZone),
         isoUtc: new Date(t).toISOString(),
+      })
+    }
+  }
+  return options.sort((a, b) => Date.parse(a.isoUtc) - Date.parse(b.isoUtc))
+}
+
+export interface DaySlotOption extends SlotOption {
+  /** Whether the full event duration fits a free window starting here. */
+  free: boolean
+}
+
+/**
+ * Every step-aligned slot inside the venue's OPEN ranges for the day, each
+ * flagged with whether the full duration fits a free window starting there.
+ * Unlike `availableStartOptionsForDuration` (free slots only), this keeps
+ * occupied/over-running slots in the list so a picker can render them
+ * grayed-out instead of hiding them.
+ */
+export function slotOptionsForDay(
+  open: OpenRange[],
+  freeIntervals: Interval[],
+  dayStart: Date,
+  dayEnd: Date,
+  durationMinutes: number,
+  stepMinutes: number,
+  timeZone: string,
+): DaySlotOption[] {
+  const dayS = dayStart.getTime()
+  const dayE = dayEnd.getTime()
+  const options: DaySlotOption[] = []
+  const seen = new Set<number>()
+  for (const r of open) {
+    const iv = toInterval(r)
+    const s = Math.max(iv.start, dayS)
+    const e = Math.min(iv.end, dayE)
+    if (s >= e) continue
+    for (const t of stepThrough({ start: s, end: e }, stepMinutes)) {
+      if (seen.has(t)) continue
+      seen.add(t)
+      options.push({
+        label: formatInTz(t, timeZone),
+        isoUtc: new Date(t).toISOString(),
+        free: durationFits(freeIntervals, t, durationMinutes),
       })
     }
   }
@@ -262,8 +308,7 @@ export function utcToLocalTzNaive(iso: string, timeZone: string): string {
     minute: "2-digit",
     hour12: false,
   }).formatToParts(d)
-  const get = (t: string) =>
-    parts.find((p) => p.type === t)?.value ?? "00"
+  const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "00"
   // Intl can emit "24" for midnight in some locales; normalize to "00".
   const hour = get("hour") === "24" ? "00" : get("hour")
   return `${get("year")}-${get("month")}-${get("day")}T${hour}:${get("minute")}`

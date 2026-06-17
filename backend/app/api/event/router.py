@@ -44,6 +44,7 @@ from app.api.event.schemas import (
     OccurrenceRef,
     RecurrenceUpdate,
     TrackEventCount,
+    VenueEventCount,
 )
 from app.api.event_audit.crud import build_event_snapshot, record_event_audit
 from app.api.event_audit.schemas import EventAuditAction
@@ -366,6 +367,7 @@ def _to_public(
     event,
     venue_map: dict[uuid.UUID, VenueInfo] | None = None,
     track_map: dict[uuid.UUID, str] | None = None,
+    count_map: dict[uuid.UUID, int] | None = None,
 ) -> EventPublic:
     """Convert an Events row (or expanded pseudo-row) to EventPublic.
 
@@ -373,7 +375,8 @@ def _to_public(
     :func:`app.api.event.crud._clone_as_occurrence`.
 
     ``venue_map``/``track_map`` let callers pre-fetch venues/tracks in a
-    single query and avoid N+1 when serializing a list.
+    single query and avoid N+1 when serializing a list. ``count_map`` does the
+    same for the RSVP ``attendee_count`` shown in the backoffice event list.
     """
     # ``custom_location_name``/``custom_location_url`` live on EventBase and
     # are picked up automatically by ``model_validate`` — no extra plumbing.
@@ -397,6 +400,8 @@ def _to_public(
             updates["track_title"] = track_map[event.track_id]
         elif track_map is None and getattr(event, "track", None) is not None:
             updates["track_title"] = event.track.name
+    if count_map is not None:
+        updates["attendee_count"] = count_map.get(event.id, 0)
     if updates:
         data = data.model_copy(update=updates)
     return data
@@ -1103,8 +1108,13 @@ async def list_events(
 
     venue_map = _venue_map_for_events(db, events)
     track_map = _track_map_for_events(db, events)
+    from app.api.event_participant.crud import event_participants_crud
+
+    count_map = event_participants_crud.count_active_for_events(
+        db, [e.id for e in events]
+    )
     return ListModel[EventPublic](
-        results=[_to_public(e, venue_map, track_map) for e in events],
+        results=[_to_public(e, venue_map, track_map, count_map) for e in events],
         paging=Paging(offset=skip, limit=limit, total=total),
     )
 
@@ -2625,6 +2635,7 @@ async def list_portal_events(
     event_status: EventStatus | None = None,
     kind: str | None = None,
     venue_id: uuid.UUID | None = None,
+    venue_ids: list[uuid.UUID] | None = Query(default=None),
     track_ids: list[uuid.UUID] | None = Query(default=None),
     tags: list[str] | None = Query(default=None),
     start_after: datetime | None = None,
@@ -2645,6 +2656,7 @@ async def list_portal_events(
             event_status=event_status,
             kind=kind,
             venue_id=venue_id,
+            venue_ids=venue_ids,
             track_ids=track_ids,
             tags=tags,
             start_after=start_after,
@@ -2821,6 +2833,25 @@ async def list_portal_track_event_counts(
     ]
 
 
+@router.get("/portal/events/venue-counts", response_model=list[VenueEventCount])
+async def list_portal_venue_event_counts(
+    db: HumanTenantSession,
+    _: CurrentHuman,
+    popup_id: uuid.UUID,
+) -> list[VenueEventCount]:
+    """Distinct published-event count per venue for a popup.
+
+    Lets the portal venue filter render labels + counts and hide venues with
+    no events without fetching the whole event list to count on the client
+    (which also capped at the page limit).
+    """
+    rows = crud.events_crud.count_published_events_by_venue(db, popup_id=popup_id)
+    return [
+        VenueEventCount(venue_id=venue_id, venue_title=venue_title, event_count=count)
+        for venue_id, venue_title, count in rows
+    ]
+
+
 @router.get("/portal/events/calendar-summary", response_model=list[DayEventCount])
 async def portal_calendar_summary(
     db: HumanTenantSession,
@@ -2831,6 +2862,7 @@ async def portal_calendar_summary(
     search: str | None = None,
     tags: list[str] | None = Query(default=None),
     track_ids: list[uuid.UUID] | None = Query(default=None),
+    venue_ids: list[uuid.UUID] | None = Query(default=None),
     rsvped_only: bool = False,
     managed_only: bool = False,
 ) -> list[DayEventCount]:
@@ -2855,6 +2887,7 @@ async def portal_calendar_summary(
         search=search,
         tags=tags,
         track_ids=track_ids,
+        venue_ids=venue_ids,
         managed_by_human_id=current_human.id if managed_only else None,
     )
     # Managed events are visible to the manager by definition, so skip the

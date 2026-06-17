@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Skeleton } from "@/components/ui/skeleton"
 import useCustomToast from "@/hooks/useCustomToast"
+import { readAgeGroup } from "@/lib/age-group"
 import { createErrorHandler } from "@/utils"
 
 export const Route = createFileRoute("/_layout/attendees/$attendeeId")({
@@ -54,6 +55,10 @@ function AttendeeEditContent({ attendeeId }: { attendeeId: string }) {
       })
     }
   }, [attendee, dirty])
+
+  // Age group (baby/kid/teen) is collected in the portal and stored in
+  // additional_data; it is shown read-only here (not editable from the BO).
+  const ageGroup = readAgeGroup(attendee)
 
   const saveMutation = useMutation({
     mutationFn: () =>
@@ -132,6 +137,14 @@ function AttendeeEditContent({ attendeeId }: { attendeeId: string }) {
               }}
             />
           </div>
+          {ageGroup && (
+            <div className="space-y-1.5">
+              <Label>Age group</Label>
+              <p className="text-sm capitalize text-muted-foreground">
+                {ageGroup}
+              </p>
+            </div>
+          )}
           <div className="flex justify-end">
             <Button
               onClick={() => saveMutation.mutate()}
