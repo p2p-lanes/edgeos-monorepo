@@ -1,5 +1,3 @@
-import hashlib
-import hmac
 import urllib.parse
 from decimal import Decimal
 from typing import Any
@@ -303,44 +301,3 @@ class SimpleFIClient:
 def get_simplefi_client(api_key: str) -> SimpleFIClient:
     """Get a SimpleFI client instance with the provided API key."""
     return SimpleFIClient(api_key)
-
-
-def verify_webhook_signature(
-    payload: bytes, signature: str | None, secret: str | None
-) -> bool:
-    """
-    Verify SimpleFI webhook signature using HMAC-SHA256.
-
-    Args:
-        payload: Raw request body bytes
-        signature: Signature from X-SimpleFI-Signature header
-        secret: The popup's simplefi_api_key used as webhook secret
-
-    Returns:
-        True if signature is valid or secret is not configured (skip validation).
-        False if signature is invalid.
-    """
-    # Skip validation if no secret is configured
-    if not secret:
-        logger.warning("No SimpleFI API key configured, skipping signature validation")
-        return True
-
-    # Reject if signature is missing but secret is configured
-    if not signature:
-        logger.warning("Missing webhook signature header")
-        return False
-
-    # Compute expected signature
-    expected = hmac.new(
-        secret.encode("utf-8"),
-        payload,
-        hashlib.sha256,
-    ).hexdigest()
-
-    # Compare signatures using constant-time comparison
-    is_valid = hmac.compare_digest(expected, signature)
-
-    if not is_valid:
-        logger.warning("Invalid webhook signature")
-
-    return is_valid

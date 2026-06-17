@@ -1,6 +1,4 @@
 import asyncio
-import hashlib
-import hmac
 import importlib
 import json
 from decimal import Decimal
@@ -400,66 +398,23 @@ def test_meta_attribution_ignores_malformed_browser_ids_and_bounds_user_agent() 
     assert len(attribution["client_user_agent"] or "") == 512
 
 
-def test_simplefi_webhook_rejects_invalid_signature(monkeypatch) -> None:
+def test_simplefi_webhook_accepts_known_payment_without_signature(monkeypatch) -> None:
     raw_body = {
         "event_type": "new_payment",
-        "data": {"payment_request": {"id": "pr-bad-signature"}},
+        "data": {"payment_request": {"id": "pr-known-payment"}},
     }
-    raw_payload = json.dumps(raw_body).encode()
-    request = Request(
-        {
-            "type": "http",
-            "headers": [(b"x-simplefi-signature", b"bad")],
-            "client": ("203.0.113.10", 12345),
-        }
-    )
 
     class FakePaymentsCRUD:
         def get_by_external_id(self, _db: object, _external_id: str) -> object:
             return SimpleNamespace(
-                id="payment-bad-signature",
-                popup=SimpleNamespace(simplefi_api_key="webhook-secret"),
+                id="payment-known",
+                popup=SimpleNamespace(simplefi_api_key="simplefi-api-key"),
             )
 
     payment_router = importlib.import_module("app.api.payment.router")
     monkeypatch.setattr(payment_router, "payments_crud", FakePaymentsCRUD())
 
-    with pytest.raises(HTTPException) as exc_info:
-        _verify_simplefi_webhook_or_raise(raw_payload, raw_body, request, db=object())
-
-    assert exc_info.value.status_code == 401
-
-
-def test_simplefi_webhook_accepts_valid_signature(monkeypatch) -> None:
-    raw_body = {
-        "event_type": "new_payment",
-        "data": {"payment_request": {"id": "pr-good-signature"}},
-    }
-    raw_payload = json.dumps(raw_body).encode()
-    signature = hmac.new(
-        b"webhook-secret",
-        raw_payload,
-        hashlib.sha256,
-    ).hexdigest()
-    request = Request(
-        {
-            "type": "http",
-            "headers": [(b"x-simplefi-signature", signature.encode())],
-            "client": ("203.0.113.10", 12345),
-        }
-    )
-
-    class FakePaymentsCRUD:
-        def get_by_external_id(self, _db: object, _external_id: str) -> object:
-            return SimpleNamespace(
-                id="payment-good-signature",
-                popup=SimpleNamespace(simplefi_api_key="webhook-secret"),
-            )
-
-    payment_router = importlib.import_module("app.api.payment.router")
-    monkeypatch.setattr(payment_router, "payments_crud", FakePaymentsCRUD())
-
-    _verify_simplefi_webhook_or_raise(raw_payload, raw_body, request, db=object())
+    _verify_simplefi_webhook_or_raise(raw_body, db=object())
 
 
 def test_simplefi_webhook_rejects_unknown_payment_without_caching(

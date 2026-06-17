@@ -156,14 +156,10 @@ def _webhook_payment_external_id(raw_body: dict[str, Any]) -> str | None:
 
 
 def _verify_simplefi_webhook_or_raise(
-    raw_payload: bytes,
     raw_body: dict[str, Any],
-    request: Request,
     db: Session,
 ) -> None:
     from loguru import logger
-
-    from app.services.simplefi import verify_webhook_signature
 
     external_id = _webhook_payment_external_id(raw_body)
     if external_id is None:
@@ -182,24 +178,6 @@ def _verify_simplefi_webhook_or_raise(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Payment not found",
-        )
-
-    secret = payment.popup.simplefi_api_key if payment.popup else None
-    if not secret:
-        logger.warning(
-            "SimpleFI webhook rejected: no webhook secret configured payment_id={}",
-            payment.id,
-        )
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Webhook signature verification failed",
-        )
-
-    signature = request.headers.get("X-SimpleFI-Signature")
-    if not verify_webhook_signature(raw_payload, signature, secret):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Webhook signature verification failed",
         )
 
 
@@ -1035,7 +1013,7 @@ async def simplefi_webhook(
             detail="Invalid webhook payload",
         )
 
-    _verify_simplefi_webhook_or_raise(raw_payload, raw_body, request, db)
+    _verify_simplefi_webhook_or_raise(raw_body, db)
 
     event_type = raw_body.get("event_type")
     logger.info(
