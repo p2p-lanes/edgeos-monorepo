@@ -7056,7 +7056,7 @@ export class TenantsService {
      * No authentication required — used by portal middleware on every request.
      * @param data The data for the request.
      * @param data.domain
-     * @returns TenantPublic Successful Response
+     * @returns TenantAnonymousPublic Successful Response
      * @throws ApiError
      */
     public static getTenantByDomain(data: TenantsGetTenantByDomainData): CancelablePromise<TenantsGetTenantByDomainResponse> {
@@ -7076,7 +7076,7 @@ export class TenantsService {
      * Get Tenant By Slug
      * @param data The data for the request.
      * @param data.slug
-     * @returns TenantPublic Successful Response
+     * @returns TenantAnonymousPublic Successful Response
      * @throws ApiError
      */
     public static getTenantBySlug(data: TenantsGetTenantBySlugData): CancelablePromise<TenantsGetTenantBySlugResponse> {

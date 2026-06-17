@@ -10947,6 +10947,30 @@ export const OpenTicketingPurchaseCreateSchema = {
                 }
             ],
             title: 'Coupon Code'
+        },
+        fbc: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 512
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Fbc'
+        },
+        fbp: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 512
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Fbp'
         }
     },
     type: 'object',
@@ -16651,6 +16675,140 @@ export const TemplateVariableSchema = {
     title: 'TemplateVariable'
 } as const;
 
+export const TenantAnonymousPublicSchema = {
+    properties: {
+        name: {
+            type: 'string',
+            maxLength: 255,
+            title: 'Name'
+        },
+        slug: {
+            type: 'string',
+            maxLength: 255,
+            title: 'Slug'
+        },
+        deleted: {
+            type: 'boolean',
+            title: 'Deleted',
+            default: false
+        },
+        sender_email: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 255,
+                    format: 'email'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Sender Email'
+        },
+        sender_name: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 255
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Sender Name'
+        },
+        image_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Image Url'
+        },
+        icon_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Icon Url'
+        },
+        logo_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Logo Url'
+        },
+        custom_domain: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 253
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Custom Domain'
+        },
+        custom_domain_active: {
+            type: 'boolean',
+            title: 'Custom Domain Active'
+        },
+        landing_mode: {
+            '$ref': '#/components/schemas/LandingMode',
+            default: 'portal'
+        },
+        meta_tracking_enabled: {
+            type: 'boolean',
+            title: 'Meta Tracking Enabled',
+            default: false
+        },
+        meta_pixel_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 64
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Meta Pixel Id'
+        },
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        active_popup_slug: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Active Popup Slug'
+        }
+    },
+    type: 'object',
+    required: ['name', 'slug', 'custom_domain_active', 'id'],
+    title: 'TenantAnonymousPublic'
+} as const;
+
 export const TenantCreateSchema = {
     properties: {
         name: {
@@ -16718,6 +16876,23 @@ export const TenantCreateSchema = {
                 }
             ],
             title: 'Logo Url'
+        },
+        meta_tracking_enabled: {
+            type: 'boolean',
+            title: 'Meta Tracking Enabled',
+            default: false
+        },
+        meta_pixel_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 64
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Meta Pixel Id'
         }
     },
     type: 'object',
@@ -16847,10 +17022,32 @@ export const TenantPublicSchema = {
             '$ref': '#/components/schemas/LandingMode',
             default: 'portal'
         },
+        meta_tracking_enabled: {
+            type: 'boolean',
+            title: 'Meta Tracking Enabled',
+            default: false
+        },
+        meta_pixel_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 64
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Meta Pixel Id'
+        },
         id: {
             type: 'string',
             format: 'uuid',
             title: 'Id'
+        },
+        meta_capi_configured: {
+            type: 'boolean',
+            title: 'Meta Capi Configured',
+            default: false
         },
         active_popup_slug: {
             anyOf: [
@@ -16969,6 +17166,40 @@ export const TenantUpdateSchema = {
                     type: 'null'
                 }
             ]
+        },
+        meta_tracking_enabled: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Meta Tracking Enabled'
+        },
+        meta_pixel_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 64
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Meta Pixel Id'
+        },
+        meta_capi_access_token: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Meta Capi Access Token'
         }
     },
     type: 'object',
