@@ -5,10 +5,12 @@ from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from unittest.mock import patch
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session, select
 
 from app.api.attendee.models import Attendees
+from app.api.coupon.models import Coupons
 from app.api.form_field.models import FormFields
 from app.api.form_section.models import FormSections
 from app.api.payment.models import Payments
@@ -17,6 +19,17 @@ from app.api.product.models import Products
 from app.api.shared.enums import SaleType
 from app.api.tenant.models import Tenants
 from tests.conftest import with_origin
+
+
+@pytest.fixture(autouse=True)
+def disable_purchase_rate_limit() -> None:
+    """Keep purchase tests isolated from shared rate-limit state.
+
+    The dedicated rate-limit test overrides this fixture with its own mocked
+    Redis client to keep asserting the 429 behavior.
+    """
+    with patch("app.core.rate_limit.get_redis", return_value=None):
+        yield
 
 
 def _make_popup(
@@ -66,6 +79,26 @@ def _make_product(
     db.add(product)
     db.flush()
     return product
+
+
+def _make_coupon(
+    db: Session,
+    popup: Popups,
+    *,
+    code: str,
+    discount_value: int,
+) -> Coupons:
+    coupon = Coupons(
+        id=uuid.uuid4(),
+        tenant_id=popup.tenant_id,
+        popup_id=popup.id,
+        code=code,
+        discount_value=discount_value,
+        is_active=True,
+    )
+    db.add(coupon)
+    db.flush()
+    return coupon
 
 
 def _make_section(
@@ -254,6 +287,45 @@ def test_purchase_provider_failure_returns_502(
         )
 
     assert response.status_code == 502, response.text
+
+
+def test_zero_amount_purchase_attempts_capi_when_email_fails(
+    client: TestClient,
+    db: Session,
+    tenant_a: Tenants,
+) -> None:
+    popup = _make_popup(db, tenant_a, slug_prefix="free-capi")
+    product = _make_product(db, popup, price="75.00")
+    _make_coupon(db, popup, code="FREEPASS", discount_value=100)
+    db.commit()
+
+    async def failing_email(*_args, **_kwargs) -> None:
+        raise RuntimeError("email failed")
+
+    with (
+        patch("app.api.checkout.router._send_payment_confirmed_email", failing_email),
+        patch("app.api.checkout.router.enqueue_purchase_event") as mock_enqueue,
+        patch("app.services.simplefi.get_simplefi_client") as mock_get_client,
+    ):
+        response = client.post(
+            f"/api/v1/checkout/{popup.slug}/purchase",
+            json={
+                "products": [{"product_id": str(product.id), "quantity": 1}],
+                "buyer": {
+                    "email": "buyer@test.com",
+                    "first_name": "Matias",
+                    "last_name": "Walter",
+                    "form_data": {},
+                },
+                "coupon_code": "FREEPASS",
+            },
+            headers={"X-Tenant-Id": str(tenant_a.id)},
+        )
+
+    assert response.status_code == 200, response.text
+    assert response.json()["status"] == "approved"
+    mock_get_client.assert_not_called()
+    mock_enqueue.assert_called_once()
 
 
 def test_purchase_with_ended_sale_window_returns_422(

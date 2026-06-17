@@ -5,7 +5,8 @@ Endpoints:
 - POST /checkout/{slug}/purchase — public, anonymous, rate-limited 10/min/IP
 """
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, BackgroundTasks, Depends, Request
+from loguru import logger
 
 from app.api.checkout.crud import get_open_ticketing_popup, runtime_for_slug
 from app.api.checkout.schemas import (
@@ -14,13 +15,38 @@ from app.api.checkout.schemas import (
     OpenTicketingPurchaseResponse,
 )
 from app.api.payment.crud import payments_crud
-from app.api.payment.router import _send_payment_confirmed_email
+from app.api.payment.router import (
+    _extract_meta_attribution,
+    _send_payment_confirmed_email,
+)
 from app.api.payment.schemas import PaymentStatus
 from app.core.dependencies.tenants import PublicTenant
 from app.core.dependencies.users import SessionDep
 from app.core.rate_limit import RateLimit
+from app.services.meta_capi import enqueue_purchase_event
 
 router = APIRouter(prefix="/checkout", tags=["checkout"])
+
+
+def _enqueue_checkout_purchase_event(
+    background_tasks: BackgroundTasks,
+    *,
+    tenant: object,
+    payment: object,
+    popup: object,
+) -> None:
+    try:
+        enqueue_purchase_event(
+            background_tasks,
+            tenant=tenant,
+            payment=payment,
+            popup=popup,
+        )
+    except Exception:
+        logger.exception(
+            "Failed to queue Meta CAPI Purchase event payment_id={}",
+            getattr(payment, "id", ""),
+        )
 
 
 @router.get(
@@ -55,6 +81,8 @@ async def get_runtime(
 async def purchase_open_ticketing(
     slug: str,
     request_in: OpenTicketingPurchaseCreate,
+    request: Request,
+    background_tasks: BackgroundTasks,
     db: SessionDep,
     tenant: PublicTenant,
 ) -> OpenTicketingPurchaseResponse:
@@ -66,10 +94,27 @@ async def purchase_open_ticketing(
         obj=request_in,
         popup=popup,
         tenant=tenant,
+        attribution=_extract_meta_attribution(
+            request,
+            fbc=request_in.fbc,
+            fbp=request_in.fbp,
+        ),
     )
 
     if payment.status == PaymentStatus.APPROVED.value:
-        await _send_payment_confirmed_email(payment, db_session=db)
+        _enqueue_checkout_purchase_event(
+            background_tasks,
+            tenant=tenant,
+            payment=payment,
+            popup=popup,
+        )
+        try:
+            await _send_payment_confirmed_email(payment, db_session=db)
+        except Exception:
+            logger.exception(
+                "Failed to send open-ticketing payment confirmation email payment_id={}",
+                payment.id,
+            )
 
     return OpenTicketingPurchaseResponse(
         payment_id=payment.id,

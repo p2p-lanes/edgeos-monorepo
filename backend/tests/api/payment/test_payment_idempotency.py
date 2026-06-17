@@ -148,6 +148,43 @@ def test_duplicate_submit_within_window_returns_existing_payment(
     )
 
 
+def test_create_payment_persists_meta_attribution_for_my_payment_path(
+    db: Session, tenant_a: Tenants
+) -> None:
+    popup = _make_popup(db, tenant_a)
+    product = _make_free_product(db, popup)
+    human = _make_human(db, tenant_a)
+    app, attendee = _make_app_and_attendee(db, popup, human)
+    db.commit()
+
+    obj = PaymentCreate(
+        application_id=app.id,
+        products=[
+            PaymentProductRequest(
+                product_id=product.id,
+                attendee_id=attendee.id,
+                quantity=1,
+            )
+        ],
+    )
+
+    payment, _ = payments_crud.create_payment(
+        db,
+        obj,
+        attribution={
+            "fbc": "fb.1.1710000000.click",
+            "fbp": "fb.1.1710000000.browser",
+            "client_ip": "203.0.113.10",
+            "client_user_agent": "Mozilla/5.0 Test",
+        },
+    )
+
+    assert payment.meta_fbc == "fb.1.1710000000.click"
+    assert payment.meta_fbp == "fb.1.1710000000.browser"
+    assert payment.meta_client_ip == "203.0.113.10"
+    assert payment.meta_client_user_agent == "Mozilla/5.0 Test"
+
+
 def test_different_products_within_window_creates_new_payment(
     db: Session, tenant_a: Tenants
 ) -> None:

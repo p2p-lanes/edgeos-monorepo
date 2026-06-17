@@ -3,7 +3,7 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING, Optional
 
-from sqlalchemy import Index, Numeric, text
+from sqlalchemy import Index, Numeric, String, Text, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlmodel import Column, DateTime, Field, Relationship, SQLModel, func
 
@@ -84,6 +84,22 @@ class Payments(PaymentBase, table=True):
             onupdate=func.now(),
             nullable=False,
         ),
+    )
+    meta_fbc: str | None = Field(
+        default=None,
+        sa_column=Column(String(512), nullable=True),
+    )
+    meta_fbp: str | None = Field(
+        default=None,
+        sa_column=Column(String(512), nullable=True),
+    )
+    meta_client_ip: str | None = Field(
+        default=None,
+        sa_column=Column(String(128), nullable=True),
+    )
+    meta_client_user_agent: str | None = Field(
+        default=None,
+        sa_column=Column(Text, nullable=True),
     )
 
     # Relationships
