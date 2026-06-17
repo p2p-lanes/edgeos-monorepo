@@ -17,6 +17,9 @@ Spec references:
   §Domain 5 "add_product Enforces Stock Caps"
 """
 
+import hashlib
+import hmac
+import json
 import threading
 import uuid
 from decimal import Decimal
@@ -195,6 +198,17 @@ def _make_simplefi_expired_webhook_body(payment_request_id: str) -> dict:
     }
 
 
+def _signed_simplefi_webhook_request(
+    body: dict, secret: str
+) -> tuple[bytes, dict[str, str]]:
+    raw_body = json.dumps(body, separators=(",", ":")).encode("utf-8")
+    signature = hmac.new(secret.encode("utf-8"), raw_body, hashlib.sha256).hexdigest()
+    return raw_body, {
+        "Content-Type": "application/json",
+        "X-SimpleFI-Signature": signature,
+    }
+
+
 # ---------------------------------------------------------------------------
 # 7.1 Concurrent checkout race
 # ---------------------------------------------------------------------------
@@ -294,10 +308,15 @@ class TestWebhookExpiryRestoration:
         stock_before = db.get(Products, product.id).total_stock_remaining
         assert stock_before == 7
 
-        # Fire the webhook via HTTP — no auth required on webhook endpoints
+        raw_body, headers = _signed_simplefi_webhook_request(
+            _make_simplefi_expired_webhook_body(external_id), popup.simplefi_api_key
+        )
+
+        # Fire the webhook via HTTP with the popup SimpleFI webhook signature.
         response = client.post(
             "/api/v1/payments/webhook/simplefi",
-            json=_make_simplefi_expired_webhook_body(external_id),
+            content=raw_body,
+            headers=headers,
         )
 
         assert response.status_code == 200, response.text
@@ -331,9 +350,14 @@ class TestWebhookExpiryRestoration:
         )
 
         webhook_body = _make_simplefi_expired_webhook_body(external_id)
+        raw_body, headers = _signed_simplefi_webhook_request(
+            webhook_body, popup.simplefi_api_key
+        )
 
         # First fire — should restore
-        r1 = client.post("/api/v1/payments/webhook/simplefi", json=webhook_body)
+        r1 = client.post(
+            "/api/v1/payments/webhook/simplefi", content=raw_body, headers=headers
+        )
         assert r1.status_code == 200
 
         db.expire_all()
@@ -343,7 +367,12 @@ class TestWebhookExpiryRestoration:
         # Second fire — different fingerprint event_id so no cache dedup;
         # but payment is now EXPIRED so update_status is a no-op
         webhook_body["id"] = f"evt-second-{uuid.uuid4().hex[:8]}"
-        r2 = client.post("/api/v1/payments/webhook/simplefi", json=webhook_body)
+        raw_body, headers = _signed_simplefi_webhook_request(
+            webhook_body, popup.simplefi_api_key
+        )
+        r2 = client.post(
+            "/api/v1/payments/webhook/simplefi", content=raw_body, headers=headers
+        )
         assert r2.status_code == 200
 
         db.expire_all()
