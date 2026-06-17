@@ -20,7 +20,9 @@ export interface UseEditEventFormResult {
   trackId: string
   setTrackId: (next: string) => void
   visibility: Visibility
-  setVisibility: (next: Visibility) => void
+  handleVisibilityChange: (next: Visibility) => void
+  groupId: string
+  setGroupId: (next: string) => void
   maxParticipants: string
   setMaxParticipants: (next: string) => void
   meetingUrl: string
@@ -60,6 +62,13 @@ export function useEditEventForm(event: EventPublic): UseEditEventFormResult {
   const [visibility, setVisibility] = useState<Visibility>(
     () => (event.visibility as Visibility) ?? "public",
   )
+  const [groupId, setGroupId] = useState<string>(() => event.group_id ?? "")
+
+  const handleVisibilityChange = (next: Visibility) => {
+    setVisibility(next)
+    if (next !== "private") setGroupId("")
+  }
+
   const [maxParticipants, setMaxParticipants] = useState(() =>
     event.max_participant != null ? String(event.max_participant) : "",
   )
@@ -95,6 +104,7 @@ export function useEditEventForm(event: EventPublic): UseEditEventFormResult {
       custom_location_url: isCustom ? customLocationUrl.trim() || null : null,
       track_id: trackId || null,
       visibility,
+      group_id: visibility === "private" ? groupId || null : null,
       max_participant: maxParticipants
         ? Math.max(0, Number.parseInt(maxParticipants, 10))
         : null,
@@ -121,7 +131,9 @@ export function useEditEventForm(event: EventPublic): UseEditEventFormResult {
     trackId,
     setTrackId,
     visibility,
-    setVisibility,
+    handleVisibilityChange,
+    groupId,
+    setGroupId,
     maxParticipants,
     setMaxParticipants,
     meetingUrl,
