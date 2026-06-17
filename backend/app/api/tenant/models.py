@@ -1,7 +1,7 @@
 import uuid
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Index, text
+from sqlalchemy import Index, Text, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlmodel import Column, Field, Relationship
 
@@ -40,6 +40,15 @@ class Tenants(TenantBase, table=True):
             primary_key=True,
         ),
     )
+
+    meta_capi_access_token_encrypted: str | None = Field(
+        default=None,
+        sa_column=Column(Text(), nullable=True),
+    )
+
+    @property
+    def meta_capi_configured(self) -> bool:
+        return bool(self.meta_capi_access_token_encrypted)
 
     # Third-party app integrations (replaces v1 single-key columns)
     third_party_apps: list["ThirdPartyApps"] = Relationship(

@@ -9,6 +9,7 @@ import {
   Info,
   Lock,
   Mail,
+  Megaphone,
   ShoppingCart,
   User,
 } from "lucide-react"
@@ -153,10 +154,13 @@ export function TenantForm({ defaultValues, onSuccess }: TenantFormProps) {
       landing_mode: (defaultValues?.landing_mode ?? "portal") as
         | "portal"
         | "checkout",
+      meta_tracking_enabled: defaultValues?.meta_tracking_enabled ?? false,
+      meta_pixel_id: defaultValues?.meta_pixel_id ?? "",
+      meta_capi_access_token: "",
     },
     onSubmit: ({ value }) => {
       if (isEdit) {
-        updateMutation.mutate({
+        const updateData: TenantUpdate = {
           name: value.name || null,
           sender_email: value.sender_email || null,
           sender_name: value.sender_name || null,
@@ -166,6 +170,14 @@ export function TenantForm({ defaultValues, onSuccess }: TenantFormProps) {
           // Map empty string to null for domain; never send custom_domain_active
           custom_domain: value.custom_domain || null,
           landing_mode: value.landing_mode,
+          meta_tracking_enabled: value.meta_tracking_enabled,
+          meta_pixel_id: value.meta_pixel_id || null,
+        }
+        if (value.meta_capi_access_token) {
+          updateData.meta_capi_access_token = value.meta_capi_access_token
+        }
+        updateMutation.mutate({
+          ...updateData,
         })
       } else {
         createMutation.mutate({
@@ -175,6 +187,8 @@ export function TenantForm({ defaultValues, onSuccess }: TenantFormProps) {
           image_url: value.image_url || undefined,
           icon_url: value.icon_url || undefined,
           logo_url: value.logo_url || undefined,
+          meta_tracking_enabled: value.meta_tracking_enabled,
+          meta_pixel_id: value.meta_pixel_id || undefined,
         })
       }
     },
@@ -341,6 +355,98 @@ export function TenantForm({ defaultValues, onSuccess }: TenantFormProps) {
               </div>
             )}
           </form.Field>
+        </InlineSection>
+
+        <Separator />
+
+        {/* Marketing Tracking */}
+        <InlineSection title="Marketing Tracking">
+          <form.Field name="meta_tracking_enabled">
+            {(field) => (
+              <InlineRow
+                icon={<Megaphone className="h-4 w-4 text-muted-foreground" />}
+                label="Meta Pixel"
+                description="Load the tenant's Meta Pixel on the portal and checkout."
+              >
+                <Switch
+                  id="meta_tracking_enabled"
+                  aria-label="Meta Pixel"
+                  checked={field.state.value}
+                  onCheckedChange={field.handleChange}
+                />
+              </InlineRow>
+            )}
+          </form.Field>
+
+          <form.Field
+            name="meta_pixel_id"
+            validators={{
+              onBlur: ({ value, fieldApi }) => {
+                const enabled = fieldApi.form.getFieldValue(
+                  "meta_tracking_enabled",
+                )
+                if (enabled && !value)
+                  return "Pixel ID is required when tracking is enabled"
+                if (value && !/^\d+$/.test(value))
+                  return "Pixel ID must contain only numbers"
+                return undefined
+              },
+            }}
+          >
+            {(field) => (
+              <div>
+                <InlineRow
+                  icon={<Megaphone className="h-4 w-4 text-muted-foreground" />}
+                  label="Meta Pixel ID"
+                  description="Shared by all popups in this organization."
+                >
+                  <Input
+                    placeholder="2118290588572651"
+                    value={field.state.value}
+                    onBlur={field.handleBlur}
+                    onChange={(e) => field.handleChange(e.target.value)}
+                    className="max-w-xs text-sm"
+                    inputMode="numeric"
+                  />
+                </InlineRow>
+                <FieldError errors={field.state.meta.errors} />
+              </div>
+            )}
+          </form.Field>
+
+          {isEdit && (
+            <form.Field name="meta_capi_access_token">
+              {(field) => (
+                <InlineRow
+                  icon={<Lock className="h-4 w-4 text-muted-foreground" />}
+                  label="CAPI Access Token"
+                  description={
+                    defaultValues?.meta_capi_configured
+                      ? "A token is configured. Enter a new token only to replace it."
+                      : "Optional server-side Conversions API token. Stored encrypted."
+                  }
+                >
+                  <div className="flex items-center gap-2">
+                    <Input
+                      placeholder={
+                        defaultValues?.meta_capi_configured
+                          ? "Configured"
+                          : "Paste access token"
+                      }
+                      type="password"
+                      value={field.state.value}
+                      onBlur={field.handleBlur}
+                      onChange={(e) => field.handleChange(e.target.value)}
+                      className="max-w-xs text-sm"
+                    />
+                    {defaultValues?.meta_capi_configured && (
+                      <Badge variant="outline">Configured</Badge>
+                    )}
+                  </div>
+                </InlineRow>
+              )}
+            </form.Field>
+          )}
         </InlineSection>
 
         <Separator />

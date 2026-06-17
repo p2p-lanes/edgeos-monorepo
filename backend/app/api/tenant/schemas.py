@@ -21,6 +21,8 @@ class TenantBase(SQLModel):
     custom_domain: str | None = Field(default=None, max_length=253)
     custom_domain_active: bool = False
     landing_mode: LandingMode = LandingMode.portal
+    meta_tracking_enabled: bool = False
+    meta_pixel_id: str | None = Field(default=None, max_length=64)
 
 
 class TenantCreate(SQLModel):
@@ -31,6 +33,8 @@ class TenantCreate(SQLModel):
     image_url: str | None = None
     icon_url: str | None = None
     logo_url: str | None = None
+    meta_tracking_enabled: bool = False
+    meta_pixel_id: str | None = Field(default=None, max_length=64)
 
     @model_validator(mode="after")
     def generate_slug(self) -> Self:
@@ -54,6 +58,9 @@ class TenantUpdate(SQLModel):
     custom_domain: str | None = None
     custom_domain_active: bool | None = None
     landing_mode: LandingMode | None = None
+    meta_tracking_enabled: bool | None = None
+    meta_pixel_id: str | None = Field(default=None, max_length=64)
+    meta_capi_access_token: str | None = Field(default=None, exclude=True)
 
     @model_validator(mode="after")
     def validate_custom_domain(self) -> Self:
@@ -109,6 +116,15 @@ class TenantUpdate(SQLModel):
 
 
 class TenantPublic(TenantBase):
+    id: uuid.UUID
+    custom_domain_active: bool  # required, no default — forces non-optional in OpenAPI
+    meta_capi_configured: bool = False
+    # Computed projection — NOT a DB column. Populated by the router after resolving
+    # the active direct-sale popup for tenants in landing_mode=checkout.
+    active_popup_slug: str | None = None
+
+
+class TenantAnonymousPublic(TenantBase):
     id: uuid.UUID
     custom_domain_active: bool  # required, no default — forces non-optional in OpenAPI
     # Computed projection — NOT a DB column. Populated by the router after resolving
