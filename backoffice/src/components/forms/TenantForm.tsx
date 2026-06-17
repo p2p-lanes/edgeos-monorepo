@@ -401,7 +401,7 @@ export function TenantForm({ defaultValues, onSuccess }: TenantFormProps) {
                   description="Shared by all popups in this organization."
                 >
                   <Input
-                    placeholder="2118290588572651"
+                    placeholder="123456789012345"
                     value={field.state.value}
                     onBlur={field.handleBlur}
                     onChange={(e) => field.handleChange(e.target.value)}
