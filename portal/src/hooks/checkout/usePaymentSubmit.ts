@@ -3,9 +3,10 @@
 import { useQueryClient } from "@tanstack/react-query"
 import { useRouter } from "next/navigation"
 import { useCallback, useEffect, useState } from "react"
+import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 import type { CheckoutMode } from "@/checkout/popupCheckoutPolicy"
-import { CheckoutService, PaymentsService } from "@/client"
+import { ApiError, CheckoutService, PaymentsService } from "@/client"
 import { getMetaAttribution, trackMetaPurchase } from "@/lib/meta-pixel"
 import { queryKeys } from "@/lib/query-keys"
 import type { AttendeePassState } from "@/types/Attendee"
@@ -41,6 +42,7 @@ interface UsePaymentSubmitParams {
   clearCart: () => void
   setCurrentStep: (step: CheckoutStep) => void
   setPromoError: (error: string | null) => void
+  clearPromoCode: () => void
   paymentCompleteRef: React.MutableRefObject<boolean>
   submitMode: "application" | "open-ticketing"
   buyerData: {
@@ -79,12 +81,14 @@ export function usePaymentSubmit({
   clearCart,
   setCurrentStep,
   setPromoError,
+  clearPromoCode,
   paymentCompleteRef,
   submitMode,
   buyerData,
   creditsEnabled,
   popupName,
 }: UsePaymentSubmitParams) {
+  const { t } = useTranslation()
   const queryClient = useQueryClient()
   const router = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -304,8 +308,21 @@ export function usePaymentSubmit({
       return { success: true }
     } catch (err: unknown) {
       console.error("Payment failed:", err)
-      const errorMsg =
-        "Something went wrong with your payment. Please try again."
+      const apiDetail =
+        err instanceof ApiError &&
+        typeof (err.body as Record<string, unknown> | null)?.detail === "string"
+          ? ((err.body as Record<string, unknown>).detail as string)
+          : null
+      const isCouponError = apiDetail?.startsWith("Coupon code")
+      if (isCouponError) {
+        clearPromoCode()
+        const errorMsg = t("checkout.coupon_no_longer_valid")
+        setPromoError(errorMsg)
+        toast.error(errorMsg)
+        setIsSubmitting(false)
+        return { success: false, error: errorMsg }
+      }
+      const errorMsg = t("checkout.payment_error")
       setPromoError(errorMsg)
       toast.error(errorMsg)
       setIsSubmitting(false)
@@ -326,6 +343,7 @@ export function usePaymentSubmit({
     promoCode,
     insurance,
     clearCart,
+    clearPromoCode,
     isEditing,
     attendeePasses,
     toggleEditing,
@@ -340,6 +358,7 @@ export function usePaymentSubmit({
     router,
     creditsEnabled,
     isSubmitting,
+    t,
   ])
 
   return { submitPayment, isSubmitting }

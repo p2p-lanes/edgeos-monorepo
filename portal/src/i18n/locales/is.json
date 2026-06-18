@@ -244,7 +244,9 @@
     "discount": {
       "not_eligible_caption": "Ekki gjaldgengt fyrir afslátt",
       "promo_discount_eligible_label": "Afsláttur (gjaldgengar vörur)"
-    }
+    },
+    "coupon_no_longer_valid": "This coupon is no longer available. Your total has been updated. Please review and try again.",
+    "payment_error": "Something went wrong with your payment. Please try again."
   },
   "openCheckout": {
     "loading": "Hleður greiðslu...",

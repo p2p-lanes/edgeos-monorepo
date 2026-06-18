@@ -1093,6 +1093,7 @@ export function CheckoutProvider({
     clearCart,
     setCurrentStep,
     setPromoError,
+    clearPromoCode,
     paymentCompleteRef,
     submitMode,
     creditsEnabled,

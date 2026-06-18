@@ -254,7 +254,9 @@
     "discount": {
       "not_eligible_caption": "不符合折扣条件",
       "promo_discount_eligible_label": "促销折扣（符合条件的商品）"
-    }
+    },
+    "coupon_no_longer_valid": "This coupon is no longer available. Your total has been updated. Please review and try again.",
+    "payment_error": "Something went wrong with your payment. Please try again."
   },
   "openCheckout": {
     "loading": "正在加载结账...",

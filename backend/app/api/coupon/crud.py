@@ -172,6 +172,23 @@ class CouponsCRUD(BaseCRUD[Coupons, CouponCreate, CouponUpdate]):
         session.refresh(coupon)
         return coupon
 
+    def release_use(self, session: Session, coupon_id: uuid.UUID) -> None:
+        """Release a previously-claimed coupon use, clamped at zero.
+
+        Mirrors stock restoration: a coupon use is held at payment creation and
+        returned when the payment moves to a terminal non-approved state
+        (expired/cancelled/rejected). Does NOT commit — the caller's transaction
+        commits alongside the payment status change. The zero clamp is a
+        structural backstop against double-release drift below zero; the caller
+        guards semantic double-release via the PENDING-only status check.
+        """
+        coupon = self.get(session, coupon_id)
+        if not coupon:
+            return
+
+        coupon.current_uses = max(coupon.current_uses - 1, 0)
+        session.add(coupon)
+
     def find_by_popup(
         self,
         session: Session,
