@@ -651,6 +651,7 @@
       "participants_heading": "Participants",
       "no_participants_yet": "No participants yet",
       "participants_more": "+{{count}} more",
+      "participants_show_less": "Show less",
       "unnamed_participant": "Unnamed",
       "copy_attendee_emails": "Copy attendee emails",
       "copy_attendee_emails_done": "Copied {{count}} attendee emails",

@@ -604,6 +604,7 @@
       "participants_heading": "Þátttakendur",
       "no_participants_yet": "Engir þátttakendur enn",
       "participants_more": "+{{count}} fleiri",
+      "participants_show_less": "Sýna minna",
       "unnamed_participant": "Ónafngreindur",
       "bulk_invite_success": "Boðið {{invited}} · Sleppt {{skipped}} · Ekki fundið {{notFound}}",
       "bulk_invite_error": "Mistókst að bjóða",
