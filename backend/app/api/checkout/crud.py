@@ -124,7 +124,12 @@ def runtime_for_slug(
 
     return CheckoutRuntimeResponse(
         popup=PopupPublic.model_validate(popup),
-        products=[CheckoutRuntimeProduct.model_validate(p) for p in products],
+        products=[
+            CheckoutRuntimeProduct.model_validate(
+                {**p.model_dump(), "currency": popup.currency}
+            )
+            for p in products
+        ],
         buyer_form=[
             CheckoutBuyerSection(
                 id=sec.id,
