@@ -85,7 +85,7 @@ export function TenantForm({ defaultValues, onSuccess }: TenantFormProps) {
   const { data: popupsData } = useQuery({
     queryKey: ["popups", { tenantId: defaultValues?.id, status: "active" }],
     queryFn: () => PopupsService.listPopups({ limit: 100 }),
-    enabled: isEdit && isSuperadmin,
+    enabled: isEdit && isAdmin,
   })
   const activePopupCount = (popupsData?.results ?? []).filter(
     (p) => p.status === "active",
@@ -562,8 +562,8 @@ export function TenantForm({ defaultValues, onSuccess }: TenantFormProps) {
               </AlertDescription>
             </Alert>
 
-            {/* Landing Mode toggle — SUPERADMIN only (ADR-4, ADR-8) */}
-            {isSuperadmin && (
+            {/* Landing Mode toggle — ADMIN and SUPERADMIN (ADR-4, ADR-8) */}
+            {isAdmin && (
               <form.Field name="landing_mode">
                 {(field) => {
                   const isDomainActive = !!defaultValues?.custom_domain_active
