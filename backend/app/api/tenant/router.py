@@ -183,13 +183,6 @@ async def update_tenant(
             detail="Only superadmin can modify custom_domain_active",
         )
 
-    # 3b. ADMIN cannot set landing_mode (only SUPERADMIN may — ADR-4)
-    if current_user.role == UserRole.ADMIN and tenant_in.landing_mode is not None:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only superadmin can modify landing_mode",
-        )
-
     # 4. ADMIN cannot change custom_domain while it is active
     if (
         current_user.role == UserRole.ADMIN
