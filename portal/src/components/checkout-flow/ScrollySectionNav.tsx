@@ -1,7 +1,7 @@
 "use client"
 
 import { Check } from "lucide-react"
-import type { ReactNode } from "react"
+import { type ReactNode, useEffect, useRef, useState } from "react"
 import { getRegistryIcon, resolveStepIcon } from "@/lib/checkoutStepIcons"
 import { cn } from "@/lib/utils"
 import { useCheckout } from "@/providers/checkoutProvider"
@@ -77,7 +77,30 @@ export default function ScrollySectionNav({
     0,
     sections.findIndex((s) => s.id === activeSection),
   )
-  const segmentWidthPct = sections.length > 0 ? 100 / sections.length : 100
+
+  // Tabs size to their own label width (no equal-width columns), so a long
+  // step name never gets truncated while a short one wastes space. The
+  // sliding pill can't ride a fixed segment fraction anymore, so we measure
+  // the active button and position the pill over its real box. Recomputed on
+  // active change and whenever the track resizes (viewport, font load, the
+  // sm-breakpoint label reveal).
+  const listRef = useRef<HTMLDivElement>(null)
+  const buttonRefs = useRef<(HTMLButtonElement | null)[]>([])
+  const [pill, setPill] = useState<{ left: number; width: number } | null>(null)
+
+  useEffect(() => {
+    const measure = () => {
+      const btn = buttonRefs.current[activeIndex]
+      if (!btn) return
+      setPill({ left: btn.offsetLeft, width: btn.offsetWidth })
+    }
+    measure()
+    const list = listRef.current
+    if (!list) return
+    const ro = new ResizeObserver(measure)
+    ro.observe(list)
+    return () => ro.disconnect()
+  }, [activeIndex])
 
   return (
     <div data-snap-nav className="sticky top-0 z-20">
@@ -94,18 +117,22 @@ export default function ScrollySectionNav({
               className="size-7 shrink-0 rounded-md object-contain"
             />
           ) : null}
-          <div className="relative flex-1 overflow-hidden rounded-xl border border-white/10 bg-checkout-badge-bg-disabled/60 p-0.5">
+          <div className="relative flex-1 overflow-x-auto rounded-xl border border-white/10 bg-checkout-badge-bg-disabled/60 p-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             <div
-              aria-hidden
-              className="absolute inset-y-0.5 rounded-lg bg-checkout-badge-bg shadow-sm transition-[transform,width] duration-300 ease-out"
-              style={{
-                width: `calc(${segmentWidthPct}% - 0.125rem)`,
-                transform: `translateX(calc(${activeIndex * 100}% + ${activeIndex * 0.125}rem))`,
-                left: "0.125rem",
-              }}
-            />
-            <div className="relative grid auto-cols-fr grid-flow-col">
-              {sections.map((section) => {
+              ref={listRef}
+              className="relative flex w-max min-w-full justify-center"
+            >
+              {pill && (
+                <div
+                  aria-hidden
+                  className="pointer-events-none absolute inset-y-0 left-0 rounded-lg bg-checkout-badge-bg shadow-sm transition-[transform,width] duration-300 ease-out"
+                  style={{
+                    width: `${pill.width}px`,
+                    transform: `translateX(${pill.left}px)`,
+                  }}
+                />
+              )}
+              {sections.map((section, index) => {
                 const Icon = resolveIcon(section)
                 const isActive = section.id === activeSection
                 const isComplete =
@@ -123,12 +150,15 @@ export default function ScrollySectionNav({
                 return (
                   <button
                     key={section.id}
+                    ref={(el) => {
+                      buttonRefs.current[index] = el
+                    }}
                     type="button"
                     onClick={() => onSectionClick(section.id)}
                     aria-current={isActive ? "step" : undefined}
                     aria-invalid={isIncomplete || undefined}
                     className={cn(
-                      "relative z-10 flex h-7 min-w-0 items-center justify-center gap-1 px-1.5 text-xs font-semibold transition-[color,opacity] duration-200",
+                      "relative z-10 flex h-7 shrink-0 items-center justify-center gap-1.5 px-3 text-xs font-semibold transition-[color,opacity] duration-200",
                       isActive
                         ? "text-checkout-badge-title"
                         : isIncomplete
@@ -155,7 +185,7 @@ export default function ScrollySectionNav({
                     ) : (
                       <Icon className="size-3.5 shrink-0" />
                     )}
-                    <span className="hidden truncate sm:inline">
+                    <span className="hidden whitespace-nowrap sm:inline">
                       {section.label}
                     </span>
                     {isComplete && (
