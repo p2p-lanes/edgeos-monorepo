@@ -1,7 +1,13 @@
 "use client"
 
 import { Check } from "lucide-react"
-import { type ReactNode, useEffect, useRef, useState } from "react"
+import {
+  type ReactNode,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react"
 import { getRegistryIcon, resolveStepIcon } from "@/lib/checkoutStepIcons"
 import { cn } from "@/lib/utils"
 import { useCheckout } from "@/providers/checkoutProvider"
@@ -15,6 +21,13 @@ export type WatermarkStyle = "none" | "ghost" | "stroke" | "bold"
 // the step-type / template lookup tables.
 const resolveIcon = (section: { id: string; template?: string | null }) =>
   resolveStepIcon({ stepType: section.id, template: section.template })
+
+// Measuring the active tab to place the sliding pill must happen before the
+// browser paints (otherwise the pill lands a frame late on first render).
+// useLayoutEffect does that on the client; fall back to useEffect on the
+// server so SSR doesn't warn about a no-op layout effect.
+const useIsomorphicLayoutEffect =
+  typeof window !== "undefined" ? useLayoutEffect : useEffect
 
 interface NavSection {
   id: string
@@ -88,7 +101,7 @@ export default function ScrollySectionNav({
   const buttonRefs = useRef<(HTMLButtonElement | null)[]>([])
   const [pill, setPill] = useState<{ left: number; width: number } | null>(null)
 
-  useEffect(() => {
+  useIsomorphicLayoutEffect(() => {
     const measure = () => {
       const btn = buttonRefs.current[activeIndex]
       if (!btn) return
@@ -100,7 +113,9 @@ export default function ScrollySectionNav({
     const ro = new ResizeObserver(measure)
     ro.observe(list)
     return () => ro.disconnect()
-  }, [activeIndex])
+    // sections.length re-runs the measure when tabs are added/removed even if
+    // the active index stays numerically the same (different button, same slot).
+  }, [activeIndex, sections.length])
 
   return (
     <div data-snap-nav className="sticky top-0 z-20">
