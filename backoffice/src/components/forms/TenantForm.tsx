@@ -169,9 +169,13 @@ export function TenantForm({ defaultValues, onSuccess }: TenantFormProps) {
           logo_url: value.logo_url || null,
           // Map empty string to null for domain; never send custom_domain_active
           custom_domain: value.custom_domain || null,
-          landing_mode: value.landing_mode,
           meta_tracking_enabled: value.meta_tracking_enabled,
           meta_pixel_id: value.meta_pixel_id || null,
+        }
+        // landing_mode is a SUPERADMIN-only field; the backend rejects any
+        // non-null value sent by an ADMIN. Only include it for superadmins.
+        if (isSuperadmin) {
+          updateData.landing_mode = value.landing_mode
         }
         if (value.meta_capi_access_token) {
           updateData.meta_capi_access_token = value.meta_capi_access_token
