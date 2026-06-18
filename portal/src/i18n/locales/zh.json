@@ -614,6 +614,7 @@
       "participants_heading": "参与者",
       "no_participants_yet": "暂无参与者",
       "participants_more": "+ 另 {{count}} 人",
+      "participants_show_less": "收起",
       "unnamed_participant": "未命名",
       "bulk_invite_success": "已邀请 {{invited}} · 已跳过 {{skipped}} · 未找到 {{notFound}}",
       "bulk_invite_error": "邀请失败",
