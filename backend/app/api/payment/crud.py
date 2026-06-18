@@ -2353,6 +2353,11 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             and old_status == PaymentStatus.PENDING.value
         ):
             self._restore_payment_stock(session, payment)
+            # Release the coupon use held since payment creation. Same guard as
+            # stock (PENDING-only) prevents semantic double-release. APPROVED is
+            # out of scope: a paid coupon use must stay consumed.
+            if payment.coupon_id:
+                coupons_crud.release_use(session, payment.coupon_id)
 
         payment.status = new_status.value
 
