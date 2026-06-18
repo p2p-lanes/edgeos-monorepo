@@ -3,9 +3,11 @@
 import { useQueryClient } from "@tanstack/react-query"
 import { useRouter } from "next/navigation"
 import { useCallback, useEffect, useState } from "react"
+import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 import type { CheckoutMode } from "@/checkout/popupCheckoutPolicy"
-import { CheckoutService, PaymentsService } from "@/client"
+import { ApiError, CheckoutService, PaymentsService } from "@/client"
+import { getMetaAttribution, trackMetaPurchase } from "@/lib/meta-pixel"
 import { queryKeys } from "@/lib/query-keys"
 import type { AttendeePassState } from "@/types/Attendee"
 import type {
@@ -40,6 +42,7 @@ interface UsePaymentSubmitParams {
   clearCart: () => void
   setCurrentStep: (step: CheckoutStep) => void
   setPromoError: (error: string | null) => void
+  clearPromoCode: () => void
   paymentCompleteRef: React.MutableRefObject<boolean>
   submitMode: "application" | "open-ticketing"
   buyerData: {
@@ -49,6 +52,7 @@ interface UsePaymentSubmitParams {
     formData: Record<string, unknown>
   } | null
   creditsEnabled: boolean
+  popupName?: string | null
 }
 
 interface PaymentSubmitResult {
@@ -77,11 +81,14 @@ export function usePaymentSubmit({
   clearCart,
   setCurrentStep,
   setPromoError,
+  clearPromoCode,
   paymentCompleteRef,
   submitMode,
   buyerData,
   creditsEnabled,
+  popupName,
 }: UsePaymentSubmitParams) {
+  const { t } = useTranslation()
   const queryClient = useQueryClient()
   const router = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -164,6 +171,7 @@ export function usePaymentSubmit({
           ? await CheckoutService.purchaseOpenTicketing({
               slug: popupSlug!,
               requestBody: {
+                ...getMetaAttribution(),
                 products: Object.values(
                   productsToSend.reduce<
                     Record<string, { product_id: string; quantity: number }>
@@ -213,6 +221,8 @@ export function usePaymentSubmit({
         payment_id?: string
         status?: string
         checkout_url?: string | null
+        amount?: string
+        currency?: string
       }
 
       if (data.status === "pending" && data.checkout_url) {
@@ -221,6 +231,25 @@ export function usePaymentSubmit({
       }
 
       if (data.status === "approved") {
+        const paymentId = data.id ?? data.payment_id
+        if (
+          submitMode === "open-ticketing" &&
+          popupId &&
+          popupSlug &&
+          paymentId
+        ) {
+          trackMetaPurchase({
+            paymentId,
+            popup: {
+              id: popupId,
+              slug: popupSlug,
+              name: popupName,
+            },
+            amount: data.amount ?? 0,
+            currency: data.currency ?? "USD",
+            products: productsToSend,
+          })
+        }
         toast.success(
           isEditing
             ? "Your passes have been updated successfully!"
@@ -263,7 +292,6 @@ export function usePaymentSubmit({
           if (isEditing) {
             router.replace(`/portal/${popupSlug}/passes`)
           } else {
-            const paymentId = data.id ?? data.payment_id
             const qs = paymentId ? `?payment_id=${paymentId}` : ""
             router.replace(`/checkout/${popupSlug}/thank-you${qs}`)
           }
@@ -280,8 +308,21 @@ export function usePaymentSubmit({
       return { success: true }
     } catch (err: unknown) {
       console.error("Payment failed:", err)
-      const errorMsg =
-        "Something went wrong with your payment. Please try again."
+      const apiDetail =
+        err instanceof ApiError &&
+        typeof (err.body as Record<string, unknown> | null)?.detail === "string"
+          ? ((err.body as Record<string, unknown>).detail as string)
+          : null
+      const isCouponError = apiDetail?.startsWith("Coupon code")
+      if (isCouponError) {
+        clearPromoCode()
+        const errorMsg = t("checkout.coupon_no_longer_valid")
+        setPromoError(errorMsg)
+        toast.error(errorMsg)
+        setIsSubmitting(false)
+        return { success: false, error: errorMsg }
+      }
+      const errorMsg = t("checkout.payment_error")
       setPromoError(errorMsg)
       toast.error(errorMsg)
       setIsSubmitting(false)
@@ -302,6 +343,7 @@ export function usePaymentSubmit({
     promoCode,
     insurance,
     clearCart,
+    clearPromoCode,
     isEditing,
     attendeePasses,
     toggleEditing,
@@ -312,9 +354,11 @@ export function usePaymentSubmit({
     popupId,
     popupSlug,
     submitMode,
+    popupName,
     router,
     creditsEnabled,
     isSubmitting,
+    t,
   ])
 
   return { submitPayment, isSubmitting }

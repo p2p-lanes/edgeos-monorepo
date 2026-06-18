@@ -39,6 +39,7 @@ import { useStepProductResolver } from "@/hooks/checkout/useStepProductResolver"
 import useGetPassesData from "@/hooks/useGetPassesData"
 import { useIsAuthenticated } from "@/hooks/useIsAuthenticated"
 import { buildFormZodSchema } from "@/lib/form-schema-builder"
+import { trackMetaAddToCart } from "@/lib/meta-pixel"
 import type { AttendeePassState } from "@/types/Attendee"
 import type {
   CheckoutCartState,
@@ -922,6 +923,14 @@ export function CheckoutProvider({
       setDynamicItems((prev) => {
         const existing = prev[stepType] ?? []
         const idx = existing.findIndex((i) => i.productId === item.productId)
+        const previousQuantity = idx >= 0 ? existing[idx].quantity : 0
+        if (item.quantity > previousQuantity && city) {
+          trackMetaAddToCart({
+            popup: city,
+            product: item.product,
+            quantity: item.quantity - previousQuantity,
+          })
+        }
         if (idx >= 0) {
           const updated = [...existing]
           updated[idx] = item
@@ -930,7 +939,7 @@ export function CheckoutProvider({
         return { ...prev, [stepType]: [...existing, item] }
       })
     },
-    [],
+    [city],
   )
 
   const removeDynamicItem = useCallback(
@@ -951,16 +960,27 @@ export function CheckoutProvider({
         removeDynamicItem(stepType, productId)
         return
       }
-      setDynamicItems((prev) => ({
-        ...prev,
-        [stepType]: (prev[stepType] ?? []).map((i) =>
-          i.productId === productId
-            ? { ...i, quantity: qty, price: i.product.price * qty }
-            : i,
-        ),
-      }))
+      setDynamicItems((prev) => {
+        const existing = prev[stepType] ?? []
+        const item = existing.find((i) => i.productId === productId)
+        if (item && qty > item.quantity && city) {
+          trackMetaAddToCart({
+            popup: city,
+            product: item.product,
+            quantity: qty - item.quantity,
+          })
+        }
+        return {
+          ...prev,
+          [stepType]: existing.map((i) =>
+            i.productId === productId
+              ? { ...i, quantity: qty, price: i.product.price * qty }
+              : i,
+          ),
+        }
+      })
     },
-    [removeDynamicItem],
+    [city, removeDynamicItem],
   )
 
   // Navigation (wrap hook navigation to save cart and clear error)
@@ -991,6 +1011,15 @@ export function CheckoutProvider({
       const attendee = attendeePasses.find((a) => a.id === attendeeId)
       const product = attendee?.products.find((p) => p.id === productId)
       if (product) {
+        const currentQuantity = product.quantity ?? 0
+        const nextQuantity = quantityOverride ?? (currentQuantity > 0 ? 0 : 1)
+        if (nextQuantity > currentQuantity && city) {
+          trackMetaAddToCart({
+            popup: city,
+            product,
+            quantity: nextQuantity - currentQuantity,
+          })
+        }
         const overridden =
           quantityOverride !== undefined
             ? { ...product, quantity: quantityOverride }
@@ -998,7 +1027,7 @@ export function CheckoutProvider({
         toggleProduct(attendeeId, overridden)
       }
     },
-    [attendeePasses, toggleProduct],
+    [attendeePasses, city, toggleProduct],
   )
 
   const resetDayProduct = useCallback(
@@ -1064,9 +1093,11 @@ export function CheckoutProvider({
     clearCart,
     setCurrentStep,
     setPromoError,
+    clearPromoCode,
     paymentCompleteRef,
     submitMode,
     creditsEnabled,
+    popupName: city?.name ?? null,
     buyerData:
       submitMode === "open-ticketing"
         ? {

@@ -2359,6 +2359,8 @@ export type OpenTicketingPurchaseCreate = {
     products: Array<ProductLine>;
     buyer: BuyerInfo;
     coupon_code?: (string | null);
+    fbc?: (string | null);
+    fbp?: (string | null);
 };
 
 /**
@@ -3376,6 +3378,24 @@ export type TemplateVariable = {
     group?: (string | null);
 };
 
+export type TenantAnonymousPublic = {
+    name: string;
+    slug: string;
+    deleted?: boolean;
+    sender_email?: (string | null);
+    sender_name?: (string | null);
+    image_url?: (string | null);
+    icon_url?: (string | null);
+    logo_url?: (string | null);
+    custom_domain?: (string | null);
+    custom_domain_active: boolean;
+    landing_mode?: LandingMode;
+    meta_tracking_enabled?: boolean;
+    meta_pixel_id?: (string | null);
+    id: string;
+    active_popup_slug?: (string | null);
+};
+
 export type TenantCreate = {
     name: string;
     slug?: string;
@@ -3384,6 +3404,8 @@ export type TenantCreate = {
     image_url?: (string | null);
     icon_url?: (string | null);
     logo_url?: (string | null);
+    meta_tracking_enabled?: boolean;
+    meta_pixel_id?: (string | null);
 };
 
 export type TenantCredentialResponse = {
@@ -3405,7 +3427,10 @@ export type TenantPublic = {
     custom_domain?: (string | null);
     custom_domain_active: boolean;
     landing_mode?: LandingMode;
+    meta_tracking_enabled?: boolean;
+    meta_pixel_id?: (string | null);
     id: string;
+    meta_capi_configured?: boolean;
     active_popup_slug?: (string | null);
 };
 
@@ -3419,6 +3444,9 @@ export type TenantUpdate = {
     custom_domain?: (string | null);
     custom_domain_active?: (boolean | null);
     landing_mode?: (LandingMode | null);
+    meta_tracking_enabled?: (boolean | null);
+    meta_pixel_id?: (string | null);
+    meta_capi_access_token?: (string | null);
 };
 
 /**
@@ -4771,6 +4799,7 @@ export type EventsPublicCalendarIcsResponse = (unknown);
 
 export type EventsListEventsData = {
     eventStatus?: (EventStatus | null);
+    excludeStatuses?: (Array<EventStatus> | null);
     kind?: (string | null);
     /**
      * Maximum number of items to return
@@ -6035,13 +6064,13 @@ export type TenantsGetTenantByDomainData = {
     domain: string;
 };
 
-export type TenantsGetTenantByDomainResponse = (TenantPublic);
+export type TenantsGetTenantByDomainResponse = (TenantAnonymousPublic);
 
 export type TenantsGetTenantBySlugData = {
     slug: string;
 };
 
-export type TenantsGetTenantBySlugResponse = (TenantPublic);
+export type TenantsGetTenantBySlugResponse = (TenantAnonymousPublic);
 
 export type TenantsListTenantsData = {
     /**

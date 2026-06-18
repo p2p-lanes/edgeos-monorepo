@@ -8,6 +8,7 @@ from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, 
 from app.api.tenant import crud
 from app.api.tenant.credential_schemas import CredentialInfo, TenantCredentialResponse
 from app.api.tenant.schemas import (
+    TenantAnonymousPublic,
     TenantCreate,
     TenantPublic,
     TenantUpdate,
@@ -21,15 +22,16 @@ from app.core.dependencies.users import (
 )
 from app.core.redis import domain_cache
 from app.core.tenant_db import get_tenant_credential, revoke_tenant_credentials
+from app.utils.encryption import encrypt
 
 router = APIRouter(prefix="/tenants", tags=["tenants"])
 
 
-@router.get("/public/by-domain/{domain}", response_model=TenantPublic)
+@router.get("/public/by-domain/{domain}", response_model=TenantAnonymousPublic)
 async def get_tenant_by_domain(
     domain: str,
     db: SessionDep,
-) -> TenantPublic:
+) -> TenantAnonymousPublic:
     """Resolve an active tenant by host — custom domain or platform subdomain.
 
     Resolution order (see TenantsCRUD.resolve_by_host):
@@ -47,7 +49,7 @@ async def get_tenant_by_domain(
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail="Not found"
             )
-        return TenantPublic.model_validate_json(cached)
+        return TenantAnonymousPublic.model_validate_json(cached)
 
     # DB lookup — resolves custom domains AND *.PORTAL_DOMAIN subdomains
     tenant = crud.resolve_by_host(db, domain, settings.PORTAL_DOMAIN)
@@ -55,7 +57,7 @@ async def get_tenant_by_domain(
         domain_cache.set(domain, "null")
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
 
-    result = TenantPublic.model_validate(tenant)
+    result = TenantAnonymousPublic.model_validate(tenant)
 
     # Populate active_popup_slug for checkout-mode tenants (OI-2, R-T5, ADR — OI-2)
     # Local import avoids circular: tenant.router -> checkout.crud -> checkout.__init__ -> checkout.router -> payment.crud
@@ -70,11 +72,11 @@ async def get_tenant_by_domain(
     return result
 
 
-@router.get("/public/{slug}", response_model=TenantPublic)
+@router.get("/public/{slug}", response_model=TenantAnonymousPublic)
 async def get_tenant_by_slug(
     slug: str,
     db: SessionDep,
-) -> TenantPublic:
+) -> TenantAnonymousPublic:
     tenant = crud.get_by_slug(db, slug)
 
     if tenant is None or tenant.deleted:
@@ -83,7 +85,7 @@ async def get_tenant_by_slug(
             detail="Tenant not found",
         )
 
-    return TenantPublic.model_validate(tenant)
+    return TenantAnonymousPublic.model_validate(tenant)
 
 
 @router.get("", response_model=ListModel[TenantPublic])
@@ -243,9 +245,14 @@ async def update_tenant(
     old_domain = tenant.custom_domain
     old_landing_mode = tenant.landing_mode
     old_custom_domain_active = tenant.custom_domain_active
+    old_meta_tracking_enabled = tenant.meta_tracking_enabled
+    old_meta_pixel_id = tenant.meta_pixel_id
 
     # 9. Perform update (IntegrityError → unique constraint race condition)
     try:
+        if "meta_capi_access_token" in tenant_in.model_fields_set:
+            token = tenant_in.meta_capi_access_token
+            tenant.meta_capi_access_token_encrypted = encrypt(token) if token else None
         updated = crud.update(db, tenant, tenant_in)
     except IntegrityError:
         raise HTTPException(
@@ -258,6 +265,8 @@ async def update_tenant(
     new_domain = updated.custom_domain
     new_landing_mode = updated.landing_mode
     new_custom_domain_active = updated.custom_domain_active
+    new_meta_tracking_enabled = updated.meta_tracking_enabled
+    new_meta_pixel_id = updated.meta_pixel_id
 
     domains_to_invalidate: set[str] = set()
 
@@ -271,6 +280,13 @@ async def update_tenant(
 
     # Invalidate current domain when custom_domain_active flips (ADR-2 latent gap fix)
     if new_custom_domain_active != old_custom_domain_active and new_domain:
+        domains_to_invalidate.add(new_domain)
+
+    # Invalidate current domain when public marketing config changes.
+    if (
+        new_meta_tracking_enabled != old_meta_tracking_enabled
+        or new_meta_pixel_id != old_meta_pixel_id
+    ) and new_domain:
         domains_to_invalidate.add(new_domain)
 
     # Also invalidate new domain when domain changes (existing behavior)

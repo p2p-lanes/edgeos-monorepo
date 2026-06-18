@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 import {
   type CheckoutRuntimeProduct,
@@ -11,6 +11,7 @@ import {
 import FaviconOverride from "@/components/checkout-flow/FaviconOverride"
 import ScrollyCheckoutFlow from "@/components/checkout-flow/ScrollyCheckoutFlow"
 import { LanguageSwitcher } from "@/components/common/LanguageSwitcher"
+import { trackMetaViewContent } from "@/lib/meta-pixel"
 import { ApplicationContext } from "@/providers/applicationProvider"
 import { CheckoutProvider } from "@/providers/checkoutProvider"
 import { CityContext } from "@/providers/cityProvider"
@@ -141,6 +142,7 @@ export function OpenCheckoutRuntime({
   })
 
   const popup = runtime.popup
+  const trackedViewContentRef = useRef<string | null>(null)
   const products = useMemo(
     () => runtime.products.map(toProductsPass),
     [runtime.products],
@@ -155,6 +157,13 @@ export function OpenCheckoutRuntime({
   )
 
   setActiveCurrency(popup.currency ?? "USD")
+
+  useEffect(() => {
+    if (trackedViewContentRef.current === popup.id) return
+
+    trackMetaViewContent({ popup, products: runtime.products })
+    trackedViewContentRef.current = popup.id
+  }, [popup, runtime.products])
 
   return (
     <CityContext.Provider

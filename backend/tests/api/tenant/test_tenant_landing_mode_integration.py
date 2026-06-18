@@ -185,6 +185,28 @@ def test_by_domain_checkout_with_active_popup(
     data = resp.json()
     assert data["landing_mode"] == "checkout"
     assert data["active_popup_slug"] == popup_slug
+    assert "meta_capi_configured" not in data
+
+
+def test_public_slug_does_not_expose_meta_capi_configured(
+    client: TestClient,
+    db: Session,
+) -> None:
+    suffix = uuid.uuid4().hex[:6]
+    t = _make_tenant(db, suffix=suffix)
+    t.meta_tracking_enabled = True
+    t.meta_pixel_id = "1234567890"
+    t.meta_capi_access_token_encrypted = "encrypted-token"
+    db.add(t)
+    db.commit()
+    db.refresh(t)
+
+    resp = client.get(f"/api/v1/tenants/public/{t.slug}")
+    assert resp.status_code == 200, resp.text
+    data = resp.json()
+    assert data["meta_tracking_enabled"] is True
+    assert data["meta_pixel_id"] == "1234567890"
+    assert "meta_capi_configured" not in data
 
 
 def test_by_domain_checkout_no_active_popup(

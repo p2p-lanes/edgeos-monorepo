@@ -11,9 +11,13 @@ import {
   Users,
 } from "lucide-react"
 import { useEffect, useMemo, useRef } from "react"
-import type { EventPublic, EventStatus } from "@/client"
+import type { EventPublic } from "@/client"
 import { Skeleton } from "@/components/ui/skeleton"
 import { fetchAllEvents } from "@/lib/events/fetchAllEvents"
+import {
+  type EventStatusFilter,
+  resolveStatusFilter,
+} from "@/lib/events/statusFilter"
 import { summarizeRrule } from "@/lib/events/summarizeRrule"
 import { useEventTimezone } from "@/lib/events/useEventTimezone"
 import { cn } from "@/lib/utils"
@@ -22,7 +26,7 @@ import { EventBadges } from "./EventBadges"
 
 interface EventsListViewProps {
   popupId: string
-  status: EventStatus | undefined
+  status: EventStatusFilter | undefined
   venueId: string | undefined
   search: string
   popupStart?: string | null
@@ -96,7 +100,7 @@ export function EventsListView({
     queryFn: () =>
       fetchAllEvents({
         popupId,
-        eventStatus: status,
+        ...resolveStatusFilter(status),
         venueId:
           venueId && venueId !== "custom" && venueId !== "meeting"
             ? venueId
@@ -152,11 +156,14 @@ export function EventsListView({
         <div
           key={date}
           ref={idx === anchorIdx ? todayAnchorRef : undefined}
-          className="scroll-mt-20"
+          className="scroll-mt-[13.5rem] sm:scroll-mt-32"
         >
-          {/* Sticky day header: freezes under the app top bar (h-16) while its
-              day is in view; the next day's header pushes it up on scroll. */}
-          <div className="sticky top-16 z-[5] flex items-center gap-3 bg-background py-2 mb-3">
+          {/* Sticky day header: freezes just below the sticky search/filters
+              toolbar (which itself pins under the h-16 app top bar) while its
+              day is in view; the next day's header pushes it up on scroll. The
+              top offset accounts for the toolbar height — taller on mobile,
+              where the filters wrap onto a second row. */}
+          <div className="sticky top-[13.5rem] sm:top-32 z-[5] flex items-center gap-3 bg-background py-2 mb-3">
             <div className="h-2 w-2 rounded-full bg-primary" />
             <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               {formatDateFull(dayEvents[0].start_time)}

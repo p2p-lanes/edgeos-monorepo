@@ -38,6 +38,7 @@ def _make_direct_popup(
     *,
     status: str = "active",
     slug_prefix: str = "boot",
+    currency: str = "USD",
 ) -> Popups:
     slug = f"{slug_prefix}-{uuid.uuid4().hex[:8]}"
     popup = Popups(
@@ -47,6 +48,7 @@ def _make_direct_popup(
         slug=slug,
         sale_type=SaleType.direct.value,
         status=status,
+        currency=currency,
     )
     db.add(popup)
     db.flush()
@@ -180,6 +182,25 @@ def test_runtime_valid_direct_popup(
     assert len(body["ticketing_steps"]) == 1
     assert body["ticketing_steps"][0]["step_type"] == "tickets"
     assert body["ticketing_steps"][0]["title"] == "Choose Tickets"
+
+
+def test_runtime_products_use_popup_currency(
+    client: TestClient, db: Session, tenant_a: Tenants
+) -> None:
+    """Runtime products inherit the popup currency."""
+    popup = _make_direct_popup(db, tenant_a, currency="ARS")
+    _make_product(db, popup, name="ARS Ticket")
+    db.commit()
+
+    response = client.get(
+        f"/api/v1/checkout/{popup.slug}/runtime",
+        headers={"X-Tenant-Id": str(tenant_a.id)},
+    )
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["popup"]["currency"] == "ARS"
+    assert body["products"][0]["currency"] == "ARS"
 
 
 def test_runtime_only_enabled_ticketing_steps(

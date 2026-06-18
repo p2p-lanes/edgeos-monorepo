@@ -268,7 +268,9 @@
     "discount": {
       "not_eligible_caption": "Not eligible for discount",
       "promo_discount_eligible_label": "Promo Discount (eligible items)"
-    }
+    },
+    "coupon_no_longer_valid": "This coupon is no longer available. Your total has been updated. Please review and try again.",
+    "payment_error": "Something went wrong with your payment. Please try again."
   },
   "openCheckout": {
     "loading": "Loading checkout...",
@@ -368,7 +370,9 @@
     "description": "Reach out to your friends to plan dates, find shared housing, or organize activities together. *This directory includes only the information of those who have voluntarily opted in to share their details.",
     "search_placeholder": "Search by name, email, organization...",
     "export_csv": "Export attendees as CSV",
-    "no_attendees": "No attendees found"
+    "no_attendees": "No attendees found",
+    "per_page_label": "Per page",
+    "showing_range": "Showing {{from}}–{{to}} of {{total}}"
   },
   "checkin": {
     "title": "Online Check-in for {{eventName}}",

@@ -1,6 +1,9 @@
+import json
+import re
 import uuid
 from decimal import Decimal
-from typing import TYPE_CHECKING, Annotated, Literal
+from ipaddress import ip_address
+from typing import TYPE_CHECKING, Annotated, Any, Literal
 
 from fastapi import APIRouter, HTTPException, Query, Request, Response, status
 from sqlmodel import Session
@@ -51,6 +54,9 @@ if TYPE_CHECKING:
 
 router = APIRouter(prefix="/payments", tags=["payments"])
 
+_META_BROWSER_ID_PATTERN = re.compile(r"^fb\.1\.\d{10,13}\.[A-Za-z0-9._-]{1,256}$")
+_MAX_USER_AGENT_LENGTH = 512
+
 
 def _normalize_payment_source(provider: str | None) -> str:
     """Normalize provider labels from SimpleFI to local payment sources."""
@@ -63,6 +69,116 @@ def _normalize_payment_source(provider: str | None) -> str:
     if normalized in {"mercadopago", "mercado pago", "mercado_pago"}:
         return "MercadoPago"
     return provider.strip()
+
+
+def _first_non_empty(*values: str | None) -> str | None:
+    for value in values:
+        if value:
+            stripped = value.strip()
+            if stripped:
+                return stripped
+    return None
+
+
+def _sanitize_meta_browser_id(value: str | None) -> str | None:
+    candidate = _first_non_empty(value)
+    if candidate is None or len(candidate) > 512:
+        return None
+    if not _META_BROWSER_ID_PATTERN.fullmatch(candidate):
+        return None
+    return candidate
+
+
+def _sanitize_client_ip(value: str | None) -> str | None:
+    candidate = _first_non_empty(value)
+    if candidate is None or len(candidate) > 128:
+        return None
+    try:
+        return str(ip_address(candidate))
+    except ValueError:
+        return None
+
+
+def _extract_client_ip(request: Request) -> str | None:
+    direct_ip = _sanitize_client_ip(request.client.host if request.client else None)
+    if direct_ip:
+        return direct_ip
+
+    forwarded_for = request.headers.get("X-Forwarded-For")
+    if not forwarded_for or len(forwarded_for) > 512:
+        return None
+    return _sanitize_client_ip(forwarded_for.split(",", maxsplit=1)[0])
+
+
+def _extract_meta_attribution(
+    request: Request,
+    *,
+    fbc: str | None = None,
+    fbp: str | None = None,
+) -> dict[str, str | None]:
+    user_agent = _first_non_empty(request.headers.get("User-Agent"))
+    return {
+        "fbc": _sanitize_meta_browser_id(
+            _first_non_empty(request.cookies.get("_fbc"), fbc)
+        ),
+        "fbp": _sanitize_meta_browser_id(
+            _first_non_empty(request.cookies.get("_fbp"), fbp)
+        ),
+        "client_ip": _extract_client_ip(request),
+        "client_user_agent": user_agent[:_MAX_USER_AGENT_LENGTH]
+        if user_agent
+        else None,
+    }
+
+
+def _webhook_payment_external_id(raw_body: dict[str, Any]) -> str | None:
+    event_type = raw_body.get("event_type")
+    data = raw_body.get("data") if isinstance(raw_body.get("data"), dict) else {}
+
+    if event_type in {
+        "installment_plan_activated",
+        "installment_plan_cancelled",
+        "installment_plan_completed",
+    }:
+        entity_id = raw_body.get("entity_id")
+        return entity_id if isinstance(entity_id, str) else None
+
+    payment_request = data.get("payment_request")
+    if not isinstance(payment_request, dict):
+        return None
+
+    installment_plan_id = payment_request.get("installment_plan_id")
+    if isinstance(installment_plan_id, str) and installment_plan_id:
+        return installment_plan_id
+
+    payment_request_id = payment_request.get("id")
+    return payment_request_id if isinstance(payment_request_id, str) else None
+
+
+def _verify_simplefi_webhook_or_raise(
+    raw_body: dict[str, Any],
+    db: Session,
+) -> None:
+    from loguru import logger
+
+    external_id = _webhook_payment_external_id(raw_body)
+    if external_id is None:
+        logger.warning("SimpleFI webhook missing verifiable payment identifier")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid webhook payload",
+        )
+
+    payment = payments_crud.get_by_external_id(db, external_id)
+    if payment is None:
+        logger.warning(
+            "SimpleFI webhook rejected: payment not found for external_id={}",
+            external_id,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Payment not found",
+        )
 
 
 def _extract_settlement_details(
@@ -126,6 +242,23 @@ def _plan_payment_source(plan: SimpleFIInstallmentPlan) -> str | None:
         if plan.mercadopago_preapproval_id:
             return PaymentSource.MERCADOPAGO.value
     return None
+
+
+def _schedule_meta_capi_purchase(payment: Payments) -> None:
+    from loguru import logger
+
+    from app.services.meta_capi import fire_and_forget_purchase_event
+
+    try:
+        fire_and_forget_purchase_event(
+            tenant=payment.tenant,
+            payment=payment,
+            popup=payment.popup,
+        )
+    except Exception:
+        logger.exception(
+            "Failed to queue Meta CAPI Purchase event payment_id={}", payment.id
+        )
 
 
 def _installment_charged_amount(payment_request: SimpleFIPaymentRequest) -> Decimal:
@@ -321,6 +454,18 @@ async def _send_payment_confirmed_email(payment, db_session=None) -> None:
     logger.info(
         f"Payment confirmed email sent to {human.email} for payment {payment.id}"
     )
+
+
+async def _send_payment_confirmed_email_best_effort(payment, db_session=None) -> None:
+    from loguru import logger
+
+    try:
+        await _send_payment_confirmed_email(payment, db_session=db_session)
+    except Exception:
+        logger.exception(
+            "Failed to send payment confirmation email payment_id={}",
+            getattr(payment, "id", ""),
+        )
 
 
 def _get_portal_owned_payment_or_404(
@@ -788,6 +933,7 @@ async def preview_my_payment(
 )
 async def create_my_payment(
     payment_in: PaymentCreate,
+    request: Request,
     db: HumanTenantSession,
     current_human: CurrentHuman,
 ) -> PaymentPublic:
@@ -812,10 +958,14 @@ async def create_my_payment(
             detail="Application not found",
         )
 
-    payment, _preview = payments_crud.create_payment(db, payment_in)
+    payment, _preview = payments_crud.create_payment(
+        db,
+        payment_in,
+        attribution=_extract_meta_attribution(request),
+    )
 
     if payment.status == PaymentStatus.APPROVED.value:
-        await _send_payment_confirmed_email(payment, db_session=db)
+        await _send_payment_confirmed_email_best_effort(payment, db_session=db)
 
     return PaymentPublic.model_validate(payment)
 
@@ -849,7 +999,22 @@ async def simplefi_webhook(
 
     from app.core.redis import webhook_cache
 
-    raw_body = await request.json()
+    raw_payload = await request.body()
+    try:
+        raw_body = json.loads(raw_payload)
+    except json.JSONDecodeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid webhook payload",
+        ) from exc
+    if not isinstance(raw_body, dict):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid webhook payload",
+        )
+
+    _verify_simplefi_webhook_or_raise(raw_body, db)
+
     event_type = raw_body.get("event_type")
     logger.info(
         "SimpleFI webhook received: event_type={} entity_type={} entity_id={}",
@@ -960,7 +1125,8 @@ async def _handle_regular_payment(
                 rate=settlement_rate,
                 source=source,
             )
-            await _send_payment_confirmed_email(payment, db_session=db)
+            _schedule_meta_capi_purchase(payment)
+            await _send_payment_confirmed_email_best_effort(payment, db_session=db)
         logger.info("Payment {} approved via SimpleFI webhook", payment.id)
     else:
         payments_crud.update_status(db, payment.id, PaymentStatus.EXPIRED)
@@ -1234,6 +1400,7 @@ async def _handle_installment_payment(
             rate=settlement_rate,
             source=source,
         )
+        _schedule_meta_capi_purchase(payment)
         logger.info("First installment received - payment {} approved", payment.id)
 
     # Increment installments_paid
@@ -1294,7 +1461,7 @@ async def _handle_installment_plan_completed(
         )
         payment.installments_paid = installment_plan.paid_installments_count
         db.commit()
-        await _send_payment_confirmed_email(payment, db_session=db)
+        await _send_payment_confirmed_email_best_effort(payment, db_session=db)
         return {"message": "Installment plan completed - count synced"}
 
     # Edge case: plan completed but payment not approved
@@ -1303,7 +1470,8 @@ async def _handle_installment_plan_completed(
     )
     payment.installments_paid = installment_plan.paid_installments_count
     payment = payments_crud.approve_payment(db, payment.id)
-    await _send_payment_confirmed_email(payment, db_session=db)
+    _schedule_meta_capi_purchase(payment)
+    await _send_payment_confirmed_email_best_effort(payment, db_session=db)
 
     return {"message": "Installment plan payment approved successfully"}
 

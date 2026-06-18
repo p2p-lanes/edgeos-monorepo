@@ -116,6 +116,8 @@ class OpenTicketingPurchaseCreate(BaseModel):
     products: list[ProductLine] = Field(min_length=1)
     buyer: BuyerInfo
     coupon_code: str | None = None
+    fbc: str | None = Field(default=None, max_length=512)
+    fbp: str | None = Field(default=None, max_length=512)
 
 
 class OpenTicketingPurchaseResponse(BaseModel):

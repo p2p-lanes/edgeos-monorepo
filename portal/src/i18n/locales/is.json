@@ -244,7 +244,9 @@
     "discount": {
       "not_eligible_caption": "Ekki gjaldgengt fyrir afslátt",
       "promo_discount_eligible_label": "Afsláttur (gjaldgengar vörur)"
-    }
+    },
+    "coupon_no_longer_valid": "This coupon is no longer available. Your total has been updated. Please review and try again.",
+    "payment_error": "Something went wrong with your payment. Please try again."
   },
   "openCheckout": {
     "loading": "Hleður greiðslu...",
@@ -343,7 +345,9 @@
     "description": "Hafðu samband við vini þína til að skipuleggja stefnumót, finna sameiginlegt húsnæði eða skipuleggja athafnir saman. *Þessi skrá inniheldur aðeins upplýsingar þeirra sem hafa sjálfviljugir samþykkt að deila upplýsingum sínum.",
     "search_placeholder": "Leita eftir nafni, netfangi, stofnun...",
     "export_csv": "Flytja þátttakendur út sem CSV",
-    "no_attendees": "Engir þátttakendur fundust"
+    "no_attendees": "Engir þátttakendur fundust",
+    "per_page_label": "Á síðu",
+    "showing_range": "Sýni {{from}}–{{to}} af {{total}}"
   },
   "checkin": {
     "title": "Innritun á netinu fyrir {{eventName}}",

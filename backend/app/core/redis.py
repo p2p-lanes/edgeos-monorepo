@@ -4,6 +4,7 @@ Configure via REDIS_URL environment variable:
 - Local: redis://redis:6379
 """
 
+import hmac
 import uuid
 from datetime import timedelta
 
@@ -233,7 +234,9 @@ class AuthCodeStore:
             if stored_code is None:
                 return False, "No authentication code pending or code has expired"
 
-            if stored_code != code:
+            # Constant-time compare so response latency does not leak how many
+            # leading digits matched. decode_responses=True, so both are str.
+            if not hmac.compare_digest(stored_code, code):
                 # Increment attempts
                 client.incr(attempts_key)
                 return False, "Invalid authentication code"
@@ -436,7 +439,7 @@ webhook_cache = WebhookCache(ttl_seconds=3600)
 class DomainCache:
     """Cache for tenant-by-domain lookups.
 
-    Stores serialized TenantPublic JSON (or the sentinel string ``"null"``
+    Stores serialized anonymous public tenant JSON (or the sentinel string ``"null"``
     for non-existent / inactive domains) with a 5-minute TTL.
 
     All methods are silent no-ops when Redis is unavailable so that the
