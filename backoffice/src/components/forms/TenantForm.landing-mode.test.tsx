@@ -6,7 +6,7 @@
  * - BK-2: toggle enabled when custom_domain_active=true
  * - BK-3: warning shown when switching to checkout AND >1 active popup
  * - BK-4: no warning when switching to checkout AND <=1 active popup
- * - BK-5: toggle is visible to admins, hidden for roles without admin rights
+ * - BK-5: ADMIN cannot see/interact with toggle (hidden for non-superadmin)
  * - BK-6: PATCH payload includes landing_mode on form submit
  */
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
@@ -32,7 +32,7 @@ vi.mock("@tanstack/react-router", () => ({
   useNavigate: () => vi.fn(),
 }))
 
-const mockUseAuth = vi.fn(() => ({ isSuperadmin: true, isAdmin: true }))
+const mockUseAuth = vi.fn(() => ({ isSuperadmin: true }))
 
 vi.mock("@/hooks/useAuth", () => ({
   default: () => mockUseAuth(),
@@ -111,7 +111,7 @@ describe("TenantForm — landing_mode toggle", () => {
   beforeEach(() => {
     vi.clearAllMocks()
     // Reset to superadmin for each test
-    mockUseAuth.mockReturnValue({ isSuperadmin: true, isAdmin: true })
+    mockUseAuth.mockReturnValue({ isSuperadmin: true })
     // Default: one active popup (no warning)
     mockListPopups.mockResolvedValue(
       makePopupResult(1) as Awaited<
@@ -225,28 +225,9 @@ describe("TenantForm — landing_mode toggle", () => {
     })
   })
 
-  // BK-5a: ADMIN can see the toggle
-  it("BK-5: toggle is rendered for admin users", async () => {
-    mockUseAuth.mockReturnValue({ isSuperadmin: false, isAdmin: true })
-
-    render(
-      <TenantForm
-        defaultValues={TENANT_WITH_ACTIVE_DOMAIN}
-        onSuccess={vi.fn()}
-      />,
-      { wrapper: makeWrapper() },
-    )
-
-    await waitFor(() => {
-      expect(
-        screen.getByRole("switch", { name: /landing mode|direct checkout/i }),
-      ).toBeInTheDocument()
-    })
-  })
-
-  // BK-5b: roles without admin rights (e.g. viewer/operator) cannot see the toggle
-  it("BK-5: toggle is not rendered for users without admin rights", async () => {
-    mockUseAuth.mockReturnValue({ isSuperadmin: false, isAdmin: false })
+  // BK-5: ADMIN cannot see toggle
+  it("BK-5: toggle is not rendered for non-superadmin users", async () => {
+    mockUseAuth.mockReturnValue({ isSuperadmin: false })
 
     render(
       <TenantForm

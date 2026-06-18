@@ -68,20 +68,20 @@ def _make_active_direct_popup(db: Session, tenant: Tenants, *, slug: str) -> Pop
 # ---------------------------------------------------------------------------
 
 
-def test_admin_can_set_landing_mode_checkout_when_domain_active(
+def test_admin_cannot_set_landing_mode(
     client: TestClient,
     db: Session,
     admin_token_tenant_a: str,
     tenant_a: Tenants,
 ) -> None:
-    """ADMIN sets landing_mode=checkout with domain active → 200.
+    """Scenario T-5: ADMIN PATCH landing_mode → 403.
 
-    Mirrors the superadmin test: the role gate on landing_mode was removed, so an
-    ADMIN may switch to checkout as long as the custom domain is already active
-    (custom_domain_active stays superadmin-only and is therefore unchanged here).
+    The payload must pass schema-level validation (include custom_domain + active=True)
+    so the router role gate is the one that rejects it, not the schema validator.
     """
+    # First ensure tenant_a has a valid custom_domain so schema accepts the payload
     suffix = uuid.uuid4().hex[:6]
-    domain = f"admin-checkout-{suffix}.example.com"
+    domain = f"admin-gate-{suffix}.example.com"
     tenant_a.custom_domain = domain
     tenant_a.custom_domain_active = True
     db.add(tenant_a)
@@ -90,39 +90,14 @@ def test_admin_can_set_landing_mode_checkout_when_domain_active(
 
     resp = client.patch(
         f"/api/v1/tenants/{tenant_a.id}",
-        json={"landing_mode": "checkout"},
+        json={
+            "landing_mode": "checkout",
+            "custom_domain": domain,
+            "custom_domain_active": True,
+        },
         headers=_admin_headers(admin_token_tenant_a),
     )
-    assert resp.status_code == 200, resp.text
-    assert resp.json()["landing_mode"] == "checkout"
-
-
-def test_admin_rejected_checkout_when_domain_inactive(
-    client: TestClient,
-    db: Session,
-    admin_token_tenant_a: str,
-    tenant_a: Tenants,
-) -> None:
-    """ADMIN PATCH landing_mode=checkout with inactive domain → 422.
-
-    The merged-state validation still protects checkout integrity for all roles:
-    an ADMIN cannot reach checkout without an active custom domain (which only a
-    superadmin can activate).
-    """
-    suffix = uuid.uuid4().hex[:6]
-    domain = f"admin-inactive-{suffix}.example.com"
-    tenant_a.custom_domain = domain
-    tenant_a.custom_domain_active = False
-    db.add(tenant_a)
-    db.commit()
-    db.refresh(tenant_a)
-
-    resp = client.patch(
-        f"/api/v1/tenants/{tenant_a.id}",
-        json={"landing_mode": "checkout"},
-        headers=_admin_headers(admin_token_tenant_a),
-    )
-    assert resp.status_code == 422, resp.text
+    assert resp.status_code == 403, resp.text
 
 
 def test_superadmin_can_set_landing_mode_checkout_when_domain_active(
