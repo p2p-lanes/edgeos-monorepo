@@ -3558,8 +3558,6 @@ export class EventsService {
      * @param data.rsvpedOnly
      * @param data.managedOnly
      * @param data.includeHidden
-     * @param data.skip Number of items to skip
-     * @param data.limit Maximum number of items to return
      * @returns ListModel_EventPublic_ Successful Response
      * @throws ApiError
      */
@@ -3580,9 +3578,7 @@ export class EventsService {
                 search: data.search,
                 rsvped_only: data.rsvpedOnly,
                 managed_only: data.managedOnly,
-                include_hidden: data.includeHidden,
-                skip: data.skip,
-                limit: data.limit
+                include_hidden: data.includeHidden
             },
             errors: {
                 422: 'Validation Error'

@@ -389,7 +389,10 @@ export function ListBody({
                     placeholderUrl ||
                     null
                   return (
-                    <Fragment key={event.id}>
+                    // Key by occurrence (id + start_time), not just id: a
+                    // recurring series shares one id across instances, so a
+                    // plain id key would collide between sibling occurrences.
+                    <Fragment key={domId}>
                       {idx === dividerAt && nowDivider(dividerIsAnchor)}
                       <div
                         id={domId}

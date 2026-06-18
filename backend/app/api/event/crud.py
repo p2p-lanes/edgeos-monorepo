@@ -28,7 +28,7 @@ class EventsCRUD(BaseCRUD[Events, EventCreate, EventUpdate]):
         session: Session,
         popup_id: uuid.UUID,
         skip: int = 0,
-        limit: int = 100,
+        limit: int | None = 100,
         event_status: EventStatus | None = None,
         kind: str | None = None,
         start_after: datetime | None = None,
@@ -128,8 +128,17 @@ class EventsCRUD(BaseCRUD[Events, EventCreate, EventUpdate]):
         count_statement = select(func.count()).select_from(statement.subquery())
         total = session.exec(count_statement).one()
 
-        statement = statement.order_by(asc(Events.start_time))
-        statement = statement.offset(skip).limit(limit)
+        # Order by start_time with ``id`` as a unique tiebreaker so the row
+        # order is deterministic across requests. Without the tiebreaker,
+        # events sharing a start_time order arbitrarily, which makes any
+        # offset/limit paging unstable (the same boundary row can repeat or
+        # vanish between pages).
+        statement = statement.order_by(asc(Events.start_time), asc(Events.id))
+        # ``limit=None`` returns the full filtered set in one query (no paging
+        # boundaries). The portal events list uses this so recurring expansion
+        # runs once over the complete window instead of per page.
+        if limit is not None:
+            statement = statement.offset(skip).limit(limit)
         results = list(session.exec(statement).all())
 
         want_expansion = bool(expand_occurrences) or (
