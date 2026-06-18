@@ -286,6 +286,8 @@ export default function EventDetailPage() {
   const [cancelEventOpen, setCancelEventOpen] = useState(false)
   const [copied, setCopied] = useState(false)
   const [copyingEmails, setCopyingEmails] = useState(false)
+  // Whether the participants list is expanded to show everyone or truncated.
+  const [participantsExpanded, setParticipantsExpanded] = useState(false)
   const cancelEventMutation = useMutation({
     mutationFn: () =>
       EventsService.cancelPortalEvent({ eventId: params.eventId }),
@@ -1095,42 +1097,50 @@ export default function EventDetailPage() {
           </p>
         ) : (
           <div className="space-y-2">
-            {activeParticipants
-              .slice(0, 10)
-              .map((p: EventParticipantPublic) => {
-                const name = [p.first_name, p.last_name]
-                  .filter(Boolean)
-                  .join(" ")
-                  .trim()
-                return (
-                  <div key={p.id} className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="h-7 w-7 rounded-full bg-muted flex items-center justify-center">
-                        <Users className="h-3 w-3 text-muted-foreground" />
-                      </div>
-                      <span className="text-sm">
-                        {name || t("events.detail.unnamed_participant")}
-                      </span>
+            {(participantsExpanded
+              ? activeParticipants
+              : activeParticipants.slice(0, 10)
+            ).map((p: EventParticipantPublic) => {
+              const name = [p.first_name, p.last_name]
+                .filter(Boolean)
+                .join(" ")
+                .trim()
+              return (
+                <div key={p.id} className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="h-7 w-7 rounded-full bg-muted flex items-center justify-center">
+                      <Users className="h-3 w-3 text-muted-foreground" />
                     </div>
-                    <div className="flex items-center gap-1.5">
-                      {p.role !== "attendee" && (
-                        <Badge variant="outline" className="text-xs">
-                          {p.role}
-                        </Badge>
-                      )}
-                      {p.status === "checked_in" && (
-                        <CheckCircle className="h-3 w-3 text-green-500" />
-                      )}
-                    </div>
+                    <span className="text-sm">
+                      {name || t("events.detail.unnamed_participant")}
+                    </span>
                   </div>
-                )
-              })}
+                  <div className="flex items-center gap-1.5">
+                    {p.role !== "attendee" && (
+                      <Badge variant="outline" className="text-xs">
+                        {p.role}
+                      </Badge>
+                    )}
+                    {p.status === "checked_in" && (
+                      <CheckCircle className="h-3 w-3 text-green-500" />
+                    )}
+                  </div>
+                </div>
+              )
+            })}
             {activeParticipants.length > 10 && (
-              <p className="text-xs text-muted-foreground text-center">
-                {t("events.detail.participants_more", {
-                  count: activeParticipants.length - 10,
-                })}
-              </p>
+              <button
+                type="button"
+                aria-expanded={participantsExpanded}
+                onClick={() => setParticipantsExpanded((prev) => !prev)}
+                className="block w-full text-center text-xs text-muted-foreground hover:text-foreground hover:underline cursor-pointer transition-colors"
+              >
+                {participantsExpanded
+                  ? t("events.detail.participants_show_less")
+                  : t("events.detail.participants_more", {
+                      count: activeParticipants.length - 10,
+                    })}
+              </button>
             )}
           </div>
         )}
