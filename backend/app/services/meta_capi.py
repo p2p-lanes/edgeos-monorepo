@@ -25,6 +25,10 @@ class PreparedMetaCapiPurchase:
     event_id: str
     payment_id: str
     popup_id: str
+    event_name: str = "Purchase"
+
+
+PreparedMetaCapiEvent = PreparedMetaCapiPurchase
 
 
 def prepare_purchase_event(
@@ -57,7 +61,11 @@ def prepare_purchase_event(
                 "event_time": int(time.time()),
                 "event_id": event_id,
                 "action_source": "website",
-                "custom_data": _custom_data(payment, resolved_popup),
+                "custom_data": _custom_data(
+                    payment,
+                    resolved_popup,
+                    include_order_id=True,
+                ),
                 "user_data": _user_data(payment),
             }
         ]
@@ -69,6 +77,56 @@ def prepare_purchase_event(
         event_id=event_id,
         payment_id=str(getattr(payment, "id", "")),
         popup_id=str(getattr(resolved_popup, "id", "")),
+    )
+
+
+def prepare_initiate_checkout_event(
+    tenant: Any, payment: Any, popup: Any | None = None
+) -> PreparedMetaCapiEvent | None:
+    """Prepare a Meta CAPI InitiateCheckout event from a pending payment."""
+    encrypted_access_token = getattr(tenant, "meta_capi_access_token_encrypted", None)
+    pixel_id = _normalize_pixel_id(getattr(tenant, "meta_pixel_id", None))
+    if (
+        not getattr(tenant, "meta_tracking_enabled", False)
+        or not pixel_id
+        or not encrypted_access_token
+    ):
+        return None
+
+    resolved_popup = popup or getattr(payment, "popup", None)
+    if resolved_popup is None:
+        logger.warning(
+            "Skipping Meta CAPI InitiateCheckout: popup missing event_id={} payment_id={}",
+            _initiate_checkout_event_id(payment),
+            str(getattr(payment, "id", "")),
+        )
+        return None
+
+    event_id = _initiate_checkout_event_id(payment)
+    payload = {
+        "data": [
+            {
+                "event_name": "InitiateCheckout",
+                "event_time": int(time.time()),
+                "event_id": event_id,
+                "action_source": "website",
+                "custom_data": _custom_data(
+                    payment,
+                    resolved_popup,
+                    include_order_id=False,
+                ),
+                "user_data": _user_data(payment),
+            }
+        ]
+    }
+    return PreparedMetaCapiEvent(
+        pixel_id=pixel_id,
+        encrypted_access_token=str(encrypted_access_token),
+        payload=payload,
+        event_id=event_id,
+        payment_id=str(getattr(payment, "id", "")),
+        popup_id=str(getattr(resolved_popup, "id", "")),
+        event_name="InitiateCheckout",
     )
 
 
@@ -92,6 +150,32 @@ def enqueue_purchase_event(
 
     background_tasks.add_task(
         prepare_and_send_purchase_event,
+        tenant_snapshot,
+        payment_snapshot,
+        popup_snapshot,
+    )
+
+
+def enqueue_initiate_checkout_event(
+    background_tasks: Any,
+    tenant: Any,
+    payment: Any,
+    popup: Any | None = None,
+) -> None:
+    """Queue Meta CAPI InitiateCheckout without affecting checkout."""
+    try:
+        tenant_snapshot = _tenant_snapshot(tenant)
+        payment_snapshot = _payment_snapshot(payment)
+        popup_snapshot = _popup_snapshot(popup) if popup is not None else None
+    except Exception:
+        logger.exception(
+            "Failed to queue Meta CAPI InitiateCheckout event payment_id={}",
+            _safe_object_id(payment),
+        )
+        return
+
+    background_tasks.add_task(
+        prepare_and_send_initiate_checkout_event,
         tenant_snapshot,
         payment_snapshot,
         popup_snapshot,
@@ -144,16 +228,37 @@ async def prepare_and_send_purchase_event(
         )
 
 
-async def send_prepared_purchase_event(event: PreparedMetaCapiPurchase | None) -> None:
-    """Send a prepared Purchase event to Meta without blocking checkout success."""
+async def prepare_and_send_initiate_checkout_event(
+    tenant: Any, payment: Any, popup: Any | None = None
+) -> None:
+    """Prepare and send an InitiateCheckout event in the background."""
+    try:
+        event = prepare_initiate_checkout_event(
+            tenant=tenant,
+            payment=payment,
+            popup=popup,
+        )
+        await send_prepared_purchase_event(event)
+    except Exception:
+        logger.exception(
+            "Meta CAPI InitiateCheckout background task failed payment_id={}",
+            _safe_object_id(payment),
+        )
+
+
+async def send_prepared_purchase_event(event: PreparedMetaCapiEvent | None) -> None:
+    """Send a prepared event to Meta without blocking checkout success."""
     if event is None:
         return
+
+    event_name = event.event_name
 
     try:
         access_token = decrypt(event.encrypted_access_token)
     except Exception:
         logger.exception(
-            "Failed to decrypt Meta CAPI token event_id={} payment_id={} popup_id={}",
+            "Failed to decrypt Meta CAPI token event_name={} event_id={} payment_id={} popup_id={}",
+            event_name,
             event.event_id,
             event.payment_id,
             event.popup_id,
@@ -170,7 +275,8 @@ async def send_prepared_purchase_event(event: PreparedMetaCapiPurchase | None) -
         trace_id = response.headers.get("x-fb-trace-id")
         response.raise_for_status()
         logger.info(
-            "Meta CAPI Purchase sent event_id={} payment_id={} popup_id={} meta_trace_id={}",
+            "Meta CAPI {} sent event_id={} payment_id={} popup_id={} meta_trace_id={}",
+            event_name,
             event.event_id,
             event.payment_id,
             event.popup_id,
@@ -179,7 +285,8 @@ async def send_prepared_purchase_event(event: PreparedMetaCapiPurchase | None) -
     except httpx.HTTPStatusError as exc:
         trace_id = exc.response.headers.get("x-fb-trace-id") or "-"
         logger.warning(
-            "Meta CAPI Purchase rejected event_id={} payment_id={} popup_id={} status={} meta_trace_id={}",
+            "Meta CAPI {} rejected event_id={} payment_id={} popup_id={} status={} meta_trace_id={}",
+            event_name,
             event.event_id,
             event.payment_id,
             event.popup_id,
@@ -188,7 +295,8 @@ async def send_prepared_purchase_event(event: PreparedMetaCapiPurchase | None) -
         )
     except httpx.RequestError:
         logger.exception(
-            "Meta CAPI Purchase request failed event_id={} payment_id={} popup_id={}",
+            "Meta CAPI {} request failed event_id={} payment_id={} popup_id={}",
+            event_name,
             event.event_id,
             event.payment_id,
             event.popup_id,
@@ -287,16 +395,24 @@ def _purchase_event_id(payment: Any) -> str:
     return f"EVT_PURCHASE_{getattr(payment, 'id', '')}"
 
 
-def _custom_data(payment: Any, popup: Any) -> dict[str, Any]:
+def _initiate_checkout_event_id(payment: Any) -> str:
+    return f"EVT_INITIATE_CHECKOUT_{getattr(payment, 'id', '')}"
+
+
+def _custom_data(
+    payment: Any,
+    popup: Any,
+    *,
+    include_order_id: bool,
+) -> dict[str, Any]:
     contents = _contents(payment)
     value = getattr(payment, "amount_charged", None) or getattr(
         payment, "amount", Decimal("0")
     )
-    return {
+    custom_data = {
         "currency": getattr(payment, "currency", None)
         or getattr(popup, "currency", "USD"),
         "value": float(value or Decimal("0")),
-        "order_id": str(getattr(payment, "id", "")),
         "content_ids": [item["id"] for item in contents],
         "contents": contents,
         "num_items": sum(item["quantity"] for item in contents),
@@ -304,6 +420,9 @@ def _custom_data(payment: Any, popup: Any) -> dict[str, Any]:
         "popup_slug": getattr(popup, "slug", "") or "",
         "popup_name": getattr(popup, "name", "") or "",
     }
+    if include_order_id:
+        custom_data["order_id"] = str(getattr(payment, "id", ""))
+    return custom_data
 
 
 def _contents(payment: Any) -> list[dict[str, Any]]:

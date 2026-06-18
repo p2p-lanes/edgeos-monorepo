@@ -23,9 +23,33 @@ from app.api.payment.schemas import PaymentStatus
 from app.core.dependencies.tenants import PublicTenant
 from app.core.dependencies.users import SessionDep
 from app.core.rate_limit import RateLimit
-from app.services.meta_capi import enqueue_purchase_event
+from app.services.meta_capi import (
+    enqueue_initiate_checkout_event,
+    enqueue_purchase_event,
+)
 
 router = APIRouter(prefix="/checkout", tags=["checkout"])
+
+
+def _enqueue_checkout_initiate_checkout_event(
+    background_tasks: BackgroundTasks,
+    *,
+    tenant: object,
+    payment: object,
+    popup: object,
+) -> None:
+    try:
+        enqueue_initiate_checkout_event(
+            background_tasks,
+            tenant=tenant,
+            payment=payment,
+            popup=popup,
+        )
+    except Exception:
+        logger.exception(
+            "Failed to queue Meta CAPI InitiateCheckout event payment_id={}",
+            getattr(payment, "id", ""),
+        )
 
 
 def _enqueue_checkout_purchase_event(
@@ -100,6 +124,14 @@ async def purchase_open_ticketing(
             fbp=request_in.fbp,
         ),
     )
+
+    if checkout_url:
+        _enqueue_checkout_initiate_checkout_event(
+            background_tasks,
+            tenant=tenant,
+            payment=payment,
+            popup=popup,
+        )
 
     if payment.status == PaymentStatus.APPROVED.value:
         _enqueue_checkout_purchase_event(
