@@ -9,6 +9,7 @@ import pytest
 from app.services import meta_capi
 from app.services.meta_capi import (
     prepare_and_send_purchase_event,
+    prepare_initiate_checkout_event,
     prepare_purchase_event,
     send_prepared_purchase_event,
 )
@@ -116,6 +117,84 @@ def test_prepare_purchase_event_includes_popup_purchase_metadata() -> None:
     assert "Lovelace" not in serialized_payload
     assert DUMMY_ACCESS_TOKEN not in serialized_payload
     assert DUMMY_ACCESS_TOKEN not in serialized_event
+
+
+def test_prepare_initiate_checkout_event_uses_payment_currency_without_order_id() -> (
+    None
+):
+    payment_id = uuid4()
+    popup_id = uuid4()
+    product_id = uuid4()
+    payment = SimpleNamespace(
+        id=payment_id,
+        amount=Decimal("15000.00"),
+        amount_charged=None,
+        currency="ARS",
+        products_snapshot=[
+            SimpleNamespace(
+                product_id=product_id,
+                quantity=2,
+                effective_unit_price=None,
+                product_price=Decimal("7500.00"),
+                product_name="General Admission",
+                attendee=SimpleNamespace(
+                    human=SimpleNamespace(
+                        id=uuid4(),
+                        email="buyer@example.com",
+                        first_name="Ada",
+                        last_name="Lovelace",
+                    )
+                ),
+            )
+        ],
+        application=None,
+        buyer_email="buyer@example.com",
+        buyer_name="Ada Lovelace",
+        buyer_snapshot=None,
+        meta_fbc="fb.1.1710000000.click",
+        meta_fbp="fb.1.1710000000.browser",
+        meta_client_ip="203.0.113.10",
+        meta_client_user_agent="Mozilla/5.0 Test",
+    )
+    popup = SimpleNamespace(
+        id=popup_id,
+        slug="summer-popup",
+        name="Summer Popup",
+        currency="ARS",
+    )
+    tenant = SimpleNamespace(
+        meta_tracking_enabled=True,
+        meta_pixel_id="123456789",
+        meta_capi_access_token_encrypted=encrypt(DUMMY_ACCESS_TOKEN),
+    )
+
+    event = prepare_initiate_checkout_event(tenant, payment, popup)
+
+    assert event is not None
+    assert event.event_name == "InitiateCheckout"
+    assert event.event_id == f"EVT_INITIATE_CHECKOUT_{payment_id}"
+    payload_event = event.payload["data"][0]
+    assert payload_event["event_name"] == "InitiateCheckout"
+    assert payload_event["custom_data"] == {
+        "currency": "ARS",
+        "value": 15000.0,
+        "content_ids": [str(product_id)],
+        "contents": [
+            {
+                "id": str(product_id),
+                "quantity": 2,
+                "item_price": 7500.0,
+                "title": "General Admission",
+            }
+        ],
+        "num_items": 2,
+        "popup_id": str(popup_id),
+        "popup_slug": "summer-popup",
+        "popup_name": "Summer Popup",
+    }
+    assert "order_id" not in payload_event["custom_data"]
+    assert payload_event["user_data"]["fbc"] == "fb.1.1710000000.click"
+    assert payload_event["user_data"]["fbp"] == "fb.1.1710000000.browser"
 
 
 def test_prepare_purchase_event_skips_invalid_pixel_id() -> None:

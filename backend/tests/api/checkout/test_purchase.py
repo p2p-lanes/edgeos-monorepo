@@ -18,6 +18,7 @@ from app.api.popup.models import Popups
 from app.api.product.models import Products
 from app.api.shared.enums import SaleType
 from app.api.tenant.models import Tenants
+from app.utils.encryption import encrypt
 from tests.conftest import with_origin
 
 
@@ -183,6 +184,205 @@ def test_purchase_happy_path_creates_payment_and_attendees(
     )
     # New design: 1 attendee per (human, popup), 2 AttendeeProducts rows for qty=2
     assert len(attendees) == 1
+
+
+def test_purchase_pending_open_checkout_sends_initiate_checkout_capi(
+    client: TestClient,
+    db: Session,
+) -> None:
+    tenant = Tenants(
+        id=uuid.uuid4(),
+        name="CAPI Checkout Tenant",
+        slug=f"capi-checkout-{uuid.uuid4().hex[:6]}",
+        meta_tracking_enabled=True,
+        meta_pixel_id="123456789",
+        meta_capi_access_token_encrypted=encrypt("test-token"),
+    )
+    db.add(tenant)
+    db.flush()
+    popup = _make_popup(db, tenant, slug_prefix="capi-checkout")
+    popup.currency = "ARS"
+    product = _make_product(db, popup, name="ARS Pass", price="7500.00")
+    db.commit()
+
+    sent_events: list[object] = []
+
+    async def capture_event(event: object) -> None:
+        sent_events.append(event)
+
+    with (
+        patch("app.services.meta_capi.send_prepared_purchase_event", capture_event),
+        patch("app.services.simplefi.get_simplefi_client") as mock_get_client,
+    ):
+        mock_get_client.return_value.create_payment.return_value = SimpleNamespace(
+            id="sf_capi_checkout_1",
+            status="pending",
+            checkout_url="https://simplefi.test/checkout/capi",
+            is_installment_plan=False,
+        )
+
+        response = client.post(
+            f"/api/v1/checkout/{popup.slug}/purchase",
+            json={
+                "products": [{"product_id": str(product.id), "quantity": 2}],
+                "buyer": {
+                    "email": "buyer@test.com",
+                    "first_name": "Meta",
+                    "last_name": "Buyer",
+                    "form_data": {},
+                },
+                "fbc": "fb.1.1710000000.click",
+                "fbp": "fb.1.1710000000.browser",
+            },
+            headers={
+                "X-Tenant-Id": str(tenant.id),
+                "User-Agent": "Checkout Test UA",
+                "X-Forwarded-For": "203.0.113.20",
+            },
+        )
+
+    assert response.status_code == 200, response.text
+    assert response.json()["status"] == "pending"
+    assert len(sent_events) == 1
+    event = sent_events[0]
+    payload_event = event.payload["data"][0]
+    payment_id = response.json()["payment_id"]
+    assert event.event_id == f"EVT_INITIATE_CHECKOUT_{payment_id}"
+    assert payload_event["event_name"] == "InitiateCheckout"
+    assert payload_event["custom_data"] == {
+        "currency": "ARS",
+        "value": 15000.0,
+        "content_ids": [str(product.id)],
+        "contents": [
+            {
+                "id": str(product.id),
+                "quantity": 2,
+                "item_price": 7500.0,
+                "title": "ARS Pass",
+            }
+        ],
+        "num_items": 2,
+        "popup_id": str(popup.id),
+        "popup_slug": popup.slug,
+        "popup_name": popup.name,
+    }
+    user_data = payload_event["user_data"]
+    assert user_data["em"]
+    assert user_data["fn"]
+    assert user_data["ln"]
+    assert user_data["fbc"] == "fb.1.1710000000.click"
+    assert user_data["fbp"] == "fb.1.1710000000.browser"
+    assert user_data["client_ip_address"] == "203.0.113.20"
+    assert user_data["client_user_agent"] == "Checkout Test UA"
+
+
+def test_purchase_non_pending_open_checkout_does_not_send_initiate_checkout_capi(
+    client: TestClient,
+    db: Session,
+) -> None:
+    tenant = Tenants(
+        id=uuid.uuid4(),
+        name="CAPI Approved Checkout Tenant",
+        slug=f"capi-approved-checkout-{uuid.uuid4().hex[:6]}",
+        meta_tracking_enabled=True,
+        meta_pixel_id="123456789",
+        meta_capi_access_token_encrypted=encrypt("test-token"),
+    )
+    db.add(tenant)
+    db.flush()
+    popup = _make_popup(db, tenant, slug_prefix="capi-approved-checkout")
+    product = _make_product(db, popup, price="100.00")
+    db.commit()
+
+    async def noop_send_confirmation(*_args: object, **_kwargs: object) -> None:
+        return None
+
+    with (
+        patch(
+            "app.api.checkout.router.enqueue_initiate_checkout_event"
+        ) as mock_initiate,
+        patch("app.api.checkout.router.enqueue_purchase_event"),
+        patch(
+            "app.api.checkout.router._send_payment_confirmed_email",
+            noop_send_confirmation,
+        ),
+        patch("app.services.simplefi.get_simplefi_client") as mock_get_client,
+    ):
+        mock_get_client.return_value.create_payment.return_value = SimpleNamespace(
+            id="sf_capi_approved_checkout_1",
+            status="approved",
+            checkout_url="https://simplefi.test/checkout/approved",
+            is_installment_plan=False,
+        )
+
+        response = client.post(
+            f"/api/v1/checkout/{popup.slug}/purchase",
+            json={
+                "products": [{"product_id": str(product.id), "quantity": 1}],
+                "buyer": {
+                    "email": "buyer@test.com",
+                    "first_name": "Meta",
+                    "last_name": "Buyer",
+                    "form_data": {},
+                },
+            },
+            headers={"X-Tenant-Id": str(tenant.id)},
+        )
+
+    assert response.status_code == 200, response.text
+    assert response.json()["status"] == "approved"
+    assert response.json()["checkout_url"] == "https://simplefi.test/checkout/approved"
+    mock_initiate.assert_not_called()
+
+
+def test_purchase_initiate_checkout_capi_failure_does_not_block_response(
+    client: TestClient,
+    db: Session,
+) -> None:
+    tenant = Tenants(
+        id=uuid.uuid4(),
+        name="CAPI Failure Tenant",
+        slug=f"capi-failure-{uuid.uuid4().hex[:6]}",
+        meta_tracking_enabled=True,
+        meta_pixel_id="123456789",
+        meta_capi_access_token_encrypted=encrypt("test-token"),
+    )
+    db.add(tenant)
+    db.flush()
+    popup = _make_popup(db, tenant, slug_prefix="capi-failure")
+    product = _make_product(db, popup, price="100.00")
+    db.commit()
+
+    async def fail_send(_event: object) -> None:
+        raise RuntimeError("Meta is unavailable")
+
+    with (
+        patch("app.services.meta_capi.send_prepared_purchase_event", fail_send),
+        patch("app.services.simplefi.get_simplefi_client") as mock_get_client,
+    ):
+        mock_get_client.return_value.create_payment.return_value = SimpleNamespace(
+            id="sf_capi_failure_1",
+            status="pending",
+            checkout_url="https://simplefi.test/checkout/failure",
+            is_installment_plan=False,
+        )
+
+        response = client.post(
+            f"/api/v1/checkout/{popup.slug}/purchase",
+            json={
+                "products": [{"product_id": str(product.id), "quantity": 1}],
+                "buyer": {
+                    "email": "buyer@test.com",
+                    "first_name": "Meta",
+                    "last_name": "Buyer",
+                    "form_data": {},
+                },
+            },
+            headers={"X-Tenant-Id": str(tenant.id)},
+        )
+
+    assert response.status_code == 200, response.text
+    assert response.json()["status"] == "pending"
 
 
 def test_purchase_unknown_slug_returns_404(
