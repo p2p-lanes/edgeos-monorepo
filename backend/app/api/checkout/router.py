@@ -125,7 +125,7 @@ async def purchase_open_ticketing(
         ),
     )
 
-    if checkout_url:
+    if checkout_url and payment.status == PaymentStatus.PENDING.value:
         _enqueue_checkout_initiate_checkout_event(
             background_tasks,
             tenant=tenant,

@@ -276,6 +276,65 @@ def test_purchase_pending_open_checkout_sends_initiate_checkout_capi(
     assert user_data["client_user_agent"] == "Checkout Test UA"
 
 
+def test_purchase_non_pending_open_checkout_does_not_send_initiate_checkout_capi(
+    client: TestClient,
+    db: Session,
+) -> None:
+    tenant = Tenants(
+        id=uuid.uuid4(),
+        name="CAPI Approved Checkout Tenant",
+        slug=f"capi-approved-checkout-{uuid.uuid4().hex[:6]}",
+        meta_tracking_enabled=True,
+        meta_pixel_id="123456789",
+        meta_capi_access_token_encrypted=encrypt("test-token"),
+    )
+    db.add(tenant)
+    db.flush()
+    popup = _make_popup(db, tenant, slug_prefix="capi-approved-checkout")
+    product = _make_product(db, popup, price="100.00")
+    db.commit()
+
+    async def noop_send_confirmation(*_args: object, **_kwargs: object) -> None:
+        return None
+
+    with (
+        patch(
+            "app.api.checkout.router.enqueue_initiate_checkout_event"
+        ) as mock_initiate,
+        patch("app.api.checkout.router.enqueue_purchase_event"),
+        patch(
+            "app.api.checkout.router._send_payment_confirmed_email",
+            noop_send_confirmation,
+        ),
+        patch("app.services.simplefi.get_simplefi_client") as mock_get_client,
+    ):
+        mock_get_client.return_value.create_payment.return_value = SimpleNamespace(
+            id="sf_capi_approved_checkout_1",
+            status="approved",
+            checkout_url="https://simplefi.test/checkout/approved",
+            is_installment_plan=False,
+        )
+
+        response = client.post(
+            f"/api/v1/checkout/{popup.slug}/purchase",
+            json={
+                "products": [{"product_id": str(product.id), "quantity": 1}],
+                "buyer": {
+                    "email": "buyer@test.com",
+                    "first_name": "Meta",
+                    "last_name": "Buyer",
+                    "form_data": {},
+                },
+            },
+            headers={"X-Tenant-Id": str(tenant.id)},
+        )
+
+    assert response.status_code == 200, response.text
+    assert response.json()["status"] == "approved"
+    assert response.json()["checkout_url"] == "https://simplefi.test/checkout/approved"
+    mock_initiate.assert_not_called()
+
+
 def test_purchase_initiate_checkout_capi_failure_does_not_block_response(
     client: TestClient,
     db: Session,
