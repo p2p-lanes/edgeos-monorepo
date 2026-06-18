@@ -2,7 +2,7 @@ import uuid
 from decimal import ROUND_HALF_UP, Decimal
 
 from fastapi import APIRouter, Query
-from sqlalchemy import case, func
+from sqlalchemy import and_, case, func
 from sqlmodel import select
 
 from app.api.application.models import Applications
@@ -31,7 +31,7 @@ from app.api.payment.models import PaymentProducts, Payments
 from app.api.payment.schemas import PaymentStatus, PaymentType
 from app.api.popup.crud import popups_crud
 from app.api.product.models import Products
-from app.api.product.schemas import CATEGORY_HOUSING, CATEGORY_PATREON, CATEGORY_TICKET
+from app.api.product.schemas import CATEGORY_HOUSING, CATEGORY_TICKET
 from app.core.dependencies.users import CurrentOperator, TenantSession
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
@@ -379,42 +379,62 @@ def _get_cumulative_trends(
 def _get_revenue_breakdown(db: TenantSession, popup_id: uuid.UUID) -> RevenueBreakdown:
     """Net revenue and quantity breakdown by product and category.
 
-    Revenue here is the money actually collected per line, so the categories
-    reconcile with the Total Revenue KPI (sum of COALESCE(amount_charged, amount))
-    rather than inflating it with pre-discount list prices. When SimpleFi applies
-    a per-rail price adjustment the per-line breakdown can't see it (it's a
-    payment-level adjustment), so categories may drift from the KPI by that delta. Per-line net revenue mirrors the
-    pricing logic in payment.crud._calculate_price:
-      - patreon donations carry their amount on effective_unit_price
-        (product_price is always 0 for patreon);
-      - discountable products are reduced by the payment's best-of-three
-        discount percentage (coupon / group / scholarship);
-      - non-discountable products are charged at full list price.
-    Insurance and contribution fees are excluded on purpose: they are not
-    product lines, so the category total equals Total Revenue minus those fees
-    (and minus edit-pass credits, which are not attributable per line).
+    Revenue is anchored on what was actually collected, never reconstructed from
+    list prices. For each approved pass-purchase payment we take the settled
+    total (COALESCE(amount_charged, amount) minus insurance and contribution
+    fees, which are not product lines) and split it across the payment's lines
+    the same way the pricing engine charged it (payment.crud._calculate_price):
+    non-discountable lines and patreon donations keep their full nominal value,
+    and only discountable lines absorb the discount, sharing whatever remains of
+    the settled total in proportion to their list price. This reconciles with
+    the Total Revenue KPI by construction, regardless of how a coupon, group
+    rate, scholarship or admin comp reduced the amount, none of which are
+    itemised per line.
+
+    Nominal value comes from effective_unit_price when set (patreon donations,
+    whose product_price is 0, and direct-sale unit-price overrides) and from the
+    snapshot product_price otherwise. When the settled total can't cover the
+    non-discountable lines at full price (a comp, or a legacy-migrated payment
+    whose snapshot price was overwritten with the current, higher catalog price)
+    the payment falls back to a plain proportional split so it still reconciles
+    and never goes negative.
     """
-    discount_factor = 1 - func.coalesce(Payments.discount_value, Decimal("0")) / 100
-    net_line_revenue = case(
-        (
-            PaymentProducts.product_category == CATEGORY_PATREON,
-            func.coalesce(PaymentProducts.effective_unit_price, Decimal("0"))
-            * PaymentProducts.quantity,
-        ),
-        (
-            Products.discountable.is_(True),
-            PaymentProducts.product_price * PaymentProducts.quantity * discount_factor,
-        ),
-        else_=PaymentProducts.product_price * PaymentProducts.quantity,
+    # Per-line nominal value: donation/override price when present, else the
+    # snapshot list price. Used as the allocation weight within a payment.
+    line_nominal = (
+        func.coalesce(
+            PaymentProducts.effective_unit_price, PaymentProducts.product_price
+        )
+        * PaymentProducts.quantity
+    )
+    # A product missing from the catalog (deleted) is treated as non-discountable.
+    is_discountable = case((Products.discountable.is_(True), 1), else_=0)
+    # Settled total per payment, excluding non-product fees. Same basis as the
+    # Total Revenue KPI in _get_payment_stats.
+    net_payment = (
+        func.coalesce(Payments.amount_charged, Payments.amount)
+        - Payments.insurance_amount
+        - Payments.contribution_amount
     )
 
-    rows = db.exec(
+    lines = (
         select(
-            PaymentProducts.product_id,
-            PaymentProducts.product_name,
-            PaymentProducts.product_category,
-            func.sum(PaymentProducts.quantity),
-            func.sum(net_line_revenue),
+            PaymentProducts.product_id.label("product_id"),
+            PaymentProducts.product_name.label("product_name"),
+            PaymentProducts.product_category.label("product_category"),
+            PaymentProducts.quantity.label("quantity"),
+            line_nominal.label("nominal"),
+            is_discountable.label("is_discountable"),
+            net_payment.label("net_payment"),
+            func.sum(line_nominal)
+            .over(partition_by=PaymentProducts.payment_id)
+            .label("nominal_total"),
+            func.sum(line_nominal * is_discountable)
+            .over(partition_by=PaymentProducts.payment_id)
+            .label("discountable_total"),
+            func.sum(line_nominal * (1 - is_discountable))
+            .over(partition_by=PaymentProducts.payment_id)
+            .label("non_discountable_total"),
         )
         .join(Payments, PaymentProducts.payment_id == Payments.id)
         .join(Products, PaymentProducts.product_id == Products.id, isouter=True)
@@ -423,10 +443,45 @@ def _get_revenue_breakdown(db: TenantSession, popup_id: uuid.UUID) -> RevenueBre
             Payments.status == PaymentStatus.APPROVED.value,
             Payments.payment_type == PaymentType.PASS_PURCHASE.value,
         )
-        .group_by(
-            PaymentProducts.product_id,
-            PaymentProducts.product_name,
-            PaymentProducts.product_category,
+        .subquery()
+    )
+
+    # Money left for the discountable bucket once non-discountable lines are paid
+    # in full.
+    remainder = lines.c.net_payment - lines.c.non_discountable_total
+    allocated_revenue = case(
+        (
+            # Normal path: non-discountable lines at full nominal; discountable
+            # lines share the remainder weighted by list price.
+            and_(lines.c.discountable_total > 0, remainder >= 0),
+            case(
+                (
+                    lines.c.is_discountable == 1,
+                    remainder * lines.c.nominal / lines.c.discountable_total,
+                ),
+                else_=lines.c.nominal,
+            ),
+        ),
+        # Fallback: settled total can't cover non-discountable lines (comp or
+        # inflated legacy snapshot) -> plain proportional split.
+        (
+            lines.c.nominal_total > 0,
+            lines.c.net_payment * lines.c.nominal / lines.c.nominal_total,
+        ),
+        else_=Decimal("0"),
+    )
+
+    rows = db.exec(
+        select(
+            lines.c.product_id,
+            lines.c.product_name,
+            lines.c.product_category,
+            func.sum(lines.c.quantity),
+            func.sum(allocated_revenue),
+        ).group_by(
+            lines.c.product_id,
+            lines.c.product_name,
+            lines.c.product_category,
         )
     ).all()
 
