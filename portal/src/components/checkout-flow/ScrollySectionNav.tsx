@@ -166,95 +166,107 @@ export default function ScrollySectionNav({
             />
           ) : null}
           <div
-            ref={trackRef}
-            className="relative flex-1 overflow-x-auto rounded-xl border border-white/10 bg-checkout-badge-bg-disabled/60 p-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            className={cn("flex min-w-0 flex-1", !compact && "justify-center")}
           >
             <div
-              ref={listRef}
+              ref={trackRef}
               className={cn(
-                "relative flex",
-                // Expanded: content-width tabs spread across the bar.
-                // Compact: equal-width tabs that fill and shrink to fit.
-                compact ? "w-full" : "w-max min-w-full justify-between",
+                "relative overflow-x-auto rounded-xl border border-white/10 bg-checkout-badge-bg-disabled/60 p-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+                // Expanded: the bar hugs the centred tab group, so the sides
+                // show the page background instead of an empty track. Compact:
+                // fill the row so equal-width icon tabs distribute.
+                compact ? "w-full" : "w-fit max-w-full",
               )}
             >
-              {pill && (
-                <div
-                  aria-hidden
-                  className="pointer-events-none absolute inset-y-0 left-0 rounded-lg bg-checkout-badge-bg shadow-sm transition-[transform,width] duration-300 ease-out"
-                  style={{
-                    width: `${pill.width}px`,
-                    transform: `translateX(${pill.left}px)`,
-                  }}
-                />
-              )}
-              {sections.map((section, index) => {
-                const Icon = resolveIcon(section)
-                const isActive = section.id === activeSection
-                const isComplete =
-                  !isActive && isStepComplete(section.id as CheckoutStep)
-                const isIncomplete = !isActive && isStepIncomplete(section.id)
-                const emoji = section.emoji?.trim()
-                // Two ways a tenant can specify the nav icon: a slug into
-                // the curated Lucide registry ("user", "mushroom", …)
-                // which renders a stroke SVG, OR a literal emoji
-                // character. If neither is set, the step-type/template
-                // default applies via resolveIcon. The literal-emoji
-                // branch picks up the optional monochrome filter so
-                // colorful glyphs can be forced to a single tone.
-                const RegistryIcon = getRegistryIcon(emoji)
-                return (
-                  <button
-                    key={section.id}
-                    ref={(el) => {
-                      buttonRefs.current[index] = el
+              <div
+                ref={listRef}
+                className={cn(
+                  "relative flex",
+                  // Expanded: content-width tabs sit adjacent so the pill slides
+                  // between them (segmented-control feel). Compact: equal-width.
+                  compact ? "w-full" : "w-max",
+                )}
+              >
+                {pill && (
+                  <div
+                    aria-hidden
+                    className="pointer-events-none absolute inset-y-0 left-0 rounded-lg bg-checkout-badge-bg shadow-sm transition-[transform,width] duration-300 ease-out"
+                    style={{
+                      width: `${pill.width}px`,
+                      transform: `translateX(${pill.left}px)`,
                     }}
-                    type="button"
-                    onClick={() => onSectionClick(section.id)}
-                    aria-current={isActive ? "step" : undefined}
-                    aria-invalid={isIncomplete || undefined}
-                    className={cn(
-                      "relative z-10 flex h-7 items-center justify-center text-xs font-semibold transition-[color,opacity] duration-200",
-                      // Compact equal-width icons vs. expanded content-width
-                      // labelled tabs.
-                      compact
-                        ? "min-w-0 flex-1 gap-1 px-1"
-                        : "shrink-0 gap-1.5 px-3",
-                      isActive
-                        ? "text-checkout-badge-title"
-                        : isIncomplete
-                          ? // Muted amber tint — "needs your attention"
-                            // without the red-alarm rage of a destructive
-                            // colour. Matches the toast/banner palette.
-                            "text-amber-400 hover:text-amber-300"
-                          : "text-checkout-badge-title-disabled hover:opacity-70",
-                    )}
-                  >
-                    {RegistryIcon ? (
-                      <RegistryIcon className="size-3.5 shrink-0" />
-                    ) : emoji ? (
-                      <span
-                        aria-hidden
-                        style={{
-                          filter:
-                            "var(--checkout-nav-emoji-filter, none)" as string,
-                        }}
-                        className="text-sm leading-none shrink-0"
-                      >
-                        {emoji}
-                      </span>
-                    ) : (
-                      <Icon className="size-3.5 shrink-0" />
-                    )}
-                    {!compact && (
-                      <span className="whitespace-nowrap">{section.label}</span>
-                    )}
-                    {isComplete && (
-                      <Check className="size-2.5 text-emerald-400" />
-                    )}
-                  </button>
-                )
-              })}
+                  />
+                )}
+                {sections.map((section, index) => {
+                  const Icon = resolveIcon(section)
+                  const isActive = section.id === activeSection
+                  const isComplete =
+                    !isActive && isStepComplete(section.id as CheckoutStep)
+                  const isIncomplete = !isActive && isStepIncomplete(section.id)
+                  const emoji = section.emoji?.trim()
+                  // Two ways a tenant can specify the nav icon: a slug into
+                  // the curated Lucide registry ("user", "mushroom", …)
+                  // which renders a stroke SVG, OR a literal emoji
+                  // character. If neither is set, the step-type/template
+                  // default applies via resolveIcon. The literal-emoji
+                  // branch picks up the optional monochrome filter so
+                  // colorful glyphs can be forced to a single tone.
+                  const RegistryIcon = getRegistryIcon(emoji)
+                  return (
+                    <button
+                      key={section.id}
+                      ref={(el) => {
+                        buttonRefs.current[index] = el
+                      }}
+                      type="button"
+                      onClick={() => onSectionClick(section.id)}
+                      aria-current={isActive ? "step" : undefined}
+                      aria-invalid={isIncomplete || undefined}
+                      className={cn(
+                        "relative z-10 flex h-7 items-center justify-center text-xs font-semibold transition-[color,opacity] duration-200",
+                        // Compact equal-width icons vs. expanded content-width
+                        // labelled tabs.
+                        compact
+                          ? "min-w-0 flex-1 gap-1 px-1"
+                          : "shrink-0 gap-1.5 px-3",
+                        isActive
+                          ? "text-checkout-badge-title"
+                          : isIncomplete
+                            ? // Muted amber tint — "needs your attention"
+                              // without the red-alarm rage of a destructive
+                              // colour. Matches the toast/banner palette.
+                              "text-amber-400 hover:text-amber-300"
+                            : "text-checkout-badge-title-disabled hover:opacity-70",
+                      )}
+                    >
+                      {RegistryIcon ? (
+                        <RegistryIcon className="size-3.5 shrink-0" />
+                      ) : emoji ? (
+                        <span
+                          aria-hidden
+                          style={{
+                            filter:
+                              "var(--checkout-nav-emoji-filter, none)" as string,
+                          }}
+                          className="text-sm leading-none shrink-0"
+                        >
+                          {emoji}
+                        </span>
+                      ) : (
+                        <Icon className="size-3.5 shrink-0" />
+                      )}
+                      {!compact && (
+                        <span className="whitespace-nowrap">
+                          {section.label}
+                        </span>
+                      )}
+                      {isComplete && (
+                        <Check className="size-2.5 text-emerald-400" />
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
             </div>
           </div>
           {extraContent ? <div className="shrink-0">{extraContent}</div> : null}
