@@ -478,7 +478,7 @@ function ScrollyCheckoutFlowInner({
                 the same size and rhythm as every other step. Only the step
                 content (the grid) uses the wider width. The max-w-2xl wrapper
                 is a no-op on non-widened steps. */}
-            <div className="mx-auto w-full max-w-2xl">
+            <div className="mx-auto mb-8 w-full max-w-2xl sm:mb-12 lg:mb-16">
               <SectionHeader
                 title={config?.title ?? section.label}
                 subtitle={config?.description ?? undefined}
