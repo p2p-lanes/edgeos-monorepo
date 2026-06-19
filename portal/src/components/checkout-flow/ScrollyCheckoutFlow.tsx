@@ -457,11 +457,21 @@ function ScrollyCheckoutFlowInner({
       <CheckoutToast onChipClick={scrollToStep} />
       {allSections.map((section) => {
         const { config } = section
+        // The ticket-card "stacked" layout renders a responsive grid of cards,
+        // which needs more width than the default centred column. Other steps
+        // (and the tabs/compact ticket-card variants) keep the narrow column.
+        const templateConfig = config?.template_config as
+          | Record<string, unknown>
+          | undefined
+        const isStackedCards =
+          config?.template === "ticket-card" &&
+          (templateConfig?.variant ?? "stacked") === "stacked"
         return (
           <SnapSection
             key={section.id}
             id={section.id}
             bottomPadding={section.id === lastSectionId ? "4rem" : "50vh"}
+            widthClass={isStackedCards ? "max-w-6xl" : "max-w-2xl"}
           >
             <SectionHeader
               title={config?.title ?? section.label}

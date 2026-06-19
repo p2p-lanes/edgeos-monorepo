@@ -7,10 +7,15 @@ export default function SnapSection({
   id,
   children,
   bottomPadding = "50vh",
+  // Most steps read as a centred column; card-grid steps pass a wider class so
+  // their cards have room to sit side by side. Both literals live here and at
+  // the call site so Tailwind keeps them.
+  widthClass = "max-w-2xl",
 }: {
   id: string
   children: React.ReactNode
   bottomPadding?: string
+  widthClass?: string
 }) {
   const ref = useRef<HTMLElement>(null)
   const [visible, setVisible] = useState(false)
@@ -88,7 +93,7 @@ export default function SnapSection({
     <section
       id={id}
       ref={ref}
-      className="flex flex-col justify-start px-4 max-w-2xl mx-auto"
+      className={`flex flex-col justify-start px-4 ${widthClass} mx-auto`}
       style={{
         minHeight: "var(--snap-section-h, 100vh)",
         paddingTop: "calc(var(--snap-nav-h, 48px) + 1.5rem)",

@@ -409,17 +409,22 @@ function StackedLayout({
   surface,
   imageAspect,
 }: LayoutProps) {
+  // Cards sit side by side at a fixed width and wrap, centred. Flex-wrap (not
+  // a fractional grid) keeps every card the same size regardless of how many
+  // sections exist, so a lone card doesn't stretch to fill the row. The parent
+  // step is widened (max-w-6xl) so up to three cards fit per row on desktop.
   return (
-    <div className="space-y-4">
+    <div className="flex flex-wrap items-start justify-center gap-4">
       {groups.map(({ section, products }) => (
-        <SectionCard
-          key={section.key}
-          section={section}
-          products={products}
-          stepType={stepType}
-          surface={surface}
-          imageAspect={imageAspect}
-        />
+        <div key={section.key} className="w-full sm:w-[340px]">
+          <SectionCard
+            section={section}
+            products={products}
+            stepType={stepType}
+            surface={surface}
+            imageAspect={imageAspect}
+          />
+        </div>
       ))}
     </div>
   )
