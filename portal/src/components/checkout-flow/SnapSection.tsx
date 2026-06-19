@@ -96,7 +96,7 @@ export default function SnapSection({
       className={`flex flex-col justify-start px-4 ${widthClass} mx-auto`}
       style={{
         minHeight: "var(--snap-section-h, 100vh)",
-        paddingTop: "calc(var(--snap-nav-h, 48px) + 1.5rem)",
+        paddingTop: "calc(var(--snap-nav-h, 48px) + 4rem)",
         paddingBottom: bottomPadding,
       }}
     >
