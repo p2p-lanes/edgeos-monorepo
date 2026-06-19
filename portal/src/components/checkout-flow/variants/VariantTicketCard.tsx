@@ -374,6 +374,9 @@ function SectionCard({
           <ExpandableDescription
             text={section.description}
             clamp={3}
+            // Bound the expanded text so a long description can't make one card
+            // tower over the others or push its product rows under the footer.
+            expandedClassName="max-h-56 overflow-y-auto pr-1 overscroll-contain"
             className="text-sm text-muted-foreground whitespace-pre-line"
             // Branded toggle: uppercase micro-caps + chevron glyph in the
             // theme accent colour. Falls back to currentColor when the

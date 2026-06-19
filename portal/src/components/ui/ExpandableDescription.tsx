@@ -18,6 +18,10 @@ interface ExpandableDescriptionProps {
   buttonClassName?: string
   moreLabel?: string
   lessLabel?: string
+  /** Classes applied to the text only while expanded. Use to bound the height
+   *  (e.g. "max-h-56 overflow-y-auto") so a long description can't make a grid
+   *  card tower over its neighbours. The toggle button stays outside this box. */
+  expandedClassName?: string
 }
 
 const ExpandableDescription = ({
@@ -27,6 +31,7 @@ const ExpandableDescription = ({
   buttonClassName,
   moreLabel,
   lessLabel,
+  expandedClassName,
 }: ExpandableDescriptionProps) => {
   const { t } = useTranslation()
   const resolvedMoreLabel = moreLabel ?? t("common.see_more")
@@ -95,7 +100,11 @@ const ExpandableDescription = ({
 
   return (
     <div className="w-full">
-      <p ref={paragraphRef} className={cn(className)} style={collapsedStyle}>
+      <p
+        ref={paragraphRef}
+        className={cn(className, isExpanded && expandedClassName)}
+        style={collapsedStyle}
+      >
         {text}
       </p>
       {isOverflowing && (
