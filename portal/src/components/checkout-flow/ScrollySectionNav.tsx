@@ -1,7 +1,13 @@
 "use client"
 
 import { Check } from "lucide-react"
-import type { ReactNode } from "react"
+import {
+  type ReactNode,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react"
 import { getRegistryIcon, resolveStepIcon } from "@/lib/checkoutStepIcons"
 import { cn } from "@/lib/utils"
 import { useCheckout } from "@/providers/checkoutProvider"
@@ -15,6 +21,13 @@ export type WatermarkStyle = "none" | "ghost" | "stroke" | "bold"
 // the step-type / template lookup tables.
 const resolveIcon = (section: { id: string; template?: string | null }) =>
   resolveStepIcon({ stepType: section.id, template: section.template })
+
+// Measuring the active tab to place the sliding pill must happen before the
+// browser paints (otherwise the pill lands a frame late on first render).
+// useLayoutEffect does that on the client; fall back to useEffect on the
+// server so SSR doesn't warn about a no-op layout effect.
+const useIsomorphicLayoutEffect =
+  typeof window !== "undefined" ? useLayoutEffect : useEffect
 
 interface NavSection {
   id: string
@@ -77,12 +90,70 @@ export default function ScrollySectionNav({
     0,
     sections.findIndex((s) => s.id === activeSection),
   )
-  const segmentWidthPct = sections.length > 0 ? 100 / sections.length : 100
+
+  // Adaptive density. Two sizing strategies fight each other across the width
+  // range: desktop wants content-width tabs (full labels, never truncated),
+  // mobile wants equal-width tabs that shrink so every icon still fits. No
+  // single CSS rule does both, so we measure: keep full labels while the row
+  // fits the track, and collapse to equal-width icon-only tabs once it would
+  // overflow. The result never truncates a label and never clips an icon at
+  // any width or step count. `compact` drives both the layout and whether
+  // labels render.
+  const trackRef = useRef<HTMLDivElement>(null)
+  const listRef = useRef<HTMLDivElement>(null)
+  const buttonRefs = useRef<(HTMLButtonElement | null)[]>([])
+  const [pill, setPill] = useState<{ left: number; width: number } | null>(null)
+  const [compact, setCompact] = useState(false)
+  // Width the labelled row needs, captured while expanded. Used as the
+  // hysteresis threshold so the boundary doesn't flap between modes.
+  const expandedWidthRef = useRef(0)
+
+  useIsomorphicLayoutEffect(() => {
+    const recalc = () => {
+      const track = trackRef.current
+      const list = listRef.current
+      if (track && list) {
+        const avail = track.clientWidth
+        if (!compact) {
+          // Labels are showing → scrollWidth is the true expanded width.
+          expandedWidthRef.current = list.scrollWidth
+          if (list.scrollWidth > avail + 1) setCompact(true)
+        } else if (
+          expandedWidthRef.current > 0 &&
+          expandedWidthRef.current <= avail
+        ) {
+          // Enough room came back for the labelled row to fit again.
+          setCompact(false)
+        }
+      }
+      const btn = buttonRefs.current[activeIndex]
+      if (btn) setPill({ left: btn.offsetLeft, width: btn.offsetWidth })
+    }
+
+    recalc()
+
+    // Safety net only: in compact mode everything fits, but on an extreme
+    // viewport (even icons overflow) keep the active step in view.
+    const btn = buttonRefs.current[activeIndex]
+    const track = trackRef.current
+    if (btn && track) {
+      const target =
+        btn.offsetLeft + btn.offsetWidth / 2 - track.clientWidth / 2
+      track.scrollTo({ left: Math.max(0, target), behavior: "smooth" })
+    }
+
+    if (!track) return
+    const ro = new ResizeObserver(recalc)
+    ro.observe(track)
+    return () => ro.disconnect()
+    // sections.length re-runs when tabs change; compact re-runs after a mode
+    // flip so the measurement settles (pre-paint, so no visible flicker).
+  }, [activeIndex, sections.length, compact])
 
   return (
     <div data-snap-nav className="sticky top-0 z-20">
       <div className="bg-checkout-navbar-bg/85 px-2.5 py-1.5 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-4xl items-center gap-1.5">
+        <div className="flex items-center gap-1.5">
           {brandLogoUrl ? (
             // Small tenant logo, sized 28px. Next/image not used because
             // tenant icon URLs come from arbitrary CDNs and don't need
@@ -94,18 +165,30 @@ export default function ScrollySectionNav({
               className="size-7 shrink-0 rounded-md object-contain"
             />
           ) : null}
-          <div className="relative flex-1 overflow-hidden rounded-xl border border-white/10 bg-checkout-badge-bg-disabled/60 p-0.5">
+          <div
+            ref={trackRef}
+            className="relative flex-1 overflow-x-auto rounded-xl border border-white/10 bg-checkout-badge-bg-disabled/60 p-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          >
             <div
-              aria-hidden
-              className="absolute inset-y-0.5 rounded-lg bg-checkout-badge-bg shadow-sm transition-[transform,width] duration-300 ease-out"
-              style={{
-                width: `calc(${segmentWidthPct}% - 0.125rem)`,
-                transform: `translateX(calc(${activeIndex * 100}% + ${activeIndex * 0.125}rem))`,
-                left: "0.125rem",
-              }}
-            />
-            <div className="relative grid auto-cols-fr grid-flow-col">
-              {sections.map((section) => {
+              ref={listRef}
+              className={cn(
+                "relative flex",
+                // Expanded: content-width tabs spread across the bar.
+                // Compact: equal-width tabs that fill and shrink to fit.
+                compact ? "w-full" : "w-max min-w-full justify-between",
+              )}
+            >
+              {pill && (
+                <div
+                  aria-hidden
+                  className="pointer-events-none absolute inset-y-0 left-0 rounded-lg bg-checkout-badge-bg shadow-sm transition-[transform,width] duration-300 ease-out"
+                  style={{
+                    width: `${pill.width}px`,
+                    transform: `translateX(${pill.left}px)`,
+                  }}
+                />
+              )}
+              {sections.map((section, index) => {
                 const Icon = resolveIcon(section)
                 const isActive = section.id === activeSection
                 const isComplete =
@@ -123,12 +206,20 @@ export default function ScrollySectionNav({
                 return (
                   <button
                     key={section.id}
+                    ref={(el) => {
+                      buttonRefs.current[index] = el
+                    }}
                     type="button"
                     onClick={() => onSectionClick(section.id)}
                     aria-current={isActive ? "step" : undefined}
                     aria-invalid={isIncomplete || undefined}
                     className={cn(
-                      "relative z-10 flex h-7 min-w-0 items-center justify-center gap-1 px-1.5 text-xs font-semibold transition-[color,opacity] duration-200",
+                      "relative z-10 flex h-7 items-center justify-center text-xs font-semibold transition-[color,opacity] duration-200",
+                      // Compact equal-width icons vs. expanded content-width
+                      // labelled tabs.
+                      compact
+                        ? "min-w-0 flex-1 gap-1 px-1"
+                        : "shrink-0 gap-1.5 px-3",
                       isActive
                         ? "text-checkout-badge-title"
                         : isIncomplete
@@ -155,9 +246,9 @@ export default function ScrollySectionNav({
                     ) : (
                       <Icon className="size-3.5 shrink-0" />
                     )}
-                    <span className="hidden truncate sm:inline">
-                      {section.label}
-                    </span>
+                    {!compact && (
+                      <span className="whitespace-nowrap">{section.label}</span>
+                    )}
                     {isComplete && (
                       <Check className="size-2.5 text-emerald-400" />
                     )}

@@ -5002,18 +5002,10 @@ export type EventsListPortalEventsData = {
     eventStatus?: (EventStatus | null);
     includeHidden?: boolean;
     kind?: (string | null);
-    /**
-     * Maximum number of items to return
-     */
-    limit?: number;
     managedOnly?: boolean;
     popupId?: (string | null);
     rsvpedOnly?: boolean;
     search?: (string | null);
-    /**
-     * Number of items to skip
-     */
-    skip?: number;
     startAfter?: (string | null);
     startBefore?: (string | null);
     tags?: (Array<(string)> | null);

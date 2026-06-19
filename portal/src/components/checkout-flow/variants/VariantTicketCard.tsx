@@ -109,6 +109,16 @@ function parseSurface(
   return "theme"
 }
 
+/** Tenant-wide aspect, set once at template_config root and applied to every
+ *  section's hero image (the backoffice copy reads "Applied to every section's
+ *  hero image"). A per-section `image_aspect` still wins when present. */
+function parseImageAspect(
+  templateConfig: VariantProps["templateConfig"],
+): SectionImageAspect | undefined {
+  const a = templateConfig?.image_aspect
+  return a === "16:9" || a === "3:2" ? a : undefined
+}
+
 function resolveAspectClass(aspect?: SectionImageAspect): string {
   return ASPECT_CLASSES[aspect ?? "16:9"]
 }
@@ -313,11 +323,13 @@ function SectionCard({
   products,
   stepType,
   surface,
+  imageAspect,
 }: {
   section: TicketCardSection
   products: ProductsPass[]
   stepType: string
   surface: TicketCardSurface
+  imageAspect?: SectionImageAspect
 }) {
   if (products.length === 0) return null
 
@@ -330,7 +342,7 @@ function SectionCard({
         <div
           className={cn(
             "relative w-full bg-muted",
-            resolveAspectClass(section.image_aspect),
+            resolveAspectClass(section.image_aspect ?? imageAspect),
           )}
         >
           <Image
@@ -388,9 +400,15 @@ interface LayoutProps {
   groups: { section: TicketCardSection; products: ProductsPass[] }[]
   stepType: string
   surface: TicketCardSurface
+  imageAspect?: SectionImageAspect
 }
 
-function StackedLayout({ groups, stepType, surface }: LayoutProps) {
+function StackedLayout({
+  groups,
+  stepType,
+  surface,
+  imageAspect,
+}: LayoutProps) {
   return (
     <div className="space-y-4">
       {groups.map(({ section, products }) => (
@@ -400,6 +418,7 @@ function StackedLayout({ groups, stepType, surface }: LayoutProps) {
           products={products}
           stepType={stepType}
           surface={surface}
+          imageAspect={imageAspect}
         />
       ))}
     </div>
@@ -432,7 +451,7 @@ function CompactLayout({ groups, stepType, surface }: LayoutProps) {
   )
 }
 
-function TabsLayout({ groups, stepType, surface }: LayoutProps) {
+function TabsLayout({ groups, stepType, surface, imageAspect }: LayoutProps) {
   // Renders section labels as a horizontal anchor strip; sections all
   // stay visible below. Kept server-renderable — no client-side tab state.
   const { t } = useTranslation()
@@ -458,6 +477,7 @@ function TabsLayout({ groups, stepType, surface }: LayoutProps) {
               products={products}
               stepType={stepType}
               surface={surface}
+              imageAspect={imageAspect}
             />
           </div>
         ))}
@@ -478,6 +498,7 @@ export default function VariantTicketCard({
   const sections = parseSections(templateConfig)
   const variant = parseVariant(templateConfig)
   const surface = parseSurface(templateConfig)
+  const imageAspect = parseImageAspect(templateConfig)
   const { t } = useTranslation()
 
   // No sections configured — show every product in a single ungrouped
@@ -527,7 +548,21 @@ export default function VariantTicketCard({
     )
   }
   if (variant === "tabs") {
-    return <TabsLayout groups={groups} stepType={stepType} surface={surface} />
+    return (
+      <TabsLayout
+        groups={groups}
+        stepType={stepType}
+        surface={surface}
+        imageAspect={imageAspect}
+      />
+    )
   }
-  return <StackedLayout groups={groups} stepType={stepType} surface={surface} />
+  return (
+    <StackedLayout
+      groups={groups}
+      stepType={stepType}
+      surface={surface}
+      imageAspect={imageAspect}
+    />
+  )
 }

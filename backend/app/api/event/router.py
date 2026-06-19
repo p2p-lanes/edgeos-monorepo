@@ -2646,15 +2646,16 @@ async def list_portal_events(
     rsvped_only: bool = False,
     managed_only: bool = False,
     include_hidden: bool = False,
-    skip: PaginationSkip = 0,
-    limit: PaginationLimit = 100,
 ) -> ListModel[EventPublic]:
     if popup_id:
+        # The portal list always consumes the full window (it groups by day and
+        # sorts globally client-side), so we fetch every matching row in one
+        # query (``limit=None``). Paging this endpoint only created boundaries
+        # where recurring expansion and tie-ordered rows could duplicate.
         events, total = crud.events_crud.find_by_popup(
             db,
             popup_id=popup_id,
-            skip=skip,
-            limit=limit,
+            limit=None,
             event_status=event_status,
             kind=kind,
             venue_id=venue_id,
@@ -2665,15 +2666,13 @@ async def list_portal_events(
             start_before=start_before,
             search=search,
             # "My events" channel: restrict to events the caller manages
-            # (owner / host / collaborator) in SQL, so pagination counts the
-            # managed set instead of post-filtering a truncated page.
+            # (owner / host / collaborator) in SQL, so the query returns the
+            # managed set directly instead of post-filtering in Python.
             managed_by_human_id=current_human.id if managed_only else None,
         )
     else:
         events, total = crud.events_crud.find(
             db,
-            skip=skip,
-            limit=limit,
             search=search,
             search_fields=["title"],
         )
@@ -2758,14 +2757,13 @@ async def list_portal_events(
             pub = pub.model_copy(update=updates)
         return pub
 
+    results = [_publicize(e) for e in visible]
     return ListModel[EventPublic](
-        results=[_publicize(e) for e in visible],
-        # ``total`` is the pre-pagination DB-row count from find_by_popup, not
-        # ``len(visible)``: post-filtering (visibility/cancelled/hidden) and
-        # recurrence expansion make the visible page size an unreliable cursor,
-        # so clients paging through the full set need the row count to know when
-        # to stop.
-        paging=Paging(offset=skip, limit=limit, total=total),
+        results=results,
+        # The list is returned unpaginated, so ``paging`` is informational only.
+        # ``total`` is the pre-expansion DB-row count from find_by_popup; the
+        # returned count differs after recurrence expansion and post-filtering.
+        paging=Paging(offset=0, limit=len(results), total=total),
     )
 
 
