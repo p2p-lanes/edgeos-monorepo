@@ -457,30 +457,49 @@ function ScrollyCheckoutFlowInner({
       <CheckoutToast onChipClick={scrollToStep} />
       {allSections.map((section) => {
         const { config } = section
+        // The ticket-card "stacked" layout renders a responsive grid of cards,
+        // which needs more width than the default centred column. Other steps
+        // (and the tabs/compact ticket-card variants) keep the narrow column.
+        const templateConfig = config?.template_config as
+          | Record<string, unknown>
+          | undefined
+        const isStackedCards =
+          config?.template === "ticket-card" &&
+          (templateConfig?.variant ?? "stacked") === "stacked"
         return (
           <SnapSection
             key={section.id}
             id={section.id}
             bottomPadding={section.id === lastSectionId ? "4rem" : "50vh"}
+            widthClass={isStackedCards ? "max-w-6xl" : "max-w-2xl"}
           >
-            <SectionHeader
-              title={config?.title ?? section.label}
-              subtitle={config?.description ?? undefined}
-              variant="snap"
-              watermark={config?.watermark ?? section.label}
-              watermarkStyle={watermarkStyle}
-              showTitle={config?.show_title ?? true}
-              showWatermark={config?.show_watermark ?? true}
-            />
+            {/* Header and footer stay in the narrow column even when the step
+                is widened for a card grid, so the section title/watermark keep
+                the same size and rhythm as every other step. Only the step
+                content (the grid) uses the wider width. The max-w-2xl wrapper
+                is a no-op on non-widened steps. */}
+            <div className="mx-auto mb-8 w-full max-w-2xl sm:mb-12 lg:mb-16">
+              <SectionHeader
+                title={config?.title ?? section.label}
+                subtitle={config?.description ?? undefined}
+                variant="snap"
+                watermark={config?.watermark ?? section.label}
+                watermarkStyle={watermarkStyle}
+                showTitle={config?.show_title ?? true}
+                showWatermark={config?.show_watermark ?? true}
+              />
+            </div>
             {renderSectionContent(section)}
             {(() => {
               const ft = (
                 config?.template_config as Record<string, unknown> | undefined
               )?.footer_text
               return typeof ft === "string" && ft ? (
-                <p className="text-xs text-gray-400 leading-relaxed px-1 pt-4 text-center">
-                  {ft}
-                </p>
+                <div className="mx-auto w-full max-w-2xl">
+                  <p className="text-xs text-gray-400 leading-relaxed px-1 pt-4 text-center">
+                    {ft}
+                  </p>
+                </div>
               ) : null
             })()}
           </SnapSection>

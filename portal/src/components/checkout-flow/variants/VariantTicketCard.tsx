@@ -24,8 +24,10 @@ import type { VariantProps } from "../registries/variantRegistry"
  *  the menu on purpose — anything more extreme than 3:2 ate the cards in
  *  the design pass. */
 const ASPECT_CLASSES = {
-  "16:9": "aspect-[16/9]",
-  "3:2": "aspect-[3/2]",
+  "16:9": "aspect-[16/9]", // Banner — panoramic, short cards
+  "3:2": "aspect-[3/2]", // Classic — standard photo
+  "1:1": "aspect-[1/1]", // Square — strong presence, CTA still visible
+  "4:5": "aspect-[4/5]", // Portrait — image-forward, poster feel
 } as const
 type SectionImageAspect = keyof typeof ASPECT_CLASSES
 
@@ -116,7 +118,9 @@ function parseImageAspect(
   templateConfig: VariantProps["templateConfig"],
 ): SectionImageAspect | undefined {
   const a = templateConfig?.image_aspect
-  return a === "16:9" || a === "3:2" ? a : undefined
+  return typeof a === "string" && a in ASPECT_CLASSES
+    ? (a as SectionImageAspect)
+    : undefined
 }
 
 function resolveAspectClass(aspect?: SectionImageAspect): string {
@@ -217,7 +221,7 @@ function ProductRow({
     >
       <div className="flex items-center gap-3">
         <div className="flex-1 min-w-0">
-          <h4 className="font-medium text-foreground text-sm">
+          <h4 className="font-medium text-foreground text-sm line-clamp-2">
             {product.name}
           </h4>
         </div>
@@ -409,17 +413,22 @@ function StackedLayout({
   surface,
   imageAspect,
 }: LayoutProps) {
+  // Cards sit side by side at a fixed width and wrap, centred. Flex-wrap (not
+  // a fractional grid) keeps every card the same size regardless of how many
+  // sections exist, so a lone card doesn't stretch to fill the row. The parent
+  // step is widened (max-w-6xl) so up to three cards fit per row on desktop.
   return (
-    <div className="space-y-4">
+    <div className="flex flex-wrap items-start justify-center gap-4">
       {groups.map(({ section, products }) => (
-        <SectionCard
-          key={section.key}
-          section={section}
-          products={products}
-          stepType={stepType}
-          surface={surface}
-          imageAspect={imageAspect}
-        />
+        <div key={section.key} className="w-full sm:w-[340px]">
+          <SectionCard
+            section={section}
+            products={products}
+            stepType={stepType}
+            surface={surface}
+            imageAspect={imageAspect}
+          />
+        </div>
       ))}
     </div>
   )

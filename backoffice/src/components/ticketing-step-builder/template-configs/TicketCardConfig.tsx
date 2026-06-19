@@ -66,8 +66,10 @@ const TICKET_CARD_SURFACES = [
 ] as const
 
 const ASPECTS = [
-  { value: "16:9", label: "16:9" },
-  { value: "3:2", label: "3:2" },
+  { value: "16:9", label: "Banner", hint: "16:9" },
+  { value: "3:2", label: "Classic", hint: "3:2" },
+  { value: "1:1", label: "Square", hint: "1:1" },
+  { value: "4:5", label: "Portrait", hint: "4:5" },
 ] as const
 
 export function TicketCardConfig({
@@ -250,10 +252,10 @@ export function TicketCardConfig({
           Section image aspect ratio
         </Label>
         <p className="text-xs text-muted-foreground">
-          Applied to every section's hero image. 16:9 keeps cards short; 3:2
-          gives the image more presence.
+          Applied to every section's hero image. Banner keeps cards short;
+          Square and Portrait give the image more presence.
         </p>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {ASPECTS.map((a) => {
             const isActive = imageAspect === a.value
             return (
@@ -267,13 +269,16 @@ export function TicketCardConfig({
                   })
                 }
                 className={cn(
-                  "rounded-md border-2 px-3 py-1.5 text-xs font-medium transition-all",
+                  "flex flex-col items-center gap-0.5 rounded-md border-2 px-3 py-1.5 text-xs font-medium transition-all",
                   isActive
                     ? "border-primary bg-primary/5 text-primary"
                     : "border-border hover:bg-accent/50",
                 )}
               >
-                {a.label}
+                <span>{a.label}</span>
+                <span className="text-[10px] text-muted-foreground">
+                  {a.hint}
+                </span>
               </button>
             )
           })}
