@@ -91,36 +91,69 @@ export default function ScrollySectionNav({
     sections.findIndex((s) => s.id === activeSection),
   )
 
-  // Tabs size to their own label width (no equal-width columns), so a long
-  // step name never gets truncated while a short one wastes space. The
-  // sliding pill can't ride a fixed segment fraction anymore, so we measure
-  // the active button and position the pill over its real box. Recomputed on
-  // active change and whenever the track resizes (viewport, font load, the
-  // sm-breakpoint label reveal).
+  // Adaptive density. Two sizing strategies fight each other across the width
+  // range: desktop wants content-width tabs (full labels, never truncated),
+  // mobile wants equal-width tabs that shrink so every icon still fits. No
+  // single CSS rule does both, so we measure: keep full labels while the row
+  // fits the track, and collapse to equal-width icon-only tabs once it would
+  // overflow. The result never truncates a label and never clips an icon at
+  // any width or step count. `compact` drives both the layout and whether
+  // labels render.
+  const trackRef = useRef<HTMLDivElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
   const buttonRefs = useRef<(HTMLButtonElement | null)[]>([])
   const [pill, setPill] = useState<{ left: number; width: number } | null>(null)
+  const [compact, setCompact] = useState(false)
+  // Width the labelled row needs, captured while expanded. Used as the
+  // hysteresis threshold so the boundary doesn't flap between modes.
+  const expandedWidthRef = useRef(0)
 
   useIsomorphicLayoutEffect(() => {
-    const measure = () => {
+    const recalc = () => {
+      const track = trackRef.current
+      const list = listRef.current
+      if (track && list) {
+        const avail = track.clientWidth
+        if (!compact) {
+          // Labels are showing → scrollWidth is the true expanded width.
+          expandedWidthRef.current = list.scrollWidth
+          if (list.scrollWidth > avail + 1) setCompact(true)
+        } else if (
+          expandedWidthRef.current > 0 &&
+          expandedWidthRef.current <= avail
+        ) {
+          // Enough room came back for the labelled row to fit again.
+          setCompact(false)
+        }
+      }
       const btn = buttonRefs.current[activeIndex]
-      if (!btn) return
-      setPill({ left: btn.offsetLeft, width: btn.offsetWidth })
+      if (btn) setPill({ left: btn.offsetLeft, width: btn.offsetWidth })
     }
-    measure()
-    const list = listRef.current
-    if (!list) return
-    const ro = new ResizeObserver(measure)
-    ro.observe(list)
+
+    recalc()
+
+    // Safety net only: in compact mode everything fits, but on an extreme
+    // viewport (even icons overflow) keep the active step in view.
+    const btn = buttonRefs.current[activeIndex]
+    const track = trackRef.current
+    if (btn && track) {
+      const target =
+        btn.offsetLeft + btn.offsetWidth / 2 - track.clientWidth / 2
+      track.scrollTo({ left: Math.max(0, target), behavior: "smooth" })
+    }
+
+    if (!track) return
+    const ro = new ResizeObserver(recalc)
+    ro.observe(track)
     return () => ro.disconnect()
-    // sections.length re-runs the measure when tabs are added/removed even if
-    // the active index stays numerically the same (different button, same slot).
-  }, [activeIndex, sections.length])
+    // sections.length re-runs when tabs change; compact re-runs after a mode
+    // flip so the measurement settles (pre-paint, so no visible flicker).
+  }, [activeIndex, sections.length, compact])
 
   return (
     <div data-snap-nav className="sticky top-0 z-20">
       <div className="bg-checkout-navbar-bg/85 px-2.5 py-1.5 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-4xl items-center gap-1.5">
+        <div className="flex items-center gap-1.5">
           {brandLogoUrl ? (
             // Small tenant logo, sized 28px. Next/image not used because
             // tenant icon URLs come from arbitrary CDNs and don't need
@@ -132,10 +165,18 @@ export default function ScrollySectionNav({
               className="size-7 shrink-0 rounded-md object-contain"
             />
           ) : null}
-          <div className="relative flex-1 overflow-x-auto rounded-xl border border-white/10 bg-checkout-badge-bg-disabled/60 p-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <div
+            ref={trackRef}
+            className="relative flex-1 overflow-x-auto rounded-xl border border-white/10 bg-checkout-badge-bg-disabled/60 p-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          >
             <div
               ref={listRef}
-              className="relative flex w-max min-w-full justify-center"
+              className={cn(
+                "relative flex",
+                // Expanded: content-width tabs spread across the bar.
+                // Compact: equal-width tabs that fill and shrink to fit.
+                compact ? "w-full" : "w-max min-w-full justify-between",
+              )}
             >
               {pill && (
                 <div
@@ -173,7 +214,12 @@ export default function ScrollySectionNav({
                     aria-current={isActive ? "step" : undefined}
                     aria-invalid={isIncomplete || undefined}
                     className={cn(
-                      "relative z-10 flex h-7 shrink-0 items-center justify-center gap-1.5 px-3 text-xs font-semibold transition-[color,opacity] duration-200",
+                      "relative z-10 flex h-7 items-center justify-center text-xs font-semibold transition-[color,opacity] duration-200",
+                      // Compact equal-width icons vs. expanded content-width
+                      // labelled tabs.
+                      compact
+                        ? "min-w-0 flex-1 gap-1 px-1"
+                        : "shrink-0 gap-1.5 px-3",
                       isActive
                         ? "text-checkout-badge-title"
                         : isIncomplete
@@ -200,9 +246,9 @@ export default function ScrollySectionNav({
                     ) : (
                       <Icon className="size-3.5 shrink-0" />
                     )}
-                    <span className="hidden whitespace-nowrap sm:inline">
-                      {section.label}
-                    </span>
+                    {!compact && (
+                      <span className="whitespace-nowrap">{section.label}</span>
+                    )}
                     {isComplete && (
                       <Check className="size-2.5 text-emerald-400" />
                     )}
