@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest"
 import { eventListWindowForPopup } from "./listWindow"
 
 describe("eventListWindowForPopup", () => {
-  it("starts at popup-timezone today when the popup is in progress", () => {
+  it("spans the full popup window even while the popup is in progress", () => {
     const window = eventListWindowForPopup(
       "2026-05-30",
       "2026-06-02",
@@ -10,9 +10,10 @@ describe("eventListWindowForPopup", () => {
       new Date("2026-06-01T01:00:00.000Z"),
     )
 
-    // 2026-06-01T01:00Z is still May 31 in Los Angeles. Same-day morning
-    // events stay visible, but May 30 events are no longer in the default list.
-    expect(window.startAfter).toBe("2026-05-31T07:00:00.000Z")
+    // The window is no longer clamped to "today": events from earlier popup
+    // days (May 30/31) stay in the list instead of silently dropping out once
+    // the local date rolls past them — matching the calendar and day views.
+    expect(window.startAfter).toBe("2026-05-30T07:00:00.000Z")
     expect(window.startBefore).toBe("2026-06-03T07:00:00.000Z")
   })
 

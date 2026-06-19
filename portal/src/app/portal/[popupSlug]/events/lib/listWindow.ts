@@ -5,17 +5,6 @@ function dayStr(s: string | null | undefined) {
   return m ? m[0] : null
 }
 
-function dayKeyInTz(date: Date, timezone: string) {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: timezone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(date)
-  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? ""
-  return `${get("year")}-${get("month")}-${get("day")}`
-}
-
 export function eventListWindowForPopup(
   popupStartDate: string | null | undefined,
   popupEndDate: string | null | undefined,
@@ -25,13 +14,18 @@ export function eventListWindowForPopup(
   const startDay = dayStr(popupStartDate)
   const endDay = dayStr(popupEndDate)
   if (startDay && endDay) {
-    const today = dayKeyInTz(now, timezone)
-    const queryStartDay =
-      startDay <= today && today <= endDay ? today : startDay
-
+    // Anchor the window to the popup's full booking range — same as the
+    // calendar and day views. We deliberately do NOT clamp the start to
+    // "today": an event earlier in the popup (e.g. yesterday, or earlier
+    // today once the local date rolls over) is still a valid published event
+    // and stays visible everywhere else, so clamping silently dropped it from
+    // the list only. The list's ``autoScrollToUpcoming`` already scrolls past
+    // events out of the initial viewport, so the "starts at today" feel is
+    // preserved without hiding anything.
+    //
     // dayBoundsInTz returns [dayStart, dayEnd): the end of ``endDay`` is
     // midnight of the following local day, which keeps the last day's events in.
-    const { start } = dayBoundsInTz(queryStartDay, timezone)
+    const { start } = dayBoundsInTz(startDay, timezone)
     const { end } = dayBoundsInTz(endDay, timezone)
     return {
       startAfter: start.toISOString(),
