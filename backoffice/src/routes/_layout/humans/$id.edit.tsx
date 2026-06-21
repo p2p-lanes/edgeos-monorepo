@@ -11,7 +11,9 @@ import { DangerZone } from "@/components/Common/DangerZone"
 import { FormPageLayout } from "@/components/Common/FormPageLayout"
 import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
 import { HumanForm } from "@/components/forms/HumanForm"
+import { HumanActivity } from "@/components/Humans/HumanActivity"
 import { Skeleton } from "@/components/ui/skeleton"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import useAuth from "@/hooks/useAuth"
 import useCustomToast from "@/hooks/useCustomToast"
 import { useGoBack } from "@/hooks/useGoBack"
@@ -59,21 +61,36 @@ function EditHumanContent({ humanId }: { humanId: string }) {
     humanId
 
   return (
-    <div className="space-y-8">
-      <HumanForm defaultValues={human} onSuccess={goBack} />
-      {isAdmin && (
-        <div className="mx-auto max-w-2xl">
-          <DangerZone
-            description="Permanently delete this human and every related row — applications, attendees, payments, products, carts, group memberships, and any group this human owns as ambassador. Intended for cleaning up test users."
-            onDelete={() => deleteMutation.mutate()}
-            isDeleting={deleteMutation.isPending}
-            confirmText="Delete Human"
-            resourceName={displayName}
-            variant="inline"
-          />
+    <Tabs defaultValue="details" className="space-y-6">
+      <TabsList>
+        <TabsTrigger value="details">Detalles</TabsTrigger>
+        <TabsTrigger value="activity">Activity</TabsTrigger>
+      </TabsList>
+
+      <TabsContent value="details">
+        <div className="space-y-8">
+          <HumanForm defaultValues={human} onSuccess={goBack} />
+          {isAdmin && (
+            <div className="mx-auto max-w-2xl">
+              <DangerZone
+                description="Permanently delete this human and every related row — applications, attendees, payments, products, carts, group memberships, and any group this human owns as ambassador. Intended for cleaning up test users."
+                onDelete={() => deleteMutation.mutate()}
+                isDeleting={deleteMutation.isPending}
+                confirmText="Delete Human"
+                resourceName={displayName}
+                variant="inline"
+              />
+            </div>
+          )}
         </div>
-      )}
-    </div>
+      </TabsContent>
+
+      <TabsContent value="activity">
+        <div className="mx-auto max-w-2xl">
+          <HumanActivity humanId={humanId} />
+        </div>
+      </TabsContent>
+    </Tabs>
   )
 }
 

@@ -9618,6 +9618,203 @@ export const HardDeleteSummarySchema = {
     title: 'HardDeleteSummary'
 } as const;
 
+export const HumanActivityCreateSchema = {
+    properties: {
+        note: {
+            type: 'string',
+            maxLength: 2000,
+            minLength: 1,
+            title: 'Note'
+        },
+        occurred_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Occurred At'
+        }
+    },
+    type: 'object',
+    required: ['note', 'occurred_at'],
+    title: 'HumanActivityCreate',
+    description: "Request body for adding a manual note to a human's timeline."
+} as const;
+
+export const HumanActivityItemSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            title: 'Id'
+        },
+        kind: {
+            '$ref': '#/components/schemas/HumanActivityKind'
+        },
+        occurred_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Occurred At'
+        },
+        popup_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Popup Id'
+        },
+        popup_label: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Popup Label'
+        },
+        note: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Note'
+        },
+        amount: {
+            anyOf: [
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Amount'
+        },
+        currency: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Currency'
+        },
+        status: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Status'
+        },
+        products: {
+            items: {
+                '$ref': '#/components/schemas/HumanActivityProduct'
+            },
+            type: 'array',
+            title: 'Products',
+            default: []
+        },
+        actor_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Actor Id'
+        },
+        actor_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Actor Name'
+        },
+        actor_email: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Actor Email'
+        }
+    },
+    type: 'object',
+    required: ['id', 'kind', 'occurred_at'],
+    title: 'HumanActivityItem',
+    description: `A single entry in a human's activity timeline.
+
+\`id\` is a composite key (e.g. \`\`"payment:<uuid>"\`\`) so it stays unique
+across the different source tables. \`occurred_at\` is the effective
+timestamp the feed sorts by.`
+} as const;
+
+export const HumanActivityKindSchema = {
+    type: 'string',
+    enum: ['application.submitted', 'application.accepted', 'payment.completed', 'ticket.added', 'note.added'],
+    title: 'HumanActivityKind',
+    description: 'The kind of event a timeline item represents.'
+} as const;
+
+export const HumanActivityProductSchema = {
+    properties: {
+        product_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Product Name'
+        },
+        product_category: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Product Category'
+        },
+        quantity: {
+            type: 'integer',
+            title: 'Quantity',
+            default: 1
+        }
+    },
+    type: 'object',
+    title: 'HumanActivityProduct',
+    description: 'One purchased line in a `payment.completed` item (snapshot at purchase).'
+} as const;
+
 export const HumanAuthSchema = {
     properties: {
         tenant_id: {
@@ -10583,6 +10780,24 @@ export const ListModel_GroupPublic_Schema = {
     type: 'object',
     required: ['results', 'paging'],
     title: 'ListModel[GroupPublic]'
+} as const;
+
+export const ListModel_HumanActivityItem_Schema = {
+    properties: {
+        results: {
+            items: {
+                '$ref': '#/components/schemas/HumanActivityItem'
+            },
+            type: 'array',
+            title: 'Results'
+        },
+        paging: {
+            '$ref': '#/components/schemas/Paging'
+        }
+    },
+    type: 'object',
+    required: ['results', 'paging'],
+    title: 'ListModel[HumanActivityItem]'
 } as const;
 
 export const ListModel_HumanPortalPublic_Schema = {

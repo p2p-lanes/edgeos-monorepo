@@ -5,7 +5,12 @@ from fastapi import APIRouter, Header, HTTPException, status
 
 from app.api.api_key import crud as api_key_crud
 from app.api.api_key.schemas import ApiKeyPublic
+from app.api.audit_log.actor import actor_from_user
+from app.api.audit_log.constants import AuditAction, AuditEntityType
+from app.api.audit_log.crud import audit_logs_crud
 from app.api.human import crud
+from app.api.human.activity_crud import build_human_activity, note_log_to_item
+from app.api.human.activity_schemas import HumanActivityCreate, HumanActivityItem
 from app.api.human.crud import HardDeleteSummary
 from app.api.human.schemas import (
     HumanCreate,
@@ -328,6 +333,68 @@ async def delete_human(
             detail="Human not found",
         )
     return crud.hard_delete_cascade(db, human_id)
+
+
+@router.get("/{human_id}/activity", response_model=ListModel[HumanActivityItem])
+async def get_human_activity(
+    human_id: uuid.UUID,
+    db: TenantSession,
+    _current_user: CurrentAdmin,
+    skip: PaginationSkip = 0,
+    limit: PaginationLimit = 50,
+) -> ListModel[HumanActivityItem]:
+    """Aggregate a human's full activity timeline (admin-only).
+
+    Built on read from applications, payments, attendees and manual notes; RLS
+    on the TenantSession scopes every source query to the caller's tenant.
+    """
+    if not crud.get(db, human_id):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Human not found",
+        )
+    items, total = build_human_activity(db, human_id, skip=skip, limit=limit)
+    return ListModel[HumanActivityItem](
+        results=items,
+        paging=Paging(offset=skip, limit=limit, total=total),
+    )
+
+
+@router.post(
+    "/{human_id}/activity",
+    response_model=HumanActivityItem,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_human_activity(
+    human_id: uuid.UUID,
+    body: HumanActivityCreate,
+    db: TenantSession,
+    current_user: CurrentAdmin,
+) -> HumanActivityItem:
+    """Add a manual note to a human's timeline at an admin-chosen time.
+
+    The note is stored in audit_logs (no migration); the chosen time lives in
+    `details.occurred_at` while `created_at` stays the real write time.
+    """
+    human = crud.get(db, human_id)
+    if not human:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Human not found",
+        )
+    log = audit_logs_crud.record(
+        db,
+        tenant_id=human.tenant_id,
+        actor=actor_from_user(current_user),
+        action=AuditAction.HUMAN_NOTE_ADDED,
+        entity_type=AuditEntityType.HUMAN,
+        entity_id=human_id,
+        entity_label=human.display_name,
+        details={"note": body.note, "occurred_at": body.occurred_at.isoformat()},
+    )
+    db.commit()
+    db.refresh(log)
+    return note_log_to_item(log)
 
 
 @router.get("/{human_id}/api-keys", response_model=list[ApiKeyPublic])

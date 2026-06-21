@@ -2023,6 +2023,51 @@ export type HTTPValidationError = {
 };
 
 /**
+ * Request body for adding a manual note to a human's timeline.
+ */
+export type HumanActivityCreate = {
+    note: string;
+    occurred_at: string;
+};
+
+/**
+ * A single entry in a human's activity timeline.
+ *
+ * `id` is a composite key (e.g. ``"payment:<uuid>"``) so it stays unique
+ * across the different source tables. `occurred_at` is the effective
+ * timestamp the feed sorts by.
+ */
+export type HumanActivityItem = {
+    id: string;
+    kind: HumanActivityKind;
+    occurred_at: string;
+    popup_id?: (string | null);
+    popup_label?: (string | null);
+    note?: (string | null);
+    amount?: (string | null);
+    currency?: (string | null);
+    status?: (string | null);
+    products?: Array<HumanActivityProduct>;
+    actor_id?: (string | null);
+    actor_name?: (string | null);
+    actor_email?: (string | null);
+};
+
+/**
+ * The kind of event a timeline item represents.
+ */
+export type HumanActivityKind = 'application.submitted' | 'application.accepted' | 'payment.completed' | 'ticket.added' | 'note.added';
+
+/**
+ * One purchased line in a `payment.completed` item (snapshot at purchase).
+ */
+export type HumanActivityProduct = {
+    product_name?: (string | null);
+    product_category?: (string | null);
+    quantity?: number;
+};
+
+/**
  * Request to initiate human authentication.
  */
 export type HumanAuth = {
@@ -2249,6 +2294,11 @@ export type ListModel_FormSectionPublic_ = {
 
 export type ListModel_GroupPublic_ = {
     results: Array<GroupPublic>;
+    paging: Paging;
+};
+
+export type ListModel_HumanActivityItem_ = {
+    results: Array<HumanActivityItem>;
     paging: Paging;
 };
 
@@ -5630,6 +5680,29 @@ export type HumansRevokeHumanApiKeysData = {
 };
 
 export type HumansRevokeHumanApiKeysResponse = (void);
+
+export type HumansGetHumanActivityData = {
+    humanId: string;
+    /**
+     * Maximum number of items to return
+     */
+    limit?: number;
+    /**
+     * Number of items to skip
+     */
+    skip?: number;
+    xTenantId?: (string | null);
+};
+
+export type HumansGetHumanActivityResponse = (ListModel_HumanActivityItem_);
+
+export type HumansCreateHumanActivityData = {
+    humanId: string;
+    requestBody: HumanActivityCreate;
+    xTenantId?: (string | null);
+};
+
+export type HumansCreateHumanActivityResponse = (HumanActivityItem);
 
 export type HumansListHumanApiKeysData = {
     humanId: string;
