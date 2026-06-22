@@ -7,7 +7,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import selectinload
 from sqlmodel import Session, col, func, select
 
-from app.api.human.models import Humans
+from app.api.human.models import HumanComment, Humans
 from app.api.human.schemas import (
     HumanCreate,
     HumanProfileStats,
@@ -226,13 +226,14 @@ class HumansCRUD(BaseCRUD[Humans, HumanCreate, HumanUpdate]):
         gender: str | None = None,
         age: str | None = None,
         residence: str | None = None,
+        rating: str | None = None,
     ) -> tuple[list[Humans], int]:
         """List humans with optional per-field filters (backoffice).
 
         ``search`` matches name/email broadly. The per-field args narrow the
         result further and are AND-combined: ``email``/``telegram``/``residence``
-        match as case-insensitive substrings, while ``gender``/``age`` match
-        the whole value case-insensitively (so "male" doesn't also match
+        match as case-insensitive substrings, while ``gender``/``age``/``rating``
+        match the whole value case-insensitively (so "male" doesn't also match
         "female").
         """
         statement = select(Humans)
@@ -255,7 +256,11 @@ class HumansCRUD(BaseCRUD[Humans, HumanCreate, HumanUpdate]):
             if value:
                 statement = statement.where(col(column).ilike(f"%{value}%"))
 
-        for column, value in ((Humans.gender, gender), (Humans.age, age)):
+        for column, value in (
+            (Humans.gender, gender),
+            (Humans.age, age),
+            (Humans.rating, rating),
+        ):
             if value:
                 statement = statement.where(col(column).ilike(value))
 
@@ -517,6 +522,20 @@ class HumansCRUD(BaseCRUD[Humans, HumanCreate, HumanUpdate]):
 
         logger.info("hard_delete_cascade: human {} purged — {}", human_id, summary)
         return summary
+
+    def list_comments(
+        self, session: Session, human_id: uuid.UUID
+    ) -> list[HumanComment]:
+        """Return a human's non-deleted comments, oldest first."""
+        statement = (
+            select(HumanComment)
+            .where(
+                HumanComment.human_id == human_id,
+                col(HumanComment.deleted_at).is_(None),
+            )
+            .order_by(col(HumanComment.created_at).asc())
+        )
+        return list(session.exec(statement).all())
 
 
 def _popup_duration_days(popup) -> int | None:  # noqa: ANN001

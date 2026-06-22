@@ -11,6 +11,8 @@ import { DangerZone } from "@/components/Common/DangerZone"
 import { FormPageLayout } from "@/components/Common/FormPageLayout"
 import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
 import { HumanForm } from "@/components/forms/HumanForm"
+import { HumanCommentThread } from "@/components/Humans/HumanCommentThread"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import useAuth from "@/hooks/useAuth"
 import useCustomToast from "@/hooks/useCustomToast"
@@ -61,6 +63,16 @@ function EditHumanContent({ humanId }: { humanId: string }) {
   return (
     <div className="space-y-8">
       <HumanForm defaultValues={human} onSuccess={goBack} />
+      <div className="mx-auto max-w-2xl">
+        <Card>
+          <CardHeader>
+            <CardTitle>Comments</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <HumanCommentThread humanId={humanId} />
+          </CardContent>
+        </Card>
+      </div>
       {isAdmin && (
         <div className="mx-auto max-w-2xl">
           <DangerZone

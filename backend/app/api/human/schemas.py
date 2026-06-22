@@ -4,6 +4,8 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict, field_validator
 from sqlmodel import DateTime, Field, SQLModel
 
+from app.api.shared.enums import HumanRating
+
 
 class HumanBase(SQLModel):
     """Base schema for humans (citizens).
@@ -25,7 +27,9 @@ class HumanBase(SQLModel):
 
     # Platform fields
     picture_url: str | None = Field(default=None, max_length=500)
-    red_flag: bool = Field(default=False)
+    # Admin assessment of the human (see HumanRating). Stored as the enum's
+    # string value; replaces the legacy red_flag boolean.
+    rating: str = Field(default=HumanRating.SIN_CALIFICAR.value, max_length=20)
 
     # Auth fields
     auth_code: str | None = Field(default=None, max_length=6)
@@ -59,6 +63,10 @@ class HumanPublic(BaseModel):
     residence: str | None = None
 
     picture_url: str | None = None
+    rating: HumanRating = HumanRating.SIN_CALIFICAR
+    # Derived from rating (rating == RED_FLAG). Kept so existing callers that
+    # gate on the blocking state (api keys, group join, application submit)
+    # keep working unchanged.
     red_flag: bool = False
 
     model_config = ConfigDict(from_attributes=True)
@@ -130,7 +138,7 @@ class HumanUpdate(BaseModel):
     age: str | None = None
     residence: str | None = None
     picture_url: str | None = None
-    red_flag: bool | None = None
+    rating: HumanRating | None = None
 
     @field_validator("telegram", mode="before")
     @classmethod
@@ -159,3 +167,27 @@ class HumanProfileStats(BaseModel):
 
     popups: list[HumanProfileStatsPopup]
     total_days: int
+
+
+# --------------------------------------------------------------------------- #
+# Comments — justify a human's rating; mirrors the task comments model.
+# --------------------------------------------------------------------------- #
+class HumanCommentCreate(BaseModel):
+    body: str = Field(min_length=1)
+
+
+class HumanCommentUpdate(BaseModel):
+    body: str = Field(min_length=1)
+
+
+class HumanCommentPublic(BaseModel):
+    id: uuid.UUID
+    human_id: uuid.UUID
+    author_user_id: uuid.UUID | None = None
+    author_name: str | None = None
+    author_email: str | None = None
+    body: str
+    created_at: datetime
+    edited_at: datetime | None = None
+
+    model_config = ConfigDict(from_attributes=True)

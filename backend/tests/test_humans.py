@@ -136,6 +136,7 @@ def test_list_humans_filters_by_field_attributes(
         gender="female",
         age="30",
         residence=f"Buenos Aires {suffix}",
+        rating="star",
     )
     bob = Humans(
         tenant_id=tenant_a.id,
@@ -145,6 +146,7 @@ def test_list_humans_filters_by_field_attributes(
         gender="male",
         age="40",
         residence=f"Lisbon {suffix}",
+        rating="green_flag",
     )
     db.add_all([alice, bob])
     db.commit()
@@ -170,3 +172,6 @@ def test_list_humans_filters_by_field_attributes(
     assert str(alice.id) not in gender_male
     # Age matches the whole value too.
     assert ids({"age": "30", "email": suffix}) == {str(alice.id)}
+    # Rating matches the whole value: "star" must not also catch "green_flag".
+    assert ids({"rating": "star", "email": suffix}) == {str(alice.id)}
+    assert ids({"rating": "green_flag", "email": suffix}) == {str(bob.id)}
