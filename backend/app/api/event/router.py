@@ -1577,6 +1577,15 @@ async def detach_occurrence(
     occ_start = payload.occurrence_start
     occ_end = occ_start + duration
 
+    # Idempotency: if this occurrence was already detached (e.g. a network
+    # retry or a stale-cache re-trigger of "Edit only this event"), return the
+    # existing override instead of creating a second standalone row. Skips the
+    # exdate append and iTIP re-send so retries neither duplicate the event nor
+    # double-send calendar invites.
+    existing_child = crud.events_crud.get_detached_child(db, master.id, occ_start)
+    if existing_child is not None:
+        return _to_public(existing_child)
+
     exdate_iso = occ_start.isoformat()
     existing = list(master.recurrence_exdates or [])
     if exdate_iso not in existing:
@@ -1597,10 +1606,16 @@ async def detach_occurrence(
         max_participant=master.max_participant,
         tags=list(master.tags or []),
         venue_id=master.venue_id,
+        custom_location_name=master.custom_location_name,
+        custom_location_url=master.custom_location_url,
         track_id=master.track_id,
         visibility=master.visibility,
         require_approval=master.require_approval,
         kind=master.kind,
+        host_id=master.host_id,
+        host_display_name=master.host_display_name,
+        collaborator_ids=list(master.collaborator_ids or []),
+        highlighted=master.highlighted,
         status=master.status,
         rrule=None,
         recurrence_master_id=master.id,
@@ -1641,6 +1656,20 @@ async def detach_occurrence(
             child.id,
             exc,
         )
+
+    # Re-point the occurrence's RSVPs onto the standalone child so the detached
+    # event owns its attendee list instead of leaving them orphaned on the
+    # master (keyed by occurrence_start). Done AFTER the iTIP dispatch above,
+    # which gathers recipients from the master occurrence — moving the rows
+    # first would leave those emails with no recipients.
+    from app.api.event_participant.crud import event_participants_crud
+
+    event_participants_crud.repoint_occurrence_to_event(
+        db, master.id, occ_start, child.id
+    )
+    db.commit()
+    db.refresh(child)
+
     detach_snapshot = build_event_snapshot(db, master)
     detach_snapshot["occurrence_start"] = occ_start.isoformat()
     detach_snapshot["detached_child_id"] = str(child.id)

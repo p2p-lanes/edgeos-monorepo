@@ -167,6 +167,38 @@ class EventParticipantsCRUD(
             session.commit()
         return len(rows)
 
+    def repoint_occurrence_to_event(
+        self,
+        session: Session,
+        src_event_id: uuid.UUID,
+        occurrence_start: datetime,
+        dst_event_id: uuid.UUID,
+    ) -> int:
+        """Move RSVPs of one occurrence onto a standalone event.
+
+        Re-points every participant row matching ``(src_event_id,
+        occurrence_start)`` to ``(dst_event_id, occurrence_start=NULL)``. Used
+        when a recurring occurrence is detached into its own row so the RSVPs
+        that targeted that occurrence follow the new event instead of being
+        orphaned on the master. All statuses are moved (cancelled rows
+        included) to preserve history.
+
+        Safe against the partial unique indexes: ``dst_event_id`` is a freshly
+        created child, so ``(dst_event_id, profile_id)`` with a NULL
+        ``occurrence_start`` cannot collide with an existing one-off row.
+        Returns the number of rows moved. Does not commit.
+        """
+        statement = select(EventParticipants).where(
+            EventParticipants.event_id == src_event_id,
+            EventParticipants.occurrence_start == occurrence_start,
+        )
+        rows = list(session.exec(statement).all())
+        for row in rows:
+            row.event_id = dst_event_id
+            row.occurrence_start = None
+            session.add(row)
+        return len(rows)
+
     def find_by_profile(
         self,
         session: Session,
