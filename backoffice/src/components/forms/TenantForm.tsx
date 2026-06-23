@@ -342,8 +342,10 @@ export function TenantForm({ defaultValues, onSuccess }: TenantFormProps) {
           <form.Field
             name="smtp_host"
             validators={{
-              onBlur: ({ value }) => validateHostname(value, "smtp.example.com"),
-              onChange: ({ value }) => validateHostname(value, "smtp.example.com"),
+              onBlur: ({ value }) =>
+                validateHostname(value, "smtp.example.com"),
+              onChange: ({ value }) =>
+                validateHostname(value, "smtp.example.com"),
             }}
           >
             {(field) => (
