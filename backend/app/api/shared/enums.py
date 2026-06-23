@@ -29,6 +29,21 @@ class HumanRating(StrEnum):
     STAR = "star"  # excellent: their presence enriches everyone's experience
 
 
+class EnrichmentSource(StrEnum):
+    """Where a single enrichment fact about a human came from.
+
+    Stored as the enum's string value in ``human_enrichment_facts.source``;
+    used as provenance so the curated ``humans.enriched_profile`` can be traced
+    back to its evidence (and re-derived if a source is corrected/removed).
+    """
+
+    TELEGRAM = "telegram"  # social Telegram group message
+    EVENT = "event"  # event creation / host / speaker signals
+    CUSTOM_FIELDS = "custom_fields"  # applications.custom_fields (org, role, goals…)
+    ORG = "org"  # web deep-dive of the person's organization
+    MANUAL = "manual"  # entered/edited by a human in the backoffice
+
+
 class LandingMode(StrEnum):
     """Per-tenant landing mode for custom domains.
 

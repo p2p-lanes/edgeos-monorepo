@@ -2,14 +2,15 @@ import uuid
 from typing import TypedDict
 
 from loguru import logger
-from sqlalchemy import delete, exists, or_, update
+from sqlalchemy import Text, cast, delete, exists, or_, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import selectinload
 from sqlmodel import Session, col, func, select
 
-from app.api.human.models import HumanComment, Humans
+from app.api.human.models import HumanComment, HumanEnrichmentFact, Humans
 from app.api.human.schemas import (
     HumanCreate,
+    HumanEnrichmentFactCreate,
     HumanProfileStats,
     HumanProfileStatsPopup,
     HumanUpdate,
@@ -227,6 +228,8 @@ class HumansCRUD(BaseCRUD[Humans, HumanCreate, HumanUpdate]):
         age: str | None = None,
         residence: str | None = None,
         rating: str | None = None,
+        has_enriched_profile: bool | None = None,
+        enrichment_query: str | None = None,
     ) -> tuple[list[Humans], int]:
         """List humans with optional per-field filters (backoffice).
 
@@ -235,6 +238,12 @@ class HumansCRUD(BaseCRUD[Humans, HumanCreate, HumanUpdate]):
         match as case-insensitive substrings, while ``gender``/``age``/``rating``
         match the whole value case-insensitively (so "male" doesn't also match
         "female").
+
+        Rich Profiles filters: ``has_enriched_profile`` keeps only humans that
+        do (True) or do not (False) have a curated ``enriched_profile``;
+        ``enrichment_query`` matches a substring anywhere inside that JSONB
+        (headline, bio, org, role, tags, interests, topics…) by casting it to
+        text — handy for finding everyone tagged "AI" or based in a city.
         """
         statement = select(Humans)
 
@@ -263,6 +272,21 @@ class HumansCRUD(BaseCRUD[Humans, HumanCreate, HumanUpdate]):
         ):
             if value:
                 statement = statement.where(col(column).ilike(value))
+
+        if has_enriched_profile is not None:
+            enriched_col = col(Humans.enriched_profile)
+            statement = statement.where(
+                enriched_col.isnot(None)
+                if has_enriched_profile
+                else enriched_col.is_(None)
+            )
+
+        if enrichment_query:
+            # Cast the JSONB to text and substring-match. Only humans with a
+            # non-null enriched_profile can match (NULL::text stays NULL).
+            statement = statement.where(
+                cast(col(Humans.enriched_profile), Text).ilike(f"%{enrichment_query}%")
+            )
 
         count_statement = select(func.count()).select_from(statement.subquery())
         total = session.exec(count_statement).one()
@@ -536,6 +560,43 @@ class HumansCRUD(BaseCRUD[Humans, HumanCreate, HumanUpdate]):
             .order_by(col(HumanComment.created_at).asc())
         )
         return list(session.exec(statement).all())
+
+    def list_enrichment_facts(
+        self, session: Session, human_id: uuid.UUID
+    ) -> list[HumanEnrichmentFact]:
+        """Return a human's enrichment facts (provenance bitácora), newest first."""
+        statement = (
+            select(HumanEnrichmentFact)
+            .where(HumanEnrichmentFact.human_id == human_id)
+            .order_by(col(HumanEnrichmentFact.created_at).desc())
+        )
+        return list(session.exec(statement).all())
+
+    def create_enrichment_fact(
+        self,
+        session: Session,
+        human_id: uuid.UUID,
+        fact_in: HumanEnrichmentFactCreate,
+    ) -> HumanEnrichmentFact:
+        """Append one atomic provenance fact extracted by the enrichment agent.
+
+        Append-only: facts are never updated, a newer fact supersedes an older
+        one. The curated ``humans.enriched_profile`` is updated separately (via
+        the human PATCH endpoint) from the accumulated facts.
+        """
+        fact = HumanEnrichmentFact(
+            human_id=human_id,
+            field=fact_in.field,
+            value=fact_in.value,
+            source=fact_in.source.value,
+            evidence=fact_in.evidence,
+            confidence=fact_in.confidence,
+            raw=fact_in.raw,
+        )
+        session.add(fact)
+        session.commit()
+        session.refresh(fact)
+        return fact
 
 
 def _popup_duration_days(popup) -> int | None:  # noqa: ANN001
