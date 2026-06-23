@@ -11,6 +11,7 @@ import { DangerZone } from "@/components/Common/DangerZone"
 import { FormPageLayout } from "@/components/Common/FormPageLayout"
 import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
 import { HumanForm } from "@/components/forms/HumanForm"
+import { EnrichedProfileCard } from "@/components/Humans/EnrichedProfileCard"
 import { HumanCommentThread } from "@/components/Humans/HumanCommentThread"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -63,6 +64,16 @@ function EditHumanContent({ humanId }: { humanId: string }) {
   return (
     <div className="space-y-8">
       <HumanForm defaultValues={human} onSuccess={goBack} />
+      <div className="mx-auto max-w-2xl">
+        <Card>
+          <CardHeader>
+            <CardTitle>Rich profile</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <EnrichedProfileCard human={human} />
+          </CardContent>
+        </Card>
+      </div>
       <div className="mx-auto max-w-2xl">
         <Card>
           <CardHeader>
