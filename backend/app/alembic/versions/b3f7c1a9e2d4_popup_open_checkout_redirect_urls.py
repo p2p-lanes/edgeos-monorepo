@@ -6,7 +6,7 @@ thank-you / cancel pages forwarded to SimpleFi as ``redirect_urls``; NULL
 falls back to the existing portal URLs. Scope is the open-checkout flow only.
 
 Revision ID: b3f7c1a9e2d4
-Revises: 2a7c9e4f1b6d
+Revises: 3c5f1a8e7d24
 """
 
 from collections.abc import Sequence
@@ -15,7 +15,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = "b3f7c1a9e2d4"
-down_revision: str | Sequence[str] | None = "2a7c9e4f1b6d"
+down_revision: str | Sequence[str] | None = "3c5f1a8e7d24"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
