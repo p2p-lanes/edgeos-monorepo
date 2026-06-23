@@ -23,6 +23,8 @@ class HumanActivityKind(str, Enum):
     PAYMENT_COMPLETED = "payment.completed"
     TICKET_ADDED = "ticket.added"
     NOTE_ADDED = "note.added"
+    RATING_CHANGED = "rating.changed"
+    COMMENT_ADDED = "comment.added"
 
 
 class HumanActivityProduct(BaseModel):
@@ -56,7 +58,13 @@ class HumanActivityItem(BaseModel):
     status: str | None = None
     products: list[HumanActivityProduct] = []
 
-    # Actor (only set for manual notes).
+    # Rating change payload (only set for `rating.changed`): the new rating and
+    # the previous one, both as HumanRating string values.
+    rating: str | None = None
+    previous_rating: str | None = None
+
+    # Actor — set for items a backoffice user performed: manual notes, rating
+    # changes and comments.
     actor_id: uuid.UUID | None = None
     actor_name: str | None = None
     actor_email: str | None = None

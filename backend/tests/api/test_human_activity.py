@@ -210,6 +210,109 @@ class TestHumanActivityNotes:
         assert rows[0].details["note"] == "Met them at a prior event"
 
 
+class TestHumanActivityRatingChanges:
+    def test_rating_change_appears_as_activity_item(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+        admin_token_tenant_a: str,
+    ) -> None:
+        human = _make_human(db, tenant_a)  # defaults to rating "sin_calificar"
+
+        patch = client.patch(
+            f"/api/v1/humans/{human.id}",
+            headers=_auth(admin_token_tenant_a),
+            json={"rating": "green_flag"},
+        )
+        assert patch.status_code == 200
+        assert patch.json()["rating"] == "green_flag"
+
+        results = client.get(
+            f"/api/v1/humans/{human.id}/activity", headers=_auth(admin_token_tenant_a)
+        ).json()["results"]
+        rating_items = [i for i in results if i["kind"] == "rating.changed"]
+        assert len(rating_items) == 1
+        item = rating_items[0]
+        assert item["rating"] == "green_flag"
+        assert item["previous_rating"] == "sin_calificar"
+        # The acting backoffice user is credited.
+        assert item["actor_name"] is not None
+
+        # Backed by a single human.rating_changed audit row.
+        rows = db.exec(
+            select(AuditLog).where(
+                AuditLog.entity_type == AuditEntityType.HUMAN,
+                AuditLog.entity_id == human.id,
+                AuditLog.action == AuditAction.HUMAN_RATING_CHANGED,
+            )
+        ).all()
+        assert len(rows) == 1
+        assert rows[0].details["rating"] == "green_flag"
+        assert rows[0].details["previous"] == "sin_calificar"
+
+    def test_setting_same_rating_records_nothing(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+        admin_token_tenant_a: str,
+    ) -> None:
+        human = _make_human(db, tenant_a)  # already "sin_calificar"
+
+        patch = client.patch(
+            f"/api/v1/humans/{human.id}",
+            headers=_auth(admin_token_tenant_a),
+            json={"rating": "sin_calificar"},
+        )
+        assert patch.status_code == 200
+
+        results = client.get(
+            f"/api/v1/humans/{human.id}/activity", headers=_auth(admin_token_tenant_a)
+        ).json()["results"]
+        assert not any(i["kind"] == "rating.changed" for i in results)
+
+
+class TestHumanActivityComments:
+    def test_comment_appears_and_soft_delete_is_hidden(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+        admin_token_tenant_a: str,
+    ) -> None:
+        human = _make_human(db, tenant_a)
+
+        created = client.post(
+            f"/api/v1/humans/{human.id}/comments",
+            headers=_auth(admin_token_tenant_a),
+            json={"body": "Strong applicant, met at a prior event"},
+        )
+        assert created.status_code == 201
+        comment_id = created.json()["id"]
+
+        results = client.get(
+            f"/api/v1/humans/{human.id}/activity", headers=_auth(admin_token_tenant_a)
+        ).json()["results"]
+        comment_items = [i for i in results if i["kind"] == "comment.added"]
+        assert len(comment_items) == 1
+        assert comment_items[0]["note"] == "Strong applicant, met at a prior event"
+        # The comment author is credited (by name or, failing that, email).
+        assert comment_items[0]["actor_name"] or comment_items[0]["actor_email"]
+
+        # Soft-deleting the comment drops it from the timeline.
+        deleted = client.delete(
+            f"/api/v1/humans/{human.id}/comments/{comment_id}",
+            headers=_auth(admin_token_tenant_a),
+        )
+        assert deleted.status_code == 204
+
+        results_after = client.get(
+            f"/api/v1/humans/{human.id}/activity", headers=_auth(admin_token_tenant_a)
+        ).json()["results"]
+        assert not any(i["kind"] == "comment.added" for i in results_after)
+
+
 class TestHumanActivityIsolationAndPermissions:
     def test_other_tenant_human_not_returned(
         self,

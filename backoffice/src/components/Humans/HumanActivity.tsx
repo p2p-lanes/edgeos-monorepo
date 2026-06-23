@@ -2,12 +2,47 @@ import { useQuery } from "@tanstack/react-query"
 import { Plus } from "lucide-react"
 import { useState } from "react"
 
-import { HumansService } from "@/client"
+import { type HumanActivityItem, HumansService } from "@/client"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import useAuth from "@/hooks/useAuth"
 import { describeHumanActivity } from "@/lib/humanActivityMessage"
 import { HumanActivityDialog } from "./HumanActivityDialog"
+
+/** Kinds performed by a backoffice user — these carry an actor to credit. */
+const ACTOR_KINDS = new Set<HumanActivityItem["kind"]>([
+  "note.added",
+  "rating.changed",
+  "comment.added",
+])
+
+/** Colour the timeline dot by event kind (rating dots match their flag). */
+function dotClass(item: HumanActivityItem): string {
+  if (item.kind === "rating.changed") {
+    switch (item.rating) {
+      case "red_flag":
+        return "bg-red-500"
+      case "orange_flag":
+        return "bg-orange-500"
+      case "green_flag":
+        return "bg-green-500"
+      case "star":
+        return "bg-yellow-400"
+      default:
+        return "bg-muted-foreground"
+    }
+  }
+  switch (item.kind) {
+    case "payment.completed":
+      return "bg-green-500"
+    case "application.accepted":
+      return "bg-blue-500"
+    case "comment.added":
+      return "bg-sky-500"
+    default:
+      return "bg-muted-foreground"
+  }
+}
 
 /**
  * Full activity timeline for a single human (newest first): applications,
@@ -49,18 +84,22 @@ export function HumanActivity({ humanId }: { humanId: string }) {
       ) : items.length === 0 ? (
         <p className="text-sm text-muted-foreground">No activity yet.</p>
       ) : (
-        <ul className="divide-y divide-border">
-          {items.map((item) => (
-            <li key={item.id} className="py-3 text-sm">
-              <p>{describeHumanActivity(item)}</p>
-              <p className="text-xs text-muted-foreground">
-                {item.kind === "note.added" && item.actor_name
-                  ? `${item.actor_name} · `
-                  : ""}
-                {new Date(item.occurred_at).toLocaleString()}
-              </p>
-            </li>
-          ))}
+        <ul className="relative ml-2 border-l border-border">
+          {items.map((item) => {
+            const actor = item.actor_name || item.actor_email
+            return (
+              <li key={item.id} className="relative py-3 pl-6 text-sm">
+                <span
+                  className={`absolute -left-[5px] top-4 h-2.5 w-2.5 rounded-full border-2 border-background ${dotClass(item)}`}
+                />
+                <p>{describeHumanActivity(item)}</p>
+                <p className="text-xs text-muted-foreground">
+                  {ACTOR_KINDS.has(item.kind) && actor ? `${actor} · ` : ""}
+                  {new Date(item.occurred_at).toLocaleString()}
+                </p>
+              </li>
+            )
+          })}
         </ul>
       )}
 

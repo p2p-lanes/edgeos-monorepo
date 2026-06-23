@@ -9728,6 +9728,28 @@ export const HumanActivityItemSchema = {
             title: 'Products',
             default: []
         },
+        rating: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Rating'
+        },
+        previous_rating: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Previous Rating'
+        },
         actor_id: {
             anyOf: [
                 {
@@ -9775,7 +9797,7 @@ timestamp the feed sorts by.`
 
 export const HumanActivityKindSchema = {
     type: 'string',
-    enum: ['application.submitted', 'application.accepted', 'payment.completed', 'ticket.added', 'note.added'],
+    enum: ['application.submitted', 'application.accepted', 'payment.completed', 'ticket.added', 'note.added', 'rating.changed', 'comment.added'],
     title: 'HumanActivityKind',
     description: 'The kind of event a timeline item represents.'
 } as const;

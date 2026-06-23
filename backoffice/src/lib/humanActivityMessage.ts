@@ -7,6 +7,20 @@ function formatProductList(products: HumanActivityProduct[]): string {
     .join(", ")
 }
 
+/** Human-readable label (with emoji) for a HumanRating value. */
+const RATING_LABELS: Record<string, string> = {
+  sin_calificar: "No rating",
+  red_flag: "🔴 Red Flag",
+  orange_flag: "🟠 Orange Flag",
+  green_flag: "🟢 Green Flag",
+  star: "⭐ Star",
+}
+
+export function ratingLabel(rating: string | null | undefined): string {
+  if (!rating) return "No rating"
+  return RATING_LABELS[rating] ?? rating
+}
+
 function withPopup(text: string, item: HumanActivityItem): string {
   return item.popup_label ? `${text} — ${item.popup_label}` : text
 }
@@ -35,6 +49,10 @@ export function describeHumanActivity(item: HumanActivityItem): string {
       return withPopup("Ticket added", item)
     case "note.added":
       return item.note ?? "Note added"
+    case "rating.changed":
+      return `Changed rating to ${ratingLabel(item.rating)}`
+    case "comment.added":
+      return item.note ?? "Commented"
     default:
       return item.kind
   }

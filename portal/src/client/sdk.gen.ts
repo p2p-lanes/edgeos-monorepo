@@ -5539,8 +5539,11 @@ export class HumansService {
      * Get Human Activity
      * Aggregate a human's full activity timeline (admin-only).
      *
-     * Built on read from applications, payments, attendees and manual notes; RLS
-     * on the TenantSession scopes every source query to the caller's tenant.
+     * Built on read from applications, payments, attendees, manual notes, rating
+     * changes and comments. RLS on the TenantSession scopes the tenant-owned
+     * sources; comments live in a global table with no RLS, so they are read via
+     * the privileged `control_db` (the RLS check above already proved tenant
+     * ownership of this human).
      * @param data The data for the request.
      * @param data.humanId
      * @param data.skip Number of items to skip

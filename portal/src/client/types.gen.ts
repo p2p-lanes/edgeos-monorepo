@@ -2048,6 +2048,8 @@ export type HumanActivityItem = {
     currency?: (string | null);
     status?: (string | null);
     products?: Array<HumanActivityProduct>;
+    rating?: (string | null);
+    previous_rating?: (string | null);
     actor_id?: (string | null);
     actor_name?: (string | null);
     actor_email?: (string | null);
@@ -2056,7 +2058,7 @@ export type HumanActivityItem = {
 /**
  * The kind of event a timeline item represents.
  */
-export type HumanActivityKind = 'application.submitted' | 'application.accepted' | 'payment.completed' | 'ticket.added' | 'note.added';
+export type HumanActivityKind = 'application.submitted' | 'application.accepted' | 'payment.completed' | 'ticket.added' | 'note.added' | 'rating.changed' | 'comment.added';
 
 /**
  * One purchased line in a `payment.completed` item (snapshot at purchase).

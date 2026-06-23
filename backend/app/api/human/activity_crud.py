@@ -12,9 +12,10 @@ under the `human.note_added` action, with the admin-chosen time in
 
 import uuid
 from datetime import UTC, datetime
+from typing import TYPE_CHECKING
 
 from sqlalchemy.orm import selectinload
-from sqlmodel import Session, select
+from sqlmodel import Session, col, select
 
 from app.api.audit_log.constants import AuditAction, AuditEntityType
 from app.api.audit_log.models import AuditLog
@@ -23,6 +24,9 @@ from app.api.human.activity_schemas import (
     HumanActivityKind,
     HumanActivityProduct,
 )
+
+if TYPE_CHECKING:
+    from app.api.human.models import HumanComment
 
 # Snapshot event value emitted when an application is accepted.
 _ACCEPTED_EVENT = "accepted"
@@ -68,8 +72,45 @@ def note_log_to_item(log: AuditLog) -> HumanActivityItem:
     )
 
 
+def rating_log_to_item(log: AuditLog) -> HumanActivityItem:
+    """Map a `human.rating_changed` audit row to a timeline item.
+
+    The new and previous ratings (HumanRating string values) live in the audit
+    row's `details`; the effective time is the real write time.
+    """
+    details = log.details or {}
+    return HumanActivityItem(
+        id=f"rating:{log.id}",
+        kind=HumanActivityKind.RATING_CHANGED,
+        occurred_at=_as_utc(log.created_at),
+        rating=details.get("rating"),
+        previous_rating=details.get("previous"),
+        actor_id=log.actor_id,
+        actor_name=log.actor_name,
+        actor_email=log.actor_email,
+    )
+
+
+def comment_to_item(comment: "HumanComment") -> HumanActivityItem:
+    """Map a (non-deleted) human comment to a timeline item.
+
+    The body is carried in `note` (the generic text field); the author becomes
+    the actor and the comment's own `created_at` is the effective time.
+    """
+    return HumanActivityItem(
+        id=f"comment:{comment.id}",
+        kind=HumanActivityKind.COMMENT_ADDED,
+        occurred_at=_as_utc(comment.created_at),
+        note=comment.body,
+        actor_id=comment.author_user_id,
+        actor_name=comment.author_name,
+        actor_email=comment.author_email,
+    )
+
+
 def build_human_activity(
     session: Session,
+    control_session: Session,
     human_id: uuid.UUID,
     *,
     skip: int,
@@ -79,6 +120,12 @@ def build_human_activity(
 
     Returns ``(items[skip : skip + limit], total)`` where ``total`` is the
     exact count across all sources.
+
+    Most sources are read through the RLS-scoped ``session``. Comments are the
+    exception: ``human_comments`` is a global table with no tenant RLS or grants
+    (it is reached only through the privileged engine), so it is read through
+    ``control_session`` instead. The caller must already have verified the human
+    belongs to the tenant before calling this.
     """
     # Imported lazily to avoid a circular import: the human router (which loads
     # this module) is imported while application.models is still initializing.
@@ -173,17 +220,35 @@ def build_human_activity(
             )
         )
 
-    # 4. Manual notes — stored in audit_logs under human.note_added.
-    note_logs = session.exec(
+    # 4. Audit-log–backed items: manual notes + rating changes. Both live in
+    # `audit_logs` (tenant-scoped, so read through `session`) and are told apart
+    # by their action.
+    audit_logs = session.exec(
         select(AuditLog).where(
             AuditLog.entity_type == AuditEntityType.HUMAN,
             AuditLog.entity_id == human_id,
-            AuditLog.action == AuditAction.HUMAN_NOTE_ADDED,
+            col(AuditLog.action).in_(
+                [AuditAction.HUMAN_NOTE_ADDED, AuditAction.HUMAN_RATING_CHANGED]
+            ),
         )
     ).all()
-    items.extend(note_log_to_item(log) for log in note_logs)
+    for log in audit_logs:
+        if log.action == AuditAction.HUMAN_RATING_CHANGED:
+            items.append(rating_log_to_item(log))
+        else:
+            items.append(note_log_to_item(log))
 
-    # 5. Popup labels — one query for all referenced popups (avoid N+1).
+    # 5. Comments — the global `human_comments` table has no tenant RLS/grants,
+    # so it is read through the privileged `control_session`. Soft-deleted
+    # comments are already filtered out by `list_comments`.
+    from app.api.human.crud import humans_crud
+
+    items.extend(
+        comment_to_item(comment)
+        for comment in humans_crud.list_comments(control_session, human_id)
+    )
+
+    # 6. Popup labels — one query for all referenced popups (avoid N+1).
     popup_ids = {item.popup_id for item in items if item.popup_id is not None}
     if popup_ids:
         rows = session.exec(
@@ -194,7 +259,7 @@ def build_human_activity(
             if item.popup_id is not None:
                 item.popup_label = labels.get(item.popup_id)
 
-    # 6. Merge: newest-first by effective timestamp, then page.
+    # 7. Merge: newest-first by effective timestamp, then page.
     items.sort(key=lambda i: i.occurred_at, reverse=True)
     total = len(items)
     return items[skip : skip + limit], total

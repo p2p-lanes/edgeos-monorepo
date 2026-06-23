@@ -247,7 +247,7 @@ async def update_human(
     human_id: uuid.UUID,
     human_in: HumanUpdate,
     db: AdminOrApiKeySession_HumansWrite,
-    _current_user: AdminOrApiKey_HumansWrite,
+    current_user: AdminOrApiKey_HumansWrite,
 ) -> HumanPublic:
     human = crud.get(db, human_id)
 
@@ -259,11 +259,33 @@ async def update_human(
 
     # Check if the rating is transitioning into RED_FLAG (the only level that
     # carries the blocking cascade). human.red_flag reflects the pre-update state.
-    is_being_flagged = (
-        human_in.rating == HumanRating.RED_FLAG and not human.red_flag
+    is_being_flagged = human_in.rating == HumanRating.RED_FLAG and not human.red_flag
+    # Snapshot the rating before the update so a change can be audited (and
+    # surfaced on the human's activity timeline) with its previous value.
+    previous_rating = human.rating
+    rating_changed = (
+        human_in.rating is not None and human_in.rating.value != previous_rating
     )
 
     updated = crud.update(db, human, human_in)
+
+    # Record the rating change as an audit event so it shows up as a row in the
+    # human's activity timeline ("<user> changed rating to <rating>").
+    if rating_changed:
+        audit_logs_crud.record(
+            db,
+            tenant_id=human.tenant_id,
+            actor=actor_from_user(current_user),
+            action=AuditAction.HUMAN_RATING_CHANGED,
+            entity_type=AuditEntityType.HUMAN,
+            entity_id=human_id,
+            entity_label=human.display_name,
+            details={
+                "rating": human_in.rating.value,
+                "previous": previous_rating,
+            },
+        )
+        db.commit()
 
     # If human is being flagged, auto-reject all their IN_REVIEW applications
     if is_being_flagged:
@@ -350,21 +372,27 @@ async def delete_human(
 async def get_human_activity(
     human_id: uuid.UUID,
     db: TenantSession,
+    control_db: SessionDep,
     _current_user: CurrentAdmin,
     skip: PaginationSkip = 0,
     limit: PaginationLimit = 50,
 ) -> ListModel[HumanActivityItem]:
     """Aggregate a human's full activity timeline (admin-only).
 
-    Built on read from applications, payments, attendees and manual notes; RLS
-    on the TenantSession scopes every source query to the caller's tenant.
+    Built on read from applications, payments, attendees, manual notes, rating
+    changes and comments. RLS on the TenantSession scopes the tenant-owned
+    sources; comments live in a global table with no RLS, so they are read via
+    the privileged `control_db` (the RLS check above already proved tenant
+    ownership of this human).
     """
     if not crud.get(db, human_id):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Human not found",
         )
-    items, total = build_human_activity(db, human_id, skip=skip, limit=limit)
+    items, total = build_human_activity(
+        db, control_db, human_id, skip=skip, limit=limit
+    )
     return ListModel[HumanActivityItem](
         results=items,
         paging=Paging(offset=skip, limit=limit, total=total),
@@ -448,9 +476,7 @@ def _get_human_in_tenant_or_404(db, human_id: uuid.UUID, current_user):  # noqa:
     return human
 
 
-@router.get(
-    "/{human_id}/comments", response_model=ListModel[HumanCommentPublic]
-)
+@router.get("/{human_id}/comments", response_model=ListModel[HumanCommentPublic])
 async def list_human_comments(
     human_id: uuid.UUID,
     db: SessionDep,
@@ -491,9 +517,7 @@ async def create_human_comment(
     return HumanCommentPublic.model_validate(comment)
 
 
-@router.put(
-    "/{human_id}/comments/{comment_id}", response_model=HumanCommentPublic
-)
+@router.put("/{human_id}/comments/{comment_id}", response_model=HumanCommentPublic)
 async def update_human_comment(
     human_id: uuid.UUID,
     comment_id: uuid.UUID,
