@@ -293,7 +293,9 @@
     "summary_pay": "Pay",
     "thank_you_title": "Payment completed",
     "thank_you_description": "Thank you for your purchase. We sent your confirmation and ticket details by email.",
-    "thank_you_cta": "Go to portal"
+    "thank_you_cta": "Go to portal",
+    "thank_you_order_summary": "Order summary",
+    "thank_you_total": "Total"
   },
   "passes": {
     "your_passes": "Your Passes",

@@ -125,6 +125,12 @@ class OpenTicketingPurchaseResponse(BaseModel):
 
     payment_id: uuid.UUID
     status: str
+    # SimpleFi-hosted checkout page where the buyer pays. Empty for the
+    # zero-amount bypass (nothing to charge).
     checkout_url: str
+    # Where the portal should send the buyer after a zero-amount approval that
+    # bypassed SimpleFi, when the popup configures a custom open-checkout
+    # success URL. Null for paid flows — SimpleFi performs that redirect itself.
+    redirect_url: str | None = None
     amount: Decimal
     currency: str

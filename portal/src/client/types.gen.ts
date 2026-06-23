@@ -2404,6 +2404,7 @@ export type OpenTicketingPurchaseResponse = {
     payment_id: string;
     status: string;
     checkout_url: string;
+    redirect_url?: (string | null);
     amount: string;
     currency: string;
 };
@@ -2639,6 +2640,9 @@ export type PopupAdmin = {
     twitter_url?: (string | null);
     simplefi_api_key?: (string | null);
     terms_and_conditions_url?: (string | null);
+    open_checkout_success_url?: (string | null);
+    open_checkout_cancel_url?: (string | null);
+    open_checkout_signing_secret?: (string | null);
     invoice_company_name?: (string | null);
     invoice_company_address?: (string | null);
     invoice_company_email?: (string | null);
@@ -2693,6 +2697,9 @@ export type PopupCreate = {
     twitter_url?: (string | null);
     simplefi_api_key?: (string | null);
     terms_and_conditions_url?: (string | null);
+    open_checkout_success_url?: (string | null);
+    open_checkout_cancel_url?: (string | null);
+    open_checkout_signing_secret?: (string | null);
     invoice_company_name?: (string | null);
     invoice_company_address?: (string | null);
     invoice_company_email?: (string | null);
@@ -2829,6 +2836,9 @@ export type PopupUpdate = {
     twitter_url?: (string | null);
     simplefi_api_key?: (string | null);
     terms_and_conditions_url?: (string | null);
+    open_checkout_success_url?: (string | null);
+    open_checkout_cancel_url?: (string | null);
+    open_checkout_signing_secret?: (string | null);
     invoice_company_name?: (string | null);
     invoice_company_address?: (string | null);
     invoice_company_email?: (string | null);

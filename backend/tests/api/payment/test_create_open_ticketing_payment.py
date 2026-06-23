@@ -199,7 +199,7 @@ def test_create_open_ticketing_payment_one_attendee_n_tickets(
     with patch("app.services.simplefi.get_simplefi_client") as mock_get_client:
         mock_get_client.return_value.create_payment.return_value = simplefi_response
 
-        payment, checkout_url = payments_crud.create_open_ticketing_payment(
+        payment, checkout_url, _ = payments_crud.create_open_ticketing_payment(
             db,
             obj=obj,
             popup=popup,
@@ -458,7 +458,7 @@ def test_create_open_ticketing_payment_applies_coupon_discount(
             is_installment_plan=False,
         )
 
-        payment, _ = payments_crud.create_open_ticketing_payment(
+        payment, _, _ = payments_crud.create_open_ticketing_payment(
             db,
             obj=obj,
             popup=popup,
@@ -497,7 +497,7 @@ def test_create_open_ticketing_payment_100_percent_coupon_auto_approves(
     )
 
     with patch("app.services.simplefi.get_simplefi_client") as mock_get_client:
-        payment, checkout_url = payments_crud.create_open_ticketing_payment(
+        payment, checkout_url, _ = payments_crud.create_open_ticketing_payment(
             db,
             obj=obj,
             popup=popup,
