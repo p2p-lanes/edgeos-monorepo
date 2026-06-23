@@ -69,10 +69,10 @@ import { cn } from "@/lib/utils"
 import { useCityProvider } from "@/providers/cityProvider"
 import { AddToCalendarModal } from "../lib/AddToCalendarModal"
 import { CoverImage } from "../lib/CoverImage"
-import { useCanRsvp } from "../lib/useCanRsvp"
 import { canManageEvent } from "../lib/eventPermissions"
 import { summarizeRrule } from "../lib/summarizeRrule"
 import { useCalendarAddedFlag } from "../lib/useCalendarAddedFlag"
+import { useCanRsvp } from "../lib/useCanRsvp"
 import {
   useEventTimezone,
   usePortalEventSettings,
