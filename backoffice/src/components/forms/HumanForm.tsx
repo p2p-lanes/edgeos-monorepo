@@ -57,31 +57,31 @@ const RATING_OPTIONS: {
 }[] = [
   {
     value: "sin_calificar",
-    label: "Sin calificar",
+    label: "No rating",
     description: "No assessment yet",
     badge: "secondary",
   },
   {
     value: "red_flag",
-    label: "Red Flag",
+    label: "🔴 Red Flag",
     description: "Should not be admitted to gatherings (blocks the user)",
     badge: "destructive",
   },
   {
     value: "orange_flag",
-    label: "Orange Flag",
+    label: "🟠 Orange Flag",
     description: "Reasons against, still open to discussion",
     badge: "outline",
   },
   {
     value: "green_flag",
-    label: "Green Flag",
+    label: "🟢 Green Flag",
     description: "A great attendee who adds value",
     badge: "default",
   },
   {
     value: "star",
-    label: "Star",
+    label: "⭐ Star",
     description: "Excellent — their presence enriches everyone's experience",
     badge: "default",
   },

@@ -74,11 +74,11 @@ function countActiveFieldFilters(filters: HumanFieldFilters): number {
 const RATING_FILTER_ALL = "all"
 
 const HUMAN_RATING_OPTIONS: { value: HumanRating; label: string }[] = [
-  { value: "sin_calificar", label: "Sin calificar" },
-  { value: "red_flag", label: "Red Flag" },
-  { value: "orange_flag", label: "Orange Flag" },
-  { value: "green_flag", label: "Green Flag" },
-  { value: "star", label: "Star" },
+  { value: "sin_calificar", label: "No rating" },
+  { value: "red_flag", label: "🔴 Red Flag" },
+  { value: "orange_flag", label: "🟠 Orange Flag" },
+  { value: "green_flag", label: "🟢 Green Flag" },
+  { value: "star", label: "⭐ Star" },
 ]
 
 /** Snapshot a value behind a debounce so typing doesn't fire a query per key. */

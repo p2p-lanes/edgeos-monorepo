@@ -25,21 +25,21 @@ const statusMap: Record<
   flagged: { variant: "destructive" },
   deleted: { variant: "destructive" },
   // Human rating levels
-  sin_calificar: { variant: "outline", label: "Sin calificar" },
-  red_flag: { variant: "destructive", label: "Red Flag" },
+  sin_calificar: { variant: "outline", label: "No rating" },
+  red_flag: { variant: "destructive", label: "🔴 Red Flag" },
   orange_flag: {
     variant: "outline",
-    label: "Orange Flag",
+    label: "🟠 Orange Flag",
     className: "border-orange-300 bg-orange-100 text-orange-800",
   },
   green_flag: {
     variant: "outline",
-    label: "Green Flag",
+    label: "🟢 Green Flag",
     className: "border-green-300 bg-green-100 text-green-800",
   },
   star: {
     variant: "outline",
-    label: "Star",
+    label: "⭐ Star",
     className: "border-yellow-400 bg-yellow-100 text-yellow-800",
   },
   ambassador: { variant: "default" },
