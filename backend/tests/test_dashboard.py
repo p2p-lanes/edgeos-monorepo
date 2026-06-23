@@ -287,3 +287,72 @@ class TestRevenueBreakdownNetReconciliation:
         # Category total equals the money actually collected (130 + 0), not the
         # 250 list total the old reconstruction would have reported.
         assert sum(by_category.values()) == Decimal("130.00")
+
+    def test_breakdown_groups_by_live_category_not_snapshot(
+        self, db: Session, tenant_a: Tenants
+    ) -> None:
+        # A ticket re-categorised after sale: the live product is category
+        # "ticket" but the purchase-time snapshot still says "month". The
+        # breakdown must report it under the live "ticket" category so it agrees
+        # with the ticket-type / product widgets, not a ghost "month" category.
+        popup = Popups(
+            name="Revenue Breakdown Live Category",
+            slug="revenue-breakdown-live-category",
+            tenant_id=tenant_a.id,
+        )
+        db.add(popup)
+        db.flush()
+
+        ticket = Products(
+            tenant_id=tenant_a.id,
+            popup_id=popup.id,
+            name="Month Pass",
+            slug="rb-live-month",
+            price=Decimal("500.00"),
+            category="ticket",
+            discountable=True,
+        )
+        db.add(ticket)
+        db.flush()
+
+        attendee = Attendees(
+            tenant_id=tenant_a.id,
+            popup_id=popup.id,
+            name="Buyer Three",
+        )
+        db.add(attendee)
+        db.flush()
+
+        payment = Payments(
+            tenant_id=tenant_a.id,
+            popup_id=popup.id,
+            status=PaymentStatus.APPROVED.value,
+            payment_type=PaymentType.PASS_PURCHASE.value,
+            amount=Decimal("500.00"),
+            insurance_amount=Decimal("0.00"),
+            contribution_amount=Decimal("0.00"),
+            discount_value=None,
+        )
+        db.add(payment)
+        db.flush()
+
+        db.add(
+            PaymentProducts(
+                tenant_id=tenant_a.id,
+                payment_id=payment.id,
+                product_id=ticket.id,
+                attendee_id=attendee.id,
+                quantity=1,
+                product_name=ticket.name,
+                product_price=Decimal("500.00"),
+                product_category="month",  # stale snapshot category
+            )
+        )
+        db.commit()
+
+        breakdown = _get_revenue_breakdown(db, popup.id)
+        by_category = {c.category: c.revenue for c in breakdown.by_category}
+
+        # Reported under the live "ticket" category, not the stale "month".
+        assert by_category == {"ticket": Decimal("500.00")}
+        assert "month" not in by_category
