@@ -3380,6 +3380,34 @@ async def update_portal_event(
             if effective != requested or "max_participant" in patch_dict:
                 patch_dict["max_participant"] = effective
 
+    # Re-approval on portal edits. Only the event's date/time or venue are
+    # "sensitive": changing any of them re-triggers admin approval when the
+    # resulting venue requires approval at the resulting time. Editing the
+    # description or any other attribute never re-triggers approval, and
+    # backoffice edits use a different handler so they are never gated. We only
+    # escalate a live (``published``) event back to ``pending_approval`` — we
+    # never auto-publish a pending/rejected/cancelled one on edit, nor re-notify
+    # an event that is already pending.
+    reapproval_reason: str | None = None
+    if timing_or_venue_changed and event.status == EventStatus.PUBLISHED:
+        reapproval_venue_id = patch_dict.get("venue_id", event.venue_id)
+        if reapproval_venue_id is not None:
+            from app.api.event_venue import crud as venue_crud
+
+            reapproval_venue = venue_crud.event_venues_crud.get(
+                db, reapproval_venue_id
+            )
+            if reapproval_venue and (
+                _resolve_effective_booking_mode(
+                    db, reapproval_venue, new_start, new_end
+                )
+                == "approval_required"
+            ):
+                patch_dict["status"] = EventStatus.PENDING_APPROVAL
+                reapproval_reason = (
+                    "Venue requires admin approval at the selected time."
+                )
+
     event_in = EventUpdate(**patch_dict)
 
     before = {
@@ -3407,6 +3435,16 @@ async def update_portal_event(
         snapshot=audit_after,
         changes=compute_changes(audit_before, audit_after),
     )
+    if reapproval_reason:
+        from app.api.event_settings.crud import event_settings_crud
+        from app.api.popup.crud import popups_crud
+        from app.services.approval_notify import notify_event_pending_approval
+
+        settings = event_settings_crud.get_by_popup_id(db, updated.popup_id)
+        popup = popups_crud.get(db, updated.popup_id)
+        await notify_event_pending_approval(
+            updated, popup, settings, reason=reapproval_reason
+        )
     return _with_collaborators(db, _to_public(updated), updated)
 
 
