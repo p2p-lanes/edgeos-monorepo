@@ -2178,7 +2178,7 @@ export type HumanPublic = {
  * automatic cascade (revoke API keys, reject in-review applications, send
  * rejection emails); the other levels are purely advisory labels.
  */
-export type HumanRating = 'sin_calificar' | 'red_flag' | 'orange_flag' | 'green_flag' | 'star';
+export type HumanRating = 'unrated' | 'red_flag' | 'orange_flag' | 'green_flag' | 'star';
 
 /**
  * Human schema for profile updates.

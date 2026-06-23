@@ -5381,6 +5381,17 @@ export const EnrichedDashboardStatsSchema = {
     description: 'Full enriched dashboard response.'
 } as const;
 
+export const EnrichmentSourceSchema = {
+    type: 'string',
+    enum: ['telegram', 'event', 'custom_fields', 'org', 'manual'],
+    title: 'EnrichmentSource',
+    description: `Where a single enrichment fact about a human came from.
+
+Stored as the enum's string value in \`\`human_enrichment_facts.source\`\`;
+used as provenance so the curated \`\`humans.enriched_profile\`\` can be traced
+back to its evidence (and re-derived if a source is corrected/removed).`
+} as const;
+
 export const EventAdminNotesSchema = {
     properties: {
         notes: {
@@ -9841,6 +9852,131 @@ export const HumanCreateSchema = {
     description: 'Human schema for creation.'
 } as const;
 
+export const HumanEnrichmentFactCreateSchema = {
+    properties: {
+        field: {
+            type: 'string',
+            maxLength: 100,
+            minLength: 1,
+            title: 'Field'
+        },
+        value: {
+            type: 'string',
+            minLength: 1,
+            title: 'Value'
+        },
+        source: {
+            '$ref': '#/components/schemas/EnrichmentSource'
+        },
+        evidence: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Evidence'
+        },
+        confidence: {
+            anyOf: [
+                {
+                    type: 'number'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Confidence'
+        },
+        raw: {
+            anyOf: [
+                {
+                    additionalProperties: true,
+                    type: 'object'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Raw'
+        }
+    },
+    type: 'object',
+    required: ['field', 'value', 'source'],
+    title: 'HumanEnrichmentFactCreate',
+    description: 'One atomic fact the enrichment agent extracted from a source.'
+} as const;
+
+export const HumanEnrichmentFactPublicSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        human_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Human Id'
+        },
+        field: {
+            type: 'string',
+            title: 'Field'
+        },
+        value: {
+            type: 'string',
+            title: 'Value'
+        },
+        source: {
+            '$ref': '#/components/schemas/EnrichmentSource'
+        },
+        evidence: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Evidence'
+        },
+        confidence: {
+            anyOf: [
+                {
+                    type: 'number'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Confidence'
+        },
+        raw: {
+            anyOf: [
+                {
+                    additionalProperties: true,
+                    type: 'object'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Raw'
+        },
+        created_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Created At'
+        }
+    },
+    type: 'object',
+    required: ['id', 'human_id', 'field', 'value', 'source', 'created_at'],
+    title: 'HumanEnrichmentFactPublic'
+} as const;
+
 export const HumanPortalPublicSchema = {
     properties: {
         id: {
@@ -10160,12 +10296,24 @@ export const HumanPublicSchema = {
         },
         rating: {
             '$ref': '#/components/schemas/HumanRating',
-            default: 'sin_calificar'
+            default: 'unrated'
         },
         red_flag: {
             type: 'boolean',
             title: 'Red Flag',
             default: false
+        },
+        enriched_profile: {
+            anyOf: [
+                {
+                    additionalProperties: true,
+                    type: 'object'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Enriched Profile'
         }
     },
     type: 'object',
@@ -10176,7 +10324,7 @@ export const HumanPublicSchema = {
 
 export const HumanRatingSchema = {
     type: 'string',
-    enum: ['sin_calificar', 'red_flag', 'orange_flag', 'green_flag', 'star'],
+    enum: ['unrated', 'red_flag', 'orange_flag', 'green_flag', 'star'],
     title: 'HumanRating',
     description: `Admin assessment of a human for gathering admission.
 
@@ -10273,6 +10421,18 @@ export const HumanUpdateSchema = {
                     type: 'null'
                 }
             ]
+        },
+        enriched_profile: {
+            anyOf: [
+                {
+                    additionalProperties: true,
+                    type: 'object'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Enriched Profile'
         }
     },
     type: 'object',
@@ -10714,6 +10874,24 @@ export const ListModel_HumanCommentPublic_Schema = {
     type: 'object',
     required: ['results', 'paging'],
     title: 'ListModel[HumanCommentPublic]'
+} as const;
+
+export const ListModel_HumanEnrichmentFactPublic_Schema = {
+    properties: {
+        results: {
+            items: {
+                '$ref': '#/components/schemas/HumanEnrichmentFactPublic'
+            },
+            type: 'array',
+            title: 'Results'
+        },
+        paging: {
+            '$ref': '#/components/schemas/Paging'
+        }
+    },
+    type: 'object',
+    required: ['results', 'paging'],
+    title: 'ListModel[HumanEnrichmentFactPublic]'
 } as const;
 
 export const ListModel_HumanPortalPublic_Schema = {
