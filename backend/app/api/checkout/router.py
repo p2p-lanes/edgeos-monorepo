@@ -113,7 +113,7 @@ async def purchase_open_ticketing(
     """Create an anonymous open-ticketing payment and return provider checkout data."""
     popup = get_open_ticketing_popup(db, slug, tenant.id)
 
-    payment, checkout_url = payments_crud.create_open_ticketing_payment(
+    payment, checkout_url, redirect_url = payments_crud.create_open_ticketing_payment(
         db,
         obj=request_in,
         popup=popup,
@@ -148,10 +148,14 @@ async def purchase_open_ticketing(
                 payment.id,
             )
 
+    # redirect_url is set by the CRUD only for the zero-amount bypass when the
+    # popup configures a custom open-checkout success URL (signed when a secret
+    # is set). Paid flows redirect via SimpleFi and return None here.
     return OpenTicketingPurchaseResponse(
         payment_id=payment.id,
         status=payment.status,
         checkout_url=checkout_url,
+        redirect_url=redirect_url,
         amount=payment.amount,
         currency=payment.currency,
     )

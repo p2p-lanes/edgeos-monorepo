@@ -12,7 +12,11 @@ from fastapi.testclient import TestClient
 from sqlmodel import Session
 
 from app.api.attendee.models import Attendees
-from app.api.dashboard.router import _get_revenue_breakdown
+from app.api.dashboard.router import (
+    _get_accommodation_percentage,
+    _get_cumulative_trends,
+    _get_revenue_breakdown,
+)
 from app.api.payment.models import PaymentProducts, Payments
 from app.api.payment.schemas import PaymentStatus, PaymentType
 from app.api.popup.models import Popups
@@ -287,3 +291,204 @@ class TestRevenueBreakdownNetReconciliation:
         # Category total equals the money actually collected (130 + 0), not the
         # 250 list total the old reconstruction would have reported.
         assert sum(by_category.values()) == Decimal("130.00")
+
+    def test_breakdown_groups_by_live_category_not_snapshot(
+        self, db: Session, tenant_a: Tenants
+    ) -> None:
+        # A ticket re-categorised after sale: the live product is category
+        # "ticket" but the purchase-time snapshot still says "month". The
+        # breakdown must report it under the live "ticket" category so it agrees
+        # with the ticket-type / product widgets, not a ghost "month" category.
+        popup = Popups(
+            name="Revenue Breakdown Live Category",
+            slug="revenue-breakdown-live-category",
+            tenant_id=tenant_a.id,
+        )
+        db.add(popup)
+        db.flush()
+
+        ticket = Products(
+            tenant_id=tenant_a.id,
+            popup_id=popup.id,
+            name="Month Pass",
+            slug="rb-live-month",
+            price=Decimal("500.00"),
+            category="ticket",
+            discountable=True,
+        )
+        db.add(ticket)
+        db.flush()
+
+        attendee = Attendees(
+            tenant_id=tenant_a.id,
+            popup_id=popup.id,
+            name="Buyer Three",
+        )
+        db.add(attendee)
+        db.flush()
+
+        payment = Payments(
+            tenant_id=tenant_a.id,
+            popup_id=popup.id,
+            status=PaymentStatus.APPROVED.value,
+            payment_type=PaymentType.PASS_PURCHASE.value,
+            amount=Decimal("500.00"),
+            insurance_amount=Decimal("0.00"),
+            contribution_amount=Decimal("0.00"),
+            discount_value=None,
+        )
+        db.add(payment)
+        db.flush()
+
+        db.add(
+            PaymentProducts(
+                tenant_id=tenant_a.id,
+                payment_id=payment.id,
+                product_id=ticket.id,
+                attendee_id=attendee.id,
+                quantity=1,
+                product_name=ticket.name,
+                product_price=Decimal("500.00"),
+                product_category="month",  # stale snapshot category
+            )
+        )
+        db.commit()
+
+        breakdown = _get_revenue_breakdown(db, popup.id)
+        by_category = {c.category: c.revenue for c in breakdown.by_category}
+
+        # Reported under the live "ticket" category, not the stale "month".
+        assert by_category == {"ticket": Decimal("500.00")}
+        assert "month" not in by_category
+
+
+class TestCategorySourceConsistency:
+    """Count/percentage widgets must detect product category from the live
+    products.category (same source as Tickets by Type), so they reconcile with
+    each other even when the purchase-time snapshot category is stale.
+    """
+
+    def test_cumulative_tickets_count_live_category(
+        self, db: Session, tenant_a: Tenants
+    ) -> None:
+        popup = Popups(
+            name="Cumulative Tickets Live Category",
+            slug="cumulative-tickets-live-category",
+            tenant_id=tenant_a.id,
+        )
+        db.add(popup)
+        db.flush()
+
+        ticket = Products(
+            tenant_id=tenant_a.id,
+            popup_id=popup.id,
+            name="Month Pass",
+            slug="ct-live-month",
+            price=Decimal("500.00"),
+            category="ticket",
+            discountable=True,
+        )
+        db.add(ticket)
+        db.flush()
+
+        attendee = Attendees(
+            tenant_id=tenant_a.id,
+            popup_id=popup.id,
+            name="Buyer Cumulative",
+        )
+        db.add(attendee)
+        db.flush()
+
+        payment = Payments(
+            tenant_id=tenant_a.id,
+            popup_id=popup.id,
+            status=PaymentStatus.APPROVED.value,
+            payment_type=PaymentType.PASS_PURCHASE.value,
+            amount=Decimal("500.00"),
+            insurance_amount=Decimal("0.00"),
+            contribution_amount=Decimal("0.00"),
+        )
+        db.add(payment)
+        db.flush()
+
+        db.add(
+            PaymentProducts(
+                tenant_id=tenant_a.id,
+                payment_id=payment.id,
+                product_id=ticket.id,
+                attendee_id=attendee.id,
+                quantity=2,
+                product_name=ticket.name,
+                product_price=Decimal("250.00"),
+                product_category="month",  # stale snapshot category
+            )
+        )
+        db.commit()
+
+        trends = _get_cumulative_trends(db, popup.id, "UTC")
+        total_tickets = sum(p.value for p in trends.tickets)
+
+        # Counted as a ticket (live category) despite the stale "month" snapshot.
+        assert total_tickets == 2
+
+    def test_accommodation_percentage_live_category(
+        self, db: Session, tenant_a: Tenants
+    ) -> None:
+        popup = Popups(
+            name="Accommodation Live Category",
+            slug="accommodation-live-category",
+            tenant_id=tenant_a.id,
+        )
+        db.add(popup)
+        db.flush()
+
+        cabin = Products(
+            tenant_id=tenant_a.id,
+            popup_id=popup.id,
+            name="Cabin",
+            slug="acc-live-cabin",
+            price=Decimal("1000.00"),
+            category="housing",
+            discountable=False,
+        )
+        db.add(cabin)
+        db.flush()
+
+        attendee = Attendees(
+            tenant_id=tenant_a.id,
+            popup_id=popup.id,
+            name="Buyer Housing",
+        )
+        db.add(attendee)
+        db.flush()
+
+        payment = Payments(
+            tenant_id=tenant_a.id,
+            popup_id=popup.id,
+            status=PaymentStatus.APPROVED.value,
+            payment_type=PaymentType.PASS_PURCHASE.value,
+            amount=Decimal("1000.00"),
+            insurance_amount=Decimal("0.00"),
+            contribution_amount=Decimal("0.00"),
+        )
+        db.add(payment)
+        db.flush()
+
+        db.add(
+            PaymentProducts(
+                tenant_id=tenant_a.id,
+                payment_id=payment.id,
+                product_id=cabin.id,
+                attendee_id=attendee.id,
+                quantity=1,
+                product_name=cabin.name,
+                product_price=Decimal("1000.00"),
+                product_category="other",  # stale snapshot category
+            )
+        )
+        db.commit()
+
+        # One housing attendee out of two total people -> 50%, detected via the
+        # live category despite the stale "other" snapshot.
+        pct = _get_accommodation_percentage(db, popup.id, total_people=2)
+        assert pct == Decimal("50.0")

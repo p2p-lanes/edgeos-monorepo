@@ -293,7 +293,9 @@
     "summary_pay": "Pagar",
     "thank_you_title": "Pago completado",
     "thank_you_description": "Gracias por tu compra. Te enviamos la confirmación y los detalles de tus tickets por email.",
-    "thank_you_cta": "Ir al portal"
+    "thank_you_cta": "Ir al portal",
+    "thank_you_order_summary": "Resumen de la orden",
+    "thank_you_total": "Total"
   },
   "passes": {
     "your_passes": "Tus Pases",
@@ -596,7 +598,9 @@
       "check_in_opens_at_start": "El check-in se habilita al comenzar el evento",
       "registered": "Anotado",
       "checked_in": "Check-in realizado",
-      "action_error": "No pudimos actualizar tu RSVP. Por favor intentá de nuevo."
+      "action_error": "No pudimos actualizar tu RSVP. Por favor intentá de nuevo.",
+      "requires_ticket": "Necesitás un ticket de este evento para registrarte.",
+      "application_rejected": "Tu aplicación no fue aceptada, no podés registrarte."
     },
     "recurrence": {
       "daily_one": "Se repite diariamente",

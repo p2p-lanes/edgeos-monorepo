@@ -16,6 +16,7 @@ from app.api.approval_strategy.models import ApprovalStrategies
 from app.api.approval_strategy.schemas import ApprovalStrategyType
 from app.api.human.models import Humans
 from app.api.popup.models import Popups
+from app.api.shared.enums import HumanRating
 from app.api.tenant.models import Tenants
 from app.core.security import create_access_token
 from app.services.approval.calculator import ApprovalCalculator
@@ -77,7 +78,7 @@ class TestRedFlagAutoReject:
             email=f"red-flag-{uuid.uuid4().hex[:8]}@test.com",
             first_name="Red",
             last_name="Flagged",
-            red_flag=True,
+            rating=HumanRating.RED_FLAG,
         )
         db.add(human)
         db.flush()
@@ -113,7 +114,7 @@ class TestRedFlagAutoReject:
             email=email,
             first_name="Red",
             last_name="Flagged",
-            red_flag=True,
+            rating=HumanRating.RED_FLAG,
         )
         db.add(human)
         db.commit()
@@ -158,7 +159,7 @@ class TestRedFlagAPIEndpoints:
             email=f"red-flag-api-{uuid.uuid4().hex[:8]}@test.com",
             first_name="Red",
             last_name="Flagged",
-            red_flag=True,
+            rating=HumanRating.RED_FLAG,
         )
         db.add(human)
         db.flush()
@@ -206,7 +207,7 @@ class TestRedFlagAPIEndpoints:
             email=email,
             first_name="Red",
             last_name="Flagged",
-            red_flag=True,
+            rating=HumanRating.RED_FLAG,
         )
         db.add(human)
         db.commit()
@@ -259,7 +260,7 @@ class TestRedFlagAPIEndpoints:
             email=f"normal-{uuid.uuid4().hex[:8]}@test.com",
             first_name="Normal",
             last_name="User",
-            red_flag=False,
+            rating=HumanRating.SIN_CALIFICAR,
         )
         db.add(human)
         db.flush()
@@ -311,7 +312,7 @@ class TestRedFlagOnHumanUpdate:
             email=f"to-be-flagged-{uuid.uuid4().hex[:8]}@test.com",
             first_name="To Be",
             last_name="Flagged",
-            red_flag=False,
+            rating=HumanRating.SIN_CALIFICAR,
         )
         db.add(human)
         db.flush()
@@ -329,11 +330,13 @@ class TestRedFlagOnHumanUpdate:
         response = client.patch(
             f"/api/v1/humans/{human.id}",
             headers={"Authorization": f"Bearer {admin_token_tenant_a}"},
-            json={"red_flag": True},
+            json={"rating": "red_flag"},
         )
 
         assert response.status_code == 200
-        assert response.json()["red_flag"] is True
+        body = response.json()
+        assert body["rating"] == "red_flag"
+        assert body["red_flag"] is True
 
         db.refresh(application)
         assert application.status == ApplicationStatus.REJECTED.value
@@ -352,7 +355,7 @@ class TestRedFlagOnHumanUpdate:
             email=f"already-rejected-{uuid.uuid4().hex[:8]}@test.com",
             first_name="Already",
             last_name="Rejected",
-            red_flag=False,
+            rating=HumanRating.SIN_CALIFICAR,
         )
         db.add(human)
         db.flush()
@@ -370,7 +373,7 @@ class TestRedFlagOnHumanUpdate:
         response = client.patch(
             f"/api/v1/humans/{human.id}",
             headers={"Authorization": f"Bearer {admin_token_tenant_a}"},
-            json={"red_flag": True},
+            json={"rating": "red_flag"},
         )
 
         assert response.status_code == 200

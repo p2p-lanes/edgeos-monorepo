@@ -72,6 +72,7 @@ import { CoverImage } from "../lib/CoverImage"
 import { canManageEvent } from "../lib/eventPermissions"
 import { summarizeRrule } from "../lib/summarizeRrule"
 import { useCalendarAddedFlag } from "../lib/useCalendarAddedFlag"
+import { useCanRsvp } from "../lib/useCanRsvp"
 import {
   useEventTimezone,
   usePortalEventSettings,
@@ -243,6 +244,16 @@ export default function EventDetailPage() {
   const goingCount = event?.attendee_count ?? activeParticipants.length
   const isFull =
     event?.max_participant != null && goingCount >= event.max_participant
+
+  // Gate the RSVP (register) action: only humans holding a ticket for this
+  // popup and without a rejected application may register. Cancel stays open.
+  const { canRsvp, reason: rsvpBlockReason } = useCanRsvp()
+  const rsvpDisabledReason =
+    rsvpBlockReason === "rejected"
+      ? (t("events.rsvp.application_rejected") as string)
+      : rsvpBlockReason === "no_tickets"
+        ? (t("events.rsvp.requires_ticket") as string)
+        : undefined
 
   // Recurring events require occurrence_start so the RSVP targets a single
   // instance; one-off events must not send it (the backend rejects mixing
@@ -731,6 +742,25 @@ export default function EventDetailPage() {
                   <Users className="h-4 w-4" />
                   {t("events.rsvp.full")}
                 </Button>
+              ) : !canRsvp ? (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    {/* span wrapper so the tooltip still fires on the
+                        disabled button (disabled elements emit no events) */}
+                    <span className="inline-flex">
+                      <Button
+                        disabled
+                        className="inline-flex items-center gap-2"
+                      >
+                        <UserPlus className="h-4 w-4" />
+                        {t("events.rsvp.rsvp")}
+                      </Button>
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>{rsvpDisabledReason}</p>
+                  </TooltipContent>
+                </Tooltip>
               ) : (
                 <Button
                   onClick={() => registerMutation.mutate()}

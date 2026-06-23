@@ -97,6 +97,23 @@ def validate_currency_value(value: str | None) -> str | None:
     return normalized
 
 
+def validate_optional_url(value: str | None) -> str | None:
+    """Validate an optional absolute http(s) URL, normalizing blanks to None.
+
+    Used for the per-popup open-checkout redirect URLs that are forwarded to
+    SimpleFi. A malformed value would break payment creation, so reject
+    anything that is not an absolute http(s) URL.
+    """
+    if value is None:
+        return None
+    stripped = value.strip()
+    if not stripped:
+        return None
+    if not stripped.startswith(("http://", "https://")):
+        raise ValueError("URL must start with http:// or https://")
+    return stripped
+
+
 def resolve_checkout_mode(
     sale_type: SaleType, checkout_mode: CheckoutMode | None
 ) -> CheckoutMode:
@@ -147,6 +164,16 @@ class PopupBase(SQLModel):
     twitter_url: str | None = None
     simplefi_api_key: str | None = None
     terms_and_conditions_url: str | None = None
+    # Per-popup redirect URLs for the open-checkout flow. When set, they
+    # override the default portal thank-you / cancel pages forwarded to
+    # SimpleFi. Null falls back to the derived portal URLs.
+    open_checkout_success_url: str | None = None
+    open_checkout_cancel_url: str | None = None
+    # Shared secret used to HMAC-sign the order payload appended to the success
+    # URL, so an external thank-you page can verify it. Dedicated per popup —
+    # never the global SECRET_KEY. When null, the success redirect is sent
+    # without a signed payload.
+    open_checkout_signing_secret: str | None = None
     invoice_company_name: str | None = None
     invoice_company_address: str | None = None
     invoice_company_email: str | None = None
@@ -257,6 +284,9 @@ class PopupCreate(SQLModel):
     twitter_url: str | None = None
     simplefi_api_key: str | None = None
     terms_and_conditions_url: str | None = None
+    open_checkout_success_url: str | None = None
+    open_checkout_cancel_url: str | None = None
+    open_checkout_signing_secret: str | None = None
     invoice_company_name: str | None = None
     invoice_company_address: str | None = None
     invoice_company_email: str | None = None
@@ -289,6 +319,11 @@ class PopupCreate(SQLModel):
     @classmethod
     def validate_currency(cls, value: str) -> str:
         return validate_currency_value(value) or "USD"
+
+    @field_validator("open_checkout_success_url", "open_checkout_cancel_url")
+    @classmethod
+    def validate_open_checkout_urls(cls, value: str | None) -> str | None:
+        return validate_optional_url(value)
 
     @field_validator("checkin_pass_lead_days")
     @classmethod
@@ -347,6 +382,9 @@ class PopupUpdate(SQLModel):
     twitter_url: str | None = None
     simplefi_api_key: str | None = None
     terms_and_conditions_url: str | None = None
+    open_checkout_success_url: str | None = None
+    open_checkout_cancel_url: str | None = None
+    open_checkout_signing_secret: str | None = None
     invoice_company_name: str | None = None
     invoice_company_address: str | None = None
     invoice_company_email: str | None = None
@@ -379,6 +417,11 @@ class PopupUpdate(SQLModel):
     @classmethod
     def validate_currency(cls, value: str | None) -> str | None:
         return validate_currency_value(value)
+
+    @field_validator("open_checkout_success_url", "open_checkout_cancel_url")
+    @classmethod
+    def validate_open_checkout_urls(cls, value: str | None) -> str | None:
+        return validate_optional_url(value)
 
     @field_validator("checkin_pass_lead_days")
     @classmethod

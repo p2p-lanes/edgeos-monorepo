@@ -4,7 +4,7 @@ import type { ColumnDef } from "@tanstack/react-table"
 import { AlertCircle, Plus, SlidersHorizontal, Users, X } from "lucide-react"
 import { Suspense, useEffect, useState } from "react"
 
-import { type HumanPublic, HumansService } from "@/client"
+import { type HumanPublic, type HumanRating, HumansService } from "@/client"
 import { DataTable, SortableHeader } from "@/components/Common/DataTable"
 import { EmptyState } from "@/components/Common/EmptyState"
 import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
@@ -50,6 +50,7 @@ type HumanFieldFilters = {
   gender?: string
   age?: string
   residence?: string
+  enrichment?: string
 }
 
 const HUMAN_FIELD_FILTER_DEFS: {
@@ -62,6 +63,19 @@ const HUMAN_FIELD_FILTER_DEFS: {
   { key: "gender", label: "Gender", placeholder: "female" },
   { key: "age", label: "Age", placeholder: "30" },
   { key: "residence", label: "Residence", placeholder: "Buenos Aires" },
+  {
+    key: "enrichment",
+    label: "Rich profile contains",
+    placeholder: "AI, founder, Buenos Aires…",
+  },
+]
+
+type EnrichedFilter = "all" | "enriched" | "not_enriched"
+
+const ENRICHED_FILTER_OPTIONS: { value: EnrichedFilter; label: string }[] = [
+  { value: "all", label: "All profiles" },
+  { value: "enriched", label: "✨ Has rich profile" },
+  { value: "not_enriched", label: "No rich profile" },
 ]
 
 function countActiveFieldFilters(filters: HumanFieldFilters): number {
@@ -69,6 +83,17 @@ function countActiveFieldFilters(filters: HumanFieldFilters): number {
     (d) => (filters[d.key] ?? "").trim() !== "",
   ).length
 }
+
+/** Sentinel for "no rating filter" — Select can't hold an empty value. */
+const RATING_FILTER_ALL = "all"
+
+const HUMAN_RATING_OPTIONS: { value: HumanRating; label: string }[] = [
+  { value: "sin_calificar", label: "No rating" },
+  { value: "red_flag", label: "🔴 Red Flag" },
+  { value: "orange_flag", label: "🟠 Orange Flag" },
+  { value: "green_flag", label: "🟢 Green Flag" },
+  { value: "star", label: "⭐ Star" },
+]
 
 /** Snapshot a value behind a debounce so typing doesn't fire a query per key. */
 function useDebouncedValue<T>(value: T, delay: number): T {
@@ -87,8 +112,16 @@ function getHumansQueryOptions(
   search?: string,
   applicationFilter: HumansApplicationFilter = HUMAN_APPLICATION_FILTER.ALL,
   fieldFilters: HumanFieldFilters = {},
+  rating: HumanRating | null = null,
+  enrichedFilter: EnrichedFilter = "all",
 ) {
   const isIncomplete = applicationFilter === HUMAN_APPLICATION_FILTER.INCOMPLETE
+  const hasEnrichedProfile =
+    enrichedFilter === "enriched"
+      ? true
+      : enrichedFilter === "not_enriched"
+        ? false
+        : undefined
   return {
     queryFn: () =>
       HumansService.listHumans({
@@ -104,10 +137,22 @@ function getHumansQueryOptions(
         gender: fieldFilters.gender?.trim() || undefined,
         age: fieldFilters.age?.trim() || undefined,
         residence: fieldFilters.residence?.trim() || undefined,
+        rating: rating ?? undefined,
+        hasEnrichedProfile,
+        enrichmentQuery: fieldFilters.enrichment?.trim() || undefined,
       }),
     queryKey: [
       "humans",
-      { popupId, page, pageSize, search, applicationFilter, fieldFilters },
+      {
+        popupId,
+        page,
+        pageSize,
+        search,
+        applicationFilter,
+        fieldFilters,
+        rating,
+        enrichedFilter,
+      },
     ],
   }
 }
@@ -151,6 +196,61 @@ function HumansApplicationFilterSelect({
         <SelectItem value={HUMAN_APPLICATION_FILTER.INCOMPLETE}>
           Incomplete application
         </SelectItem>
+      </SelectContent>
+    </Select>
+  )
+}
+
+function HumansRatingFilterSelect({
+  value,
+  onValueChange,
+}: {
+  value: HumanRating | null
+  onValueChange: (value: HumanRating | null) => void
+}) {
+  return (
+    <Select
+      value={value ?? RATING_FILTER_ALL}
+      onValueChange={(next) =>
+        onValueChange(next === RATING_FILTER_ALL ? null : (next as HumanRating))
+      }
+    >
+      <SelectTrigger className="w-[180px]">
+        <SelectValue placeholder="Filter by rating" />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value={RATING_FILTER_ALL}>All ratings</SelectItem>
+        {HUMAN_RATING_OPTIONS.map((opt) => (
+          <SelectItem key={opt.value} value={opt.value}>
+            {opt.label}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  )
+}
+
+function HumansEnrichedFilterSelect({
+  value,
+  onValueChange,
+}: {
+  value: EnrichedFilter
+  onValueChange: (value: EnrichedFilter) => void
+}) {
+  return (
+    <Select
+      value={value}
+      onValueChange={(next) => onValueChange(next as EnrichedFilter)}
+    >
+      <SelectTrigger className="w-[180px]">
+        <SelectValue placeholder="Rich profile" />
+      </SelectTrigger>
+      <SelectContent>
+        {ENRICHED_FILTER_OPTIONS.map((opt) => (
+          <SelectItem key={opt.value} value={opt.value}>
+            {opt.label}
+          </SelectItem>
+        ))}
       </SelectContent>
     </Select>
   )
@@ -233,10 +333,10 @@ const columns: ColumnDef<HumanPublic>[] = [
     ),
   },
   {
-    accessorKey: "red_flag",
-    header: "Status",
+    accessorKey: "rating",
+    header: "Rating",
     cell: ({ row }) => (
-      <StatusBadge status={row.original.red_flag ? "flagged" : "active"} />
+      <StatusBadge status={row.original.rating ?? "sin_calificar"} />
     ),
   },
 ]
@@ -267,6 +367,24 @@ function HumansTableContent() {
     }
   }
 
+  const [ratingFilter, setRatingFilter] = useState<HumanRating | null>(null)
+  const handleRatingFilterChange = (next: HumanRating | null) => {
+    setRatingFilter(next)
+    // New filter criteria → back to the first page.
+    if (pagination.pageIndex !== 0) {
+      setPagination({ pageIndex: 0, pageSize: pagination.pageSize })
+    }
+  }
+
+  const [enrichedFilter, setEnrichedFilter] = useState<EnrichedFilter>("all")
+  const handleEnrichedFilterChange = (next: EnrichedFilter) => {
+    setEnrichedFilter(next)
+    // New filter criteria → back to the first page.
+    if (pagination.pageIndex !== 0) {
+      setPagination({ pageIndex: 0, pageSize: pagination.pageSize })
+    }
+  }
+
   const setApplicationFilter = (value: HumansApplicationFilter) => {
     navigate({
       to: "/humans",
@@ -287,6 +405,8 @@ function HumansTableContent() {
       search,
       applicationFilter,
       debouncedFieldFilters,
+      ratingFilter,
+      enrichedFilter,
     ),
     enabled: !requiresPopupForFilter,
     placeholderData: keepPreviousData,
@@ -307,7 +427,7 @@ function HumansTableContent() {
       columns={columns}
       data={humans.results}
       searchPlaceholder="Search by name or email..."
-      hiddenOnMobile={["red_flag"]}
+      hiddenOnMobile={["rating"]}
       searchValue={search}
       onSearchChange={setSearch}
       onRowClick={(human) =>
@@ -318,6 +438,14 @@ function HumansTableContent() {
           <HumansApplicationFilterSelect
             value={applicationFilter}
             onValueChange={setApplicationFilter}
+          />
+          <HumansRatingFilterSelect
+            value={ratingFilter}
+            onValueChange={handleRatingFilterChange}
+          />
+          <HumansEnrichedFilterSelect
+            value={enrichedFilter}
+            onValueChange={handleEnrichedFilterChange}
           />
           <HumansFieldFilters
             value={fieldFilters}

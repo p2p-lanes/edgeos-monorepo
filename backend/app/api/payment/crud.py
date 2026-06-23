@@ -38,9 +38,69 @@ from app.api.product.models import Products
 from app.api.product.product_state import ProductSaleState, derive_product_state
 from app.api.product.schemas import ProductPublic
 from app.api.shared.crud import BaseCRUD
+from app.utils.checkout_signing import (
+    build_signed_redirect_url,
+    build_thank_you_payload,
+    build_unsigned_redirect_url,
+)
 
 # Decimal precision for money calculations
 MONEY_PRECISION = Decimal("0.01")
+
+
+def _build_purchase_thank_you_payload(
+    popup: "Popups",
+    payment: Payments,
+    obj: "OpenTicketingPurchaseCreate",
+    products_map: "dict[uuid.UUID, Products]",
+    *,
+    issued_at: str,
+) -> dict:
+    """Order snapshot at creation time — quoted total and items, no provider
+    choices (installment count / payment method are chosen later on SimpleFi)."""
+    items = [
+        {
+            "name": products_map[line.product_id].name,
+            "quantity": line.quantity,
+        }
+        for line in obj.products
+    ]
+    return build_thank_you_payload(
+        order_id=str(payment.id),
+        first_name=obj.buyer.first_name,
+        email=obj.buyer.email,
+        items=items,
+        amount_total=str(payment.amount),
+        currency=popup.currency,
+        issued_at=issued_at,
+    )
+
+
+def _resolve_open_checkout_success_url(
+    popup: "Popups", internal_thank_you_url: str, payload: dict
+) -> str:
+    """Resolve where a successful open-checkout buyer lands.
+
+    A custom popup success URL overrides the portal thank-you: signed with the
+    order payload when a signing secret is set (external page verifies it),
+    plain otherwise. With no custom URL, the buyer stays on the portal
+    thank-you, which carries the order data unsigned so it can render the
+    summary (our own page — no HMAC needed).
+    """
+    custom = popup.open_checkout_success_url
+    if custom:
+        secret = popup.open_checkout_signing_secret
+        return build_signed_redirect_url(custom, payload, secret) if secret else custom
+    return build_unsigned_redirect_url(internal_thank_you_url, payload)
+
+
+def _internal_open_checkout_thank_you_url(
+    portal_base: str, landing_is_checkout: bool, popup: "Popups", payment: Payments
+) -> str:
+    """Portal thank-you URL for the open-checkout flow (landing-mode aware)."""
+    if landing_is_checkout:
+        return f"{portal_base}/thank-you?payment_id={payment.id}"
+    return f"{portal_base}/checkout/{popup.slug}/thank-you?payment_id={payment.id}"
 
 
 def resolve_patron_template_config(
@@ -510,8 +570,15 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         popup: "Popups",
         tenant: "Tenants",
         attribution: dict[str, str | None] | None = None,
-    ) -> tuple[Payments, str]:
-        """Create an anonymous open-ticketing payment with per-ticket attendees."""
+    ) -> tuple[Payments, str, str | None]:
+        """Create an anonymous open-ticketing payment with per-ticket attendees.
+
+        Returns ``(payment, checkout_url, redirect_url)``. ``checkout_url`` is the
+        SimpleFi-hosted payment page (empty for a zero-amount bypass).
+        ``redirect_url`` is set only for the zero-amount bypass when the popup
+        configures a custom open-checkout success URL — paid flows redirect via
+        SimpleFi and return None.
+        """
         from app.api.popup.schemas import PopupStatus
         from app.api.shared.enums import SaleType
         from app.api.tenant.utils import get_portal_url
@@ -679,6 +746,31 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
 
             payment.amount = discountable_amount + non_discountable_amount
 
+            # Resolve the open-checkout success redirect once, reused by the
+            # zero-amount bypass (returned as redirect_url) and the paid path
+            # (handed to SimpleFi as the success URL). Snapshot the order now so
+            # both the external (signed) and portal (unsigned) thank-you pages
+            # can render it. URL construction is landing-mode aware: when
+            # landing_mode=checkout the custom domain IS the checkout (no slug).
+            from app.api.shared.enums import LandingMode  # noqa: PLC0415
+
+            portal_base = get_portal_url(tenant)
+            landing_is_checkout = tenant.landing_mode == LandingMode.checkout
+            thank_you_payload = _build_purchase_thank_you_payload(
+                popup,
+                payment,
+                obj,
+                products_map,
+                issued_at=datetime.now(UTC).isoformat(),
+            )
+            success_redirect = _resolve_open_checkout_success_url(
+                popup,
+                _internal_open_checkout_thank_you_url(
+                    portal_base, landing_is_checkout, popup, payment
+                ),
+                thank_you_payload,
+            )
+
             # Zero-amount short-circuit: a 100% coupon zeroed the cart, so
             # SimpleFI has nothing to charge and would either reject or auto-
             # approve without firing the webhook. Share the auto-approval path
@@ -702,7 +794,11 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 # can fire the confirmation email against the persisted row.
                 session.commit()
                 session.refresh(payment)
-                return payment, ""
+                # No SimpleFi checkout exists for a zero-amount purchase, so we
+                # perform the success redirect ourselves: the resolved URL is the
+                # custom page (signed when configured) or the portal thank-you
+                # carrying the order data. The portal redirects the buyer there.
+                return payment, "", success_redirect
 
             if not popup.simplefi_api_key:
                 raise HTTPException(
@@ -710,20 +806,19 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                     detail="Payment provider not configured for this popup",
                 )
 
-            portal_base = get_portal_url(tenant)
             simplefi_client = get_simplefi_client(popup.simplefi_api_key)
 
-            # URL construction depends on tenant landing_mode (R-P1, R-P2, R-P3)
-            # When landing_mode=checkout the custom domain IS the checkout — no slug prefix.
-            # Application Fee flow (lines ~776-779) is UNCHANGED — see R-P5 / AC-P2.
-            from app.api.shared.enums import LandingMode  # noqa: PLC0415
-
-            if tenant.landing_mode == LandingMode.checkout:
-                success_url = f"{portal_base}/thank-you?payment_id={payment.id}"
+            # SimpleFi performs the redirect, so hand it the resolved success URL
+            # (custom-signed, or the portal thank-you with the order data). The
+            # cancel URL stays the landing-aware portal page unless the popup
+            # overrides it. Application fee / pass purchase are untouched.
+            success_url = success_redirect
+            if landing_is_checkout:
                 cancel_url = f"{portal_base}/?cancelled=1"
             else:
-                success_url = f"{portal_base}/checkout/{popup.slug}/thank-you?payment_id={payment.id}"
                 cancel_url = f"{portal_base}/checkout/{popup.slug}?cancelled=1"
+            if popup.open_checkout_cancel_url:
+                cancel_url = popup.open_checkout_cancel_url
             reference = {
                 "email": buyer.email,
                 "human_id": str(buyer.id),
@@ -788,7 +883,9 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             session.add(payment)
             session.commit()
             session.refresh(payment)
-            return payment, simplefi_response.checkout_url
+            # Paid flow: SimpleFi performs the success redirect itself (to the
+            # signed success_url built above), so redirect_url is None.
+            return payment, simplefi_response.checkout_url, None
         except HTTPException:
             session.rollback()
             raise

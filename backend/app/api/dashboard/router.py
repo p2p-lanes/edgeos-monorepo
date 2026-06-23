@@ -270,15 +270,18 @@ def _get_accommodation_percentage(
     if total_people == 0:
         return Decimal("0")
 
-    # Count distinct attendees with an approved housing payment product
+    # Count distinct attendees with an approved housing payment product.
+    # Filter by the live product category (consistent with the ticket widgets);
+    # the purchase-time snapshot product_category can be stale.
     housing_attendees = db.exec(
         select(func.count(func.distinct(PaymentProducts.attendee_id)))
         .join(Payments, PaymentProducts.payment_id == Payments.id)
+        .join(Products, PaymentProducts.product_id == Products.id)
         .where(
             Payments.popup_id == popup_id,
             Payments.status == PaymentStatus.APPROVED.value,
             Payments.payment_type == PaymentType.PASS_PURCHASE.value,
-            PaymentProducts.product_category == CATEGORY_HOUSING,
+            Products.category == CATEGORY_HOUSING,
         )
     ).one()
 
@@ -321,11 +324,16 @@ def _get_cumulative_trends(
     ticket_rows = db.exec(
         select(bucket, func.coalesce(func.sum(PaymentProducts.quantity), 0))
         .join(Payments, PaymentProducts.payment_id == Payments.id)
+        .join(Products, PaymentProducts.product_id == Products.id)
         .where(
             Payments.popup_id == popup_id,
             Payments.status == PaymentStatus.APPROVED.value,
             Payments.payment_type == PaymentType.PASS_PURCHASE.value,
-            PaymentProducts.product_category == CATEGORY_TICKET,
+            # Live product category (same source as the Tickets by Type widget)
+            # so the cumulative count reconciles with it. The purchase-time
+            # snapshot product_category is stale for tickets re-categorised
+            # after sale (e.g. day/week/month folded into ticket + duration).
+            Products.category == CATEGORY_TICKET,
         )
         .group_by(bucket)
         .order_by(bucket)
@@ -421,7 +429,14 @@ def _get_revenue_breakdown(db: TenantSession, popup_id: uuid.UUID) -> RevenueBre
         select(
             PaymentProducts.product_id.label("product_id"),
             PaymentProducts.product_name.label("product_name"),
-            PaymentProducts.product_category.label("product_category"),
+            # Group by the live product category, not the purchase-time snapshot:
+            # products re-categorised after a sale (e.g. day/week/month folded
+            # into "ticket" + duration_type) left stale snapshot categories that
+            # scattered tickets into ghost categories and disagreed with the
+            # other widgets. Fall back to the snapshot for deleted products.
+            func.coalesce(Products.category, PaymentProducts.product_category).label(
+                "product_category"
+            ),
             PaymentProducts.quantity.label("quantity"),
             line_nominal.label("nominal"),
             is_discountable.label("is_discountable"),
@@ -611,18 +626,20 @@ def _get_distribution(db: TenantSession, popup_id: uuid.UUID) -> Distribution:
         for cat, qty in attendee_type_rows
     ]
 
-    # Accommodation by product name
+    # Accommodation by product name. Live product category, consistent with the
+    # other widgets (snapshot product_category can be stale).
     housing_rows = db.exec(
         select(
             PaymentProducts.product_name,
             func.sum(PaymentProducts.quantity),
         )
         .join(Payments, PaymentProducts.payment_id == Payments.id)
+        .join(Products, PaymentProducts.product_id == Products.id)
         .where(
             Payments.popup_id == popup_id,
             Payments.status == PaymentStatus.APPROVED.value,
             Payments.payment_type == PaymentType.PASS_PURCHASE.value,
-            PaymentProducts.product_category == CATEGORY_HOUSING,
+            Products.category == CATEGORY_HOUSING,
         )
         .group_by(PaymentProducts.product_name)
     ).all()
@@ -681,11 +698,13 @@ def _get_attach_rate(db: TenantSession, popup_id: uuid.UUID) -> list[AttachRateI
     housing_attendee_ids = (
         select(PaymentProducts.attendee_id)
         .join(Payments, PaymentProducts.payment_id == Payments.id)
+        .join(Products, PaymentProducts.product_id == Products.id)
         .where(
             Payments.popup_id == popup_id,
             Payments.status == PaymentStatus.APPROVED.value,
             Payments.payment_type == PaymentType.PASS_PURCHASE.value,
-            PaymentProducts.product_category == CATEGORY_HOUSING,
+            # Live product category, matching the ticket leg of this metric.
+            Products.category == CATEGORY_HOUSING,
         )
     ).correlate(None)
 

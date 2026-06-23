@@ -9652,6 +9652,105 @@ export const HumanAuthSchema = {
     description: 'Request to initiate human authentication.'
 } as const;
 
+export const HumanCommentCreateSchema = {
+    properties: {
+        body: {
+            type: 'string',
+            minLength: 1,
+            title: 'Body'
+        }
+    },
+    type: 'object',
+    required: ['body'],
+    title: 'HumanCommentCreate'
+} as const;
+
+export const HumanCommentPublicSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        human_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Human Id'
+        },
+        author_user_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Author User Id'
+        },
+        author_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Author Name'
+        },
+        author_email: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Author Email'
+        },
+        body: {
+            type: 'string',
+            title: 'Body'
+        },
+        created_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Created At'
+        },
+        edited_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Edited At'
+        }
+    },
+    type: 'object',
+    required: ['id', 'human_id', 'body', 'created_at'],
+    title: 'HumanCommentPublic'
+} as const;
+
+export const HumanCommentUpdateSchema = {
+    properties: {
+        body: {
+            type: 'string',
+            minLength: 1,
+            title: 'Body'
+        }
+    },
+    type: 'object',
+    required: ['body'],
+    title: 'HumanCommentUpdate'
+} as const;
+
 export const HumanCreateSchema = {
     properties: {
         email: {
@@ -10059,6 +10158,10 @@ export const HumanPublicSchema = {
             ],
             title: 'Picture Url'
         },
+        rating: {
+            '$ref': '#/components/schemas/HumanRating',
+            default: 'sin_calificar'
+        },
         red_flag: {
             type: 'boolean',
             title: 'Red Flag',
@@ -10069,6 +10172,17 @@ export const HumanPublicSchema = {
     required: ['id', 'tenant_id', 'email'],
     title: 'HumanPublic',
     description: 'Human schema for API responses.'
+} as const;
+
+export const HumanRatingSchema = {
+    type: 'string',
+    enum: ['sin_calificar', 'red_flag', 'orange_flag', 'green_flag', 'star'],
+    title: 'HumanRating',
+    description: `Admin assessment of a human for gathering admission.
+
+Replaces the legacy \`\`red_flag\`\` boolean. Only \`\`RED_FLAG\`\` carries the
+automatic cascade (revoke API keys, reject in-review applications, send
+rejection emails); the other levels are purely advisory labels.`
 } as const;
 
 export const HumanUpdateSchema = {
@@ -10150,16 +10264,15 @@ export const HumanUpdateSchema = {
             ],
             title: 'Picture Url'
         },
-        red_flag: {
+        rating: {
             anyOf: [
                 {
-                    type: 'boolean'
+                    '$ref': '#/components/schemas/HumanRating'
                 },
                 {
                     type: 'null'
                 }
-            ],
-            title: 'Red Flag'
+            ]
         }
     },
     type: 'object',
@@ -10585,6 +10698,24 @@ export const ListModel_GroupPublic_Schema = {
     title: 'ListModel[GroupPublic]'
 } as const;
 
+export const ListModel_HumanCommentPublic_Schema = {
+    properties: {
+        results: {
+            items: {
+                '$ref': '#/components/schemas/HumanCommentPublic'
+            },
+            type: 'array',
+            title: 'Results'
+        },
+        paging: {
+            '$ref': '#/components/schemas/Paging'
+        }
+    },
+    type: 'object',
+    required: ['results', 'paging'],
+    title: 'ListModel[HumanCommentPublic]'
+} as const;
+
 export const ListModel_HumanPortalPublic_Schema = {
     properties: {
         results: {
@@ -10993,6 +11124,17 @@ export const OpenTicketingPurchaseResponseSchema = {
         checkout_url: {
             type: 'string',
             title: 'Checkout Url'
+        },
+        redirect_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Redirect Url'
         },
         amount: {
             type: 'string',
@@ -12171,6 +12313,39 @@ export const PopupAdminSchema = {
             ],
             title: 'Terms And Conditions Url'
         },
+        open_checkout_success_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Open Checkout Success Url'
+        },
+        open_checkout_cancel_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Open Checkout Cancel Url'
+        },
+        open_checkout_signing_secret: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Open Checkout Signing Secret'
+        },
         invoice_company_name: {
             anyOf: [
                 {
@@ -12615,6 +12790,39 @@ export const PopupCreateSchema = {
                 }
             ],
             title: 'Terms And Conditions Url'
+        },
+        open_checkout_success_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Open Checkout Success Url'
+        },
+        open_checkout_cancel_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Open Checkout Cancel Url'
+        },
+        open_checkout_signing_secret: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Open Checkout Signing Secret'
         },
         invoice_company_name: {
             anyOf: [
@@ -13557,6 +13765,39 @@ export const PopupUpdateSchema = {
                 }
             ],
             title: 'Terms And Conditions Url'
+        },
+        open_checkout_success_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Open Checkout Success Url'
+        },
+        open_checkout_cancel_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Open Checkout Cancel Url'
+        },
+        open_checkout_signing_secret: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Open Checkout Signing Secret'
         },
         invoice_company_name: {
             anyOf: [

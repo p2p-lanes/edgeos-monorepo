@@ -1577,6 +1577,15 @@ async def detach_occurrence(
     occ_start = payload.occurrence_start
     occ_end = occ_start + duration
 
+    # Idempotency: if this occurrence was already detached (e.g. a network
+    # retry or a stale-cache re-trigger of "Edit only this event"), return the
+    # existing override instead of creating a second standalone row. Skips the
+    # exdate append and iTIP re-send so retries neither duplicate the event nor
+    # double-send calendar invites.
+    existing_child = crud.events_crud.get_detached_child(db, master.id, occ_start)
+    if existing_child is not None:
+        return _to_public(existing_child)
+
     exdate_iso = occ_start.isoformat()
     existing = list(master.recurrence_exdates or [])
     if exdate_iso not in existing:
@@ -1597,10 +1606,16 @@ async def detach_occurrence(
         max_participant=master.max_participant,
         tags=list(master.tags or []),
         venue_id=master.venue_id,
+        custom_location_name=master.custom_location_name,
+        custom_location_url=master.custom_location_url,
         track_id=master.track_id,
         visibility=master.visibility,
         require_approval=master.require_approval,
         kind=master.kind,
+        host_id=master.host_id,
+        host_display_name=master.host_display_name,
+        collaborator_ids=list(master.collaborator_ids or []),
+        highlighted=master.highlighted,
         status=master.status,
         rrule=None,
         recurrence_master_id=master.id,
@@ -1641,6 +1656,20 @@ async def detach_occurrence(
             child.id,
             exc,
         )
+
+    # Re-point the occurrence's RSVPs onto the standalone child so the detached
+    # event owns its attendee list instead of leaving them orphaned on the
+    # master (keyed by occurrence_start). Done AFTER the iTIP dispatch above,
+    # which gathers recipients from the master occurrence — moving the rows
+    # first would leave those emails with no recipients.
+    from app.api.event_participant.crud import event_participants_crud
+
+    event_participants_crud.repoint_occurrence_to_event(
+        db, master.id, occ_start, child.id
+    )
+    db.commit()
+    db.refresh(child)
+
     detach_snapshot = build_event_snapshot(db, master)
     detach_snapshot["occurrence_start"] = occ_start.isoformat()
     detach_snapshot["detached_child_id"] = str(child.id)
@@ -3351,6 +3380,34 @@ async def update_portal_event(
             if effective != requested or "max_participant" in patch_dict:
                 patch_dict["max_participant"] = effective
 
+    # Re-approval on portal edits. Only the event's date/time or venue are
+    # "sensitive": changing any of them re-triggers admin approval when the
+    # resulting venue requires approval at the resulting time. Editing the
+    # description or any other attribute never re-triggers approval, and
+    # backoffice edits use a different handler so they are never gated. We only
+    # escalate a live (``published``) event back to ``pending_approval`` — we
+    # never auto-publish a pending/rejected/cancelled one on edit, nor re-notify
+    # an event that is already pending.
+    reapproval_reason: str | None = None
+    if timing_or_venue_changed and event.status == EventStatus.PUBLISHED:
+        reapproval_venue_id = patch_dict.get("venue_id", event.venue_id)
+        if reapproval_venue_id is not None:
+            from app.api.event_venue import crud as venue_crud
+
+            reapproval_venue = venue_crud.event_venues_crud.get(
+                db, reapproval_venue_id
+            )
+            if reapproval_venue and (
+                _resolve_effective_booking_mode(
+                    db, reapproval_venue, new_start, new_end
+                )
+                == "approval_required"
+            ):
+                patch_dict["status"] = EventStatus.PENDING_APPROVAL
+                reapproval_reason = (
+                    "Venue requires admin approval at the selected time."
+                )
+
     event_in = EventUpdate(**patch_dict)
 
     before = {
@@ -3378,6 +3435,16 @@ async def update_portal_event(
         snapshot=audit_after,
         changes=compute_changes(audit_before, audit_after),
     )
+    if reapproval_reason:
+        from app.api.event_settings.crud import event_settings_crud
+        from app.api.popup.crud import popups_crud
+        from app.services.approval_notify import notify_event_pending_approval
+
+        settings = event_settings_crud.get_by_popup_id(db, updated.popup_id)
+        popup = popups_crud.get(db, updated.popup_id)
+        await notify_event_pending_approval(
+            updated, popup, settings, reason=reapproval_reason
+        )
     return _with_collaborators(db, _to_public(updated), updated)
 
 

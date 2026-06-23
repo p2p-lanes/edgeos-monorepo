@@ -23,6 +23,28 @@ class EventsCRUD(BaseCRUD[Events, EventCreate, EventUpdate]):
     def __init__(self) -> None:
         super().__init__(Events)
 
+    def get_detached_child(
+        self,
+        session: Session,
+        master_id: uuid.UUID,
+        occ_start: datetime,
+    ) -> Events | None:
+        """Return the already-materialized override for a given occurrence.
+
+        A detached override is a child row with ``recurrence_master_id ==
+        master_id`` whose ``start_time`` equals the occurrence. Matching uses
+        ``_strip_tz`` so it mirrors how the series expander keys overrides
+        (see ``_expand_rows_with_occurrences``), making detach idempotent: a
+        retry of the same occurrence finds the existing child instead of
+        creating a duplicate. Returns ``None`` when no override exists yet.
+        """
+        target = _strip_tz(occ_start)
+        statement = select(Events).where(Events.recurrence_master_id == master_id)
+        for child in session.exec(statement).all():
+            if _strip_tz(child.start_time) == target:
+                return child
+        return None
+
     def find_by_popup(
         self,
         session: Session,

@@ -1274,6 +1274,15 @@ export type EnrichedDashboardStats = {
 };
 
 /**
+ * Where a single enrichment fact about a human came from.
+ *
+ * Stored as the enum's string value in ``human_enrichment_facts.source``;
+ * used as provenance so the curated ``humans.enriched_profile`` can be traced
+ * back to its evidence (and re-derived if a source is corrected/removed).
+ */
+export type EnrichmentSource = 'telegram' | 'event' | 'custom_fields' | 'org' | 'manual';
+
+/**
  * Staff-only free-text notes for an event.
  *
  * Returned/accepted exclusively by the dedicated admin-notes endpoints — kept
@@ -2032,6 +2041,25 @@ export type HumanAuth = {
     red_flag?: boolean;
 };
 
+export type HumanCommentCreate = {
+    body: string;
+};
+
+export type HumanCommentPublic = {
+    id: string;
+    human_id: string;
+    author_user_id?: (string | null);
+    author_name?: (string | null);
+    author_email?: (string | null);
+    body: string;
+    created_at: string;
+    edited_at?: (string | null);
+};
+
+export type HumanCommentUpdate = {
+    body: string;
+};
+
 /**
  * Human schema for creation.
  */
@@ -2044,6 +2072,34 @@ export type HumanCreate = {
     age?: (string | null);
     residence?: (string | null);
     picture_url?: (string | null);
+};
+
+/**
+ * One atomic fact the enrichment agent extracted from a source.
+ */
+export type HumanEnrichmentFactCreate = {
+    field: string;
+    value: string;
+    source: EnrichmentSource;
+    evidence?: (string | null);
+    confidence?: (number | null);
+    raw?: ({
+    [key: string]: unknown;
+} | null);
+};
+
+export type HumanEnrichmentFactPublic = {
+    id: string;
+    human_id: string;
+    field: string;
+    value: string;
+    source: EnrichmentSource;
+    evidence?: (string | null);
+    confidence?: (number | null);
+    raw?: ({
+    [key: string]: unknown;
+} | null);
+    created_at: string;
 };
 
 /**
@@ -2108,8 +2164,21 @@ export type HumanPublic = {
     age?: (string | null);
     residence?: (string | null);
     picture_url?: (string | null);
+    rating?: HumanRating;
     red_flag?: boolean;
+    enriched_profile?: ({
+    [key: string]: unknown;
+} | null);
 };
+
+/**
+ * Admin assessment of a human for gathering admission.
+ *
+ * Replaces the legacy ``red_flag`` boolean. Only ``RED_FLAG`` carries the
+ * automatic cascade (revoke API keys, reject in-review applications, send
+ * rejection emails); the other levels are purely advisory labels.
+ */
+export type HumanRating = 'sin_calificar' | 'red_flag' | 'orange_flag' | 'green_flag' | 'star';
 
 /**
  * Human schema for profile updates.
@@ -2122,7 +2191,10 @@ export type HumanUpdate = {
     age?: (string | null);
     residence?: (string | null);
     picture_url?: (string | null);
-    red_flag?: (boolean | null);
+    rating?: (HumanRating | null);
+    enriched_profile?: ({
+    [key: string]: unknown;
+} | null);
 };
 
 /**
@@ -2252,6 +2324,16 @@ export type ListModel_GroupPublic_ = {
     paging: Paging;
 };
 
+export type ListModel_HumanCommentPublic_ = {
+    results: Array<HumanCommentPublic>;
+    paging: Paging;
+};
+
+export type ListModel_HumanEnrichmentFactPublic_ = {
+    results: Array<HumanEnrichmentFactPublic>;
+    paging: Paging;
+};
+
 export type ListModel_HumanPortalPublic_ = {
     results: Array<HumanPortalPublic>;
     paging: Paging;
@@ -2370,6 +2452,7 @@ export type OpenTicketingPurchaseResponse = {
     payment_id: string;
     status: string;
     checkout_url: string;
+    redirect_url?: (string | null);
     amount: string;
     currency: string;
 };
@@ -2605,6 +2688,9 @@ export type PopupAdmin = {
     twitter_url?: (string | null);
     simplefi_api_key?: (string | null);
     terms_and_conditions_url?: (string | null);
+    open_checkout_success_url?: (string | null);
+    open_checkout_cancel_url?: (string | null);
+    open_checkout_signing_secret?: (string | null);
     invoice_company_name?: (string | null);
     invoice_company_address?: (string | null);
     invoice_company_email?: (string | null);
@@ -2659,6 +2745,9 @@ export type PopupCreate = {
     twitter_url?: (string | null);
     simplefi_api_key?: (string | null);
     terms_and_conditions_url?: (string | null);
+    open_checkout_success_url?: (string | null);
+    open_checkout_cancel_url?: (string | null);
+    open_checkout_signing_secret?: (string | null);
     invoice_company_name?: (string | null);
     invoice_company_address?: (string | null);
     invoice_company_email?: (string | null);
@@ -2795,6 +2884,9 @@ export type PopupUpdate = {
     twitter_url?: (string | null);
     simplefi_api_key?: (string | null);
     terms_and_conditions_url?: (string | null);
+    open_checkout_success_url?: (string | null);
+    open_checkout_cancel_url?: (string | null);
+    open_checkout_signing_secret?: (string | null);
     invoice_company_name?: (string | null);
     invoice_company_address?: (string | null);
     invoice_company_email?: (string | null);
@@ -5552,13 +5644,16 @@ export type GroupsGetGroupPublicResponse = (GroupPublic);
 export type HumansListHumansData = {
     age?: (string | null);
     email?: (string | null);
+    enrichmentQuery?: (string | null);
     gender?: (string | null);
+    hasEnrichedProfile?: (boolean | null);
     incompleteApplication?: boolean;
     /**
      * Maximum number of items to return
      */
     limit?: number;
     popupId?: (string | null);
+    rating?: (HumanRating | null);
     residence?: (string | null);
     search?: (string | null);
     /**
@@ -5637,6 +5732,47 @@ export type HumansListHumanApiKeysData = {
 };
 
 export type HumansListHumanApiKeysResponse = (Array<ApiKeyPublic>);
+
+export type HumansListHumanCommentsData = {
+    humanId: string;
+};
+
+export type HumansListHumanCommentsResponse = (ListModel_HumanCommentPublic_);
+
+export type HumansCreateHumanCommentData = {
+    humanId: string;
+    requestBody: HumanCommentCreate;
+};
+
+export type HumansCreateHumanCommentResponse = (HumanCommentPublic);
+
+export type HumansUpdateHumanCommentData = {
+    commentId: string;
+    humanId: string;
+    requestBody: HumanCommentUpdate;
+};
+
+export type HumansUpdateHumanCommentResponse = (HumanCommentPublic);
+
+export type HumansDeleteHumanCommentData = {
+    commentId: string;
+    humanId: string;
+};
+
+export type HumansDeleteHumanCommentResponse = (void);
+
+export type HumansListHumanEnrichmentFactsData = {
+    humanId: string;
+};
+
+export type HumansListHumanEnrichmentFactsResponse = (ListModel_HumanEnrichmentFactPublic_);
+
+export type HumansCreateHumanEnrichmentFactData = {
+    humanId: string;
+    requestBody: HumanEnrichmentFactCreate;
+};
+
+export type HumansCreateHumanEnrichmentFactResponse = (HumanEnrichmentFactPublic);
 
 export type PaymentsListPaymentsData = {
     applicationId?: (string | null);

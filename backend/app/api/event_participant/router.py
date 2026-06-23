@@ -321,6 +321,9 @@ async def register_for_event(
     body: RegisterRequest | None = None,
 ) -> EventParticipantPublic:
     """Register current human for an event (portal)."""
+    from app.api.application.crud import applications_crud
+    from app.api.application.schemas import ApplicationStatus
+    from app.api.attendee.crud import attendees_crud
     from app.api.event.crud import events_crud
     from app.api.event.schemas import EventStatus
     from app.api.event_participant.models import EventParticipants
@@ -333,6 +336,34 @@ async def register_for_event(
     if event.status != EventStatus.PUBLISHED:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Event is not published"
+        )
+
+    # Eligibility gate: a human may only RSVP to a popup's events if they have a
+    # purchased ticket for that popup AND their application (if any) was not
+    # rejected. Mirrors the portal UI gate; enforced here so the rule can't be
+    # bypassed via the API directly.
+    application = applications_crud.get_by_human_popup(
+        db, current_human.id, event.popup_id
+    )
+    if application and application.status == ApplicationStatus.REJECTED.value:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Your application was not accepted, so you can't RSVP to events.",
+        )
+
+    # Same ticket source as `list_my_tickets` (find_by_human) so "has a ticket"
+    # matches exactly what the portal shows, including companion/spouse tickets.
+    owned_attendees, _ = attendees_crud.find_by_human(
+        db, human_id=current_human.id, limit=1000
+    )
+    has_ticket = any(
+        a.popup_id == event.popup_id and len(a.attendee_products) > 0
+        for a in owned_attendees
+    )
+    if not has_ticket:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You need a purchased ticket for this popup to RSVP.",
         )
 
     occ_start = _resolve_occurrence_start(
