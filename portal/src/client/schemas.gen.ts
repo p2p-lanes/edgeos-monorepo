@@ -10994,6 +10994,17 @@ export const OpenTicketingPurchaseResponseSchema = {
             type: 'string',
             title: 'Checkout Url'
         },
+        redirect_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Redirect Url'
+        },
         amount: {
             type: 'string',
             pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$',
@@ -12171,6 +12182,39 @@ export const PopupAdminSchema = {
             ],
             title: 'Terms And Conditions Url'
         },
+        open_checkout_success_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Open Checkout Success Url'
+        },
+        open_checkout_cancel_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Open Checkout Cancel Url'
+        },
+        open_checkout_signing_secret: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Open Checkout Signing Secret'
+        },
         invoice_company_name: {
             anyOf: [
                 {
@@ -12615,6 +12659,39 @@ export const PopupCreateSchema = {
                 }
             ],
             title: 'Terms And Conditions Url'
+        },
+        open_checkout_success_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Open Checkout Success Url'
+        },
+        open_checkout_cancel_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Open Checkout Cancel Url'
+        },
+        open_checkout_signing_secret: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Open Checkout Signing Secret'
         },
         invoice_company_name: {
             anyOf: [
@@ -13557,6 +13634,39 @@ export const PopupUpdateSchema = {
                 }
             ],
             title: 'Terms And Conditions Url'
+        },
+        open_checkout_success_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Open Checkout Success Url'
+        },
+        open_checkout_cancel_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Open Checkout Cancel Url'
+        },
+        open_checkout_signing_secret: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Open Checkout Signing Secret'
         },
         invoice_company_name: {
             anyOf: [

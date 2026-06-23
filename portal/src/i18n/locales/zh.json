@@ -279,7 +279,9 @@
     "summary_pay": "支付",
     "thank_you_title": "付款已完成",
     "thank_you_description": "感谢您的购买。我们已通过电子邮件发送您的确认信息和门票详情。",
-    "thank_you_cta": "前往门户"
+    "thank_you_cta": "前往门户",
+    "thank_you_order_summary": "订单摘要",
+    "thank_you_total": "总计"
   },
   "passes": {
     "your_passes": "我的通行证",

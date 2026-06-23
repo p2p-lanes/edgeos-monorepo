@@ -269,7 +269,9 @@
     "summary_pay": "Greiða",
     "thank_you_title": "Greiðslu lokið",
     "thank_you_description": "Takk fyrir kaupin. Við sendum staðfestingu og miðaupplýsingar með tölvupósti.",
-    "thank_you_cta": "Fara í vefgátt"
+    "thank_you_cta": "Fara í vefgátt",
+    "thank_you_order_summary": "Yfirlit pöntunar",
+    "thank_you_total": "Samtals"
   },
   "passes": {
     "your_passes": "Passarnir þínir",

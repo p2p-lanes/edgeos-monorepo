@@ -214,6 +214,10 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
       blog_url: defaultValues?.blog_url ?? "",
       twitter_url: defaultValues?.twitter_url ?? "",
       terms_and_conditions_url: defaultValues?.terms_and_conditions_url ?? "",
+      open_checkout_success_url: defaultValues?.open_checkout_success_url ?? "",
+      open_checkout_cancel_url: defaultValues?.open_checkout_cancel_url ?? "",
+      open_checkout_signing_secret:
+        defaultValues?.open_checkout_signing_secret ?? "",
       simplefi_api_key: defaultValues?.simplefi_api_key ?? "",
       invoice_company_name: defaultValues?.invoice_company_name ?? "",
       invoice_company_address: defaultValues?.invoice_company_address ?? "",
@@ -272,6 +276,10 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
         blog_url: value.blog_url || null,
         twitter_url: value.twitter_url || null,
         terms_and_conditions_url: value.terms_and_conditions_url || null,
+        open_checkout_success_url: value.open_checkout_success_url || null,
+        open_checkout_cancel_url: value.open_checkout_cancel_url || null,
+        open_checkout_signing_secret:
+          value.open_checkout_signing_secret || null,
         simplefi_api_key: value.simplefi_api_key || null,
         invoice_company_name: value.invoice_company_name || null,
         invoice_company_address: value.invoice_company_address || null,
@@ -1015,6 +1023,63 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
                   id="simplefi_api_key"
                   type="password"
                   placeholder="Enter API key"
+                  value={field.state.value}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                  disabled={readOnly}
+                  className="max-w-xs text-sm"
+                />
+              </InlineRow>
+            )}
+          </form.Field>
+          <form.Field name="open_checkout_success_url">
+            {(field) => (
+              <InlineRow
+                icon={<LinkIcon className="h-4 w-4 text-muted-foreground" />}
+                label="Open checkout success URL"
+                description="Where the buyer is redirected after a successful open-checkout payment. Defaults to the portal thank-you page."
+              >
+                <Input
+                  id="open_checkout_success_url"
+                  type="url"
+                  placeholder="https://example.com/thank-you"
+                  value={field.state.value}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                  disabled={readOnly}
+                  className="max-w-xs text-sm"
+                />
+              </InlineRow>
+            )}
+          </form.Field>
+          <form.Field name="open_checkout_cancel_url">
+            {(field) => (
+              <InlineRow
+                icon={<LinkIcon className="h-4 w-4 text-muted-foreground" />}
+                label="Open checkout cancel URL"
+                description="Where the buyer is redirected after a cancelled open-checkout payment. Defaults to the portal checkout page."
+              >
+                <Input
+                  id="open_checkout_cancel_url"
+                  type="url"
+                  placeholder="https://example.com/checkout"
+                  value={field.state.value}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                  disabled={readOnly}
+                  className="max-w-xs text-sm"
+                />
+              </InlineRow>
+            )}
+          </form.Field>
+          <form.Field name="open_checkout_signing_secret">
+            {(field) => (
+              <InlineRow
+                icon={<Key className="h-4 w-4 text-muted-foreground" />}
+                label="Open checkout signing secret"
+                description="Shared secret to HMAC-sign the order data sent to the success URL. Set the same value on the external thank-you page to verify it. Leave empty to send the redirect without a signed payload."
+              >
+                <Input
+                  id="open_checkout_signing_secret"
+                  type="password"
+                  placeholder="Enter signing secret"
                   value={field.state.value}
                   onChange={(e) => field.handleChange(e.target.value)}
                   disabled={readOnly}

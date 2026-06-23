@@ -221,6 +221,7 @@ export function usePaymentSubmit({
         payment_id?: string
         status?: string
         checkout_url?: string | null
+        redirect_url?: string | null
         amount?: string
         currency?: string
       }
@@ -291,6 +292,12 @@ export function usePaymentSubmit({
           // email was sent, matching the open-ticketing zero-amount path.
           if (isEditing) {
             router.replace(`/portal/${popupSlug}/passes`)
+          } else if (submitMode === "open-ticketing" && data.redirect_url) {
+            // Zero-amount open checkout where the popup configured a custom
+            // success URL: SimpleFI was bypassed, so we perform the redirect
+            // the provider would have done on a paid purchase. The backend
+            // returns the configured URL in redirect_url for this case.
+            window.location.href = data.redirect_url
           } else {
             const qs = paymentId ? `?payment_id=${paymentId}` : ""
             router.replace(`/checkout/${popupSlug}/thank-you${qs}`)
