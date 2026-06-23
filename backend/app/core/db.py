@@ -8,7 +8,7 @@ from dateutil.parser import parse as parse_datetime
 from loguru import logger
 from sqlmodel import Session, create_engine, select
 
-from app.api.shared.enums import UserRole
+from app.api.shared.enums import HumanRating, UserRole
 from app.core.config import settings
 
 engine = create_engine(
@@ -523,7 +523,11 @@ def _seed_humans(session: Session, seed_data: dict, tenant_id) -> dict:
                 gender=human_data.get("gender"),
                 age=human_data.get("age"),
                 residence=human_data.get("residence"),
-                red_flag=human_data.get("red_flag", False),
+                rating=(
+                    HumanRating.RED_FLAG
+                    if human_data.get("red_flag", False)
+                    else HumanRating.SIN_CALIFICAR
+                ),
             )
             session.add(human)
             session.commit()

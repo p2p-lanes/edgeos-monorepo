@@ -12,7 +12,7 @@ from app.api.auth.utils import (
     is_code_valid,
 )
 from app.api.human.models import Humans
-from app.api.shared.enums import UserRole
+from app.api.shared.enums import HumanRating, UserRole
 from app.api.tenant.models import Tenants
 from app.api.user.models import Users
 from app.core.config import settings
@@ -534,7 +534,11 @@ async def authenticate_human(
             tenant_id=pending_data["tenant_id"],
             email=pending_data["email"],
             picture_url=pending_data["picture_url"],
-            red_flag=pending_data["red_flag"],
+            rating=(
+                HumanRating.RED_FLAG
+                if pending_data["red_flag"]
+                else HumanRating.SIN_CALIFICAR
+            ),
         )
 
         session.add(human)
@@ -587,7 +591,11 @@ async def authenticate_human(
             tenant_id=pending_human.tenant_id,
             email=pending_human.email,
             picture_url=pending_human.picture_url,
-            red_flag=pending_human.red_flag,
+            rating=(
+                HumanRating.RED_FLAG
+                if pending_human.red_flag
+                else HumanRating.SIN_CALIFICAR
+            ),
         )
 
         session.add(human)

@@ -15,6 +15,7 @@ from app.api.event_settings.models import EventSettings
 from app.api.event_settings.schemas import PublishPermission
 from app.api.human.models import Humans
 from app.api.popup.models import Popups
+from app.api.shared.enums import HumanRating
 from app.api.tenant.models import Tenants
 
 # POST /api/v1/events/portal/events is temporarily disabled for API keys
@@ -279,7 +280,7 @@ class TestApiKeyPolicy:
         from app.core.security import create_access_token
 
         human = _make_human(db, tenant_a)
-        human.red_flag = True
+        human.rating = HumanRating.RED_FLAG
         db.add(human)
         db.commit()
         db.refresh(human)
@@ -785,7 +786,7 @@ class TestApiKeyPolicy:
         resp = client.patch(
             f"/api/v1/humans/{human.id}",
             headers={"Authorization": f"Bearer {admin_token_tenant_a}"},
-            json={"red_flag": True},
+            json={"rating": "red_flag"},
         )
 
         assert resp.status_code == 200, resp.text

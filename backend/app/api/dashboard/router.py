@@ -421,7 +421,14 @@ def _get_revenue_breakdown(db: TenantSession, popup_id: uuid.UUID) -> RevenueBre
         select(
             PaymentProducts.product_id.label("product_id"),
             PaymentProducts.product_name.label("product_name"),
-            PaymentProducts.product_category.label("product_category"),
+            # Group by the live product category, not the purchase-time snapshot:
+            # products re-categorised after a sale (e.g. day/week/month folded
+            # into "ticket" + duration_type) left stale snapshot categories that
+            # scattered tickets into ghost categories and disagreed with the
+            # other widgets. Fall back to the snapshot for deleted products.
+            func.coalesce(Products.category, PaymentProducts.product_category).label(
+                "product_category"
+            ),
             PaymentProducts.quantity.label("quantity"),
             line_nominal.label("nominal"),
             is_discountable.label("is_discountable"),
