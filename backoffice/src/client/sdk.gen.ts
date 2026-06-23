@@ -89,7 +89,7 @@ export class AdminApiKeysService {
             }
         });
     }
-    
+
     /**
      * Revoke Admin Api Key
      * Revoke an admin API key by setting revoked_at.
