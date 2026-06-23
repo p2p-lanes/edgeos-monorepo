@@ -17,6 +17,8 @@ from app.services.email import get_email_service
 from app.services.event_datetime import format_event_when_range
 
 if TYPE_CHECKING:
+    from sqlmodel import Session
+
     from app.api.event.models import Events
     from app.api.event_venue.models import EventVenues
     from app.api.popup.models import Popups
@@ -55,6 +57,7 @@ async def notify_event_pending_approval(
     settings,
     *,
     reason: str = "This event requires approval.",
+    db_session: Session | None = None,
 ) -> None:
     to, from_address, from_name = _resolve_admin_recipient(settings, popup)
     if not to:
@@ -87,6 +90,8 @@ async def notify_event_pending_approval(
             html_content=html,
             from_address=from_address,
             from_name=from_name,
+            tenant_id=popup.tenant_id if popup else None,
+            db_session=db_session,
         )
         logger.info(
             "Sent event approval notice to {} for event {} ({})",
@@ -107,6 +112,7 @@ async def notify_venue_pending_approval(
     venue: EventVenues,
     popup: Popups | None,
     settings,
+    db_session: Session | None = None,
 ) -> None:
     to, from_address, from_name = _resolve_admin_recipient(settings, popup)
     if not to:
@@ -133,6 +139,8 @@ async def notify_venue_pending_approval(
             html_content=html,
             from_address=from_address,
             from_name=from_name,
+            tenant_id=popup.tenant_id if popup else None,
+            db_session=db_session,
         )
         logger.info(
             "Sent venue approval notice to {} for venue {}", recipients_log, venue.id

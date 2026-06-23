@@ -3450,6 +3450,12 @@ export type TenantCreate = {
     logo_url?: (string | null);
     meta_tracking_enabled?: boolean;
     meta_pixel_id?: (string | null);
+    smtp_host?: (string | null);
+    smtp_port?: (number | null);
+    smtp_user?: (string | null);
+    smtp_password?: (string | null);
+    smtp_tls?: (boolean | null);
+    smtp_ssl?: (boolean | null);
 };
 
 export type TenantCredentialResponse = {
@@ -3475,7 +3481,22 @@ export type TenantPublic = {
     meta_pixel_id?: (string | null);
     id: string;
     meta_capi_configured?: boolean;
+    smtp_host?: (string | null);
+    smtp_port?: (number | null);
+    smtp_user?: (string | null);
+    smtp_tls?: (boolean | null);
+    smtp_ssl?: (boolean | null);
+    smtp_configured?: boolean;
+    smtp_password_configured?: boolean;
     active_popup_slug?: (string | null);
+};
+
+export type TenantSmtpTestRequest = {
+    to_email?: (string | null);
+};
+
+export type TenantSmtpTestResponse = {
+    message: string;
 };
 
 export type TenantUpdate = {
@@ -3491,6 +3512,12 @@ export type TenantUpdate = {
     meta_tracking_enabled?: (boolean | null);
     meta_pixel_id?: (string | null);
     meta_capi_access_token?: (string | null);
+    smtp_host?: (string | null);
+    smtp_port?: (number | null);
+    smtp_user?: (string | null);
+    smtp_password?: (string | null);
+    smtp_tls?: (boolean | null);
+    smtp_ssl?: (boolean | null);
 };
 
 /**
@@ -6175,6 +6202,13 @@ export type TenantsDeleteTenantData = {
 };
 
 export type TenantsDeleteTenantResponse = (void);
+
+export type TenantsSendSmtpTestEmailData = {
+    requestBody: TenantSmtpTestRequest;
+    tenantId: string;
+};
+
+export type TenantsSendSmtpTestEmailResponse = (TenantSmtpTestResponse);
 
 export type TenantsGetCredentialsData = {
     tenantId: string;
