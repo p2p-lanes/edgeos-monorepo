@@ -91,6 +91,14 @@ interface CalendarBodyProps {
   timezoneOverride?: string
   /** Popup-scoped fallback image when an event has no cover/venue image. */
   placeholderUrl?: string | null
+  /**
+   * When false, the RSVP (register) button is disabled — the human lacks a
+   * ticket for this popup or has a rejected application. Cancel is never gated.
+   * Defaults to true.
+   */
+  canRsvp?: boolean
+  /** Tooltip text shown on the disabled RSVP button explaining why. */
+  rsvpDisabledReason?: string
 }
 
 /**
@@ -114,6 +122,8 @@ export function CalendarBody({
   onEventClick,
   timezoneOverride,
   placeholderUrl,
+  canRsvp = true,
+  rsvpDisabledReason,
 }: CalendarBodyProps) {
   const isAuthed = mode === "authed"
   const useOverride = eventsOverride !== undefined
@@ -606,7 +616,10 @@ export function CalendarBody({
                               ) : (
                                 <button
                                   type="button"
-                                  disabled={isRsvpPending}
+                                  disabled={isRsvpPending || !canRsvp}
+                                  title={
+                                    !canRsvp ? rsvpDisabledReason : undefined
+                                  }
                                   onClick={() => rsvpMutation.mutate(event)}
                                   className="inline-flex items-center gap-1 rounded-md border bg-background px-2 py-1 text-xs font-medium hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
                                 >

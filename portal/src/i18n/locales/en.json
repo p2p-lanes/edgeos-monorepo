@@ -601,7 +601,9 @@
       "check_in_opens_at_start": "Check-in opens at start time",
       "registered": "Registered",
       "checked_in": "Checked in",
-      "action_error": "Couldn't update your RSVP. Please try again."
+      "action_error": "Couldn't update your RSVP. Please try again.",
+      "requires_ticket": "You need a ticket for this popup to RSVP.",
+      "application_rejected": "Your application wasn't accepted, so you can't RSVP."
     },
     "recurrence": {
       "daily_one": "Repeats daily",

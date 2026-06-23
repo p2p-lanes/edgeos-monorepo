@@ -110,6 +110,14 @@ interface ListBodyProps {
    * spinner and is disabled until the request settles.
    */
   pendingRsvpKey?: string | null
+  /**
+   * When false, the RSVP (register) button is disabled — the human lacks a
+   * ticket for this popup or has a rejected application. The "Going"/cancel
+   * button is never gated. Defaults to true.
+   */
+  canRsvp?: boolean
+  /** Tooltip text shown on the disabled RSVP button explaining why. */
+  rsvpDisabledReason?: string
   onHide?: (eventId: string) => void
   onUnhide?: (eventId: string) => void
   /** Popup-scoped fallback image when an event has no cover/venue image. */
@@ -150,6 +158,8 @@ export function ListBody({
   onRsvp,
   onCancelRsvp,
   pendingRsvpKey,
+  canRsvp = true,
+  rsvpDisabledReason,
   onHide,
   onUnhide,
   placeholderUrl,
@@ -525,7 +535,10 @@ export function ListBody({
                                 ) : (
                                   <button
                                     type="button"
-                                    disabled={isRsvpPending}
+                                    disabled={isRsvpPending || !canRsvp}
+                                    title={
+                                      !canRsvp ? rsvpDisabledReason : undefined
+                                    }
                                     onClick={(e) => {
                                       e.preventDefault()
                                       e.stopPropagation()

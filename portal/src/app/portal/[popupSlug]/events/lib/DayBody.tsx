@@ -92,6 +92,14 @@ interface DayBodyProps {
    */
   isFullscreen?: boolean
   onToggleFullscreen?: () => void
+  /**
+   * When false, the RSVP (register) button is disabled — the human lacks a
+   * ticket for this popup or has a rejected application. Cancel is never gated.
+   * Defaults to true.
+   */
+  canRsvp?: boolean
+  /** Tooltip text shown on the disabled RSVP button explaining why. */
+  rsvpDisabledReason?: string
 }
 
 const HOUR_PX = 56
@@ -155,6 +163,8 @@ export function DayBody({
   venuesOverride,
   onEventClick,
   timezoneOverride,
+  canRsvp = true,
+  rsvpDisabledReason,
 }: DayBodyProps) {
   const isAuthed = mode === "authed"
   const useOverride = eventsOverride !== undefined
@@ -819,7 +829,12 @@ export function DayBody({
                                     ) : (
                                       <button
                                         type="button"
-                                        disabled={isRsvpPending}
+                                        disabled={isRsvpPending || !canRsvp}
+                                        title={
+                                          !canRsvp
+                                            ? rsvpDisabledReason
+                                            : undefined
+                                        }
                                         onClick={(e) => {
                                           e.preventDefault()
                                           e.stopPropagation()

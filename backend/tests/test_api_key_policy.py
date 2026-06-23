@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 
 import pytest
 from fastapi.testclient import TestClient
@@ -9,12 +10,14 @@ from sqlmodel import Session, select
 
 from app.api.api_key import crud as api_key_crud
 from app.api.api_key.models import ApiKeys
+from app.api.attendee.models import AttendeeProducts, Attendees
 from app.api.event.models import EventInvitations, Events
 from app.api.event.schemas import EventStatus, EventVisibility
 from app.api.event_settings.models import EventSettings
 from app.api.event_settings.schemas import PublishPermission
 from app.api.human.models import Humans
 from app.api.popup.models import Popups
+from app.api.product.models import Products
 from app.api.shared.enums import HumanRating
 from app.api.tenant.models import Tenants
 
@@ -40,6 +43,48 @@ def _make_popup(db: Session, tenant: Tenants) -> Popups:
     db.commit()
     db.refresh(popup)
     return popup
+
+
+def _give_ticket(
+    db: Session, tenant: Tenants, popup: Popups, human: Humans
+) -> Attendees:
+    """Seed a purchased ticket for ``human`` in ``popup``.
+
+    Portal RSVP registration requires the human to hold a ticket for the
+    event's popup, so the success-path register test must seed one.
+    """
+    product = Products(
+        tenant_id=tenant.id,
+        popup_id=popup.id,
+        name=f"Ticket {uuid.uuid4().hex[:6]}",
+        slug=f"ticket-{uuid.uuid4().hex[:10]}",
+        price=Decimal("100.00"),
+    )
+    db.add(product)
+    db.commit()
+    db.refresh(product)
+
+    attendee = Attendees(
+        tenant_id=tenant.id,
+        popup_id=popup.id,
+        human_id=human.id,
+        name="PAT Ticket Holder",
+        email=human.email,
+    )
+    db.add(attendee)
+    db.commit()
+    db.refresh(attendee)
+
+    db.add(
+        AttendeeProducts(
+            tenant_id=tenant.id,
+            attendee_id=attendee.id,
+            product_id=product.id,
+            check_in_code=uuid.uuid4().hex[:10],
+        )
+    )
+    db.commit()
+    return attendee
 
 
 def _set_event_settings(
@@ -262,6 +307,7 @@ class TestApiKeyPolicy:
         db.refresh(event)
 
         human = _make_human(db, tenant_a)
+        _give_ticket(db, tenant_a, popup, human)
         raw_key = _make_pat(db, tenant_a, human, scopes=["rsvp:write"])
 
         resp = client.post(
