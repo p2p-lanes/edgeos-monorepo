@@ -22,7 +22,7 @@ class HumanRating(StrEnum):
     rejection emails); the other levels are purely advisory labels.
     """
 
-    SIN_CALIFICAR = "sin_calificar"  # default / neutral, no assessment yet
+    UNRATED = "unrated"  # default / neutral, no assessment yet
     RED_FLAG = "red_flag"  # undesirable: should not be admitted to gatherings
     ORANGE_FLAG = "orange_flag"  # reasons against, still open to discussion
     GREEN_FLAG = "green_flag"  # a great attendee who adds value
