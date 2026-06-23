@@ -1,12 +1,14 @@
 import uuid
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import UniqueConstraint
+from sqlalchemy import DateTime, Text, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import UUID
-from sqlmodel import Column, Field, Relationship
+from sqlmodel import Column, Field, Relationship, SQLModel
 
 from app.api.group.models import GroupLeaders, GroupMembers
 from app.api.human.schemas import HumanBase
+from app.api.shared.enums import HumanRating
 
 if TYPE_CHECKING:
     from app.api.application.models import Applications
@@ -49,6 +51,16 @@ class Humans(HumanBase, table=True):
     )
 
     @property
+    def red_flag(self) -> bool:
+        """Whether the human is blocked (rating == RED_FLAG).
+
+        Derived from ``rating`` so existing gates that branch on the blocking
+        state keep working after the red_flag boolean was replaced by the
+        rating enum.
+        """
+        return self.rating == HumanRating.RED_FLAG
+
+    @property
     def latest_application(self) -> "Applications | None":
         if not self.applications:
             return None
@@ -65,3 +77,48 @@ class Humans(HumanBase, table=True):
         if self.first_name or self.last_name:
             return f"{self.first_name or ''} {self.last_name or ''}".strip()
         return None
+
+
+class HumanComment(SQLModel, table=True):
+    """A single comment in a human's flat discussion thread.
+
+    Mirrors TaskComment: comments justify the human's rating, and the author
+    identity (name/email) is snapshotted at write time so the thread stays
+    readable even if the user is later renamed or removed.
+    """
+
+    __tablename__ = "human_comments"
+
+    id: uuid.UUID = Field(
+        default_factory=uuid.uuid4,
+        sa_column=Column(UUID(as_uuid=True), primary_key=True),
+    )
+
+    human_id: uuid.UUID = Field(foreign_key="humans.id", index=True)
+
+    author_user_id: uuid.UUID | None = Field(
+        default=None, foreign_key="users.id", nullable=True
+    )
+    author_name: str | None = Field(default=None, sa_column=Column(Text, nullable=True))
+    author_email: str | None = Field(
+        default=None, sa_column=Column(Text, nullable=True)
+    )
+
+    body: str = Field(sa_column=Column(Text, nullable=False))
+
+    created_at: datetime = Field(
+        default_factory=lambda: datetime.now(UTC),
+        sa_column=Column(
+            DateTime(timezone=True), server_default=func.now(), nullable=False
+        ),
+    )
+    # Set when the body is edited; surfaced as an "edited" marker in the UI.
+    edited_at: datetime | None = Field(
+        default=None,
+        sa_column=Column(DateTime(timezone=True), nullable=True),
+    )
+    # Soft-delete: row is preserved, hidden from reads.
+    deleted_at: datetime | None = Field(
+        default=None,
+        sa_column=Column(DateTime(timezone=True), nullable=True),
+    )

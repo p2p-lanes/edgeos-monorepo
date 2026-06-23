@@ -1,4 +1,5 @@
 import uuid
+from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Header, HTTPException, status
@@ -7,7 +8,11 @@ from app.api.api_key import crud as api_key_crud
 from app.api.api_key.schemas import ApiKeyPublic
 from app.api.human import crud
 from app.api.human.crud import HardDeleteSummary
+from app.api.human.models import HumanComment
 from app.api.human.schemas import (
+    HumanCommentCreate,
+    HumanCommentPublic,
+    HumanCommentUpdate,
     HumanCreate,
     HumanPortalPublic,
     HumanProfileStats,
@@ -15,7 +20,7 @@ from app.api.human.schemas import (
     HumanPublic,
     HumanUpdate,
 )
-from app.api.shared.enums import UserRole
+from app.api.shared.enums import HumanRating, UserRole
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
 from app.core.dependencies.users import (
     AdminOrApiKey_HumansRead,
@@ -25,6 +30,7 @@ from app.core.dependencies.users import (
     CurrentAdmin,
     CurrentHuman,
     CurrentSuperadmin,
+    CurrentUser,
     HumanTenantSession,
     SessionDep,
     TenantSession,
@@ -47,6 +53,7 @@ async def list_humans(
     gender: str | None = None,
     age: str | None = None,
     residence: str | None = None,
+    rating: HumanRating | None = None,
     skip: PaginationSkip = 0,
     limit: PaginationLimit = 100,
 ) -> ListModel[HumanPublic]:
@@ -74,6 +81,7 @@ async def list_humans(
             gender=gender,
             age=age,
             residence=residence,
+            rating=rating.value if rating else None,
         )
 
     return ListModel[HumanPublic](
@@ -244,8 +252,11 @@ async def update_human(
             detail="Human not found",
         )
 
-    # Check if red_flag is being set to True
-    is_being_flagged = human_in.red_flag is True and not human.red_flag
+    # Check if the rating is transitioning into RED_FLAG (the only level that
+    # carries the blocking cascade). human.red_flag reflects the pre-update state.
+    is_being_flagged = (
+        human_in.rating == HumanRating.RED_FLAG and not human.red_flag
+    )
 
     updated = crud.update(db, human, human_in)
 
@@ -345,3 +356,129 @@ async def list_human_api_keys(
 
     rows = api_key_crud.list_for_human(db, human_id)
     return [ApiKeyPublic.model_validate(row) for row in rows]
+
+
+# --------------------------------------------------------------------------- #
+# Comments — justify a human's rating. Mirrors the task comments model:
+# any backoffice user can read/add, the author edits their own, the author or
+# a superadmin soft-deletes. Scoped to the caller's tenant (superadmin bypass).
+# --------------------------------------------------------------------------- #
+def _get_human_in_tenant_or_404(db, human_id: uuid.UUID, current_user):  # noqa: ANN001
+    """Load a human or 404, hiding humans outside the caller's tenant.
+
+    Runs on the control-plane session (bypasses RLS), so the tenant ownership
+    check is enforced explicitly — same pattern as the hard-delete endpoint.
+    """
+    human = crud.get(db, human_id)
+    if not human or (
+        current_user.role != UserRole.SUPERADMIN
+        and human.tenant_id != current_user.tenant_id
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Human not found",
+        )
+    return human
+
+
+@router.get(
+    "/{human_id}/comments", response_model=ListModel[HumanCommentPublic]
+)
+async def list_human_comments(
+    human_id: uuid.UUID,
+    db: SessionDep,
+    current_user: CurrentUser,
+) -> ListModel[HumanCommentPublic]:
+    """List a human's comments, oldest first."""
+    _get_human_in_tenant_or_404(db, human_id, current_user)
+    comments = crud.list_comments(db, human_id)
+    return ListModel[HumanCommentPublic](
+        results=[HumanCommentPublic.model_validate(c) for c in comments],
+        paging=Paging(offset=0, limit=len(comments), total=len(comments)),
+    )
+
+
+@router.post(
+    "/{human_id}/comments",
+    response_model=HumanCommentPublic,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_human_comment(
+    human_id: uuid.UUID,
+    comment_in: HumanCommentCreate,
+    db: SessionDep,
+    current_user: CurrentUser,
+) -> HumanCommentPublic:
+    """Add a comment to a human."""
+    _get_human_in_tenant_or_404(db, human_id, current_user)
+    comment = HumanComment(
+        human_id=human_id,
+        author_user_id=current_user.id,
+        author_name=current_user.full_name,
+        author_email=current_user.email,
+        body=comment_in.body,
+    )
+    db.add(comment)
+    db.commit()
+    db.refresh(comment)
+    return HumanCommentPublic.model_validate(comment)
+
+
+@router.put(
+    "/{human_id}/comments/{comment_id}", response_model=HumanCommentPublic
+)
+async def update_human_comment(
+    human_id: uuid.UUID,
+    comment_id: uuid.UUID,
+    comment_in: HumanCommentUpdate,
+    db: SessionDep,
+    current_user: CurrentUser,
+) -> HumanCommentPublic:
+    """Edit your own comment."""
+    _get_human_in_tenant_or_404(db, human_id, current_user)
+    comment = db.get(HumanComment, comment_id)
+    if not comment or comment.human_id != human_id or comment.deleted_at is not None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Comment not found"
+        )
+    if comment.author_user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can only edit your own comments",
+        )
+    comment.body = comment_in.body
+    comment.edited_at = datetime.now(UTC)
+    db.add(comment)
+    db.commit()
+    db.refresh(comment)
+    return HumanCommentPublic.model_validate(comment)
+
+
+@router.delete(
+    "/{human_id}/comments/{comment_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def delete_human_comment(
+    human_id: uuid.UUID,
+    comment_id: uuid.UUID,
+    db: SessionDep,
+    current_user: CurrentUser,
+) -> None:
+    """Soft-delete a comment: the author, or any superadmin. Row is preserved."""
+    _get_human_in_tenant_or_404(db, human_id, current_user)
+    comment = db.get(HumanComment, comment_id)
+    if not comment or comment.human_id != human_id or comment.deleted_at is not None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Comment not found"
+        )
+    if (
+        current_user.role != UserRole.SUPERADMIN
+        and comment.author_user_id != current_user.id
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can only delete your own comments",
+        )
+    comment.deleted_at = datetime.now(UTC)
+    db.add(comment)
+    db.commit()
