@@ -1,9 +1,14 @@
 """Tests for POST /checkout/{slug}/purchase — CAP-C."""
 
+import base64
+import hashlib
+import hmac
+import json
 import uuid
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from unittest.mock import patch
+from urllib.parse import parse_qs, urlparse
 
 import pytest
 from fastapi.testclient import TestClient
@@ -526,6 +531,245 @@ def test_zero_amount_purchase_attempts_capi_when_email_fails(
     assert response.json()["status"] == "approved"
     mock_get_client.assert_not_called()
     mock_enqueue.assert_called_once()
+
+
+def test_zero_amount_purchase_returns_custom_success_redirect_url(
+    client: TestClient,
+    db: Session,
+    tenant_a: Tenants,
+) -> None:
+    """A zero-amount approval bypasses SimpleFi, so the response carries the
+    popup's custom open-checkout success URL in redirect_url for the portal to
+    redirect to. checkout_url stays empty (no provider checkout)."""
+    popup = _make_popup(db, tenant_a, slug_prefix="free-redirect")
+    popup.open_checkout_success_url = "https://brand.example.com/thank-you"
+    db.add(popup)
+    product = _make_product(db, popup, price="75.00")
+    _make_coupon(db, popup, code="FREEPASS", discount_value=100)
+    db.commit()
+
+    with patch("app.services.simplefi.get_simplefi_client") as mock_get_client:
+        response = client.post(
+            f"/api/v1/checkout/{popup.slug}/purchase",
+            json={
+                "products": [{"product_id": str(product.id), "quantity": 1}],
+                "buyer": {
+                    "email": "buyer@test.com",
+                    "first_name": "Matias",
+                    "last_name": "Walter",
+                    "form_data": {},
+                },
+                "coupon_code": "FREEPASS",
+            },
+            headers={"X-Tenant-Id": str(tenant_a.id)},
+        )
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["status"] == "approved"
+    assert body["checkout_url"] == ""
+    assert body["redirect_url"] == "https://brand.example.com/thank-you"
+    mock_get_client.assert_not_called()
+
+
+def _verify_signed_redirect(url: str, secret: str) -> dict:
+    """Verify a signed thank-you URL the way an external page would, returning
+    the recovered payload. Raises AssertionError on a bad signature."""
+    query = parse_qs(urlparse(url).query)
+    data = query["data"][0]
+    sig = query["sig"][0]
+    expected = (
+        base64.urlsafe_b64encode(
+            hmac.new(secret.encode(), data.encode("ascii"), hashlib.sha256).digest()
+        )
+        .rstrip(b"=")
+        .decode("ascii")
+    )
+    assert hmac.compare_digest(sig, expected), "signature mismatch"
+    padding = "=" * (-len(data) % 4)
+    return json.loads(base64.urlsafe_b64decode(data + padding))
+
+
+def test_paid_purchase_signs_order_payload_into_simplefi_success_url(
+    client: TestClient,
+    db: Session,
+    tenant_a: Tenants,
+) -> None:
+    """A paid open-checkout purchase hands SimpleFi a success URL carrying the
+    HMAC-signed order snapshot, so the external thank-you page can verify it."""
+    secret = "amanita-secret"
+    popup = _make_popup(db, tenant_a, slug_prefix="paid-signed")
+    popup.open_checkout_success_url = "https://brand.example.com/thank-you"
+    popup.open_checkout_signing_secret = secret
+    db.add(popup)
+    product = _make_product(db, popup, price="120.00")
+    db.commit()
+
+    with patch("app.services.simplefi.get_simplefi_client") as mock_get_client:
+        mock_get_client.return_value.create_payment.return_value = SimpleNamespace(
+            id="sf_signed_1",
+            status="pending",
+            checkout_url="https://simplefi.test/checkout/signed",
+            is_installment_plan=False,
+        )
+        response = client.post(
+            f"/api/v1/checkout/{popup.slug}/purchase",
+            json={
+                "products": [{"product_id": str(product.id), "quantity": 2}],
+                "buyer": {
+                    "email": "buyer@test.com",
+                    "first_name": "Matias",
+                    "last_name": "Walter",
+                    "form_data": {},
+                },
+            },
+            headers={"X-Tenant-Id": str(tenant_a.id)},
+        )
+
+        assert response.status_code == 200, response.text
+        success_url = mock_get_client.return_value.create_payment.call_args.kwargs[
+            "success_path"
+        ]
+
+    assert success_url.startswith("https://brand.example.com/thank-you")
+    payload = _verify_signed_redirect(success_url, secret)
+    assert payload["first_name"] == "Matias"
+    assert payload["amount_total"] == "240.00"
+    assert payload["currency"] == "USD"
+    assert payload["items"] == [{"name": product.name, "quantity": 2}]
+    assert payload["email_hash"] == hashlib.sha256(b"buyer@test.com").hexdigest()
+
+
+def test_zero_amount_purchase_signs_order_payload_into_redirect_url(
+    client: TestClient,
+    db: Session,
+    tenant_a: Tenants,
+) -> None:
+    """A zero-amount purchase returns redirect_url with the signed order payload
+    when the popup configures a signing secret."""
+    secret = "amanita-secret"
+    popup = _make_popup(db, tenant_a, slug_prefix="free-signed")
+    popup.open_checkout_success_url = "https://brand.example.com/thank-you"
+    popup.open_checkout_signing_secret = secret
+    db.add(popup)
+    product = _make_product(db, popup, price="75.00")
+    _make_coupon(db, popup, code="FREEPASS", discount_value=100)
+    db.commit()
+
+    with patch("app.services.simplefi.get_simplefi_client") as mock_get_client:
+        response = client.post(
+            f"/api/v1/checkout/{popup.slug}/purchase",
+            json={
+                "products": [{"product_id": str(product.id), "quantity": 1}],
+                "buyer": {
+                    "email": "buyer@test.com",
+                    "first_name": "Matias",
+                    "last_name": "Walter",
+                    "form_data": {},
+                },
+                "coupon_code": "FREEPASS",
+            },
+            headers={"X-Tenant-Id": str(tenant_a.id)},
+        )
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["status"] == "approved"
+    assert body["checkout_url"] == ""
+    payload = _verify_signed_redirect(body["redirect_url"], secret)
+    assert payload["amount_total"] == "0.00"
+    assert payload["items"] == [{"name": product.name, "quantity": 1}]
+    mock_get_client.assert_not_called()
+
+
+def _decode_data_param(url: str) -> dict:
+    """Decode the unsigned ``data`` param from a portal thank-you URL."""
+    data = parse_qs(urlparse(url).query)["data"][0]
+    padding = "=" * (-len(data) % 4)
+    return json.loads(base64.urlsafe_b64decode(data + padding))
+
+
+def test_paid_purchase_injects_order_data_into_portal_thank_you(
+    client: TestClient,
+    db: Session,
+    tenant_a: Tenants,
+) -> None:
+    """With no custom success URL, the paid flow sends SimpleFi the portal
+    thank-you URL carrying the (unsigned) order data so the page can render it."""
+    popup = _make_popup(db, tenant_a, slug_prefix="paid-internal-data")
+    product = _make_product(db, popup, price="120.00")
+    db.commit()
+
+    with patch("app.services.simplefi.get_simplefi_client") as mock_get_client:
+        mock_get_client.return_value.create_payment.return_value = SimpleNamespace(
+            id="sf_internal_1",
+            status="pending",
+            checkout_url="https://simplefi.test/checkout/internal",
+            is_installment_plan=False,
+        )
+        response = client.post(
+            f"/api/v1/checkout/{popup.slug}/purchase",
+            json={
+                "products": [{"product_id": str(product.id), "quantity": 2}],
+                "buyer": {
+                    "email": "buyer@test.com",
+                    "first_name": "Matias",
+                    "last_name": "Walter",
+                    "form_data": {},
+                },
+            },
+            headers={"X-Tenant-Id": str(tenant_a.id)},
+        )
+        assert response.status_code == 200, response.text
+        success_url = mock_get_client.return_value.create_payment.call_args.kwargs[
+            "success_path"
+        ]
+
+    assert f"/checkout/{popup.slug}/thank-you" in success_url
+    assert "sig=" not in success_url  # portal page is ours — no signature
+    payload = _decode_data_param(success_url)
+    assert payload["first_name"] == "Matias"
+    assert payload["amount_total"] == "240.00"
+    assert payload["items"] == [{"name": product.name, "quantity": 2}]
+
+
+def test_zero_amount_purchase_injects_order_data_into_portal_thank_you(
+    client: TestClient,
+    db: Session,
+    tenant_a: Tenants,
+) -> None:
+    """With no custom success URL, the zero-amount flow returns the portal
+    thank-you URL with the order data so the page can render the summary."""
+    popup = _make_popup(db, tenant_a, slug_prefix="free-internal-data")
+    product = _make_product(db, popup, price="75.00")
+    _make_coupon(db, popup, code="FREEPASS", discount_value=100)
+    db.commit()
+
+    with patch("app.services.simplefi.get_simplefi_client") as mock_get_client:
+        response = client.post(
+            f"/api/v1/checkout/{popup.slug}/purchase",
+            json={
+                "products": [{"product_id": str(product.id), "quantity": 1}],
+                "buyer": {
+                    "email": "buyer@test.com",
+                    "first_name": "Matias",
+                    "last_name": "Walter",
+                    "form_data": {},
+                },
+                "coupon_code": "FREEPASS",
+            },
+            headers={"X-Tenant-Id": str(tenant_a.id)},
+        )
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["status"] == "approved"
+    redirect_url = body["redirect_url"]
+    assert f"/checkout/{popup.slug}/thank-you" in redirect_url
+    payload = _decode_data_param(redirect_url)
+    assert payload["amount_total"] == "0.00"
+    assert payload["items"] == [{"name": product.name, "quantity": 1}]
+    mock_get_client.assert_not_called()
 
 
 def test_purchase_with_ended_sale_window_returns_422(

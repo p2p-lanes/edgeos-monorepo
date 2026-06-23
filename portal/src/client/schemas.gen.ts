@@ -9618,6 +9618,203 @@ export const HardDeleteSummarySchema = {
     title: 'HardDeleteSummary'
 } as const;
 
+export const HumanActivityCreateSchema = {
+    properties: {
+        note: {
+            type: 'string',
+            maxLength: 2000,
+            minLength: 1,
+            title: 'Note'
+        },
+        occurred_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Occurred At'
+        }
+    },
+    type: 'object',
+    required: ['note', 'occurred_at'],
+    title: 'HumanActivityCreate',
+    description: "Request body for adding a manual note to a human's timeline."
+} as const;
+
+export const HumanActivityItemSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            title: 'Id'
+        },
+        kind: {
+            '$ref': '#/components/schemas/HumanActivityKind'
+        },
+        occurred_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Occurred At'
+        },
+        popup_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Popup Id'
+        },
+        popup_label: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Popup Label'
+        },
+        note: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Note'
+        },
+        amount: {
+            anyOf: [
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Amount'
+        },
+        currency: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Currency'
+        },
+        status: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Status'
+        },
+        products: {
+            items: {
+                '$ref': '#/components/schemas/HumanActivityProduct'
+            },
+            type: 'array',
+            title: 'Products',
+            default: []
+        },
+        actor_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Actor Id'
+        },
+        actor_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Actor Name'
+        },
+        actor_email: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Actor Email'
+        }
+    },
+    type: 'object',
+    required: ['id', 'kind', 'occurred_at'],
+    title: 'HumanActivityItem',
+    description: `A single entry in a human's activity timeline.
+
+\`id\` is a composite key (e.g. \`\`"payment:<uuid>"\`\`) so it stays unique
+across the different source tables. \`occurred_at\` is the effective
+timestamp the feed sorts by.`
+} as const;
+
+export const HumanActivityKindSchema = {
+    type: 'string',
+    enum: ['application.submitted', 'application.accepted', 'payment.completed', 'ticket.added', 'note.added'],
+    title: 'HumanActivityKind',
+    description: 'The kind of event a timeline item represents.'
+} as const;
+
+export const HumanActivityProductSchema = {
+    properties: {
+        product_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Product Name'
+        },
+        product_category: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Product Category'
+        },
+        quantity: {
+            type: 'integer',
+            title: 'Quantity',
+            default: 1
+        }
+    },
+    type: 'object',
+    title: 'HumanActivityProduct',
+    description: 'One purchased line in a `payment.completed` item (snapshot at purchase).'
+} as const;
+
 export const HumanAuthSchema = {
     properties: {
         tenant_id: {
@@ -9650,6 +9847,105 @@ export const HumanAuthSchema = {
     required: ['tenant_id', 'email'],
     title: 'HumanAuth',
     description: 'Request to initiate human authentication.'
+} as const;
+
+export const HumanCommentCreateSchema = {
+    properties: {
+        body: {
+            type: 'string',
+            minLength: 1,
+            title: 'Body'
+        }
+    },
+    type: 'object',
+    required: ['body'],
+    title: 'HumanCommentCreate'
+} as const;
+
+export const HumanCommentPublicSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        human_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Human Id'
+        },
+        author_user_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Author User Id'
+        },
+        author_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Author Name'
+        },
+        author_email: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Author Email'
+        },
+        body: {
+            type: 'string',
+            title: 'Body'
+        },
+        created_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Created At'
+        },
+        edited_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Edited At'
+        }
+    },
+    type: 'object',
+    required: ['id', 'human_id', 'body', 'created_at'],
+    title: 'HumanCommentPublic'
+} as const;
+
+export const HumanCommentUpdateSchema = {
+    properties: {
+        body: {
+            type: 'string',
+            minLength: 1,
+            title: 'Body'
+        }
+    },
+    type: 'object',
+    required: ['body'],
+    title: 'HumanCommentUpdate'
 } as const;
 
 export const HumanCreateSchema = {
@@ -10059,6 +10355,10 @@ export const HumanPublicSchema = {
             ],
             title: 'Picture Url'
         },
+        rating: {
+            '$ref': '#/components/schemas/HumanRating',
+            default: 'sin_calificar'
+        },
         red_flag: {
             type: 'boolean',
             title: 'Red Flag',
@@ -10069,6 +10369,17 @@ export const HumanPublicSchema = {
     required: ['id', 'tenant_id', 'email'],
     title: 'HumanPublic',
     description: 'Human schema for API responses.'
+} as const;
+
+export const HumanRatingSchema = {
+    type: 'string',
+    enum: ['sin_calificar', 'red_flag', 'orange_flag', 'green_flag', 'star'],
+    title: 'HumanRating',
+    description: `Admin assessment of a human for gathering admission.
+
+Replaces the legacy \`\`red_flag\`\` boolean. Only \`\`RED_FLAG\`\` carries the
+automatic cascade (revoke API keys, reject in-review applications, send
+rejection emails); the other levels are purely advisory labels.`
 } as const;
 
 export const HumanUpdateSchema = {
@@ -10150,16 +10461,15 @@ export const HumanUpdateSchema = {
             ],
             title: 'Picture Url'
         },
-        red_flag: {
+        rating: {
             anyOf: [
                 {
-                    type: 'boolean'
+                    '$ref': '#/components/schemas/HumanRating'
                 },
                 {
                     type: 'null'
                 }
-            ],
-            title: 'Red Flag'
+            ]
         }
     },
     type: 'object',
@@ -10585,6 +10895,42 @@ export const ListModel_GroupPublic_Schema = {
     title: 'ListModel[GroupPublic]'
 } as const;
 
+export const ListModel_HumanActivityItem_Schema = {
+    properties: {
+        results: {
+            items: {
+                '$ref': '#/components/schemas/HumanActivityItem'
+            },
+            type: 'array',
+            title: 'Results'
+        },
+        paging: {
+            '$ref': '#/components/schemas/Paging'
+        }
+    },
+    type: 'object',
+    required: ['results', 'paging'],
+    title: 'ListModel[HumanActivityItem]'
+} as const;
+
+export const ListModel_HumanCommentPublic_Schema = {
+    properties: {
+        results: {
+            items: {
+                '$ref': '#/components/schemas/HumanCommentPublic'
+            },
+            type: 'array',
+            title: 'Results'
+        },
+        paging: {
+            '$ref': '#/components/schemas/Paging'
+        }
+    },
+    type: 'object',
+    required: ['results', 'paging'],
+    title: 'ListModel[HumanCommentPublic]'
+} as const;
+
 export const ListModel_HumanPortalPublic_Schema = {
     properties: {
         results: {
@@ -10993,6 +11339,17 @@ export const OpenTicketingPurchaseResponseSchema = {
         checkout_url: {
             type: 'string',
             title: 'Checkout Url'
+        },
+        redirect_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Redirect Url'
         },
         amount: {
             type: 'string',
@@ -12171,6 +12528,39 @@ export const PopupAdminSchema = {
             ],
             title: 'Terms And Conditions Url'
         },
+        open_checkout_success_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Open Checkout Success Url'
+        },
+        open_checkout_cancel_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Open Checkout Cancel Url'
+        },
+        open_checkout_signing_secret: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Open Checkout Signing Secret'
+        },
         invoice_company_name: {
             anyOf: [
                 {
@@ -12615,6 +13005,39 @@ export const PopupCreateSchema = {
                 }
             ],
             title: 'Terms And Conditions Url'
+        },
+        open_checkout_success_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Open Checkout Success Url'
+        },
+        open_checkout_cancel_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Open Checkout Cancel Url'
+        },
+        open_checkout_signing_secret: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Open Checkout Signing Secret'
         },
         invoice_company_name: {
             anyOf: [
@@ -13557,6 +13980,39 @@ export const PopupUpdateSchema = {
                 }
             ],
             title: 'Terms And Conditions Url'
+        },
+        open_checkout_success_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Open Checkout Success Url'
+        },
+        open_checkout_cancel_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Open Checkout Cancel Url'
+        },
+        open_checkout_signing_secret: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Open Checkout Signing Secret'
         },
         invoice_company_name: {
             anyOf: [

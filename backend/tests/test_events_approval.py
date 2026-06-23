@@ -715,3 +715,211 @@ class TestEndToEndVisibilityConsistency:
         else:
             assert event_id not in bystander_ids
         assert event_id in self._list_ids(client, popup, creator)
+
+
+class TestEventEditReapproval:
+    """PATCH /events/portal/events/{id} re-triggers approval only when a
+    sensitive field (date/time/venue) changes AND the resulting venue requires
+    approval at the resulting time. Description-only edits and moves to a free
+    venue never re-trigger; backoffice edits use a different handler entirely.
+    """
+
+    def _published_event(
+        self,
+        db: Session,
+        tenant: Tenants,
+        popup: Popups,
+        owner: Humans,
+        *,
+        venue_id: uuid.UUID | None = None,
+        start: str = "2026-05-05T14:00:00+00:00",
+        end: str = "2026-05-05T15:00:00+00:00",
+    ) -> Events:
+        event = Events(
+            tenant_id=tenant.id,
+            popup_id=popup.id,
+            owner_id=owner.id,
+            title="Editable Event",
+            start_time=start,
+            end_time=end,
+            timezone="UTC",
+            visibility=EventVisibility.PUBLIC,
+            status=EventStatus.PUBLISHED,
+            **({"venue_id": venue_id} if venue_id else {}),
+        )
+        db.add(event)
+        db.commit()
+        db.refresh(event)
+        return event
+
+    def _patch(
+        self,
+        client: TestClient,
+        event_id: uuid.UUID,
+        owner: Humans,
+        body: dict,
+    ):
+        return client.patch(
+            f"/api/v1/events/portal/events/{event_id}",
+            headers=_human_auth(owner),
+            json=body,
+        )
+
+    def test_edit_time_in_approval_venue_reapproves(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+    ) -> None:
+        popup = _make_popup(db, tenant_a)
+        _set_event_settings(db, tenant_a, popup)
+        owner = _make_human(db, tenant_a)
+        venue = _make_venue(
+            db, tenant_a, popup, booking_mode=VenueBookingMode.APPROVAL_REQUIRED
+        )
+        event = self._published_event(db, tenant_a, popup, owner, venue_id=venue.id)
+
+        resp = self._patch(
+            client,
+            event.id,
+            owner,
+            {
+                "start_time": "2026-05-06T14:00:00+00:00",
+                "end_time": "2026-05-06T15:00:00+00:00",
+            },
+        )
+
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["status"] == EventStatus.PENDING_APPROVAL.value
+
+    def test_move_to_approval_venue_reapproves(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+    ) -> None:
+        popup = _make_popup(db, tenant_a)
+        _set_event_settings(db, tenant_a, popup)
+        owner = _make_human(db, tenant_a)
+        free_venue = _make_venue(
+            db, tenant_a, popup, booking_mode=VenueBookingMode.FREE
+        )
+        approval_venue = _make_venue(
+            db, tenant_a, popup, booking_mode=VenueBookingMode.APPROVAL_REQUIRED
+        )
+        event = self._published_event(
+            db, tenant_a, popup, owner, venue_id=free_venue.id
+        )
+
+        resp = self._patch(
+            client, event.id, owner, {"venue_id": str(approval_venue.id)}
+        )
+
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["status"] == EventStatus.PENDING_APPROVAL.value
+
+    def test_edit_description_does_not_reapprove(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+    ) -> None:
+        popup = _make_popup(db, tenant_a)
+        _set_event_settings(db, tenant_a, popup)
+        owner = _make_human(db, tenant_a)
+        venue = _make_venue(
+            db, tenant_a, popup, booking_mode=VenueBookingMode.APPROVAL_REQUIRED
+        )
+        event = self._published_event(db, tenant_a, popup, owner, venue_id=venue.id)
+
+        resp = self._patch(
+            client, event.id, owner, {"title": "A brand new title"}
+        )
+
+        assert resp.status_code == 200, resp.text
+        # Non-sensitive edit on an approval venue: stays published.
+        assert resp.json()["status"] == EventStatus.PUBLISHED.value
+
+    def test_move_to_free_venue_does_not_reapprove(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+    ) -> None:
+        popup = _make_popup(db, tenant_a)
+        _set_event_settings(db, tenant_a, popup)
+        owner = _make_human(db, tenant_a)
+        approval_venue = _make_venue(
+            db, tenant_a, popup, booking_mode=VenueBookingMode.APPROVAL_REQUIRED
+        )
+        free_venue = _make_venue(
+            db, tenant_a, popup, booking_mode=VenueBookingMode.FREE
+        )
+        event = self._published_event(
+            db, tenant_a, popup, owner, venue_id=approval_venue.id
+        )
+
+        resp = self._patch(
+            client, event.id, owner, {"venue_id": str(free_venue.id)}
+        )
+
+        assert resp.status_code == 200, resp.text
+        # Moving to a free venue is a sensitive change but the resulting venue
+        # does not require approval: stays published.
+        assert resp.json()["status"] == EventStatus.PUBLISHED.value
+
+    def test_edit_time_in_free_venue_does_not_reapprove(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+    ) -> None:
+        popup = _make_popup(db, tenant_a)
+        _set_event_settings(db, tenant_a, popup)
+        owner = _make_human(db, tenant_a)
+        venue = _make_venue(db, tenant_a, popup, booking_mode=VenueBookingMode.FREE)
+        event = self._published_event(db, tenant_a, popup, owner, venue_id=venue.id)
+
+        resp = self._patch(
+            client,
+            event.id,
+            owner,
+            {
+                "start_time": "2026-05-06T14:00:00+00:00",
+                "end_time": "2026-05-06T15:00:00+00:00",
+            },
+        )
+
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["status"] == EventStatus.PUBLISHED.value
+
+    def test_pending_event_edit_does_not_double_escalate(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+    ) -> None:
+        popup = _make_popup(db, tenant_a)
+        _set_event_settings(db, tenant_a, popup)
+        owner = _make_human(db, tenant_a)
+        venue = _make_venue(
+            db, tenant_a, popup, booking_mode=VenueBookingMode.APPROVAL_REQUIRED
+        )
+        event = self._published_event(db, tenant_a, popup, owner, venue_id=venue.id)
+        event.status = EventStatus.PENDING_APPROVAL
+        db.add(event)
+        db.commit()
+
+        resp = self._patch(
+            client,
+            event.id,
+            owner,
+            {
+                "start_time": "2026-05-06T14:00:00+00:00",
+                "end_time": "2026-05-06T15:00:00+00:00",
+            },
+        )
+
+        assert resp.status_code == 200, resp.text
+        # Already pending: stays pending, no spurious re-notification path.
+        assert resp.json()["status"] == EventStatus.PENDING_APPROVAL.value

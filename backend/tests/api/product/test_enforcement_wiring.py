@@ -495,7 +495,7 @@ class TestOpenTicketingPaymentEnforcement:
 
         with patch("app.services.simplefi.get_simplefi_client") as mock_get_client:
             mock_get_client.return_value.create_payment.return_value = simplefi_response
-            payment, _ = payments_crud.create_open_ticketing_payment(
+            payment, _, _ = payments_crud.create_open_ticketing_payment(
                 db, obj=obj, popup=popup, tenant=tenant_a
             )
 

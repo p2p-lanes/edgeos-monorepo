@@ -14,6 +14,21 @@ class CredentialType(str, Enum):
     READONLY = "readonly"
 
 
+class HumanRating(StrEnum):
+    """Admin assessment of a human for gathering admission.
+
+    Replaces the legacy ``red_flag`` boolean. Only ``RED_FLAG`` carries the
+    automatic cascade (revoke API keys, reject in-review applications, send
+    rejection emails); the other levels are purely advisory labels.
+    """
+
+    SIN_CALIFICAR = "sin_calificar"  # default / neutral, no assessment yet
+    RED_FLAG = "red_flag"  # undesirable: should not be admitted to gatherings
+    ORANGE_FLAG = "orange_flag"  # reasons against, still open to discussion
+    GREEN_FLAG = "green_flag"  # a great attendee who adds value
+    STAR = "star"  # excellent: their presence enriches everyone's experience
+
+
 class LandingMode(StrEnum):
     """Per-tenant landing mode for custom domains.
 

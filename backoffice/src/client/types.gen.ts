@@ -2077,6 +2077,25 @@ export type HumanAuth = {
     red_flag?: boolean;
 };
 
+export type HumanCommentCreate = {
+    body: string;
+};
+
+export type HumanCommentPublic = {
+    id: string;
+    human_id: string;
+    author_user_id?: (string | null);
+    author_name?: (string | null);
+    author_email?: (string | null);
+    body: string;
+    created_at: string;
+    edited_at?: (string | null);
+};
+
+export type HumanCommentUpdate = {
+    body: string;
+};
+
 /**
  * Human schema for creation.
  */
@@ -2153,8 +2172,18 @@ export type HumanPublic = {
     age?: (string | null);
     residence?: (string | null);
     picture_url?: (string | null);
+    rating?: HumanRating;
     red_flag?: boolean;
 };
+
+/**
+ * Admin assessment of a human for gathering admission.
+ *
+ * Replaces the legacy ``red_flag`` boolean. Only ``RED_FLAG`` carries the
+ * automatic cascade (revoke API keys, reject in-review applications, send
+ * rejection emails); the other levels are purely advisory labels.
+ */
+export type HumanRating = 'sin_calificar' | 'red_flag' | 'orange_flag' | 'green_flag' | 'star';
 
 /**
  * Human schema for profile updates.
@@ -2167,7 +2196,7 @@ export type HumanUpdate = {
     age?: (string | null);
     residence?: (string | null);
     picture_url?: (string | null);
-    red_flag?: (boolean | null);
+    rating?: (HumanRating | null);
 };
 
 /**
@@ -2302,6 +2331,11 @@ export type ListModel_HumanActivityItem_ = {
     paging: Paging;
 };
 
+export type ListModel_HumanCommentPublic_ = {
+    results: Array<HumanCommentPublic>;
+    paging: Paging;
+};
+
 export type ListModel_HumanPortalPublic_ = {
     results: Array<HumanPortalPublic>;
     paging: Paging;
@@ -2420,6 +2454,7 @@ export type OpenTicketingPurchaseResponse = {
     payment_id: string;
     status: string;
     checkout_url: string;
+    redirect_url?: (string | null);
     amount: string;
     currency: string;
 };
@@ -2655,6 +2690,9 @@ export type PopupAdmin = {
     twitter_url?: (string | null);
     simplefi_api_key?: (string | null);
     terms_and_conditions_url?: (string | null);
+    open_checkout_success_url?: (string | null);
+    open_checkout_cancel_url?: (string | null);
+    open_checkout_signing_secret?: (string | null);
     invoice_company_name?: (string | null);
     invoice_company_address?: (string | null);
     invoice_company_email?: (string | null);
@@ -2709,6 +2747,9 @@ export type PopupCreate = {
     twitter_url?: (string | null);
     simplefi_api_key?: (string | null);
     terms_and_conditions_url?: (string | null);
+    open_checkout_success_url?: (string | null);
+    open_checkout_cancel_url?: (string | null);
+    open_checkout_signing_secret?: (string | null);
     invoice_company_name?: (string | null);
     invoice_company_address?: (string | null);
     invoice_company_email?: (string | null);
@@ -2845,6 +2886,9 @@ export type PopupUpdate = {
     twitter_url?: (string | null);
     simplefi_api_key?: (string | null);
     terms_and_conditions_url?: (string | null);
+    open_checkout_success_url?: (string | null);
+    open_checkout_cancel_url?: (string | null);
+    open_checkout_signing_secret?: (string | null);
     invoice_company_name?: (string | null);
     invoice_company_address?: (string | null);
     invoice_company_email?: (string | null);
@@ -5609,6 +5653,7 @@ export type HumansListHumansData = {
      */
     limit?: number;
     popupId?: (string | null);
+    rating?: (HumanRating | null);
     residence?: (string | null);
     search?: (string | null);
     /**
@@ -5710,6 +5755,34 @@ export type HumansListHumanApiKeysData = {
 };
 
 export type HumansListHumanApiKeysResponse = (Array<ApiKeyPublic>);
+
+export type HumansListHumanCommentsData = {
+    humanId: string;
+};
+
+export type HumansListHumanCommentsResponse = (ListModel_HumanCommentPublic_);
+
+export type HumansCreateHumanCommentData = {
+    humanId: string;
+    requestBody: HumanCommentCreate;
+};
+
+export type HumansCreateHumanCommentResponse = (HumanCommentPublic);
+
+export type HumansUpdateHumanCommentData = {
+    commentId: string;
+    humanId: string;
+    requestBody: HumanCommentUpdate;
+};
+
+export type HumansUpdateHumanCommentResponse = (HumanCommentPublic);
+
+export type HumansDeleteHumanCommentData = {
+    commentId: string;
+    humanId: string;
+};
+
+export type HumansDeleteHumanCommentResponse = (void);
 
 export type PaymentsListPaymentsData = {
     applicationId?: (string | null);
