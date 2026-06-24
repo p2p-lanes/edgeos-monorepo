@@ -46,10 +46,13 @@ import {
 import { createErrorHandler } from "@/utils"
 
 /** Reject hostnames that contain a scheme, path, or port — mirrors backend validator. */
-function validateHostname(value: string): string | undefined {
+function validateHostname(
+  value: string,
+  example = "checkout.example.com",
+): string | undefined {
   if (!value) return undefined
   if (value.includes("://") || value.includes("/") || value.includes(":")) {
-    return "Enter a plain hostname (no scheme, path, or port). Example: checkout.example.com"
+    return `Enter a plain hostname (no scheme, path, or port). Example: ${example}`
   }
   return undefined
 }
@@ -64,7 +67,7 @@ const PORTAL_DOMAIN = import.meta.env.VITE_PORTAL_DOMAIN ?? ""
 export function TenantForm({ defaultValues, onSuccess }: TenantFormProps) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const { isSuperadmin, isAdmin } = useAuth()
+  const { user, isSuperadmin, isAdmin } = useAuth()
   const [copied, setCopied] = useState(false)
 
   const cnameTarget =
@@ -142,6 +145,18 @@ export function TenantForm({ defaultValues, onSuccess }: TenantFormProps) {
     onError: createErrorHandler(showErrorToast),
   })
 
+  const smtpTestMutation = useMutation({
+    mutationFn: () =>
+      TenantsService.sendSmtpTestEmail({
+        tenantId: defaultValues!.id,
+        requestBody: { to_email: user?.email ?? undefined },
+      }),
+    onSuccess: (response) => {
+      showSuccessToast(response.message)
+    },
+    onError: createErrorHandler(showErrorToast),
+  })
+
   const form = useForm({
     defaultValues: {
       name: defaultValues?.name ?? "",
@@ -157,8 +172,17 @@ export function TenantForm({ defaultValues, onSuccess }: TenantFormProps) {
       meta_tracking_enabled: defaultValues?.meta_tracking_enabled ?? false,
       meta_pixel_id: defaultValues?.meta_pixel_id ?? "",
       meta_capi_access_token: "",
+      smtp_host: defaultValues?.smtp_host ?? "",
+      smtp_port: defaultValues?.smtp_port ?? 587,
+      smtp_user: defaultValues?.smtp_user ?? "",
+      smtp_password: "",
+      smtp_tls: defaultValues?.smtp_tls ?? true,
+      smtp_ssl: defaultValues?.smtp_ssl ?? false,
     },
     onSubmit: ({ value }) => {
+      const smtpHost = value.smtp_host.trim()
+      const smtpUser = smtpHost ? value.smtp_user.trim() : ""
+
       if (isEdit) {
         const updateData: TenantUpdate = {
           name: value.name || null,
@@ -171,6 +195,11 @@ export function TenantForm({ defaultValues, onSuccess }: TenantFormProps) {
           custom_domain: value.custom_domain || null,
           meta_tracking_enabled: value.meta_tracking_enabled,
           meta_pixel_id: value.meta_pixel_id || null,
+          smtp_host: smtpHost || null,
+          smtp_port: value.smtp_port || null,
+          smtp_user: smtpUser || null,
+          smtp_tls: value.smtp_tls,
+          smtp_ssl: value.smtp_ssl,
         }
         // landing_mode is a SUPERADMIN-only field; the backend rejects any
         // non-null value sent by an ADMIN. Only include it for superadmins.
@@ -179,6 +208,11 @@ export function TenantForm({ defaultValues, onSuccess }: TenantFormProps) {
         }
         if (value.meta_capi_access_token) {
           updateData.meta_capi_access_token = value.meta_capi_access_token
+        }
+        if (smtpHost && value.smtp_password) {
+          updateData.smtp_password = value.smtp_password
+        } else if (!smtpUser && defaultValues?.smtp_password_configured) {
+          updateData.smtp_password = null
         }
         updateMutation.mutate({
           ...updateData,
@@ -193,6 +227,14 @@ export function TenantForm({ defaultValues, onSuccess }: TenantFormProps) {
           logo_url: value.logo_url || undefined,
           meta_tracking_enabled: value.meta_tracking_enabled,
           meta_pixel_id: value.meta_pixel_id || undefined,
+          smtp_host: smtpHost || undefined,
+          smtp_port: value.smtp_port || undefined,
+          smtp_user: smtpUser || undefined,
+          smtp_password: smtpHost
+            ? value.smtp_password || undefined
+            : undefined,
+          smtp_tls: value.smtp_tls,
+          smtp_ssl: value.smtp_ssl,
         })
       }
     },
@@ -286,6 +328,192 @@ export function TenantForm({ defaultValues, onSuccess }: TenantFormProps) {
               </InlineRow>
             )}
           </form.Field>
+
+          <div className="py-3">
+            <Alert>
+              <AlertDescription>
+                Leave SMTP host empty to use the platform default. If custom
+                SMTP is configured and delivery fails, emails will not fall back
+                to the default provider.
+              </AlertDescription>
+            </Alert>
+          </div>
+
+          <form.Field
+            name="smtp_host"
+            validators={{
+              onBlur: ({ value }) =>
+                validateHostname(value, "smtp.example.com"),
+              onChange: ({ value }) =>
+                validateHostname(value, "smtp.example.com"),
+            }}
+          >
+            {(field) => (
+              <div>
+                <InlineRow
+                  icon={<Mail className="h-4 w-4 text-muted-foreground" />}
+                  label="SMTP Host"
+                  description="SMTP server for this organization"
+                >
+                  <Input
+                    placeholder="smtp.example.com"
+                    value={field.state.value}
+                    onBlur={field.handleBlur}
+                    onChange={(e) => field.handleChange(e.target.value)}
+                    className="max-w-xs text-sm"
+                  />
+                </InlineRow>
+                <FieldError errors={field.state.meta.errors} />
+              </div>
+            )}
+          </form.Field>
+
+          <form.Field
+            name="smtp_port"
+            validators={{
+              onBlur: ({ value }) => {
+                if (!value || value < 1 || value > 65535) {
+                  return "Port must be between 1 and 65535"
+                }
+                return undefined
+              },
+            }}
+          >
+            {(field) => (
+              <div>
+                <InlineRow
+                  icon={<Mail className="h-4 w-4 text-muted-foreground" />}
+                  label="SMTP Port"
+                  description="Common values are 587 for STARTTLS or 465 for SSL/TLS"
+                >
+                  <Input
+                    type="number"
+                    min={1}
+                    max={65535}
+                    value={field.state.value}
+                    onBlur={field.handleBlur}
+                    onChange={(e) =>
+                      field.handleChange(Number(e.target.value) || 587)
+                    }
+                    className="max-w-xs text-sm"
+                  />
+                </InlineRow>
+                <FieldError errors={field.state.meta.errors} />
+              </div>
+            )}
+          </form.Field>
+
+          <form.Field name="smtp_user">
+            {(field) => (
+              <InlineRow
+                icon={<User className="h-4 w-4 text-muted-foreground" />}
+                label="SMTP Username"
+                description="Leave blank for SMTP servers without auth"
+              >
+                <Input
+                  placeholder="smtp-user@example.com"
+                  value={field.state.value}
+                  onBlur={field.handleBlur}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                  className="max-w-xs text-sm"
+                />
+              </InlineRow>
+            )}
+          </form.Field>
+
+          <form.Field name="smtp_password">
+            {(field) => (
+              <InlineRow
+                icon={<Lock className="h-4 w-4 text-muted-foreground" />}
+                label="SMTP Password"
+                description={
+                  defaultValues?.smtp_password_configured
+                    ? "A password is configured. Enter a new value only to replace it."
+                    : "Stored encrypted. Required when username is set."
+                }
+              >
+                <div className="flex items-center gap-2">
+                  <Input
+                    placeholder={
+                      defaultValues?.smtp_password_configured
+                        ? "Configured"
+                        : "SMTP password"
+                    }
+                    type="password"
+                    value={field.state.value}
+                    onBlur={field.handleBlur}
+                    onChange={(e) => field.handleChange(e.target.value)}
+                    className="max-w-xs text-sm"
+                  />
+                  {defaultValues?.smtp_password_configured && (
+                    <Badge variant="outline">Configured</Badge>
+                  )}
+                </div>
+              </InlineRow>
+            )}
+          </form.Field>
+
+          <form.Field name="smtp_tls">
+            {(field) => (
+              <InlineRow
+                icon={<Lock className="h-4 w-4 text-muted-foreground" />}
+                label="STARTTLS"
+                description="Upgrade the SMTP connection with STARTTLS"
+              >
+                <Switch
+                  id="smtp_tls"
+                  aria-label="STARTTLS"
+                  checked={field.state.value}
+                  onCheckedChange={(checked) => {
+                    field.handleChange(checked)
+                    if (checked) form.setFieldValue("smtp_ssl", false)
+                  }}
+                />
+              </InlineRow>
+            )}
+          </form.Field>
+
+          <form.Field name="smtp_ssl">
+            {(field) => (
+              <InlineRow
+                icon={<Lock className="h-4 w-4 text-muted-foreground" />}
+                label="SSL/TLS"
+                description="Use implicit TLS from the start of the connection"
+              >
+                <Switch
+                  id="smtp_ssl"
+                  aria-label="SSL/TLS"
+                  checked={field.state.value}
+                  onCheckedChange={(checked) => {
+                    field.handleChange(checked)
+                    if (checked) form.setFieldValue("smtp_tls", false)
+                  }}
+                />
+              </InlineRow>
+            )}
+          </form.Field>
+
+          {isEdit && (
+            <InlineRow
+              icon={<Mail className="h-4 w-4 text-muted-foreground" />}
+              label="Test Email"
+              description={
+                user?.email
+                  ? `Send a test email to ${user.email}. Save changes before testing.`
+                  : "Save changes before sending a test email."
+              }
+            >
+              <LoadingButton
+                type="button"
+                variant="outline"
+                loading={smtpTestMutation.isPending}
+                disabled={!user?.email}
+                onClick={() => smtpTestMutation.mutate()}
+              >
+                Send test email
+              </LoadingButton>
+            </InlineRow>
+          )}
         </InlineSection>
 
         <Separator />
