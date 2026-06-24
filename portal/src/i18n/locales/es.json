@@ -598,7 +598,9 @@
       "check_in_opens_at_start": "El check-in se habilita al comenzar el evento",
       "registered": "Anotado",
       "checked_in": "Check-in realizado",
-      "action_error": "No pudimos actualizar tu RSVP. Por favor intentá de nuevo."
+      "action_error": "No pudimos actualizar tu RSVP. Por favor intentá de nuevo.",
+      "requires_ticket": "Necesitás un ticket de este evento para registrarte.",
+      "application_rejected": "Tu aplicación no fue aceptada, no podés registrarte."
     },
     "recurrence": {
       "daily_one": "Se repite diariamente",

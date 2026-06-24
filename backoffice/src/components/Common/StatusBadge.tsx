@@ -25,7 +25,7 @@ const statusMap: Record<
   flagged: { variant: "destructive" },
   deleted: { variant: "destructive" },
   // Human rating levels
-  sin_calificar: { variant: "outline", label: "No rating" },
+  unrated: { variant: "outline", label: "No rating" },
   red_flag: { variant: "destructive", label: "🔴 Red Flag" },
   orange_flag: {
     variant: "outline",

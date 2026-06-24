@@ -31,6 +31,7 @@ import { fetchAllPortalEvents } from "./lib/fetchAllPortalEvents"
 import { ListBody } from "./lib/ListBody"
 import { eventListWindowForPopup } from "./lib/listWindow"
 import { SubscribeCalendarButton } from "./lib/SubscribeCalendarButton"
+import { useCanRsvp } from "./lib/useCanRsvp"
 import { useEventRsvp } from "./lib/useEventRsvp"
 import {
   useEventTimezone,
@@ -519,6 +520,17 @@ export default function EventsPage() {
     "portal-events",
   ])
 
+  // Gate the RSVP (register) action: a human can only RSVP if they hold a
+  // ticket for this popup and their application isn't rejected. Shared across
+  // all three views; the button renders disabled with an explanatory tooltip.
+  const { canRsvp, reason: rsvpBlockReason } = useCanRsvp()
+  const rsvpDisabledReason =
+    rsvpBlockReason === "rejected"
+      ? (t("events.rsvp.application_rejected") as string)
+      : rsvpBlockReason === "no_tickets"
+        ? (t("events.rsvp.requires_ticket") as string)
+        : undefined
+
   const hideMutation = useMutation({
     mutationFn: (eventId: string) => EventsService.hidePortalEvent({ eventId }),
     onSuccess: () => {
@@ -792,6 +804,8 @@ export default function EventsPage() {
             defaultDate={selectedDate}
             onEventLinkClick={handleEventLinkClick}
             placeholderUrl={eventSettings?.placeholder_url}
+            canRsvp={canRsvp}
+            rsvpDisabledReason={rsvpDisabledReason}
           />
         ) : view === "day" ? (
           isDayFullscreen ? null : (
@@ -810,6 +824,8 @@ export default function EventsPage() {
               onEventLinkClick={handleEventLinkClick}
               isFullscreen={false}
               onToggleFullscreen={toggleDayFullscreen}
+              canRsvp={canRsvp}
+              rsvpDisabledReason={rsvpDisabledReason}
             />
           )
         ) : (
@@ -826,6 +842,8 @@ export default function EventsPage() {
             onRsvp={(e) => rsvpMutation.mutate(e)}
             onCancelRsvp={(e) => cancelRsvpMutation.mutate(e)}
             pendingRsvpKey={pendingRsvpKey}
+            canRsvp={canRsvp}
+            rsvpDisabledReason={rsvpDisabledReason}
             onHide={(id) => hideMutation.mutate(id)}
             onUnhide={(id) => unhideMutation.mutate(id)}
             placeholderUrl={eventSettings?.placeholder_url}
@@ -883,6 +901,8 @@ export default function EventsPage() {
               onEventLinkClick={handleEventLinkClick}
               isFullscreen={true}
               onToggleFullscreen={toggleDayFullscreen}
+              canRsvp={canRsvp}
+              rsvpDisabledReason={rsvpDisabledReason}
             />
           </div>,
           document.body,

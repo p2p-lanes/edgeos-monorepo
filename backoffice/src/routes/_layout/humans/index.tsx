@@ -88,7 +88,7 @@ function countActiveFieldFilters(filters: HumanFieldFilters): number {
 const RATING_FILTER_ALL = "all"
 
 const HUMAN_RATING_OPTIONS: { value: HumanRating; label: string }[] = [
-  { value: "sin_calificar", label: "No rating" },
+  { value: "unrated", label: "No rating" },
   { value: "red_flag", label: "🔴 Red Flag" },
   { value: "orange_flag", label: "🟠 Orange Flag" },
   { value: "green_flag", label: "🟢 Green Flag" },
@@ -336,7 +336,7 @@ const columns: ColumnDef<HumanPublic>[] = [
     accessorKey: "rating",
     header: "Rating",
     cell: ({ row }) => (
-      <StatusBadge status={row.original.rating ?? "sin_calificar"} />
+      <StatusBadge status={row.original.rating ?? "unrated"} />
     ),
   },
 ]

@@ -1,7 +1,7 @@
 """Add tenant-level SMTP settings.
 
 Revision ID: d9e6f4b2a1c3
-Revises: b8d2f3a47c19
+Revises: fc6890fea75f
 """
 
 from collections.abc import Sequence
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = "d9e6f4b2a1c3"
-down_revision: str | Sequence[str] | None = "b8d2f3a47c19"
+down_revision: str | Sequence[str] | None = "fc6890fea75f"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

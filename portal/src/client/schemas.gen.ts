@@ -10296,7 +10296,7 @@ export const HumanPublicSchema = {
         },
         rating: {
             '$ref': '#/components/schemas/HumanRating',
-            default: 'sin_calificar'
+            default: 'unrated'
         },
         red_flag: {
             type: 'boolean',
@@ -10324,7 +10324,7 @@ export const HumanPublicSchema = {
 
 export const HumanRatingSchema = {
     type: 'string',
-    enum: ['sin_calificar', 'red_flag', 'orange_flag', 'green_flag', 'star'],
+    enum: ['unrated', 'red_flag', 'orange_flag', 'green_flag', 'star'],
     title: 'HumanRating',
     description: `Admin assessment of a human for gathering admission.
 

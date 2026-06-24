@@ -526,7 +526,7 @@ def _seed_humans(session: Session, seed_data: dict, tenant_id) -> dict:
                 rating=(
                     HumanRating.RED_FLAG
                     if human_data.get("red_flag", False)
-                    else HumanRating.SIN_CALIFICAR
+                    else HumanRating.UNRATED
                 ),
             )
             session.add(human)

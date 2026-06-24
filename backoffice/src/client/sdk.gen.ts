@@ -132,7 +132,7 @@ export class ApiKeysService {
             url: '/api/v1/api-keys'
         });
     }
-    
+
     /**
      * Create an API key
      * @param data The data for the request.
@@ -151,7 +151,7 @@ export class ApiKeysService {
             }
         });
     }
-    
+
     /**
      * Revoke an API key
      * @param data The data for the request.
@@ -204,7 +204,7 @@ export class ApplicationReviewsService {
             }
         });
     }
-    
+
     /**
      * Submit Review
      * Submit or update a review for an application.

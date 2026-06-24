@@ -61,7 +61,7 @@ def _make_human(
         email=email,
         first_name="Test",
         last_name="Human",
-        rating=HumanRating.RED_FLAG if red_flag else HumanRating.SIN_CALIFICAR,
+        rating=HumanRating.RED_FLAG if red_flag else HumanRating.UNRATED,
     )
     db.add(human)
     db.commit()

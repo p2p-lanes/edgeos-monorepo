@@ -56,7 +56,7 @@ const RATING_OPTIONS: {
   badge: BadgeVariant
 }[] = [
   {
-    value: "sin_calificar",
+    value: "unrated",
     label: "No rating",
     description: "No assessment yet",
     badge: "secondary",
@@ -182,7 +182,7 @@ export function HumanForm({ defaultValues, onSuccess }: HumanFormProps) {
       age: defaultValues?.age ?? "",
       residence: defaultValues?.residence ?? "",
       picture_url: defaultValues?.picture_url ?? "",
-      rating: defaultValues?.rating ?? "sin_calificar",
+      rating: defaultValues?.rating ?? "unrated",
     },
     onSubmit: ({ value }) => {
       if (isEdit) {

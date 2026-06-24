@@ -89,7 +89,7 @@ export class AdminApiKeysService {
             }
         });
     }
-    
+
     /**
      * Revoke Admin Api Key
      * Revoke an admin API key by setting revoked_at.
@@ -132,7 +132,7 @@ export class ApiKeysService {
             url: '/api/v1/api-keys'
         });
     }
-    
+
     /**
      * Create an API key
      * @param data The data for the request.
@@ -151,7 +151,7 @@ export class ApiKeysService {
             }
         });
     }
-    
+
     /**
      * Revoke an API key
      * @param data The data for the request.
