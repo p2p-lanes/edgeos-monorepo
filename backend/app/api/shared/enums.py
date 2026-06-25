@@ -44,6 +44,29 @@ class EnrichmentSource(StrEnum):
     MANUAL = "manual"  # entered/edited by a human in the backoffice
 
 
+class TelegramLinkMethod(StrEnum):
+    """How a ``human_telegram_links`` row binding a Telegram account to a human
+    was established. Drives trust: only high-confidence, ``verified`` links are
+    used to auto-attribute downloaded chat messages / new bot messages to a human.
+
+    Note: this is an INTERNAL, derived identity link. It is never written back to
+    the user-owned ``humans.telegram`` field — a human who never typed their own
+    handle must not see one we inferred.
+    """
+
+    # Telethon resolved a human's own ``humans.telegram`` handle to the numeric id
+    # and it matched a group participant / export author. Deterministic.
+    HANDLE_RESOLVED = "handle_resolved"
+    # A current group participant's @username equals a human's ``telegram`` handle
+    # (exact, normalized, unique). Deterministic.
+    HANDLE_EXACT = "handle_exact"
+    # Only the display name matched a human's full name (unique). Weak — stays
+    # ``verified = false`` until a human confirms it in the backoffice.
+    NAME_FUZZY = "name_fuzzy"
+    # Confirmed/created by hand in the backoffice.
+    MANUAL = "manual"
+
+
 class LandingMode(StrEnum):
     """Per-tenant landing mode for custom domains.
 
