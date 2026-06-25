@@ -128,7 +128,7 @@
     "pay_and_submit": "Greiða og senda ({{amount}})",
     "fee": {
       "required_title": "Umsóknargjald krafist",
-      "required_description": "Óafturkræft gjald upp á ${{amount}} USD er krafist til að senda umsóknina. Þér verður vísað á örugga greiðslusíðu.",
+      "required_description": "Endurgreiðanlegt gjald upp á ${{amount}} USD er krafist til að senda umsóknina. Þér verður vísað á örugga greiðslusíðu.",
       "processing_title": "Vinn úr greiðslu...",
       "processing_description": "Við erum að staðfesta greiðsluna þína. Þetta getur tekið nokkur augnablik.",
       "confirmed_title": "Greiðsla staðfest!",
