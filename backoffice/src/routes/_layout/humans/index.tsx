@@ -70,14 +70,6 @@ const HUMAN_FIELD_FILTER_DEFS: {
   },
 ]
 
-type EnrichedFilter = "all" | "enriched" | "not_enriched"
-
-const ENRICHED_FILTER_OPTIONS: { value: EnrichedFilter; label: string }[] = [
-  { value: "all", label: "All profiles" },
-  { value: "enriched", label: "✨ Has rich profile" },
-  { value: "not_enriched", label: "No rich profile" },
-]
-
 function countActiveFieldFilters(filters: HumanFieldFilters): number {
   return HUMAN_FIELD_FILTER_DEFS.filter(
     (d) => (filters[d.key] ?? "").trim() !== "",
@@ -113,15 +105,8 @@ function getHumansQueryOptions(
   applicationFilter: HumansApplicationFilter = HUMAN_APPLICATION_FILTER.ALL,
   fieldFilters: HumanFieldFilters = {},
   rating: HumanRating | null = null,
-  enrichedFilter: EnrichedFilter = "all",
 ) {
   const isIncomplete = applicationFilter === HUMAN_APPLICATION_FILTER.INCOMPLETE
-  const hasEnrichedProfile =
-    enrichedFilter === "enriched"
-      ? true
-      : enrichedFilter === "not_enriched"
-        ? false
-        : undefined
   return {
     queryFn: () =>
       HumansService.listHumans({
@@ -138,7 +123,6 @@ function getHumansQueryOptions(
         age: fieldFilters.age?.trim() || undefined,
         residence: fieldFilters.residence?.trim() || undefined,
         rating: rating ?? undefined,
-        hasEnrichedProfile,
         enrichmentQuery: fieldFilters.enrichment?.trim() || undefined,
       }),
     queryKey: [
@@ -151,7 +135,6 @@ function getHumansQueryOptions(
         applicationFilter,
         fieldFilters,
         rating,
-        enrichedFilter,
       },
     ],
   }
@@ -221,32 +204,6 @@ function HumansRatingFilterSelect({
       <SelectContent>
         <SelectItem value={RATING_FILTER_ALL}>All ratings</SelectItem>
         {HUMAN_RATING_OPTIONS.map((opt) => (
-          <SelectItem key={opt.value} value={opt.value}>
-            {opt.label}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
-  )
-}
-
-function HumansEnrichedFilterSelect({
-  value,
-  onValueChange,
-}: {
-  value: EnrichedFilter
-  onValueChange: (value: EnrichedFilter) => void
-}) {
-  return (
-    <Select
-      value={value}
-      onValueChange={(next) => onValueChange(next as EnrichedFilter)}
-    >
-      <SelectTrigger className="w-[180px]">
-        <SelectValue placeholder="Rich profile" />
-      </SelectTrigger>
-      <SelectContent>
-        {ENRICHED_FILTER_OPTIONS.map((opt) => (
           <SelectItem key={opt.value} value={opt.value}>
             {opt.label}
           </SelectItem>
@@ -376,15 +333,6 @@ function HumansTableContent() {
     }
   }
 
-  const [enrichedFilter, setEnrichedFilter] = useState<EnrichedFilter>("all")
-  const handleEnrichedFilterChange = (next: EnrichedFilter) => {
-    setEnrichedFilter(next)
-    // New filter criteria → back to the first page.
-    if (pagination.pageIndex !== 0) {
-      setPagination({ pageIndex: 0, pageSize: pagination.pageSize })
-    }
-  }
-
   const setApplicationFilter = (value: HumansApplicationFilter) => {
     navigate({
       to: "/humans",
@@ -406,7 +354,6 @@ function HumansTableContent() {
       applicationFilter,
       debouncedFieldFilters,
       ratingFilter,
-      enrichedFilter,
     ),
     enabled: !requiresPopupForFilter,
     placeholderData: keepPreviousData,
@@ -442,10 +389,6 @@ function HumansTableContent() {
           <HumansRatingFilterSelect
             value={ratingFilter}
             onValueChange={handleRatingFilterChange}
-          />
-          <HumansEnrichedFilterSelect
-            value={enrichedFilter}
-            onValueChange={handleEnrichedFilterChange}
           />
           <HumansFieldFilters
             value={fieldFilters}
