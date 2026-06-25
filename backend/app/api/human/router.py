@@ -19,6 +19,8 @@ from app.api.human.schemas import (
     HumanCommentPublic,
     HumanCommentUpdate,
     HumanCreate,
+    HumanEnrichmentFactCreate,
+    HumanEnrichmentFactPublic,
     HumanPortalPublic,
     HumanProfileStats,
     HumanProfileUpdate,
@@ -59,6 +61,8 @@ async def list_humans(
     age: str | None = None,
     residence: str | None = None,
     rating: HumanRating | None = None,
+    has_enriched_profile: bool | None = None,
+    enrichment_query: str | None = None,
     skip: PaginationSkip = 0,
     limit: PaginationLimit = 100,
 ) -> ListModel[HumanPublic]:
@@ -87,6 +91,8 @@ async def list_humans(
             age=age,
             residence=residence,
             rating=rating.value if rating else None,
+            has_enriched_profile=has_enriched_profile,
+            enrichment_query=enrichment_query,
         )
 
     return ListModel[HumanPublic](
@@ -573,3 +579,47 @@ async def delete_human_comment(
     comment.deleted_at = datetime.now(UTC)
     db.add(comment)
     db.commit()
+
+
+# --------------------------------------------------------------------------- #
+# Enrichment facts — the append-only provenance bitácora behind a human's
+# curated `enriched_profile`. The Rich Profiles agent (a claude.ai routine
+# logged in as the "Claude" superadmin) POSTs one row per atomic fact it
+# extracts from a source (Telegram, custom fields, events, org deep-dive) and
+# updates the curated profile via PATCH /humans/{id}. Backoffice reads the
+# facts to show where each profile value came from. Tenant-scoped (superadmin
+# bypass), same gating as comments.
+# --------------------------------------------------------------------------- #
+@router.get(
+    "/{human_id}/enrichment-facts",
+    response_model=ListModel[HumanEnrichmentFactPublic],
+)
+async def list_human_enrichment_facts(
+    human_id: uuid.UUID,
+    db: SessionDep,
+    current_user: CurrentUser,
+) -> ListModel[HumanEnrichmentFactPublic]:
+    """List a human's enrichment facts, newest first."""
+    _get_human_in_tenant_or_404(db, human_id, current_user)
+    facts = crud.list_enrichment_facts(db, human_id)
+    return ListModel[HumanEnrichmentFactPublic](
+        results=[HumanEnrichmentFactPublic.model_validate(f) for f in facts],
+        paging=Paging(offset=0, limit=len(facts), total=len(facts)),
+    )
+
+
+@router.post(
+    "/{human_id}/enrichment-facts",
+    response_model=HumanEnrichmentFactPublic,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_human_enrichment_fact(
+    human_id: uuid.UUID,
+    fact_in: HumanEnrichmentFactCreate,
+    db: SessionDep,
+    current_user: CurrentUser,
+) -> HumanEnrichmentFactPublic:
+    """Append one provenance fact extracted by the enrichment agent."""
+    _get_human_in_tenant_or_404(db, human_id, current_user)
+    fact = crud.create_enrichment_fact(db, human_id, fact_in)
+    return HumanEnrichmentFactPublic.model_validate(fact)

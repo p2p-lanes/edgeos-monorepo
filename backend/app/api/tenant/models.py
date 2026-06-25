@@ -45,10 +45,27 @@ class Tenants(TenantBase, table=True):
         default=None,
         sa_column=Column(Text(), nullable=True),
     )
+    smtp_host: str | None = Field(default=None, max_length=255)
+    smtp_port: int | None = Field(default=587)
+    smtp_user: str | None = Field(default=None, max_length=255)
+    smtp_password_encrypted: str | None = Field(
+        default=None,
+        sa_column=Column(Text(), nullable=True),
+    )
+    smtp_tls: bool | None = Field(default=True)
+    smtp_ssl: bool | None = Field(default=False)
 
     @property
     def meta_capi_configured(self) -> bool:
         return bool(self.meta_capi_access_token_encrypted)
+
+    @property
+    def smtp_configured(self) -> bool:
+        return bool(self.smtp_host)
+
+    @property
+    def smtp_password_configured(self) -> bool:
+        return bool(self.smtp_password_encrypted)
 
     # Third-party app integrations (replaces v1 single-key columns)
     third_party_apps: list["ThirdPartyApps"] = Relationship(

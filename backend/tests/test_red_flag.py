@@ -260,7 +260,7 @@ class TestRedFlagAPIEndpoints:
             email=f"normal-{uuid.uuid4().hex[:8]}@test.com",
             first_name="Normal",
             last_name="User",
-            rating=HumanRating.SIN_CALIFICAR,
+            rating=HumanRating.UNRATED,
         )
         db.add(human)
         db.flush()
@@ -312,7 +312,7 @@ class TestRedFlagOnHumanUpdate:
             email=f"to-be-flagged-{uuid.uuid4().hex[:8]}@test.com",
             first_name="To Be",
             last_name="Flagged",
-            rating=HumanRating.SIN_CALIFICAR,
+            rating=HumanRating.UNRATED,
         )
         db.add(human)
         db.flush()
@@ -355,7 +355,7 @@ class TestRedFlagOnHumanUpdate:
             email=f"already-rejected-{uuid.uuid4().hex[:8]}@test.com",
             first_name="Already",
             last_name="Rejected",
-            rating=HumanRating.SIN_CALIFICAR,
+            rating=HumanRating.UNRATED,
         )
         db.add(human)
         db.flush()

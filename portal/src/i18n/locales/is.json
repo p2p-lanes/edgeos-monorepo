@@ -574,7 +574,9 @@
       "check_in_opens_at_start": "Innritun opnar á upphafstíma",
       "registered": "Skráður",
       "checked_in": "Innritaður",
-      "action_error": "Ekki tókst að uppfæra RSVP. Vinsamlegast reyndu aftur."
+      "action_error": "Ekki tókst að uppfæra RSVP. Vinsamlegast reyndu aftur.",
+      "requires_ticket": "Þú þarft miða fyrir þennan viðburð til að skrá þig.",
+      "application_rejected": "Umsókn þín var ekki samþykkt, svo þú getur ekki skráð þig."
     },
     "login_required": {
       "title": "Skráðu þig inn til að sjá þennan viðburð",

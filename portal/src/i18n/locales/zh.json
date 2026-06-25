@@ -584,7 +584,9 @@
       "check_in_opens_at_start": "签到将在活动开始时开放",
       "registered": "已登记",
       "checked_in": "已签到",
-      "action_error": "无法更新你的报名，请稍后重试。"
+      "action_error": "无法更新你的报名，请稍后重试。",
+      "requires_ticket": "你需要持有该活动的票才能报名。",
+      "application_rejected": "你的申请未获通过，无法报名。"
     },
     "login_required": {
       "title": "登录以查看此活动",

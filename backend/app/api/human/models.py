@@ -2,8 +2,8 @@ import uuid
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import DateTime, Text, UniqueConstraint, func
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import DateTime, Numeric, String, Text, UniqueConstraint, func
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlmodel import Column, Field, Relationship, SQLModel
 
 from app.api.group.models import GroupLeaders, GroupMembers
@@ -121,4 +121,49 @@ class HumanComment(SQLModel, table=True):
     deleted_at: datetime | None = Field(
         default=None,
         sa_column=Column(DateTime(timezone=True), nullable=True),
+    )
+
+
+class HumanEnrichmentFact(SQLModel, table=True):
+    """One atomic, append-only fact the enrichment agent extracted about a human.
+
+    The provenance bitácora behind ``humans.enriched_profile``: each row records
+    a single value, where it came from (``source``) and the link to its evidence,
+    so the curated profile can be traced back and re-derived if a source is
+    corrected. Rows are never updated — a newer fact supersedes an older one.
+
+    Like ``human_comments`` / the task tables this is reached only through the
+    privileged main engine (authorization at the API layer), so it carries NO
+    tenant RLS policy and NO grants to the tenant DB roles.
+    """
+
+    __tablename__ = "human_enrichment_facts"
+
+    id: uuid.UUID = Field(
+        default_factory=uuid.uuid4,
+        sa_column=Column(UUID(as_uuid=True), primary_key=True),
+    )
+
+    human_id: uuid.UUID = Field(foreign_key="humans.id", index=True)
+
+    # Profile attribute this fact informs (e.g. "organization", "interests").
+    field: str = Field(sa_column=Column(String(100), nullable=False))
+    # Extracted value / statement.
+    value: str = Field(sa_column=Column(Text, nullable=False))
+    # Provenance — see EnrichmentSource (telegram|event|custom_fields|org|manual).
+    source: str = Field(sa_column=Column(String(20), nullable=False))
+    # Permalink / event id / org URL backing the fact.
+    evidence: str | None = Field(default=None, sa_column=Column(Text, nullable=True))
+    # Agent's 0..1 confidence score, optional.
+    confidence: float | None = Field(
+        default=None, sa_column=Column(Numeric, nullable=True)
+    )
+    # Structured payload for traceability (message/chat/event ids, etc.).
+    raw: dict | None = Field(default=None, sa_column=Column(JSONB, nullable=True))
+
+    created_at: datetime = Field(
+        default_factory=lambda: datetime.now(UTC),
+        sa_column=Column(
+            DateTime(timezone=True), server_default=func.now(), nullable=False
+        ),
     )

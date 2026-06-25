@@ -537,7 +537,7 @@ async def authenticate_human(
             rating=(
                 HumanRating.RED_FLAG
                 if pending_data["red_flag"]
-                else HumanRating.SIN_CALIFICAR
+                else HumanRating.UNRATED
             ),
         )
 
@@ -592,9 +592,7 @@ async def authenticate_human(
             email=pending_human.email,
             picture_url=pending_human.picture_url,
             rating=(
-                HumanRating.RED_FLAG
-                if pending_human.red_flag
-                else HumanRating.SIN_CALIFICAR
+                HumanRating.RED_FLAG if pending_human.red_flag else HumanRating.UNRATED
             ),
         )
 
