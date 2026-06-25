@@ -10296,7 +10296,7 @@ export const HumanPublicSchema = {
         },
         rating: {
             '$ref': '#/components/schemas/HumanRating',
-            default: 'sin_calificar'
+            default: 'unrated'
         },
         red_flag: {
             type: 'boolean',
@@ -10324,7 +10324,7 @@ export const HumanPublicSchema = {
 
 export const HumanRatingSchema = {
     type: 'string',
-    enum: ['sin_calificar', 'red_flag', 'orange_flag', 'green_flag', 'star'],
+    enum: ['unrated', 'red_flag', 'orange_flag', 'green_flag', 'star'],
     title: 'HumanRating',
     description: `Admin assessment of a human for gathering admission.
 
@@ -17312,6 +17312,77 @@ export const TenantCreateSchema = {
                 }
             ],
             title: 'Meta Pixel Id'
+        },
+        smtp_host: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 255
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Smtp Host'
+        },
+        smtp_port: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Smtp Port',
+            default: 587
+        },
+        smtp_user: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 255
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Smtp User'
+        },
+        smtp_password: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Smtp Password'
+        },
+        smtp_tls: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Smtp Tls',
+            default: true
+        },
+        smtp_ssl: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Smtp Ssl',
+            default: false
         }
     },
     type: 'object',
@@ -17468,6 +17539,71 @@ export const TenantPublicSchema = {
             title: 'Meta Capi Configured',
             default: false
         },
+        smtp_host: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Smtp Host'
+        },
+        smtp_port: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Smtp Port'
+        },
+        smtp_user: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Smtp User'
+        },
+        smtp_tls: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Smtp Tls'
+        },
+        smtp_ssl: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Smtp Ssl'
+        },
+        smtp_configured: {
+            type: 'boolean',
+            title: 'Smtp Configured',
+            default: false
+        },
+        smtp_password_configured: {
+            type: 'boolean',
+            title: 'Smtp Password Configured',
+            default: false
+        },
         active_popup_slug: {
             anyOf: [
                 {
@@ -17483,6 +17619,37 @@ export const TenantPublicSchema = {
     type: 'object',
     required: ['name', 'slug', 'custom_domain_active', 'id'],
     title: 'TenantPublic'
+} as const;
+
+export const TenantSmtpTestRequestSchema = {
+    properties: {
+        to_email: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'email'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'To Email'
+        }
+    },
+    type: 'object',
+    title: 'TenantSmtpTestRequest'
+} as const;
+
+export const TenantSmtpTestResponseSchema = {
+    properties: {
+        message: {
+            type: 'string',
+            title: 'Message'
+        }
+    },
+    type: 'object',
+    required: ['message'],
+    title: 'TenantSmtpTestResponse'
 } as const;
 
 export const TenantUpdateSchema = {
@@ -17619,6 +17786,74 @@ export const TenantUpdateSchema = {
                 }
             ],
             title: 'Meta Capi Access Token'
+        },
+        smtp_host: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 255
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Smtp Host'
+        },
+        smtp_port: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Smtp Port'
+        },
+        smtp_user: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 255
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Smtp User'
+        },
+        smtp_password: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Smtp Password'
+        },
+        smtp_tls: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Smtp Tls'
+        },
+        smtp_ssl: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Smtp Ssl'
         }
     },
     type: 'object',

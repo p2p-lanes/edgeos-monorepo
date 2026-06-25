@@ -955,7 +955,7 @@ async def create_portal_venue(
         from app.services.approval_notify import notify_venue_pending_approval
 
         popup = popups_crud.get(db, venue.popup_id)
-        await notify_venue_pending_approval(venue, popup, settings)
+        await notify_venue_pending_approval(venue, popup, settings, db_session=db)
 
     return EventVenuePublic.model_validate(venue)
 

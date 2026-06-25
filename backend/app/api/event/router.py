@@ -3274,7 +3274,7 @@ async def create_portal_event(
 
         popup = popups_crud.get(db, event.popup_id)
         await notify_event_pending_approval(
-            event, popup, settings, reason=approval_reason
+            event, popup, settings, reason=approval_reason, db_session=db
         )
 
     record_event_audit(
@@ -3443,7 +3443,7 @@ async def update_portal_event(
         settings = event_settings_crud.get_by_popup_id(db, updated.popup_id)
         popup = popups_crud.get(db, updated.popup_id)
         await notify_event_pending_approval(
-            updated, popup, settings, reason=reapproval_reason
+            updated, popup, settings, reason=reapproval_reason, db_session=db
         )
     return _with_collaborators(db, _to_public(updated), updated)
 

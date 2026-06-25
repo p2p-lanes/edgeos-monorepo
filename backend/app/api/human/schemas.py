@@ -30,7 +30,7 @@ class HumanBase(SQLModel):
     picture_url: str | None = Field(default=None, max_length=500)
     # Admin assessment of the human (see HumanRating). Stored as the enum's
     # string value; replaces the legacy red_flag boolean.
-    rating: str = Field(default=HumanRating.SIN_CALIFICAR.value, max_length=20)
+    rating: str = Field(default=HumanRating.UNRATED.value, max_length=20)
 
     # Curated profile maintained by the enrichment agent (see EnrichedProfile
     # for the expected shape). Free-form JSONB so the agent can evolve it
@@ -74,7 +74,7 @@ class HumanPublic(BaseModel):
     residence: str | None = None
 
     picture_url: str | None = None
-    rating: HumanRating = HumanRating.SIN_CALIFICAR
+    rating: HumanRating = HumanRating.UNRATED
     # Derived from rating (rating == RED_FLAG). Kept so existing callers that
     # gate on the blocking state (api keys, group join, application submit)
     # keep working unchanged.

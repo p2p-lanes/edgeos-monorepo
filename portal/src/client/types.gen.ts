@@ -1274,6 +1274,15 @@ export type EnrichedDashboardStats = {
 };
 
 /**
+ * Where a single enrichment fact about a human came from.
+ *
+ * Stored as the enum's string value in ``human_enrichment_facts.source``;
+ * used as provenance so the curated ``humans.enriched_profile`` can be traced
+ * back to its evidence (and re-derived if a source is corrected/removed).
+ */
+export type EnrichmentSource = 'telegram' | 'event' | 'custom_fields' | 'org' | 'manual';
+
+/**
  * Staff-only free-text notes for an event.
  *
  * Returned/accepted exclusively by the dedicated admin-notes endpoints — kept
@@ -2066,6 +2075,34 @@ export type HumanCreate = {
 };
 
 /**
+ * One atomic fact the enrichment agent extracted from a source.
+ */
+export type HumanEnrichmentFactCreate = {
+    field: string;
+    value: string;
+    source: EnrichmentSource;
+    evidence?: (string | null);
+    confidence?: (number | null);
+    raw?: ({
+    [key: string]: unknown;
+} | null);
+};
+
+export type HumanEnrichmentFactPublic = {
+    id: string;
+    human_id: string;
+    field: string;
+    value: string;
+    source: EnrichmentSource;
+    evidence?: (string | null);
+    confidence?: (number | null);
+    raw?: ({
+    [key: string]: unknown;
+} | null);
+    created_at: string;
+};
+
+/**
  * Slim human profile for portal-facing pickers (event host, mentions…).
  *
  * Intentionally excludes email and contact fields: portal-authenticated
@@ -2129,6 +2166,9 @@ export type HumanPublic = {
     picture_url?: (string | null);
     rating?: HumanRating;
     red_flag?: boolean;
+    enriched_profile?: ({
+    [key: string]: unknown;
+} | null);
 };
 
 /**
@@ -2138,7 +2178,7 @@ export type HumanPublic = {
  * automatic cascade (revoke API keys, reject in-review applications, send
  * rejection emails); the other levels are purely advisory labels.
  */
-export type HumanRating = 'sin_calificar' | 'red_flag' | 'orange_flag' | 'green_flag' | 'star';
+export type HumanRating = 'unrated' | 'red_flag' | 'orange_flag' | 'green_flag' | 'star';
 
 /**
  * Human schema for profile updates.
@@ -2152,6 +2192,9 @@ export type HumanUpdate = {
     residence?: (string | null);
     picture_url?: (string | null);
     rating?: (HumanRating | null);
+    enriched_profile?: ({
+    [key: string]: unknown;
+} | null);
 };
 
 /**
@@ -2283,6 +2326,11 @@ export type ListModel_GroupPublic_ = {
 
 export type ListModel_HumanCommentPublic_ = {
     results: Array<HumanCommentPublic>;
+    paging: Paging;
+};
+
+export type ListModel_HumanEnrichmentFactPublic_ = {
+    results: Array<HumanEnrichmentFactPublic>;
     paging: Paging;
 };
 
@@ -3450,6 +3498,12 @@ export type TenantCreate = {
     logo_url?: (string | null);
     meta_tracking_enabled?: boolean;
     meta_pixel_id?: (string | null);
+    smtp_host?: (string | null);
+    smtp_port?: (number | null);
+    smtp_user?: (string | null);
+    smtp_password?: (string | null);
+    smtp_tls?: (boolean | null);
+    smtp_ssl?: (boolean | null);
 };
 
 export type TenantCredentialResponse = {
@@ -3475,7 +3529,22 @@ export type TenantPublic = {
     meta_pixel_id?: (string | null);
     id: string;
     meta_capi_configured?: boolean;
+    smtp_host?: (string | null);
+    smtp_port?: (number | null);
+    smtp_user?: (string | null);
+    smtp_tls?: (boolean | null);
+    smtp_ssl?: (boolean | null);
+    smtp_configured?: boolean;
+    smtp_password_configured?: boolean;
     active_popup_slug?: (string | null);
+};
+
+export type TenantSmtpTestRequest = {
+    to_email?: (string | null);
+};
+
+export type TenantSmtpTestResponse = {
+    message: string;
 };
 
 export type TenantUpdate = {
@@ -3491,6 +3560,12 @@ export type TenantUpdate = {
     meta_tracking_enabled?: (boolean | null);
     meta_pixel_id?: (string | null);
     meta_capi_access_token?: (string | null);
+    smtp_host?: (string | null);
+    smtp_port?: (number | null);
+    smtp_user?: (string | null);
+    smtp_password?: (string | null);
+    smtp_tls?: (boolean | null);
+    smtp_ssl?: (boolean | null);
 };
 
 /**
@@ -5596,7 +5671,9 @@ export type GroupsGetGroupPublicResponse = (GroupPublic);
 export type HumansListHumansData = {
     age?: (string | null);
     email?: (string | null);
+    enrichmentQuery?: (string | null);
     gender?: (string | null);
+    hasEnrichedProfile?: (boolean | null);
     incompleteApplication?: boolean;
     /**
      * Maximum number of items to return
@@ -5710,6 +5787,19 @@ export type HumansDeleteHumanCommentData = {
 };
 
 export type HumansDeleteHumanCommentResponse = (void);
+
+export type HumansListHumanEnrichmentFactsData = {
+    humanId: string;
+};
+
+export type HumansListHumanEnrichmentFactsResponse = (ListModel_HumanEnrichmentFactPublic_);
+
+export type HumansCreateHumanEnrichmentFactData = {
+    humanId: string;
+    requestBody: HumanEnrichmentFactCreate;
+};
+
+export type HumansCreateHumanEnrichmentFactResponse = (HumanEnrichmentFactPublic);
 
 export type PaymentsListPaymentsData = {
     applicationId?: (string | null);
@@ -6175,6 +6265,13 @@ export type TenantsDeleteTenantData = {
 };
 
 export type TenantsDeleteTenantResponse = (void);
+
+export type TenantsSendSmtpTestEmailData = {
+    requestBody: TenantSmtpTestRequest;
+    tenantId: string;
+};
+
+export type TenantsSendSmtpTestEmailResponse = (TenantSmtpTestResponse);
 
 export type TenantsGetCredentialsData = {
     tenantId: string;

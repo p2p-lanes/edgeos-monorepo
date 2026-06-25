@@ -61,6 +61,17 @@ class EmailAttachment:
     mime_type: str = "application/octet-stream"
 
 
+@dataclass(frozen=True)
+class SMTPDeliveryConfig:
+    hostname: str
+    port: int
+    start_tls: bool
+    use_tls: bool
+    username: str | None = None
+    password: str | None = None
+    source: str = "global"
+
+
 def compute_order_summary(payment: "Payments") -> str:
     """Pre-render payment products into an HTML summary for custom templates.
 
@@ -268,6 +279,68 @@ class EmailService:
             logger.error(f"Error rendering email template {template_name}: {e}")
             raise
 
+    def _resolve_smtp_config(
+        self,
+        tenant_id: uuid.UUID | None = None,
+        db_session: Session | None = None,
+    ) -> SMTPDeliveryConfig | None:
+        if tenant_id and db_session:
+            from app.api.tenant.models import Tenants
+            from app.utils.encryption import decrypt
+
+            tenant = db_session.get(Tenants, tenant_id)
+            if tenant and tenant.smtp_host:
+                if bool(tenant.smtp_user) != bool(tenant.smtp_password_encrypted):
+                    logger.error(
+                        f"Tenant SMTP config is incomplete for tenant {tenant_id}"
+                    )
+                    return None
+
+                password = None
+                if tenant.smtp_password_encrypted:
+                    try:
+                        password = decrypt(tenant.smtp_password_encrypted)
+                    except Exception as e:
+                        logger.error(
+                            f"Failed to decrypt tenant SMTP password for tenant {tenant_id}: {e}"
+                        )
+                        return None
+
+                return SMTPDeliveryConfig(
+                    hostname=tenant.smtp_host,
+                    port=tenant.smtp_port or 587,
+                    start_tls=True if tenant.smtp_tls is None else tenant.smtp_tls,
+                    use_tls=False if tenant.smtp_ssl is None else tenant.smtp_ssl,
+                    username=tenant.smtp_user,
+                    password=password,
+                    source="tenant",
+                )
+
+        if not settings.SMTP_HOST:
+            return None
+
+        return SMTPDeliveryConfig(
+            hostname=settings.SMTP_HOST,
+            port=settings.SMTP_PORT,
+            start_tls=settings.SMTP_TLS,
+            use_tls=settings.SMTP_SSL,
+            username=settings.SMTP_USER if settings.SMTP_USER else None,
+            password=settings.SMTP_PASSWORD if settings.SMTP_PASSWORD else None,
+        )
+
+    def _resolve_tenant_id_from_popup(
+        self,
+        popup_id: uuid.UUID | None,
+        db_session: Session | None,
+    ) -> uuid.UUID | None:
+        if not popup_id or not db_session:
+            return None
+
+        from app.api.popup.models import Popups
+
+        popup = db_session.get(Popups, popup_id)
+        return popup.tenant_id if popup else None
+
     async def send_email(
         self,
         to: str | list[str],
@@ -279,6 +352,8 @@ class EmailService:
         attachments: list[EmailAttachment] | None = None,
         ical_body: str | None = None,
         ical_method: str = "REQUEST",
+        tenant_id: uuid.UUID | None = None,
+        db_session: Session | None = None,
     ) -> bool:
         """
         Send an email via SMTP.
@@ -299,9 +374,12 @@ class EmailService:
         Returns:
             True if email was sent successfully, False otherwise
         """
-        assert settings.emails_enabled, "No provided configuration for email variables"
-
         try:
+            smtp_config = self._resolve_smtp_config(tenant_id, db_session)
+            if not smtp_config:
+                logger.error("No SMTP configuration available for email delivery")
+                return False
+
             # Use tenant-specific email config or fall back to global settings
             sender_email = from_address or settings.SENDER_EMAIL
             sender_name = from_name or settings.SENDER_NAME
@@ -363,19 +441,21 @@ class EmailService:
                 recipients = [to]
 
             smtp_kwargs: dict[str, Any] = {
-                "hostname": settings.SMTP_HOST,
-                "port": settings.SMTP_PORT,
-                "start_tls": settings.SMTP_TLS,
-                "use_tls": settings.SMTP_SSL,
+                "hostname": smtp_config.hostname,
+                "port": smtp_config.port,
+                "start_tls": smtp_config.start_tls,
+                "use_tls": smtp_config.use_tls,
             }
 
-            if settings.SMTP_USER and settings.SMTP_PASSWORD:
-                smtp_kwargs["username"] = settings.SMTP_USER
-                smtp_kwargs["password"] = settings.SMTP_PASSWORD
+            if smtp_config.username and smtp_config.password:
+                smtp_kwargs["username"] = smtp_config.username
+                smtp_kwargs["password"] = smtp_config.password
 
             await aiosmtplib.send(message, **smtp_kwargs)
 
-            logger.info(f"Email sent successfully to {recipients}")
+            logger.info(
+                f"Email sent successfully to {recipients} via {smtp_config.source} SMTP"
+            )
             return True
 
         except aiosmtplib.SMTPException as e:
@@ -397,6 +477,8 @@ class EmailService:
         attachments: list[EmailAttachment] | None = None,
         ical_body: str | None = None,
         ical_method: str = "REQUEST",
+        tenant_id: uuid.UUID | None = None,
+        db_session: Session | None = None,
     ) -> bool:
         """Render and send a templated email. See ``send_email`` for args."""
         try:
@@ -411,6 +493,8 @@ class EmailService:
                 attachments=attachments,
                 ical_body=ical_body,
                 ical_method=ical_method,
+                tenant_id=tenant_id,
+                db_session=db_session,
             )
 
         except Exception as e:
@@ -435,6 +519,8 @@ class EmailService:
             context=context.model_dump(exclude_none=True),
             from_address=from_address,
             from_name=from_name,
+            tenant_id=tenant_id,
+            db_session=db_session,
         )
 
     async def send_login_code_human(
@@ -883,11 +969,14 @@ class EmailService:
                     dict(context), popup_id, db_session
                 )
             log_missing_template_variables(template_type, dict(enriched_context))
+            resolved_tenant_id = tenant_id or self._resolve_tenant_id_from_popup(
+                popup_id, db_session
+            )
             rendered_html, custom_subject = self.render_with_fallback(
                 template_type,
                 enriched_context,
                 popup_id=popup_id,
-                tenant_id=tenant_id,
+                tenant_id=resolved_tenant_id,
                 db_session=db_session,
             )
             final_subject = custom_subject or subject
@@ -900,6 +989,8 @@ class EmailService:
                 attachments=attachments,
                 ical_body=ical_body,
                 ical_method=ical_method,
+                tenant_id=resolved_tenant_id,
+                db_session=db_session,
             )
 
         except Exception as e:
