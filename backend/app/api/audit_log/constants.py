@@ -14,6 +14,12 @@ class AuditAction:
     TICKET_REMOVE = "ticket.remove"
     TICKET_GRANT = "ticket.grant"
 
+    # Manual activity note added to a human from the backoffice timeline.
+    HUMAN_NOTE_ADDED = "human.note_added"
+
+    # A human's rating (red/orange/green flag, star, …) was changed by a user.
+    HUMAN_RATING_CHANGED = "human.rating_changed"
+
 
 class AuditEntityType:
     """Type of the primary entity an event is grouped under."""
