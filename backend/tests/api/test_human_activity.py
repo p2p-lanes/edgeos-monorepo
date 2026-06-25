@@ -218,7 +218,7 @@ class TestHumanActivityRatingChanges:
         tenant_a: Tenants,
         admin_token_tenant_a: str,
     ) -> None:
-        human = _make_human(db, tenant_a)  # defaults to rating "sin_calificar"
+        human = _make_human(db, tenant_a)  # defaults to rating "unrated"
 
         patch = client.patch(
             f"/api/v1/humans/{human.id}",
@@ -235,7 +235,7 @@ class TestHumanActivityRatingChanges:
         assert len(rating_items) == 1
         item = rating_items[0]
         assert item["rating"] == "green_flag"
-        assert item["previous_rating"] == "sin_calificar"
+        assert item["previous_rating"] == "unrated"
         # The acting backoffice user is credited.
         assert item["actor_name"] is not None
 
@@ -249,7 +249,7 @@ class TestHumanActivityRatingChanges:
         ).all()
         assert len(rows) == 1
         assert rows[0].details["rating"] == "green_flag"
-        assert rows[0].details["previous"] == "sin_calificar"
+        assert rows[0].details["previous"] == "unrated"
 
     def test_setting_same_rating_records_nothing(
         self,
@@ -258,12 +258,12 @@ class TestHumanActivityRatingChanges:
         tenant_a: Tenants,
         admin_token_tenant_a: str,
     ) -> None:
-        human = _make_human(db, tenant_a)  # already "sin_calificar"
+        human = _make_human(db, tenant_a)  # already "unrated"
 
         patch = client.patch(
             f"/api/v1/humans/{human.id}",
             headers=_auth(admin_token_tenant_a),
-            json={"rating": "sin_calificar"},
+            json={"rating": "unrated"},
         )
         assert patch.status_code == 200
 
