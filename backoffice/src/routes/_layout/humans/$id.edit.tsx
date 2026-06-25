@@ -11,10 +11,17 @@ import { DangerZone } from "@/components/Common/DangerZone"
 import { FormPageLayout } from "@/components/Common/FormPageLayout"
 import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
 import { HumanForm } from "@/components/forms/HumanForm"
+import { DeclaredFieldsCard } from "@/components/Humans/DeclaredFieldsCard"
 import { EnrichedProfileCard } from "@/components/Humans/EnrichedProfileCard"
 import { HumanActivity } from "@/components/Humans/HumanActivity"
 import { HumanCommentThread } from "@/components/Humans/HumanCommentThread"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import useAuth from "@/hooks/useAuth"
@@ -73,26 +80,38 @@ function EditHumanContent({ humanId }: { humanId: string }) {
       <TabsContent value="details">
         <div className="space-y-8">
           <HumanForm defaultValues={human} onSuccess={goBack} />
-          <div className="mx-auto max-w-2xl">
+          <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-2">
             <Card>
               <CardHeader>
                 <CardTitle>Rich profile</CardTitle>
+                <CardDescription>
+                  Curated from non-declared signals (Telegram activity, events).
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 <EnrichedProfileCard human={human} />
               </CardContent>
             </Card>
-          </div>
-          <div className="mx-auto max-w-2xl">
             <Card>
               <CardHeader>
-                <CardTitle>Comments</CardTitle>
+                <CardTitle>Declared</CardTitle>
+                <CardDescription>
+                  What this person typed into their application form.
+                </CardDescription>
               </CardHeader>
               <CardContent>
-                <HumanCommentThread humanId={humanId} />
+                <DeclaredFieldsCard human={human} />
               </CardContent>
             </Card>
           </div>
+          <Card>
+            <CardHeader>
+              <CardTitle>Comments</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <HumanCommentThread humanId={humanId} />
+            </CardContent>
+          </Card>
           {isAdmin && (
             <div className="mx-auto max-w-2xl">
               <DangerZone

@@ -2,7 +2,7 @@ import uuid
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import DateTime, Numeric, String, Text, UniqueConstraint, func
+from sqlalchemy import Boolean, DateTime, Numeric, String, Text, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlmodel import Column, Field, Relationship, SQLModel
 
@@ -165,5 +165,91 @@ class HumanEnrichmentFact(SQLModel, table=True):
         default_factory=lambda: datetime.now(UTC),
         sa_column=Column(
             DateTime(timezone=True), server_default=func.now(), nullable=False
+        ),
+    )
+
+
+class HumanTelegramLink(SQLModel, table=True):
+    """Derived binding between a Telegram account and an EdgeOS human.
+
+    Telegram chat exports (and the live Bot API) identify an author by a stable
+    numeric ``tg_user_id`` — the *export never contains the @handle*. This table
+    is the durable join key that lets us attribute a downloaded conversation (or
+    a new bot message) to a human deterministically by id, instead of guessing by
+    display name on every re-run.
+
+    IMPORTANT — this is an INTERNAL identity index, deliberately separate from
+    ``humans.telegram``: that field is user-owned and user-visible, so we never
+    write a handle we derived into it. The binding here may be high-confidence
+    (a resolved/exact handle match) or weak (display-name only), in which case it
+    stays ``verified = False`` until a human confirms it in the backoffice.
+
+    Like ``human_enrichment_facts`` / ``human_comments`` it is reached only through
+    the privileged main engine (authorization at the API layer), so it carries NO
+    tenant RLS policy and NO grants to the tenant DB roles. A single ``tg_user_id``
+    may bind to more than one human (the same person can be a human under several
+    tenants), so uniqueness is on the (human, tg) pair, not on ``tg_user_id``.
+    """
+
+    __tablename__ = "human_telegram_links"
+    __table_args__ = (
+        UniqueConstraint(
+            "human_id", "tg_user_id", name="uq_human_telegram_link_human_tg"
+        ),
+    )
+
+    id: uuid.UUID = Field(
+        default_factory=uuid.uuid4,
+        sa_column=Column(UUID(as_uuid=True), primary_key=True),
+    )
+
+    human_id: uuid.UUID = Field(foreign_key="humans.id", index=True)
+
+    # Numeric Telegram user id as text (e.g. "7027773675"). This equals the chat
+    # export's ``from_id`` with the "user" prefix stripped, and the Bot API's
+    # ``message.from.id`` — the same id space across all three. Indexed for the
+    # bot's lookup-by-id path.
+    tg_user_id: str = Field(sa_column=Column(String(32), nullable=False, index=True))
+
+    # Handle observed for this account (without "@"), when known. Evidence only —
+    # NOT authoritative and NOT mirrored to humans.telegram.
+    tg_username: str | None = Field(
+        default=None, sa_column=Column(String(255), nullable=True)
+    )
+    # Display name observed in the group/export (changes over time; evidence only).
+    tg_display_name: str | None = Field(
+        default=None, sa_column=Column(String(255), nullable=True)
+    )
+
+    # See TelegramLinkMethod (handle_resolved|handle_exact|name_fuzzy|manual).
+    match_method: str = Field(sa_column=Column(String(20), nullable=False))
+    # 0..1 score of how sure we are this id is this human.
+    confidence: float | None = Field(
+        default=None, sa_column=Column(Numeric, nullable=True)
+    )
+    # Trust gate: only verified (or deterministic) links auto-attribute messages.
+    verified: bool = Field(
+        default=False,
+        sa_column=Column(Boolean, nullable=False, server_default="false"),
+    )
+
+    # Which exported group(s)/source(s) this link's evidence came from.
+    source_groups: dict | None = Field(
+        default=None, sa_column=Column(JSONB, nullable=True)
+    )
+
+    created_at: datetime = Field(
+        default_factory=lambda: datetime.now(UTC),
+        sa_column=Column(
+            DateTime(timezone=True), server_default=func.now(), nullable=False
+        ),
+    )
+    updated_at: datetime = Field(
+        default_factory=lambda: datetime.now(UTC),
+        sa_column=Column(
+            DateTime(timezone=True),
+            server_default=func.now(),
+            onupdate=func.now(),
+            nullable=False,
         ),
     )
