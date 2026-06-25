@@ -142,7 +142,7 @@
     "pay_and_submit": "Pay & Submit ({{amount}})",
     "fee": {
       "required_title": "Application fee required",
-      "required_description": "A non-refundable fee of ${{amount}} USD is required to submit your application. You will be redirected to a secure payment page.",
+      "required_description": "A refundable fee of ${{amount}} USD is required to submit your application. You will be redirected to a secure payment page.",
       "processing_title": "Processing payment...",
       "processing_description": "We are confirming your payment. This may take a few moments.",
       "confirmed_title": "Payment confirmed!",

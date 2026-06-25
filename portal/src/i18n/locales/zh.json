@@ -128,7 +128,7 @@
     "pay_and_submit": "支付并提交 ({{amount}})",
     "fee": {
       "required_title": "需要申请费",
-      "required_description": "提交申请需支付 ${{amount}} USD 的不可退还费用。您将被重定向到安全支付页面。",
+      "required_description": "提交申请需支付 ${{amount}} USD 的可退还费用。您将被重定向到安全支付页面。",
       "processing_title": "正在处理付款...",
       "processing_description": "我们正在确认您的付款。这可能需要一些时间。",
       "confirmed_title": "付款已确认！",
