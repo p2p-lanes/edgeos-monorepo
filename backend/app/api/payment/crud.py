@@ -742,9 +742,23 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 payment.coupon_id = coupon.id
                 payment.coupon_code = coupon.code
                 payment.discount_value = discount_value
-                coupons_crud.use_coupon(session, coupon.id)
+                # Consumption is deferred until the payment is persisted (the
+                # zero-amount commit or the post-SimpleFi commit below) so a
+                # provider failure never burns a single-use code. Mirrors the
+                # application flow.
 
             payment.amount = discountable_amount + non_discountable_amount
+
+            # Contribution fee (mandatory when the popup enables it — no buyer
+            # opt-in). Open checkout has no insurance, so the post-discount
+            # subtotal is the contribution base, matching the portal display.
+            # Mirrors the application flow in _apply_discounts.
+            if popup.contribution_enabled and popup.contribution_percentage:
+                contribution_amount = calculate_contribution_amount(
+                    popup, payment.amount
+                )
+                payment.contribution_amount = contribution_amount
+                payment.amount += contribution_amount
 
             # Resolve the open-checkout success redirect once, reused by the
             # zero-amount bypass (returned as redirect_url) and the paid path
@@ -778,6 +792,10 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             # this, the open-ticketing buyer never received tickets nor the
             # confirmation email).
             if payment.amount == Decimal("0"):
+                # A 100% coupon zeroed the cart: consume it now, alongside the
+                # auto-approval, since this branch never reaches SimpleFi.
+                if payment.coupon_id:
+                    coupons_crud.use_coupon(session, payment.coupon_id)
                 self._finalize_zero_amount_payment(
                     session,
                     payment,
@@ -881,6 +899,10 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 0 if simplefi_response.is_installment_plan else None
             )
             session.add(payment)
+            # Consume the coupon only now that SimpleFi accepted the payment, so
+            # a provider failure above never burns a single-use code.
+            if payment.coupon_id:
+                coupons_crud.use_coupon(session, payment.coupon_id)
             session.commit()
             session.refresh(payment)
             # Paid flow: SimpleFi performs the success redirect itself (to the
