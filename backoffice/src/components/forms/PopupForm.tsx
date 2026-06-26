@@ -744,7 +744,7 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
               <InlineRow
                 icon={<DollarSign className="h-4 w-4 text-muted-foreground" />}
                 label="Require Application Fee"
-                description="Applicants must pay a fee before their application is reviewed"
+                description="Applicants must pay a refundable fee before their application is reviewed"
               >
                 <Switch
                   id="requires_application_fee"

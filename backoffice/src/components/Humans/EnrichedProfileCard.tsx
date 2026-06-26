@@ -78,6 +78,53 @@ function linkLabel(url: string): string {
   }
 }
 
+/** The two Telegram groups we enriched from — for a human-readable source label. */
+const TELEGRAM_GROUPS: Record<string, string> = {
+  "2944565963": "Edge City Patagonia 2025",
+  "3980048315": "Edge Esmeralda 2026",
+}
+
+/**
+ * Provenance facts were written by two passes with different `evidence` shapes:
+ * a proper `https://t.me/c/<chat>/<msg>` deep link, and a bare `<chat>:<msg>`
+ * (which the browser resolves as a relative path → 404). Normalize both to a
+ * valid Telegram deep link, preferring the structured `raw` payload when present.
+ */
+function factEvidence(f: {
+  evidence?: string | null
+  raw?: { [key: string]: unknown } | null
+}): { href: string; label: string } | null {
+  let chat: string | undefined
+  let msg: string | undefined
+
+  const raw = f.raw
+  if (raw && typeof raw === "object") {
+    if (raw.chat_id != null) chat = String(raw.chat_id)
+    if (raw.message_id != null) msg = String(raw.message_id)
+  }
+
+  const ev = f.evidence?.trim()
+  if (ev) {
+    if (/^https?:\/\//i.test(ev)) {
+      const m = ev.match(/t\.me\/c\/(\d+)\/(\d+)/)
+      const label =
+        m && TELEGRAM_GROUPS[m[1]] ? TELEGRAM_GROUPS[m[1]] : "Telegram"
+      return { href: ev, label }
+    }
+    const m = ev.match(/^(\d+):(\d+)$/)
+    if (m) {
+      chat = chat ?? m[1]
+      msg = msg ?? m[2]
+    }
+  }
+
+  if (chat && msg) {
+    const label = TELEGRAM_GROUPS[chat] ?? "Telegram"
+    return { href: `https://t.me/c/${chat}/${msg}`, label }
+  }
+  return null
+}
+
 function BadgeRow({ label, values }: { label: string; values: string[] }) {
   if (values.length === 0) return null
   return (
@@ -136,17 +183,20 @@ function EnrichmentFacts({ humanId }: { humanId: string }) {
                 </Badge>
               </div>
               <p className="mt-1 text-foreground/80">{f.value}</p>
-              {f.evidence && (
-                <a
-                  href={f.evidence}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="mt-1 inline-flex items-center gap-1 text-primary underline"
-                >
-                  <ExternalLink className="h-3 w-3" />
-                  evidence
-                </a>
-              )}
+              {(() => {
+                const ev = factEvidence(f)
+                return ev ? (
+                  <a
+                    href={ev.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-1 inline-flex items-center gap-1 text-primary underline"
+                  >
+                    <ExternalLink className="h-3 w-3" />
+                    {ev.label}
+                  </a>
+                ) : null
+              })()}
             </div>
           ))
         )}
@@ -167,8 +217,7 @@ export function EnrichedProfileCard({ human }: { human: HumanPublic }) {
     <div className="space-y-3">
       {!profile || isEmptyProfile(profile) ? (
         <p className="text-sm text-muted-foreground">
-          This person hasn't been enriched yet. The enrichment agent fills this
-          in from Telegram, applications, events and an org deep-dive.
+          There is no additional information for this profile.
         </p>
       ) : (
         <div className="space-y-4">
@@ -195,31 +244,33 @@ export function EnrichedProfileCard({ human }: { human: HumanPublic }) {
 
           {(profile.tags.length > 0 ||
             profile.interests.length > 0 ||
-            profile.topics.length > 0) && (
-            <div className="space-y-2">
+            profile.topics.length > 0 ||
+            profile.links.length > 0) && (
+            <div className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
               <BadgeRow label="Tags" values={profile.tags} />
               <BadgeRow label="Interests" values={profile.interests} />
               <BadgeRow label="Topics" values={profile.topics} />
-            </div>
-          )}
-
-          {profile.links.length > 0 && (
-            <div className="space-y-1">
-              <p className="text-xs font-medium text-muted-foreground">Links</p>
-              <div className="flex flex-col gap-1">
-                {profile.links.map((url) => (
-                  <a
-                    key={url}
-                    href={url.includes("://") ? url : `https://${url}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 text-sm text-primary underline"
-                  >
-                    <ExternalLink className="h-3 w-3 shrink-0" />
-                    {linkLabel(url)}
-                  </a>
-                ))}
-              </div>
+              {profile.links.length > 0 && (
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-muted-foreground">
+                    Links
+                  </p>
+                  <div className="flex flex-col gap-1">
+                    {profile.links.map((url) => (
+                      <a
+                        key={url}
+                        href={url.includes("://") ? url : `https://${url}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-sm text-primary underline"
+                      >
+                        <ExternalLink className="h-3 w-3 shrink-0" />
+                        {linkLabel(url)}
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>

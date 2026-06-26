@@ -142,7 +142,7 @@
     "pay_and_submit": "Pagar y enviar ({{amount}})",
     "fee": {
       "required_title": "Se requiere tarifa de aplicación",
-      "required_description": "Se requiere una tarifa no reembolsable de ${{amount}} USD para enviar tu aplicación. Serás redirigido a una página de pago segura.",
+      "required_description": "Se requiere una tarifa reembolsable de ${{amount}} USD para enviar tu aplicación. Serás redirigido a una página de pago segura.",
       "processing_title": "Procesando pago...",
       "processing_description": "Estamos confirmando tu pago. Esto puede tardar unos momentos.",
       "confirmed_title": "¡Pago confirmado!",
