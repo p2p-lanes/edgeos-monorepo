@@ -29,7 +29,14 @@ from app.api.shared.enums import SaleType
 from app.api.tenant.models import Tenants
 
 
-def _make_popup(db: Session, tenant: Tenants, *, slug_prefix: str = "ot") -> Popups:
+def _make_popup(
+    db: Session,
+    tenant: Tenants,
+    *,
+    slug_prefix: str = "ot",
+    contribution_enabled: bool = False,
+    contribution_percentage: str | None = None,
+) -> Popups:
     popup = Popups(
         id=uuid.uuid4(),
         tenant_id=tenant.id,
@@ -39,6 +46,10 @@ def _make_popup(db: Session, tenant: Tenants, *, slug_prefix: str = "ot") -> Pop
         status="active",
         simplefi_api_key="simplefi_test_key",
         currency="USD",
+        contribution_enabled=contribution_enabled,
+        contribution_percentage=Decimal(contribution_percentage)
+        if contribution_percentage
+        else None,
     )
     db.add(popup)
     db.flush()
@@ -432,6 +443,43 @@ def test_create_open_ticketing_payment_rolls_back_payment_artifacts_on_provider_
     assert attendee_products == []
 
 
+def test_create_open_ticketing_payment_does_not_consume_coupon_on_provider_failure(
+    db: Session,
+    tenant_a: Tenants,
+) -> None:
+    """A coupon is consumed only after SimpleFI accepts the payment. A provider
+    failure must NOT burn a single-use code. Regression: the open-checkout path
+    used to consume the coupon before the SimpleFI call, creating false uses."""
+    popup = _make_popup(db, tenant_a, slug_prefix="coupon-rollback")
+    product = _make_product(db, popup, name="GA", price="100.00")
+    coupon = _make_coupon(db, popup, code="SAFE10", discount_value=10)
+    db.commit()
+
+    obj = _purchase_create(
+        email="buyer@test.com",
+        first_name="Matias",
+        last_name="Walter",
+        products=[(product, 2)],
+        form_data={},
+        coupon_code="SAFE10",
+    )
+
+    with patch("app.services.simplefi.get_simplefi_client") as mock_get_client:
+        mock_get_client.return_value.create_payment.side_effect = RuntimeError("boom")
+
+        with pytest.raises(HTTPException):
+            payments_crud.create_open_ticketing_payment(
+                db,
+                obj=obj,
+                popup=popup,
+                tenant=tenant_a,
+            )
+
+    db.expire(coupon)
+    db.refresh(coupon)
+    assert coupon.current_uses == 0
+
+
 def test_create_open_ticketing_payment_applies_coupon_discount(
     db: Session,
     tenant_a: Tenants,
@@ -474,6 +522,57 @@ def test_create_open_ticketing_payment_applies_coupon_discount(
     db.expire(coupon)
     db.refresh(coupon)
     assert coupon.current_uses == 1
+
+
+def test_create_open_ticketing_payment_applies_contribution(
+    db: Session,
+    tenant_a: Tenants,
+) -> None:
+    """Popup-level contribution fee is added to the open-checkout total, persisted
+    on the payment, and sent to SimpleFI. Regression: the festival popup showed the
+    contribution in checkout but never charged it (separate code path from
+    _apply_discounts)."""
+    popup = _make_popup(
+        db,
+        tenant_a,
+        slug_prefix="contribution",
+        contribution_enabled=True,
+        contribution_percentage="10.00",
+    )
+    product = _make_product(db, popup, name="GA", price="100.00")
+    db.commit()
+
+    obj = _purchase_create(
+        email="buyer@test.com",
+        first_name="Matias",
+        last_name="Walter",
+        products=[(product, 2)],
+        form_data={},
+    )
+
+    with patch("app.services.simplefi.get_simplefi_client") as mock_get_client:
+        mock_get_client.return_value.create_payment.return_value = SimpleNamespace(
+            id="sf_open_ticketing_contribution",
+            status="pending",
+            checkout_url="https://simplefi.test/checkout/contribution",
+            is_installment_plan=False,
+        )
+
+        payment, _, _ = payments_crud.create_open_ticketing_payment(
+            db,
+            obj=obj,
+            popup=popup,
+            tenant=tenant_a,
+        )
+
+        sent_amount = mock_get_client.return_value.create_payment.call_args.kwargs[
+            "amount"
+        ]
+
+    # 2 × $100 = $200 base, + 10% contribution = $20 → $220 grand total
+    assert payment.contribution_amount == Decimal("20.00")
+    assert payment.amount == Decimal("220.00")
+    assert sent_amount == Decimal("220.00")
 
 
 def test_create_open_ticketing_payment_100_percent_coupon_auto_approves(
