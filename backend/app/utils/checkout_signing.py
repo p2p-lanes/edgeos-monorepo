@@ -59,6 +59,23 @@ def sign_data(data: str, secret: str) -> str:
     return _b64url_nopad(digest)
 
 
+def build_cart_restore_token(cart_id: str, secret: str) -> str:
+    """HMAC for an open-checkout cart restore link.
+
+    Signs the cart id so an anonymous buyer can rebuild their saved cart via
+    GET /checkout/{slug}/cart?cid=<cart_id>&sig=<token> without logging in. The
+    signature makes the link unguessable, so the cart can never be read by
+    enumerating ids or emails.
+    """
+    return sign_data(cart_id, secret)
+
+
+def verify_cart_restore_token(cart_id: str, sig: str, secret: str) -> bool:
+    """Constant-time check of a cart restore token against the cart id."""
+    expected = sign_data(cart_id, secret)
+    return hmac.compare_digest(expected, sig)
+
+
 def build_thank_you_payload(
     *,
     order_id: str,

@@ -5,9 +5,13 @@ Endpoints:
 - POST /checkout/{slug}/purchase — public, anonymous, rate-limited 10/min/IP
 """
 
-from fastapi import APIRouter, BackgroundTasks, Depends, Request
+import uuid
+
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
 from loguru import logger
 
+from app.api.cart.crud import carts_crud
+from app.api.cart.schemas import CartState, OpenCartPublic, OpenCartUpsert
 from app.api.checkout.crud import get_open_ticketing_popup, runtime_for_slug
 from app.api.checkout.schemas import (
     CheckoutRuntimeResponse,
@@ -26,6 +30,10 @@ from app.core.rate_limit import RateLimit
 from app.services.meta_capi import (
     enqueue_initiate_checkout_event,
     enqueue_purchase_event,
+)
+from app.utils.checkout_signing import (
+    build_cart_restore_token,
+    verify_cart_restore_token,
 )
 
 router = APIRouter(prefix="/checkout", tags=["checkout"])
@@ -159,3 +167,84 @@ async def purchase_open_ticketing(
         amount=payment.amount,
         currency=payment.currency,
     )
+
+
+def _to_open_cart_public(cart: object, *, restore_token: str | None) -> OpenCartPublic:
+    """Build the anonymous cart response, coercing stored JSONB into CartState."""
+    raw_items = getattr(cart, "items", None) or {}
+    return OpenCartPublic(
+        id=cart.id,  # type: ignore[attr-defined]
+        popup_id=cart.popup_id,  # type: ignore[attr-defined]
+        email=cart.email or "",  # type: ignore[attr-defined]
+        items=CartState(**raw_items),
+        restore_token=restore_token,
+        created_at=getattr(cart, "created_at", None),
+        updated_at=getattr(cart, "updated_at", None),
+    )
+
+
+@router.put(
+    "/{slug}/cart",
+    response_model=OpenCartPublic,
+    dependencies=[
+        Depends(RateLimit(limit=30, window_sec=60, key_prefix="rl:checkout-cart")),
+    ],
+)
+async def upsert_open_cart(
+    slug: str,
+    cart_in: OpenCartUpsert,
+    db: SessionDep,
+    tenant: PublicTenant,
+) -> OpenCartPublic:
+    """Save (create or replace) the anonymous open-checkout cart for an email.
+
+    Fully public (no JWT), keyed by (popup, email). Returns a signed
+    `restore_token` when the popup configures an open_checkout_signing_secret so
+    the client can later rebuild the cart cross-device. Rate-limited 30/min/IP.
+    """
+    popup = get_open_ticketing_popup(db, slug, tenant.id)
+    cart = carts_crud.upsert_anonymous(
+        db,
+        tenant_id=tenant.id,
+        popup_id=popup.id,
+        email=cart_in.email,
+        items=cart_in.items,
+    )
+    secret = popup.open_checkout_signing_secret
+    restore_token = build_cart_restore_token(str(cart.id), secret) if secret else None
+    return _to_open_cart_public(cart, restore_token=restore_token)
+
+
+@router.get(
+    "/{slug}/cart",
+    response_model=OpenCartPublic,
+    dependencies=[
+        Depends(
+            RateLimit(limit=60, window_sec=60, key_prefix="rl:checkout-cart-restore")
+        ),
+    ],
+)
+async def restore_open_cart(
+    slug: str,
+    db: SessionDep,
+    tenant: PublicTenant,
+    cid: uuid.UUID = Query(..., description="Cart id from the signed restore link"),
+    sig: str = Query(..., description="HMAC restore token for the cart id"),
+) -> OpenCartPublic:
+    """Restore an anonymous cart from a signed link (cid + sig).
+
+    The cart is served only when the signature matches, so it can never be read
+    by enumerating ids or emails. Requires the popup to have an
+    open_checkout_signing_secret. Rate-limited 60/min/IP.
+    """
+    popup = get_open_ticketing_popup(db, slug, tenant.id)
+    secret = popup.open_checkout_signing_secret
+    if not secret:
+        raise HTTPException(status_code=404, detail="Cart restore is not available")
+    if not verify_cart_restore_token(str(cid), sig, secret):
+        raise HTTPException(status_code=403, detail="Invalid cart link")
+
+    cart = carts_crud.find_anonymous_by_id_popup(db, cid, popup.id)
+    if cart is None:
+        raise HTTPException(status_code=404, detail="Cart not found")
+    return _to_open_cart_public(cart, restore_token=sig)

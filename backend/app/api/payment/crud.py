@@ -2169,6 +2169,21 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
 
         return payment, preview
 
+    def _direct_buyer_email(self, session: Session, payment: Payments) -> str | None:
+        """Resolve the buyer email for a direct-sale payment via its attendee.
+
+        Direct-sale payments have no application; the buyer is the human behind
+        the (single) attendee on the payment's product snapshot. Used to clear
+        the anonymous open-checkout cart keyed by that email.
+        """
+        snapshot = payment.products_snapshot
+        if not snapshot:
+            return None
+        attendee = session.get(Attendees, snapshot[0].attendee_id)
+        if attendee is None or attendee.human is None:
+            return None
+        return attendee.human.email
+
     def approve_payment(
         self,
         session: Session,
@@ -2232,8 +2247,9 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             if payment.application_id is not None:
                 self._create_ambassador_group(session, payment)
 
-            # Clear cart after successful payment (application flow only —
-            # direct-sale payments don't use the cart).
+            # Clear cart after successful payment. Application flow clears by
+            # human; direct-sale (open checkout) clears the anonymous cart by the
+            # buyer email so a returning buyer never restores an already-paid cart.
             from app.api.cart.crud import carts_crud
 
             if payment.application:
@@ -2242,6 +2258,12 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                     human_id=payment.application.human_id,
                     popup_id=payment.application.popup_id,
                 )
+            elif payment.popup_id:
+                buyer_email = self._direct_buyer_email(session, payment)
+                if buyer_email:
+                    carts_crud.delete_anonymous_by_email_popup(
+                        session, buyer_email, payment.popup_id
+                    )
 
             # Single atomic commit for the entire operation
             session.commit()

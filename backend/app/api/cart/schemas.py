@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, EmailStr
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlmodel import Column, Field, SQLModel
 
@@ -73,8 +73,16 @@ class CartBase(SQLModel):
     """Base cart schema."""
 
     tenant_id: uuid.UUID = Field(foreign_key="tenants.id", index=True)
-    human_id: uuid.UUID = Field(foreign_key="humans.id", index=True)
+    # Nullable for anonymous open-checkout carts (no logged-in human). The
+    # authenticated portal flow always sets it.
+    human_id: uuid.UUID | None = Field(
+        default=None, foreign_key="humans.id", index=True
+    )
     popup_id: uuid.UUID = Field(foreign_key="popups.id", index=True)
+    # Set only for anonymous open-checkout carts, which are keyed by email
+    # instead of a human. Stored in clear so backoffice can show it in the
+    # abandoned-cart list. Authenticated carts read the email from the human.
+    email: str | None = Field(default=None, index=True)
     items: dict = Field(
         default_factory=dict,
         sa_column=Column(JSONB, nullable=False, server_default="{}"),
@@ -94,6 +102,33 @@ class CartPublic(BaseModel):
     human_id: uuid.UUID
     popup_id: uuid.UUID
     items: CartState
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class OpenCartUpsert(BaseModel):
+    """Anonymous open-checkout cart upsert request (keyed by email)."""
+
+    email: EmailStr
+    items: CartState
+
+
+class OpenCartPublic(BaseModel):
+    """Anonymous open-checkout cart response.
+
+    `restore_token` is the HMAC for the signed restore link
+    (GET /checkout/{slug}/cart?cid=<id>&sig=<restore_token>). It is only
+    present when the popup configures an open_checkout_signing_secret; the
+    client stores it to rebuild the cart on a later visit.
+    """
+
+    id: uuid.UUID
+    popup_id: uuid.UUID
+    email: str
+    items: CartState
+    restore_token: str | None = None
     created_at: datetime | None = None
     updated_at: datetime | None = None
 
