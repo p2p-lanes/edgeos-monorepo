@@ -16,6 +16,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
+from dateutil.relativedelta import relativedelta
 from sqlmodel import Session
 
 from app.api.application.models import Applications
@@ -50,8 +51,15 @@ def _make_popup_with_installments(
     contribution_enabled is True we also flip on a percentage fee so the
     SimpleFi total_amount includes it.
     """
+    # Count calendar months from `now` (not from the 1st) plus a 15-day buffer so
+    # exactly `deadline_months_ahead` monthly cycles fit regardless of today's
+    # day-of-month. The old `replace(day=1) + 30 * n` formula was date-dependent:
+    # on the last days of a month the 6th cycle fell just past the deadline and
+    # _calculate_max_installments returned 5 instead of 6.
     deadline = (
-        datetime.now(UTC).replace(day=1) + timedelta(days=30 * deadline_months_ahead)
+        datetime.now(UTC)
+        + relativedelta(months=deadline_months_ahead - 1)
+        + timedelta(days=15)
         if installments_enabled
         else None
     )
