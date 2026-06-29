@@ -1,5 +1,6 @@
 "use client"
 
+import { useQueryClient } from "@tanstack/react-query"
 import { useSearchParams } from "next/navigation"
 import { useEffect, useMemo, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
@@ -13,6 +14,7 @@ import FaviconOverride from "@/components/checkout-flow/FaviconOverride"
 import ScrollyCheckoutFlow from "@/components/checkout-flow/ScrollyCheckoutFlow"
 import { LanguageSwitcher } from "@/components/common/LanguageSwitcher"
 import { trackMetaViewContent } from "@/lib/meta-pixel"
+import { queryKeys } from "@/lib/query-keys"
 import { ApplicationContext } from "@/providers/applicationProvider"
 import { CheckoutProvider } from "@/providers/checkoutProvider"
 import { CityContext } from "@/providers/cityProvider"
@@ -146,6 +148,22 @@ export function OpenCheckoutRuntime({
   })
 
   const popup = runtime.popup
+
+  // Seed the attendee-categories cache from the public runtime so the shared
+  // checkout components read it from cache instead of calling the human-gated
+  // /portal/popups/{id}/attendee-categories endpoint, which 401s for anonymous
+  // buyers. Runs once, synchronously, before children mount, so the query
+  // resolves from fresh cache with no network request.
+  const queryClient = useQueryClient()
+  const categoriesSeededRef = useRef(false)
+  if (!categoriesSeededRef.current) {
+    queryClient.setQueryData(
+      queryKeys.attendeeCategories.byPopup(popup.id),
+      runtime.attendee_categories ?? [],
+    )
+    categoriesSeededRef.current = true
+  }
+
   const trackedViewContentRef = useRef<string | null>(null)
   const products = useMemo(
     () => runtime.products.map(toProductsPass),

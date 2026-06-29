@@ -4637,6 +4637,14 @@ export const CheckoutRuntimeResponseSchema = {
             type: 'array',
             title: 'Ticketing Steps'
         },
+        attendee_categories: {
+            items: {
+                '$ref': '#/components/schemas/AttendeeCategoryPublic'
+            },
+            type: 'array',
+            title: 'Attendee Categories',
+            default: []
+        },
         form_schema: {
             anyOf: [
                 {
