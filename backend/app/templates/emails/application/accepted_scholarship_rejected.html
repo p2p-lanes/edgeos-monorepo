@@ -43,9 +43,9 @@
     </table>
 </div>
 
-{% if portal_url %}
+{% if passes_url or portal_url %}
 <div style="text-align: center; margin: 30px 0;">
-    <a href="{{ portal_url }}" class="button" style="background-color: #28a745;">
+    <a href="{{ passes_url or portal_url }}" class="button" style="background-color: #28a745;">
         Purchase Your Pass
     </a>
 </div>

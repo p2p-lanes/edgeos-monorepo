@@ -117,14 +117,15 @@ def _enrich_with_popup_data(
         else None,
     }
 
-    # Build portal_url from tenant (respects active custom domain)
-    if "portal_url" not in enriched:
-        from app.api.tenant.models import Tenants
-        from app.api.tenant.utils import get_portal_url
+    # Build popup-specific URLs from tenant (respects active custom domain)
+    from app.api.tenant.models import Tenants
+    from app.api.tenant.utils import get_portal_url
 
-        tenant = db_session.get(Tenants, popup.tenant_id)
-        if tenant:
-            popup_fields["portal_url"] = get_portal_url(tenant)
+    tenant = db_session.get(Tenants, popup.tenant_id)
+    if tenant:
+        portal_base = get_portal_url(tenant).rstrip("/")
+        popup_fields["portal_url"] = portal_base
+        popup_fields["passes_url"] = f"{portal_base}/portal/{popup.slug}/passes"
 
     for key, value in popup_fields.items():
         if key not in enriched:
