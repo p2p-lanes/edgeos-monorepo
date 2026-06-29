@@ -36,6 +36,8 @@ def _make_popup(
     slug_prefix: str = "ot",
     contribution_enabled: bool = False,
     contribution_percentage: str | None = None,
+    insurance_enabled: bool = False,
+    insurance_percentage: str | None = None,
 ) -> Popups:
     popup = Popups(
         id=uuid.uuid4(),
@@ -50,6 +52,10 @@ def _make_popup(
         contribution_percentage=Decimal(contribution_percentage)
         if contribution_percentage
         else None,
+        insurance_enabled=insurance_enabled,
+        insurance_percentage=Decimal(insurance_percentage)
+        if insurance_percentage
+        else None,
     )
     db.add(popup)
     db.flush()
@@ -63,6 +69,7 @@ def _make_product(
     name: str,
     price: str,
     attendee_category_id: uuid.UUID | None = None,
+    insurance_eligible: bool = False,
 ) -> Products:
     product = Products(
         id=uuid.uuid4(),
@@ -74,6 +81,7 @@ def _make_product(
         category="ticket",
         attendee_category_id=attendee_category_id,
         is_active=True,
+        insurance_eligible=insurance_eligible,
     )
     db.add(product)
     db.flush()
@@ -151,6 +159,7 @@ def _purchase_create(
     products: list[tuple[Products, int]],
     form_data: dict[str, object],
     coupon_code: str | None = None,
+    insurance: bool = False,
 ) -> OpenTicketingPurchaseCreate:
     return OpenTicketingPurchaseCreate(
         products=[
@@ -164,6 +173,7 @@ def _purchase_create(
             form_data=form_data,
         ),
         coupon_code=coupon_code,
+        insurance=insurance,
     )
 
 
@@ -573,6 +583,167 @@ def test_create_open_ticketing_payment_applies_contribution(
     assert payment.contribution_amount == Decimal("20.00")
     assert payment.amount == Decimal("220.00")
     assert sent_amount == Decimal("220.00")
+
+
+def test_create_open_ticketing_payment_applies_insurance_opt_in(
+    db: Session,
+    tenant_a: Tenants,
+) -> None:
+    """Buyer opt-in insurance is computed on the eligible-product subtotal,
+    persisted on the payment, and charged via SimpleFI. Only products flagged
+    insurance_eligible feed the eligible subtotal."""
+    popup = _make_popup(
+        db,
+        tenant_a,
+        slug_prefix="insurance",
+        insurance_enabled=True,
+        insurance_percentage="5.00",
+    )
+    eligible = _make_product(
+        db, popup, name="GA", price="100.00", insurance_eligible=True
+    )
+    not_eligible = _make_product(
+        db, popup, name="Donation", price="50.00", insurance_eligible=False
+    )
+    db.commit()
+
+    obj = _purchase_create(
+        email="buyer@test.com",
+        first_name="Matias",
+        last_name="Walter",
+        products=[(eligible, 2), (not_eligible, 1)],
+        form_data={},
+        insurance=True,
+    )
+
+    with patch("app.services.simplefi.get_simplefi_client") as mock_get_client:
+        mock_get_client.return_value.create_payment.return_value = SimpleNamespace(
+            id="sf_open_ticketing_insurance",
+            status="pending",
+            checkout_url="https://simplefi.test/checkout/insurance",
+            is_installment_plan=False,
+        )
+
+        payment, _, _ = payments_crud.create_open_ticketing_payment(
+            db,
+            obj=obj,
+            popup=popup,
+            tenant=tenant_a,
+        )
+
+        sent_amount = mock_get_client.return_value.create_payment.call_args.kwargs[
+            "amount"
+        ]
+
+    # Eligible subtotal = 2 × $100 = $200 (the $50 donation is excluded).
+    # 5% insurance = $10. Grand total = $200 + $50 + $10 = $260.
+    assert payment.insurance_amount == Decimal("10.00")
+    assert payment.amount == Decimal("260.00")
+    assert sent_amount == Decimal("260.00")
+
+
+def test_create_open_ticketing_payment_insurance_skipped_without_opt_in(
+    db: Session,
+    tenant_a: Tenants,
+) -> None:
+    """Insurance is opt-in: an eligible product on an insurance-enabled popup is
+    NOT charged insurance when the buyer did not opt in (default)."""
+    popup = _make_popup(
+        db,
+        tenant_a,
+        slug_prefix="insurance-off",
+        insurance_enabled=True,
+        insurance_percentage="5.00",
+    )
+    product = _make_product(
+        db, popup, name="GA", price="100.00", insurance_eligible=True
+    )
+    db.commit()
+
+    obj = _purchase_create(
+        email="buyer@test.com",
+        first_name="Matias",
+        last_name="Walter",
+        products=[(product, 1)],
+        form_data={},
+    )
+
+    with patch("app.services.simplefi.get_simplefi_client") as mock_get_client:
+        mock_get_client.return_value.create_payment.return_value = SimpleNamespace(
+            id="sf_open_ticketing_no_insurance",
+            status="pending",
+            checkout_url="https://simplefi.test/checkout/no-insurance",
+            is_installment_plan=False,
+        )
+
+        payment, _, _ = payments_crud.create_open_ticketing_payment(
+            db,
+            obj=obj,
+            popup=popup,
+            tenant=tenant_a,
+        )
+
+    assert payment.insurance_amount == Decimal("0")
+    assert payment.amount == Decimal("100.00")
+
+
+def test_create_open_ticketing_payment_insurance_and_contribution_dont_compound(
+    db: Session,
+    tenant_a: Tenants,
+) -> None:
+    """Insurance and contribution both read the post-discount subtotal as their
+    base — neither compounds on the other (ADR-2 invariant, matching the
+    authenticated flow)."""
+    popup = _make_popup(
+        db,
+        tenant_a,
+        slug_prefix="both-fees",
+        contribution_enabled=True,
+        contribution_percentage="10.00",
+        insurance_enabled=True,
+        insurance_percentage="5.00",
+    )
+    product = _make_product(
+        db, popup, name="GA", price="100.00", insurance_eligible=True
+    )
+    db.commit()
+
+    obj = _purchase_create(
+        email="buyer@test.com",
+        first_name="Matias",
+        last_name="Walter",
+        products=[(product, 1)],
+        form_data={},
+        insurance=True,
+    )
+
+    with patch("app.services.simplefi.get_simplefi_client") as mock_get_client:
+        mock_get_client.return_value.create_payment.return_value = SimpleNamespace(
+            id="sf_open_ticketing_both_fees",
+            status="pending",
+            checkout_url="https://simplefi.test/checkout/both-fees",
+            is_installment_plan=False,
+        )
+
+        payment, _, _ = payments_crud.create_open_ticketing_payment(
+            db,
+            obj=obj,
+            popup=popup,
+            tenant=tenant_a,
+        )
+
+        sent_amount = mock_get_client.return_value.create_payment.call_args.kwargs[
+            "amount"
+        ]
+
+    # Post-discount base = $100. Both fees read THAT base, not each other:
+    #   insurance     = 5%  of $100 = $5
+    #   contribution  = 10% of $100 = $10  (NOT 10% of $105)
+    #   grand total   = $100 + $5 + $10 = $115
+    assert payment.insurance_amount == Decimal("5.00")
+    assert payment.contribution_amount == Decimal("10.00")
+    assert payment.amount == Decimal("115.00")
+    assert sent_amount == Decimal("115.00")
 
 
 def test_create_open_ticketing_payment_100_percent_coupon_auto_approves(

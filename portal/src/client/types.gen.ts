@@ -2519,6 +2519,7 @@ export type OpenTicketingPurchaseCreate = {
     products: Array<ProductLine>;
     buyer: BuyerInfo;
     coupon_code?: (string | null);
+    insurance?: boolean;
     fbc?: (string | null);
     fbp?: (string | null);
 };

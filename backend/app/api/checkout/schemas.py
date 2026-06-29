@@ -116,6 +116,10 @@ class OpenTicketingPurchaseCreate(BaseModel):
     products: list[ProductLine] = Field(min_length=1)
     buyer: BuyerInfo
     coupon_code: str | None = None
+    # Buyer opt-in for the optional insurance fee (mirrors the authenticated
+    # flow). Insurance is charged only when this is true and the popup enables
+    # it; the amount is computed server-side from eligible products.
+    insurance: bool = False
     fbc: str | None = Field(default=None, max_length=512)
     fbp: str | None = Field(default=None, max_length=512)
 

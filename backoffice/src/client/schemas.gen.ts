@@ -11577,6 +11577,11 @@ export const OpenTicketingPurchaseCreateSchema = {
             ],
             title: 'Coupon Code'
         },
+        insurance: {
+            type: 'boolean',
+            title: 'Insurance',
+            default: false
+        },
         fbc: {
             anyOf: [
                 {
