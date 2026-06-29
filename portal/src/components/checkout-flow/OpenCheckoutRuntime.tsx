@@ -1,5 +1,6 @@
 "use client"
 
+import { useSearchParams } from "next/navigation"
 import { useEffect, useMemo, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 import {
@@ -134,6 +135,9 @@ export function OpenCheckoutRuntime({
   prefilledBuyer,
 }: OpenCheckoutRuntimeProps) {
   const { t } = useTranslation()
+  const searchParams = useSearchParams()
+  const cartCid = searchParams.get("cid")
+  const cartSig = searchParams.get("sig")
   const [discountApplied, setDiscountApplied] = useState<DiscountProps>({
     discount_value: 0,
     discount_type: "percentage",
@@ -217,6 +221,9 @@ export function OpenCheckoutRuntime({
                   }
                   cartPersistenceEnabled={false}
                   cartUiEnabled={true}
+                  openCartPopupSlug={popupSlug}
+                  openCartCid={cartCid}
+                  openCartSig={cartSig}
                   validatePromoCodeOverride={async (code) => {
                     const result = await CouponsService.validateCouponPublic({
                       requestBody: {

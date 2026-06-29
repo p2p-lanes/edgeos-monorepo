@@ -11470,6 +11470,89 @@ export const OccurrenceRefSchema = {
     description: 'Body referencing a specific instance of a recurring series.'
 } as const;
 
+export const OpenCartPublicSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        popup_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Popup Id'
+        },
+        email: {
+            type: 'string',
+            title: 'Email'
+        },
+        items: {
+            '$ref': '#/components/schemas/CartState'
+        },
+        restore_token: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Restore Token'
+        },
+        created_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Created At'
+        },
+        updated_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Updated At'
+        }
+    },
+    type: 'object',
+    required: ['id', 'popup_id', 'email', 'items'],
+    title: 'OpenCartPublic',
+    description: `Anonymous open-checkout cart response.
+
+\`restore_token\` is the HMAC for the signed restore link
+(GET /checkout/{slug}/cart?cid=<id>&sig=<restore_token>). It is only
+present when the popup configures an open_checkout_signing_secret; the
+client stores it to rebuild the cart on a later visit.`
+} as const;
+
+export const OpenCartUpsertSchema = {
+    properties: {
+        email: {
+            type: 'string',
+            format: 'email',
+            title: 'Email'
+        },
+        items: {
+            '$ref': '#/components/schemas/CartState'
+        }
+    },
+    type: 'object',
+    required: ['email', 'items'],
+    title: 'OpenCartUpsert',
+    description: 'Anonymous open-checkout cart upsert request (keyed by email).'
+} as const;
+
 export const OpenTicketingPurchaseCreateSchema = {
     properties: {
         products: {

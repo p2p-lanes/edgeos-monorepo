@@ -35,6 +35,7 @@ import {
   usePaymentSubmit,
   usePromoCode,
 } from "@/hooks/checkout"
+import { useOpenCartPersistence } from "@/hooks/checkout/useOpenCartPersistence"
 import { useStepProductResolver } from "@/hooks/checkout/useStepProductResolver"
 import useGetPassesData from "@/hooks/useGetPassesData"
 import { useIsAuthenticated } from "@/hooks/useIsAuthenticated"
@@ -200,6 +201,12 @@ interface CheckoutProviderProps {
   initialBuyerValues?: Record<string, unknown>
   cartPersistenceEnabled?: boolean
   cartUiEnabled?: boolean
+  /** When set, enables anonymous open-cart persistence (localStorage + backend upsert). */
+  openCartPopupSlug?: string | null
+  /** Cart id from the signed restore link (?cid=). Only relevant when openCartPopupSlug is set. */
+  openCartCid?: string | null
+  /** HMAC restore token (?sig=). Only relevant when openCartPopupSlug is set. */
+  openCartSig?: string | null
 }
 
 export function CheckoutProvider({
@@ -215,6 +222,9 @@ export function CheckoutProvider({
   initialBuyerValues = {},
   cartPersistenceEnabled = true,
   cartUiEnabled = true,
+  openCartPopupSlug = null,
+  openCartCid = null,
+  openCartSig = null,
 }: CheckoutProviderProps) {
   const { t } = useTranslation()
   const {
@@ -526,6 +536,33 @@ export function CheckoutProvider({
     paymentCompleteRef,
   })
 
+  // Anonymous open-cart persistence (localStorage + backend upsert).
+  // Only active when openCartPopupSlug is provided (open-checkout flow).
+  const openCartEnabled = !!openCartPopupSlug
+  const openCartBuyerEmail =
+    typeof buyerValues.email === "string" ? buyerValues.email : ""
+
+  const { scheduleSave: scheduleOpenCartSave, clearOpenCart } =
+    useOpenCartPersistence({
+      popupSlug: openCartPopupSlug ?? "",
+      selectionStateRef,
+      products,
+      housingPricePerDay,
+      restorationSetters: {
+        setHousing,
+        setMerch,
+        setPatron,
+        setMealPlans: setSelectedMealPlans,
+        setInsurance,
+      },
+      hasRestoredCheckoutRef,
+      paymentCompleteRef,
+      buyerEmail: openCartBuyerEmail,
+      initialStep,
+      cid: openCartCid,
+      sig: openCartSig,
+    })
+
   // Promo code hook
   const {
     promoCode,
@@ -589,6 +626,7 @@ export function CheckoutProvider({
   // biome-ignore lint/correctness/useExhaustiveDependencies: deps drive the save; scheduleSave reads via ref
   useEffect(() => {
     scheduleSave()
+    if (openCartEnabled) scheduleOpenCartSave()
   }, [
     selectedPasses,
     housing,
@@ -598,7 +636,12 @@ export function CheckoutProvider({
     promoCode,
     promoCodeValid,
     insurance,
+    // openCartBuyerEmail included so a valid email entered after product
+    // selection triggers the first anonymous save.
+    openCartBuyerEmail,
     scheduleSave,
+    scheduleOpenCartSave,
+    openCartEnabled,
   ])
 
   // Credit calculations — gated by popup.credits_enabled
@@ -1053,6 +1096,7 @@ export function CheckoutProvider({
   // Cart management
   const clearCart = useCallback(() => {
     clearPersistedCart()
+    if (openCartEnabled) clearOpenCart()
     clearSelections()
     clearHousing()
     setMerch([])
@@ -1063,6 +1107,8 @@ export function CheckoutProvider({
     setDynamicItems({})
   }, [
     clearPersistedCart,
+    clearOpenCart,
+    openCartEnabled,
     clearSelections,
     clearHousing,
     setMerch,
