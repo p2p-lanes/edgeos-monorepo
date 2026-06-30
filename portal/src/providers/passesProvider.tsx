@@ -21,6 +21,7 @@ import { usePurchasesQuery } from "@/hooks/useGetPurchases"
 import { getPriceStrategy } from "@/strategies/PriceStrategy"
 import { getProductStrategy } from "@/strategies/ProductStrategies"
 import { getPurchaseStrategy } from "@/strategies/PurchaseStrategy"
+import { isPassQuantityBased } from "@/strategies/passQuantityHelper"
 import type { AttendeePassState } from "@/types/Attendee"
 import type { ProductsPass } from "@/types/Products"
 import { useCityProvider } from "./cityProvider"
@@ -120,9 +121,14 @@ export function buildBaseAttendeePasses(
       products,
       purchased,
     ).map((product: ProductsPass) => {
+      // Use isPassQuantityBased so full/month passes are never treated as
+      // multi-unit, regardless of max_per_order. A full pass with
+      // max_per_order=null means "one per order, unlimited stock" — not
+      // "can add multiple units". Without this, supportsQuantitySelector(null)
+      // returns true for full/month, setting initialQuantity=0 and breaking
+      // editCredit (price * 0 = 0).
       const isMultiUnit =
-        product.duration_type !== "day" &&
-        supportsQuantitySelector(product.max_per_order)
+        product.duration_type !== "day" && isPassQuantityBased(product)
       const originalQuantity =
         product.duration_type === "day"
           ? (purchased.find((p) => p.id === product.id)?.quantity ?? 0)

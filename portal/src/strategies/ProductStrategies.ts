@@ -8,6 +8,7 @@ import {
   getPriceStrategy,
   type PriceStrategy,
 } from "@/strategies/PriceStrategy"
+import { isPassQuantityBased } from "@/strategies/passQuantityHelper"
 import type { AttendeePassState } from "@/types/Attendee"
 import type { DiscountProps } from "@/types/discounts"
 import type { ProductsPass } from "@/types/Products"
@@ -502,11 +503,12 @@ class EditProductStrategy implements ProductStrategy {
 
     const isMonthLike =
       product.duration_type === "month" || product.duration_type === "full"
-    // Day passes and multi-unit products (max_per_order null/>1) are driven by
-    // quantity, not a plain selected toggle — the caller passes the new value.
-    const usesQuantity =
-      product.duration_type === "day" ||
-      supportsQuantitySelector(product.max_per_order)
+    // Day passes and genuinely multi-unit products are driven by quantity, not a
+    // plain selected toggle. Full and month passes are single-select in
+    // pass_system regardless of max_per_order — use isPassQuantityBased so a
+    // purchased full/month pass with max_per_order=null is toggled for credit
+    // instead of hitting the quantity branch and no-op'ing.
+    const usesQuantity = isPassQuantityBased(product)
 
     return attendees.map((attendee) => {
       if (attendee.id !== attendeeId) return attendee
