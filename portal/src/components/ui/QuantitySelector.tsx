@@ -130,9 +130,12 @@ const QuantitySelector = ({
     const addClasses = cn(
       "transition-all duration-200 ease-out transform hover:scale-110 active:scale-95 flex items-center justify-center rounded-full shadow-sm",
       isAccent
-        ? // Solid PRIMARY tile + ACCENT icon. Falls back to foreground/background
-          // if the popup didn't set a primary/accent so the button still renders.
-          "bg-[color:var(--primary,theme(colors.foreground))] text-[color:var(--accent,theme(colors.background))] hover:brightness-110"
+        ? // Solid PRIMARY tile + PRIMARY-FOREGROUND icon — the theme's
+          // guaranteed on-primary colour (same pairing as the Continue
+          // button), so the "+" stays legible even when the accent is a
+          // dark earthy tone that barely contrasts with primary. Falls back
+          // to foreground/background if the popup set no theme.
+          "bg-[color:var(--primary,theme(colors.foreground))] text-[color:var(--primary-foreground,theme(colors.background))] hover:brightness-110"
         : "hover:bg-primary/30 bg-primary/20 text-primary",
       ADD_BUTTON_SIZES[size],
     )

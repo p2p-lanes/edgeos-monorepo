@@ -192,16 +192,18 @@ function ProductRow({
     updateDynamicQuantity(stepType, product.id, qty)
   }
 
-  // CTA palette mirrors the inverted "+" tile in QuantitySelector:
-  // PRIMARY fill with ACCENT text/icon. Pops harder against light card
-  // surfaces. When added, swap to a softer accent fill so the toggle
-  // state is visually distinct.
+  // CTA palette mirrors the inverted "+" tile in QuantitySelector: a PRIMARY
+  // fill with the theme's PRIMARY-FOREGROUND icon/text — the guaranteed
+  // on-primary contrast pair (same as the Continue button), so the control
+  // stays legible regardless of how close the accent sits to primary. When
+  // added, swap to an accent fill (still with primary-foreground content) so
+  // the toggle state reads as distinct without sacrificing legibility.
   const ctaClass = cn(
     "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold tracking-wide shrink-0 transition-all whitespace-nowrap",
     "shadow-sm border border-[color:var(--primary,transparent)]",
     isAdded
-      ? "bg-[color:var(--accent,theme(colors.foreground))] text-[color:var(--primary,theme(colors.background))]"
-      : "bg-[color:var(--primary,theme(colors.foreground))] text-[color:var(--accent,theme(colors.background))] hover:brightness-110 active:scale-[0.98]",
+      ? "bg-[color:var(--accent,theme(colors.foreground))] text-[color:var(--primary-foreground,theme(colors.background))]"
+      : "bg-[color:var(--primary,theme(colors.foreground))] text-[color:var(--primary-foreground,theme(colors.background))] hover:brightness-110 active:scale-[0.98]",
     rowDisabled && "cursor-not-allowed opacity-50",
   )
 
@@ -340,7 +342,12 @@ function SectionCard({
   return (
     <article
       style={resolveSurfaceStyle(surface)}
-      className="rounded-2xl overflow-hidden border border-border shadow-sm"
+      // Border is drawn as an inset overlay (after:) instead of a box `border`.
+      // A real border + overflow-hidden + a full-bleed image rasterise the
+      // rounded edge in two passes, leaving a 1px seam where the image meets
+      // the frame. The overlay shares the exact same rounded shape and paints
+      // on top of the image, so the edge is pixel-aligned.
+      className="relative flex h-full w-full flex-col rounded-2xl overflow-hidden shadow-sm after:pointer-events-none after:absolute after:inset-0 after:rounded-2xl after:border after:border-border"
     >
       {section.image_url && (
         <div
@@ -387,7 +394,12 @@ function SectionCard({
           />
         </div>
       )}
-      <div className="divide-y divide-border">
+      {/* Products anchored to the bottom (mt-auto) so the add CTAs line up
+          across cards of different product counts — the pricing-card pattern
+          that aids cross-card comparison. The top border seals them as an
+          "options" footer so a short card reads as deliberate spacing rather
+          than a half-empty card. */}
+      <div className="mt-auto divide-y divide-border border-t border-border">
         {products.map((p) => (
           <ProductRow key={p.id} product={p} stepType={stepType} />
         ))}
@@ -417,10 +429,12 @@ function StackedLayout({
   // a fractional grid) keeps every card the same size regardless of how many
   // sections exist, so a lone card doesn't stretch to fill the row. The parent
   // step is widened (max-w-6xl) so up to three cards fit per row on desktop.
+  // `items-stretch` + a flex card wrapper make every card in a row match the
+  // tallest one regardless of how many products its section holds.
   return (
-    <div className="flex flex-wrap items-start justify-center gap-4">
+    <div className="flex flex-wrap items-stretch justify-center gap-4">
       {groups.map(({ section, products }) => (
-        <div key={section.key} className="w-full sm:w-[340px]">
+        <div key={section.key} className="flex w-full sm:w-[340px]">
           <SectionCard
             section={section}
             products={products}
