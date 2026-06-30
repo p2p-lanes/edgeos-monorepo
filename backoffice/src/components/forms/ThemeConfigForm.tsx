@@ -406,6 +406,86 @@ export function ThemeConfigForm({
               isHighlighted={highlightedKeys.has("checkout_subtitle_color")}
               disabled={readOnly}
             />
+            <ColorField
+              colorKey="checkout_nav_text_color"
+              label="Checkout nav text"
+              description="Optional color for the checkout step-nav labels and icons (Tickets, Your Information, Review). Leave empty to derive from your primary text color."
+              value={colors.checkout_nav_text_color ?? ""}
+              defaultValue=""
+              onChange={(v) => handleColorChange("checkout_nav_text_color", v)}
+              onReset={() => handleResetColor("checkout_nav_text_color")}
+              onHover={handleHover}
+              isHighlighted={highlightedKeys.has("checkout_nav_text_color")}
+              disabled={readOnly}
+            />
+            <ColorField
+              colorKey="checkout_bottom_bar_bg_color"
+              label="Checkout footer bar"
+              description="Optional background for the floating total/continue bar at the bottom of the checkout. Leave empty to use the default bar color."
+              value={colors.checkout_bottom_bar_bg_color ?? ""}
+              defaultValue=""
+              onChange={(v) =>
+                handleColorChange("checkout_bottom_bar_bg_color", v)
+              }
+              onReset={() => handleResetColor("checkout_bottom_bar_bg_color")}
+              onHover={handleHover}
+              isHighlighted={highlightedKeys.has(
+                "checkout_bottom_bar_bg_color",
+              )}
+              disabled={readOnly}
+            />
+            <ColorField
+              colorKey="checkout_bottom_bar_text_color"
+              label="Checkout footer text"
+              description="Optional text/total color for the floating bottom bar. Leave empty to use the default."
+              value={colors.checkout_bottom_bar_text_color ?? ""}
+              defaultValue=""
+              onChange={(v) =>
+                handleColorChange("checkout_bottom_bar_text_color", v)
+              }
+              onReset={() => handleResetColor("checkout_bottom_bar_text_color")}
+              onHover={handleHover}
+              isHighlighted={highlightedKeys.has(
+                "checkout_bottom_bar_text_color",
+              )}
+              disabled={readOnly}
+            />
+            <ColorField
+              colorKey="card_background_color"
+              label="Checkout card background"
+              description="Optional background for cards in the checkout (ticket cards, summary, insurance). Leave empty to use the mode's card surface."
+              value={colors.card_background_color ?? ""}
+              defaultValue=""
+              onChange={(v) => handleColorChange("card_background_color", v)}
+              onReset={() => handleResetColor("card_background_color")}
+              onHover={handleHover}
+              isHighlighted={highlightedKeys.has("card_background_color")}
+              disabled={readOnly}
+            />
+            <ColorField
+              colorKey="card_foreground_color"
+              label="Checkout card text"
+              description="Optional text color inside checkout cards. Leave empty to derive from the mode for readable contrast."
+              value={colors.card_foreground_color ?? ""}
+              defaultValue=""
+              onChange={(v) => handleColorChange("card_foreground_color", v)}
+              onReset={() => handleResetColor("card_foreground_color")}
+              onHover={handleHover}
+              isHighlighted={highlightedKeys.has("card_foreground_color")}
+              disabled={readOnly}
+            />
+            <ColorField
+              colorKey="checkout_watermark_color"
+              label="Checkout watermark"
+              description="Optional color for the giant section-name text behind the checkout content. Leave empty to derive a subtle tint from the mode."
+              value={colors.checkout_watermark_color ?? ""}
+              defaultValue=""
+              onChange={(v) => handleColorChange("checkout_watermark_color", v)}
+              onReset={() => handleResetColor("checkout_watermark_color")}
+              onHover={handleHover}
+              isHighlighted={highlightedKeys.has("checkout_watermark_color")}
+              disabled={readOnly}
+            />
           </div>
 
           {/* Typography */}
