@@ -4637,6 +4637,14 @@ export const CheckoutRuntimeResponseSchema = {
             type: 'array',
             title: 'Ticketing Steps'
         },
+        attendee_categories: {
+            items: {
+                '$ref': '#/components/schemas/AttendeeCategoryPublic'
+            },
+            type: 'array',
+            title: 'Attendee Categories',
+            default: []
+        },
         form_schema: {
             anyOf: [
                 {
@@ -11576,6 +11584,11 @@ export const OpenTicketingPurchaseCreateSchema = {
                 }
             ],
             title: 'Coupon Code'
+        },
+        insurance: {
+            type: 'boolean',
+            title: 'Insurance',
+            default: false
         },
         fbc: {
             anyOf: [

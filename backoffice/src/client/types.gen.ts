@@ -1072,6 +1072,7 @@ export type CheckoutRuntimeResponse = {
     products: Array<CheckoutRuntimeProduct>;
     buyer_form: Array<CheckoutBuyerSection>;
     ticketing_steps: Array<TicketingStepPublic>;
+    attendee_categories?: Array<AttendeeCategoryPublic>;
     form_schema?: ({
     [key: string]: unknown;
 } | null);
@@ -2519,6 +2520,7 @@ export type OpenTicketingPurchaseCreate = {
     products: Array<ProductLine>;
     buyer: BuyerInfo;
     coupon_code?: (string | null);
+    insurance?: boolean;
     fbc?: (string | null);
     fbp?: (string | null);
 };

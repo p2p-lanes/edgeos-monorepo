@@ -658,6 +658,7 @@ export function CheckoutProvider({
       selectedPasses,
       housing,
       merch,
+      dynamicItems,
       insurance,
     },
   )

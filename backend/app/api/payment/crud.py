@@ -747,15 +747,34 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 # provider failure never burns a single-use code. Mirrors the
                 # application flow.
 
-            payment.amount = discountable_amount + non_discountable_amount
+            # Post-discount subtotal is the shared base for BOTH optional fees.
+            # Insurance and contribution each read this same baseline so they
+            # never compound on each other (mirrors _apply_discounts / ADR-2).
+            post_discount_amount = discountable_amount + non_discountable_amount
+            payment.amount = post_discount_amount
+
+            # Insurance fee (buyer opt-in). Computed on the eligible-product
+            # subtotal at full price via the shared helper, matching the
+            # authenticated flow and the portal display. Skipped when the cart
+            # is already $0 (a fee on nothing makes no sense).
+            if obj.insurance and post_discount_amount > Decimal("0"):
+                insurance_amount = calculate_insurance_amount(
+                    popup,
+                    [
+                        (products_map[line.product_id], line.quantity)
+                        for line in obj.products
+                    ],
+                )
+                payment.insurance_amount = insurance_amount
+                payment.amount += insurance_amount
 
             # Contribution fee (mandatory when the popup enables it — no buyer
-            # opt-in). Open checkout has no insurance, so the post-discount
-            # subtotal is the contribution base, matching the portal display.
+            # opt-in). Its base is the post-discount subtotal, NOT the
+            # insurance-inflated total, so the two fees stay independent.
             # Mirrors the application flow in _apply_discounts.
             if popup.contribution_enabled and popup.contribution_percentage:
                 contribution_amount = calculate_contribution_amount(
-                    popup, payment.amount
+                    popup, post_discount_amount
                 )
                 payment.contribution_amount = contribution_amount
                 payment.amount += contribution_amount
