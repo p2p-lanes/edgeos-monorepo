@@ -7,6 +7,7 @@ import {
   CONTENT_ONLY_TEMPLATES,
   VARIANT_REGISTRY,
 } from "./registries/variantRegistry"
+import EditPassesToggle from "./shared/EditPassesToggle"
 
 interface DynamicProductStepProps {
   stepConfig: TicketingStepPublic
@@ -67,7 +68,7 @@ export default function DynamicProductStep({
     )
   }
 
-  return (
+  const variant = (
     <VariantComponent
       products={filtered}
       stepType={stepConfig.step_type}
@@ -77,4 +78,18 @@ export default function DynamicProductStep({
       }
     />
   )
+
+  // The edit-passes toggle is checkout-level functionality, agnostic to the
+  // product template. Render it above the variant for the tickets step so it
+  // appears regardless of which ticket template the popup uses.
+  if (stepConfig.step_type === "tickets") {
+    return (
+      <div className="space-y-4">
+        <EditPassesToggle />
+        {variant}
+      </div>
+    )
+  }
+
+  return variant
 }
