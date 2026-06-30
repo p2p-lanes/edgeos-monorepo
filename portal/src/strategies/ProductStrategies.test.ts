@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 import { CHECKOUT_MODE } from "@/checkout/popupCheckoutPolicy"
 import { getProductStrategy } from "@/strategies/ProductStrategies"
+import { isPassQuantityBased } from "@/strategies/passQuantityHelper"
 import type { AttendeePassState } from "@/types/Attendee"
 import type { ProductsPass } from "@/types/Products"
 
@@ -488,5 +489,457 @@ describe("ExclusivityGuard — section scope (tech-summit reproduction)", () => 
     expect(updatedGa?.selected).toBe(true)
     expect(updatedVip?.quantity).toBe(0)
     expect(updatedVip?.selected).toBe(false)
+  })
+})
+
+describe("EditProductStrategy — month upgrade while editing", () => {
+  const month = (overrides: Partial<ProductsPass> = {}) =>
+    createProduct({
+      id: "month",
+      duration_type: "month",
+      price: 400,
+      max_per_order: 1,
+      ...overrides,
+    })
+  const week = (id: string, overrides: Partial<ProductsPass> = {}) =>
+    createProduct({
+      id,
+      duration_type: "week",
+      price: 100,
+      max_per_order: 1,
+      ...overrides,
+    })
+
+  // Owns Week 1. Selecting the month should give up the owned week for credit
+  // (edit=true) so the price collapses to month - credit.
+  it("selecting month credits owned weeks", () => {
+    const attendees = [
+      createAttendee([
+        month(),
+        week("w1", { purchased: true, selected: true }),
+      ]),
+    ]
+    const strategy = getProductStrategy(
+      month(),
+      true,
+      CHECKOUT_MODE.PASS_SYSTEM,
+    )
+    const result = strategy.handleSelection(attendees, "attendee-1", month())
+
+    const m = result[0]?.products.find((p) => p.id === "month")
+    const w1 = result[0]?.products.find((p) => p.id === "w1")
+    expect(m?.selected).toBe(true)
+    expect(w1?.edit).toBe(true)
+    expect(w1?.selected).toBe(false)
+  })
+
+  // Owns Week 1 (given up for credit) and added Weeks 2-4. Selecting the month
+  // must drop the newly added weeks and keep the owned week credited.
+  it("selecting month deselects newly added weeks and keeps owned week credited", () => {
+    const attendees = [
+      createAttendee([
+        month(),
+        week("w1", { purchased: true, edit: true, selected: false }),
+        week("w2", { selected: true }),
+        week("w3", { selected: true }),
+        week("w4", { selected: true }),
+      ]),
+    ]
+    const strategy = getProductStrategy(
+      month(),
+      true,
+      CHECKOUT_MODE.PASS_SYSTEM,
+    )
+    const result = strategy.handleSelection(attendees, "attendee-1", month())
+
+    const products = result[0]?.products
+    expect(products?.find((p) => p.id === "month")?.selected).toBe(true)
+    expect(products?.find((p) => p.id === "w1")?.edit).toBe(true)
+    for (const id of ["w2", "w3", "w4"]) {
+      expect(products?.find((p) => p.id === id)?.selected).toBe(false)
+    }
+  })
+
+  // Deselecting the month restores the owned week as kept (not credited).
+  it("deselecting month restores owned weeks to kept", () => {
+    const attendees = [
+      createAttendee([
+        month({ selected: true }),
+        week("w1", { purchased: true, edit: true, selected: false }),
+      ]),
+    ]
+    const selectedMonth = month({ selected: true })
+    const strategy = getProductStrategy(
+      selectedMonth,
+      true,
+      CHECKOUT_MODE.PASS_SYSTEM,
+    )
+    const result = strategy.handleSelection(
+      attendees,
+      "attendee-1",
+      selectedMonth,
+    )
+
+    const m = result[0]?.products.find((p) => p.id === "month")
+    const w1 = result[0]?.products.find((p) => p.id === "w1")
+    expect(m?.selected).toBe(false)
+    expect(w1?.edit).toBe(false)
+    expect(w1?.selected).toBe(true)
+  })
+
+  // The reported bug: owns Week 1 (kept) and selects the remaining weeks. The
+  // 4th selection completes the set and must auto-promote to the month, just
+  // like WeekProductStrategy does in normal checkout (bypassed while editing).
+  it("completing the week set auto-promotes to month and credits the owned week", () => {
+    const scope = ["month", "w1", "w2", "w3", "w4"]
+    const attendees = [
+      createAttendee([
+        month(),
+        week("w1", { purchased: true, selected: true }),
+        week("w2", { selected: true }),
+        week("w3", { selected: true }),
+        week("w4", { selected: false }),
+      ]),
+    ]
+    const w4 = week("w4", { selected: false })
+    const strategy = getProductStrategy(w4, true, CHECKOUT_MODE.PASS_SYSTEM)
+    const result = strategy.handleSelection(
+      attendees,
+      "attendee-1",
+      w4,
+      undefined,
+      scope,
+      scope,
+    )
+
+    const products = result[0]?.products
+    expect(products?.find((p) => p.id === "month")?.selected).toBe(true)
+    // Owned week is given up for credit, newly added weeks are dropped.
+    expect(products?.find((p) => p.id === "w1")?.edit).toBe(true)
+    for (const id of ["w2", "w3", "w4"]) {
+      expect(products?.find((p) => p.id === id)?.selected).toBe(false)
+    }
+  })
+
+  // Below the threshold there is no promotion: selecting a 2nd week with one
+  // owned must keep the weeks as-is (no month yet).
+  it("does not promote before the full week set is active", () => {
+    const scope = ["month", "w1", "w2", "w3", "w4"]
+    const attendees = [
+      createAttendee([
+        month(),
+        week("w1", { purchased: true, selected: true }),
+        week("w2", { selected: false }),
+        week("w3", { selected: false }),
+        week("w4", { selected: false }),
+      ]),
+    ]
+    const w2 = week("w2", { selected: false })
+    const strategy = getProductStrategy(w2, true, CHECKOUT_MODE.PASS_SYSTEM)
+    const result = strategy.handleSelection(
+      attendees,
+      "attendee-1",
+      w2,
+      undefined,
+      scope,
+      scope,
+    )
+
+    const products = result[0]?.products
+    expect(products?.find((p) => p.id === "month")?.selected).toBeFalsy()
+    expect(products?.find((p) => p.id === "w2")?.selected).toBe(true)
+    expect(products?.find((p) => p.id === "w1")?.selected).toBe(true)
+  })
+
+  // Reported bug: owns a week and adds a day pass. Day passes are driven by
+  // quantity, which the plain edit toggle ignored — the "+" did nothing.
+  it("adding a day pass updates its quantity while editing", () => {
+    const attendees = [
+      createAttendee([
+        week("w1", { purchased: true, selected: true }),
+        createProduct({
+          id: "day",
+          duration_type: "day",
+          price: 99,
+          quantity: 0,
+          max_per_order: 5,
+        }),
+      ]),
+    ]
+    const dayClick = createProduct({
+      id: "day",
+      duration_type: "day",
+      price: 99,
+      quantity: 1,
+      max_per_order: 5,
+    })
+    const strategy = getProductStrategy(
+      dayClick,
+      true,
+      CHECKOUT_MODE.PASS_SYSTEM,
+    )
+    const result = strategy.handleSelection(attendees, "attendee-1", dayClick)
+
+    const day = result[0]?.products.find((p) => p.id === "day")
+    expect(day?.quantity).toBe(1)
+    expect(day?.selected).toBe(true)
+    // Owned week is untouched — adding a day is not a month upgrade.
+    expect(result[0]?.products.find((p) => p.id === "w1")?.edit).toBeFalsy()
+  })
+
+  // Reported bug: a quantity-based full pass (max_per_order null/>1) reads its
+  // selection from quantity, so upgrading credited the week but the tile never
+  // showed selected because quantity stayed 0.
+  it("upgrading to a quantity-based full pass sets its quantity and credits the week", () => {
+    const fullPass = createProduct({
+      id: "full",
+      duration_type: "full",
+      price: 400,
+      quantity: 1,
+      max_per_order: 5,
+    })
+    const attendees = [
+      createAttendee([
+        createProduct({
+          id: "full",
+          duration_type: "full",
+          price: 400,
+          quantity: 0,
+          max_per_order: 5,
+          selected: false,
+        }),
+        week("w1", { purchased: true, selected: true }),
+      ]),
+    ]
+    const strategy = getProductStrategy(
+      fullPass,
+      true,
+      CHECKOUT_MODE.PASS_SYSTEM,
+    )
+    const result = strategy.handleSelection(attendees, "attendee-1", fullPass)
+
+    const full = result[0]?.products.find((p) => p.id === "full")
+    const w1 = result[0]?.products.find((p) => p.id === "w1")
+    expect(full?.selected).toBe(true)
+    expect(full?.quantity).toBeGreaterThanOrEqual(1)
+    expect(w1?.edit).toBe(true)
+    expect(w1?.selected).toBe(false)
+  })
+
+  // A Full pass is NOT an auto-upgrade target: completing the week set with
+  // only a full available must keep the weeks selected, never promote to full.
+  it("completing the week set does not auto-promote to a full pass", () => {
+    const scope = ["full", "w1", "w2", "w3", "w4"]
+    const attendees = [
+      createAttendee([
+        createProduct({
+          id: "full",
+          duration_type: "full",
+          price: 400,
+          quantity: 0,
+          max_per_order: 5,
+          selected: false,
+        }),
+        week("w1", { selected: true }),
+        week("w2", { selected: true }),
+        week("w3", { selected: true }),
+        week("w4", { selected: false }),
+      ]),
+    ]
+    const w4 = week("w4", { selected: false })
+    const strategy = getProductStrategy(w4, true, CHECKOUT_MODE.PASS_SYSTEM)
+    const result = strategy.handleSelection(
+      attendees,
+      "attendee-1",
+      w4,
+      undefined,
+      scope,
+      scope,
+    )
+
+    const products = result[0]?.products
+    expect(products?.find((p) => p.id === "full")?.selected).toBeFalsy()
+    for (const id of ["w1", "w2", "w3", "w4"]) {
+      expect(products?.find((p) => p.id === id)?.selected).toBe(true)
+    }
+  })
+})
+
+// ---------------------------------------------------------------------------
+// isPassQuantityBased helper
+// ---------------------------------------------------------------------------
+
+describe("isPassQuantityBased", () => {
+  const makePass = (overrides: Partial<ProductsPass>): ProductsPass =>
+    createProduct({
+      id: "p",
+      duration_type: "week",
+      max_per_order: 1,
+      ...overrides,
+    })
+
+  // full passes are ALWAYS single-select in pass_system, regardless of max_per_order
+  it("full pass with max_per_order=null → NOT quantity-based", () => {
+    const p = {
+      ...makePass({ duration_type: "full" }),
+      max_per_order: null,
+    } as ProductsPass
+    expect(isPassQuantityBased(p)).toBe(false)
+  })
+
+  it("full pass with max_per_order=5 → NOT quantity-based", () => {
+    const p = makePass({ duration_type: "full", max_per_order: 5 })
+    expect(isPassQuantityBased(p)).toBe(false)
+  })
+
+  // month passes are ALWAYS single-select in pass_system
+  it("month pass with max_per_order=null → NOT quantity-based", () => {
+    const p = {
+      ...makePass({ duration_type: "month" }),
+      max_per_order: null,
+    } as ProductsPass
+    expect(isPassQuantityBased(p)).toBe(false)
+  })
+
+  it("month pass with max_per_order=3 → NOT quantity-based", () => {
+    const p = makePass({ duration_type: "month", max_per_order: 3 })
+    expect(isPassQuantityBased(p)).toBe(false)
+  })
+
+  // day passes are ALWAYS quantity-based
+  it("day pass with max_per_order=1 → quantity-based", () => {
+    const p = makePass({ duration_type: "day", max_per_order: 1 })
+    expect(isPassQuantityBased(p)).toBe(true)
+  })
+
+  it("day pass with max_per_order=null → quantity-based", () => {
+    const p = {
+      ...makePass({ duration_type: "day" }),
+      max_per_order: null,
+    } as ProductsPass
+    expect(isPassQuantityBased(p)).toBe(true)
+  })
+
+  // week passes: quantity-based only when max_per_order is null or >1
+  it("week pass with max_per_order=1 → NOT quantity-based", () => {
+    const p = makePass({ duration_type: "week", max_per_order: 1 })
+    expect(isPassQuantityBased(p)).toBe(false)
+  })
+
+  it("week pass with max_per_order=3 → quantity-based", () => {
+    const p = makePass({ duration_type: "week", max_per_order: 3 })
+    expect(isPassQuantityBased(p)).toBe(true)
+  })
+
+  it("week pass with max_per_order=null → quantity-based", () => {
+    const p = {
+      ...makePass({ duration_type: "week" }),
+      max_per_order: null,
+    } as ProductsPass
+    expect(isPassQuantityBased(p)).toBe(true)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// EditProductStrategy — purchased FULL pass in edit mode (bug fix)
+// ---------------------------------------------------------------------------
+
+describe("EditProductStrategy — purchased full pass can be given up for credit", () => {
+  // Purchased FULL pass (max_per_order=null) clicked in edit mode.
+  // Must toggle edit=true (give up for credit), NOT no-op via quantity branch.
+  it("purchased full pass (max_per_order=null) row click sets edit=true", () => {
+    const fullPass = {
+      ...createProduct({
+        id: "full-ga",
+        duration_type: "full",
+        price: 500,
+        selected: true,
+        purchased: true,
+      }),
+      max_per_order: null,
+    } as ProductsPass
+
+    const attendees = [createAttendee([fullPass])]
+    const strategy = getProductStrategy(
+      fullPass,
+      true,
+      CHECKOUT_MODE.PASS_SYSTEM,
+    )
+    // Row click passes quantity=0 (default for a toggle row click)
+    const clicked = { ...fullPass, quantity: 0 }
+    const result = strategy.handleSelection(attendees, "attendee-1", clicked)
+
+    const p = result[0]?.products.find((prod) => prod.id === "full-ga")
+    expect(p?.edit).toBe(true)
+  })
+
+  it("purchased month pass (max_per_order=null) row click sets edit=true", () => {
+    const monthPass = {
+      ...createProduct({
+        id: "month-pass",
+        duration_type: "month",
+        price: 400,
+        selected: true,
+        purchased: true,
+      }),
+      max_per_order: null,
+    } as ProductsPass
+
+    const attendees = [createAttendee([monthPass])]
+    const strategy = getProductStrategy(
+      monthPass,
+      true,
+      CHECKOUT_MODE.PASS_SYSTEM,
+    )
+    const clicked = { ...monthPass, quantity: 0 }
+    const result = strategy.handleSelection(attendees, "attendee-1", clicked)
+
+    const p = result[0]?.products.find((prod) => prod.id === "month-pass")
+    expect(p?.edit).toBe(true)
+  })
+
+  // Regression: day pass and a genuinely multi-unit NON-full product STILL use quantity
+  it("day pass still uses quantity branch in edit mode (regression)", () => {
+    const dayPass = createProduct({
+      id: "day",
+      duration_type: "day",
+      price: 99,
+      quantity: 0,
+      max_per_order: 5,
+    })
+    const attendees = [createAttendee([dayPass])]
+    const strategy = getProductStrategy(
+      dayPass,
+      true,
+      CHECKOUT_MODE.PASS_SYSTEM,
+    )
+    const clicked = { ...dayPass, quantity: 2 }
+    const result = strategy.handleSelection(attendees, "attendee-1", clicked)
+
+    const p = result[0]?.products.find((prod) => prod.id === "day")
+    expect(p?.quantity).toBe(2)
+    expect(p?.selected).toBe(true)
+  })
+
+  it("week pass with max_per_order=3 still uses quantity branch in edit mode (regression)", () => {
+    const weekMulti = createProduct({
+      id: "week-multi",
+      duration_type: "week",
+      price: 150,
+      quantity: 0,
+      max_per_order: 3,
+    })
+    const attendees = [createAttendee([weekMulti])]
+    const strategy = getProductStrategy(
+      weekMulti,
+      true,
+      CHECKOUT_MODE.PASS_SYSTEM,
+    )
+    const clicked = { ...weekMulti, quantity: 2 }
+    const result = strategy.handleSelection(attendees, "attendee-1", clicked)
+
+    const p = result[0]?.products.find((prod) => prod.id === "week-multi")
+    expect(p?.quantity).toBe(2)
+    expect(p?.selected).toBe(true)
   })
 })
