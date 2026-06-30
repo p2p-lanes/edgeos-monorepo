@@ -237,7 +237,7 @@ class PopupBase(SQLModel):
         default=False,
         sa_column=Column(Boolean, nullable=False, server_default="false"),
     )
-    credits_enabled: bool = Field(
+    edit_passes_enabled: bool = Field(
         default=False,
         sa_column=Column(Boolean, nullable=False, server_default="false"),
     )
@@ -307,7 +307,7 @@ class PopupCreate(SQLModel):
     events_enabled: bool = True
     self_check_in_enabled: bool = False
     show_attendee_directory: bool = False
-    credits_enabled: bool = False
+    edit_passes_enabled: bool = False
     installments_enabled: bool = False
     installments_deadline: datetime | None = None
     installments_max: int | None = None
@@ -405,7 +405,7 @@ class PopupUpdate(SQLModel):
     events_enabled: bool | None = None
     self_check_in_enabled: bool | None = None
     show_attendee_directory: bool | None = None
-    credits_enabled: bool | None = None
+    edit_passes_enabled: bool | None = None
     installments_enabled: bool | None = None
     installments_deadline: datetime | None = None
     installments_max: int | None = None
@@ -511,7 +511,7 @@ class PopupPublic(SQLModel):
     application_layout: ApplicationLayout = ApplicationLayout.single_page
     events_enabled: bool = True
     show_attendee_directory: bool = False
-    credits_enabled: bool = False
+    edit_passes_enabled: bool = False
     installments_enabled: bool = False
     installments_deadline: datetime | None = None
     installments_max: int | None = None

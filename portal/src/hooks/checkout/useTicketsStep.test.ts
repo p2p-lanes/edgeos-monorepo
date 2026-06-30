@@ -43,7 +43,7 @@ vi.mock("@/providers/checkoutProvider", () => ({
   useCheckout: () => ({
     editCredit: mockEditCredit,
     isEditing: mockIsEditing,
-    creditsEnabled: true,
+    editPassesEnabled: true,
     cart: { dynamicItems: mockDynamicItems },
     addDynamicItem: mockAddDynamicItem,
     removeDynamicItem: mockRemoveDynamicItem,

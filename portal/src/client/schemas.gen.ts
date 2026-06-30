@@ -9769,6 +9769,29 @@ export const HumanActivityItemSchema = {
             ],
             title: 'Previous Rating'
         },
+        source: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Source'
+        },
+        balance_after: {
+            anyOf: [
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Balance After'
+        },
         actor_id: {
             anyOf: [
                 {
@@ -9816,7 +9839,7 @@ timestamp the feed sorts by.`
 
 export const HumanActivityKindSchema = {
     type: 'string',
-    enum: ['application.submitted', 'application.accepted', 'payment.completed', 'ticket.added', 'note.added', 'rating.changed', 'comment.added'],
+    enum: ['application.submitted', 'application.accepted', 'payment.completed', 'ticket.added', 'note.added', 'rating.changed', 'comment.added', 'credit.granted', 'credit.applied', 'credit.restored'],
     title: 'HumanActivityKind',
     description: 'The kind of event a timeline item represents.'
 } as const;
@@ -11857,6 +11880,12 @@ export const PaymentPreviewSchema = {
             title: 'Scholarship Discount',
             default: false
         },
+        credit_applied: {
+            type: 'string',
+            pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$',
+            title: 'Credit Applied',
+            default: '0'
+        },
         status: {
             anyOf: [
                 {
@@ -12303,6 +12332,12 @@ export const PaymentPublicSchema = {
                 }
             ],
             title: 'Granted By User Id'
+        },
+        credit_applied: {
+            type: 'string',
+            pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$',
+            title: 'Credit Applied',
+            default: '0'
         },
         id: {
             type: 'string',
@@ -13036,9 +13071,9 @@ export const PopupAdminSchema = {
             title: 'Show Attendee Directory',
             default: false
         },
-        credits_enabled: {
+        edit_passes_enabled: {
             type: 'boolean',
-            title: 'Credits Enabled',
+            title: 'Edit Passes Enabled',
             default: false
         },
         installments_enabled: {
@@ -13511,9 +13546,9 @@ export const PopupCreateSchema = {
             title: 'Show Attendee Directory',
             default: false
         },
-        credits_enabled: {
+        edit_passes_enabled: {
             type: 'boolean',
-            title: 'Credits Enabled',
+            title: 'Edit Passes Enabled',
             default: false
         },
         installments_enabled: {
@@ -13876,9 +13911,9 @@ export const PopupPublicSchema = {
             title: 'Show Attendee Directory',
             default: false
         },
-        credits_enabled: {
+        edit_passes_enabled: {
             type: 'boolean',
-            title: 'Credits Enabled',
+            title: 'Edit Passes Enabled',
             default: false
         },
         installments_enabled: {
@@ -14546,7 +14581,7 @@ export const PopupUpdateSchema = {
             ],
             title: 'Show Attendee Directory'
         },
-        credits_enabled: {
+        edit_passes_enabled: {
             anyOf: [
                 {
                     type: 'boolean'
@@ -14555,7 +14590,7 @@ export const PopupUpdateSchema = {
                     type: 'null'
                 }
             ],
-            title: 'Credits Enabled'
+            title: 'Edit Passes Enabled'
         },
         installments_enabled: {
             anyOf: [

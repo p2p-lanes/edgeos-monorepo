@@ -41,7 +41,7 @@ export default function ConfirmStep() {
     stepConfigs,
     buyerValues,
     buyerGeneralError,
-    creditsEnabled,
+    editPassesEnabled,
     removeMealPlan,
   } = useCheckout()
   const { getCity } = useCityProvider()
@@ -49,7 +49,7 @@ export default function ConfirmStep() {
   const { getRelevantApplication } = useApplication()
   const application = getRelevantApplication()
   const accountCredit =
-    creditsEnabled && application?.credit ? Number(application.credit) : 0
+    editPassesEnabled && application?.credit ? Number(application.credit) : 0
 
   const [promoInput, setPromoInput] = useState(cart.promoCode)
   const [promoError, setPromoError] = useState("")

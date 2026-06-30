@@ -26,6 +26,11 @@ class HumanActivityKind(str, Enum):
     RATING_CHANGED = "rating.changed"
     COMMENT_ADDED = "comment.added"
 
+    # Credit movements (grant, debit at purchase, restore on expire/cancel).
+    CREDIT_GRANTED = "credit.granted"
+    CREDIT_APPLIED = "credit.applied"
+    CREDIT_RESTORED = "credit.restored"
+
 
 class HumanActivityProduct(BaseModel):
     """One purchased line in a `payment.completed` item (snapshot at purchase)."""
@@ -62,6 +67,10 @@ class HumanActivityItem(BaseModel):
     # the previous one, both as HumanRating string values.
     rating: str | None = None
     previous_rating: str | None = None
+
+    # Credit movement payload (only set for credit.* kinds).
+    source: str | None = None
+    balance_after: Decimal | None = None
 
     # Actor — set for items a backoffice user performed: manual notes, rating
     # changes and comments.

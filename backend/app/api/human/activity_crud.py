@@ -12,6 +12,7 @@ under the `human.note_added` action, with the admin-chosen time in
 
 import uuid
 from datetime import UTC, datetime
+from decimal import Decimal
 from typing import TYPE_CHECKING
 
 from sqlalchemy.orm import selectinload
@@ -85,6 +86,40 @@ def rating_log_to_item(log: AuditLog) -> HumanActivityItem:
         occurred_at=_as_utc(log.created_at),
         rating=details.get("rating"),
         previous_rating=details.get("previous"),
+        actor_id=log.actor_id,
+        actor_name=log.actor_name,
+        actor_email=log.actor_email,
+    )
+
+
+def credit_log_to_item(log: AuditLog) -> HumanActivityItem:
+    """Map a credit.* audit row to a timeline item.
+
+    Credit actions (credit.granted, credit.applied, credit.restored) are
+    recorded with entity_type=HUMAN so they land on the human timeline via the
+    standard audit_logs query. The details dict carries amount, source,
+    balance_after, and optionally payment_id and note.
+    """
+    _KIND_MAP = {
+        AuditAction.CREDIT_GRANTED: HumanActivityKind.CREDIT_GRANTED,
+        AuditAction.CREDIT_APPLIED: HumanActivityKind.CREDIT_APPLIED,
+        AuditAction.CREDIT_RESTORED: HumanActivityKind.CREDIT_RESTORED,
+    }
+    details = log.details or {}
+    kind = _KIND_MAP.get(log.action, HumanActivityKind.CREDIT_GRANTED)
+    amount_raw = details.get("amount")
+    amount = Decimal(str(amount_raw)) if amount_raw is not None else None
+    balance_raw = details.get("balance_after")
+    balance_after = Decimal(str(balance_raw)) if balance_raw is not None else None
+    return HumanActivityItem(
+        id=f"credit:{log.id}",
+        kind=kind,
+        occurred_at=_as_utc(log.created_at),
+        popup_id=log.popup_id,
+        amount=amount,
+        source=details.get("source"),
+        balance_after=balance_after,
+        note=details.get("note"),
         actor_id=log.actor_id,
         actor_name=log.actor_name,
         actor_email=log.actor_email,
@@ -220,21 +255,34 @@ def build_human_activity(
             )
         )
 
-    # 4. Audit-log–backed items: manual notes + rating changes. Both live in
-    # `audit_logs` (tenant-scoped, so read through `session`) and are told apart
-    # by their action.
+    # 4. Audit-log–backed items: manual notes + rating changes + credit movements.
+    # All live in `audit_logs` (tenant-scoped, read through `session`) and are
+    # told apart by their action.
+    _CREDIT_ACTIONS = {
+        AuditAction.CREDIT_GRANTED,
+        AuditAction.CREDIT_APPLIED,
+        AuditAction.CREDIT_RESTORED,
+    }
     audit_logs = session.exec(
         select(AuditLog).where(
             AuditLog.entity_type == AuditEntityType.HUMAN,
             AuditLog.entity_id == human_id,
             col(AuditLog.action).in_(
-                [AuditAction.HUMAN_NOTE_ADDED, AuditAction.HUMAN_RATING_CHANGED]
+                [
+                    AuditAction.HUMAN_NOTE_ADDED,
+                    AuditAction.HUMAN_RATING_CHANGED,
+                    AuditAction.CREDIT_GRANTED,
+                    AuditAction.CREDIT_APPLIED,
+                    AuditAction.CREDIT_RESTORED,
+                ]
             ),
         )
     ).all()
     for log in audit_logs:
         if log.action == AuditAction.HUMAN_RATING_CHANGED:
             items.append(rating_log_to_item(log))
+        elif log.action in _CREDIT_ACTIONS:
+            items.append(credit_log_to_item(log))
         else:
             items.append(note_log_to_item(log))
 

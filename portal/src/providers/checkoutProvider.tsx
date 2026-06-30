@@ -172,7 +172,7 @@ interface CheckoutContextValue {
   triggerCheckoutToast: (state: Omit<CheckoutToastState, "id">) => void
   dismissCheckoutToast: () => void
   cartUiEnabled: boolean
-  creditsEnabled: boolean
+  editPassesEnabled: boolean
 }
 
 export interface CheckoutToastChip {
@@ -243,10 +243,10 @@ export function CheckoutProvider({
   const isAuthenticated = useIsAuthenticated()
   const application = getRelevantApplication()
   const city = getCity()
-  const creditsEnabled = city?.credits_enabled ?? false
-  const appCredit = creditsEnabled
-    ? (accountCreditOverride ?? application?.credit)
-    : 0
+  const editPassesEnabled = city?.edit_passes_enabled ?? false
+  // The stored credit balance applies unconditionally (R-FE-02, R-BE-03):
+  // edit_passes_enabled gates only the edit-passes in-flow UI, not credit application.
+  const appCredit = accountCreditOverride ?? application?.credit ?? 0
   const checkoutPolicy = resolvePopupCheckoutPolicy(city)
   const cityId = city?.id ? String(city.id) : null
 
@@ -644,11 +644,11 @@ export function CheckoutProvider({
     openCartEnabled,
   ])
 
-  // Credit calculations — gated by popup.credits_enabled
+  // Credit calculations — gated by popup.edit_passes_enabled
   const { editCredit, monthUpgradeCredit } = useCreditCalculation({
     attendeePasses,
     isEditing,
-    creditsEnabled,
+    editPassesEnabled,
   })
 
   // Insurance calculations
@@ -1143,7 +1143,7 @@ export function CheckoutProvider({
     clearPromoCode,
     paymentCompleteRef,
     submitMode,
-    creditsEnabled,
+    editPassesEnabled,
     popupName: city?.name ?? null,
     buyerData:
       submitMode === "open-ticketing"
@@ -1236,7 +1236,7 @@ export function CheckoutProvider({
     triggerCheckoutToast,
     dismissCheckoutToast,
     cartUiEnabled,
-    creditsEnabled,
+    editPassesEnabled,
   }
 
   return (
