@@ -4,12 +4,14 @@ import {
   durationFits,
   freeIntervalsForDay,
   localTzNaiveToUtc,
+  slotOptionsForDay,
   utcToLocalTzNaive,
 } from "@edgeos/shared-events"
+import { MarkdownEditor } from "@edgeos/shared-form-ui"
 import { useForm, useStore } from "@tanstack/react-form"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Link, useNavigate } from "@tanstack/react-router"
-import { Home, Trash2, UserSearch, Video } from "lucide-react"
+import { Home, Trash2, UserSearch, Video, X } from "lucide-react"
 import { useEffect, useMemo, useRef, useState } from "react"
 import {
   type EventCreate,
@@ -25,6 +27,7 @@ import {
 } from "@/client"
 import { DangerZone } from "@/components/Common/DangerZone"
 import { FieldError } from "@/components/Common/FieldError"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { DatePicker } from "@/components/ui/date-picker"
 import { ImageUpload } from "@/components/ui/image-upload"
@@ -72,7 +75,8 @@ import {
   RepeatPicker,
   type RepeatState,
 } from "./EventForm/RepeatPicker"
-import { StartTimeCombobox } from "./EventForm/StartTimeCombobox"
+import { StartTimeSelect, type TimeOption } from "./EventForm/StartTimeSelect"
+import { VenueDayScheduleDialog } from "./EventForm/VenueDayScheduleDialog"
 import { VenueDetailsDialog } from "./EventForm/VenueDetailsDialog"
 
 interface EventFormProps {
@@ -174,6 +178,56 @@ export function EventForm({
     const name = [h.first_name, h.last_name].filter(Boolean).join(" ").trim()
     return name || h.email
   }
+
+  // --- Collaborators: multi participant picker ---------------------------
+  // Collaborators can edit, cancel and manage the event just like its
+  // creator (same flat-permission model as the portal edit form). Mirrors
+  // the Displayed host picker but accumulates a list instead of one pick.
+  const [collaboratorPickerOpen, setCollaboratorPickerOpen] = useState(false)
+  const [collaboratorSearch, setCollaboratorSearch] = useState("")
+  const [debouncedCollaboratorSearch, setDebouncedCollaboratorSearch] =
+    useState("")
+  useEffect(() => {
+    const handle = setTimeout(
+      () => setDebouncedCollaboratorSearch(collaboratorSearch),
+      250,
+    )
+    return () => clearTimeout(handle)
+  }, [collaboratorSearch])
+  const trimmedCollaboratorSearch = debouncedCollaboratorSearch.trim()
+  const {
+    data: collaboratorSearchResults,
+    isFetching: collaboratorSearchFetching,
+  } = useQuery({
+    queryKey: [
+      "humans",
+      "event-collaborator-picker",
+      selectedPopupId,
+      trimmedCollaboratorSearch,
+    ],
+    queryFn: () =>
+      HumansService.listHumans({
+        popupId: selectedPopupId!,
+        search: trimmedCollaboratorSearch || null,
+        limit: 10,
+      }),
+    enabled: collaboratorPickerOpen && !!selectedPopupId,
+  })
+  // Display names for the selected collaborator chips. Seeded from the
+  // resolved profiles the API returns for an existing event, and extended
+  // as the user picks more humans from the search popover.
+  const [collaboratorNames, setCollaboratorNames] = useState<
+    Record<string, string>
+  >(() =>
+    Object.fromEntries(
+      (defaultValues?.collaborators ?? []).map((c) => [
+        c.id,
+        [c.first_name, c.last_name].filter(Boolean).join(" ").trim() ||
+          c.email ||
+          c.id,
+      ]),
+    ),
+  )
 
   const { data: venues } = useQuery({
     queryKey: ["event-venues", selectedPopupId],
@@ -314,6 +368,11 @@ export function EventForm({
   const [customSelected, setCustomSelected] = useState<boolean>(
     Boolean(defaultValues?.custom_location_name),
   )
+  // Venue (or custom location) is mandatory for events. The online-only
+  // "Meeting" option survives solely while editing an event that is already
+  // a meeting, so legacy data stays editable without forcing a venue pick.
+  const allowMeeting =
+    isEdit && !defaultValues?.venue_id && !defaultValues?.custom_location_name
   const durationMinutes = Math.max(
     1,
     Math.round(durationUnit === "hours" ? durationValue * 60 : durationValue),
@@ -348,6 +407,7 @@ export function EventForm({
       highlighted: defaultValues?.highlighted ?? false,
       host_display_name: defaultValues?.host_display_name ?? "",
       host_id: defaultValues?.host_id ?? null,
+      collaborator_ids: defaultValues?.collaborator_ids ?? [],
       tags: defaultValues?.tags ?? [],
     },
     onSubmit: ({ value }) => {
@@ -369,10 +429,25 @@ export function EventForm({
       const startDate = localTzNaiveToUtc(value.start_time, value.timezone)
       const endDate = new Date(startDate.getTime() + durationMinutes * 60_000)
 
+      // Block creating an event that starts in the past. Hosts have repeatedly
+      // booked events on a past date by mistake (e.g. created Jun 15, scheduled
+      // Jun 14), which is time-consuming for organizers to clean up. Editing an
+      // existing event is still allowed so a past event can be fixed/cancelled.
+      if (!isEdit && startDate.getTime() < Date.now()) {
+        showErrorToast(
+          "Event start time can't be in the past. Pick a future date and time.",
+        )
+        return
+      }
+
       // meeting_url only applies for online-only Meeting events (no venue,
       // no custom physical location). When the Meeting option is selected
       // it is required — there's nowhere else for attendees to go.
       const isMeeting = !value.venue_id && !customSelected
+      if (isMeeting && !allowMeeting) {
+        showErrorToast("Select a venue or a custom location.")
+        return
+      }
       const meetingUrl = isMeeting ? value.meeting_url.trim() || null : null
       if (isMeeting && !meetingUrl) {
         showErrorToast("Meeting URL is required for Meeting events.")
@@ -405,6 +480,7 @@ export function EventForm({
           kind: value.kind || null,
           host_display_name: hostDisplayName,
           host_id: value.host_id,
+          collaborator_ids: value.collaborator_ids,
           start_time: startDate.toISOString(),
           end_time: endDate.toISOString(),
           timezone: value.timezone,
@@ -432,6 +508,7 @@ export function EventForm({
           kind: value.kind || null,
           host_display_name: hostDisplayName,
           host_id: value.host_id,
+          collaborator_ids: value.collaborator_ids,
           start_time: startDate.toISOString(),
           end_time: endDate.toISOString(),
           timezone: value.timezone,
@@ -690,6 +767,37 @@ export function EventForm({
     }
   }, [popup?.start_date, popup?.end_date])
 
+  // Past days are unselectable when creating a new event: the backend rejects
+  // a past start time and the form already blocks submit (see the validator's
+  // `!isEdit && startDate < now` guard), so greying them out in the picker
+  // stops the user from picking a day they can't use. Editing an existing
+  // event still allows past dates so a past/mis-scheduled event can be fixed
+  // or cancelled — mirrors the submit-time guard's `!isEdit` condition.
+  const isDateInPast = useMemo(() => {
+    if (isEdit) return undefined
+    const today = new Date()
+    const todayKey = `${today.getFullYear()}-${String(
+      today.getMonth() + 1,
+    ).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`
+    return (d: Date) => {
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(
+        2,
+        "0",
+      )}-${String(d.getDate()).padStart(2, "0")}`
+      return key < todayKey
+    }
+  }, [isEdit])
+
+  // The picker's "disabled" matcher folds together both reasons a day is
+  // unselectable: outside the popup booking window, or in the past (new
+  // events only). Either one greys the day out and blocks selection.
+  const isDateUnselectable = useMemo(() => {
+    if (isDateOutsidePopupWindow && isDateInPast) {
+      return (d: Date) => isDateOutsidePopupWindow(d) || isDateInPast(d)
+    }
+    return isDateOutsidePopupWindow ?? isDateInPast
+  }, [isDateOutsidePopupWindow, isDateInPast])
+
   // First day within the popup window where the venue is open. Used to
   // default the date picker when a user picks a venue with no date set
   // yet — and to recover when the previously selected date becomes a
@@ -769,6 +877,35 @@ export function EventForm({
     [freeIntervals, durationMinutes, popupTz],
   )
 
+  // Options offered by the start-time dropdown. With a venue: every slot
+  // inside the venue's open hours, occupied ones flagged so the picker
+  // renders them grayed out. Without a venue (or while availability loads):
+  // a generic all-day 30-minute grid.
+  const startTimeOptions = useMemo<TimeOption[]>(() => {
+    if (venueIdValue && dayAvailability && dayBounds) {
+      return slotOptionsForDay(
+        dayAvailability.open_ranges ?? [],
+        freeIntervals,
+        dayBounds.start,
+        dayBounds.end,
+        durationMinutes,
+        30,
+        popupTz,
+      ).map((o) => ({ label: o.label, free: o.free }))
+    }
+    return Array.from({ length: 48 }, (_, i) => ({
+      label: `${String(Math.floor(i / 2)).padStart(2, "0")}:${i % 2 ? "30" : "00"}`,
+      free: true,
+    }))
+  }, [
+    venueIdValue,
+    dayAvailability,
+    dayBounds,
+    freeIntervals,
+    durationMinutes,
+    popupTz,
+  ])
+
   // Does the typed start + duration fit a free window? Returns the reason
   // it does NOT fit (so the indicator and submit gate share a single source
   // of truth and a precise message), or null when the slot is fine /
@@ -826,74 +963,48 @@ export function EventForm({
       ? { status: "unavailable", reason: fitnessIssue }
       : availability
 
-  // When picking a venue (create mode), snap start_time into one of the
-  // venue's open slots. Without this, the form keeps whatever default time
-  // it had before the venue was chosen — often outside the venue's hours,
-  // which then either gets rejected by the backend or, worse, slips through
-  // when no weekly_hours are configured. Two-step: seed a date first so the
-  // availability query can fire, then snap to the first available slot.
-  const venueAutoInitRef = useRef<string | null>(null)
+  // Show the day-schedule preview only when a real venue is selected (a UUID,
+  // not the "custom location" / "none" sentinels) and we have a day to render.
+  const showSchedule = !!venueIdValue && !!dateStr
+
+  // Clicking a free slot in the schedule preview sets the form's start time.
+  // The form stores naive wall-clock in the popup TZ, so convert the UTC
+  // instant the column hands back the same way every other start setter does.
+  const handlePickScheduleTime = (isoUtc: string) => {
+    form.setFieldValue(
+      "start_time",
+      utcToLocalTzNaive(isoUtc, timezoneValue || popupTz || "UTC"),
+    )
+  }
+
+  // Seed a usable default date (create mode): when the date is unset, not
+  // parseable, or outside the popup window — those days are disabled in the
+  // picker, so they're never the user's choice — move it to the first open
+  // day, keeping any time already typed. Never adjust the time and never
+  // move a date the user picked (e.g. a day the venue is closed): the
+  // existing validation (fitnessIssue → effectiveAvailability, the "Nearby
+  // open times" pills, the Publish gate) surfaces it, and the backend
+  // rejects out-of-hours times.
   useEffect(() => {
     if (isEdit) return
-
-    // When no venue is selected, just ensure the date sits inside the
-    // popup window — every day outside it is disabled in the picker, so
-    // an empty/out-of-window default would force the user to navigate
-    // there manually.
-    if (!venueIdValue) {
-      venueAutoInitRef.current = null
-      const dateInvalid = (() => {
-        if (!dateStr) return true
-        const [y, m, d] = dateStr.split("-").map(Number)
-        if (!y || !m || !d) return true
-        const date = new Date(y, m - 1, d, 12, 0, 0)
-        return isDateOutsidePopupWindow?.(date) ?? false
-      })()
-      if (dateInvalid && firstOpenDayKey) {
-        form.setFieldValue("start_time", `${firstOpenDayKey}T09:00`)
-      }
-      return
-    }
-
-    // If the current date is unset, closed for this venue, or outside the
-    // popup window, snap to the first day the venue is open. Covers both
-    // "no date yet" and "switched venues — old date is now closed".
-    const currentDateInvalid = (() => {
+    const dateInvalid = (() => {
       if (!dateStr) return true
       const [y, m, d] = dateStr.split("-").map(Number)
       if (!y || !m || !d) return true
       const date = new Date(y, m - 1, d, 12, 0, 0)
-      if (isDateOutsidePopupWindow?.(date)) return true
-      if (isClosedOnDate?.(date)) return true
-      return false
+      return isDateOutsidePopupWindow?.(date) ?? false
     })()
-
-    if (currentDateInvalid) {
-      const target = firstOpenDayKey ?? new Date().toISOString().slice(0, 10)
-      form.setFieldValue("start_time", `${target}T09:00`)
-      return
-    }
-
-    if (venueAutoInitRef.current === venueIdValue) return
-    if (startSlotOptions.length === 0) return
-    venueAutoInitRef.current = venueIdValue
-    if (!startTimeValue || !startFits) {
-      form.setFieldValue(
-        "start_time",
-        `${dateStr}T${startSlotOptions[0].label}`,
-      )
+    if (dateInvalid && firstOpenDayKey) {
+      const hhmm = startTimeValue?.slice(11, 16) || "09:00"
+      form.setFieldValue("start_time", `${firstOpenDayKey}T${hhmm}`)
     }
   }, [
     isEdit,
-    venueIdValue,
     dateStr,
-    startSlotOptions,
-    startFits,
     startTimeValue,
-    form,
     firstOpenDayKey,
-    isClosedOnDate,
     isDateOutsidePopupWindow,
+    form,
   ])
 
   // --- Max participant warning -------------------------------------------
@@ -1065,7 +1176,10 @@ export function EventForm({
                 value={
                   customSelected
                     ? "__custom__"
-                    : field.state.value || "__none__"
+                    : // With the Meeting option hidden, an empty venue must
+                      // fall back to the placeholder ("__none__" would point
+                      // at a non-rendered item and paint an empty trigger).
+                      field.state.value || (allowMeeting ? "__none__" : "")
                 }
                 onValueChange={(v) => {
                   if (v === "__custom__") {
@@ -1082,18 +1196,22 @@ export function EventForm({
                 disabled={readOnly}
               >
                 <SelectTrigger className="w-[240px]">
-                  <SelectValue placeholder="Meeting" />
+                  <SelectValue
+                    placeholder={allowMeeting ? "Meeting" : "Select a venue"}
+                  />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem
-                    value="__none__"
-                    className="bg-muted/40 text-foreground data-[highlighted]:bg-muted"
-                  >
-                    <span className="inline-flex items-center gap-2">
-                      <Video className="h-3.5 w-3.5 text-muted-foreground" />
-                      Meeting
-                    </span>
-                  </SelectItem>
+                  {allowMeeting && (
+                    <SelectItem
+                      value="__none__"
+                      className="bg-muted/40 text-foreground data-[highlighted]:bg-muted"
+                    >
+                      <span className="inline-flex items-center gap-2">
+                        <Video className="h-3.5 w-3.5 text-muted-foreground" />
+                        Meeting
+                      </span>
+                    </SelectItem>
+                  )}
                   <SelectItem
                     value="__custom__"
                     className="bg-muted/40 text-foreground data-[highlighted]:bg-muted"
@@ -1172,14 +1290,26 @@ export function EventForm({
                 </p>
                 <VenueHoursSummary hours={selectedVenue.weekly_hours} />
               </div>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setVenueDialogOpen(true)}
-              >
-                View details
-              </Button>
+              <div className="flex shrink-0 flex-col items-end gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setVenueDialogOpen(true)}
+                >
+                  View details
+                </Button>
+                {showSchedule && (
+                  <VenueDayScheduleDialog
+                    availability={dayAvailability}
+                    timezone={popupTz}
+                    dayKey={dateStr}
+                    proposedStartIso={startUtc?.toISOString() ?? null}
+                    proposedEndIso={endTimeIso || null}
+                    onPickTime={readOnly ? undefined : handlePickScheduleTime}
+                  />
+                )}
+              </div>
             </div>
 
             {selectedVenue.photos && selectedVenue.photos.length > 0 && (
@@ -1209,7 +1339,7 @@ export function EventForm({
           </div>
         )}
 
-        {!venueIdValue && !customSelected && (
+        {allowMeeting && !venueIdValue && !customSelected && (
           <InlineRow
             label="Meeting URL"
             description="Virtual meeting link — required for Meeting events."
@@ -1300,12 +1430,11 @@ export function EventForm({
           <DatePicker
             value={dateStr}
             disabled={readOnly}
-            disabledDays={isDateOutsidePopupWindow}
+            disabledDays={isDateUnselectable}
             closedDays={
               isClosedOnDate
                 ? (d) =>
-                    !(isDateOutsidePopupWindow?.(d) ?? false) &&
-                    isClosedOnDate(d)
+                    !(isDateUnselectable?.(d) ?? false) && isClosedOnDate(d)
                 : undefined
             }
             onChange={(newDate) => {
@@ -1364,7 +1493,7 @@ export function EventForm({
 
         <InlineRow label="Start time" description="Pick or type a time">
           <div className="flex flex-col items-end gap-1 w-[240px]">
-            <StartTimeCombobox
+            <StartTimeSelect
               value={startTimeValue ? startTimeValue.slice(11, 16) : ""}
               onChange={(hhmm) => {
                 if (!hhmm) {
@@ -1374,12 +1503,13 @@ export function EventForm({
                 const date = dateStr || new Date().toISOString().slice(0, 10)
                 form.setFieldValue("start_time", `${date}T${hhmm}`)
               }}
+              options={startTimeOptions}
               disabled={readOnly}
               fits={venueIdValue ? startFits : true}
               placeholder={
-                venueIdValue && startSlotOptions.length === 0
+                venueIdValue && startTimeOptions.length === 0
                   ? "No open hours"
-                  : "HH:mm"
+                  : "Pick a time"
               }
             />
             <AvailabilityIndicator availability={effectiveAvailability} />
@@ -1606,15 +1736,135 @@ export function EventForm({
           </form.Field>
         </InlineRow>
 
+        <InlineRow
+          label="Collaborators"
+          description="Co-organizers who can edit, cancel and manage this event — just like its creator."
+        >
+          <form.Field name="collaborator_ids">
+            {(field) => {
+              const ids = field.state.value
+              const addCollaborator = (h: HumanPublic) => {
+                if (ids.includes(h.id)) return
+                setCollaboratorNames((prev) => ({
+                  ...prev,
+                  [h.id]: humanDisplayName(h),
+                }))
+                field.handleChange([...ids, h.id])
+              }
+              const removeCollaborator = (id: string) =>
+                field.handleChange(ids.filter((cid) => cid !== id))
+              return (
+                <div className="flex w-full max-w-[380px] flex-col gap-2">
+                  {ids.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {ids.map((id) => (
+                        <Badge
+                          key={id}
+                          variant="secondary"
+                          className="gap-1 pr-1 font-normal"
+                        >
+                          {collaboratorNames[id] ?? id}
+                          {!readOnly && (
+                            <button
+                              type="button"
+                              className="rounded-sm hover:bg-muted-foreground/20"
+                              aria-label={`Remove ${collaboratorNames[id] ?? "collaborator"}`}
+                              onClick={() => removeCollaborator(id)}
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          )}
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
+                  {!readOnly && (
+                    <div className="flex justify-end">
+                      <Popover
+                        open={collaboratorPickerOpen}
+                        onOpenChange={(open) => {
+                          setCollaboratorPickerOpen(open)
+                          if (!open) setCollaboratorSearch("")
+                        }}
+                      >
+                        <PopoverTrigger asChild>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 px-2 text-xs"
+                            disabled={!selectedPopupId}
+                          >
+                            <UserSearch className="mr-1 h-3.5 w-3.5" />
+                            Add collaborator…
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent align="end" className="w-72 p-0">
+                          <div className="border-b p-2">
+                            <Input
+                              autoFocus
+                              value={collaboratorSearch}
+                              onChange={(e) =>
+                                setCollaboratorSearch(e.target.value)
+                              }
+                              placeholder="Search participants"
+                              className="h-8"
+                            />
+                          </div>
+                          <div className="max-h-64 overflow-y-auto py-1">
+                            {collaboratorSearchResults?.results?.length ? (
+                              collaboratorSearchResults.results.map((h) => {
+                                const name = humanDisplayName(h)
+                                const already = ids.includes(h.id)
+                                return (
+                                  <button
+                                    key={h.id}
+                                    type="button"
+                                    disabled={already}
+                                    className="flex w-full flex-col items-start gap-0.5 px-3 py-2 text-left text-sm hover:bg-muted disabled:opacity-50"
+                                    onClick={() => addCollaborator(h)}
+                                  >
+                                    <span className="font-medium">
+                                      {name}
+                                      {already ? " (added)" : ""}
+                                    </span>
+                                    {h.email && h.email !== name && (
+                                      <span className="text-xs text-muted-foreground">
+                                        {h.email}
+                                      </span>
+                                    )}
+                                  </button>
+                                )
+                              })
+                            ) : (
+                              <p className="px-3 py-4 text-center text-xs text-muted-foreground">
+                                {collaboratorSearchFetching
+                                  ? "Searching…"
+                                  : trimmedCollaboratorSearch
+                                    ? "No matches"
+                                    : "Type to search participants"}
+                              </p>
+                            )}
+                          </div>
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                  )}
+                </div>
+              )
+            }}
+          </form.Field>
+        </InlineRow>
+
         <InlineRow label="Description" description="Details about the event">
           <form.Field name="content">
             {(field) => (
-              <Textarea
-                value={field.state.value}
-                onChange={(e) => field.handleChange(e.target.value)}
+              <MarkdownEditor
+                value={field.state.value ?? ""}
+                onChange={(md) => field.handleChange(md)}
                 placeholder="Describe the event..."
                 disabled={readOnly}
-                className="w-[380px] min-h-20"
+                className="w-[380px]"
               />
             )}
           </form.Field>

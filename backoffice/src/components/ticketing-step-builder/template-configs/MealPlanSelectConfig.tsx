@@ -17,7 +17,6 @@ import { useQuery } from "@tanstack/react-query"
 import {
   AlertTriangle,
   CalendarRange,
-  ChefHat,
   GripVertical,
   Package,
   Plus,
@@ -40,7 +39,7 @@ import type { TemplateConfigProps } from "./types"
 
 // ---------------------------------------------------------------------------
 // Types — mirror backend MealPlanSection / MealPlanSectionProduct /
-// MealPlanMenuOption / MealPlanChefChoiceOption.
+// MealPlanMenuOption.
 // ---------------------------------------------------------------------------
 
 interface MealPlanMenuOption {
@@ -66,23 +65,8 @@ interface MealPlanSection {
   products: MealPlanSectionProduct[]
 }
 
-interface MealPlanChefChoice {
-  key: "chef"
-  icon?: string
-  title: string
-  description?: string
-}
-
 interface MealPlanConfig {
   sections: MealPlanSection[]
-  chef_choice_option: MealPlanChefChoice
-}
-
-const DEFAULT_CHEF_CHOICE: MealPlanChefChoice = {
-  key: "chef",
-  icon: "👨‍🍳",
-  title: "Chef's choice",
-  description: "Surprise me with what's freshest that day",
 }
 
 const MEAL_PLAN_CATEGORY = "meal_plan"
@@ -139,24 +123,7 @@ function parseConfig(config: Record<string, unknown> | null): MealPlanConfig {
     }
   })
 
-  const chefRaw = (raw.chef_choice_option ?? {}) as Record<string, unknown>
-  const chef_choice_option: MealPlanChefChoice = {
-    key: "chef",
-    icon:
-      typeof chefRaw.icon === "string"
-        ? chefRaw.icon
-        : DEFAULT_CHEF_CHOICE.icon,
-    title:
-      typeof chefRaw.title === "string" && chefRaw.title.trim() !== ""
-        ? chefRaw.title
-        : DEFAULT_CHEF_CHOICE.title,
-    description:
-      typeof chefRaw.description === "string"
-        ? chefRaw.description
-        : DEFAULT_CHEF_CHOICE.description,
-  }
-
-  return { sections, chef_choice_option }
+  return { sections }
 }
 
 interface PickerProduct {
@@ -487,7 +454,7 @@ function MealPlanProductCard({
         {product.menu_options.length === 0 ? (
           <div className="rounded border border-dashed p-3 text-center text-xs text-muted-foreground">
             No menu options yet. Add at least one — buyers will pick from these
-            per day. Chef's choice is added automatically.
+            per day.
           </div>
         ) : (
           <DndContext
@@ -733,59 +700,6 @@ function SortableSectionCard({
 }
 
 // ---------------------------------------------------------------------------
-// Chef's choice card
-// ---------------------------------------------------------------------------
-
-function ChefChoiceCard({
-  chef,
-  onUpdate,
-}: {
-  chef: MealPlanChefChoice
-  onUpdate: (updates: Partial<MealPlanChefChoice>) => void
-}) {
-  return (
-    <div className="rounded-lg border bg-background shadow-sm p-3 flex flex-col gap-3">
-      <div className="flex items-center gap-2">
-        <ChefHat className="h-4 w-4 text-muted-foreground" />
-        <Label className="text-sm font-medium">Chef's choice fallback</Label>
-        <span className="ml-auto rounded bg-muted px-1.5 py-0.5 text-[10px] font-mono uppercase tracking-wide text-muted-foreground">
-          key: chef
-        </span>
-      </div>
-      <p className="text-xs text-muted-foreground -mt-2">
-        Shown alongside menu options for every day. The key is locked to
-        <code className="mx-1 font-mono">chef</code> in v0 — cart logic relies
-        on the literal string.
-      </p>
-
-      <div className="grid grid-cols-[auto_1fr] gap-2 items-start">
-        <Input
-          value={chef.icon ?? ""}
-          onChange={(e) => onUpdate({ icon: e.target.value.slice(0, 4) })}
-          placeholder="👨‍🍳"
-          className="h-9 w-14 text-center text-base"
-          aria-label="Chef's choice icon"
-        />
-        <Input
-          value={chef.title}
-          onChange={(e) => onUpdate({ title: e.target.value })}
-          placeholder="Chef's choice"
-          className="h-9 text-sm"
-          aria-label="Chef's choice title"
-        />
-      </div>
-
-      <Textarea
-        value={chef.description ?? ""}
-        onChange={(e) => onUpdate({ description: e.target.value })}
-        placeholder="Surprise me with what's freshest that day"
-        className="min-h-12 text-sm"
-      />
-    </div>
-  )
-}
-
-// ---------------------------------------------------------------------------
 // Main component
 // ---------------------------------------------------------------------------
 
@@ -841,8 +755,6 @@ export function MealPlanSelectConfig({
     onChange({
       ...config,
       sections: updates.sections ?? parsed.sections,
-      chef_choice_option:
-        updates.chef_choice_option ?? parsed.chef_choice_option,
     })
   }
 
@@ -886,16 +798,6 @@ export function MealPlanSelectConfig({
       (s, i) => ({ ...s, order: i }),
     )
     updateConfig({ sections: reordered })
-  }
-
-  const handleChefUpdate = (updates: Partial<MealPlanChefChoice>) => {
-    updateConfig({
-      chef_choice_option: {
-        ...parsed.chef_choice_option,
-        ...updates,
-        key: "chef", // immutable in v0
-      },
-    })
   }
 
   const noMealPlanProducts = !productsLoading && productList.length === 0
@@ -965,13 +867,6 @@ export function MealPlanSelectConfig({
           </SortableContext>
         </DndContext>
       )}
-
-      <Separator />
-
-      <ChefChoiceCard
-        chef={parsed.chef_choice_option}
-        onUpdate={handleChefUpdate}
-      />
     </div>
   )
 }

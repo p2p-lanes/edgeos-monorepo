@@ -2029,6 +2029,18 @@ export const AttendeeCreateSchema = {
                 }
             ],
             title: 'Gender'
+        },
+        additional_data: {
+            anyOf: [
+                {
+                    additionalProperties: true,
+                    type: 'object'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Additional Data'
         }
     },
     type: 'object',
@@ -2039,6 +2051,30 @@ export const AttendeeCreateSchema = {
 Accepts category_id (UUID FK) as the primary input. The legacy \`category\`
 string field is kept for backward compatibility but the router now validates
 via category_id against the popup's attendee_categories table.`
+} as const;
+
+export const AttendeeEmailsResponseSchema = {
+    properties: {
+        emails: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Emails'
+        },
+        count: {
+            type: 'integer',
+            title: 'Count'
+        }
+    },
+    type: 'object',
+    required: ['emails', 'count'],
+    title: 'AttendeeEmailsResponse',
+    description: `Active RSVPers' emails for an event, for its managers (portal).
+
+Returned only to the event's owner/host/collaborators so they can
+contact everyone who RSVPed. Emails are deduplicated and ordered by
+registration order.`
 } as const;
 
 export const AttendeeInfoSchema = {
@@ -2162,6 +2198,11 @@ export const AttendeeListItemSchema = {
                 }
             ],
             title: 'Poap Url'
+        },
+        additional_data: {
+            additionalProperties: true,
+            type: 'object',
+            title: 'Additional Data'
         },
         id: {
             type: 'string',
@@ -2422,6 +2463,11 @@ export const AttendeePublicSchema = {
             ],
             title: 'Poap Url'
         },
+        additional_data: {
+            additionalProperties: true,
+            type: 'object',
+            title: 'Additional Data'
+        },
         id: {
             type: 'string',
             format: 'uuid',
@@ -2651,6 +2697,50 @@ export const AttendeeTicketLineSchema = {
     description: 'One product + quantity line in a bulk ticket add.'
 } as const;
 
+export const AttendeeTicketMetadataUpdateSchema = {
+    properties: {
+        daily_choices: {
+            additionalProperties: {
+                type: 'string'
+            },
+            type: 'object',
+            title: 'Daily Choices'
+        },
+        dietary_restriction: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Dietary Restriction'
+        },
+        special_request: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Special Request'
+        }
+    },
+    type: 'object',
+    required: ['daily_choices'],
+    title: 'AttendeeTicketMetadataUpdate',
+    description: `Request body to edit a meal-plan ticket's choices post-purchase (portal).
+
+Replaces the three choice keys inside AttendeeProducts.purchase_metadata:
+daily_choices (ISO date -> menu key | "chef"), dietary_restriction, and
+special_request. The key/date semantics are NOT validated here — that needs
+the meal-plan step's template_config and happens in the CRUD layer via
+ticketing_step.meal_plan.validate_daily_choices.`
+} as const;
+
 export const AttendeeTicketProductSwapSchema = {
     properties: {
         product_id: {
@@ -2699,6 +2789,18 @@ export const AttendeeUpdateSchema = {
                 }
             ],
             title: 'Gender'
+        },
+        additional_data: {
+            anyOf: [
+                {
+                    additionalProperties: true,
+                    type: 'object'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Additional Data'
         }
     },
     type: 'object',
@@ -2790,6 +2892,11 @@ export const AttendeeWithOriginPublicSchema = {
                 }
             ],
             title: 'Poap Url'
+        },
+        additional_data: {
+            additionalProperties: true,
+            type: 'object',
+            title: 'Additional Data'
         },
         id: {
             type: 'string',
@@ -3479,6 +3586,24 @@ export const BugReportCreateSchema = {
             ],
             title: 'Detail'
         },
+        type: {
+            '$ref': '#/components/schemas/TaskType',
+            default: 'bug'
+        },
+        priority: {
+            '$ref': '#/components/schemas/TaskPriority',
+            default: 'medium'
+        },
+        app: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/TaskApp'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
         attachments: {
             items: {
                 '$ref': '#/components/schemas/TaskAttachmentCreate'
@@ -3492,8 +3617,11 @@ export const BugReportCreateSchema = {
     title: 'BugReportCreate',
     description: `The 'report a bug' payload, open to every backoffice user.
 
-Always produces an internal bug in the to-do column. Attachments are
-optional screenshots / screen-recordings already uploaded to S3.`
+Produces a to-do task in the reporter's tenant scope. The reporter can
+classify it (type / priority / which app it relates to); type defaults to
+\`\`bug\`\` so the plain "report a bug" flow keeps working unchanged.
+Attachments are optional screenshots / screen-recordings already uploaded
+to S3.`
 } as const;
 
 export const BuyerInfoSchema = {
@@ -4509,6 +4637,14 @@ export const CheckoutRuntimeResponseSchema = {
             type: 'array',
             title: 'Ticketing Steps'
         },
+        attendee_categories: {
+            items: {
+                '$ref': '#/components/schemas/AttendeeCategoryPublic'
+            },
+            type: 'array',
+            title: 'Attendee Categories',
+            default: []
+        },
         form_schema: {
             anyOf: [
                 {
@@ -4904,6 +5040,29 @@ export const DashboardStatsSchema = {
     description: 'Complete dashboard statistics.'
 } as const;
 
+export const DayEventCountSchema = {
+    properties: {
+        day: {
+            type: 'string',
+            title: 'Day'
+        },
+        count: {
+            type: 'integer',
+            title: 'Count'
+        }
+    },
+    type: 'object',
+    required: ['day', 'count'],
+    title: 'DayEventCount',
+    description: `Number of occurrence-expanded events that start on a given calendar day.
+
+Backs the portal calendar grid dots: the frontend can fetch per-day counts
+for an entire month without pulling full event payloads, then render a dot
+on each day that has at least one event.  \`\`day\`\` is formatted as
+\`\`YYYY-MM-DD\`\` in the popup's configured timezone so it aligns with the
+frontend's \`\`formatDayKey\`\` helper.`
+} as const;
+
 export const DetachCompanionRequestSchema = {
     properties: {
         popup_id: {
@@ -5153,7 +5312,7 @@ export const EmailTemplatePublicSchema = {
 
 export const EmailTemplateTypeSchema = {
     type: 'string',
-    enum: ['login_code_user', 'login_code_human', 'application_received', 'application_accepted', 'application_rejected', 'application_accepted_with_discount', 'application_accepted_with_incentive', 'application_accepted_scholarship_rejected', 'payment_confirmed', 'abandoned_cart', 'edit_passes_confirmed', 'event_invitation', 'event_updated', 'event_cancelled', 'event_approval_approved', 'event_approval_rejected', 'check_in_pass'],
+    enum: ['login_code_user', 'login_code_human', 'application_received', 'application_accepted', 'application_rejected', 'application_accepted_with_discount', 'application_accepted_with_incentive', 'application_accepted_scholarship_rejected', 'payment_confirmed', 'abandoned_cart', 'edit_passes_confirmed', 'event_invitation', 'event_updated', 'event_cancelled', 'event_rsvp_cancelled', 'event_approval_approved', 'event_approval_rejected', 'check_in_pass'],
     title: 'EmailTemplateType'
 } as const;
 
@@ -5228,6 +5387,17 @@ export const EnrichedDashboardStatsSchema = {
     required: ['key_metrics', 'cumulative_trends', 'revenue_breakdown', 'distribution', 'application_funnel', 'applications', 'attendees', 'payments'],
     title: 'EnrichedDashboardStats',
     description: 'Full enriched dashboard response.'
+} as const;
+
+export const EnrichmentSourceSchema = {
+    type: 'string',
+    enum: ['telegram', 'event', 'custom_fields', 'org', 'manual'],
+    title: 'EnrichmentSource',
+    description: `Where a single enrichment fact about a human came from.
+
+Stored as the enum's string value in \`\`human_enrichment_facts.source\`\`;
+used as provenance so the curated \`\`humans.enriched_profile\`\` can be traced
+back to its evidence (and re-derived if a source is corrected/removed).`
 } as const;
 
 export const EventAdminNotesSchema = {
@@ -5421,6 +5591,74 @@ export const EventCalendarTrackSchema = {
     description: 'Minimal track projection for the public calendar toolbar.'
 } as const;
 
+export const EventCollaboratorPublicSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        first_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'First Name'
+        },
+        last_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Last Name'
+        },
+        picture_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Picture Url'
+        },
+        email: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Email'
+        }
+    },
+    type: 'object',
+    required: ['id'],
+    title: 'EventCollaboratorPublic',
+    description: `Slim human projection for an event's collaborator chips in the portal.
+
+Mirrors \`\`HumanPortalPublic\`\` so the same picker/avatar rendering works
+for already-saved collaborators. Resolved from \`\`Events.collaborator_ids\`\`
+by the portal get/create/update endpoints (the list endpoints leave it
+empty — collaborators aren't shown on cards).
+
+\`\`email\`\` is only populated by the admin (backoffice) endpoints so a chip
+for a human with no name can fall back to their email; the portal
+endpoints leave it \`\`None\`\` to avoid exposing organizer emails to every
+viewer of a public event.`
+} as const;
+
 export const EventCreateSchema = {
     properties: {
         popup_id: {
@@ -5587,6 +5825,15 @@ export const EventCreateSchema = {
                 }
             ],
             title: 'Host Id'
+        },
+        collaborator_ids: {
+            items: {
+                type: 'string',
+                format: 'uuid'
+            },
+            type: 'array',
+            title: 'Collaborator Ids',
+            default: []
         },
         status: {
             '$ref': '#/components/schemas/EventStatus',
@@ -6123,6 +6370,14 @@ export const EventPublicSchema = {
             ],
             title: 'Host Id'
         },
+        collaborator_ids: {
+            items: {
+                type: 'string',
+                format: 'uuid'
+            },
+            type: 'array',
+            title: 'Collaborator Ids'
+        },
         status: {
             '$ref': '#/components/schemas/EventStatus',
             default: 'draft'
@@ -6249,6 +6504,14 @@ export const EventPublicSchema = {
             ],
             title: 'Track Title'
         },
+        collaborators: {
+            items: {
+                '$ref': '#/components/schemas/EventCollaboratorPublic'
+            },
+            type: 'array',
+            title: 'Collaborators',
+            default: []
+        },
         hidden: {
             type: 'boolean',
             title: 'Hidden',
@@ -6264,6 +6527,17 @@ export const EventPublicSchema = {
                 }
             ],
             title: 'My Rsvp Status'
+        },
+        attendee_count: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Attendee Count'
         }
     },
     type: 'object',
@@ -6893,6 +7167,52 @@ export const EventSettingsUpdateSchema = {
     description: 'Event settings schema for updates.'
 } as const;
 
+export const EventShareMetaSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        title: {
+            type: 'string',
+            title: 'Title'
+        },
+        description: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Description'
+        },
+        image_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Image Url'
+        }
+    },
+    type: 'object',
+    required: ['id', 'title'],
+    title: 'EventShareMeta',
+    description: `Tiny, unauthenticated projection for social/OpenGraph share previews.
+
+Returned by the public \`\`/public/events/{id}/share\`\` endpoint so social
+crawlers (which send no JWT) can render the real event title, a short
+plaintext snippet and the cover image. Deliberately minimal — no
+\`\`meeting_url\`\`, \`\`tenant_id\`\`, \`\`owner_id\`\`, \`\`visibility\`\` or any other
+field that could leak through an unauthenticated route.`
+} as const;
+
 export const EventStatusSchema = {
     type: 'string',
     enum: ['draft', 'published', 'cancelled', 'pending_approval', 'rejected'],
@@ -7105,6 +7425,21 @@ export const EventUpdateSchema = {
                 }
             ],
             title: 'Host Id'
+        },
+        collaborator_ids: {
+            anyOf: [
+                {
+                    items: {
+                        type: 'string',
+                        format: 'uuid'
+                    },
+                    type: 'array'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Collaborator Ids'
         },
         status: {
             anyOf: [
@@ -9302,6 +9637,225 @@ export const HardDeleteSummarySchema = {
     title: 'HardDeleteSummary'
 } as const;
 
+export const HumanActivityCreateSchema = {
+    properties: {
+        note: {
+            type: 'string',
+            maxLength: 2000,
+            minLength: 1,
+            title: 'Note'
+        },
+        occurred_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Occurred At'
+        }
+    },
+    type: 'object',
+    required: ['note', 'occurred_at'],
+    title: 'HumanActivityCreate',
+    description: "Request body for adding a manual note to a human's timeline."
+} as const;
+
+export const HumanActivityItemSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            title: 'Id'
+        },
+        kind: {
+            '$ref': '#/components/schemas/HumanActivityKind'
+        },
+        occurred_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Occurred At'
+        },
+        popup_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Popup Id'
+        },
+        popup_label: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Popup Label'
+        },
+        note: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Note'
+        },
+        amount: {
+            anyOf: [
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Amount'
+        },
+        currency: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Currency'
+        },
+        status: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Status'
+        },
+        products: {
+            items: {
+                '$ref': '#/components/schemas/HumanActivityProduct'
+            },
+            type: 'array',
+            title: 'Products',
+            default: []
+        },
+        rating: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Rating'
+        },
+        previous_rating: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Previous Rating'
+        },
+        actor_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Actor Id'
+        },
+        actor_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Actor Name'
+        },
+        actor_email: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Actor Email'
+        }
+    },
+    type: 'object',
+    required: ['id', 'kind', 'occurred_at'],
+    title: 'HumanActivityItem',
+    description: `A single entry in a human's activity timeline.
+
+\`id\` is a composite key (e.g. \`\`"payment:<uuid>"\`\`) so it stays unique
+across the different source tables. \`occurred_at\` is the effective
+timestamp the feed sorts by.`
+} as const;
+
+export const HumanActivityKindSchema = {
+    type: 'string',
+    enum: ['application.submitted', 'application.accepted', 'payment.completed', 'ticket.added', 'note.added', 'rating.changed', 'comment.added'],
+    title: 'HumanActivityKind',
+    description: 'The kind of event a timeline item represents.'
+} as const;
+
+export const HumanActivityProductSchema = {
+    properties: {
+        product_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Product Name'
+        },
+        product_category: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Product Category'
+        },
+        quantity: {
+            type: 'integer',
+            title: 'Quantity',
+            default: 1
+        }
+    },
+    type: 'object',
+    title: 'HumanActivityProduct',
+    description: 'One purchased line in a `payment.completed` item (snapshot at purchase).'
+} as const;
+
 export const HumanAuthSchema = {
     properties: {
         tenant_id: {
@@ -9334,6 +9888,105 @@ export const HumanAuthSchema = {
     required: ['tenant_id', 'email'],
     title: 'HumanAuth',
     description: 'Request to initiate human authentication.'
+} as const;
+
+export const HumanCommentCreateSchema = {
+    properties: {
+        body: {
+            type: 'string',
+            minLength: 1,
+            title: 'Body'
+        }
+    },
+    type: 'object',
+    required: ['body'],
+    title: 'HumanCommentCreate'
+} as const;
+
+export const HumanCommentPublicSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        human_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Human Id'
+        },
+        author_user_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Author User Id'
+        },
+        author_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Author Name'
+        },
+        author_email: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Author Email'
+        },
+        body: {
+            type: 'string',
+            title: 'Body'
+        },
+        created_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Created At'
+        },
+        edited_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Edited At'
+        }
+    },
+    type: 'object',
+    required: ['id', 'human_id', 'body', 'created_at'],
+    title: 'HumanCommentPublic'
+} as const;
+
+export const HumanCommentUpdateSchema = {
+    properties: {
+        body: {
+            type: 'string',
+            minLength: 1,
+            title: 'Body'
+        }
+    },
+    type: 'object',
+    required: ['body'],
+    title: 'HumanCommentUpdate'
 } as const;
 
 export const HumanCreateSchema = {
@@ -9424,6 +10077,131 @@ export const HumanCreateSchema = {
     required: ['email'],
     title: 'HumanCreate',
     description: 'Human schema for creation.'
+} as const;
+
+export const HumanEnrichmentFactCreateSchema = {
+    properties: {
+        field: {
+            type: 'string',
+            maxLength: 100,
+            minLength: 1,
+            title: 'Field'
+        },
+        value: {
+            type: 'string',
+            minLength: 1,
+            title: 'Value'
+        },
+        source: {
+            '$ref': '#/components/schemas/EnrichmentSource'
+        },
+        evidence: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Evidence'
+        },
+        confidence: {
+            anyOf: [
+                {
+                    type: 'number'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Confidence'
+        },
+        raw: {
+            anyOf: [
+                {
+                    additionalProperties: true,
+                    type: 'object'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Raw'
+        }
+    },
+    type: 'object',
+    required: ['field', 'value', 'source'],
+    title: 'HumanEnrichmentFactCreate',
+    description: 'One atomic fact the enrichment agent extracted from a source.'
+} as const;
+
+export const HumanEnrichmentFactPublicSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        human_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Human Id'
+        },
+        field: {
+            type: 'string',
+            title: 'Field'
+        },
+        value: {
+            type: 'string',
+            title: 'Value'
+        },
+        source: {
+            '$ref': '#/components/schemas/EnrichmentSource'
+        },
+        evidence: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Evidence'
+        },
+        confidence: {
+            anyOf: [
+                {
+                    type: 'number'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Confidence'
+        },
+        raw: {
+            anyOf: [
+                {
+                    additionalProperties: true,
+                    type: 'object'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Raw'
+        },
+        created_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Created At'
+        }
+    },
+    type: 'object',
+    required: ['id', 'human_id', 'field', 'value', 'source', 'created_at'],
+    title: 'HumanEnrichmentFactPublic'
 } as const;
 
 export const HumanPortalPublicSchema = {
@@ -9743,16 +10521,43 @@ export const HumanPublicSchema = {
             ],
             title: 'Picture Url'
         },
+        rating: {
+            '$ref': '#/components/schemas/HumanRating',
+            default: 'unrated'
+        },
         red_flag: {
             type: 'boolean',
             title: 'Red Flag',
             default: false
+        },
+        enriched_profile: {
+            anyOf: [
+                {
+                    additionalProperties: true,
+                    type: 'object'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Enriched Profile'
         }
     },
     type: 'object',
     required: ['id', 'tenant_id', 'email'],
     title: 'HumanPublic',
     description: 'Human schema for API responses.'
+} as const;
+
+export const HumanRatingSchema = {
+    type: 'string',
+    enum: ['unrated', 'red_flag', 'orange_flag', 'green_flag', 'star'],
+    title: 'HumanRating',
+    description: `Admin assessment of a human for gathering admission.
+
+Replaces the legacy \`\`red_flag\`\` boolean. Only \`\`RED_FLAG\`\` carries the
+automatic cascade (revoke API keys, reject in-review applications, send
+rejection emails); the other levels are purely advisory labels.`
 } as const;
 
 export const HumanUpdateSchema = {
@@ -9834,16 +10639,27 @@ export const HumanUpdateSchema = {
             ],
             title: 'Picture Url'
         },
-        red_flag: {
+        rating: {
             anyOf: [
                 {
-                    type: 'boolean'
+                    '$ref': '#/components/schemas/HumanRating'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        enriched_profile: {
+            anyOf: [
+                {
+                    additionalProperties: true,
+                    type: 'object'
                 },
                 {
                     type: 'null'
                 }
             ],
-            title: 'Red Flag'
+            title: 'Enriched Profile'
         }
     },
     type: 'object',
@@ -9874,6 +10690,13 @@ export const HumanVerifySchema = {
     required: ['email', 'tenant_id', 'code'],
     title: 'HumanVerify',
     description: 'Request to verify human authentication code.'
+} as const;
+
+export const InstallmentIntervalSchema = {
+    type: 'string',
+    enum: ['day', 'week', 'month', 'year'],
+    title: 'InstallmentInterval',
+    description: "Billing interval for installment plans (mirrors SimpleFi's InstallmentInterval)."
 } as const;
 
 export const KeyMetricsSchema = {
@@ -10262,6 +11085,60 @@ export const ListModel_GroupPublic_Schema = {
     title: 'ListModel[GroupPublic]'
 } as const;
 
+export const ListModel_HumanActivityItem_Schema = {
+    properties: {
+        results: {
+            items: {
+                '$ref': '#/components/schemas/HumanActivityItem'
+            },
+            type: 'array',
+            title: 'Results'
+        },
+        paging: {
+            '$ref': '#/components/schemas/Paging'
+        }
+    },
+    type: 'object',
+    required: ['results', 'paging'],
+    title: 'ListModel[HumanActivityItem]'
+} as const;
+
+export const ListModel_HumanCommentPublic_Schema = {
+    properties: {
+        results: {
+            items: {
+                '$ref': '#/components/schemas/HumanCommentPublic'
+            },
+            type: 'array',
+            title: 'Results'
+        },
+        paging: {
+            '$ref': '#/components/schemas/Paging'
+        }
+    },
+    type: 'object',
+    required: ['results', 'paging'],
+    title: 'ListModel[HumanCommentPublic]'
+} as const;
+
+export const ListModel_HumanEnrichmentFactPublic_Schema = {
+    properties: {
+        results: {
+            items: {
+                '$ref': '#/components/schemas/HumanEnrichmentFactPublic'
+            },
+            type: 'array',
+            title: 'Results'
+        },
+        paging: {
+            '$ref': '#/components/schemas/Paging'
+        }
+    },
+    type: 'object',
+    required: ['results', 'paging'],
+    title: 'ListModel[HumanEnrichmentFactPublic]'
+} as const;
+
 export const ListModel_HumanPortalPublic_Schema = {
     properties: {
         results: {
@@ -10601,6 +11478,89 @@ export const OccurrenceRefSchema = {
     description: 'Body referencing a specific instance of a recurring series.'
 } as const;
 
+export const OpenCartPublicSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        popup_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Popup Id'
+        },
+        email: {
+            type: 'string',
+            title: 'Email'
+        },
+        items: {
+            '$ref': '#/components/schemas/CartState'
+        },
+        restore_token: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Restore Token'
+        },
+        created_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Created At'
+        },
+        updated_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Updated At'
+        }
+    },
+    type: 'object',
+    required: ['id', 'popup_id', 'email', 'items'],
+    title: 'OpenCartPublic',
+    description: `Anonymous open-checkout cart response.
+
+\`restore_token\` is the HMAC for the signed restore link
+(GET /checkout/{slug}/cart?cid=<id>&sig=<restore_token>). It is only
+present when the popup configures an open_checkout_signing_secret; the
+client stores it to rebuild the cart on a later visit.`
+} as const;
+
+export const OpenCartUpsertSchema = {
+    properties: {
+        email: {
+            type: 'string',
+            format: 'email',
+            title: 'Email'
+        },
+        items: {
+            '$ref': '#/components/schemas/CartState'
+        }
+    },
+    type: 'object',
+    required: ['email', 'items'],
+    title: 'OpenCartUpsert',
+    description: 'Anonymous open-checkout cart upsert request (keyed by email).'
+} as const;
+
 export const OpenTicketingPurchaseCreateSchema = {
     properties: {
         products: {
@@ -10624,6 +11584,35 @@ export const OpenTicketingPurchaseCreateSchema = {
                 }
             ],
             title: 'Coupon Code'
+        },
+        insurance: {
+            type: 'boolean',
+            title: 'Insurance',
+            default: false
+        },
+        fbc: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 512
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Fbc'
+        },
+        fbp: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 512
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Fbp'
         }
     },
     type: 'object',
@@ -10646,6 +11635,17 @@ export const OpenTicketingPurchaseResponseSchema = {
         checkout_url: {
             type: 'string',
             title: 'Checkout Url'
+        },
+        redirect_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Redirect Url'
         },
         amount: {
             type: 'string',
@@ -11121,6 +12121,18 @@ export const PaymentPublicSchema = {
             title: 'Amount',
             default: '0'
         },
+        amount_charged: {
+            anyOf: [
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Amount Charged'
+        },
         insurance_amount: {
             type: 'string',
             pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$',
@@ -11360,9 +12372,14 @@ export const PaymentPublicSchema = {
 
 export const PaymentSourceSchema = {
     type: 'string',
-    enum: ['SimpleFI', 'Stripe', 'MercadoPago'],
+    enum: ['SimpleFI', 'Stripe', 'MercadoPago', 'Crypto'],
     title: 'PaymentSource',
-    description: 'Settlement rail/provider shown to users.'
+    description: `Settlement rail/provider shown to users.
+
+SIMPLEFI is the residual value: settlement webhooks that don't expose a
+card provider. CRYPTO is written at installment-plan activation, where
+the rail is explicit — so a plan with SIMPLEFI source predates that
+logic and its rail is unknown.`
 } as const;
 
 export const PaymentStatsSchema = {
@@ -11807,6 +12824,39 @@ export const PopupAdminSchema = {
             ],
             title: 'Terms And Conditions Url'
         },
+        open_checkout_success_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Open Checkout Success Url'
+        },
+        open_checkout_cancel_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Open Checkout Cancel Url'
+        },
+        open_checkout_signing_secret: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Open Checkout Signing Secret'
+        },
         invoice_company_name: {
             anyOf: [
                 {
@@ -11990,6 +13040,43 @@ export const PopupAdminSchema = {
             type: 'boolean',
             title: 'Credits Enabled',
             default: false
+        },
+        installments_enabled: {
+            type: 'boolean',
+            title: 'Installments Enabled',
+            default: false
+        },
+        installments_deadline: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Installments Deadline'
+        },
+        installments_max: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Installments Max'
+        },
+        installments_interval: {
+            '$ref': '#/components/schemas/InstallmentInterval',
+            default: 'month'
+        },
+        installments_interval_count: {
+            type: 'integer',
+            title: 'Installments Interval Count',
+            default: 1
         },
         id: {
             type: 'string',
@@ -12215,6 +13302,39 @@ export const PopupCreateSchema = {
             ],
             title: 'Terms And Conditions Url'
         },
+        open_checkout_success_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Open Checkout Success Url'
+        },
+        open_checkout_cancel_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Open Checkout Cancel Url'
+        },
+        open_checkout_signing_secret: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Open Checkout Signing Secret'
+        },
         invoice_company_name: {
             anyOf: [
                 {
@@ -12395,6 +13515,43 @@ export const PopupCreateSchema = {
             type: 'boolean',
             title: 'Credits Enabled',
             default: false
+        },
+        installments_enabled: {
+            type: 'boolean',
+            title: 'Installments Enabled',
+            default: false
+        },
+        installments_deadline: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Installments Deadline'
+        },
+        installments_max: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Installments Max'
+        },
+        installments_interval: {
+            '$ref': '#/components/schemas/InstallmentInterval',
+            default: 'month'
+        },
+        installments_interval_count: {
+            type: 'integer',
+            title: 'Installments Interval Count',
+            default: 1
         },
         checkin_pass_lead_days: {
             anyOf: [
@@ -12723,6 +13880,43 @@ export const PopupPublicSchema = {
             type: 'boolean',
             title: 'Credits Enabled',
             default: false
+        },
+        installments_enabled: {
+            type: 'boolean',
+            title: 'Installments Enabled',
+            default: false
+        },
+        installments_deadline: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Installments Deadline'
+        },
+        installments_max: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Installments Max'
+        },
+        installments_interval: {
+            '$ref': '#/components/schemas/InstallmentInterval',
+            default: 'month'
+        },
+        installments_interval_count: {
+            type: 'integer',
+            title: 'Installments Interval Count',
+            default: 1
         }
     },
     type: 'object',
@@ -13083,6 +14277,39 @@ export const PopupUpdateSchema = {
             ],
             title: 'Terms And Conditions Url'
         },
+        open_checkout_success_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Open Checkout Success Url'
+        },
+        open_checkout_cancel_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Open Checkout Cancel Url'
+        },
+        open_checkout_signing_secret: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Open Checkout Signing Secret'
+        },
         invoice_company_name: {
             anyOf: [
                 {
@@ -13329,6 +14556,61 @@ export const PopupUpdateSchema = {
                 }
             ],
             title: 'Credits Enabled'
+        },
+        installments_enabled: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Installments Enabled'
+        },
+        installments_deadline: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Installments Deadline'
+        },
+        installments_max: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Installments Max'
+        },
+        installments_interval: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/InstallmentInterval'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        installments_interval_count: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Installments Interval Count'
         },
         checkin_pass_lead_days: {
             anyOf: [
@@ -15255,6 +16537,26 @@ export const SendTestRequestSchema = {
     title: 'SendTestRequest'
 } as const;
 
+export const TaskAppSchema = {
+    type: 'string',
+    enum: ['portal', 'backoffice'],
+    title: 'TaskApp',
+    description: 'Which surface a task relates to. Optional (NULL = unspecified).'
+} as const;
+
+export const TaskArchiveResultSchema = {
+    properties: {
+        archived: {
+            type: 'integer',
+            title: 'Archived'
+        }
+    },
+    type: 'object',
+    required: ['archived'],
+    title: 'TaskArchiveResult',
+    description: 'Count of tasks archived by a bulk operation.'
+} as const;
+
 export const TaskAttachmentCreateSchema = {
     properties: {
         storage_key: {
@@ -15506,6 +16808,16 @@ export const TaskCreateSchema = {
             ],
             title: 'Release'
         },
+        app: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/TaskApp'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
         visibility: {
             '$ref': '#/components/schemas/TaskVisibility',
             default: 'internal'
@@ -15605,6 +16917,16 @@ export const TaskDetailPublicSchema = {
             ],
             title: 'Release'
         },
+        app: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/TaskApp'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
         visibility: {
             '$ref': '#/components/schemas/TaskVisibility'
         },
@@ -15631,6 +16953,18 @@ export const TaskDetailPublicSchema = {
                 }
             ],
             title: 'Published At'
+        },
+        archived_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Archived At'
         },
         created_by: {
             anyOf: [
@@ -15767,6 +17101,16 @@ export const TaskPublicSchema = {
             ],
             title: 'Release'
         },
+        app: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/TaskApp'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
         visibility: {
             '$ref': '#/components/schemas/TaskVisibility'
         },
@@ -15793,6 +17137,18 @@ export const TaskPublicSchema = {
                 }
             ],
             title: 'Published At'
+        },
+        archived_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Archived At'
         },
         created_by: {
             anyOf: [
@@ -15937,6 +17293,16 @@ export const TaskUpdateSchema = {
             ],
             title: 'Release'
         },
+        app: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/TaskApp'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
         visibility: {
             anyOf: [
                 {
@@ -16061,6 +17427,140 @@ export const TemplateVariableSchema = {
     title: 'TemplateVariable'
 } as const;
 
+export const TenantAnonymousPublicSchema = {
+    properties: {
+        name: {
+            type: 'string',
+            maxLength: 255,
+            title: 'Name'
+        },
+        slug: {
+            type: 'string',
+            maxLength: 255,
+            title: 'Slug'
+        },
+        deleted: {
+            type: 'boolean',
+            title: 'Deleted',
+            default: false
+        },
+        sender_email: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 255,
+                    format: 'email'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Sender Email'
+        },
+        sender_name: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 255
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Sender Name'
+        },
+        image_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Image Url'
+        },
+        icon_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Icon Url'
+        },
+        logo_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Logo Url'
+        },
+        custom_domain: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 253
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Custom Domain'
+        },
+        custom_domain_active: {
+            type: 'boolean',
+            title: 'Custom Domain Active'
+        },
+        landing_mode: {
+            '$ref': '#/components/schemas/LandingMode',
+            default: 'portal'
+        },
+        meta_tracking_enabled: {
+            type: 'boolean',
+            title: 'Meta Tracking Enabled',
+            default: false
+        },
+        meta_pixel_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 64
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Meta Pixel Id'
+        },
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        active_popup_slug: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Active Popup Slug'
+        }
+    },
+    type: 'object',
+    required: ['name', 'slug', 'custom_domain_active', 'id'],
+    title: 'TenantAnonymousPublic'
+} as const;
+
 export const TenantCreateSchema = {
     properties: {
         name: {
@@ -16128,6 +17628,94 @@ export const TenantCreateSchema = {
                 }
             ],
             title: 'Logo Url'
+        },
+        meta_tracking_enabled: {
+            type: 'boolean',
+            title: 'Meta Tracking Enabled',
+            default: false
+        },
+        meta_pixel_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 64
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Meta Pixel Id'
+        },
+        smtp_host: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 255
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Smtp Host'
+        },
+        smtp_port: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Smtp Port',
+            default: 587
+        },
+        smtp_user: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 255
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Smtp User'
+        },
+        smtp_password: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Smtp Password'
+        },
+        smtp_tls: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Smtp Tls',
+            default: true
+        },
+        smtp_ssl: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Smtp Ssl',
+            default: false
         }
     },
     type: 'object',
@@ -16257,10 +17845,97 @@ export const TenantPublicSchema = {
             '$ref': '#/components/schemas/LandingMode',
             default: 'portal'
         },
+        meta_tracking_enabled: {
+            type: 'boolean',
+            title: 'Meta Tracking Enabled',
+            default: false
+        },
+        meta_pixel_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 64
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Meta Pixel Id'
+        },
         id: {
             type: 'string',
             format: 'uuid',
             title: 'Id'
+        },
+        meta_capi_configured: {
+            type: 'boolean',
+            title: 'Meta Capi Configured',
+            default: false
+        },
+        smtp_host: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Smtp Host'
+        },
+        smtp_port: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Smtp Port'
+        },
+        smtp_user: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Smtp User'
+        },
+        smtp_tls: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Smtp Tls'
+        },
+        smtp_ssl: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Smtp Ssl'
+        },
+        smtp_configured: {
+            type: 'boolean',
+            title: 'Smtp Configured',
+            default: false
+        },
+        smtp_password_configured: {
+            type: 'boolean',
+            title: 'Smtp Password Configured',
+            default: false
         },
         active_popup_slug: {
             anyOf: [
@@ -16277,6 +17952,37 @@ export const TenantPublicSchema = {
     type: 'object',
     required: ['name', 'slug', 'custom_domain_active', 'id'],
     title: 'TenantPublic'
+} as const;
+
+export const TenantSmtpTestRequestSchema = {
+    properties: {
+        to_email: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'email'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'To Email'
+        }
+    },
+    type: 'object',
+    title: 'TenantSmtpTestRequest'
+} as const;
+
+export const TenantSmtpTestResponseSchema = {
+    properties: {
+        message: {
+            type: 'string',
+            title: 'Message'
+        }
+    },
+    type: 'object',
+    required: ['message'],
+    title: 'TenantSmtpTestResponse'
 } as const;
 
 export const TenantUpdateSchema = {
@@ -16379,6 +18085,108 @@ export const TenantUpdateSchema = {
                     type: 'null'
                 }
             ]
+        },
+        meta_tracking_enabled: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Meta Tracking Enabled'
+        },
+        meta_pixel_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 64
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Meta Pixel Id'
+        },
+        meta_capi_access_token: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Meta Capi Access Token'
+        },
+        smtp_host: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 255
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Smtp Host'
+        },
+        smtp_port: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Smtp Port'
+        },
+        smtp_user: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 255
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Smtp User'
+        },
+        smtp_password: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Smtp Password'
+        },
+        smtp_tls: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Smtp Tls'
+        },
+        smtp_ssl: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Smtp Ssl'
         }
     },
     type: 'object',
@@ -17363,6 +19171,28 @@ export const TrackCreateSchema = {
     title: 'TrackCreate'
 } as const;
 
+export const TrackEventCountSchema = {
+    properties: {
+        track_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Track Id'
+        },
+        event_count: {
+            type: 'integer',
+            title: 'Event Count'
+        }
+    },
+    type: 'object',
+    required: ['track_id', 'event_count'],
+    title: 'TrackEventCount',
+    description: `Number of distinct published events that belong to a track.
+
+Backs the portal track filter / Tracks section so it can show per-track
+counts (and hide empty tracks) without pulling the full event list to the
+client just to count.`
+} as const;
+
 export const TrackPublicSchema = {
     properties: {
         tenant_id: {
@@ -17887,6 +19717,17 @@ export const VenueBusySlotSchema = {
             ],
             title: 'Label'
         },
+        visibility: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Visibility'
+        },
         event_id: {
             anyOf: [
                 {
@@ -17932,6 +19773,33 @@ export const VenueBusySlotSchema = {
     type: 'object',
     required: ['start', 'end', 'source'],
     title: 'VenueBusySlot'
+} as const;
+
+export const VenueEventCountSchema = {
+    properties: {
+        venue_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Venue Id'
+        },
+        venue_title: {
+            type: 'string',
+            title: 'Venue Title'
+        },
+        event_count: {
+            type: 'integer',
+            title: 'Event Count'
+        }
+    },
+    type: 'object',
+    required: ['venue_id', 'venue_title', 'event_count'],
+    title: 'VenueEventCount',
+    description: `Number of distinct published events that belong to a venue.
+
+Backs the portal venue filter so it can show per-venue counts (and hide
+venues with no events) without pulling the full event list to the client
+just to count. \`\`venue_title\`\` is included so the filter has a label
+without a second lookup.`
 } as const;
 
 export const VenueExceptionCreateSchema = {

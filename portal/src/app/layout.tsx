@@ -4,6 +4,8 @@ import type { Metadata, Viewport } from "next"
 import { headers } from "next/headers"
 import "./globals.css"
 import { Toaster } from "sonner"
+import { MetaPixel } from "@/components/MetaPixel"
+import { ServiceWorkerRegistrar } from "@/components/ServiceWorkerRegistrar"
 import GoogleAnalytics from "@/components/utils/GoogleAnalytics"
 import { fetchTenantBySlug } from "@/lib/tenant"
 import { resolveHostname } from "@/lib/tenant-resolution"
@@ -52,8 +54,15 @@ export async function generateMetadata(): Promise<Metadata> {
   return {
     title: name,
     description,
+    manifest: "/manifest.webmanifest",
+    appleWebApp: {
+      capable: true,
+      statusBarStyle: "default",
+      title: name,
+    },
     icons: {
       icon: tenant?.icon_url ?? "/icon.png",
+      apple: "/icons/icon-192.png",
     },
     openGraph: {
       title: name,
@@ -77,6 +86,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
+  themeColor: "#ffffff",
 }
 
 export default async function RootLayout({
@@ -105,6 +115,7 @@ export default async function RootLayout({
         suppressHydrationWarning
       >
         <GoogleAnalytics />
+        <ServiceWorkerRegistrar />
         <QueryProvider>
           <TenantProvider
             initialTenantId={middlewareTenantId}
@@ -112,6 +123,7 @@ export default async function RootLayout({
             initialLandingMode={middlewareLandingMode}
             initialActivePopupSlug={middlewareActivePopupSlug}
           >
+            <MetaPixel />
             <div className="w-full">{children}</div>
           </TenantProvider>
         </QueryProvider>

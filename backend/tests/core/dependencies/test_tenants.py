@@ -33,7 +33,7 @@ _TENANT_A_ID = uuid.uuid4()
 
 
 def _make_tenant(tenant_id: uuid.UUID = _TENANT_A_ID) -> MagicMock:
-    """Return a mock Tenants ORM instance with enough fields for TenantPublic.model_validate."""
+    """Return a mock Tenants ORM instance with enough fields for TenantAnonymousPublic."""
     from app.api.shared.enums import LandingMode
 
     t = MagicMock()
@@ -49,19 +49,22 @@ def _make_tenant(tenant_id: uuid.UUID = _TENANT_A_ID) -> MagicMock:
     t.custom_domain = None
     t.custom_domain_active = False
     t.landing_mode = LandingMode.portal
+    t.meta_tracking_enabled = False
+    t.meta_pixel_id = None
     t.active_popup_slug = None  # computed projection — not a DB column
     t.third_party_key_prefix = None  # third-party OTP display fragment
     return t
 
 
 def _make_tenant_public_json(tenant_id: uuid.UUID = _TENANT_A_ID) -> str:
-    """Return a minimal TenantPublic JSON string as stored in domain_cache."""
+    """Return a minimal TenantAnonymousPublic JSON string as stored in domain_cache."""
     return (
         f'{{"id":"{tenant_id}","name":"Test","slug":"test",'
         f'"deleted":false,"sender_email":null,"sender_name":null,'
         f'"image_url":null,"icon_url":null,"logo_url":null,'
         f'"custom_domain":null,"custom_domain_active":false,'
-        f'"landing_mode":"portal","active_popup_slug":null}}'
+        f'"landing_mode":"portal","meta_tracking_enabled":false,'
+        f'"meta_pixel_id":null,"active_popup_slug":null}}'
     )
 
 

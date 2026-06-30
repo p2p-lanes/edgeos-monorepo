@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query"
-import { ChevronDown, Info, RotateCcw, Type } from "lucide-react"
+import { ChevronDown, Info, PartyPopper, RotateCcw, Type } from "lucide-react"
 import { useCallback, useMemo, useState } from "react"
 import { RgbaColorPicker } from "react-colorful"
 import { PopupsService, type PopupUpdate } from "@/client"
@@ -15,6 +15,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover"
 import { Separator } from "@/components/ui/separator"
+import { Textarea } from "@/components/ui/textarea"
 import {
   Tooltip,
   TooltipContent,
@@ -31,6 +32,17 @@ import {
 } from "./ThemePreview"
 import { NEW_KEY_DEFAULTS } from "./ThemePreview/themeExpand"
 
+interface ThankYouConfig {
+  title?: string
+  description?: string
+  background?: { color?: string; image_url?: string }
+  text_color?: string
+  accent_color?: string
+  icon?: { show?: boolean; color?: string }
+  cta?: { show?: boolean; label?: string; url?: string }
+  show_order_summary?: boolean
+}
+
 interface ThemeConfig {
   colors?: Record<string, string>
   typography?: {
@@ -40,6 +52,32 @@ interface ThemeConfig {
   radius?: string
   border_radius?: string
   checkout_background_contexts?: CheckoutBackgroundContext[]
+  thank_you?: ThankYouConfig
+}
+
+/** Serialize the thank-you editor state into the persisted theme_config shape. */
+function buildThankYouConfig(ty: ThankYouConfig): Record<string, unknown> {
+  const out: Record<string, unknown> = {
+    icon: {
+      show: ty.icon?.show ?? true,
+      ...(ty.icon?.color ? { color: ty.icon.color } : {}),
+    },
+    cta: {
+      show: ty.cta?.show ?? true,
+      ...(ty.cta?.label ? { label: ty.cta.label } : {}),
+      ...(ty.cta?.url ? { url: ty.cta.url } : {}),
+    },
+    show_order_summary: ty.show_order_summary ?? false,
+  }
+  if (ty.title) out.title = ty.title
+  if (ty.description) out.description = ty.description
+  const bg: Record<string, string> = {}
+  if (ty.background?.color) bg.color = ty.background.color
+  if (ty.background?.image_url) bg.image_url = ty.background.image_url
+  if (Object.keys(bg).length > 0) out.background = bg
+  if (ty.text_color) out.text_color = ty.text_color
+  if (ty.accent_color) out.accent_color = ty.accent_color
+  return out
 }
 
 const BACKGROUND_CONTEXT_OPTIONS: {
@@ -114,6 +152,13 @@ export function ThemeConfigForm({
     CheckoutBackgroundContext[]
   >(() => sanitizeContexts(themeConfig?.checkout_background_contexts))
   const [typographyExpanded, setTypographyExpanded] = useState(false)
+  const [thankYouExpanded, setThankYouExpanded] = useState(false)
+  const [thankYouEnabled, setThankYouEnabled] = useState(
+    themeConfig?.thank_you !== undefined,
+  )
+  const [thankYou, setThankYou] = useState<ThankYouConfig>(
+    themeConfig?.thank_you ?? {},
+  )
   const [highlightedKeys, setHighlightedKeys] = useState<Set<string>>(
     () => new Set(),
   )
@@ -171,6 +216,8 @@ export function ThemeConfigForm({
     setRadius("")
     setBorderRadius("")
     setBackgroundContexts([])
+    setThankYouEnabled(false)
+    setThankYou({})
   }
 
   const handleSave = () => {
@@ -180,12 +227,13 @@ export function ThemeConfigForm({
     const hasBorderRadius = !!borderRadius
     const hasBackgroundContexts = backgroundContexts.length > 0
 
-    const config: ThemeConfig | null =
+    const config: Record<string, unknown> | null =
       hasColors ||
       hasTypography ||
       hasRadius ||
       hasBorderRadius ||
-      hasBackgroundContexts
+      hasBackgroundContexts ||
+      thankYouEnabled
         ? {
             ...(hasColors && { colors }),
             ...(hasTypography && {
@@ -201,12 +249,13 @@ export function ThemeConfigForm({
             ...(hasBackgroundContexts && {
               checkout_background_contexts: backgroundContexts,
             }),
+            ...(thankYouEnabled && {
+              thank_you: buildThankYouConfig(thankYou),
+            }),
           }
         : null
 
-    updateMutation.mutate({
-      theme_config: config as Record<string, unknown> | null,
-    })
+    updateMutation.mutate({ theme_config: config })
   }
 
   const savedContexts = useMemo(
@@ -221,7 +270,11 @@ export function ThemeConfigForm({
       (themeConfig?.typography?.font_heading_scale?.toString() ?? "") ||
     radius !== (themeConfig?.radius ?? "") ||
     borderRadius !== (themeConfig?.border_radius ?? "") ||
-    JSON.stringify(backgroundContexts) !== JSON.stringify(savedContexts)
+    JSON.stringify(backgroundContexts) !== JSON.stringify(savedContexts) ||
+    thankYouEnabled !== (themeConfig?.thank_you !== undefined) ||
+    (thankYouEnabled &&
+      JSON.stringify(buildThankYouConfig(thankYou)) !==
+        JSON.stringify(themeConfig?.thank_you ?? {}))
 
   // Effective values = user override OR default.
   const effectiveColors = useMemo(() => {
@@ -353,6 +406,86 @@ export function ThemeConfigForm({
               isHighlighted={highlightedKeys.has("checkout_subtitle_color")}
               disabled={readOnly}
             />
+            <ColorField
+              colorKey="checkout_nav_text_color"
+              label="Checkout nav text"
+              description="Optional color for the checkout step-nav labels and icons (Tickets, Your Information, Review). Leave empty to derive from your primary text color."
+              value={colors.checkout_nav_text_color ?? ""}
+              defaultValue=""
+              onChange={(v) => handleColorChange("checkout_nav_text_color", v)}
+              onReset={() => handleResetColor("checkout_nav_text_color")}
+              onHover={handleHover}
+              isHighlighted={highlightedKeys.has("checkout_nav_text_color")}
+              disabled={readOnly}
+            />
+            <ColorField
+              colorKey="checkout_bottom_bar_bg_color"
+              label="Checkout footer bar"
+              description="Optional background for the floating total/continue bar at the bottom of the checkout. Leave empty to use the default bar color."
+              value={colors.checkout_bottom_bar_bg_color ?? ""}
+              defaultValue=""
+              onChange={(v) =>
+                handleColorChange("checkout_bottom_bar_bg_color", v)
+              }
+              onReset={() => handleResetColor("checkout_bottom_bar_bg_color")}
+              onHover={handleHover}
+              isHighlighted={highlightedKeys.has(
+                "checkout_bottom_bar_bg_color",
+              )}
+              disabled={readOnly}
+            />
+            <ColorField
+              colorKey="checkout_bottom_bar_text_color"
+              label="Checkout footer text"
+              description="Optional text/total color for the floating bottom bar. Leave empty to use the default."
+              value={colors.checkout_bottom_bar_text_color ?? ""}
+              defaultValue=""
+              onChange={(v) =>
+                handleColorChange("checkout_bottom_bar_text_color", v)
+              }
+              onReset={() => handleResetColor("checkout_bottom_bar_text_color")}
+              onHover={handleHover}
+              isHighlighted={highlightedKeys.has(
+                "checkout_bottom_bar_text_color",
+              )}
+              disabled={readOnly}
+            />
+            <ColorField
+              colorKey="card_background_color"
+              label="Checkout card background"
+              description="Optional background for cards in the checkout (ticket cards, summary, insurance). Leave empty to use the mode's card surface."
+              value={colors.card_background_color ?? ""}
+              defaultValue=""
+              onChange={(v) => handleColorChange("card_background_color", v)}
+              onReset={() => handleResetColor("card_background_color")}
+              onHover={handleHover}
+              isHighlighted={highlightedKeys.has("card_background_color")}
+              disabled={readOnly}
+            />
+            <ColorField
+              colorKey="card_foreground_color"
+              label="Checkout card text"
+              description="Optional text color inside checkout cards. Leave empty to derive from the mode for readable contrast."
+              value={colors.card_foreground_color ?? ""}
+              defaultValue=""
+              onChange={(v) => handleColorChange("card_foreground_color", v)}
+              onReset={() => handleResetColor("card_foreground_color")}
+              onHover={handleHover}
+              isHighlighted={highlightedKeys.has("card_foreground_color")}
+              disabled={readOnly}
+            />
+            <ColorField
+              colorKey="checkout_watermark_color"
+              label="Checkout watermark"
+              description="Optional color for the giant section-name text behind the checkout content. Leave empty to derive a subtle tint from the mode."
+              value={colors.checkout_watermark_color ?? ""}
+              defaultValue=""
+              onChange={(v) => handleColorChange("checkout_watermark_color", v)}
+              onReset={() => handleResetColor("checkout_watermark_color")}
+              onHover={handleHover}
+              isHighlighted={highlightedKeys.has("checkout_watermark_color")}
+              disabled={readOnly}
+            />
           </div>
 
           {/* Typography */}
@@ -374,6 +507,17 @@ export function ThemeConfigForm({
           <BackgroundContextsSection
             value={backgroundContexts}
             onToggle={toggleBackgroundContext}
+            disabled={readOnly}
+          />
+
+          {/* Open-checkout thank-you page */}
+          <ThankYouSection
+            enabled={thankYouEnabled}
+            onEnabledChange={setThankYouEnabled}
+            value={thankYou}
+            onChange={setThankYou}
+            expanded={thankYouExpanded}
+            onToggle={() => setThankYouExpanded((v) => !v)}
             disabled={readOnly}
           />
 
@@ -476,6 +620,252 @@ function BackgroundContextsSection({
           )
         })}
       </div>
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ThankYouSection — customize the open-checkout thank-you page (texts,
+// background, colors, icon, CTA, order summary). Stored under
+// theme_config.thank_you and rendered by the portal thank-you route.
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface ThankYouSectionProps {
+  enabled: boolean
+  onEnabledChange: (v: boolean) => void
+  value: ThankYouConfig
+  onChange: (next: ThankYouConfig) => void
+  expanded: boolean
+  onToggle: () => void
+  disabled?: boolean
+}
+
+function TyTextField({
+  label,
+  hint,
+  placeholder,
+  value,
+  onChange,
+  disabled,
+}: {
+  label: string
+  hint?: string
+  placeholder?: string
+  value: string
+  onChange: (v: string) => void
+  disabled?: boolean
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <div className="flex flex-1 flex-col">
+        <Label className="text-xs">{label}</Label>
+        {hint && (
+          <span className="text-[11px] text-muted-foreground">{hint}</span>
+        )}
+      </div>
+      <Input
+        value={value}
+        placeholder={placeholder}
+        onChange={(e) => onChange(e.target.value)}
+        disabled={disabled}
+        className="h-8 max-w-[170px] text-xs"
+      />
+    </div>
+  )
+}
+
+function TyToggleField({
+  id,
+  label,
+  checked,
+  onChange,
+  disabled,
+}: {
+  id: string
+  label: string
+  checked: boolean
+  onChange: (v: boolean) => void
+  disabled?: boolean
+}) {
+  return (
+    <div className="flex items-center gap-2">
+      <Checkbox
+        id={id}
+        checked={checked}
+        disabled={disabled}
+        onCheckedChange={(s) => onChange(!!s)}
+      />
+      <Label htmlFor={id} className="text-xs font-medium">
+        {label}
+      </Label>
+    </div>
+  )
+}
+
+function ThankYouSection({
+  enabled,
+  onEnabledChange,
+  value,
+  onChange,
+  expanded,
+  onToggle,
+  disabled,
+}: ThankYouSectionProps) {
+  const set = (patch: Partial<ThankYouConfig>) =>
+    onChange({ ...value, ...patch })
+
+  return (
+    <div className="rounded-lg border bg-background">
+      <button
+        type="button"
+        onClick={onToggle}
+        className="flex w-full items-center justify-between px-3 py-2.5 text-left"
+      >
+        <div className="flex items-center gap-2">
+          <PartyPopper className="h-4 w-4 text-muted-foreground" />
+          <div className="flex flex-col">
+            <span className="text-sm font-medium">Thank-you page</span>
+            <span className="text-[11px] text-muted-foreground">
+              Open-checkout confirmation: texts, background, CTA, order summary.
+            </span>
+          </div>
+          {enabled && (
+            <span className="ml-1 rounded-full bg-primary/10 px-1.5 py-0.5 text-xs text-primary">
+              on
+            </span>
+          )}
+        </div>
+        <ChevronDown
+          className={cn(
+            "h-4 w-4 shrink-0 text-muted-foreground transition-transform",
+            expanded && "rotate-180",
+          )}
+        />
+      </button>
+
+      {expanded && (
+        <div className="space-y-3 border-t px-3 pb-3 pt-3">
+          <div className="flex items-start gap-2">
+            <Checkbox
+              id="ty-enabled"
+              checked={enabled}
+              disabled={disabled}
+              onCheckedChange={(s) => onEnabledChange(!!s)}
+              className="mt-0.5"
+            />
+            <div className="flex flex-col">
+              <Label htmlFor="ty-enabled" className="text-xs font-medium">
+                Customize thank-you page
+              </Label>
+              <span className="text-[11px] text-muted-foreground">
+                {
+                  "Off uses the default translated page. Texts support {first_name}, {amount_total}, {currency}, {order_id}."
+                }
+              </span>
+            </div>
+          </div>
+
+          {enabled && (
+            <div className="space-y-3">
+              <TyTextField
+                label="Title"
+                hint="Empty uses the default translation."
+                placeholder="Thanks {first_name}!"
+                value={value.title ?? ""}
+                onChange={(v) => set({ title: v })}
+                disabled={disabled}
+              />
+              <div className="flex flex-col gap-1">
+                <Label className="text-xs">Description</Label>
+                <Textarea
+                  value={value.description ?? ""}
+                  placeholder="Your order for {amount_total} {currency} is confirmed."
+                  onChange={(e) => set({ description: e.target.value })}
+                  disabled={disabled}
+                  className="text-xs"
+                />
+              </div>
+              <TyTextField
+                label="Background color"
+                hint="CSS color. Ignored when an image is set."
+                placeholder="#0f172a"
+                value={value.background?.color ?? ""}
+                onChange={(v) =>
+                  set({ background: { ...value.background, color: v } })
+                }
+                disabled={disabled}
+              />
+              <TyTextField
+                label="Background image URL"
+                placeholder="https://example.com/bg.jpg"
+                value={value.background?.image_url ?? ""}
+                onChange={(v) =>
+                  set({ background: { ...value.background, image_url: v } })
+                }
+                disabled={disabled}
+              />
+              <TyTextField
+                label="Text color"
+                placeholder="#ffffff"
+                value={value.text_color ?? ""}
+                onChange={(v) => set({ text_color: v })}
+                disabled={disabled}
+              />
+              <TyTextField
+                label="Accent color (CTA)"
+                placeholder="#10b981"
+                value={value.accent_color ?? ""}
+                onChange={(v) => set({ accent_color: v })}
+                disabled={disabled}
+              />
+              <TyToggleField
+                id="ty-icon-show"
+                label="Show success icon"
+                checked={value.icon?.show ?? true}
+                onChange={(v) => set({ icon: { ...value.icon, show: v } })}
+                disabled={disabled}
+              />
+              <TyTextField
+                label="Icon color"
+                placeholder="#10b981"
+                value={value.icon?.color ?? ""}
+                onChange={(v) => set({ icon: { ...value.icon, color: v } })}
+                disabled={disabled}
+              />
+              <TyToggleField
+                id="ty-order-summary"
+                label="Show order summary (items + total)"
+                checked={value.show_order_summary ?? false}
+                onChange={(v) => set({ show_order_summary: v })}
+                disabled={disabled}
+              />
+              <TyToggleField
+                id="ty-cta-show"
+                label="Show CTA button"
+                checked={value.cta?.show ?? true}
+                onChange={(v) => set({ cta: { ...value.cta, show: v } })}
+                disabled={disabled}
+              />
+              <TyTextField
+                label="CTA label"
+                hint="Empty uses the default translation."
+                placeholder="Go to portal"
+                value={value.cta?.label ?? ""}
+                onChange={(v) => set({ cta: { ...value.cta, label: v } })}
+                disabled={disabled}
+              />
+              <TyTextField
+                label="CTA URL"
+                hint="External link. Empty returns to the portal."
+                placeholder="https://example.com"
+                value={value.cta?.url ?? ""}
+                onChange={(v) => set({ cta: { ...value.cta, url: v } })}
+                disabled={disabled}
+              />
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }

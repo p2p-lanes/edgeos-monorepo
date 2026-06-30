@@ -1,8 +1,11 @@
 "use client"
 
+import { utcToLocalTzNaive } from "@edgeos/shared-events"
+import { MarkdownEditor } from "@edgeos/shared-form-ui"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import {
   ArrowLeft,
+  CheckCircle2,
   Image as ImageIcon,
   Loader2,
   Plus,
@@ -34,11 +37,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Textarea } from "@/components/ui/textarea"
 import { useCityProvider } from "@/providers/cityProvider"
+import { CollaboratorsField } from "../components/CollaboratorsField"
 import { EventScheduleFields } from "../components/EventScheduleFields"
 import { EventVenueField } from "../components/EventVenueField"
 import { HostDisplayField } from "../components/HostDisplayField"
+import { VenueDayScheduleDialog } from "../components/VenueDayScheduleDialog"
+import { VisibilityHint } from "../components/VisibilityHint"
 import { todayInTz, useEventScheduling } from "../lib/useEventScheduling"
 import { usePortalEventSettings } from "../lib/useEventTimezone"
 import { useFileUpload } from "../lib/useFileUpload"
@@ -160,9 +165,17 @@ function NewPortalEventForm({
   const { uploadFile, isUploading } = useFileUpload()
   const fileRef = useRef<HTMLInputElement>(null)
 
+  // When the created event lands in pending_approval, the form is replaced
+  // by a success screen explaining the review flow instead of redirecting.
+  const [pendingCreatedEventId, setPendingCreatedEventId] = useState<
+    string | null
+  >(null)
+
   // ---- form state -----------------------------------------------------
   const [title, setTitle] = useState("")
   const [content, setContent] = useState("")
+  // "" = no location picked yet (the select shows a placeholder). Virtual
+  // meeting is an explicit "__meeting__" choice, never the default.
   const [venueId, setVenueId] = useState<string>("")
   const [customLocationName, setCustomLocationName] = useState("")
   const [customLocationUrl, setCustomLocationUrl] = useState("")
@@ -209,6 +222,28 @@ function NewPortalEventForm({
   const [coverUrl, setCoverUrl] = useState("")
   const [hostDisplayName, setHostDisplayName] = useState("")
   const [hostId, setHostId] = useState<string | null>(null)
+  const [collaboratorIds, setCollaboratorIds] = useState<string[]>([])
+
+  const isCustomLocation = venueId === "__custom__"
+  const isMeeting = venueId === "__meeting__"
+  // The id of an actual venue — empty for the sentinel options (meeting /
+  // custom location) and while nothing is picked yet.
+  const realVenueId = isCustomLocation || isMeeting ? "" : venueId
+
+  // Default the Displayed-host field to the creator (the logged-in human),
+  // mirroring the field's "Use my name" quick-fill, so a freshly created event
+  // reads "Hosted by <creator>" instead of falling back to the popup name.
+  // One-shot and guarded on an untouched field, so a manual edit — even one
+  // typed before `currentHuman` resolved — is never clobbered. host_id is left
+  // null exactly like "Use my name": the creator is already the owner and
+  // carries full manage rights without it.
+  const didDefaultHostRef = useRef(false)
+  useEffect(() => {
+    if (didDefaultHostRef.current) return
+    if (!currentHumanName) return
+    didDefaultHostRef.current = true
+    setHostDisplayName((prev) => (prev.trim() ? prev : currentHumanName))
+  }, [currentHumanName])
 
   // ---- venue + availability ------------------------------------------
   const {
@@ -223,17 +258,16 @@ function NewPortalEventForm({
     availabilityData,
     effectiveBookingMode,
   } = useVenueAvailability({
+    // Selecting or changing the venue keeps the user's chosen date and
+    // time untouched. Availability is still re-checked (withinOpenHours,
+    // conflict check, selectedDateIsClosed) and surfaced as a warning.
     popupId,
-    venueId,
+    venueId: realVenueId,
     dateStr,
     displayTz,
     startIso,
     endIso,
     durationMinutes,
-    isDateOutsidePopupWindow,
-    popupStartKey,
-    setDateStr,
-    setTimeStr,
   })
 
   // ---- tracks --------------------------------------------------------
@@ -244,8 +278,17 @@ function NewPortalEventForm({
   })
   const tracks: TrackPublic[] = tracksData?.results ?? []
 
-  const isCustomLocation = venueId === "__custom__"
-  const isMeeting = !venueId && !isCustomLocation
+  // Show the day-schedule preview only when a real venue (not the custom-
+  // location / meeting sentinels) and a day are selected.
+  const showSchedule = !!realVenueId && !!dateStr
+
+  // Clicking a free slot in the preview sets the start time. The form stores
+  // a "HH:mm" wall-clock label in the display tz; convert the UTC instant the
+  // column hands back the same way the nearby-slot pills do.
+  const handlePickScheduleTime = (isoUtc: string) => {
+    setTimeStr(utcToLocalTzNaive(isoUtc, displayTz).slice(11, 16))
+  }
+
   const customLocationMissing =
     isCustomLocation &&
     (!customLocationName.trim() || !customLocationUrl.trim())
@@ -260,6 +303,11 @@ function NewPortalEventForm({
       if (!displayTz) {
         throw new Error(t("events.form.no_timezone_error"))
       }
+      if (startIso && new Date(startIso).getTime() < Date.now()) {
+        throw new Error(
+          "Start time is in the past. Pick a future date and time.",
+        )
+      }
       return EventsService.createPortalEvent({
         requestBody: {
           popup_id: popupId,
@@ -268,7 +316,7 @@ function NewPortalEventForm({
           start_time: startIso,
           end_time: endIso,
           timezone: displayTz,
-          venue_id: !isCustomLocation && venueId ? venueId : null,
+          venue_id: realVenueId || null,
           custom_location_name: isCustomLocation
             ? customLocationName.trim() || null
             : null,
@@ -285,6 +333,7 @@ function NewPortalEventForm({
           tags,
           host_display_name: hostDisplayName.trim() || null,
           host_id: hostId,
+          collaborator_ids: collaboratorIds,
           status: "published",
         },
       })
@@ -293,11 +342,13 @@ function NewPortalEventForm({
       queryClient.invalidateQueries({ queryKey: ["portal-events"] })
       queryClient.invalidateQueries({ queryKey: ["portal-events-day"] })
       queryClient.invalidateQueries({ queryKey: ["portal-events-calendar"] })
-      const messageKey =
-        event.status === "pending_approval"
-          ? "events.form.event_created_pending_approval_success"
-          : "events.form.event_created_success"
-      toast.success(t(messageKey))
+      if (event.status === "pending_approval") {
+        // Don't bounce to a detail page that looks like nothing happened —
+        // swap the form for a success screen explaining the approval flow.
+        setPendingCreatedEventId(event.id)
+        return
+      }
+      toast.success(t("events.form.event_created_success"))
       router.push(`/portal/${city?.slug}/events/${event.id}`)
     },
     onError: (err) => {
@@ -357,11 +408,20 @@ function NewPortalEventForm({
     maxParticipants !== "" &&
     parseInt(maxParticipants, 10) > venueMaxCapacity
 
+  // Block scheduling an event in the past. Hosts have repeatedly booked events
+  // on a past date by mistake (e.g. created Jun 15 for Jun 14), which is
+  // time-consuming for organizers to clean up. ``startIso`` is a UTC instant,
+  // so a direct comparison against the current instant is correct.
+  const startInPast = !!startIso && new Date(startIso).getTime() < Date.now()
+
   const canSubmit =
     !!title.trim() &&
     !!startIso &&
     !!endIso &&
-    (!venueId || isCustomLocation || withinOpenHours) &&
+    !startInPast &&
+    // A location choice is required — venue, custom location, or meeting.
+    !!venueId &&
+    (!realVenueId || withinOpenHours) &&
     !customLocationMissing &&
     !meetingUrlMissing &&
     availability !== "conflict" &&
@@ -369,6 +429,34 @@ function NewPortalEventForm({
     !createMutation.isPending
 
   const venueDisabled = selectedVenue?.booking_mode === "unbookable"
+
+  if (pendingCreatedEventId) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 text-center max-w-md mx-auto">
+        <CheckCircle2 className="h-10 w-10 text-green-600 mb-3" />
+        <h1 className="text-xl font-semibold">
+          {t("events.form.pending_success_heading")}
+        </h1>
+        <p className="text-sm text-muted-foreground mt-2">
+          {t("events.form.pending_success_message")}
+        </p>
+        <div className="flex gap-2 mt-6">
+          <Button variant="outline" asChild>
+            <Link href={`/portal/${city?.slug}/events`}>
+              {t("events.common.back_to_events")}
+            </Link>
+          </Button>
+          <Button asChild>
+            <Link
+              href={`/portal/${city?.slug}/events/${pendingCreatedEventId}`}
+            >
+              {t("events.form.pending_success_view_event")}
+            </Link>
+          </Button>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="flex flex-col max-w-2xl mx-auto p-4 sm:p-6 space-y-5">
@@ -508,7 +596,7 @@ function NewPortalEventForm({
             setDurationValue(next.value)
             setDurationUnit(next.unit)
           }}
-          venueId={venueId}
+          venueId={realVenueId}
           withinOpenHours={withinOpenHours}
           availability={availability}
           availabilityLoaded={!!availabilityData}
@@ -517,6 +605,17 @@ function NewPortalEventForm({
           onSuggestionPick={setTimeStr}
           disabled={venueDisabled}
         />
+
+        {showSchedule && (
+          <VenueDayScheduleDialog
+            availability={availabilityData}
+            timezone={displayTz}
+            dayKey={dateStr}
+            proposedStartIso={startIso || null}
+            proposedEndIso={endIso || null}
+            onPickTime={handlePickScheduleTime}
+          />
+        )}
 
         {/* Visibility */}
         <div className="space-y-2">
@@ -553,15 +652,20 @@ function NewPortalEventForm({
           popupId={popupId}
         />
 
+        <CollaboratorsField
+          value={collaboratorIds}
+          onChange={setCollaboratorIds}
+          popupId={popupId}
+        />
+
         {/* Description */}
         <div className="space-y-2">
           <Label htmlFor="content">{t("events.form.description_label")}</Label>
-          <Textarea
+          <MarkdownEditor
             id="content"
             value={content}
-            onChange={(e) => setContent(e.target.value)}
+            onChange={setContent}
             placeholder={t("events.form.description_placeholder")}
-            rows={4}
           />
         </div>
 
@@ -673,6 +777,12 @@ function NewPortalEventForm({
           </div>
         )}
 
+        {startInPast && (
+          <p className="text-sm text-destructive text-right">
+            Start time is in the past. Pick a future date and time.
+          </p>
+        )}
+
         <div className="flex justify-end gap-2 pt-2">
           <Button
             type="button"
@@ -690,6 +800,7 @@ function NewPortalEventForm({
             {t("events.form.create_button")}
           </Button>
         </div>
+        <VisibilityHint value={visibility} />
       </form>
 
       {pendingCrop && (

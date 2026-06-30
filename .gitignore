@@ -18,6 +18,9 @@ Thumbs.db
 .crush
 .claude/*
 .atl/
+
+# Personal/local working files (not part of the project)
+docs-local/
 AGENTS.md
 CLAUDE.md
 tasks/*

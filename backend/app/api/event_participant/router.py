@@ -6,6 +6,7 @@ from loguru import logger
 
 from app.api.event_participant import crud
 from app.api.event_participant.schemas import (
+    AttendeeEmailsResponse,
     EventParticipantCreate,
     EventParticipantPublic,
     EventParticipantUpdate,
@@ -212,6 +213,9 @@ async def list_portal_participants(
     occurrence; otherwise return every participant row of the event (used
     by the admin/owner participants section that wants the full picture).
     """
+    from app.api.application.crud import applications_crud
+    from app.api.event.crud import events_crud
+
     participants, total = crud.event_participants_crud.find_by_event(
         db,
         event_id=event_id,
@@ -220,10 +224,84 @@ async def list_portal_participants(
         occurrence_start=occurrence_start,
         scope_to_occurrence=occurrence_start is not None,
     )
+
+    # Privacy: drop participants who hid their name (info_not_shared) on their
+    # application for this event's popup. Excluding (not masking) keeps the RSVP
+    # list from leaking a name the attendee chose to hide.
+    event = events_crud.get(db, event_id)
+    if event is not None and participants:
+        hidden = applications_crud.human_ids_hiding_name(
+            db,
+            event.popup_id,
+            [p.profile_id for p in participants],
+        )
+        if hidden:
+            dropped = sum(1 for p in participants if p.profile_id in hidden)
+            participants = [p for p in participants if p.profile_id not in hidden]
+            total = max(total - dropped, len(participants))
+
     return ListModel[EventParticipantPublic](
         results=_participants_with_names(db, participants),
         paging=Paging(offset=skip, limit=limit, total=total),
     )
+
+
+@router.get("/portal/attendee-emails", response_model=AttendeeEmailsResponse)
+async def list_portal_attendee_emails(
+    db: HumanTenantSession,
+    current_human: CurrentHuman,
+    event_id: uuid.UUID,
+    occurrence_start: datetime | None = None,
+) -> AttendeeEmailsResponse:
+    """Emails of an event's active RSVPers, for its managers (portal).
+
+    Gated to the event's owner/host/collaborators so they can contact
+    everyone who RSVPed. Unlike the participants list, this includes every
+    active (non-cancelled) registrant regardless of the directory name-hide
+    flag — this is the organiser reaching their own attendees, not a public
+    listing. Emails are deduplicated and kept in registration order.
+    """
+    from sqlmodel import select
+
+    from app.api.event.crud import events_crud
+    from app.api.event.router import _human_id_manages_event
+    from app.api.human.models import Humans
+
+    event = events_crud.get(db, event_id)
+    if not event:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Event not found"
+        )
+    if not _human_id_manages_event(event, current_human.id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the event's host or collaborators can view attendees",
+        )
+
+    participants, _ = crud.event_participants_crud.find_by_event(
+        db,
+        event_id=event_id,
+        skip=0,
+        limit=10000,
+        occurrence_start=occurrence_start,
+        scope_to_occurrence=occurrence_start is not None,
+    )
+    active = [p for p in participants if p.status != ParticipantStatus.CANCELLED]
+    if not active:
+        return AttendeeEmailsResponse(emails=[], count=0)
+
+    profile_ids = {p.profile_id for p in active}
+    rows = db.exec(select(Humans).where(Humans.id.in_(profile_ids))).all()
+    email_by_id = {h.id: h.email for h in rows if h.email}
+
+    seen: set[str] = set()
+    emails: list[str] = []
+    for p in active:
+        email = email_by_id.get(p.profile_id)
+        if email and email not in seen:
+            seen.add(email)
+            emails.append(email)
+    return AttendeeEmailsResponse(emails=emails, count=len(emails))
 
 
 @router.post(
@@ -243,6 +321,9 @@ async def register_for_event(
     body: RegisterRequest | None = None,
 ) -> EventParticipantPublic:
     """Register current human for an event (portal)."""
+    from app.api.application.crud import applications_crud
+    from app.api.application.schemas import ApplicationStatus
+    from app.api.attendee.crud import attendees_crud
     from app.api.event.crud import events_crud
     from app.api.event.schemas import EventStatus
     from app.api.event_participant.models import EventParticipants
@@ -255,6 +336,34 @@ async def register_for_event(
     if event.status != EventStatus.PUBLISHED:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Event is not published"
+        )
+
+    # Eligibility gate: a human may only RSVP to a popup's events if they have a
+    # purchased ticket for that popup AND their application (if any) was not
+    # rejected. Mirrors the portal UI gate; enforced here so the rule can't be
+    # bypassed via the API directly.
+    application = applications_crud.get_by_human_popup(
+        db, current_human.id, event.popup_id
+    )
+    if application and application.status == ApplicationStatus.REJECTED.value:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Your application was not accepted, so you can't RSVP to events.",
+        )
+
+    # Same ticket source as `list_my_tickets` (find_by_human) so "has a ticket"
+    # matches exactly what the portal shows, including companion/spouse tickets.
+    owned_attendees, _ = attendees_crud.find_by_human(
+        db, human_id=current_human.id, limit=1000
+    )
+    has_ticket = any(
+        a.popup_id == event.popup_id and len(a.attendee_products) > 0
+        for a in owned_attendees
+    )
+    if not has_ticket:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You need a purchased ticket for this popup to RSVP.",
         )
 
     occ_start = _resolve_occurrence_start(
@@ -341,7 +450,11 @@ async def _notify_rsvp(
             human_id=human.id,
             method=method,
             occurrence_start=occurrence_start,
-            is_self_rsvp=method == "REQUEST",
+            # Always the human acting on their own registration, whether
+            # registering (REQUEST) or withdrawing (CANCEL). On CANCEL this
+            # selects the "registration cancelled" email instead of the
+            # organiser-driven "event cancelled" notice.
+            is_self_rsvp=True,
         )
     except Exception as exc:  # pragma: no cover - defensive
         logger.warning("iTIP {} delivery to {} failed: {}", method, human.email, exc)

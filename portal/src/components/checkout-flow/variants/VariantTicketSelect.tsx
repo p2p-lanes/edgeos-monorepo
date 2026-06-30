@@ -11,7 +11,7 @@ import QuantitySelector, {
   supportsQuantitySelector,
 } from "@/components/ui/QuantitySelector"
 import { useAttendeeCategories } from "@/hooks/useAttendeeCategories"
-import { deriveProductState, type ProductSaleState } from "@/lib/product-state"
+import { deriveProductState } from "@/lib/product-state"
 import { cn } from "@/lib/utils"
 import { useApplication } from "@/providers/applicationProvider"
 import { useCheckout } from "@/providers/checkoutProvider"
@@ -21,6 +21,7 @@ import type { AttendeePassState } from "@/types/Attendee"
 import { formatCurrency, formatPrice } from "@/types/checkout"
 import type { ProductsPass } from "@/types/Products"
 import type { VariantProps } from "../registries/variantRegistry"
+import { SaleStateBadge } from "./saleStateBadge"
 
 // ---------------------------------------------------------------------------
 // Types & constants
@@ -42,7 +43,10 @@ interface TemplateSection {
 
 /** True when the section's visible_if matches the application's form answers.
  *  No visible_if → always visible. Missing custom_fields → visible (open-ticketing
- *  fallback: the form hasn't been answered yet, treat as no-gate). */
+ *  fallback: the form hasn't been answered yet, treat as no-gate). An application
+ *  that never answered the gating field (applied before the field existed, or the
+ *  question isn't in its form) also passes: hiding every gated section would leave
+ *  the attendee unable to buy those passes at all. */
 export function isSectionVisibleForApp(
   section: TemplateSection,
   customFields: Record<string, unknown> | null | undefined,
@@ -51,6 +55,7 @@ export function isSectionVisibleForApp(
   if (!cond?.field_id) return true
   if (!customFields) return true
   const answer = customFields[cond.field_id]
+  if (answer == null || answer === "") return true
   const expected = Array.isArray(cond.value) ? cond.value : [cond.value]
   return expected.includes(answer as string)
 }
@@ -97,38 +102,6 @@ const getCategoryMeta = (cat: string) => {
       badge: "bg-gray-100 text-gray-700",
       tab: "text-gray-700 border-gray-700",
     }
-  )
-}
-
-function SaleStateBadge({ state }: { state: ProductSaleState }) {
-  if (state === "on_sale") return null
-  const config: Record<
-    Exclude<ProductSaleState, "on_sale">,
-    { label: string; classes: string }
-  > = {
-    upcoming: {
-      label: "UPCOMING",
-      classes: "bg-blue-100 text-blue-700 border-blue-200",
-    },
-    ended: {
-      label: "ENDED",
-      classes: "bg-slate-100 text-slate-500 border-slate-200",
-    },
-    sold_out: {
-      label: "SOLD OUT",
-      classes: "bg-rose-100 text-rose-700 border-rose-200",
-    },
-  }
-  const { label, classes } = config[state]
-  return (
-    <span
-      className={cn(
-        "px-2 py-0.5 text-[10px] font-semibold uppercase rounded tracking-wide border shrink-0",
-        classes,
-      )}
-    >
-      {label}
-    </span>
   )
 }
 

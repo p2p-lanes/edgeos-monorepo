@@ -2,14 +2,15 @@ import uuid
 from typing import TypedDict
 
 from loguru import logger
-from sqlalchemy import delete, exists, or_, update
+from sqlalchemy import Text, cast, delete, exists, or_, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import selectinload
 from sqlmodel import Session, col, func, select
 
-from app.api.human.models import Humans
+from app.api.human.models import HumanComment, HumanEnrichmentFact, Humans
 from app.api.human.schemas import (
     HumanCreate,
+    HumanEnrichmentFactCreate,
     HumanProfileStats,
     HumanProfileStatsPopup,
     HumanUpdate,
@@ -214,33 +215,77 @@ class HumansCRUD(BaseCRUD[Humans, HumanCreate, HumanUpdate]):
         results = list(session.exec(statement.offset(skip).limit(limit)).all())
         return results, total
 
-    def search_named(
+    def find_filtered(
         self,
         session: Session,
         *,
         skip: int = 0,
         limit: int = 100,
         search: str | None = None,
+        email: str | None = None,
+        telegram: str | None = None,
+        gender: str | None = None,
+        age: str | None = None,
+        residence: str | None = None,
+        rating: str | None = None,
+        has_enriched_profile: bool | None = None,
+        enrichment_query: str | None = None,
     ) -> tuple[list[Humans], int]:
-        """Search humans that have a usable display name.
+        """List humans with optional per-field filters (backoffice).
 
-        Powers the portal participant picker. Humans with neither a first nor
-        a last name are excluded so the picker never falls back to rendering a
-        raw UUID prefix.
+        ``search`` matches name/email broadly. The per-field args narrow the
+        result further and are AND-combined: ``email``/``telegram``/``residence``
+        match as case-insensitive substrings, while ``gender``/``age``/``rating``
+        match the whole value case-insensitively (so "male" doesn't also match
+        "female").
+
+        Rich Profiles filters: ``has_enriched_profile`` keeps only humans that
+        do (True) or do not (False) have a curated ``enriched_profile``;
+        ``enrichment_query`` matches a substring anywhere inside that JSONB
+        (headline, bio, org, role, tags, interests, topics…) by casting it to
+        text — handy for finding everyone tagged "AI" or based in a city.
         """
-        has_name = or_(
-            func.trim(func.coalesce(col(Humans.first_name), "")) != "",
-            func.trim(func.coalesce(col(Humans.last_name), "")) != "",
-        )
-        statement = select(Humans).where(has_name)
+        statement = select(Humans)
 
         if search:
-            search_term = f"%{search}%"
+            term = f"%{search}%"
             statement = statement.where(
                 or_(
-                    col(Humans.first_name).ilike(search_term),
-                    col(Humans.last_name).ilike(search_term),
+                    col(Humans.first_name).ilike(term),
+                    col(Humans.last_name).ilike(term),
+                    col(Humans.email).ilike(term),
                 )
+            )
+
+        for column, value in (
+            (Humans.email, email),
+            (Humans.telegram, telegram),
+            (Humans.residence, residence),
+        ):
+            if value:
+                statement = statement.where(col(column).ilike(f"%{value}%"))
+
+        for column, value in (
+            (Humans.gender, gender),
+            (Humans.age, age),
+            (Humans.rating, rating),
+        ):
+            if value:
+                statement = statement.where(col(column).ilike(value))
+
+        if has_enriched_profile is not None:
+            enriched_col = col(Humans.enriched_profile)
+            statement = statement.where(
+                enriched_col.isnot(None)
+                if has_enriched_profile
+                else enriched_col.is_(None)
+            )
+
+        if enrichment_query:
+            # Cast the JSONB to text and substring-match. Only humans with a
+            # non-null enriched_profile can match (NULL::text stays NULL).
+            statement = statement.where(
+                cast(col(Humans.enriched_profile), Text).ilike(f"%{enrichment_query}%")
             )
 
         count_statement = select(func.count()).select_from(statement.subquery())
@@ -501,6 +546,57 @@ class HumansCRUD(BaseCRUD[Humans, HumanCreate, HumanUpdate]):
 
         logger.info("hard_delete_cascade: human {} purged — {}", human_id, summary)
         return summary
+
+    def list_comments(
+        self, session: Session, human_id: uuid.UUID
+    ) -> list[HumanComment]:
+        """Return a human's non-deleted comments, oldest first."""
+        statement = (
+            select(HumanComment)
+            .where(
+                HumanComment.human_id == human_id,
+                col(HumanComment.deleted_at).is_(None),
+            )
+            .order_by(col(HumanComment.created_at).asc())
+        )
+        return list(session.exec(statement).all())
+
+    def list_enrichment_facts(
+        self, session: Session, human_id: uuid.UUID
+    ) -> list[HumanEnrichmentFact]:
+        """Return a human's enrichment facts (provenance bitácora), newest first."""
+        statement = (
+            select(HumanEnrichmentFact)
+            .where(HumanEnrichmentFact.human_id == human_id)
+            .order_by(col(HumanEnrichmentFact.created_at).desc())
+        )
+        return list(session.exec(statement).all())
+
+    def create_enrichment_fact(
+        self,
+        session: Session,
+        human_id: uuid.UUID,
+        fact_in: HumanEnrichmentFactCreate,
+    ) -> HumanEnrichmentFact:
+        """Append one atomic provenance fact extracted by the enrichment agent.
+
+        Append-only: facts are never updated, a newer fact supersedes an older
+        one. The curated ``humans.enriched_profile`` is updated separately (via
+        the human PATCH endpoint) from the accumulated facts.
+        """
+        fact = HumanEnrichmentFact(
+            human_id=human_id,
+            field=fact_in.field,
+            value=fact_in.value,
+            source=fact_in.source.value,
+            evidence=fact_in.evidence,
+            confidence=fact_in.confidence,
+            raw=fact_in.raw,
+        )
+        session.add(fact)
+        session.commit()
+        session.refresh(fact)
+        return fact
 
 
 def _popup_duration_days(popup) -> int | None:  # noqa: ANN001

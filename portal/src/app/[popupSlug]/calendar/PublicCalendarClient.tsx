@@ -17,12 +17,14 @@ import {
 } from "@/app/portal/[popupSlug]/events/lib/EventsToolbar"
 import { ListBody } from "@/app/portal/[popupSlug]/events/lib/ListBody"
 import { useEventTimezone } from "@/app/portal/[popupSlug]/events/lib/useEventTimezone"
+import { useMeasuredHeight } from "@/app/portal/[popupSlug]/events/lib/useMeasuredHeight"
 import { ApiError, type EventPublic } from "@/client"
 import {
   LoginRequiredDialog,
   type LoginRequiredEvent,
 } from "@/components/LoginRequiredDialog"
 import { useIsAuthenticated } from "@/hooks/useIsAuthenticated"
+import { cn } from "@/lib/utils"
 import { useTenant } from "@/providers/tenantProvider"
 
 import { usePublicCalendarEvents } from "./usePublicCalendarEvents"
@@ -203,6 +205,10 @@ export function PublicCalendarClient({ popupSlug }: PublicCalendarClientProps) {
   // when the underlying event set actually changes.
   const venuesOverride = useMemo(() => collectVenues(events), [events])
 
+  // Measure the sticky toolbar so the list's per-day headers freeze right
+  // below it (the toolbar grows a row when its filter chips wrap).
+  const [toolbarRef, toolbarHeight] = useMeasuredHeight<HTMLDivElement>(112)
+
   return (
     <div className="max-w-4xl mx-auto p-4 sm:p-6 overflow-x-clip">
       {meta?.popup_name ? (
@@ -230,7 +236,17 @@ export function PublicCalendarClient({ popupSlug }: PublicCalendarClientProps) {
         </p>
       </div>
 
-      <div className="mb-4">
+      <div
+        ref={toolbarRef}
+        className={cn(
+          "mb-4",
+          // Freeze the filters for the list & calendar views (the page
+          // scrolls there). The day grid has its own internal scroll, so
+          // it keeps the toolbar in normal flow.
+          view !== "day" &&
+            "sticky top-0 z-20 -mx-4 bg-background px-4 pb-3 pt-2 sm:-mx-6 sm:px-6",
+        )}
+      >
         <EventsToolbar
           view={view}
           onViewChange={setView}
@@ -305,6 +321,7 @@ export function PublicCalendarClient({ popupSlug }: PublicCalendarClientProps) {
             mode="public"
             onEventClick={handleEventClick}
             placeholderUrl={meta?.placeholder_url}
+            stickyTop={toolbarHeight}
           />
         )}
       </div>

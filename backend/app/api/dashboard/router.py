@@ -2,7 +2,7 @@ import uuid
 from decimal import ROUND_HALF_UP, Decimal
 
 from fastapi import APIRouter, Query
-from sqlalchemy import func
+from sqlalchemy import and_, case, func
 from sqlmodel import select
 
 from app.api.application.models import Applications
@@ -163,7 +163,12 @@ def _get_payment_stats(db: TenantSession, popup_id: uuid.UUID) -> PaymentStats:
         select(
             Payments.status,
             func.count(Payments.id),
-            func.coalesce(func.sum(Payments.amount), Decimal("0")),
+            # amount_charged is the settled total when SimpleFi applied a
+            # per-rail price adjustment; fall back to the quoted amount.
+            func.coalesce(
+                func.sum(func.coalesce(Payments.amount_charged, Payments.amount)),
+                Decimal("0"),
+            ),
             func.coalesce(func.sum(Payments.discount_value), Decimal("0")),
         )
         .where(
@@ -265,15 +270,18 @@ def _get_accommodation_percentage(
     if total_people == 0:
         return Decimal("0")
 
-    # Count distinct attendees with an approved housing payment product
+    # Count distinct attendees with an approved housing payment product.
+    # Filter by the live product category (consistent with the ticket widgets);
+    # the purchase-time snapshot product_category can be stale.
     housing_attendees = db.exec(
         select(func.count(func.distinct(PaymentProducts.attendee_id)))
         .join(Payments, PaymentProducts.payment_id == Payments.id)
+        .join(Products, PaymentProducts.product_id == Products.id)
         .where(
             Payments.popup_id == popup_id,
             Payments.status == PaymentStatus.APPROVED.value,
             Payments.payment_type == PaymentType.PASS_PURCHASE.value,
-            PaymentProducts.product_category == CATEGORY_HOUSING,
+            Products.category == CATEGORY_HOUSING,
         )
     ).one()
 
@@ -316,11 +324,16 @@ def _get_cumulative_trends(
     ticket_rows = db.exec(
         select(bucket, func.coalesce(func.sum(PaymentProducts.quantity), 0))
         .join(Payments, PaymentProducts.payment_id == Payments.id)
+        .join(Products, PaymentProducts.product_id == Products.id)
         .where(
             Payments.popup_id == popup_id,
             Payments.status == PaymentStatus.APPROVED.value,
             Payments.payment_type == PaymentType.PASS_PURCHASE.value,
-            PaymentProducts.product_category == CATEGORY_TICKET,
+            # Live product category (same source as the Tickets by Type widget)
+            # so the cumulative count reconciles with it. The purchase-time
+            # snapshot product_category is stale for tickets re-categorised
+            # after sale (e.g. day/week/month folded into ticket + duration).
+            Products.category == CATEGORY_TICKET,
         )
         .group_by(bucket)
         .order_by(bucket)
@@ -340,7 +353,13 @@ def _get_cumulative_trends(
 
     # Revenue: approved pass_purchase amount on the same payment-date axis
     revenue_rows = db.exec(
-        select(bucket, func.coalesce(func.sum(Payments.amount), Decimal("0")))
+        select(
+            bucket,
+            func.coalesce(
+                func.sum(func.coalesce(Payments.amount_charged, Payments.amount)),
+                Decimal("0"),
+            ),
+        )
         .where(
             Payments.popup_id == popup_id,
             Payments.status == PaymentStatus.APPROVED.value,
@@ -366,25 +385,118 @@ def _get_cumulative_trends(
 
 
 def _get_revenue_breakdown(db: TenantSession, popup_id: uuid.UUID) -> RevenueBreakdown:
-    """Revenue and quantity breakdown by product and category."""
-    rows = db.exec(
+    """Net revenue and quantity breakdown by product and category.
+
+    Revenue is anchored on what was actually collected, never reconstructed from
+    list prices. For each approved pass-purchase payment we take the settled
+    total (COALESCE(amount_charged, amount) minus insurance and contribution
+    fees, which are not product lines) and split it across the payment's lines
+    the same way the pricing engine charged it (payment.crud._calculate_price):
+    non-discountable lines and patreon donations keep their full nominal value,
+    and only discountable lines absorb the discount, sharing whatever remains of
+    the settled total in proportion to their list price. This reconciles with
+    the Total Revenue KPI by construction, regardless of how a coupon, group
+    rate, scholarship or admin comp reduced the amount, none of which are
+    itemised per line.
+
+    Nominal value comes from effective_unit_price when set (patreon donations,
+    whose product_price is 0, and direct-sale unit-price overrides) and from the
+    snapshot product_price otherwise. When the settled total can't cover the
+    non-discountable lines at full price (a comp, or a legacy-migrated payment
+    whose snapshot price was overwritten with the current, higher catalog price)
+    the payment falls back to a plain proportional split so it still reconciles
+    and never goes negative.
+    """
+    # Per-line nominal value: donation/override price when present, else the
+    # snapshot list price. Used as the allocation weight within a payment.
+    line_nominal = (
+        func.coalesce(
+            PaymentProducts.effective_unit_price, PaymentProducts.product_price
+        )
+        * PaymentProducts.quantity
+    )
+    # A product missing from the catalog (deleted) is treated as non-discountable.
+    is_discountable = case((Products.discountable.is_(True), 1), else_=0)
+    # Settled total per payment, excluding non-product fees. Same basis as the
+    # Total Revenue KPI in _get_payment_stats.
+    net_payment = (
+        func.coalesce(Payments.amount_charged, Payments.amount)
+        - Payments.insurance_amount
+        - Payments.contribution_amount
+    )
+
+    lines = (
         select(
-            PaymentProducts.product_id,
-            PaymentProducts.product_name,
-            PaymentProducts.product_category,
-            func.sum(PaymentProducts.quantity),
-            func.sum(PaymentProducts.product_price * PaymentProducts.quantity),
+            PaymentProducts.product_id.label("product_id"),
+            PaymentProducts.product_name.label("product_name"),
+            # Group by the live product category, not the purchase-time snapshot:
+            # products re-categorised after a sale (e.g. day/week/month folded
+            # into "ticket" + duration_type) left stale snapshot categories that
+            # scattered tickets into ghost categories and disagreed with the
+            # other widgets. Fall back to the snapshot for deleted products.
+            func.coalesce(Products.category, PaymentProducts.product_category).label(
+                "product_category"
+            ),
+            PaymentProducts.quantity.label("quantity"),
+            line_nominal.label("nominal"),
+            is_discountable.label("is_discountable"),
+            net_payment.label("net_payment"),
+            func.sum(line_nominal)
+            .over(partition_by=PaymentProducts.payment_id)
+            .label("nominal_total"),
+            func.sum(line_nominal * is_discountable)
+            .over(partition_by=PaymentProducts.payment_id)
+            .label("discountable_total"),
+            func.sum(line_nominal * (1 - is_discountable))
+            .over(partition_by=PaymentProducts.payment_id)
+            .label("non_discountable_total"),
         )
         .join(Payments, PaymentProducts.payment_id == Payments.id)
+        .join(Products, PaymentProducts.product_id == Products.id, isouter=True)
         .where(
             Payments.popup_id == popup_id,
             Payments.status == PaymentStatus.APPROVED.value,
             Payments.payment_type == PaymentType.PASS_PURCHASE.value,
         )
-        .group_by(
-            PaymentProducts.product_id,
-            PaymentProducts.product_name,
-            PaymentProducts.product_category,
+        .subquery()
+    )
+
+    # Money left for the discountable bucket once non-discountable lines are paid
+    # in full.
+    remainder = lines.c.net_payment - lines.c.non_discountable_total
+    allocated_revenue = case(
+        (
+            # Normal path: non-discountable lines at full nominal; discountable
+            # lines share the remainder weighted by list price.
+            and_(lines.c.discountable_total > 0, remainder >= 0),
+            case(
+                (
+                    lines.c.is_discountable == 1,
+                    remainder * lines.c.nominal / lines.c.discountable_total,
+                ),
+                else_=lines.c.nominal,
+            ),
+        ),
+        # Fallback: settled total can't cover non-discountable lines (comp or
+        # inflated legacy snapshot) -> plain proportional split.
+        (
+            lines.c.nominal_total > 0,
+            lines.c.net_payment * lines.c.nominal / lines.c.nominal_total,
+        ),
+        else_=Decimal("0"),
+    )
+
+    rows = db.exec(
+        select(
+            lines.c.product_id,
+            lines.c.product_name,
+            lines.c.product_category,
+            func.sum(lines.c.quantity),
+            func.sum(allocated_revenue),
+        ).group_by(
+            lines.c.product_id,
+            lines.c.product_name,
+            lines.c.product_category,
         )
     ).all()
 
@@ -400,13 +512,14 @@ def _get_revenue_breakdown(db: TenantSession, popup_id: uuid.UUID) -> RevenueBre
     }
 
     for product_id, name, category, qty, rev in rows:
+        revenue = (rev or Decimal("0")).quantize(TWO_DECIMAL, ROUND_HALF_UP)
         by_product.append(
             ProductBreakdownItem(
                 product_id=str(product_id),
                 product_name=name,
                 product_category=category,
                 quantity=qty or 0,
-                revenue=rev or Decimal("0"),
+                revenue=revenue,
             )
         )
 
@@ -416,7 +529,7 @@ def _get_revenue_breakdown(db: TenantSession, popup_id: uuid.UUID) -> RevenueBre
                 label=category_labels.get(category, category.title()),
             )
         category_agg[category].quantity += qty or 0
-        category_agg[category].revenue += rev or Decimal("0")
+        category_agg[category].revenue += revenue
 
     return RevenueBreakdown(
         by_product=by_product,
@@ -513,18 +626,20 @@ def _get_distribution(db: TenantSession, popup_id: uuid.UUID) -> Distribution:
         for cat, qty in attendee_type_rows
     ]
 
-    # Accommodation by product name
+    # Accommodation by product name. Live product category, consistent with the
+    # other widgets (snapshot product_category can be stale).
     housing_rows = db.exec(
         select(
             PaymentProducts.product_name,
             func.sum(PaymentProducts.quantity),
         )
         .join(Payments, PaymentProducts.payment_id == Payments.id)
+        .join(Products, PaymentProducts.product_id == Products.id)
         .where(
             Payments.popup_id == popup_id,
             Payments.status == PaymentStatus.APPROVED.value,
             Payments.payment_type == PaymentType.PASS_PURCHASE.value,
-            PaymentProducts.product_category == CATEGORY_HOUSING,
+            Products.category == CATEGORY_HOUSING,
         )
         .group_by(PaymentProducts.product_name)
     ).all()
@@ -583,11 +698,13 @@ def _get_attach_rate(db: TenantSession, popup_id: uuid.UUID) -> list[AttachRateI
     housing_attendee_ids = (
         select(PaymentProducts.attendee_id)
         .join(Payments, PaymentProducts.payment_id == Payments.id)
+        .join(Products, PaymentProducts.product_id == Products.id)
         .where(
             Payments.popup_id == popup_id,
             Payments.status == PaymentStatus.APPROVED.value,
             Payments.payment_type == PaymentType.PASS_PURCHASE.value,
-            PaymentProducts.product_category == CATEGORY_HOUSING,
+            # Live product category, matching the ticket leg of this metric.
+            Products.category == CATEGORY_HOUSING,
         )
     ).correlate(None)
 

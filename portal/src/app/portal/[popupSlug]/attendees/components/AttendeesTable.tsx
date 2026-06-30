@@ -1,7 +1,7 @@
 import { useTranslation } from "react-i18next"
-import Pagination from "@/components/common/Pagination"
 import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table"
 import type { AttendeeDirectory } from "@/types/Attendee"
+import PaginationControls from "./Pagination"
 import AttendeeCell from "./Table/Cells/AttendeeCell"
 import CommonCell from "./Table/Cells/CommonCell"
 import Header from "./Table/Header"
@@ -24,6 +24,7 @@ const AttendeesTable = ({
   currentPage,
   pageSize,
   onPageChange,
+  onPageSizeChange,
 }: AttendeesTableProps) => {
   const { t } = useTranslation()
 
@@ -79,10 +80,12 @@ const AttendeesTable = ({
         </TableBody>
       </Table>
 
-      <Pagination
+      <PaginationControls
         currentPage={currentPage}
+        totalItems={totalAttendees}
+        pageSize={pageSize}
         onPageChange={onPageChange}
-        totalPages={Math.ceil(totalAttendees / pageSize)}
+        onPageSizeChange={onPageSizeChange}
       />
     </div>
   )

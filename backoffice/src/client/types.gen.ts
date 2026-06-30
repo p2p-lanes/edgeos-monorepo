@@ -446,6 +446,21 @@ export type AttendeeCreate = {
     category?: (string | null);
     email?: (string | null);
     gender?: (string | null);
+    additional_data?: ({
+    [key: string]: unknown;
+} | null);
+};
+
+/**
+ * Active RSVPers' emails for an event, for its managers (portal).
+ *
+ * Returned only to the event's owner/host/collaborators so they can
+ * contact everyone who RSVPed. Emails are deduplicated and ordered by
+ * registration order.
+ */
+export type AttendeeEmailsResponse = {
+    emails: Array<(string)>;
+    count: number;
 };
 
 /**
@@ -475,6 +490,9 @@ export type AttendeeListItem = {
     email?: (string | null);
     gender?: (string | null);
     poap_url?: (string | null);
+    additional_data?: {
+        [key: string]: unknown;
+    };
     id: string;
     category?: (string | null);
     created_at?: (string | null);
@@ -535,6 +553,9 @@ export type AttendeePublic = {
     email?: (string | null);
     gender?: (string | null);
     poap_url?: (string | null);
+    additional_data?: {
+        [key: string]: unknown;
+    };
     id: string;
     category?: (string | null);
     created_at?: (string | null);
@@ -627,6 +648,23 @@ export type AttendeeTicketLine = {
 };
 
 /**
+ * Request body to edit a meal-plan ticket's choices post-purchase (portal).
+ *
+ * Replaces the three choice keys inside AttendeeProducts.purchase_metadata:
+ * daily_choices (ISO date -> menu key | "chef"), dietary_restriction, and
+ * special_request. The key/date semantics are NOT validated here — that needs
+ * the meal-plan step's template_config and happens in the CRUD layer via
+ * ticketing_step.meal_plan.validate_daily_choices.
+ */
+export type AttendeeTicketMetadataUpdate = {
+    daily_choices: {
+        [key: string]: (string);
+    };
+    dietary_restriction?: (string | null);
+    special_request?: (string | null);
+};
+
+/**
  * Request body to change the product of an attendee's ticket (admin panel).
  */
 export type AttendeeTicketProductSwap = {
@@ -640,6 +678,9 @@ export type AttendeeUpdate = {
     name?: (string | null);
     email?: (string | null);
     gender?: (string | null);
+    additional_data?: ({
+    [key: string]: unknown;
+} | null);
 };
 
 /**
@@ -662,6 +703,9 @@ export type AttendeeWithOriginPublic = {
     email?: (string | null);
     gender?: (string | null);
     poap_url?: (string | null);
+    additional_data?: {
+        [key: string]: unknown;
+    };
     id: string;
     category?: (string | null);
     created_at?: (string | null);
@@ -755,12 +799,18 @@ export type BaseFieldConfigUpdate = {
 /**
  * The 'report a bug' payload, open to every backoffice user.
  *
- * Always produces an internal bug in the to-do column. Attachments are
- * optional screenshots / screen-recordings already uploaded to S3.
+ * Produces a to-do task in the reporter's tenant scope. The reporter can
+ * classify it (type / priority / which app it relates to); type defaults to
+ * ``bug`` so the plain "report a bug" flow keeps working unchanged.
+ * Attachments are optional screenshots / screen-recordings already uploaded
+ * to S3.
  */
 export type BugReportCreate = {
     title: string;
     detail?: (string | null);
+    type?: TaskType;
+    priority?: TaskPriority;
+    app?: (TaskApp | null);
     attachments?: Array<TaskAttachmentCreate>;
 };
 
@@ -1022,6 +1072,7 @@ export type CheckoutRuntimeResponse = {
     products: Array<CheckoutRuntimeProduct>;
     buyer_form: Array<CheckoutBuyerSection>;
     ticketing_steps: Array<TicketingStepPublic>;
+    attendee_categories?: Array<AttendeeCategoryPublic>;
     form_schema?: ({
     [key: string]: unknown;
 } | null);
@@ -1130,6 +1181,20 @@ export type DashboardStats = {
 };
 
 /**
+ * Number of occurrence-expanded events that start on a given calendar day.
+ *
+ * Backs the portal calendar grid dots: the frontend can fetch per-day counts
+ * for an entire month without pulling full event payloads, then render a dot
+ * on each day that has at least one event.  ``day`` is formatted as
+ * ``YYYY-MM-DD`` in the popup's configured timezone so it aligns with the
+ * frontend's ``formatDayKey`` helper.
+ */
+export type DayEventCount = {
+    day: string;
+    count: number;
+};
+
+/**
  * Request body for POST /applications/my/detach-companion.
  */
 export type DetachCompanionRequest = {
@@ -1187,7 +1252,7 @@ export type EmailTemplatePublic = {
     updated_at?: (string | null);
 };
 
-export type EmailTemplateType = 'login_code_user' | 'login_code_human' | 'application_received' | 'application_accepted' | 'application_rejected' | 'application_accepted_with_discount' | 'application_accepted_with_incentive' | 'application_accepted_scholarship_rejected' | 'payment_confirmed' | 'abandoned_cart' | 'edit_passes_confirmed' | 'event_invitation' | 'event_updated' | 'event_cancelled' | 'event_approval_approved' | 'event_approval_rejected' | 'check_in_pass';
+export type EmailTemplateType = 'login_code_user' | 'login_code_human' | 'application_received' | 'application_accepted' | 'application_rejected' | 'application_accepted_with_discount' | 'application_accepted_with_incentive' | 'application_accepted_scholarship_rejected' | 'payment_confirmed' | 'abandoned_cart' | 'edit_passes_confirmed' | 'event_invitation' | 'event_updated' | 'event_cancelled' | 'event_rsvp_cancelled' | 'event_approval_approved' | 'event_approval_rejected' | 'check_in_pass';
 
 export type EmailTemplateUpdate = {
     subject?: (string | null);
@@ -1208,6 +1273,15 @@ export type EnrichedDashboardStats = {
     attendees: AttendeeStats;
     payments: PaymentStats;
 };
+
+/**
+ * Where a single enrichment fact about a human came from.
+ *
+ * Stored as the enum's string value in ``human_enrichment_facts.source``;
+ * used as provenance so the curated ``humans.enriched_profile`` can be traced
+ * back to its evidence (and re-derived if a source is corrected/removed).
+ */
+export type EnrichmentSource = 'telegram' | 'event' | 'custom_fields' | 'org' | 'manual';
 
 /**
  * Staff-only free-text notes for an event.
@@ -1260,6 +1334,27 @@ export type EventCalendarTrack = {
 };
 
 /**
+ * Slim human projection for an event's collaborator chips in the portal.
+ *
+ * Mirrors ``HumanPortalPublic`` so the same picker/avatar rendering works
+ * for already-saved collaborators. Resolved from ``Events.collaborator_ids``
+ * by the portal get/create/update endpoints (the list endpoints leave it
+ * empty — collaborators aren't shown on cards).
+ *
+ * ``email`` is only populated by the admin (backoffice) endpoints so a chip
+ * for a human with no name can fall back to their email; the portal
+ * endpoints leave it ``None`` to avoid exposing organizer emails to every
+ * viewer of a public event.
+ */
+export type EventCollaboratorPublic = {
+    id: string;
+    first_name?: (string | null);
+    last_name?: (string | null);
+    picture_url?: (string | null);
+    email?: (string | null);
+};
+
+/**
  * Event schema for creation.
  */
 export type EventCreate = {
@@ -1282,6 +1377,7 @@ export type EventCreate = {
     kind?: (string | null);
     host_display_name?: (string | null);
     host_id?: (string | null);
+    collaborator_ids?: Array<(string)>;
     status?: EventStatus;
     highlighted?: boolean;
     recurrence?: (RecurrenceRule | null);
@@ -1387,6 +1483,7 @@ export type EventPublic = {
     kind?: (string | null);
     host_display_name?: (string | null);
     host_id?: (string | null);
+    collaborator_ids?: Array<(string)>;
     status?: EventStatus;
     highlighted?: boolean;
     rejection_reason?: (string | null);
@@ -1402,8 +1499,10 @@ export type EventPublic = {
     venue_location?: (string | null);
     venue_image_url?: (string | null);
     track_title?: (string | null);
+    collaborators?: Array<EventCollaboratorPublic>;
     hidden?: boolean;
     my_rsvp_status?: (string | null);
+    attendee_count?: (number | null);
 };
 
 /**
@@ -1525,6 +1624,22 @@ export type EventSettingsUpdate = {
     placeholder_url?: (string | null);
 };
 
+/**
+ * Tiny, unauthenticated projection for social/OpenGraph share previews.
+ *
+ * Returned by the public ``/public/events/{id}/share`` endpoint so social
+ * crawlers (which send no JWT) can render the real event title, a short
+ * plaintext snippet and the cover image. Deliberately minimal — no
+ * ``meeting_url``, ``tenant_id``, ``owner_id``, ``visibility`` or any other
+ * field that could leak through an unauthenticated route.
+ */
+export type EventShareMeta = {
+    id: string;
+    title: string;
+    description?: (string | null);
+    image_url?: (string | null);
+};
+
 export type EventStatus = 'draft' | 'published' | 'cancelled' | 'pending_approval' | 'rejected';
 
 /**
@@ -1549,6 +1664,7 @@ export type EventUpdate = {
     kind?: (string | null);
     host_display_name?: (string | null);
     host_id?: (string | null);
+    collaborator_ids?: (Array<(string)> | null);
     status?: (EventStatus | null);
     highlighted?: (boolean | null);
 };
@@ -1917,6 +2033,53 @@ export type HTTPValidationError = {
 };
 
 /**
+ * Request body for adding a manual note to a human's timeline.
+ */
+export type HumanActivityCreate = {
+    note: string;
+    occurred_at: string;
+};
+
+/**
+ * A single entry in a human's activity timeline.
+ *
+ * `id` is a composite key (e.g. ``"payment:<uuid>"``) so it stays unique
+ * across the different source tables. `occurred_at` is the effective
+ * timestamp the feed sorts by.
+ */
+export type HumanActivityItem = {
+    id: string;
+    kind: HumanActivityKind;
+    occurred_at: string;
+    popup_id?: (string | null);
+    popup_label?: (string | null);
+    note?: (string | null);
+    amount?: (string | null);
+    currency?: (string | null);
+    status?: (string | null);
+    products?: Array<HumanActivityProduct>;
+    rating?: (string | null);
+    previous_rating?: (string | null);
+    actor_id?: (string | null);
+    actor_name?: (string | null);
+    actor_email?: (string | null);
+};
+
+/**
+ * The kind of event a timeline item represents.
+ */
+export type HumanActivityKind = 'application.submitted' | 'application.accepted' | 'payment.completed' | 'ticket.added' | 'note.added' | 'rating.changed' | 'comment.added';
+
+/**
+ * One purchased line in a `payment.completed` item (snapshot at purchase).
+ */
+export type HumanActivityProduct = {
+    product_name?: (string | null);
+    product_category?: (string | null);
+    quantity?: number;
+};
+
+/**
  * Request to initiate human authentication.
  */
 export type HumanAuth = {
@@ -1924,6 +2087,25 @@ export type HumanAuth = {
     email: string;
     picture_url?: (string | null);
     red_flag?: boolean;
+};
+
+export type HumanCommentCreate = {
+    body: string;
+};
+
+export type HumanCommentPublic = {
+    id: string;
+    human_id: string;
+    author_user_id?: (string | null);
+    author_name?: (string | null);
+    author_email?: (string | null);
+    body: string;
+    created_at: string;
+    edited_at?: (string | null);
+};
+
+export type HumanCommentUpdate = {
+    body: string;
 };
 
 /**
@@ -1938,6 +2120,34 @@ export type HumanCreate = {
     age?: (string | null);
     residence?: (string | null);
     picture_url?: (string | null);
+};
+
+/**
+ * One atomic fact the enrichment agent extracted from a source.
+ */
+export type HumanEnrichmentFactCreate = {
+    field: string;
+    value: string;
+    source: EnrichmentSource;
+    evidence?: (string | null);
+    confidence?: (number | null);
+    raw?: ({
+    [key: string]: unknown;
+} | null);
+};
+
+export type HumanEnrichmentFactPublic = {
+    id: string;
+    human_id: string;
+    field: string;
+    value: string;
+    source: EnrichmentSource;
+    evidence?: (string | null);
+    confidence?: (number | null);
+    raw?: ({
+    [key: string]: unknown;
+} | null);
+    created_at: string;
 };
 
 /**
@@ -2002,8 +2212,21 @@ export type HumanPublic = {
     age?: (string | null);
     residence?: (string | null);
     picture_url?: (string | null);
+    rating?: HumanRating;
     red_flag?: boolean;
+    enriched_profile?: ({
+    [key: string]: unknown;
+} | null);
 };
+
+/**
+ * Admin assessment of a human for gathering admission.
+ *
+ * Replaces the legacy ``red_flag`` boolean. Only ``RED_FLAG`` carries the
+ * automatic cascade (revoke API keys, reject in-review applications, send
+ * rejection emails); the other levels are purely advisory labels.
+ */
+export type HumanRating = 'unrated' | 'red_flag' | 'orange_flag' | 'green_flag' | 'star';
 
 /**
  * Human schema for profile updates.
@@ -2016,7 +2239,10 @@ export type HumanUpdate = {
     age?: (string | null);
     residence?: (string | null);
     picture_url?: (string | null);
-    red_flag?: (boolean | null);
+    rating?: (HumanRating | null);
+    enriched_profile?: ({
+    [key: string]: unknown;
+} | null);
 };
 
 /**
@@ -2027,6 +2253,11 @@ export type HumanVerify = {
     tenant_id: string;
     code: string;
 };
+
+/**
+ * Billing interval for installment plans (mirrors SimpleFi's InstallmentInterval).
+ */
+export type InstallmentInterval = 'day' | 'week' | 'month' | 'year';
 
 /**
  * Top-level KPI cards with derived metrics.
@@ -2141,6 +2372,21 @@ export type ListModel_GroupPublic_ = {
     paging: Paging;
 };
 
+export type ListModel_HumanActivityItem_ = {
+    results: Array<HumanActivityItem>;
+    paging: Paging;
+};
+
+export type ListModel_HumanCommentPublic_ = {
+    results: Array<HumanCommentPublic>;
+    paging: Paging;
+};
+
+export type ListModel_HumanEnrichmentFactPublic_ = {
+    results: Array<HumanEnrichmentFactPublic>;
+    paging: Paging;
+};
+
 export type ListModel_HumanPortalPublic_ = {
     results: Array<HumanPortalPublic>;
     paging: Paging;
@@ -2242,12 +2488,41 @@ export type OccurrenceRef = {
 };
 
 /**
+ * Anonymous open-checkout cart response.
+ *
+ * `restore_token` is the HMAC for the signed restore link
+ * (GET /checkout/{slug}/cart?cid=<id>&sig=<restore_token>). It is only
+ * present when the popup configures an open_checkout_signing_secret; the
+ * client stores it to rebuild the cart on a later visit.
+ */
+export type OpenCartPublic = {
+    id: string;
+    popup_id: string;
+    email: string;
+    items: CartState;
+    restore_token?: (string | null);
+    created_at?: (string | null);
+    updated_at?: (string | null);
+};
+
+/**
+ * Anonymous open-checkout cart upsert request (keyed by email).
+ */
+export type OpenCartUpsert = {
+    email: string;
+    items: CartState;
+};
+
+/**
  * Request schema for POST /checkout/{slug}/purchase.
  */
 export type OpenTicketingPurchaseCreate = {
     products: Array<ProductLine>;
     buyer: BuyerInfo;
     coupon_code?: (string | null);
+    insurance?: boolean;
+    fbc?: (string | null);
+    fbp?: (string | null);
 };
 
 /**
@@ -2257,6 +2532,7 @@ export type OpenTicketingPurchaseResponse = {
     payment_id: string;
     status: string;
     checkout_url: string;
+    redirect_url?: (string | null);
     amount: string;
     currency: string;
 };
@@ -2361,6 +2637,7 @@ export type PaymentPublic = {
     external_id?: (string | null);
     status?: string;
     amount?: string;
+    amount_charged?: (string | null);
     insurance_amount?: string;
     contribution_amount?: string;
     currency?: string;
@@ -2391,8 +2668,13 @@ export type PaymentPublic = {
 
 /**
  * Settlement rail/provider shown to users.
+ *
+ * SIMPLEFI is the residual value: settlement webhooks that don't expose a
+ * card provider. CRYPTO is written at installment-plan activation, where
+ * the rail is explicit — so a plan with SIMPLEFI source predates that
+ * logic and its rail is unknown.
  */
-export type PaymentSource = 'SimpleFI' | 'Stripe' | 'MercadoPago';
+export type PaymentSource = 'SimpleFI' | 'Stripe' | 'MercadoPago' | 'Crypto';
 
 /**
  * Statistics for payments.
@@ -2486,6 +2768,9 @@ export type PopupAdmin = {
     twitter_url?: (string | null);
     simplefi_api_key?: (string | null);
     terms_and_conditions_url?: (string | null);
+    open_checkout_success_url?: (string | null);
+    open_checkout_cancel_url?: (string | null);
+    open_checkout_signing_secret?: (string | null);
     invoice_company_name?: (string | null);
     invoice_company_address?: (string | null);
     invoice_company_email?: (string | null);
@@ -2510,6 +2795,11 @@ export type PopupAdmin = {
     checkin_pass_lead_days?: (number | null);
     show_attendee_directory?: boolean;
     credits_enabled?: boolean;
+    installments_enabled?: boolean;
+    installments_deadline?: (string | null);
+    installments_max?: (number | null);
+    installments_interval?: InstallmentInterval;
+    installments_interval_count?: number;
     id: string;
 };
 
@@ -2535,6 +2825,9 @@ export type PopupCreate = {
     twitter_url?: (string | null);
     simplefi_api_key?: (string | null);
     terms_and_conditions_url?: (string | null);
+    open_checkout_success_url?: (string | null);
+    open_checkout_cancel_url?: (string | null);
+    open_checkout_signing_secret?: (string | null);
     invoice_company_name?: (string | null);
     invoice_company_address?: (string | null);
     invoice_company_email?: (string | null);
@@ -2558,6 +2851,11 @@ export type PopupCreate = {
     self_check_in_enabled?: boolean;
     show_attendee_directory?: boolean;
     credits_enabled?: boolean;
+    installments_enabled?: boolean;
+    installments_deadline?: (string | null);
+    installments_max?: (number | null);
+    installments_interval?: InstallmentInterval;
+    installments_interval_count?: number;
     checkin_pass_lead_days?: (number | null);
 };
 
@@ -2604,6 +2902,11 @@ export type PopupPublic = {
     events_enabled?: boolean;
     show_attendee_directory?: boolean;
     credits_enabled?: boolean;
+    installments_enabled?: boolean;
+    installments_deadline?: (string | null);
+    installments_max?: (number | null);
+    installments_interval?: InstallmentInterval;
+    installments_interval_count?: number;
 };
 
 /**
@@ -2661,6 +2964,9 @@ export type PopupUpdate = {
     twitter_url?: (string | null);
     simplefi_api_key?: (string | null);
     terms_and_conditions_url?: (string | null);
+    open_checkout_success_url?: (string | null);
+    open_checkout_cancel_url?: (string | null);
+    open_checkout_signing_secret?: (string | null);
     invoice_company_name?: (string | null);
     invoice_company_address?: (string | null);
     invoice_company_email?: (string | null);
@@ -2684,6 +2990,11 @@ export type PopupUpdate = {
     self_check_in_enabled?: (boolean | null);
     show_attendee_directory?: (boolean | null);
     credits_enabled?: (boolean | null);
+    installments_enabled?: (boolean | null);
+    installments_deadline?: (string | null);
+    installments_max?: (number | null);
+    installments_interval?: (InstallmentInterval | null);
+    installments_interval_count?: (number | null);
     checkin_pass_lead_days?: (number | null);
 };
 
@@ -3076,6 +3387,18 @@ export type SendTestRequest = {
 };
 
 /**
+ * Which surface a task relates to. Optional (NULL = unspecified).
+ */
+export type TaskApp = 'portal' | 'backoffice';
+
+/**
+ * Count of tasks archived by a bulk operation.
+ */
+export type TaskArchiveResult = {
+    archived: number;
+};
+
+/**
  * Register an already-uploaded S3 object as a task attachment.
  *
  * The file itself is uploaded directly to S3 via POST /uploads/presigned-url;
@@ -3126,6 +3449,7 @@ export type TaskCreate = {
     priority?: TaskPriority;
     responsible_user_id?: (string | null);
     release?: (string | null);
+    app?: (TaskApp | null);
     visibility?: TaskVisibility;
     target_tenant_id?: (string | null);
 };
@@ -3141,9 +3465,11 @@ export type TaskDetailPublic = {
     responsible_name?: (string | null);
     responsible_email?: (string | null);
     release?: (string | null);
+    app?: (TaskApp | null);
     visibility: TaskVisibility;
     target_tenant_id?: (string | null);
     published_at?: (string | null);
+    archived_at?: (string | null);
     created_by?: (string | null);
     created_by_name?: (string | null);
     created_at: string;
@@ -3166,9 +3492,11 @@ export type TaskPublic = {
     responsible_name?: (string | null);
     responsible_email?: (string | null);
     release?: (string | null);
+    app?: (TaskApp | null);
     visibility: TaskVisibility;
     target_tenant_id?: (string | null);
     published_at?: (string | null);
+    archived_at?: (string | null);
     created_by?: (string | null);
     created_by_name?: (string | null);
     created_at: string;
@@ -3194,6 +3522,7 @@ export type TaskUpdate = {
     priority?: (TaskPriority | null);
     responsible_user_id?: (string | null);
     release?: (string | null);
+    app?: (TaskApp | null);
     visibility?: (TaskVisibility | null);
     target_tenant_id?: (string | null);
 };
@@ -3221,6 +3550,24 @@ export type TemplateVariable = {
     group?: (string | null);
 };
 
+export type TenantAnonymousPublic = {
+    name: string;
+    slug: string;
+    deleted?: boolean;
+    sender_email?: (string | null);
+    sender_name?: (string | null);
+    image_url?: (string | null);
+    icon_url?: (string | null);
+    logo_url?: (string | null);
+    custom_domain?: (string | null);
+    custom_domain_active: boolean;
+    landing_mode?: LandingMode;
+    meta_tracking_enabled?: boolean;
+    meta_pixel_id?: (string | null);
+    id: string;
+    active_popup_slug?: (string | null);
+};
+
 export type TenantCreate = {
     name: string;
     slug?: string;
@@ -3229,6 +3576,14 @@ export type TenantCreate = {
     image_url?: (string | null);
     icon_url?: (string | null);
     logo_url?: (string | null);
+    meta_tracking_enabled?: boolean;
+    meta_pixel_id?: (string | null);
+    smtp_host?: (string | null);
+    smtp_port?: (number | null);
+    smtp_user?: (string | null);
+    smtp_password?: (string | null);
+    smtp_tls?: (boolean | null);
+    smtp_ssl?: (boolean | null);
 };
 
 export type TenantCredentialResponse = {
@@ -3250,8 +3605,26 @@ export type TenantPublic = {
     custom_domain?: (string | null);
     custom_domain_active: boolean;
     landing_mode?: LandingMode;
+    meta_tracking_enabled?: boolean;
+    meta_pixel_id?: (string | null);
     id: string;
+    meta_capi_configured?: boolean;
+    smtp_host?: (string | null);
+    smtp_port?: (number | null);
+    smtp_user?: (string | null);
+    smtp_tls?: (boolean | null);
+    smtp_ssl?: (boolean | null);
+    smtp_configured?: boolean;
+    smtp_password_configured?: boolean;
     active_popup_slug?: (string | null);
+};
+
+export type TenantSmtpTestRequest = {
+    to_email?: (string | null);
+};
+
+export type TenantSmtpTestResponse = {
+    message: string;
 };
 
 export type TenantUpdate = {
@@ -3264,6 +3637,15 @@ export type TenantUpdate = {
     custom_domain?: (string | null);
     custom_domain_active?: (boolean | null);
     landing_mode?: (LandingMode | null);
+    meta_tracking_enabled?: (boolean | null);
+    meta_pixel_id?: (string | null);
+    meta_capi_access_token?: (string | null);
+    smtp_host?: (string | null);
+    smtp_port?: (number | null);
+    smtp_user?: (string | null);
+    smtp_password?: (string | null);
+    smtp_tls?: (boolean | null);
+    smtp_ssl?: (boolean | null);
 };
 
 /**
@@ -3483,6 +3865,18 @@ export type TrackCreate = {
     topic?: Array<(string)>;
 };
 
+/**
+ * Number of distinct published events that belong to a track.
+ *
+ * Backs the portal track filter / Tracks section so it can show per-track
+ * counts (and hide empty tracks) without pulling the full event list to the
+ * client just to count.
+ */
+export type TrackEventCount = {
+    track_id: string;
+    event_count: number;
+};
+
 export type TrackPublic = {
     tenant_id: string;
     popup_id: string;
@@ -3593,10 +3987,25 @@ export type VenueBusySlot = {
     end: string;
     source: string;
     label?: (string | null);
+    visibility?: (string | null);
     event_id?: (string | null);
     event_start?: (string | null);
     event_end?: (string | null);
     highlighted?: boolean;
+};
+
+/**
+ * Number of distinct published events that belong to a venue.
+ *
+ * Backs the portal venue filter so it can show per-venue counts (and hide
+ * venues with no events) without pulling the full event list to the client
+ * just to count. ``venue_title`` is included so the filter has a label
+ * without a second lookup.
+ */
+export type VenueEventCount = {
+    venue_id: string;
+    venue_title: string;
+    event_count: number;
 };
 
 export type VenueExceptionCreate = {
@@ -4065,8 +4474,18 @@ export type AttendeesDeleteMyAttendeeForPopupResponse = ({
     [key: string]: unknown;
 });
 
+export type AttendeesUpdateMyMealPlanTicketData = {
+    attendeeId: string;
+    popupId: string;
+    requestBody: AttendeeTicketMetadataUpdate;
+    ticketId: string;
+};
+
+export type AttendeesUpdateMyMealPlanTicketResponse = (AttendeeWithOriginPublic);
+
 export type AttendeesListAttendeesData = {
     applicationId?: (string | null);
+    categoryId?: (string | null);
     email?: (string | null);
     hasTickets?: (boolean | null);
     /**
@@ -4319,6 +4738,29 @@ export type CheckoutPurchaseOpenTicketingData = {
 
 export type CheckoutPurchaseOpenTicketingResponse = (OpenTicketingPurchaseResponse);
 
+export type CheckoutUpsertOpenCartData = {
+    requestBody: OpenCartUpsert;
+    slug: string;
+    xTenantId?: (string | null);
+};
+
+export type CheckoutUpsertOpenCartResponse = (OpenCartPublic);
+
+export type CheckoutRestoreOpenCartData = {
+    /**
+     * Cart id from the signed restore link
+     */
+    cid: string;
+    /**
+     * HMAC restore token for the cart id
+     */
+    sig: string;
+    slug: string;
+    xTenantId?: (string | null);
+};
+
+export type CheckoutRestoreOpenCartResponse = (OpenCartPublic);
+
 export type CouponsValidateCouponPublicData = {
     requestBody: CouponValidatePublicRequest;
     xTenantId?: (string | null);
@@ -4520,6 +4962,13 @@ export type EventParticipantsListPortalParticipantsData = {
 
 export type EventParticipantsListPortalParticipantsResponse = (ListModel_EventParticipantPublic_);
 
+export type EventParticipantsListPortalAttendeeEmailsData = {
+    eventId: string;
+    occurrenceStart?: (string | null);
+};
+
+export type EventParticipantsListPortalAttendeeEmailsResponse = (AttendeeEmailsResponse);
+
 export type EventParticipantsRegisterForEventData = {
     eventId: string;
     requestBody?: (RegisterRequest | null);
@@ -4557,8 +5006,22 @@ export type EventsListPublicCalendarData = {
 
 export type EventsListPublicCalendarResponse = (EventPublicCalendarResponse);
 
+export type EventsGetPublicEventShareMetaData = {
+    eventId: string;
+    xTenantId?: (string | null);
+};
+
+export type EventsGetPublicEventShareMetaResponse = (EventShareMeta);
+
+export type EventsPublicCalendarIcsData = {
+    popupId: string;
+};
+
+export type EventsPublicCalendarIcsResponse = (unknown);
+
 export type EventsListEventsData = {
     eventStatus?: (EventStatus | null);
+    excludeStatuses?: (Array<EventStatus> | null);
     kind?: (string | null);
     /**
      * Maximum number of items to return
@@ -4576,6 +5039,7 @@ export type EventsListEventsData = {
     startBefore?: (string | null);
     trackIds?: (Array<(string)> | null);
     venueId?: (string | null);
+    visibility?: (EventVisibility | null);
     xTenantId?: (string | null);
 };
 
@@ -4760,22 +5224,16 @@ export type EventsListPortalEventsData = {
     eventStatus?: (EventStatus | null);
     includeHidden?: boolean;
     kind?: (string | null);
-    /**
-     * Maximum number of items to return
-     */
-    limit?: number;
+    managedOnly?: boolean;
     popupId?: (string | null);
     rsvpedOnly?: boolean;
     search?: (string | null);
-    /**
-     * Number of items to skip
-     */
-    skip?: number;
     startAfter?: (string | null);
     startBefore?: (string | null);
     tags?: (Array<(string)> | null);
     trackIds?: (Array<(string)> | null);
     venueId?: (string | null);
+    venueIds?: (Array<(string)> | null);
 };
 
 export type EventsListPortalEventsResponse = (ListModel_EventPublic_);
@@ -4799,6 +5257,32 @@ export type EventsPortalHiddenEventsCountData = {
 export type EventsPortalHiddenEventsCountResponse = ({
     [key: string]: (number);
 });
+
+export type EventsListPortalTrackEventCountsData = {
+    popupId: string;
+};
+
+export type EventsListPortalTrackEventCountsResponse = (Array<TrackEventCount>);
+
+export type EventsListPortalVenueEventCountsData = {
+    popupId: string;
+};
+
+export type EventsListPortalVenueEventCountsResponse = (Array<VenueEventCount>);
+
+export type EventsPortalCalendarSummaryData = {
+    managedOnly?: boolean;
+    popupId: string;
+    rsvpedOnly?: boolean;
+    search?: (string | null);
+    startAfter?: (string | null);
+    startBefore?: (string | null);
+    tags?: (Array<(string)> | null);
+    trackIds?: (Array<(string)> | null);
+    venueIds?: (Array<(string)> | null);
+};
+
+export type EventsPortalCalendarSummaryResponse = (Array<DayEventCount>);
 
 export type EventsGetPortalEventData = {
     eventId: string;
@@ -5288,17 +5772,25 @@ export type GroupsGetGroupPublicData = {
 export type GroupsGetGroupPublicResponse = (GroupPublic);
 
 export type HumansListHumansData = {
+    age?: (string | null);
+    email?: (string | null);
+    enrichmentQuery?: (string | null);
+    gender?: (string | null);
+    hasEnrichedProfile?: (boolean | null);
     incompleteApplication?: boolean;
     /**
      * Maximum number of items to return
      */
     limit?: number;
     popupId?: (string | null);
+    rating?: (HumanRating | null);
+    residence?: (string | null);
     search?: (string | null);
     /**
      * Number of items to skip
      */
     skip?: number;
+    telegram?: (string | null);
     xTenantId?: (string | null);
 };
 
@@ -5326,6 +5818,7 @@ export type HumansSearchHumansPortalData = {
      * Maximum number of items to return
      */
     limit?: number;
+    popupId: string;
     search?: (string | null);
     /**
      * Number of items to skip
@@ -5363,12 +5856,76 @@ export type HumansRevokeHumanApiKeysData = {
 
 export type HumansRevokeHumanApiKeysResponse = (void);
 
+export type HumansGetHumanActivityData = {
+    humanId: string;
+    /**
+     * Maximum number of items to return
+     */
+    limit?: number;
+    /**
+     * Number of items to skip
+     */
+    skip?: number;
+    xTenantId?: (string | null);
+};
+
+export type HumansGetHumanActivityResponse = (ListModel_HumanActivityItem_);
+
+export type HumansCreateHumanActivityData = {
+    humanId: string;
+    requestBody: HumanActivityCreate;
+    xTenantId?: (string | null);
+};
+
+export type HumansCreateHumanActivityResponse = (HumanActivityItem);
+
 export type HumansListHumanApiKeysData = {
     humanId: string;
     xTenantId?: (string | null);
 };
 
 export type HumansListHumanApiKeysResponse = (Array<ApiKeyPublic>);
+
+export type HumansListHumanCommentsData = {
+    humanId: string;
+};
+
+export type HumansListHumanCommentsResponse = (ListModel_HumanCommentPublic_);
+
+export type HumansCreateHumanCommentData = {
+    humanId: string;
+    requestBody: HumanCommentCreate;
+};
+
+export type HumansCreateHumanCommentResponse = (HumanCommentPublic);
+
+export type HumansUpdateHumanCommentData = {
+    commentId: string;
+    humanId: string;
+    requestBody: HumanCommentUpdate;
+};
+
+export type HumansUpdateHumanCommentResponse = (HumanCommentPublic);
+
+export type HumansDeleteHumanCommentData = {
+    commentId: string;
+    humanId: string;
+};
+
+export type HumansDeleteHumanCommentResponse = (void);
+
+export type HumansListHumanEnrichmentFactsData = {
+    humanId: string;
+};
+
+export type HumansListHumanEnrichmentFactsResponse = (ListModel_HumanEnrichmentFactPublic_);
+
+export type HumansCreateHumanEnrichmentFactData = {
+    humanId: string;
+    requestBody: HumanEnrichmentFactCreate;
+};
+
+export type HumansCreateHumanEnrichmentFactResponse = (HumanEnrichmentFactPublic);
 
 export type PaymentsListPaymentsData = {
     applicationId?: (string | null);
@@ -5676,6 +6233,7 @@ export type TasksReportBugData = {
 export type TasksReportBugResponse = (TaskPublic);
 
 export type TasksListTasksData = {
+    archived?: (boolean | null);
     /**
      * Maximum number of items to return
      */
@@ -5690,6 +6248,7 @@ export type TasksListTasksData = {
     status?: (TaskStatus | null);
     type?: (TaskType | null);
     visibility?: (TaskVisibility | null);
+    xTenantId?: (string | null);
 };
 
 export type TasksListTasksResponse = (ListModel_TaskPublic_);
@@ -5725,6 +6284,20 @@ export type TasksUpdateTaskStatusData = {
 };
 
 export type TasksUpdateTaskStatusResponse = (TaskPublic);
+
+export type TasksArchivePublishedTasksResponse = (TaskArchiveResult);
+
+export type TasksArchiveTaskData = {
+    taskId: string;
+};
+
+export type TasksArchiveTaskResponse = (TaskPublic);
+
+export type TasksUnarchiveTaskData = {
+    taskId: string;
+};
+
+export type TasksUnarchiveTaskResponse = (TaskPublic);
 
 export type TasksAddAttachmentData = {
     requestBody: TaskAttachmentCreate;
@@ -5772,13 +6345,13 @@ export type TenantsGetTenantByDomainData = {
     domain: string;
 };
 
-export type TenantsGetTenantByDomainResponse = (TenantPublic);
+export type TenantsGetTenantByDomainResponse = (TenantAnonymousPublic);
 
 export type TenantsGetTenantBySlugData = {
     slug: string;
 };
 
-export type TenantsGetTenantBySlugResponse = (TenantPublic);
+export type TenantsGetTenantBySlugResponse = (TenantAnonymousPublic);
 
 export type TenantsListTenantsData = {
     /**
@@ -5818,6 +6391,13 @@ export type TenantsDeleteTenantData = {
 };
 
 export type TenantsDeleteTenantResponse = (void);
+
+export type TenantsSendSmtpTestEmailData = {
+    requestBody: TenantSmtpTestRequest;
+    tenantId: string;
+};
+
+export type TenantsSendSmtpTestEmailResponse = (TenantSmtpTestResponse);
 
 export type TenantsGetCredentialsData = {
     tenantId: string;

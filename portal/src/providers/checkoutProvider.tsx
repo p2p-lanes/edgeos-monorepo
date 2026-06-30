@@ -35,10 +35,12 @@ import {
   usePaymentSubmit,
   usePromoCode,
 } from "@/hooks/checkout"
+import { useOpenCartPersistence } from "@/hooks/checkout/useOpenCartPersistence"
 import { useStepProductResolver } from "@/hooks/checkout/useStepProductResolver"
 import useGetPassesData from "@/hooks/useGetPassesData"
 import { useIsAuthenticated } from "@/hooks/useIsAuthenticated"
 import { buildFormZodSchema } from "@/lib/form-schema-builder"
+import { trackMetaAddToCart } from "@/lib/meta-pixel"
 import type { AttendeePassState } from "@/types/Attendee"
 import type {
   CheckoutCartState,
@@ -90,11 +92,13 @@ interface CheckoutContextValue {
   /** Add a meal-plan cart entry for (attendee, weekly product). `weekdayDates`
    *  are the Mon–Fri ISO dates derived by the variant from the step's
    *  template_config coverage range. The reducer seeds dailyChoices to
-   *  {date: "chef"} for every weekday. */
+   *  {date: defaultKey} for every weekday (the variant passes the product's
+   *  first menu option); days start unset when `defaultKey` is omitted. */
   addMealPlan: (
     attendeeId: string,
     productId: string,
     weekdayDates: string[],
+    defaultKey?: string,
   ) => void
   removeMealPlan: (attendeeId: string, productId: string) => void
   setMealPlanDailyChoice: (
@@ -197,6 +201,12 @@ interface CheckoutProviderProps {
   initialBuyerValues?: Record<string, unknown>
   cartPersistenceEnabled?: boolean
   cartUiEnabled?: boolean
+  /** When set, enables anonymous open-cart persistence (localStorage + backend upsert). */
+  openCartPopupSlug?: string | null
+  /** Cart id from the signed restore link (?cid=). Only relevant when openCartPopupSlug is set. */
+  openCartCid?: string | null
+  /** HMAC restore token (?sig=). Only relevant when openCartPopupSlug is set. */
+  openCartSig?: string | null
 }
 
 export function CheckoutProvider({
@@ -212,6 +222,9 @@ export function CheckoutProvider({
   initialBuyerValues = {},
   cartPersistenceEnabled = true,
   cartUiEnabled = true,
+  openCartPopupSlug = null,
+  openCartCid = null,
+  openCartSig = null,
 }: CheckoutProviderProps) {
   const { t } = useTranslation()
   const {
@@ -523,6 +536,33 @@ export function CheckoutProvider({
     paymentCompleteRef,
   })
 
+  // Anonymous open-cart persistence (localStorage + backend upsert).
+  // Only active when openCartPopupSlug is provided (open-checkout flow).
+  const openCartEnabled = !!openCartPopupSlug
+  const openCartBuyerEmail =
+    typeof buyerValues.email === "string" ? buyerValues.email : ""
+
+  const { scheduleSave: scheduleOpenCartSave, clearOpenCart } =
+    useOpenCartPersistence({
+      popupSlug: openCartPopupSlug ?? "",
+      selectionStateRef,
+      products,
+      housingPricePerDay,
+      restorationSetters: {
+        setHousing,
+        setMerch,
+        setPatron,
+        setMealPlans: setSelectedMealPlans,
+        setInsurance,
+      },
+      hasRestoredCheckoutRef,
+      paymentCompleteRef,
+      buyerEmail: openCartBuyerEmail,
+      initialStep,
+      cid: openCartCid,
+      sig: openCartSig,
+    })
+
   // Promo code hook
   const {
     promoCode,
@@ -586,6 +626,7 @@ export function CheckoutProvider({
   // biome-ignore lint/correctness/useExhaustiveDependencies: deps drive the save; scheduleSave reads via ref
   useEffect(() => {
     scheduleSave()
+    if (openCartEnabled) scheduleOpenCartSave()
   }, [
     selectedPasses,
     housing,
@@ -595,7 +636,12 @@ export function CheckoutProvider({
     promoCode,
     promoCodeValid,
     insurance,
+    // openCartBuyerEmail included so a valid email entered after product
+    // selection triggers the first anonymous save.
+    openCartBuyerEmail,
     scheduleSave,
+    scheduleOpenCartSave,
+    openCartEnabled,
   ])
 
   // Credit calculations — gated by popup.credits_enabled
@@ -612,6 +658,7 @@ export function CheckoutProvider({
       selectedPasses,
       housing,
       merch,
+      dynamicItems,
       insurance,
     },
   )
@@ -920,6 +967,14 @@ export function CheckoutProvider({
       setDynamicItems((prev) => {
         const existing = prev[stepType] ?? []
         const idx = existing.findIndex((i) => i.productId === item.productId)
+        const previousQuantity = idx >= 0 ? existing[idx].quantity : 0
+        if (item.quantity > previousQuantity && city) {
+          trackMetaAddToCart({
+            popup: city,
+            product: item.product,
+            quantity: item.quantity - previousQuantity,
+          })
+        }
         if (idx >= 0) {
           const updated = [...existing]
           updated[idx] = item
@@ -928,7 +983,7 @@ export function CheckoutProvider({
         return { ...prev, [stepType]: [...existing, item] }
       })
     },
-    [],
+    [city],
   )
 
   const removeDynamicItem = useCallback(
@@ -949,16 +1004,27 @@ export function CheckoutProvider({
         removeDynamicItem(stepType, productId)
         return
       }
-      setDynamicItems((prev) => ({
-        ...prev,
-        [stepType]: (prev[stepType] ?? []).map((i) =>
-          i.productId === productId
-            ? { ...i, quantity: qty, price: i.product.price * qty }
-            : i,
-        ),
-      }))
+      setDynamicItems((prev) => {
+        const existing = prev[stepType] ?? []
+        const item = existing.find((i) => i.productId === productId)
+        if (item && qty > item.quantity && city) {
+          trackMetaAddToCart({
+            popup: city,
+            product: item.product,
+            quantity: qty - item.quantity,
+          })
+        }
+        return {
+          ...prev,
+          [stepType]: existing.map((i) =>
+            i.productId === productId
+              ? { ...i, quantity: qty, price: i.product.price * qty }
+              : i,
+          ),
+        }
+      })
     },
-    [removeDynamicItem],
+    [city, removeDynamicItem],
   )
 
   // Navigation (wrap hook navigation to save cart and clear error)
@@ -989,6 +1055,15 @@ export function CheckoutProvider({
       const attendee = attendeePasses.find((a) => a.id === attendeeId)
       const product = attendee?.products.find((p) => p.id === productId)
       if (product) {
+        const currentQuantity = product.quantity ?? 0
+        const nextQuantity = quantityOverride ?? (currentQuantity > 0 ? 0 : 1)
+        if (nextQuantity > currentQuantity && city) {
+          trackMetaAddToCart({
+            popup: city,
+            product,
+            quantity: nextQuantity - currentQuantity,
+          })
+        }
         const overridden =
           quantityOverride !== undefined
             ? { ...product, quantity: quantityOverride }
@@ -996,7 +1071,7 @@ export function CheckoutProvider({
         toggleProduct(attendeeId, overridden)
       }
     },
-    [attendeePasses, toggleProduct],
+    [attendeePasses, city, toggleProduct],
   )
 
   const resetDayProduct = useCallback(
@@ -1022,6 +1097,7 @@ export function CheckoutProvider({
   // Cart management
   const clearCart = useCallback(() => {
     clearPersistedCart()
+    if (openCartEnabled) clearOpenCart()
     clearSelections()
     clearHousing()
     setMerch([])
@@ -1032,6 +1108,8 @@ export function CheckoutProvider({
     setDynamicItems({})
   }, [
     clearPersistedCart,
+    clearOpenCart,
+    openCartEnabled,
     clearSelections,
     clearHousing,
     setMerch,
@@ -1062,9 +1140,11 @@ export function CheckoutProvider({
     clearCart,
     setCurrentStep,
     setPromoError,
+    clearPromoCode,
     paymentCompleteRef,
     submitMode,
     creditsEnabled,
+    popupName: city?.name ?? null,
     buyerData:
       submitMode === "open-ticketing"
         ? {

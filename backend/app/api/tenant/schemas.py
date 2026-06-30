@@ -9,6 +9,35 @@ from app.api.shared.enums import LandingMode
 from app.utils.utils import slugify
 
 
+def _validate_smtp_common(
+    smtp_host: str | None,
+    smtp_port: int | None,
+    smtp_tls: bool | None,
+    smtp_ssl: bool | None,
+) -> None:
+    if smtp_host is not None:
+        if "://" in smtp_host or "/" in smtp_host or ":" in smtp_host:
+            raise ValueError(
+                "smtp_host must be a plain hostname (no scheme, path, or port)"
+            )
+        if not re.match(
+            r"^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$",
+            smtp_host,
+        ):
+            raise ValueError("smtp_host must be a valid hostname")
+    if smtp_port is not None and not 1 <= smtp_port <= 65535:
+        raise ValueError("smtp_port must be between 1 and 65535")
+    if smtp_tls and smtp_ssl:
+        raise ValueError("smtp_tls and smtp_ssl cannot both be true")
+
+
+def _normalize_smtp_host(smtp_host: str | None) -> str | None:
+    if smtp_host is None:
+        return None
+    stripped = smtp_host.strip()
+    return stripped or None
+
+
 class TenantBase(SQLModel):
     name: str = Field(max_length=255)
     slug: str = Field(unique=True, index=True, max_length=255)
@@ -21,6 +50,8 @@ class TenantBase(SQLModel):
     custom_domain: str | None = Field(default=None, max_length=253)
     custom_domain_active: bool = False
     landing_mode: LandingMode = LandingMode.portal
+    meta_tracking_enabled: bool = False
+    meta_pixel_id: str | None = Field(default=None, max_length=64)
 
 
 class TenantCreate(SQLModel):
@@ -31,6 +62,18 @@ class TenantCreate(SQLModel):
     image_url: str | None = None
     icon_url: str | None = None
     logo_url: str | None = None
+    meta_tracking_enabled: bool = False
+    meta_pixel_id: str | None = Field(default=None, max_length=64)
+    smtp_host: str | None = Field(default=None, max_length=255)
+    smtp_port: int | None = 587
+    smtp_user: str | None = Field(default=None, max_length=255)
+    smtp_password: str | None = Field(
+        default=None,
+        exclude=True,
+        schema_extra={"writeOnly": True},
+    )
+    smtp_tls: bool | None = True
+    smtp_ssl: bool | None = False
 
     @model_validator(mode="after")
     def generate_slug(self) -> Self:
@@ -41,6 +84,14 @@ class TenantCreate(SQLModel):
     def validate_sender_name(self) -> Self:
         if not self.sender_name:
             self.sender_name = self.name
+        return self
+
+    @model_validator(mode="after")
+    def validate_smtp(self) -> Self:
+        self.smtp_host = _normalize_smtp_host(self.smtp_host)
+        _validate_smtp_common(
+            self.smtp_host, self.smtp_port, self.smtp_tls, self.smtp_ssl
+        )
         return self
 
 
@@ -54,6 +105,19 @@ class TenantUpdate(SQLModel):
     custom_domain: str | None = None
     custom_domain_active: bool | None = None
     landing_mode: LandingMode | None = None
+    meta_tracking_enabled: bool | None = None
+    meta_pixel_id: str | None = Field(default=None, max_length=64)
+    meta_capi_access_token: str | None = Field(default=None, exclude=True)
+    smtp_host: str | None = Field(default=None, max_length=255)
+    smtp_port: int | None = None
+    smtp_user: str | None = Field(default=None, max_length=255)
+    smtp_password: str | None = Field(
+        default=None,
+        exclude=True,
+        schema_extra={"writeOnly": True},
+    )
+    smtp_tls: bool | None = None
+    smtp_ssl: bool | None = None
 
     @model_validator(mode="after")
     def validate_custom_domain(self) -> Self:
@@ -68,6 +132,14 @@ class TenantUpdate(SQLModel):
                 domain,
             ):
                 raise ValueError("custom_domain must be a valid hostname")
+        return self
+
+    @model_validator(mode="after")
+    def validate_smtp(self) -> Self:
+        self.smtp_host = _normalize_smtp_host(self.smtp_host)
+        _validate_smtp_common(
+            self.smtp_host, self.smtp_port, self.smtp_tls, self.smtp_ssl
+        )
         return self
 
     @model_validator(mode="after")
@@ -111,6 +183,30 @@ class TenantUpdate(SQLModel):
 class TenantPublic(TenantBase):
     id: uuid.UUID
     custom_domain_active: bool  # required, no default — forces non-optional in OpenAPI
+    meta_capi_configured: bool = False
+    smtp_host: str | None = None
+    smtp_port: int | None = None
+    smtp_user: str | None = None
+    smtp_tls: bool | None = None
+    smtp_ssl: bool | None = None
+    smtp_configured: bool = False
+    smtp_password_configured: bool = False
     # Computed projection — NOT a DB column. Populated by the router after resolving
     # the active direct-sale popup for tenants in landing_mode=checkout.
     active_popup_slug: str | None = None
+
+
+class TenantAnonymousPublic(TenantBase):
+    id: uuid.UUID
+    custom_domain_active: bool  # required, no default — forces non-optional in OpenAPI
+    # Computed projection — NOT a DB column. Populated by the router after resolving
+    # the active direct-sale popup for tenants in landing_mode=checkout.
+    active_popup_slug: str | None = None
+
+
+class TenantSmtpTestRequest(SQLModel):
+    to_email: EmailStr | None = None
+
+
+class TenantSmtpTestResponse(SQLModel):
+    message: str

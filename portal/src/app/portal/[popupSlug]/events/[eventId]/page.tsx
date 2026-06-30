@@ -1,5 +1,6 @@
 "use client"
 
+import { MarkdownContent } from "@edgeos/shared-form-ui"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import {
   AlertTriangle,
@@ -11,6 +12,7 @@ import {
   Check,
   CheckCircle,
   Clock,
+  Globe,
   Home,
   Layers,
   Lock,
@@ -57,18 +59,27 @@ import {
 } from "@/components/ui/dialog"
 import { Pill } from "@/components/ui/pill"
 import { Textarea } from "@/components/ui/textarea"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
 import { useCityProvider } from "@/providers/cityProvider"
 import { AddToCalendarModal } from "../lib/AddToCalendarModal"
 import { CoverImage } from "../lib/CoverImage"
+import { canManageEvent } from "../lib/eventPermissions"
 import { summarizeRrule } from "../lib/summarizeRrule"
 import { useCalendarAddedFlag } from "../lib/useCalendarAddedFlag"
+import { useCanRsvp } from "../lib/useCanRsvp"
 import {
   useEventTimezone,
   usePortalEventSettings,
 } from "../lib/useEventTimezone"
 
 function AdminNotesSection({ eventId }: { eventId: string }) {
+  const { t } = useTranslation()
   const queryClient = useQueryClient()
   const [value, setValue] = useState("")
   const [dirty, setDirty] = useState(false)
@@ -95,9 +106,9 @@ function AdminNotesSection({ eventId }: { eventId: string }) {
     onSuccess: (res) => {
       setDirty(false)
       queryClient.setQueryData(["portal-event-admin-notes", eventId], res)
-      toast.success("Notes saved")
+      toast.success(t("events.detail.admin_notes_saved_toast"))
     },
-    onError: () => toast.error("Could not save notes"),
+    onError: () => toast.error(t("events.detail.admin_notes_error_toast")),
   })
 
   if (!isSuccess) return null
@@ -106,15 +117,17 @@ function AdminNotesSection({ eventId }: { eventId: string }) {
     <div className="rounded-xl border bg-card p-4 space-y-3">
       <div className="flex items-center gap-2">
         <Lock className="h-4 w-4 text-muted-foreground" />
-        <h3 className="text-sm font-semibold">Admin notes</h3>
+        <h3 className="text-sm font-semibold">
+          {t("events.detail.admin_notes_heading")}
+        </h3>
         <span className="text-xs text-muted-foreground">
-          Internal — staff only
+          {t("events.detail.admin_notes_staff_only")}
         </span>
       </div>
       <Textarea
         value={value}
         rows={4}
-        placeholder="Notes about this event, visible only to backoffice staff…"
+        placeholder={t("events.detail.admin_notes_placeholder") as string}
         onChange={(e) => {
           setValue(e.target.value)
           setDirty(true)
@@ -126,7 +139,9 @@ function AdminNotesSection({ eventId }: { eventId: string }) {
           disabled={!dirty || saveMutation.isPending}
           onClick={() => saveMutation.mutate()}
         >
-          {saveMutation.isPending ? "Saving…" : "Save notes"}
+          {saveMutation.isPending
+            ? t("events.detail.admin_notes_saving_button")
+            : t("events.detail.admin_notes_save_button")}
         </Button>
       </div>
     </div>
@@ -213,8 +228,7 @@ export default function EventDetailPage() {
     (p: EventParticipantPublic) => p.status !== "cancelled",
   )
 
-  const isOwner =
-    !!event && !!currentHuman && event.owner_id === currentHuman.id
+  const canManage = !!event && canManageEvent(event, currentHuman?.id)
 
   // RSVP state is sourced from the event's own `my_rsvp_status` field so
   // this page agrees with the list/day/calendar views (which read the
@@ -222,6 +236,24 @@ export default function EventDetailPage() {
   // attendee roster / count, not for deciding the caller's own status.
   const myRsvpStatus = event?.my_rsvp_status ?? null
   const isRsvped = !!myRsvpStatus && myRsvpStatus !== "cancelled"
+
+  // Capacity is enforced server-side against every active registration,
+  // including attendees who hid their name (and are therefore absent from
+  // the roster above). Prefer the backend count so the badge and the "full"
+  // state stay consistent with what registration actually allows.
+  const goingCount = event?.attendee_count ?? activeParticipants.length
+  const isFull =
+    event?.max_participant != null && goingCount >= event.max_participant
+
+  // Gate the RSVP (register) action: only humans holding a ticket for this
+  // popup and without a rejected application may register. Cancel stays open.
+  const { canRsvp, reason: rsvpBlockReason } = useCanRsvp()
+  const rsvpDisabledReason =
+    rsvpBlockReason === "rejected"
+      ? (t("events.rsvp.application_rejected") as string)
+      : rsvpBlockReason === "no_tickets"
+        ? (t("events.rsvp.requires_ticket") as string)
+        : undefined
 
   // Recurring events require occurrence_start so the RSVP targets a single
   // instance; one-off events must not send it (the backend rejects mixing
@@ -264,6 +296,9 @@ export default function EventDetailPage() {
 
   const [cancelEventOpen, setCancelEventOpen] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [copyingEmails, setCopyingEmails] = useState(false)
+  // Whether the participants list is expanded to show everyone or truncated.
+  const [participantsExpanded, setParticipantsExpanded] = useState(false)
   const cancelEventMutation = useMutation({
     mutationFn: () =>
       EventsService.cancelPortalEvent({ eventId: params.eventId }),
@@ -299,7 +334,7 @@ export default function EventDetailPage() {
     queryKey: ["portal-event-invitations", params.eventId],
     queryFn: () =>
       EventsService.listPortalInvitations({ eventId: params.eventId }),
-    enabled: !!params.eventId && isOwner,
+    enabled: !!params.eventId && canManage,
   })
 
   const [emailsInput, setEmailsInput] = useState("")
@@ -439,14 +474,6 @@ export default function EventDetailPage() {
       : sharePath
 
   const handleShare = async () => {
-    if (typeof navigator !== "undefined" && navigator.share) {
-      try {
-        await navigator.share({ title: event.title, url: shareUrl })
-        return
-      } catch (err) {
-        if (err instanceof Error && err.name === "AbortError") return
-      }
-    }
     try {
       await navigator.clipboard.writeText(shareUrl)
       setCopied(true)
@@ -454,6 +481,32 @@ export default function EventDetailPage() {
       toast.success(t("events.detail.share_link_copied"))
     } catch {
       toast.error(t("events.detail.share_link_error"))
+    }
+  }
+
+  // Managers (owner/host/collaborator) copy every active RSVPer's email in
+  // one click. The endpoint is gated server-side to the same roles and
+  // returns all registrants — including those who hid their name from the
+  // directory — so the organiser can actually reach everyone.
+  const handleCopyAttendeeEmails = async () => {
+    setCopyingEmails(true)
+    try {
+      const res = await EventParticipantsService.listPortalAttendeeEmails({
+        eventId: params.eventId,
+        occurrenceStart: occParam ?? undefined,
+      })
+      if (res.emails.length === 0) {
+        toast.info(t("events.detail.copy_attendee_emails_empty"))
+        return
+      }
+      await navigator.clipboard.writeText(res.emails.join(", "))
+      toast.success(
+        t("events.detail.copy_attendee_emails_done", { count: res.count }),
+      )
+    } catch {
+      toast.error(t("events.detail.copy_attendee_emails_error"))
+    } finally {
+      setCopyingEmails(false)
     }
   }
 
@@ -477,7 +530,7 @@ export default function EventDetailPage() {
           <ArrowLeft className="h-4 w-4" /> {t("events.common.back_to_events")}
         </Link>
         <div className="flex items-center gap-2 shrink-0">
-          {isOwner && event.status !== "cancelled" && (
+          {canManage && event.status !== "cancelled" && (
             <Dialog open={cancelEventOpen} onOpenChange={setCancelEventOpen}>
               <DialogTrigger asChild>
                 <Button
@@ -521,7 +574,7 @@ export default function EventDetailPage() {
               </DialogContent>
             </Dialog>
           )}
-          {isOwner && (
+          {canManage && (
             <Button asChild variant="outline" size="sm">
               <Link
                 href={`/portal/${city?.slug}/events/${event.id}/edit`}
@@ -549,7 +602,7 @@ export default function EventDetailPage() {
         </div>
       )}
 
-      {isOwner && event.status === "rejected" && event.rejection_reason && (
+      {canManage && event.status === "rejected" && event.rejection_reason && (
         <div className="flex items-start gap-2.5 rounded-xl border border-red-300 bg-red-50 p-3 text-red-900 dark:border-red-500/40 dark:bg-red-950/40 dark:text-red-100">
           <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0 text-red-600 dark:text-red-400" />
           <div className="text-sm">
@@ -640,38 +693,88 @@ export default function EventDetailPage() {
       {/* Details card */}
       <div className="relative rounded-xl border bg-card p-4 space-y-3">
         {event.status === "published" && (
-          <div className="absolute top-3 right-3 flex flex-col items-end gap-1.5">
-            {isRsvped ? (
-              <>
-                <div className="inline-flex items-center gap-1.5 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-sm font-medium text-emerald-700 dark:border-emerald-500/40 dark:bg-emerald-950/40 dark:text-emerald-300">
-                  <CheckCircle className="h-4 w-4" />
-                  {myRsvpStatus === "checked_in"
-                    ? t("events.rsvp.checked_in")
-                    : t("events.rsvp.going")}
-                </div>
-                {myRsvpStatus === "registered" && eventStarted && (
-                  <Button
-                    size="sm"
-                    onClick={() => checkInMutation.mutate()}
-                    disabled={isPending}
-                  >
-                    {t("events.rsvp.check_in")}
+          <div className="absolute top-3 right-3 flex items-start gap-2">
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button asChild variant="outline">
+                    <a
+                      href={`https://ee26.geobrowser.io/events/${event.id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label={t("events.detail.join_on_geo")}
+                    >
+                      <Globe className="mr-2 h-4 w-4" />
+                      {t("events.detail.join_on_geo")}
+                    </a>
                   </Button>
-                )}
-              </>
-            ) : (
-              <Button
-                onClick={() => registerMutation.mutate()}
-                disabled={isPending}
-                className="inline-flex items-center gap-2"
-              >
-                <UserPlus className="h-4 w-4" />
-                {t("events.rsvp.rsvp")}
-              </Button>
-            )}
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>{t("events.detail.join_on_geo_tooltip")}</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+            <div className="flex flex-col items-end gap-1.5">
+              {isRsvped ? (
+                <>
+                  <div className="inline-flex items-center gap-1.5 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-sm font-medium text-emerald-700 dark:border-emerald-500/40 dark:bg-emerald-950/40 dark:text-emerald-300">
+                    <CheckCircle className="h-4 w-4" />
+                    {myRsvpStatus === "checked_in"
+                      ? t("events.rsvp.checked_in")
+                      : t("events.rsvp.going")}
+                  </div>
+                  {myRsvpStatus === "registered" && eventStarted && (
+                    <Button
+                      size="sm"
+                      onClick={() => checkInMutation.mutate()}
+                      disabled={isPending}
+                    >
+                      {t("events.rsvp.check_in")}
+                    </Button>
+                  )}
+                </>
+              ) : isFull ? (
+                <Button
+                  disabled
+                  variant="secondary"
+                  className="inline-flex items-center gap-2"
+                >
+                  <Users className="h-4 w-4" />
+                  {t("events.rsvp.full")}
+                </Button>
+              ) : !canRsvp ? (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    {/* span wrapper so the tooltip still fires on the
+                        disabled button (disabled elements emit no events) */}
+                    <span className="inline-flex">
+                      <Button
+                        disabled
+                        className="inline-flex items-center gap-2"
+                      >
+                        <UserPlus className="h-4 w-4" />
+                        {t("events.rsvp.rsvp")}
+                      </Button>
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>{rsvpDisabledReason}</p>
+                  </TooltipContent>
+                </Tooltip>
+              ) : (
+                <Button
+                  onClick={() => registerMutation.mutate()}
+                  disabled={isPending}
+                  className="inline-flex items-center gap-2"
+                >
+                  <UserPlus className="h-4 w-4" />
+                  {t("events.rsvp.rsvp")}
+                </Button>
+              )}
+            </div>
           </div>
         )}
-        <div className="flex items-center gap-2.5 pr-36">
+        <div className="flex items-center gap-2.5 pr-44 sm:pr-56">
           <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
             <Clock className="h-4 w-4 text-primary" />
           </div>
@@ -684,7 +787,7 @@ export default function EventDetailPage() {
             </p>
             {timezone && (
               <p className="text-[11px] text-muted-foreground/80 mt-0.5">
-                — {t("events.common.in_timezone_time", { timezone })}
+                {t("events.common.in_timezone_time", { timezone })}
               </p>
             )}
           </div>
@@ -697,7 +800,7 @@ export default function EventDetailPage() {
             event.host_display_name?.trim() || city?.name?.trim() || null
           if (!hostName) return null
           return (
-            <div className="flex items-center gap-2.5 pr-36">
+            <div className="flex items-center gap-2.5 pr-44 sm:pr-56">
               <div className="h-8 w-8 rounded-lg bg-amber-500/10 flex items-center justify-center shrink-0">
                 <User className="h-4 w-4 text-amber-600" />
               </div>
@@ -711,12 +814,12 @@ export default function EventDetailPage() {
           )
         })()}
         {event.rrule && (
-          <div className="flex items-center gap-2.5 pr-36">
+          <div className="flex items-center gap-2.5 pr-44 sm:pr-56">
             <div className="h-8 w-8 rounded-lg bg-blue-500/10 flex items-center justify-center shrink-0">
               <Repeat className="h-4 w-4 text-blue-600" />
             </div>
             <p className="text-sm text-muted-foreground">
-              {summarizeRrule(event.rrule)}
+              {summarizeRrule(event.rrule, t)}
             </p>
           </div>
         )}
@@ -871,9 +974,10 @@ export default function EventDetailPage() {
           <h2 className="text-sm font-semibold mb-2">
             {t("events.detail.description_heading")}
           </h2>
-          <p className="text-sm text-muted-foreground whitespace-pre-wrap break-words">
-            {event.content}
-          </p>
+          <MarkdownContent
+            source={event.content}
+            className="text-muted-foreground break-words"
+          />
         </div>
       )}
 
@@ -916,8 +1020,8 @@ export default function EventDetailPage() {
         </div>
       )}
 
-      {/* Owner-only: Paste attendees to invite */}
-      {isOwner && (
+      {/* Managers only (owner / host / collaborators): paste attendees to invite */}
+      {canManage && (
         <div className="rounded-xl border bg-card p-4 space-y-3">
           <div className="flex items-center gap-2">
             <Mail className="h-4 w-4 text-primary" />
@@ -1001,52 +1105,72 @@ export default function EventDetailPage() {
             {t("events.detail.participants_heading")}
           </h3>
           <span className="text-sm text-muted-foreground">
-            {activeParticipants.length}
+            {goingCount}
             {event.max_participant ? ` / ${event.max_participant}` : ""}
           </span>
         </div>
+        {canManage && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleCopyAttendeeEmails}
+            disabled={copyingEmails}
+            className="mb-3 w-full"
+          >
+            <Mail className="mr-2 h-4 w-4" />
+            {t("events.detail.copy_attendee_emails")}
+          </Button>
+        )}
         {activeParticipants.length === 0 ? (
           <p className="text-sm text-muted-foreground">
             {t("events.detail.no_participants_yet")}
           </p>
         ) : (
           <div className="space-y-2">
-            {activeParticipants
-              .slice(0, 10)
-              .map((p: EventParticipantPublic) => {
-                const name = [p.first_name, p.last_name]
-                  .filter(Boolean)
-                  .join(" ")
-                  .trim()
-                return (
-                  <div key={p.id} className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="h-7 w-7 rounded-full bg-muted flex items-center justify-center">
-                        <Users className="h-3 w-3 text-muted-foreground" />
-                      </div>
-                      <span className="text-sm">
-                        {name || t("events.detail.unnamed_participant")}
-                      </span>
+            {(participantsExpanded
+              ? activeParticipants
+              : activeParticipants.slice(0, 10)
+            ).map((p: EventParticipantPublic) => {
+              const name = [p.first_name, p.last_name]
+                .filter(Boolean)
+                .join(" ")
+                .trim()
+              return (
+                <div key={p.id} className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="h-7 w-7 rounded-full bg-muted flex items-center justify-center">
+                      <Users className="h-3 w-3 text-muted-foreground" />
                     </div>
-                    <div className="flex items-center gap-1.5">
-                      {p.role !== "attendee" && (
-                        <Badge variant="outline" className="text-xs">
-                          {p.role}
-                        </Badge>
-                      )}
-                      {p.status === "checked_in" && (
-                        <CheckCircle className="h-3 w-3 text-green-500" />
-                      )}
-                    </div>
+                    <span className="text-sm">
+                      {name || t("events.detail.unnamed_participant")}
+                    </span>
                   </div>
-                )
-              })}
+                  <div className="flex items-center gap-1.5">
+                    {p.role !== "attendee" && (
+                      <Badge variant="outline" className="text-xs">
+                        {p.role}
+                      </Badge>
+                    )}
+                    {p.status === "checked_in" && (
+                      <CheckCircle className="h-3 w-3 text-green-500" />
+                    )}
+                  </div>
+                </div>
+              )
+            })}
             {activeParticipants.length > 10 && (
-              <p className="text-xs text-muted-foreground text-center">
-                {t("events.detail.participants_more", {
-                  count: activeParticipants.length - 10,
-                })}
-              </p>
+              <button
+                type="button"
+                aria-expanded={participantsExpanded}
+                onClick={() => setParticipantsExpanded((prev) => !prev)}
+                className="block w-full text-center text-xs text-muted-foreground hover:text-foreground hover:underline cursor-pointer transition-colors"
+              >
+                {participantsExpanded
+                  ? t("events.detail.participants_show_less")
+                  : t("events.detail.participants_more", {
+                      count: activeParticipants.length - 10,
+                    })}
+              </button>
             )}
           </div>
         )}

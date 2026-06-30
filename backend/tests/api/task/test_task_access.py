@@ -79,6 +79,21 @@ def test_superadmin_sees_all_visibilities(
         assert str(visibility_tasks[key].id) in ids
 
 
+def test_superadmin_board_scoped_to_active_workspace(
+    client, superadmin_token, tenant_a: Tenants, visibility_tasks
+) -> None:
+    """With an active workspace (X-Tenant-Id), the superadmin board hides other
+    tenants' tasks but keeps global (universal/internal) ones visible."""
+    headers = _auth(superadmin_token) | {"X-Tenant-Id": str(tenant_a.id)}
+    r = client.get("/api/v1/tasks?limit=1000", headers=headers)
+    assert r.status_code == 200
+    ids = {t["id"] for t in r.json()["results"]}
+    assert str(visibility_tasks["universal"].id) in ids
+    assert str(visibility_tasks["internal"].id) in ids
+    assert str(visibility_tasks["tenant_a"].id) in ids
+    assert str(visibility_tasks["tenant_b"].id) not in ids
+
+
 def test_get_task_404_when_not_viewable(
     client, admin_token_tenant_a, visibility_tasks
 ) -> None:
@@ -169,3 +184,64 @@ def test_report_bug_is_scoped_to_reporter_tenant(
     assert body["type"] == "bug"
     assert body["visibility"] == "tenant"
     assert body["target_tenant_id"] == str(tenant_a.id)
+    # Unspecified classification falls back to sensible defaults.
+    assert body["priority"] == "medium"
+    assert body["app"] is None
+
+
+def test_report_bug_accepts_classification_fields(
+    client, admin_token_tenant_a
+) -> None:
+    """A reporter can classify the report: type / priority / app."""
+    r = client.post(
+        "/api/v1/tasks/report-bug",
+        headers=_auth(admin_token_tenant_a),
+        json={
+            "title": "add dark mode",
+            "type": "feature",
+            "priority": "high",
+            "app": "portal",
+        },
+    )
+    assert r.status_code == 201
+    body = r.json()
+    assert body["type"] == "feature"
+    assert body["priority"] == "high"
+    assert body["app"] == "portal"
+    # Still routed to the to-do column regardless of classification.
+    assert body["status"] == TaskStatus.TO_DO.value
+
+
+def test_app_field_roundtrips_and_clears(client, superadmin_token) -> None:
+    """The optional `app` (portal | backoffice) persists, updates and clears."""
+    created = client.post(
+        "/api/v1/tasks",
+        headers=_auth(superadmin_token),
+        json={"title": "app-field", "app": "portal"},
+    )
+    assert created.status_code == 201
+    assert created.json()["app"] == "portal"
+    tid = created.json()["id"]
+
+    # Defaults to null when omitted.
+    plain = client.post(
+        "/api/v1/tasks", headers=_auth(superadmin_token), json={"title": "no-app"}
+    )
+    assert plain.status_code == 201
+    assert plain.json()["app"] is None
+
+    updated = client.put(
+        f"/api/v1/tasks/{tid}",
+        headers=_auth(superadmin_token),
+        json={"app": "backoffice"},
+    )
+    assert updated.status_code == 200
+    assert updated.json()["app"] == "backoffice"
+
+    cleared = client.put(
+        f"/api/v1/tasks/{tid}",
+        headers=_auth(superadmin_token),
+        json={"app": None},
+    )
+    assert cleared.status_code == 200
+    assert cleared.json()["app"] is None

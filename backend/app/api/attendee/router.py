@@ -9,6 +9,7 @@ from app.api.attendee.schemas import (
     AttendeeListItem,
     AttendeeProductPublic,
     AttendeeTicketAdd,
+    AttendeeTicketMetadataUpdate,
     AttendeeTicketProductSwap,
     AttendeeUpdate,
     AttendeeWithOriginPublic,
@@ -44,6 +45,55 @@ router = APIRouter(prefix="/attendees", tags=["attendees"])
 _AttendeeLimit = Annotated[
     int, Query(ge=1, le=100, description="Max attendees to return")
 ]
+
+
+def _validate_required_fields(
+    required_fields: list[dict],
+    additional_data: dict,
+) -> None:
+    """Validate declarative required_fields against submitted additional_data.
+
+    For each field marked ``required``, ensure a non-empty value is present. For
+    fields typed ``"date"``, also ensure the value parses as an ISO date when
+    present. Extra keys in additional_data are permitted (unknown keys are kept,
+    not rejected) so partial/extra answers do not break the flow. Raises 422 with
+    the offending field name on the first failure.
+    """
+    from datetime import date as _date
+
+    data = additional_data or {}
+    for field in required_fields or []:
+        name = field.get("name")
+        if not name:
+            continue
+        value = data.get(name)
+        if field.get("required") and (value is None or value == ""):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=[
+                    {
+                        "code": "required_field_missing",
+                        "field": name,
+                        "message": f"Missing required field '{name}'",
+                    }
+                ],
+            )
+        if field.get("type") == "date" and value not in (None, ""):
+            try:
+                _date.fromisoformat(str(value))
+            except (ValueError, TypeError):
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=[
+                        {
+                            "code": "invalid_date",
+                            "field": name,
+                            "message": (
+                                f"Field '{name}' must be an ISO date (YYYY-MM-DD)"
+                            ),
+                        }
+                    ],
+                ) from None
 
 
 def _build_attendee_with_origin(
@@ -132,6 +182,7 @@ def _build_attendee_with_origin(
         "email": attendee.email,
         "gender": attendee.gender,
         "poap_url": attendee.poap_url,
+        "additional_data": getattr(attendee, "additional_data", None) or {},
         "created_at": getattr(attendee, "created_at", None),
         "updated_at": getattr(attendee, "updated_at", None),
     }
@@ -293,6 +344,12 @@ async def create_my_attendee_for_popup(
                         }
                     ],
                 )
+        # Validate declarative required_fields (e.g. a kid's date_of_birth) are
+        # present in the submitted additional_data. Permissive toward extra keys.
+        _validate_required_fields(
+            category_row.required_fields or [],
+            attendee_in.additional_data or {},
+        )
         # Derive legacy category string from FK for backward compatibility
         effective_category = category_row.key
         effective_category_id = category_row.id
@@ -311,6 +368,7 @@ async def create_my_attendee_for_popup(
         category_id=effective_category_id,
         email=attendee_in.email,
         gender=attendee_in.gender,
+        additional_data=attendee_in.additional_data,
     )
 
     last_scan_by_ticket = get_last_scan_by_tickets(
@@ -377,6 +435,66 @@ async def update_my_attendee_for_popup(
     return _build_attendee_with_origin(updated, last_scan_by_ticket)
 
 
+@router.patch(
+    "/my/popup/{popup_id}/{attendee_id}/tickets/{ticket_id}/meal-plan",
+    response_model=AttendeeWithOriginPublic,
+    tags=["portal"],
+    summary="Edit your meal-plan ticket choices",
+    dependencies=[needs("portal:attendees:write")],
+)
+async def update_my_meal_plan_ticket(
+    popup_id: uuid.UUID,
+    attendee_id: uuid.UUID,
+    ticket_id: uuid.UUID,
+    body: AttendeeTicketMetadataUpdate,
+    db: HumanTenantSession,
+    current_human: CurrentHuman,
+) -> AttendeeWithOriginPublic:
+    """Edit a purchased meal-plan ticket's per-day choices (portal, no payment).
+
+    Mutates only AttendeeProducts.purchase_metadata (daily_choices,
+    dietary_restriction, special_request) for a week whose sale window is still
+    open. Does not change products, price, stock, or the payment snapshot.
+
+    Authorization: same dual-path predicate as update_my_attendee_for_popup —
+    attendee.popup_id == popup_id AND (attendee.human_id == current_human.id OR
+    attendee.application.human_id == current_human.id). Returns 404 (never 403)
+    on any failure so existence is not leaked to unauthorized callers.
+
+    Errors from the CRUD layer: 404 (ticket/product not found), 409
+    meal_plan_week_locked (week closed), 422 not_meal_plan_ticket or
+    invalid_meal_plan_choice.
+    """
+    from app.api.application.models import Applications
+
+    attendee = crud.attendees_crud.get(db, attendee_id)
+
+    if attendee is None or attendee.popup_id != popup_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Attendee not found"
+        )
+
+    # Dual-path auth predicate
+    owned = attendee.human_id == current_human.id
+    if not owned and attendee.application_id is not None:
+        application = db.get(Applications, attendee.application_id)
+        owned = application is not None and application.human_id == current_human.id
+
+    if not owned:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Attendee not found"
+        )
+
+    crud.attendees_crud.update_ticket_metadata(
+        db,
+        attendee_id=attendee_id,
+        ticket_id=ticket_id,
+        choices=body,
+    )
+
+    return _attendee_response(db, attendee_id)
+
+
 @router.delete(
     "/my/popup/{popup_id}/{attendee_id}",
     tags=["portal"],
@@ -432,6 +550,7 @@ async def list_attendees(
     email: str | None = None,
     search: str | None = None,
     has_tickets: bool | None = None,
+    category_id: uuid.UUID | None = None,
     skip: PaginationSkip = 0,
     limit: PaginationLimit = 100,
 ) -> ListModel[AttendeeListItem]:
@@ -456,6 +575,7 @@ async def list_attendees(
             limit=limit,
             search=search,
             has_tickets=has_tickets,
+            category_id=category_id,
         )
     elif email:
         attendees, total = crud.attendees_crud.find_by_email(

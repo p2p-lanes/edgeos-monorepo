@@ -436,6 +436,101 @@ class TestVenueAvailability:
         assert status_code == 200, data
         assert data["busy"] == []
 
+    def test_recurring_event_occurrences_appear_as_busy(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+        admin_token_tenant_a: str,
+    ) -> None:
+        # A weekly series whose first occurrence is BEFORE the queried window
+        # must still mark the in-window occurrence as busy — the regression
+        # behind "recommended times are already blocked": only the master's
+        # own start/end was considered.
+        popup = _make_popup(db, tenant_a, tz="UTC")
+        venue = _make_venue(db, tenant_a, popup, setup_minutes=30, teardown_minutes=15)
+        _add_weekly(db, venue, 0, open_t=time(9), close_t=time(17))
+
+        db.add(
+            Events(
+                tenant_id=tenant_a.id,
+                popup_id=popup.id,
+                venue_id=venue.id,
+                owner_id=uuid.uuid4(),
+                title="Weekly Standup",
+                start_time=datetime(2026, 4, 6, 12, 0, tzinfo=UTC),
+                end_time=datetime(2026, 4, 6, 13, 0, tzinfo=UTC),
+                timezone="UTC",
+                visibility=EventVisibility.PUBLIC,
+                status=EventStatus.PUBLISHED,
+                rrule="FREQ=WEEKLY;COUNT=10",
+            )
+        )
+        db.commit()
+
+        status_code, data = _get_availability(
+            client,
+            venue,
+            admin_token_tenant_a,
+            start=datetime(2026, 4, 13, 0, 0, tzinfo=UTC),
+            end=datetime(2026, 4, 14, 0, 0, tzinfo=UTC),
+        )
+
+        assert status_code == 200, data
+        assert len(data["busy"]) == 1
+        busy = data["busy"][0]
+        assert busy["source"] == "event"
+        assert busy["label"] == "Weekly Standup"
+        occ_start = datetime(2026, 4, 13, 12, 0, tzinfo=UTC)
+        occ_end = datetime(2026, 4, 13, 13, 0, tzinfo=UTC)
+        assert datetime.fromisoformat(busy["event_start"]) == occ_start
+        assert datetime.fromisoformat(busy["event_end"]) == occ_end
+        # Setup/teardown buffers apply per occurrence too.
+        assert datetime.fromisoformat(busy["start"]) == occ_start - timedelta(
+            minutes=30
+        )
+        assert datetime.fromisoformat(busy["end"]) == occ_end + timedelta(minutes=15)
+
+    def test_recurring_exdate_does_not_block(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+        admin_token_tenant_a: str,
+    ) -> None:
+        popup = _make_popup(db, tenant_a, tz="UTC")
+        venue = _make_venue(db, tenant_a, popup)
+        _add_weekly(db, venue, 0, open_t=time(9), close_t=time(17))
+
+        db.add(
+            Events(
+                tenant_id=tenant_a.id,
+                popup_id=popup.id,
+                venue_id=venue.id,
+                owner_id=uuid.uuid4(),
+                title="Weekly Standup",
+                start_time=datetime(2026, 4, 6, 12, 0, tzinfo=UTC),
+                end_time=datetime(2026, 4, 6, 13, 0, tzinfo=UTC),
+                timezone="UTC",
+                visibility=EventVisibility.PUBLIC,
+                status=EventStatus.PUBLISHED,
+                rrule="FREQ=WEEKLY;COUNT=10",
+                recurrence_exdates=["2026-04-13T12:00:00Z"],
+            )
+        )
+        db.commit()
+
+        status_code, data = _get_availability(
+            client,
+            venue,
+            admin_token_tenant_a,
+            start=datetime(2026, 4, 13, 0, 0, tzinfo=UTC),
+            end=datetime(2026, 4, 14, 0, 0, tzinfo=UTC),
+        )
+
+        assert status_code == 200, data
+        assert data["busy"] == []
+
     def test_end_not_after_start_rejected(
         self,
         client: TestClient,
@@ -455,3 +550,112 @@ class TestVenueAvailability:
         )
 
         assert status_code == 400
+
+
+class TestComputeAvailabilityRedaction:
+    """Privacy behaviour of ``_compute_availability`` (the portal endpoint
+    passes ``redact_private=True`` + the viewer's human id).
+
+    A private event owned by another human must lose its title on the portal
+    while staying visible as occupied; the backoffice (defaults) keeps the
+    title; and a manager's own private event keeps its title even on the
+    portal.
+    """
+
+    def _make_event(
+        self,
+        db: Session,
+        tenant: Tenants,
+        popup: Popups,
+        venue: EventVenues,
+        *,
+        owner_id: uuid.UUID,
+        visibility: EventVisibility,
+        title: str,
+    ) -> Events:
+        ev = Events(
+            tenant_id=tenant.id,
+            popup_id=popup.id,
+            venue_id=venue.id,
+            owner_id=owner_id,
+            title=title,
+            start_time=datetime(2026, 4, 13, 12, 0, tzinfo=UTC),
+            end_time=datetime(2026, 4, 13, 13, 0, tzinfo=UTC),
+            timezone="UTC",
+            visibility=visibility,
+            status=EventStatus.PUBLISHED,
+        )
+        db.add(ev)
+        db.commit()
+        db.refresh(ev)
+        return ev
+
+    def test_private_event_redaction_matrix(
+        self,
+        db: Session,
+        tenant_a: Tenants,
+    ) -> None:
+        from app.api.event_venue.router import _compute_availability
+
+        popup = _make_popup(db, tenant_a, tz="UTC")
+        venue = _make_venue(db, tenant_a, popup)
+        owner = uuid.uuid4()
+        other = uuid.uuid4()
+        self._make_event(
+            db,
+            tenant_a,
+            popup,
+            venue,
+            owner_id=owner,
+            visibility=EventVisibility.PRIVATE,
+            title="Secret Standup",
+        )
+
+        start = datetime(2026, 4, 13, 0, 0, tzinfo=UTC)
+        end = datetime(2026, 4, 14, 0, 0, tzinfo=UTC)
+
+        # Portal view, non-manager: title redacted, slot still visible.
+        portal = _compute_availability(
+            db, venue, start, end, redact_private=True, viewer_human_id=other
+        )
+        assert len(portal.busy) == 1
+        assert portal.busy[0].label is None
+        assert portal.busy[0].visibility == "private"
+
+        # Backoffice defaults: title preserved.
+        backoffice = _compute_availability(db, venue, start, end)
+        assert backoffice.busy[0].label == "Secret Standup"
+        assert backoffice.busy[0].visibility == "private"
+
+        # Portal view, manager (owner): own private event keeps its title.
+        as_owner = _compute_availability(
+            db, venue, start, end, redact_private=True, viewer_human_id=owner
+        )
+        assert as_owner.busy[0].label == "Secret Standup"
+
+    def test_public_event_never_redacted_on_portal(
+        self,
+        db: Session,
+        tenant_a: Tenants,
+    ) -> None:
+        from app.api.event_venue.router import _compute_availability
+
+        popup = _make_popup(db, tenant_a, tz="UTC")
+        venue = _make_venue(db, tenant_a, popup)
+        self._make_event(
+            db,
+            tenant_a,
+            popup,
+            venue,
+            owner_id=uuid.uuid4(),
+            visibility=EventVisibility.PUBLIC,
+            title="Open Mic",
+        )
+
+        start = datetime(2026, 4, 13, 0, 0, tzinfo=UTC)
+        end = datetime(2026, 4, 14, 0, 0, tzinfo=UTC)
+        portal = _compute_availability(
+            db, venue, start, end, redact_private=True, viewer_human_id=uuid.uuid4()
+        )
+        assert portal.busy[0].label == "Open Mic"
+        assert portal.busy[0].visibility == "public"

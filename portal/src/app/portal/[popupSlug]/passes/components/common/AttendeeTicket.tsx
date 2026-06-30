@@ -1,7 +1,13 @@
-import { ChevronRight, QrCode, User } from "lucide-react"
-import React, { useState } from "react"
+import { useQuery } from "@tanstack/react-query"
+import { ChevronRight, Pencil, QrCode, User } from "lucide-react"
+import React, { useMemo, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { TICKET_CATEGORY } from "@/checkout/popupCheckoutPolicy"
+import { TicketingStepsService } from "@/client"
+import {
+  mealPlanProductIds,
+  parseMealPlanTemplateConfig,
+} from "@/components/checkout-flow/variants/mealPlanShared"
 import {
   Collapsible,
   CollapsibleContent,
@@ -9,15 +15,18 @@ import {
 } from "@/components/ui/collapsible"
 import { Separator } from "@/components/ui/separator"
 import useAttendee from "@/hooks/useAttendee"
+import { deriveProductState } from "@/lib/product-state"
 import { cn } from "@/lib/utils"
 import { useCityProvider } from "@/providers/cityProvider"
-import type { AttendeePassState } from "@/types/Attendee"
+import { usePassesProvider } from "@/providers/passesProvider"
+import type { AttendeePassState, TicketEntry } from "@/types/Attendee"
 import type { ProductsPass } from "@/types/Products"
 import { badgeName } from "../../constants/multiuse"
 import useModal from "../../hooks/useModal"
 import { compareByCategory, getCategoryIcon } from "../../utils/categoryDisplay"
 import { AttendeeModal } from "../AttendeeModal"
 import OptionsMenu from "./Buttons/OptionsMenu"
+import { MealPlanEditModal } from "./MealPlanEditModal"
 import Product from "./Products/ProductTicket"
 import QRcode from "./QRcode"
 
@@ -56,10 +65,59 @@ const AttendeeTicket = ({
     .sort(sortProductsByPriority)
   const { getCity } = useCityProvider()
   const city = getCity()
+  const { products } = usePassesProvider()
   const { handleEdit, handleCloseModal, modal, handleDelete } = useModal()
   const { removeAttendee, editAttendee } = useAttendee()
   const hasPurchased = attendee.products.some((product) => product.purchased)
   const isMainAttendee = attendee.category === "main"
+
+  // Meal-plan editing: resolve which purchased tickets are meal-plan weeks via
+  // the popup's meal-plan-select step config (more robust than matching a
+  // configurable category string). Reuses the same portal query as YourPasses,
+  // so React Query dedupes it by key.
+  const popupId = city?.id ? String(city.id) : null
+  const { data: ticketingStepsData } = useQuery({
+    queryKey: ["ticketing-steps-portal", popupId],
+    queryFn: () =>
+      TicketingStepsService.listPortalTicketingSteps({ popupId: popupId! }),
+    enabled: !!popupId,
+  })
+  const mealPlanStep = (ticketingStepsData?.results ?? []).find(
+    (s) => s.template === "meal-plan-select",
+  )
+  const mealPlanTemplateConfig = mealPlanStep?.template_config ?? null
+  const mealPlanIds = useMemo(
+    () => mealPlanProductIds(mealPlanTemplateConfig),
+    [mealPlanTemplateConfig],
+  )
+
+  // Resolve each meal-plan product so we can (a) apply the same per-week lock
+  // rule the modal uses (deriveProductState === "ended") and (b) order the weeks
+  // chronologically. coverageStart comes from the meal-plan-select step config.
+  const mealPlanInfoById = useMemo(() => {
+    const { sections } = parseMealPlanTemplateConfig(
+      mealPlanTemplateConfig,
+      products,
+    )
+    const map = new Map<
+      string,
+      { product: ProductsPass; coverageStart: string }
+    >()
+    for (const section of sections) {
+      for (const p of section.products) {
+        map.set(p.id, { product: p.product, coverageStart: p.coverageStart })
+      }
+    }
+    return map
+  }, [mealPlanTemplateConfig, products])
+
+  const isMealPlanEntryEditable = (entry: TicketEntry): boolean => {
+    const product = mealPlanInfoById.get(entry.product_id)?.product
+    if (!product) return false
+    return deriveProductState(product) !== "ended"
+  }
+
+  const [editingEntryId, setEditingEntryId] = useState<string | null>(null)
 
   // Used by buy mode <Product> components to disable day/week tickets when a
   // monthly pass is selected/purchased (buy-mode logic is out of scope here).
@@ -78,10 +136,26 @@ const AttendeeTicket = ({
     (p) => p.category === TICKET_CATEGORY,
   )
 
-  // Ticket entries for view mode: exclude patreon, sort by category order
+  // Ticket entries for view mode: exclude patreon, sort by category order.
+  // Within meal-plan weeks (same category) order chronologically by coverage
+  // start so editing a week never reshuffles the list (the API may return the
+  // just-edited row last).
   const ticketEntries = [...(attendee.ticket_entries ?? [])]
     .filter((e) => e.product_category !== "patreon")
-    .sort(compareByCategory)
+    .sort((a, b) => {
+      const byCategory = compareByCategory(a, b)
+      if (byCategory !== 0) return byCategory
+      const aStart = mealPlanInfoById.get(a.product_id)?.coverageStart
+      const bStart = mealPlanInfoById.get(b.product_id)?.coverageStart
+      if (aStart && bStart) return aStart.localeCompare(bStart)
+      return 0
+    })
+
+  // Purchased meal-plan tickets (any week of the plan). The edit button on each
+  // such row opens a single modal that edits all of this attendee's weeks.
+  const mealPlanEntries = ticketEntries.filter((e) =>
+    mealPlanIds.has(e.product_id),
+  )
 
   // Inline QR modal state — drives the shared <QRcode> modal at bottom of file.
   // Tracks lastScanAt alongside the code so the modal can flag already-used QRs.
@@ -109,6 +183,7 @@ const AttendeeTicket = ({
           name: data.name ?? "",
           email: data.email ?? "",
           gender: data.gender ?? "",
+          additional_data: data.additional_data,
         })
       }
     } catch (_error) {
@@ -233,6 +308,20 @@ const AttendeeTicket = ({
                           {entry.product_name}
                         </span>
                       </div>
+                      {mealPlanIds.has(entry.product_id) &&
+                        isMealPlanEntryEditable(entry) && (
+                          <button
+                            type="button"
+                            onClick={() => setEditingEntryId(entry.id)}
+                            aria-label="Edit meal plan"
+                            className="flex items-center gap-1 text-xs font-medium text-pass-text hover:text-pass-title transition-colors cursor-pointer flex-shrink-0"
+                          >
+                            <Pencil className="w-4 h-4" />
+                            <span className="hidden sm:inline">
+                              Edit meal plan
+                            </span>
+                          </button>
+                        )}
                       {entry.requires_check_in === true && (
                         <button
                           type="button"
@@ -417,6 +506,19 @@ const AttendeeTicket = ({
           category={modal.category}
           editingAttendee={modal.editingAttendee}
           isDelete={modal.isDelete}
+        />
+      )}
+
+      {editingEntryId && (
+        <MealPlanEditModal
+          open={!!editingEntryId}
+          onClose={() => setEditingEntryId(null)}
+          attendee={attendee}
+          mealPlanEntries={mealPlanEntries.filter(
+            (e) => e.id === editingEntryId,
+          )}
+          templateConfig={mealPlanTemplateConfig}
+          products={products}
         />
       )}
     </div>

@@ -62,12 +62,21 @@ class TasksCRUD(BaseCRUD[Task, TaskCreate, TaskUpdate]):
         release: str | None = None,
         search: str | None = None,
         viewer: "UserPublic | None" = None,
+        active_tenant_id: uuid.UUID | None = None,
+        archived: bool | None = None,
     ) -> tuple[list[Task], int]:
         statement = select(Task)
 
+        # Archive gate: ``False`` → active board (archived_at IS NULL),
+        # ``True`` → the archive view, ``None`` → no filter (both).
+        if archived is True:
+            statement = statement.where(col(Task.archived_at).is_not(None))
+        elif archived is False:
+            statement = statement.where(col(Task.archived_at).is_(None))
+
         # Visibility gate for non-superadmin viewers: only universal tasks and
-        # tenant tasks targeting their own tenant. Superadmins (or no viewer)
-        # see everything. internal tasks never reach non-superadmins.
+        # tenant tasks targeting their own tenant. internal tasks never reach
+        # non-superadmins.
         if viewer is not None and viewer.role != UserRole.SUPERADMIN:
             statement = statement.where(
                 (col(Task.visibility) == TaskVisibility.UNIVERSAL.value)
@@ -75,6 +84,15 @@ class TasksCRUD(BaseCRUD[Task, TaskCreate, TaskUpdate]):
                     (col(Task.visibility) == TaskVisibility.TENANT.value)
                     & (col(Task.target_tenant_id) == viewer.tenant_id)
                 )
+            )
+        # Superadmin with an active workspace (X-Tenant-Id) sees the board scoped
+        # to that tenant: tenant tasks of other tenants are hidden, while global
+        # tasks (universal/internal) stay visible. Without an active tenant the
+        # superadmin keeps the cross-tenant view (no filter).
+        elif active_tenant_id is not None:
+            statement = statement.where(
+                (col(Task.visibility) != TaskVisibility.TENANT.value)
+                | (col(Task.target_tenant_id) == active_tenant_id)
             )
 
         if status is not None:

@@ -37,6 +37,11 @@ interface VenueSectionProps {
    * until the debounced availability check resolves.
    */
   effectiveBookingMode?: string | null
+  /**
+   * Keep the virtual-meeting option visible — only for events that are
+   * already meetings (venue selection is mandatory for everything else).
+   */
+  allowMeeting?: boolean
 }
 
 export function VenueSection({
@@ -51,6 +56,7 @@ export function VenueSection({
   customLocationUrl,
   onCustomLocationUrlChange,
   effectiveBookingMode,
+  allowMeeting,
 }: VenueSectionProps) {
   const { t } = useTranslation()
   const [picturesOpen, setPicturesOpen] = useState(false)
@@ -75,6 +81,7 @@ export function VenueSection({
         onVenueChange={onVenueChange}
         venues={venues}
         selectedVenueLabel={selectedVenueLabel}
+        allowMeeting={allowMeeting}
       />
       {isCustom && (
         <div className="space-y-2 pt-1">

@@ -1,21 +1,33 @@
 import uuid
+from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Header, HTTPException, status
 
 from app.api.api_key import crud as api_key_crud
 from app.api.api_key.schemas import ApiKeyPublic
+from app.api.audit_log.actor import actor_from_user
+from app.api.audit_log.constants import AuditAction, AuditEntityType
+from app.api.audit_log.crud import audit_logs_crud
 from app.api.human import crud
+from app.api.human.activity_crud import build_human_activity, note_log_to_item
+from app.api.human.activity_schemas import HumanActivityCreate, HumanActivityItem
 from app.api.human.crud import HardDeleteSummary
+from app.api.human.models import HumanComment
 from app.api.human.schemas import (
+    HumanCommentCreate,
+    HumanCommentPublic,
+    HumanCommentUpdate,
     HumanCreate,
+    HumanEnrichmentFactCreate,
+    HumanEnrichmentFactPublic,
     HumanPortalPublic,
     HumanProfileStats,
     HumanProfileUpdate,
     HumanPublic,
     HumanUpdate,
 )
-from app.api.shared.enums import UserRole
+from app.api.shared.enums import HumanRating, UserRole
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
 from app.core.dependencies.users import (
     AdminOrApiKey_HumansRead,
@@ -25,6 +37,7 @@ from app.core.dependencies.users import (
     CurrentAdmin,
     CurrentHuman,
     CurrentSuperadmin,
+    CurrentUser,
     HumanTenantSession,
     SessionDep,
     TenantSession,
@@ -42,6 +55,14 @@ async def list_humans(
     search: str | None = None,
     popup_id: uuid.UUID | None = None,
     incomplete_application: bool = False,
+    email: str | None = None,
+    telegram: str | None = None,
+    gender: str | None = None,
+    age: str | None = None,
+    residence: str | None = None,
+    rating: HumanRating | None = None,
+    has_enriched_profile: bool | None = None,
+    enrichment_query: str | None = None,
     skip: PaginationSkip = 0,
     limit: PaginationLimit = 100,
 ) -> ListModel[HumanPublic]:
@@ -59,12 +80,19 @@ async def list_humans(
             popup_id=popup_id,
         )
     else:
-        humans, total = crud.find(
+        humans, total = crud.find_filtered(
             db,
             skip=skip,
             limit=limit,
             search=search,
-            search_fields=["first_name", "last_name", "email"],
+            email=email,
+            telegram=telegram,
+            gender=gender,
+            age=age,
+            residence=residence,
+            rating=rating.value if rating else None,
+            has_enriched_profile=has_enriched_profile,
+            enrichment_query=enrichment_query,
         )
 
     return ListModel[HumanPublic](
@@ -175,22 +203,27 @@ async def update_current_human(
 async def search_humans_portal(
     db: HumanTenantSession,
     _: CurrentHuman,
+    popup_id: uuid.UUID,
     search: str | None = None,
     skip: PaginationSkip = 0,
     limit: PaginationLimit = 20,
 ) -> ListModel[HumanPortalPublic]:
-    """Search humans in the current tenant for portal pickers.
+    """Search a popup's attendees who share their name, for portal pickers.
 
     Used by the event-creation Displayed-host field to let a creator pick a
-    participant by name. RLS already scopes to the caller's tenant via
-    HumanTenantSession; the slim response schema omits email so this isn't
-    a wider exposure than the participant lists portal users can already see.
+    host. Scoped to humans who actually attend ``popup_id`` (accepted
+    application with a ticket-holding main/spouse attendee) AND who have not
+    hidden their name via ``info_not_shared`` for that popup. RLS scopes to the
+    caller's tenant; the slim response schema omits email.
     """
-    humans, total = crud.search_named(
+    from app.api.application.crud import applications_crud
+
+    humans, total = applications_crud.find_directory_humans(
         db,
+        popup_id=popup_id,
+        q=search,
         skip=skip,
         limit=limit,
-        search=search,
     )
     return ListModel[HumanPortalPublic](
         results=[HumanPortalPublic.model_validate(h) for h in humans],
@@ -220,7 +253,7 @@ async def update_human(
     human_id: uuid.UUID,
     human_in: HumanUpdate,
     db: AdminOrApiKeySession_HumansWrite,
-    _current_user: AdminOrApiKey_HumansWrite,
+    current_user: AdminOrApiKey_HumansWrite,
 ) -> HumanPublic:
     human = crud.get(db, human_id)
 
@@ -230,10 +263,35 @@ async def update_human(
             detail="Human not found",
         )
 
-    # Check if red_flag is being set to True
-    is_being_flagged = human_in.red_flag is True and not human.red_flag
+    # Check if the rating is transitioning into RED_FLAG (the only level that
+    # carries the blocking cascade). human.red_flag reflects the pre-update state.
+    is_being_flagged = human_in.rating == HumanRating.RED_FLAG and not human.red_flag
+    # Snapshot the rating before the update so a change can be audited (and
+    # surfaced on the human's activity timeline) with its previous value.
+    previous_rating = human.rating
+    rating_changed = (
+        human_in.rating is not None and human_in.rating.value != previous_rating
+    )
 
     updated = crud.update(db, human, human_in)
+
+    # Record the rating change as an audit event so it shows up as a row in the
+    # human's activity timeline ("<user> changed rating to <rating>").
+    if rating_changed:
+        audit_logs_crud.record(
+            db,
+            tenant_id=human.tenant_id,
+            actor=actor_from_user(current_user),
+            action=AuditAction.HUMAN_RATING_CHANGED,
+            entity_type=AuditEntityType.HUMAN,
+            entity_id=human_id,
+            entity_label=human.display_name,
+            details={
+                "rating": human_in.rating.value,
+                "previous": previous_rating,
+            },
+        )
+        db.commit()
 
     # If human is being flagged, auto-reject all their IN_REVIEW applications
     if is_being_flagged:
@@ -316,6 +374,74 @@ async def delete_human(
     return crud.hard_delete_cascade(db, human_id)
 
 
+@router.get("/{human_id}/activity", response_model=ListModel[HumanActivityItem])
+async def get_human_activity(
+    human_id: uuid.UUID,
+    db: TenantSession,
+    control_db: SessionDep,
+    _current_user: CurrentAdmin,
+    skip: PaginationSkip = 0,
+    limit: PaginationLimit = 50,
+) -> ListModel[HumanActivityItem]:
+    """Aggregate a human's full activity timeline (admin-only).
+
+    Built on read from applications, payments, attendees, manual notes, rating
+    changes and comments. RLS on the TenantSession scopes the tenant-owned
+    sources; comments live in a global table with no RLS, so they are read via
+    the privileged `control_db` (the RLS check above already proved tenant
+    ownership of this human).
+    """
+    if not crud.get(db, human_id):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Human not found",
+        )
+    items, total = build_human_activity(
+        db, control_db, human_id, skip=skip, limit=limit
+    )
+    return ListModel[HumanActivityItem](
+        results=items,
+        paging=Paging(offset=skip, limit=limit, total=total),
+    )
+
+
+@router.post(
+    "/{human_id}/activity",
+    response_model=HumanActivityItem,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_human_activity(
+    human_id: uuid.UUID,
+    body: HumanActivityCreate,
+    db: TenantSession,
+    current_user: CurrentAdmin,
+) -> HumanActivityItem:
+    """Add a manual note to a human's timeline at an admin-chosen time.
+
+    The note is stored in audit_logs (no migration); the chosen time lives in
+    `details.occurred_at` while `created_at` stays the real write time.
+    """
+    human = crud.get(db, human_id)
+    if not human:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Human not found",
+        )
+    log = audit_logs_crud.record(
+        db,
+        tenant_id=human.tenant_id,
+        actor=actor_from_user(current_user),
+        action=AuditAction.HUMAN_NOTE_ADDED,
+        entity_type=AuditEntityType.HUMAN,
+        entity_id=human_id,
+        entity_label=human.display_name,
+        details={"note": body.note, "occurred_at": body.occurred_at.isoformat()},
+    )
+    db.commit()
+    db.refresh(log)
+    return note_log_to_item(log)
+
+
 @router.get("/{human_id}/api-keys", response_model=list[ApiKeyPublic])
 async def list_human_api_keys(
     human_id: uuid.UUID,
@@ -331,3 +457,169 @@ async def list_human_api_keys(
 
     rows = api_key_crud.list_for_human(db, human_id)
     return [ApiKeyPublic.model_validate(row) for row in rows]
+
+
+# --------------------------------------------------------------------------- #
+# Comments — justify a human's rating. Mirrors the task comments model:
+# any backoffice user can read/add, the author edits their own, the author or
+# a superadmin soft-deletes. Scoped to the caller's tenant (superadmin bypass).
+# --------------------------------------------------------------------------- #
+def _get_human_in_tenant_or_404(db, human_id: uuid.UUID, current_user):  # noqa: ANN001
+    """Load a human or 404, hiding humans outside the caller's tenant.
+
+    Runs on the control-plane session (bypasses RLS), so the tenant ownership
+    check is enforced explicitly — same pattern as the hard-delete endpoint.
+    """
+    human = crud.get(db, human_id)
+    if not human or (
+        current_user.role != UserRole.SUPERADMIN
+        and human.tenant_id != current_user.tenant_id
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Human not found",
+        )
+    return human
+
+
+@router.get("/{human_id}/comments", response_model=ListModel[HumanCommentPublic])
+async def list_human_comments(
+    human_id: uuid.UUID,
+    db: SessionDep,
+    current_user: CurrentUser,
+) -> ListModel[HumanCommentPublic]:
+    """List a human's comments, oldest first."""
+    _get_human_in_tenant_or_404(db, human_id, current_user)
+    comments = crud.list_comments(db, human_id)
+    return ListModel[HumanCommentPublic](
+        results=[HumanCommentPublic.model_validate(c) for c in comments],
+        paging=Paging(offset=0, limit=len(comments), total=len(comments)),
+    )
+
+
+@router.post(
+    "/{human_id}/comments",
+    response_model=HumanCommentPublic,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_human_comment(
+    human_id: uuid.UUID,
+    comment_in: HumanCommentCreate,
+    db: SessionDep,
+    current_user: CurrentUser,
+) -> HumanCommentPublic:
+    """Add a comment to a human."""
+    _get_human_in_tenant_or_404(db, human_id, current_user)
+    comment = HumanComment(
+        human_id=human_id,
+        author_user_id=current_user.id,
+        author_name=current_user.full_name,
+        author_email=current_user.email,
+        body=comment_in.body,
+    )
+    db.add(comment)
+    db.commit()
+    db.refresh(comment)
+    return HumanCommentPublic.model_validate(comment)
+
+
+@router.put("/{human_id}/comments/{comment_id}", response_model=HumanCommentPublic)
+async def update_human_comment(
+    human_id: uuid.UUID,
+    comment_id: uuid.UUID,
+    comment_in: HumanCommentUpdate,
+    db: SessionDep,
+    current_user: CurrentUser,
+) -> HumanCommentPublic:
+    """Edit your own comment."""
+    _get_human_in_tenant_or_404(db, human_id, current_user)
+    comment = db.get(HumanComment, comment_id)
+    if not comment or comment.human_id != human_id or comment.deleted_at is not None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Comment not found"
+        )
+    if comment.author_user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can only edit your own comments",
+        )
+    comment.body = comment_in.body
+    comment.edited_at = datetime.now(UTC)
+    db.add(comment)
+    db.commit()
+    db.refresh(comment)
+    return HumanCommentPublic.model_validate(comment)
+
+
+@router.delete(
+    "/{human_id}/comments/{comment_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def delete_human_comment(
+    human_id: uuid.UUID,
+    comment_id: uuid.UUID,
+    db: SessionDep,
+    current_user: CurrentUser,
+) -> None:
+    """Soft-delete a comment: the author, or any superadmin. Row is preserved."""
+    _get_human_in_tenant_or_404(db, human_id, current_user)
+    comment = db.get(HumanComment, comment_id)
+    if not comment or comment.human_id != human_id or comment.deleted_at is not None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Comment not found"
+        )
+    if (
+        current_user.role != UserRole.SUPERADMIN
+        and comment.author_user_id != current_user.id
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can only delete your own comments",
+        )
+    comment.deleted_at = datetime.now(UTC)
+    db.add(comment)
+    db.commit()
+
+
+# --------------------------------------------------------------------------- #
+# Enrichment facts — the append-only provenance bitácora behind a human's
+# curated `enriched_profile`. The Rich Profiles agent (a claude.ai routine
+# logged in as the "Claude" superadmin) POSTs one row per atomic fact it
+# extracts from a source (Telegram, custom fields, events, org deep-dive) and
+# updates the curated profile via PATCH /humans/{id}. Backoffice reads the
+# facts to show where each profile value came from. Tenant-scoped (superadmin
+# bypass), same gating as comments.
+# --------------------------------------------------------------------------- #
+@router.get(
+    "/{human_id}/enrichment-facts",
+    response_model=ListModel[HumanEnrichmentFactPublic],
+)
+async def list_human_enrichment_facts(
+    human_id: uuid.UUID,
+    db: SessionDep,
+    current_user: CurrentUser,
+) -> ListModel[HumanEnrichmentFactPublic]:
+    """List a human's enrichment facts, newest first."""
+    _get_human_in_tenant_or_404(db, human_id, current_user)
+    facts = crud.list_enrichment_facts(db, human_id)
+    return ListModel[HumanEnrichmentFactPublic](
+        results=[HumanEnrichmentFactPublic.model_validate(f) for f in facts],
+        paging=Paging(offset=0, limit=len(facts), total=len(facts)),
+    )
+
+
+@router.post(
+    "/{human_id}/enrichment-facts",
+    response_model=HumanEnrichmentFactPublic,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_human_enrichment_fact(
+    human_id: uuid.UUID,
+    fact_in: HumanEnrichmentFactCreate,
+    db: SessionDep,
+    current_user: CurrentUser,
+) -> HumanEnrichmentFactPublic:
+    """Append one provenance fact extracted by the enrichment agent."""
+    _get_human_in_tenant_or_404(db, human_id, current_user)
+    fact = crud.create_enrichment_fact(db, human_id, fact_in)
+    return HumanEnrichmentFactPublic.model_validate(fact)

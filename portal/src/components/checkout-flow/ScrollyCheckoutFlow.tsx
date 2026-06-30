@@ -201,7 +201,13 @@ function ScrollyCheckoutFlowInner({
     const sectionsSnapshot = allSections
 
     const prevSnapType = mainEl.style.scrollSnapType
-    mainEl.style.scrollSnapType = "y mandatory"
+    // `proximity` (not `mandatory`): sections here can be 2-3 viewport
+    // heights tall (ticket/housing card lists). Mandatory snap turns the
+    // gaps between snap points into dead zones — a moderate touch flick
+    // that ends mid-gap gets yanked back to the previous section, which
+    // on phones feels like the page refusing to scroll. Proximity keeps
+    // the aligned-landing behaviour near section tops and frees the rest.
+    mainEl.style.scrollSnapType = "y proximity"
 
     const sectionEls = sectionsSnapshot
       .map((s) => document.getElementById(s.id))
@@ -216,28 +222,116 @@ function ScrollyCheckoutFlowInner({
       el.style.scrollSnapStop = "normal"
     }
 
+    // Which section currently crosses the "active band" — a horizontal
+    // strip 35-45% down the scrollport. Geometry fallback for the band
+    // observer below; both must agree on the same band.
+    const sectionAtBand = (): string | null => {
+      const rootRect = mainEl.getBoundingClientRect()
+      const bandY = rootRect.top + rootRect.height * 0.4
+      for (const el of sectionEls) {
+        const r = el.getBoundingClientRect()
+        if (r.top <= bandY && r.bottom > bandY) return el.id
+      }
+      return null
+    }
+
     // While a programmatic scroll is in flight we lock the active section to
     // the destination so the IntersectionObserver doesn't flip through every
     // intermediate section as they pass under the viewport.
     let scrollTargetId: string | null = null
     let scrollTargetTimeout: number | null = null
-    const releaseScrollTarget = () => {
+    const releaseScrollTarget = (settle = false) => {
       scrollTargetId = null
       if (scrollTargetTimeout !== null) {
         window.clearTimeout(scrollTargetTimeout)
         scrollTargetTimeout = null
       }
+      // Safety-net path (lock expired without the target reporting in,
+      // e.g. the smooth scroll was interrupted by a touch): settle the
+      // highlight from actual geometry instead of leaving it wherever
+      // the optimistic set put it.
+      if (settle) {
+        const id = sectionAtBand()
+        if (id) {
+          markStepVisited(id)
+          setActiveSection(id)
+        }
+      }
     }
 
+    // Self-owned smooth scroll (rAF) instead of el.scrollIntoView({smooth}).
+    // Native smooth scroll serialises one animation at a time, so rapid nav
+    // taps misbehave: Chrome queues them (the page lags far behind the taps)
+    // and iOS Safari drops the overlapping calls outright (the page stops
+    // moving until a manual scroll clears the stuck animation — the exact
+    // "tap stops working, nudge unsticks it" report). A loop we own retargets
+    // instantly on every tap and always settles on the latest destination.
+    let scrollRafId: number | null = null
+    const cancelScrollAnim = () => {
+      if (scrollRafId !== null) {
+        window.cancelAnimationFrame(scrollRafId)
+        scrollRafId = null
+      }
+    }
+    const animateScrollTo = (top: number, onDone: () => void) => {
+      cancelScrollAnim()
+      const maxTop = mainEl.scrollHeight - mainEl.clientHeight
+      const dest = Math.max(0, Math.min(top, maxTop))
+      const start = mainEl.scrollTop
+      const dist = dest - start
+      const reduceMotion = window.matchMedia(
+        "(prefers-reduced-motion: reduce)",
+      ).matches
+      if (reduceMotion || Math.abs(dist) < 1) {
+        mainEl.scrollTop = dest
+        onDone()
+        return
+      }
+      // Duration scales with distance but is clamped so even a full-page
+      // jump stays snappy (≤600ms).
+      const duration = Math.min(600, Math.max(240, Math.abs(dist) * 0.4))
+      const startTime = performance.now()
+      const easeOutCubic = (p: number) => 1 - (1 - p) ** 3
+      const step = (now: number) => {
+        const p = Math.min(1, (now - startTime) / duration)
+        mainEl.scrollTop = start + dist * easeOutCubic(p)
+        if (p < 1) {
+          scrollRafId = window.requestAnimationFrame(step)
+        } else {
+          scrollRafId = null
+          onDone()
+        }
+      }
+      scrollRafId = window.requestAnimationFrame(step)
+    }
+
+    // A real touch/wheel scroll must always win over an in-flight
+    // programmatic animation: abort it and hand control back to the band
+    // observer so the highlight tracks the user's finger.
+    const onUserScrollIntent = () => {
+      if (scrollRafId !== null) {
+        cancelScrollAnim()
+        releaseScrollTarget()
+      }
+    }
+    mainEl.addEventListener("touchstart", onUserScrollIntent, { passive: true })
+    mainEl.addEventListener("wheel", onUserScrollIntent, { passive: true })
+
+    // Active = the section overlapping the band, NOT "≥30% of the section
+    // visible". The old ratio threshold was unreachable for tall sections
+    // on real phones: a 2,100px ticket list in a ~550px visual viewport
+    // (browser chrome showing) peaks at ratio ~0.27, so the nav highlight
+    // froze on whatever step last fired. Band intersection is independent
+    // of section height, and guarantees the in-flight lock below is always
+    // released by an arrival event.
     const observer = new IntersectionObserver(
       (entries) => {
         for (const entry of entries) {
-          if (entry.isIntersecting && entry.intersectionRatio >= 0.3) {
+          if (entry.isIntersecting) {
             const id = entry.target.id
-            // Any section that crosses the 30% visibility threshold
-            // counts as "visited" for the wayfinding nav. Triggered for
-            // both natural scroll and programmatic scroll, so the user
-            // gets credited for visits they actively chose.
+            // Crossing the band counts as "visited" for the wayfinding
+            // nav. Triggered for both natural and programmatic scroll,
+            // so the user gets credited for visits they actively chose.
             markStepVisited(id)
             if (scrollTargetId !== null) {
               if (id === scrollTargetId) {
@@ -250,7 +344,7 @@ function ScrollyCheckoutFlowInner({
           }
         }
       },
-      { root: mainEl, threshold: [0.3] },
+      { root: mainEl, rootMargin: "-35% 0px -55% 0px", threshold: 0 },
     )
     for (const el of sectionEls) observer.observe(el)
 
@@ -259,30 +353,34 @@ function ScrollyCheckoutFlowInner({
       const targetId = sectionsSnapshot[clamped].id
       const el = document.getElementById(targetId)
       if (!el) return
-      const reduceMotion = window.matchMedia(
-        "(prefers-reduced-motion: reduce)",
-      ).matches
+      // Lock the highlight to the destination so the band observer doesn't
+      // flip through intermediate sections while we animate there.
       scrollTargetId = targetId
       if (scrollTargetTimeout !== null) {
         window.clearTimeout(scrollTargetTimeout)
       }
-      // Safety net: if the IntersectionObserver doesn't fire (e.g. target
-      // already in view), free up scrollTargetId so future scrolls work.
-      scrollTargetTimeout = window.setTimeout(releaseScrollTarget, 1500)
-      // Why scrollIntoView over scrollTo + manual snap toggling: keeping
-      // scroll-snap-type: y mandatory during the animation lets the browser
-      // land precisely on the snap point without the post-animation "settle"
-      // jump that happened when snap was re-enabled after the scrollTo.
-      // Why the deferred setTimeout: when the click originates inside a
-      // position: fixed element (e.g. footer button), Chrome can swallow a
-      // scroll issued in the same tick.
-      window.setTimeout(() => {
-        el.scrollIntoView({
-          behavior: reduceMotion ? "auto" : "smooth",
-          block: "start",
-        })
-      }, 0)
+      // Backstop: if the animation callback is somehow missed, release the
+      // lock and settle the highlight from geometry.
+      scrollTargetTimeout = window.setTimeout(
+        () => releaseScrollTarget(true),
+        1500,
+      )
       setActiveSection(targetId)
+      // scrollTop that puts the section top at the scrollport top — same
+      // landing as scrollIntoView({block:"start"}) given snap-align:start.
+      const targetTop =
+        el.getBoundingClientRect().top -
+        mainEl.getBoundingClientRect().top +
+        mainEl.scrollTop
+      animateScrollTo(targetTop, () => {
+        // Only settle if this tap is still the active intent — a later tap
+        // (which reset scrollTargetId) or a user scroll must not be undone.
+        if (scrollTargetId === targetId) {
+          markStepVisited(targetId)
+          setActiveSection(targetId)
+          releaseScrollTarget()
+        }
+      })
     }
 
     return () => {
@@ -297,6 +395,9 @@ function ScrollyCheckoutFlowInner({
       observer.disconnect()
       ro.disconnect()
       navRo.disconnect()
+      cancelScrollAnim()
+      mainEl.removeEventListener("touchstart", onUserScrollIntent)
+      mainEl.removeEventListener("wheel", onUserScrollIntent)
       releaseScrollTarget()
       scrollToIndexRef.current = null
     }
@@ -356,30 +457,49 @@ function ScrollyCheckoutFlowInner({
       <CheckoutToast onChipClick={scrollToStep} />
       {allSections.map((section) => {
         const { config } = section
+        // The ticket-card "stacked" layout renders a responsive grid of cards,
+        // which needs more width than the default centred column. Other steps
+        // (and the tabs/compact ticket-card variants) keep the narrow column.
+        const templateConfig = config?.template_config as
+          | Record<string, unknown>
+          | undefined
+        const isStackedCards =
+          config?.template === "ticket-card" &&
+          (templateConfig?.variant ?? "stacked") === "stacked"
         return (
           <SnapSection
             key={section.id}
             id={section.id}
             bottomPadding={section.id === lastSectionId ? "4rem" : "50vh"}
+            widthClass={isStackedCards ? "max-w-6xl" : "max-w-2xl"}
           >
-            <SectionHeader
-              title={config?.title ?? section.label}
-              subtitle={config?.description ?? undefined}
-              variant="snap"
-              watermark={config?.watermark ?? section.label}
-              watermarkStyle={watermarkStyle}
-              showTitle={config?.show_title ?? true}
-              showWatermark={config?.show_watermark ?? true}
-            />
+            {/* Header and footer stay in the narrow column even when the step
+                is widened for a card grid, so the section title/watermark keep
+                the same size and rhythm as every other step. Only the step
+                content (the grid) uses the wider width. The max-w-2xl wrapper
+                is a no-op on non-widened steps. */}
+            <div className="mx-auto mb-8 w-full max-w-2xl sm:mb-12 lg:mb-16">
+              <SectionHeader
+                title={config?.title ?? section.label}
+                subtitle={config?.description ?? undefined}
+                variant="snap"
+                watermark={config?.watermark ?? section.label}
+                watermarkStyle={watermarkStyle}
+                showTitle={config?.show_title ?? true}
+                showWatermark={config?.show_watermark ?? true}
+              />
+            </div>
             {renderSectionContent(section)}
             {(() => {
               const ft = (
                 config?.template_config as Record<string, unknown> | undefined
               )?.footer_text
               return typeof ft === "string" && ft ? (
-                <p className="text-xs text-gray-400 leading-relaxed px-1 pt-4 text-center">
-                  {ft}
-                </p>
+                <div className="mx-auto w-full max-w-2xl">
+                  <p className="text-xs text-gray-400 leading-relaxed px-1 pt-4 text-center">
+                    {ft}
+                  </p>
+                </div>
               ) : null
             })()}
           </SnapSection>

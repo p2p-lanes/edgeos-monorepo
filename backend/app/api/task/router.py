@@ -10,8 +10,9 @@ The ``tasks`` table is global, so every endpoint uses the privileged main engine
 
 import uuid
 from datetime import UTC, datetime
+from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, Header, HTTPException, Query, status
 
 from app.api.shared.enums import UserRole
 from app.api.shared.response import (
@@ -24,6 +25,7 @@ from app.api.task import crud
 from app.api.task.models import Task, TaskAttachment, TaskComment
 from app.api.task.schemas import (
     BugReportCreate,
+    TaskArchiveResult,
     TaskAttachmentCreate,
     TaskAttachmentPublic,
     TaskCommentCreate,
@@ -105,11 +107,12 @@ async def report_bug(
 ) -> TaskPublic:
     """File a bug report (any authenticated backoffice user).
 
-    Creates a to-do bug attributed to the reporter, scoped to the reporter's
+    Creates a to-do task attributed to the reporter, scoped to the reporter's
     tenant (``visibility='tenant'``) so that tenant's users can see it. A
-    superadmin reporter (no tenant) falls back to an ``internal`` bug. Optional
-    attachments are screenshots / screen-recordings already uploaded to S3 via
-    POST /uploads/presigned-url.
+    superadmin reporter (no tenant) falls back to an ``internal`` task. The
+    reporter classifies it via ``type`` (defaults to ``bug``), ``priority``
+    and ``app``. Optional attachments are screenshots / screen-recordings
+    already uploaded to S3 via POST /uploads/presigned-url.
     """
     if current_user.tenant_id is not None:
         visibility = TaskVisibility.TENANT.value
@@ -118,11 +121,15 @@ async def report_bug(
         visibility = TaskVisibility.INTERNAL.value
         target_tenant_id = None
 
+    # ``use_enum_values=True`` on BugReportCreate means type/priority/app are
+    # already plain column strings (app may be None = unspecified).
     task = Task(
         title=report_in.title,
         detail=report_in.detail,
         status=TaskStatus.TO_DO.value,
-        type=TaskType.BUG.value,
+        type=report_in.type,
+        priority=report_in.priority,
+        app=report_in.app,
         visibility=visibility,
         target_tenant_id=target_tenant_id,
         created_by=current_user.id,
@@ -158,10 +165,25 @@ async def list_tasks(
     responsible_user_id: uuid.UUID | None = None,
     release: str | None = None,
     search: str | None = None,
+    archived: bool | None = None,
     skip: PaginationSkip = 0,
     limit: PaginationLimit = 100,
+    x_tenant_id: Annotated[str | None, Header(alias="X-Tenant-Id")] = None,
 ) -> ListModel[TaskPublic]:
-    """List tasks the current user may see (filtered by visibility)."""
+    """List tasks the current user may see (filtered by visibility).
+
+    For a superadmin, the active workspace header (``X-Tenant-Id``) scopes the
+    board to that tenant: tenant tasks of other tenants are hidden, while global
+    (universal/internal) tasks stay visible. A malformed/absent header keeps the
+    cross-tenant view.
+    """
+    active_tenant_id: uuid.UUID | None = None
+    if x_tenant_id:
+        try:
+            active_tenant_id = uuid.UUID(x_tenant_id)
+        except ValueError:
+            active_tenant_id = None
+
     tasks, total = crud.tasks_crud.find_tasks(
         db,
         skip=skip,
@@ -173,6 +195,8 @@ async def list_tasks(
         release=release,
         search=search,
         viewer=current_user,
+        active_tenant_id=active_tenant_id,
+        archived=archived,
     )
     return ListModel[TaskPublic](
         results=crud.to_public_list(db, tasks),
@@ -268,6 +292,66 @@ async def update_task_status(
     db.add(task)
     db.commit()
     db.refresh(task)
+    return crud.to_public_list(db, [task])[0]
+
+
+# --------------------------------------------------------------------------- #
+# Archive — superadmin only. Orthogonal to status: archiving hides a card from
+# the board (active view) without changing its column; unarchiving restores it.
+# --------------------------------------------------------------------------- #
+@router.post("/archive-published", response_model=TaskArchiveResult)
+async def archive_published_tasks(
+    db: SessionDep,
+    _: CurrentSuperadmin,
+) -> TaskArchiveResult:
+    """Archive every published task that isn't already archived (superadmin).
+
+    Used to clear out the Published column after a release ships.
+    """
+    now = datetime.now(UTC)
+    tasks, _total = crud.tasks_crud.find_tasks(
+        db,
+        status=TaskStatus.PUBLISHED.value,
+        archived=False,
+        limit=10_000,
+    )
+    for task in tasks:
+        task.archived_at = now
+        db.add(task)
+    if tasks:
+        db.commit()
+    return TaskArchiveResult(archived=len(tasks))
+
+
+@router.post("/{task_id}/archive", response_model=TaskPublic)
+async def archive_task(
+    task_id: uuid.UUID,
+    db: SessionDep,
+    _: CurrentSuperadmin,
+) -> TaskPublic:
+    """Archive a single task (superadmin). No-op if already archived."""
+    task = _get_task_or_404(db, task_id)
+    if task.archived_at is None:
+        task.archived_at = datetime.now(UTC)
+        db.add(task)
+        db.commit()
+        db.refresh(task)
+    return crud.to_public_list(db, [task])[0]
+
+
+@router.post("/{task_id}/unarchive", response_model=TaskPublic)
+async def unarchive_task(
+    task_id: uuid.UUID,
+    db: SessionDep,
+    _: CurrentSuperadmin,
+) -> TaskPublic:
+    """Restore an archived task to the board (superadmin). No-op if active."""
+    task = _get_task_or_404(db, task_id)
+    if task.archived_at is not None:
+        task.archived_at = None
+        db.add(task)
+        db.commit()
+        db.refresh(task)
     return crud.to_public_list(db, [task])[0]
 
 

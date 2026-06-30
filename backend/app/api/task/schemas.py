@@ -27,6 +27,13 @@ class TaskPriority(str, Enum):
     HIGH = "high"
 
 
+class TaskApp(str, Enum):
+    """Which surface a task relates to. Optional (NULL = unspecified)."""
+
+    PORTAL = "portal"
+    BACKOFFICE = "backoffice"
+
+
 class TaskVisibility(str, Enum):
     UNIVERSAL = "universal"  # all tenants (phase 2)
     TENANT = "tenant"  # a single target tenant (phase 2)
@@ -104,6 +111,7 @@ class TaskCreate(BaseModel):
     priority: TaskPriority = TaskPriority.MEDIUM
     responsible_user_id: uuid.UUID | None = None
     release: str | None = Field(default=None, max_length=50)
+    app: TaskApp | None = None
     visibility: TaskVisibility = TaskVisibility.INTERNAL
     target_tenant_id: uuid.UUID | None = None
 
@@ -118,6 +126,7 @@ class TaskUpdate(BaseModel):
     priority: TaskPriority | None = None
     responsible_user_id: uuid.UUID | None = None
     release: str | None = Field(default=None, max_length=50)
+    app: TaskApp | None = None
     visibility: TaskVisibility | None = None
     target_tenant_id: uuid.UUID | None = None
 
@@ -132,18 +141,30 @@ class TaskStatusUpdate(BaseModel):
     model_config = ConfigDict(use_enum_values=True)
 
 
+class TaskArchiveResult(BaseModel):
+    """Count of tasks archived by a bulk operation."""
+
+    archived: int
+
+
 class BugReportCreate(BaseModel):
     """The 'report a bug' payload, open to every backoffice user.
 
-    Always produces an internal bug in the to-do column. Attachments are
-    optional screenshots / screen-recordings already uploaded to S3.
+    Produces a to-do task in the reporter's tenant scope. The reporter can
+    classify it (type / priority / which app it relates to); type defaults to
+    ``bug`` so the plain "report a bug" flow keeps working unchanged.
+    Attachments are optional screenshots / screen-recordings already uploaded
+    to S3.
     """
 
     title: str = Field(min_length=1, max_length=200)
     detail: str | None = None
+    type: TaskType = TaskType.BUG
+    priority: TaskPriority = TaskPriority.MEDIUM
+    app: TaskApp | None = None
     attachments: list[TaskAttachmentCreate] = Field(default_factory=list)
 
-    model_config = ConfigDict(str_strip_whitespace=True)
+    model_config = ConfigDict(use_enum_values=True, str_strip_whitespace=True)
 
 
 class TaskPublic(BaseModel):
@@ -157,9 +178,11 @@ class TaskPublic(BaseModel):
     responsible_name: str | None = None
     responsible_email: str | None = None
     release: str | None = None
+    app: TaskApp | None = None
     visibility: TaskVisibility
     target_tenant_id: uuid.UUID | None = None
     published_at: datetime | None = None
+    archived_at: datetime | None = None
     created_by: uuid.UUID | None = None
     created_by_name: str | None = None
     created_at: datetime

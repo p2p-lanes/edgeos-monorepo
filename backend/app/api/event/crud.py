@@ -23,23 +23,48 @@ class EventsCRUD(BaseCRUD[Events, EventCreate, EventUpdate]):
     def __init__(self) -> None:
         super().__init__(Events)
 
+    def get_detached_child(
+        self,
+        session: Session,
+        master_id: uuid.UUID,
+        occ_start: datetime,
+    ) -> Events | None:
+        """Return the already-materialized override for a given occurrence.
+
+        A detached override is a child row with ``recurrence_master_id ==
+        master_id`` whose ``start_time`` equals the occurrence. Matching uses
+        ``_strip_tz`` so it mirrors how the series expander keys overrides
+        (see ``_expand_rows_with_occurrences``), making detach idempotent: a
+        retry of the same occurrence finds the existing child instead of
+        creating a duplicate. Returns ``None`` when no override exists yet.
+        """
+        target = _strip_tz(occ_start)
+        statement = select(Events).where(Events.recurrence_master_id == master_id)
+        for child in session.exec(statement).all():
+            if _strip_tz(child.start_time) == target:
+                return child
+        return None
+
     def find_by_popup(
         self,
         session: Session,
         popup_id: uuid.UUID,
         skip: int = 0,
-        limit: int = 100,
+        limit: int | None = 100,
         event_status: EventStatus | None = None,
         kind: str | None = None,
         start_after: datetime | None = None,
         start_before: datetime | None = None,
         venue_id: uuid.UUID | None = None,
+        venue_ids: list[uuid.UUID] | None = None,
         location_kind: str | None = None,
         track_ids: list[uuid.UUID] | None = None,
         owner_id: uuid.UUID | None = None,
+        managed_by_human_id: uuid.UUID | None = None,
         tags: list[str] | None = None,
         search: str | None = None,
         visibility: EventVisibility | None = None,
+        exclude_visibility: list[EventVisibility] | None = None,
         exclude_statuses: list[EventStatus] | None = None,
         expand_occurrences: bool | None = None,
     ) -> tuple[list[Events], int]:
@@ -58,10 +83,16 @@ class EventsCRUD(BaseCRUD[Events, EventCreate, EventUpdate]):
             statement = statement.where(col(Events.status).not_in(exclude_statuses))
         if visibility is not None:
             statement = statement.where(Events.visibility == visibility)
+        if exclude_visibility:
+            statement = statement.where(
+                col(Events.visibility).not_in(exclude_visibility)
+            )
         if kind is not None:
             statement = statement.where(Events.kind == kind)
         if venue_id is not None:
             statement = statement.where(Events.venue_id == venue_id)
+        if venue_ids:
+            statement = statement.where(col(Events.venue_id).in_(venue_ids))
         if location_kind == "custom":
             # No venue + a custom_location_name (e.g. a Google Maps link).
             statement = statement.where(Events.venue_id.is_(None))  # type: ignore[union-attr]
@@ -74,6 +105,19 @@ class EventsCRUD(BaseCRUD[Events, EventCreate, EventUpdate]):
             statement = statement.where(col(Events.track_id).in_(track_ids))
         if owner_id is not None:
             statement = statement.where(Events.owner_id == owner_id)
+        if managed_by_human_id is not None:
+            # Events the human manages: owner, designated host, or a listed
+            # collaborator. Pushed into SQL so pagination counts the managed
+            # set (not a post-filtered page) — otherwise a managed event past
+            # the limit would never be fetched. ``collaborator_ids`` is a
+            # native uuid[], so ``= ANY(...)`` checks membership.
+            statement = statement.where(
+                or_(
+                    Events.owner_id == managed_by_human_id,
+                    Events.host_id == managed_by_human_id,
+                    col(Events.collaborator_ids).any(managed_by_human_id),
+                )
+            )
         if tags:
             # Postgres JSONB ?| operator: any of the provided tags present.
             # The right operand must be text[] — wrapping with array() makes
@@ -106,8 +150,17 @@ class EventsCRUD(BaseCRUD[Events, EventCreate, EventUpdate]):
         count_statement = select(func.count()).select_from(statement.subquery())
         total = session.exec(count_statement).one()
 
-        statement = statement.order_by(asc(Events.start_time))
-        statement = statement.offset(skip).limit(limit)
+        # Order by start_time with ``id`` as a unique tiebreaker so the row
+        # order is deterministic across requests. Without the tiebreaker,
+        # events sharing a start_time order arbitrarily, which makes any
+        # offset/limit paging unstable (the same boundary row can repeat or
+        # vanish between pages).
+        statement = statement.order_by(asc(Events.start_time), asc(Events.id))
+        # ``limit=None`` returns the full filtered set in one query (no paging
+        # boundaries). The portal events list uses this so recurring expansion
+        # runs once over the complete window instead of per page.
+        if limit is not None:
+            statement = statement.offset(skip).limit(limit)
         results = list(session.exec(statement).all())
 
         want_expansion = bool(expand_occurrences) or (
@@ -122,6 +175,78 @@ class EventsCRUD(BaseCRUD[Events, EventCreate, EventUpdate]):
             )
 
         return results, total
+
+    def find_in_range_expanded(
+        self,
+        session: Session,
+        popup_id: uuid.UUID,
+        *,
+        start_after: datetime | None = None,
+        start_before: datetime | None = None,
+        event_status: EventStatus | None = None,
+        search: str | None = None,
+        tags: list[str] | None = None,
+        track_ids: list[uuid.UUID] | None = None,
+        venue_ids: list[uuid.UUID] | None = None,
+        managed_by_human_id: uuid.UUID | None = None,
+    ) -> list[Events]:
+        """Return occurrence-expanded events in a window for a popup.
+
+        Applies the same filters as ``find_by_popup`` (including the
+        recurring-master OR bypass so series starting before the window
+        are still expanded) but without pagination — a month-sized window
+        is naturally bounded.  Results are ordered by ``start_time`` asc
+        and fully expanded via ``_expand_rows_in_window``.
+        """
+        statement = select(Events).where(Events.popup_id == popup_id)
+
+        if event_status is not None:
+            statement = statement.where(Events.status == event_status)
+        if managed_by_human_id is not None:
+            # Events the human manages: owner, designated host, or a listed
+            # collaborator. Pushed into SQL so the "My events" calendar matches
+            # the list view's managed channel.
+            statement = statement.where(
+                or_(
+                    Events.owner_id == managed_by_human_id,
+                    Events.host_id == managed_by_human_id,
+                    col(Events.collaborator_ids).any(managed_by_human_id),
+                )
+            )
+        if track_ids:
+            statement = statement.where(col(Events.track_id).in_(track_ids))
+        if venue_ids:
+            statement = statement.where(col(Events.venue_id).in_(venue_ids))
+        if tags:
+            from sqlalchemy.dialects.postgresql import array
+
+            statement = statement.where(Events.tags.op("?|")(array(list(tags))))
+        if start_after is not None:
+            statement = statement.where(
+                or_(
+                    Events.rrule.is_not(None),  # type: ignore[union-attr]
+                    Events.start_time >= start_after,
+                )
+            )
+        if start_before is not None:
+            statement = statement.where(
+                or_(
+                    Events.rrule.is_not(None),  # type: ignore[union-attr]
+                    Events.start_time <= start_before,
+                )
+            )
+        if search:
+            statement = statement.where(col(Events.title).ilike(f"%{search}%"))
+
+        statement = statement.order_by(asc(Events.start_time))
+        results = list(session.exec(statement).all())
+
+        return _expand_rows_in_window(
+            session,
+            results,
+            window_start=start_after,
+            window_end=start_before,
+        )
 
     def find_by_owner(
         self,
@@ -179,6 +304,53 @@ class EventsCRUD(BaseCRUD[Events, EventCreate, EventUpdate]):
         # Dedup again post-trim (DISTINCT didn't see the trim) and sort
         # case-insensitively for stable, human-friendly ordering.
         return sorted(set(tags), key=lambda s: s.casefold())
+
+    def count_published_events_by_track(
+        self, db: Session, *, popup_id: uuid.UUID
+    ) -> dict[uuid.UUID, int]:
+        """Distinct published events per track for a popup, across all history.
+
+        Backs the portal track filter / Tracks section so it can show each
+        track's event count without pulling every event to the client and
+        counting on the front (which also capped at the page limit). Counts
+        distinct event ids so recurring masters aren't inflated. ``status`` is
+        stored as the uppercase Enum name, so filter against that form.
+        """
+        sql = """
+            SELECT track_id, COUNT(DISTINCT id) AS event_count
+            FROM events
+            WHERE popup_id = :popup_id
+              AND track_id IS NOT NULL
+              AND status = 'PUBLISHED'
+            GROUP BY track_id
+        """
+        rows = db.exec(text(sql).bindparams(popup_id=popup_id)).all()
+        return {row[0]: int(row[1]) for row in rows}
+
+    def count_published_events_by_venue(
+        self, db: Session, *, popup_id: uuid.UUID
+    ) -> list[tuple[uuid.UUID, str, int]]:
+        """Distinct published events per venue for a popup, across all history.
+
+        Backs the portal venue filter so it can show each venue's event count
+        and hide venues with no events without pulling the full event list to
+        the client. Joins ``event_venues`` for the title so the filter has a
+        label without a second query. Counts distinct event ids so recurring
+        masters aren't inflated. ``status`` is stored as the uppercase Enum
+        name, so filter against that form.
+        """
+        sql = """
+            SELECT e.venue_id, v.title AS venue_title,
+                   COUNT(DISTINCT e.id) AS event_count
+            FROM events e
+            JOIN event_venues v ON v.id = e.venue_id
+            WHERE e.popup_id = :popup_id
+              AND e.venue_id IS NOT NULL
+              AND e.status = 'PUBLISHED'
+            GROUP BY e.venue_id, v.title
+        """
+        rows = db.exec(text(sql).bindparams(popup_id=popup_id)).all()
+        return [(row[0], row[1], int(row[2])) for row in rows]
 
     def list_distinct_hosts(
         self,

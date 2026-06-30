@@ -24,8 +24,10 @@ import type { VariantProps } from "../registries/variantRegistry"
  *  the menu on purpose — anything more extreme than 3:2 ate the cards in
  *  the design pass. */
 const ASPECT_CLASSES = {
-  "16:9": "aspect-[16/9]",
-  "3:2": "aspect-[3/2]",
+  "16:9": "aspect-[16/9]", // Banner — panoramic, short cards
+  "3:2": "aspect-[3/2]", // Classic — standard photo
+  "1:1": "aspect-[1/1]", // Square — strong presence, CTA still visible
+  "4:5": "aspect-[4/5]", // Portrait — image-forward, poster feel
 } as const
 type SectionImageAspect = keyof typeof ASPECT_CLASSES
 
@@ -109,6 +111,18 @@ function parseSurface(
   return "theme"
 }
 
+/** Tenant-wide aspect, set once at template_config root and applied to every
+ *  section's hero image (the backoffice copy reads "Applied to every section's
+ *  hero image"). A per-section `image_aspect` still wins when present. */
+function parseImageAspect(
+  templateConfig: VariantProps["templateConfig"],
+): SectionImageAspect | undefined {
+  const a = templateConfig?.image_aspect
+  return typeof a === "string" && a in ASPECT_CLASSES
+    ? (a as SectionImageAspect)
+    : undefined
+}
+
 function resolveAspectClass(aspect?: SectionImageAspect): string {
   return ASPECT_CLASSES[aspect ?? "16:9"]
 }
@@ -178,16 +192,18 @@ function ProductRow({
     updateDynamicQuantity(stepType, product.id, qty)
   }
 
-  // CTA palette mirrors the inverted "+" tile in QuantitySelector:
-  // PRIMARY fill with ACCENT text/icon. Pops harder against light card
-  // surfaces. When added, swap to a softer accent fill so the toggle
-  // state is visually distinct.
+  // CTA palette mirrors the inverted "+" tile in QuantitySelector: a PRIMARY
+  // fill with the theme's PRIMARY-FOREGROUND icon/text — the guaranteed
+  // on-primary contrast pair (same as the Continue button), so the control
+  // stays legible regardless of how close the accent sits to primary. When
+  // added, swap to an accent fill (still with primary-foreground content) so
+  // the toggle state reads as distinct without sacrificing legibility.
   const ctaClass = cn(
     "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold tracking-wide shrink-0 transition-all whitespace-nowrap",
     "shadow-sm border border-[color:var(--primary,transparent)]",
     isAdded
-      ? "bg-[color:var(--accent,theme(colors.foreground))] text-[color:var(--primary,theme(colors.background))]"
-      : "bg-[color:var(--primary,theme(colors.foreground))] text-[color:var(--accent,theme(colors.background))] hover:brightness-110 active:scale-[0.98]",
+      ? "bg-[color:var(--accent,theme(colors.foreground))] text-[color:var(--primary-foreground,theme(colors.background))]"
+      : "bg-[color:var(--primary,theme(colors.foreground))] text-[color:var(--primary-foreground,theme(colors.background))] hover:brightness-110 active:scale-[0.98]",
     rowDisabled && "cursor-not-allowed opacity-50",
   )
 
@@ -207,7 +223,7 @@ function ProductRow({
     >
       <div className="flex items-center gap-3">
         <div className="flex-1 min-w-0">
-          <h4 className="font-medium text-foreground text-sm">
+          <h4 className="font-medium text-foreground text-sm line-clamp-2">
             {product.name}
           </h4>
         </div>
@@ -313,24 +329,31 @@ function SectionCard({
   products,
   stepType,
   surface,
+  imageAspect,
 }: {
   section: TicketCardSection
   products: ProductsPass[]
   stepType: string
   surface: TicketCardSurface
+  imageAspect?: SectionImageAspect
 }) {
   if (products.length === 0) return null
 
   return (
     <article
       style={resolveSurfaceStyle(surface)}
-      className="rounded-2xl overflow-hidden border border-border shadow-sm"
+      // Border is drawn as an inset overlay (after:) instead of a box `border`.
+      // A real border + overflow-hidden + a full-bleed image rasterise the
+      // rounded edge in two passes, leaving a 1px seam where the image meets
+      // the frame. The overlay shares the exact same rounded shape and paints
+      // on top of the image, so the edge is pixel-aligned.
+      className="relative flex h-full w-full flex-col rounded-2xl overflow-hidden shadow-sm after:pointer-events-none after:absolute after:inset-0 after:rounded-2xl after:border after:border-border"
     >
       {section.image_url && (
         <div
           className={cn(
             "relative w-full bg-muted",
-            resolveAspectClass(section.image_aspect),
+            resolveAspectClass(section.image_aspect ?? imageAspect),
           )}
         >
           <Image
@@ -371,7 +394,12 @@ function SectionCard({
           />
         </div>
       )}
-      <div className="divide-y divide-border">
+      {/* Products anchored to the bottom (mt-auto) so the add CTAs line up
+          across cards of different product counts — the pricing-card pattern
+          that aids cross-card comparison. The top border seals them as an
+          "options" footer so a short card reads as deliberate spacing rather
+          than a half-empty card. */}
+      <div className="mt-auto divide-y divide-border border-t border-border">
         {products.map((p) => (
           <ProductRow key={p.id} product={p} stepType={stepType} />
         ))}
@@ -388,19 +416,33 @@ interface LayoutProps {
   groups: { section: TicketCardSection; products: ProductsPass[] }[]
   stepType: string
   surface: TicketCardSurface
+  imageAspect?: SectionImageAspect
 }
 
-function StackedLayout({ groups, stepType, surface }: LayoutProps) {
+function StackedLayout({
+  groups,
+  stepType,
+  surface,
+  imageAspect,
+}: LayoutProps) {
+  // Cards sit side by side at a fixed width and wrap, centred. Flex-wrap (not
+  // a fractional grid) keeps every card the same size regardless of how many
+  // sections exist, so a lone card doesn't stretch to fill the row. The parent
+  // step is widened (max-w-6xl) so up to three cards fit per row on desktop.
+  // `items-stretch` + a flex card wrapper make every card in a row match the
+  // tallest one regardless of how many products its section holds.
   return (
-    <div className="space-y-4">
+    <div className="flex flex-wrap items-stretch justify-center gap-4">
       {groups.map(({ section, products }) => (
-        <SectionCard
-          key={section.key}
-          section={section}
-          products={products}
-          stepType={stepType}
-          surface={surface}
-        />
+        <div key={section.key} className="flex w-full sm:w-[340px]">
+          <SectionCard
+            section={section}
+            products={products}
+            stepType={stepType}
+            surface={surface}
+            imageAspect={imageAspect}
+          />
+        </div>
       ))}
     </div>
   )
@@ -432,7 +474,7 @@ function CompactLayout({ groups, stepType, surface }: LayoutProps) {
   )
 }
 
-function TabsLayout({ groups, stepType, surface }: LayoutProps) {
+function TabsLayout({ groups, stepType, surface, imageAspect }: LayoutProps) {
   // Renders section labels as a horizontal anchor strip; sections all
   // stay visible below. Kept server-renderable — no client-side tab state.
   const { t } = useTranslation()
@@ -458,6 +500,7 @@ function TabsLayout({ groups, stepType, surface }: LayoutProps) {
               products={products}
               stepType={stepType}
               surface={surface}
+              imageAspect={imageAspect}
             />
           </div>
         ))}
@@ -478,6 +521,7 @@ export default function VariantTicketCard({
   const sections = parseSections(templateConfig)
   const variant = parseVariant(templateConfig)
   const surface = parseSurface(templateConfig)
+  const imageAspect = parseImageAspect(templateConfig)
   const { t } = useTranslation()
 
   // No sections configured — show every product in a single ungrouped
@@ -527,7 +571,21 @@ export default function VariantTicketCard({
     )
   }
   if (variant === "tabs") {
-    return <TabsLayout groups={groups} stepType={stepType} surface={surface} />
+    return (
+      <TabsLayout
+        groups={groups}
+        stepType={stepType}
+        surface={surface}
+        imageAspect={imageAspect}
+      />
+    )
   }
-  return <StackedLayout groups={groups} stepType={stepType} surface={surface} />
+  return (
+    <StackedLayout
+      groups={groups}
+      stepType={stepType}
+      surface={surface}
+      imageAspect={imageAspect}
+    />
+  )
 }

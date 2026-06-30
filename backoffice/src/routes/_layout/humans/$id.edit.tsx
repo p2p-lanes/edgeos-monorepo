@@ -11,7 +11,19 @@ import { DangerZone } from "@/components/Common/DangerZone"
 import { FormPageLayout } from "@/components/Common/FormPageLayout"
 import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
 import { HumanForm } from "@/components/forms/HumanForm"
+import { DeclaredFieldsCard } from "@/components/Humans/DeclaredFieldsCard"
+import { EnrichedProfileCard } from "@/components/Humans/EnrichedProfileCard"
+import { HumanActivity } from "@/components/Humans/HumanActivity"
+import { HumanCommentThread } from "@/components/Humans/HumanCommentThread"
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import useAuth from "@/hooks/useAuth"
 import useCustomToast from "@/hooks/useCustomToast"
 import { useGoBack } from "@/hooks/useGoBack"
@@ -59,21 +71,68 @@ function EditHumanContent({ humanId }: { humanId: string }) {
     humanId
 
   return (
-    <div className="space-y-8">
-      <HumanForm defaultValues={human} onSuccess={goBack} />
-      {isAdmin && (
-        <div className="mx-auto max-w-2xl">
-          <DangerZone
-            description="Permanently delete this human and every related row — applications, attendees, payments, products, carts, group memberships, and any group this human owns as ambassador. Intended for cleaning up test users."
-            onDelete={() => deleteMutation.mutate()}
-            isDeleting={deleteMutation.isPending}
-            confirmText="Delete Human"
-            resourceName={displayName}
-            variant="inline"
-          />
+    <Tabs defaultValue="details" className="space-y-6">
+      <TabsList>
+        <TabsTrigger value="details">Detalles</TabsTrigger>
+        <TabsTrigger value="activity">Activity</TabsTrigger>
+      </TabsList>
+
+      <TabsContent value="details">
+        <div className="space-y-8">
+          <HumanForm defaultValues={human} onSuccess={goBack} />
+          <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-2">
+            <Card>
+              <CardHeader>
+                <CardTitle>Rich profile</CardTitle>
+                <CardDescription>
+                  Curated from non-declared signals (Telegram activity, events).
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <EnrichedProfileCard human={human} />
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle>Declared</CardTitle>
+                <CardDescription>
+                  What this person typed into their application form.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <DeclaredFieldsCard human={human} />
+              </CardContent>
+            </Card>
+          </div>
+          <Card>
+            <CardHeader>
+              <CardTitle>Comments</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <HumanCommentThread humanId={humanId} />
+            </CardContent>
+          </Card>
+          {isAdmin && (
+            <div className="mx-auto max-w-2xl">
+              <DangerZone
+                description="Permanently delete this human and every related row — applications, attendees, payments, products, carts, group memberships, and any group this human owns as ambassador. Intended for cleaning up test users."
+                onDelete={() => deleteMutation.mutate()}
+                isDeleting={deleteMutation.isPending}
+                confirmText="Delete Human"
+                resourceName={displayName}
+                variant="inline"
+              />
+            </div>
+          )}
         </div>
-      )}
-    </div>
+      </TabsContent>
+
+      <TabsContent value="activity">
+        <div className="mx-auto max-w-2xl">
+          <HumanActivity humanId={humanId} />
+        </div>
+      </TabsContent>
+    </Tabs>
   )
 }
 

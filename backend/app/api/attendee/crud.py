@@ -10,7 +10,11 @@ from sqlalchemy.orm import selectinload
 from sqlmodel import Session, func, select
 
 from app.api.attendee.models import AttendeeProducts, Attendees
-from app.api.attendee.schemas import AttendeeCreate, AttendeeUpdate
+from app.api.attendee.schemas import (
+    AttendeeCreate,
+    AttendeeTicketMetadataUpdate,
+    AttendeeUpdate,
+)
 from app.api.audit_log.actor import AuditActor
 from app.api.audit_log.constants import AuditAction, AuditEntityType
 from app.api.shared.crud import BaseCRUD
@@ -102,6 +106,7 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
         limit: int = 100,
         search: str | None = None,
         has_tickets: bool | None = None,
+        category_id: uuid.UUID | None = None,
     ) -> tuple[list[Attendees], int]:
         """Find attendees by popup_id with eager loading.
 
@@ -131,6 +136,9 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
             base_statement = base_statement.where(
                 ticket_exists if has_tickets else ~ticket_exists
             )
+
+        if category_id is not None:
+            base_statement = base_statement.where(Attendees.category_id == category_id)
 
         # Use proper count query instead of fetching all rows
         count_statement = select(func.count()).select_from(base_statement.subquery())
@@ -163,6 +171,7 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
         gender: str | None = None,
         human_id: uuid.UUID | None = None,
         category_id: uuid.UUID | None = None,
+        additional_data: dict | None = None,
     ) -> Attendees:
         """Create an attendee with internal fields.
 
@@ -191,6 +200,7 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
             email=email,
             gender=gender,
             human_id=human_id,
+            additional_data=additional_data or {},
         )
         session.add(attendee)
         session.commit()
@@ -883,6 +893,95 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
                 },
             )
 
+        session.commit()
+        session.refresh(ticket)
+        return ticket
+
+    def update_ticket_metadata(
+        self,
+        session: Session,
+        attendee_id: uuid.UUID,
+        ticket_id: uuid.UUID,
+        choices: "AttendeeTicketMetadataUpdate",
+    ) -> AttendeeProducts:
+        """Edit a meal-plan ticket's choices in place (portal, no payment).
+
+        Mutates only the ticket-layer ``purchase_metadata`` blob — the three
+        choice keys (daily_choices, dietary_restriction, special_request). It
+        does NOT touch stock, payments, or the payment_products financial
+        snapshot: the receipt records what was bought and is allowed to diverge
+        from the current (editable) choices.
+
+        Steps:
+          1. Resolve the ticket; 404 if missing or not owned by *attendee_id*.
+          2. Resolve its product; 404 if missing.
+          3. Lock: if the week's sale has ended (derive_product_state == ended)
+             reject with 409 ``meal_plan_week_locked``. ``sale_ends_at = None``
+             → on_sale → editable (documented decision).
+          4. Resolve the meal-plan config for the product; 422
+             ``not_meal_plan_ticket`` when the product is not a meal-plan week.
+          5. Validate daily_choices against coverage + menu keys (422).
+          6. Merge-replace the three keys and persist (flag_modified for JSONB).
+        """
+        from sqlalchemy.orm.attributes import flag_modified
+
+        from app.api.product.models import Products
+        from app.api.product.product_state import (
+            ProductSaleState,
+            derive_product_state,
+        )
+        from app.api.ticketing_step.meal_plan import (
+            resolve_meal_plan_product_config,
+            validate_daily_choices,
+        )
+
+        ticket = session.get(AttendeeProducts, ticket_id)
+        if ticket is None or ticket.attendee_id != attendee_id:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Ticket not found",
+            )
+
+        product = session.get(Products, ticket.product_id)
+        if product is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Product not found",
+            )
+
+        # Week lock: a meal-plan week whose sale window has ended is read-only
+        # (the kitchen closed orders). Stock-based sold_out does not lock edits.
+        if derive_product_state(product) is ProductSaleState.ended:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "code": "meal_plan_week_locked",
+                    "message": "This meal-plan week is closed for edits.",
+                },
+            )
+
+        resolved = resolve_meal_plan_product_config(
+            session, product.popup_id, product.id
+        )
+        if resolved is None:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail={
+                    "code": "not_meal_plan_ticket",
+                    "message": "This ticket is not an editable meal-plan week.",
+                },
+            )
+        section_product, chef = resolved
+
+        validate_daily_choices(choices.daily_choices, section_product, chef)
+
+        md = dict(ticket.purchase_metadata or {})
+        md["daily_choices"] = choices.daily_choices
+        md["dietary_restriction"] = choices.dietary_restriction
+        md["special_request"] = choices.special_request
+        ticket.purchase_metadata = md
+        flag_modified(ticket, "purchase_metadata")
+        session.add(ticket)
         session.commit()
         session.refresh(ticket)
         return ticket

@@ -38,9 +38,69 @@ from app.api.product.models import Products
 from app.api.product.product_state import ProductSaleState, derive_product_state
 from app.api.product.schemas import ProductPublic
 from app.api.shared.crud import BaseCRUD
+from app.utils.checkout_signing import (
+    build_signed_redirect_url,
+    build_thank_you_payload,
+    build_unsigned_redirect_url,
+)
 
 # Decimal precision for money calculations
 MONEY_PRECISION = Decimal("0.01")
+
+
+def _build_purchase_thank_you_payload(
+    popup: "Popups",
+    payment: Payments,
+    obj: "OpenTicketingPurchaseCreate",
+    products_map: "dict[uuid.UUID, Products]",
+    *,
+    issued_at: str,
+) -> dict:
+    """Order snapshot at creation time — quoted total and items, no provider
+    choices (installment count / payment method are chosen later on SimpleFi)."""
+    items = [
+        {
+            "name": products_map[line.product_id].name,
+            "quantity": line.quantity,
+        }
+        for line in obj.products
+    ]
+    return build_thank_you_payload(
+        order_id=str(payment.id),
+        first_name=obj.buyer.first_name,
+        email=obj.buyer.email,
+        items=items,
+        amount_total=str(payment.amount),
+        currency=popup.currency,
+        issued_at=issued_at,
+    )
+
+
+def _resolve_open_checkout_success_url(
+    popup: "Popups", internal_thank_you_url: str, payload: dict
+) -> str:
+    """Resolve where a successful open-checkout buyer lands.
+
+    A custom popup success URL overrides the portal thank-you: signed with the
+    order payload when a signing secret is set (external page verifies it),
+    plain otherwise. With no custom URL, the buyer stays on the portal
+    thank-you, which carries the order data unsigned so it can render the
+    summary (our own page — no HMAC needed).
+    """
+    custom = popup.open_checkout_success_url
+    if custom:
+        secret = popup.open_checkout_signing_secret
+        return build_signed_redirect_url(custom, payload, secret) if secret else custom
+    return build_unsigned_redirect_url(internal_thank_you_url, payload)
+
+
+def _internal_open_checkout_thank_you_url(
+    portal_base: str, landing_is_checkout: bool, popup: "Popups", payment: Payments
+) -> str:
+    """Portal thank-you URL for the open-checkout flow (landing-mode aware)."""
+    if landing_is_checkout:
+        return f"{portal_base}/thank-you?payment_id={payment.id}"
+    return f"{portal_base}/checkout/{popup.slug}/thank-you?payment_id={payment.id}"
 
 
 def resolve_patron_template_config(
@@ -302,6 +362,53 @@ def _calculate_price(
     return discounted_standard + non_discountable_amount
 
 
+def _calculate_max_installments(
+    deadline: datetime,
+    ceiling: int,
+    interval: str,
+    interval_count: int,
+    now: datetime | None = None,
+) -> int:
+    """Return how many installment cycles fit before ``deadline``.
+
+    Iterates cycle-by-cycle using ``dateutil.relativedelta`` so month/year
+    calendar boundaries are computed identically to SimpleFi (cycle N of a
+    plan created on the 31st falls on the last day of the target month, etc).
+    A naive ``delta.days // 30`` would silently mismatch SimpleFi's schedule.
+
+    Cycle 1 is "today" (plan creation); subsequent cycles are spaced by
+    ``interval * interval_count``. Cycles past ``deadline`` are dropped.
+    The result is clamped to ``[1, ceiling]``.
+    """
+    from calendar import monthrange
+
+    from dateutil.relativedelta import relativedelta
+
+    now = now or datetime.now(UTC)
+    if deadline <= now or ceiling < 2:
+        return 1
+
+    interval_kwarg = {
+        "day": "days",
+        "week": "weeks",
+        "month": "months",
+        "year": "years",
+    }[interval]
+
+    count = 1  # cycle 1 is plan creation — always fits
+    while count < ceiling:
+        offset = relativedelta(**{interval_kwarg: count * interval_count})
+        candidate = now + offset
+        if interval in ("month", "year"):
+            # Mirror SimpleFi's billing_day clipping (Feb 30 -> Feb 28/29).
+            _, last_day = monthrange(candidate.year, candidate.month)
+            candidate = candidate.replace(day=min(now.day, last_day))
+        if candidate > deadline:
+            break
+        count += 1
+    return count
+
+
 class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
     """CRUD operations for Payments."""
 
@@ -313,6 +420,34 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
     def get_by_external_id(self, session: Session, external_id: str) -> Payments | None:
         """Get a payment by external ID."""
         statement = select(Payments).where(Payments.external_id == external_id)
+        return session.exec(statement).first()
+
+    def _get_in_progress_installment_plan(
+        self,
+        session: Session,
+        application_id: uuid.UUID,
+    ) -> Payments | None:
+        """Return the application's in-progress installment plan, or None.
+
+        "In-progress" covers two states:
+          - PENDING: SimpleFi plan exists, no installment paid yet.
+          - APPROVED with installments_paid < installments_total (or total NULL,
+            meaning the activated webhook hasn't filled it yet).
+
+        Completed (paid==total), cancelled, rejected, and expired plans are
+        treated as finalized and do NOT block subsequent payments.
+        """
+        statement = select(Payments).where(
+            Payments.application_id == application_id,
+            Payments.is_installment_plan == True,  # noqa: E712
+            Payments.status.in_(  # type: ignore[attr-defined]
+                [PaymentStatus.PENDING.value, PaymentStatus.APPROVED.value]
+            ),
+            or_(
+                Payments.installments_total.is_(None),  # type: ignore[attr-defined]
+                Payments.installments_paid < Payments.installments_total,  # type: ignore[operator]
+            ),
+        )
         return session.exec(statement).first()
 
     def _validate_open_ticketing_form_data(
@@ -434,8 +569,16 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         obj: "OpenTicketingPurchaseCreate",
         popup: "Popups",
         tenant: "Tenants",
-    ) -> tuple[Payments, str]:
-        """Create an anonymous open-ticketing payment with per-ticket attendees."""
+        attribution: dict[str, str | None] | None = None,
+    ) -> tuple[Payments, str, str | None]:
+        """Create an anonymous open-ticketing payment with per-ticket attendees.
+
+        Returns ``(payment, checkout_url, redirect_url)``. ``checkout_url`` is the
+        SimpleFi-hosted payment page (empty for a zero-amount bypass).
+        ``redirect_url`` is set only for the zero-amount bypass when the popup
+        configures a custom open-checkout success URL — paid flows redirect via
+        SimpleFi and return None.
+        """
         from app.api.popup.schemas import PopupStatus
         from app.api.shared.enums import SaleType
         from app.api.tenant.utils import get_portal_url
@@ -525,6 +668,10 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             currency=popup.currency,
             source=PaymentSource.SIMPLEFI.value,
             buyer_snapshot=buyer_snapshot,
+            meta_fbc=(attribution or {}).get("fbc"),
+            meta_fbp=(attribution or {}).get("fbp"),
+            meta_client_ip=(attribution or {}).get("client_ip"),
+            meta_client_user_agent=(attribution or {}).get("client_user_agent"),
         )
         session.add(payment)
         session.flush()
@@ -595,9 +742,67 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 payment.coupon_id = coupon.id
                 payment.coupon_code = coupon.code
                 payment.discount_value = discount_value
-                coupons_crud.use_coupon(session, coupon.id)
+                # Consumption is deferred until the payment is persisted (the
+                # zero-amount commit or the post-SimpleFi commit below) so a
+                # provider failure never burns a single-use code. Mirrors the
+                # application flow.
 
-            payment.amount = discountable_amount + non_discountable_amount
+            # Post-discount subtotal is the shared base for BOTH optional fees.
+            # Insurance and contribution each read this same baseline so they
+            # never compound on each other (mirrors _apply_discounts / ADR-2).
+            post_discount_amount = discountable_amount + non_discountable_amount
+            payment.amount = post_discount_amount
+
+            # Insurance fee (buyer opt-in). Computed on the eligible-product
+            # subtotal at full price via the shared helper, matching the
+            # authenticated flow and the portal display. Skipped when the cart
+            # is already $0 (a fee on nothing makes no sense).
+            if obj.insurance and post_discount_amount > Decimal("0"):
+                insurance_amount = calculate_insurance_amount(
+                    popup,
+                    [
+                        (products_map[line.product_id], line.quantity)
+                        for line in obj.products
+                    ],
+                )
+                payment.insurance_amount = insurance_amount
+                payment.amount += insurance_amount
+
+            # Contribution fee (mandatory when the popup enables it — no buyer
+            # opt-in). Its base is the post-discount subtotal, NOT the
+            # insurance-inflated total, so the two fees stay independent.
+            # Mirrors the application flow in _apply_discounts.
+            if popup.contribution_enabled and popup.contribution_percentage:
+                contribution_amount = calculate_contribution_amount(
+                    popup, post_discount_amount
+                )
+                payment.contribution_amount = contribution_amount
+                payment.amount += contribution_amount
+
+            # Resolve the open-checkout success redirect once, reused by the
+            # zero-amount bypass (returned as redirect_url) and the paid path
+            # (handed to SimpleFi as the success URL). Snapshot the order now so
+            # both the external (signed) and portal (unsigned) thank-you pages
+            # can render it. URL construction is landing-mode aware: when
+            # landing_mode=checkout the custom domain IS the checkout (no slug).
+            from app.api.shared.enums import LandingMode  # noqa: PLC0415
+
+            portal_base = get_portal_url(tenant)
+            landing_is_checkout = tenant.landing_mode == LandingMode.checkout
+            thank_you_payload = _build_purchase_thank_you_payload(
+                popup,
+                payment,
+                obj,
+                products_map,
+                issued_at=datetime.now(UTC).isoformat(),
+            )
+            success_redirect = _resolve_open_checkout_success_url(
+                popup,
+                _internal_open_checkout_thank_you_url(
+                    portal_base, landing_is_checkout, popup, payment
+                ),
+                thank_you_payload,
+            )
 
             # Zero-amount short-circuit: a 100% coupon zeroed the cart, so
             # SimpleFI has nothing to charge and would either reject or auto-
@@ -606,6 +811,10 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             # this, the open-ticketing buyer never received tickets nor the
             # confirmation email).
             if payment.amount == Decimal("0"):
+                # A 100% coupon zeroed the cart: consume it now, alongside the
+                # auto-approval, since this branch never reaches SimpleFi.
+                if payment.coupon_id:
+                    coupons_crud.use_coupon(session, payment.coupon_id)
                 self._finalize_zero_amount_payment(
                     session,
                     payment,
@@ -622,7 +831,11 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 # can fire the confirmation email against the persisted row.
                 session.commit()
                 session.refresh(payment)
-                return payment, ""
+                # No SimpleFi checkout exists for a zero-amount purchase, so we
+                # perform the success redirect ourselves: the resolved URL is the
+                # custom page (signed when configured) or the portal thank-you
+                # carrying the order data. The portal redirects the buyer there.
+                return payment, "", success_redirect
 
             if not popup.simplefi_api_key:
                 raise HTTPException(
@@ -630,20 +843,19 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                     detail="Payment provider not configured for this popup",
                 )
 
-            portal_base = get_portal_url(tenant)
             simplefi_client = get_simplefi_client(popup.simplefi_api_key)
 
-            # URL construction depends on tenant landing_mode (R-P1, R-P2, R-P3)
-            # When landing_mode=checkout the custom domain IS the checkout — no slug prefix.
-            # Application Fee flow (lines ~776-779) is UNCHANGED — see R-P5 / AC-P2.
-            from app.api.shared.enums import LandingMode  # noqa: PLC0415
-
-            if tenant.landing_mode == LandingMode.checkout:
-                success_url = f"{portal_base}/thank-you?payment_id={payment.id}"
+            # SimpleFi performs the redirect, so hand it the resolved success URL
+            # (custom-signed, or the portal thank-you with the order data). The
+            # cancel URL stays the landing-aware portal page unless the popup
+            # overrides it. Application fee / pass purchase are untouched.
+            success_url = success_redirect
+            if landing_is_checkout:
                 cancel_url = f"{portal_base}/?cancelled=1"
             else:
-                success_url = f"{portal_base}/checkout/{popup.slug}/thank-you?payment_id={payment.id}"
                 cancel_url = f"{portal_base}/checkout/{popup.slug}?cancelled=1"
+            if popup.open_checkout_cancel_url:
+                cancel_url = popup.open_checkout_cancel_url
             reference = {
                 "email": buyer.email,
                 "human_id": str(buyer.id),
@@ -660,6 +872,24 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 ],
             }
 
+            # Same installment-plan eligibility as the pass-purchase path —
+            # open-ticketing buyers are anonymous but provide an email, which
+            # is all SimpleFi needs to create a plan.
+            max_installments: int | None = None
+            if (
+                popup.installments_enabled
+                and popup.installments_deadline is not None
+                and popup.installments_max is not None
+            ):
+                computed = _calculate_max_installments(
+                    popup.installments_deadline,
+                    popup.installments_max,
+                    popup.installments_interval,
+                    popup.installments_interval_count,
+                )
+                if computed >= 2:
+                    max_installments = computed
+
             simplefi_response = simplefi_client.create_payment(
                 amount=payment.amount,
                 popup_slug=popup.slug,
@@ -670,15 +900,33 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 portal_base_override=portal_base,
                 success_path=success_url,
                 cancel_path=cancel_url,
+                max_installments=max_installments,
+                installment_interval=popup.installments_interval,
+                installment_interval_count=popup.installments_interval_count,
+                user_email=buyer.email,
+                plan_name=popup.name,
             )
 
             payment.external_id = simplefi_response.id
             payment.status = simplefi_response.status
             payment.checkout_url = simplefi_response.checkout_url
+            # When the response signals an installment plan, external_id is an
+            # installment_plan_id and installments_total stays NULL until the
+            # installment_plan_activated webhook delivers the buyer's pick.
+            payment.is_installment_plan = simplefi_response.is_installment_plan
+            payment.installments_paid = (
+                0 if simplefi_response.is_installment_plan else None
+            )
             session.add(payment)
+            # Consume the coupon only now that SimpleFi accepted the payment, so
+            # a provider failure above never burns a single-use code.
+            if payment.coupon_id:
+                coupons_crud.use_coupon(session, payment.coupon_id)
             session.commit()
             session.refresh(payment)
-            return payment, simplefi_response.checkout_url
+            # Paid flow: SimpleFi performs the success redirect itself (to the
+            # signed success_url built above), so redirect_url is None.
+            return payment, simplefi_response.checkout_url, None
         except HTTPException:
             session.rollback()
             raise
@@ -1516,6 +1764,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         self,
         session: Session,
         obj: PaymentCreate,
+        attribution: dict[str, str | None] | None = None,
     ) -> tuple[Payments, PaymentPreview]:
         """
         Create a payment with all validations and discount calculations.
@@ -1624,6 +1873,33 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 detail="Application not found",
             )
 
+        # Block edit_passes when an installment plan is in flight on this
+        # application. SimpleFi keeps charging the plan independent of our
+        # state, so swapping passes would leave attendee products inconsistent
+        # with money still being collected. Admin can manually cancel the
+        # plan (PATCH status=cancelled) to unblock; completed/cancelled plans
+        # don't trip this guard.
+        if obj.edit_passes:
+            active_plan = self._get_in_progress_installment_plan(
+                session, application.id
+            )
+            if active_plan:
+                logger.warning(
+                    "Blocked edit_passes for application_id={}: in-progress installment plan payment_id={} (paid={}/{})",
+                    application.id,
+                    active_plan.id,
+                    active_plan.installments_paid,
+                    active_plan.installments_total,
+                )
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=(
+                        "Cannot edit passes while an installment plan is in "
+                        "progress. Complete the plan or contact support to "
+                        "cancel it."
+                    ),
+                )
+
         # Handle zero or negative amount (credit covers cost)
         if preview.amount <= 0:
             if preview.amount < 0:
@@ -1663,6 +1939,10 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 edit_passes=obj.edit_passes,
                 group_id=preview.group_id,
                 source=None,
+                meta_fbc=(attribution or {}).get("fbc"),
+                meta_fbp=(attribution or {}).get("fbp"),
+                meta_client_ip=(attribution or {}).get("client_ip"),
+                meta_client_user_agent=(attribution or {}).get("client_user_agent"),
             )
             session.add(payment)
             session.flush()
@@ -1763,11 +2043,32 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             ],
         }
 
+        # Compute installment-plan eligibility for this payment. Edit-passes
+        # deltas are always one-shot (see PR design — Option A); confirmed
+        # in-flight plans are blocked by the guard above so we only see fresh
+        # purchases here.
+        popup = application.popup
+        max_installments: int | None = None
+        if (
+            not obj.edit_passes
+            and popup.installments_enabled
+            and popup.installments_deadline is not None
+            and popup.installments_max is not None
+        ):
+            computed = _calculate_max_installments(
+                popup.installments_deadline,
+                popup.installments_max,
+                popup.installments_interval,
+                popup.installments_interval_count,
+            )
+            if computed >= 2:
+                max_installments = computed
+
         try:
             from app.api.tenant.utils import get_portal_url
 
             logger.info(
-                "Creating SimpleFI pass payment: application_id={} popup_id={} tenant_id={} amount={} currency={} product_count={} coupon_code={} edit_passes={} insurance={}",
+                "Creating SimpleFI pass payment: application_id={} popup_id={} tenant_id={} amount={} currency={} product_count={} coupon_code={} edit_passes={} insurance={} max_installments={}",
                 application.id,
                 application.popup_id,
                 application.tenant_id,
@@ -1777,6 +2078,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 obj.coupon_code,
                 obj.edit_passes,
                 obj.insurance,
+                max_installments,
             )
             simplefi_response = simplefi_client.create_payment(
                 amount=preview.amount,
@@ -1786,13 +2088,19 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 reference=reference,
                 memo=application.popup.tenant.name,
                 portal_base_override=get_portal_url(application.popup.tenant),
+                max_installments=max_installments,
+                installment_interval=popup.installments_interval,
+                installment_interval_count=popup.installments_interval_count,
+                user_email=application.human.email if application.human else None,
+                plan_name=popup.name,
             )
             logger.info(
-                "SimpleFI pass payment created: application_id={} external_id={} provider_status={} checkout_url={}",
+                "SimpleFI pass payment created: application_id={} external_id={} provider_status={} checkout_url={} is_installment_plan={}",
                 application.id,
                 simplefi_response.id,
                 simplefi_response.status,
                 simplefi_response.checkout_url,
+                simplefi_response.is_installment_plan,
             )
         except Exception as e:
             logger.error(f"Failed to create SimpleFI payment: {e}")
@@ -1801,7 +2109,10 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 detail="Failed to create payment with payment provider",
             ) from e
 
-        # Create payment record with SimpleFI data
+        # Create payment record with SimpleFI data. When the response signals
+        # an installment plan, external_id is the installment_plan_id (not a
+        # payment_request_id) and installments_total stays NULL until the
+        # `installment_plan_activated` webhook delivers the buyer's pick.
         payment = Payments(
             tenant_id=application.tenant_id,
             application_id=obj.application_id,
@@ -1819,6 +2130,12 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             external_id=simplefi_response.id,
             checkout_url=simplefi_response.checkout_url,
             source=PaymentSource.SIMPLEFI.value,
+            is_installment_plan=simplefi_response.is_installment_plan,
+            installments_paid=0 if simplefi_response.is_installment_plan else None,
+            meta_fbc=(attribution or {}).get("fbc"),
+            meta_fbp=(attribution or {}).get("fbp"),
+            meta_client_ip=(attribution or {}).get("client_ip"),
+            meta_client_user_agent=(attribution or {}).get("client_user_agent"),
         )
 
         session.add(payment)
@@ -1870,6 +2187,21 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         preview.checkout_url = simplefi_response.checkout_url
 
         return payment, preview
+
+    def _direct_buyer_email(self, session: Session, payment: Payments) -> str | None:
+        """Resolve the buyer email for a direct-sale payment via its attendee.
+
+        Direct-sale payments have no application; the buyer is the human behind
+        the (single) attendee on the payment's product snapshot. Used to clear
+        the anonymous open-checkout cart keyed by that email.
+        """
+        snapshot = payment.products_snapshot
+        if not snapshot:
+            return None
+        attendee = session.get(Attendees, snapshot[0].attendee_id)
+        if attendee is None or attendee.human is None:
+            return None
+        return attendee.human.email
 
     def approve_payment(
         self,
@@ -1934,8 +2266,9 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             if payment.application_id is not None:
                 self._create_ambassador_group(session, payment)
 
-            # Clear cart after successful payment (application flow only —
-            # direct-sale payments don't use the cart).
+            # Clear cart after successful payment. Application flow clears by
+            # human; direct-sale (open checkout) clears the anonymous cart by the
+            # buyer email so a returning buyer never restores an already-paid cart.
             from app.api.cart.crud import carts_crud
 
             if payment.application:
@@ -1944,6 +2277,12 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                     human_id=payment.application.human_id,
                     popup_id=payment.application.popup_id,
                 )
+            elif payment.popup_id:
+                buyer_email = self._direct_buyer_email(session, payment)
+                if buyer_email:
+                    carts_crud.delete_anonymous_by_email_popup(
+                        session, buyer_email, payment.popup_id
+                    )
 
             # Single atomic commit for the entire operation
             session.commit()
@@ -2174,6 +2513,11 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             and old_status == PaymentStatus.PENDING.value
         ):
             self._restore_payment_stock(session, payment)
+            # Release the coupon use held since payment creation. Same guard as
+            # stock (PENDING-only) prevents semantic double-release. APPROVED is
+            # out of scope: a paid coupon use must stay consumed.
+            if payment.coupon_id:
+                coupons_crud.release_use(session, payment.coupon_id)
 
         payment.status = new_status.value
 

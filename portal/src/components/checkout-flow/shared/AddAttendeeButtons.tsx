@@ -71,6 +71,7 @@ export default function AddAttendeeButtons({
       email: data.email ?? "",
       category_id: data.category_id ?? selectedCategory.id,
       gender: data.gender ?? "",
+      additional_data: data.additional_data,
     })
     setSelectedCategory(null)
     if (result?.id && onAttendeeAdded) onAttendeeAdded(result.id)

@@ -20,6 +20,7 @@ from app.services.email.templates import (
     EventApprovalRejectedContext,
     EventCancelledContext,
     EventInvitationContext,
+    EventRsvpCancelledContext,
     EventUpdatedContext,
     LoginCodeHumanContext,
     LoginCodeUserContext,
@@ -53,6 +54,7 @@ __all__ = [
     "EventInvitationContext",
     "EventUpdatedContext",
     "EventCancelledContext",
+    "EventRsvpCancelledContext",
     "EventApprovalApprovedContext",
     "EventApprovalRejectedContext",
     # Check-in contexts

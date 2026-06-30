@@ -24,16 +24,22 @@ import {
   Users,
 } from "lucide-react"
 import { useEffect, useRef, useState } from "react"
-import { type EventPublic, type EventStatus, EventsService } from "@/client"
+import type { EventPublic } from "@/client"
 import { Button } from "@/components/ui/button"
+import { fetchAllEvents } from "@/lib/events/fetchAllEvents"
+import {
+  type EventStatusFilter,
+  resolveStatusFilter,
+} from "@/lib/events/statusFilter"
 import { summarizeRrule } from "@/lib/events/summarizeRrule"
 import { useEventTimezone } from "@/lib/events/useEventTimezone"
 import { cn } from "@/lib/utils"
 import { CoverImage } from "./CoverImage"
+import { EventBadges } from "./EventBadges"
 
 interface EventsCalendarViewProps {
   popupId: string
-  status: EventStatus | undefined
+  status: EventStatusFilter | undefined
   venueId: string | undefined
   search: string
   defaultDate?: Date | null
@@ -145,25 +151,28 @@ export function EventsCalendarView({
       venueId,
       search,
     ],
+    // Walk every page so a dense month is never truncated at a fixed limit
+    // (the cause of the calendar showing fewer events than the list/day).
     queryFn: () =>
-      EventsService.listEvents({
+      fetchAllEvents({
         popupId,
-        eventStatus: status,
+        ...resolveStatusFilter(status),
         venueId:
           venueId && venueId !== "custom" && venueId !== "meeting"
             ? venueId
             : undefined,
         locationKind:
-          venueId === "custom" || venueId === "meeting" ? venueId : undefined,
+          venueId === "custom" || venueId === "meeting"
+            ? (venueId as "custom" | "meeting")
+            : undefined,
         search: search || undefined,
         startAfter: monthBounds.start.toISOString(),
         startBefore: monthBounds.end.toISOString(),
-        limit: 200,
       }),
     enabled: !!popupId && !tzLoading,
   })
 
-  const events = data?.results ?? []
+  const events = data ?? []
 
   // Grid cells are calendar days (number labels) — match them against
   // events by formatting both sides in the popup's timezone, so an event
@@ -323,7 +332,13 @@ export function EventsCalendarView({
                             </div>
                           )}
                           <div className="min-w-0 flex-1">
-                            <h4 className="text-sm font-medium truncate">
+                            <h4
+                              className={cn(
+                                "text-sm font-medium truncate",
+                                event.status === "cancelled" &&
+                                  "line-through text-muted-foreground",
+                              )}
+                            >
                               {event.title}
                             </h4>
                             {event.kind && (
@@ -331,6 +346,11 @@ export function EventsCalendarView({
                                 {event.kind}
                               </p>
                             )}
+                            <EventBadges
+                              status={event.status}
+                              visibility={event.visibility}
+                              className="mt-1"
+                            />
                             <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-1">
                               <Clock className="h-3 w-3" />
                               {formatTime(event.start_time)} –{" "}

@@ -116,6 +116,31 @@ def test_backoffice_operator_can_read_and_write_notes(
     assert again.json()["notes"] == "internal note"
 
 
+def test_viewer_can_read_but_not_write_admin_notes(
+    client: TestClient,
+    db: Session,
+    tenant_a: Tenants,
+    viewer_token_tenant_a: str,
+) -> None:
+    # A VIEWER may read staff notes but must NOT be able to write them: the
+    # PUT requires events-write access (operator/admin), not any logged-in user.
+    popup = _make_popup(db, tenant_a)
+    ev = _make_event(db, tenant_a, popup)
+
+    read = client.get(
+        f"/api/v1/events/{ev.id}/admin-notes",
+        headers=_auth(viewer_token_tenant_a),
+    )
+    assert read.status_code == 200, read.text
+
+    blocked = client.put(
+        f"/api/v1/events/{ev.id}/admin-notes",
+        headers=_auth(viewer_token_tenant_a),
+        json={"notes": "should be blocked"},
+    )
+    assert blocked.status_code == 403, blocked.text
+
+
 def test_admin_notes_never_appear_in_event_payload(
     client: TestClient,
     db: Session,

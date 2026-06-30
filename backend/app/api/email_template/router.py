@@ -212,7 +212,7 @@ async def preview_template(
 @router.post("/send-test", status_code=status.HTTP_200_OK)
 async def send_test_email(
     body: SendTestRequest,
-    _: CurrentOperator,
+    current_user: CurrentOperator,
     db: TenantSession,
 ) -> dict[str, str]:
     from app.services.email.templates import (
@@ -261,6 +261,10 @@ async def send_test_email(
     from app.services.email.service import get_email_service
 
     service = get_email_service()
+    tenant_id = _resolve_effective_tenant_id(current_user, db)
+    from app.api.tenant.models import Tenants
+
+    tenant = db.get(Tenants, tenant_id)
 
     try:
         rendered_html = service.render_preview_template(body.html_content, variables)
@@ -283,6 +287,10 @@ async def send_test_email(
         to=body.to_email,
         subject=f"[TEST] {rendered_subject}",
         html_content=rendered_html,
+        from_address=tenant.sender_email if tenant else None,
+        from_name=tenant.sender_name if tenant else None,
+        tenant_id=tenant_id,
+        db_session=db,
     )
 
     if not success:

@@ -97,10 +97,9 @@ const thirdPartyAppsItem: Item = {
 // it to users.
 const SHOW_AGENTIC_ACCESS = false
 
-// Superadmin only items - organizations list view + product task board
+// Superadmin only items - organizations list view
 const superadminItems: Item[] = [
   { icon: Building2, title: "Organizations", path: "/organizations" },
-  { icon: ListChecks, title: "Tasks", path: "/tasks" },
 ]
 
 export function AppSidebar() {
@@ -167,13 +166,17 @@ export function AppSidebar() {
   )
 
   // For admins (non-superadmin), get their tenant-specific items.
-  // Activity (audit log) is admin-only — it lives under Administration.
+  // Activity (audit log) and the Tasks board are admin-only — they live under
+  // Administration. Non-superadmins see Tasks read-only (view + comment).
   const adminNavigationItems: Item[] = [
     ...(isOperatorOrAbove && !isSuperadmin
       ? getAdminItems(currentUser?.tenant_id)
       : adminItems),
     ...(isAdmin
-      ? [{ icon: History, title: "Activity", path: "/activity" }]
+      ? [
+          { icon: History, title: "Activity", path: "/activity" },
+          { icon: ListChecks, title: "Tasks", path: "/tasks" },
+        ]
       : []),
   ]
 

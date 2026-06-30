@@ -24,6 +24,24 @@ const statusMap: Record<
   cancelled: { variant: "destructive" },
   flagged: { variant: "destructive" },
   deleted: { variant: "destructive" },
+  // Human rating levels
+  unrated: { variant: "outline", label: "No rating" },
+  red_flag: { variant: "destructive", label: "🔴 Red Flag" },
+  orange_flag: {
+    variant: "outline",
+    label: "🟠 Orange Flag",
+    className: "border-orange-300 bg-orange-100 text-orange-800",
+  },
+  green_flag: {
+    variant: "outline",
+    label: "🟢 Green Flag",
+    className: "border-green-300 bg-green-100 text-green-800",
+  },
+  star: {
+    variant: "outline",
+    label: "⭐ Star",
+    className: "border-yellow-400 bg-yellow-100 text-yellow-800",
+  },
   ambassador: { variant: "default" },
   regular: { variant: "outline" },
   strong_yes: { variant: "default", label: "Strong Yes" },

@@ -7,6 +7,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
+from app.api.attendee_category.schemas import AttendeeCategoryPublic
 from app.api.popup.schemas import PopupPublic
 from app.api.ticketing_step.schemas import TicketingStepPublic
 
@@ -86,6 +87,10 @@ class CheckoutRuntimeResponse(BaseModel):
     products: list[CheckoutRuntimeProduct]
     buyer_form: list[CheckoutBuyerSection]
     ticketing_steps: list[TicketingStepPublic]
+    # Per-popup attendee categories (benign config: keys, labels, sort order).
+    # Shipped in the public bootstrap so anonymous checkout never has to call
+    # the human-gated /portal/popups/{id}/attendee-categories endpoint.
+    attendee_categories: list[AttendeeCategoryPublic] = []
     form_schema: dict[str, Any] | None = None
 
 
@@ -116,6 +121,12 @@ class OpenTicketingPurchaseCreate(BaseModel):
     products: list[ProductLine] = Field(min_length=1)
     buyer: BuyerInfo
     coupon_code: str | None = None
+    # Buyer opt-in for the optional insurance fee (mirrors the authenticated
+    # flow). Insurance is charged only when this is true and the popup enables
+    # it; the amount is computed server-side from eligible products.
+    insurance: bool = False
+    fbc: str | None = Field(default=None, max_length=512)
+    fbp: str | None = Field(default=None, max_length=512)
 
 
 class OpenTicketingPurchaseResponse(BaseModel):
@@ -123,6 +134,12 @@ class OpenTicketingPurchaseResponse(BaseModel):
 
     payment_id: uuid.UUID
     status: str
+    # SimpleFi-hosted checkout page where the buyer pays. Empty for the
+    # zero-amount bypass (nothing to charge).
     checkout_url: str
+    # Where the portal should send the buyer after a zero-amount approval that
+    # bypassed SimpleFi, when the popup configures a custom open-checkout
+    # success URL. Null for paid flows — SimpleFi performs that redirect itself.
+    redirect_url: str | None = None
     amount: Decimal
     currency: str

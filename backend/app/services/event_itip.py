@@ -16,6 +16,7 @@ from app.core.config import settings
 from app.services.email import (
     EventCancelledContext,
     EventInvitationContext,
+    EventRsvpCancelledContext,
     EventUpdatedContext,
     get_email_service,
 )
@@ -167,10 +168,25 @@ async def send_event_itip(
     service = get_email_service()
     from_address = popup.tenant.sender_email if popup and popup.tenant else None
     from_name = popup.tenant.sender_name if popup and popup.tenant else None
+    # ORGANIZER must always be present and match the actual From, or clients
+    # (Gmail especially) treat the REQUEST as malformed / from a different
+    # organiser and silently refuse to update the existing entry. The email
+    # service sends from ``from_address or settings.SENDER_EMAIL``, so mirror
+    # that exact resolution so ORGANIZER == From in every case.
+    organizer_email = from_address or settings.SENDER_EMAIL
     organizer_name = from_name or popup_name or None
 
     is_cancelled = method == "CANCEL"
-    if is_cancelled:
+    # A self-RSVP cancellation reuses the iTIP CANCEL method (so the entry
+    # leaves the recipient's calendar) but must NOT read as an event
+    # cancellation — the event still exists, only this registration was
+    # withdrawn. Organiser-driven cancellations leave is_self_rsvp False.
+    is_self_cancel = is_cancelled and is_self_rsvp
+    if is_self_cancel:
+        subject = f"Your registration was cancelled: {event.title or 'an event'}"
+        if popup_name:
+            subject += f" — {popup_name}"
+    elif is_cancelled:
         subject = f"Event cancelled: {event.title or 'an event'}"
         if popup_name:
             subject += f" — {popup_name}"
@@ -212,7 +228,7 @@ async def send_event_itip(
                 event,
                 recipient_email=r["email"],
                 recipient_name=r["first_name"] or None,
-                organizer_email=from_address,
+                organizer_email=organizer_email,
                 organizer_name=organizer_name,
                 event_url=event_url or None,
                 method=method,
@@ -229,7 +245,25 @@ async def send_event_itip(
             ics_body = None
 
         try:
-            if is_cancelled:
+            if is_self_cancel:
+                await service.send_event_rsvp_cancelled(
+                    to=r["email"],
+                    subject=subject,
+                    context=EventRsvpCancelledContext(
+                        first_name=r["first_name"],
+                        event_title=event.title or "",
+                        popup_name=popup_name,
+                        event_when=when,
+                        venue_title=venue_title,
+                        event_url=event_url,
+                    ),
+                    from_address=from_address,
+                    from_name=from_name,
+                    popup_id=event.popup_id,
+                    db_session=db,
+                    ical_body=ics_body,
+                )
+            elif is_cancelled:
                 await service.send_event_cancelled(
                     to=r["email"],
                     subject=subject,
@@ -413,9 +447,17 @@ def calendar_fields_changed(before: dict, after) -> bool:
         "venue_id",
         "custom_location_name",
         "custom_location_url",
+        # Also material for what the calendar entry shows / when it recurs:
+        "meeting_url",  # the join link for online events (rendered as LOCATION)
+        "content",  # description
+        "timezone",
+        "rrule",
+        "recurrence_exdates",
     )
     for f in fields:
-        if before.get(f) != getattr(after, f, None):
+        # Only compare fields the caller actually snapshotted, so a partial
+        # ``before`` dict never reports a spurious change.
+        if f in before and before[f] != getattr(after, f, None):
             return True
     return False
 

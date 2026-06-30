@@ -1,7 +1,7 @@
 "use client"
 
 import { monthBoundsInTz } from "@edgeos/shared-events"
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { useQuery } from "@tanstack/react-query"
 import {
   addDays,
   addMonths,
@@ -10,8 +10,10 @@ import {
   format,
   isSameMonth,
   isToday,
+  startOfDay,
   startOfMonth,
   startOfWeek,
+  subDays,
   subMonths,
 } from "date-fns"
 import {
@@ -29,22 +31,17 @@ import {
   Users,
 } from "lucide-react"
 import Link from "next/link"
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
-import { toast } from "sonner"
 
-import {
-  ApiError,
-  EventParticipantsService,
-  type EventPublic,
-  EventsService,
-  HumansService,
-} from "@/client"
+import { type EventPublic, EventsService, HumansService } from "@/client"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { CoverImage } from "./CoverImage"
 import type { EventsScrollSnapshot } from "./eventsViewState"
+import { fetchAllPortalEvents } from "./fetchAllPortalEvents"
 import { summarizeRrule } from "./summarizeRrule"
+import { useEventRsvp } from "./useEventRsvp"
 import { useEventTimezone } from "./useEventTimezone"
 
 interface CalendarBodyProps {
@@ -52,8 +49,11 @@ interface CalendarBodyProps {
   slug: string | undefined
   search: string
   rsvpedOnly: boolean
+  /** "My events": owner/host/collaborator. Includes the manager's drafts. */
+  mineOnly?: boolean
   tags?: string[]
   trackIds?: string[]
+  venueIds?: string[]
   /** Initial month + selected day. Defaults to today before the popup loads. */
   defaultDate?: Date | null
   /**
@@ -91,6 +91,14 @@ interface CalendarBodyProps {
   timezoneOverride?: string
   /** Popup-scoped fallback image when an event has no cover/venue image. */
   placeholderUrl?: string | null
+  /**
+   * When false, the RSVP (register) button is disabled — the human lacks a
+   * ticket for this popup or has a rejected application. Cancel is never gated.
+   * Defaults to true.
+   */
+  canRsvp?: boolean
+  /** Tooltip text shown on the disabled RSVP button explaining why. */
+  rsvpDisabledReason?: string
 }
 
 /**
@@ -103,8 +111,10 @@ export function CalendarBody({
   slug,
   search,
   rsvpedOnly,
+  mineOnly,
   tags,
   trackIds,
+  venueIds,
   defaultDate,
   onEventLinkClick,
   mode = "authed",
@@ -112,11 +122,12 @@ export function CalendarBody({
   onEventClick,
   timezoneOverride,
   placeholderUrl,
+  canRsvp = true,
+  rsvpDisabledReason,
 }: CalendarBodyProps) {
   const isAuthed = mode === "authed"
   const useOverride = eventsOverride !== undefined
   const { t } = useTranslation()
-  const queryClient = useQueryClient()
   const [currentMonth, setCurrentMonth] = useState(
     () => defaultDate ?? new Date(),
   )
@@ -164,85 +175,106 @@ export function CalendarBody({
   // query window when the viewer's browser TZ differs.
   const monthBounds = monthBoundsInTz(currentMonth, timezone)
 
-  const { data } = useQuery({
+  // Grid dots only need to know which days have events and how many (capped
+  // at 3 dots). The summary endpoint returns per-day counts in the popup tz,
+  // so we avoid pulling full event payloads for the whole month here.
+  const { data: summaryData } = useQuery({
     queryKey: [
       "portal-events-calendar",
+      "summary",
       popupId,
       format(currentMonth, "yyyy-MM"),
       timezone,
       rsvpedOnly,
+      mineOnly,
       search,
       tags,
       trackIds,
+      venueIds,
     ],
     queryFn: () =>
-      EventsService.listPortalEvents({
+      EventsService.portalCalendarSummary({
         popupId: popupId!,
-        eventStatus: "published",
         startAfter: monthBounds.start.toISOString(),
         startBefore: monthBounds.end.toISOString(),
         rsvpedOnly: rsvpedOnly || undefined,
+        managedOnly: mineOnly || undefined,
         search: search || undefined,
         tags: tags?.length ? tags : undefined,
         trackIds: trackIds?.length ? trackIds : undefined,
-        limit: 200,
+        venueIds: venueIds?.length ? venueIds : undefined,
       }),
     enabled: isAuthed && !useOverride && !!popupId && !tzLoading,
   })
 
-  // Recurring events require occurrence_start so the RSVP targets a single
-  // instance. That includes both expanded pseudo-rows (have occurrence_id)
-  // AND the series master itself, whose start_time IS the first occurrence.
-  // One-off events must not send it.
-  const rsvpBodyFor = (e: EventPublic) =>
-    e.rrule || e.occurrence_id ? { occurrence_start: e.start_time } : undefined
-  const toastRsvpError = (err: unknown) => {
-    const fallback = t("events.rsvp.action_error") as string
-    let detail = fallback
-    if (err instanceof ApiError && err.body && typeof err.body === "object") {
-      const body = err.body as { detail?: unknown }
-      if (typeof body.detail === "string") detail = body.detail
-    }
-    toast.error(detail)
-  }
-  const rsvpMutation = useMutation({
-    mutationFn: (e: EventPublic) =>
-      EventParticipantsService.registerForEvent({
-        eventId: e.id,
-        requestBody: rsvpBodyFor(e),
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["portal-events-calendar"] })
-    },
-    onError: toastRsvpError,
-  })
-  const cancelRsvpMutation = useMutation({
-    mutationFn: (e: EventPublic) =>
-      EventParticipantsService.cancelRegistration({
-        eventId: e.id,
-        requestBody: rsvpBodyFor(e),
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["portal-events-calendar"] })
-    },
-    onError: toastRsvpError,
-  })
-  // Tracks the in-flight RSVP target so we can pin the spinner to the
-  // specific event (and recurring occurrence) the user clicked instead
-  // of flipping every "Going" button on the day.
-  const pendingRsvpKey: string | null = (() => {
-    const pending =
-      (rsvpMutation.isPending && rsvpMutation.variables) ||
-      (cancelRsvpMutation.isPending && cancelRsvpMutation.variables) ||
-      null
-    return pending ? `${pending.id}:${pending.start_time}` : null
-  })()
+  // `day -> count`, keyed by the summary's popup-tz "YYYY-MM-DD" which matches
+  // ``formatGridDayKey``. Used for the authed grid dots.
+  const countByDay = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const entry of summaryData ?? []) map.set(entry.day, entry.count)
+    return map
+  }, [summaryData])
 
-  const events = useOverride ? (eventsOverride ?? []) : (data?.results ?? [])
+  // 24h ±1 day window around the selected day in the popup tz. Padding catches
+  // events whose UTC start lands on the neighbouring day once re-projected.
+  // Mirrors DayBody's window so both views fetch the exact same day slice.
+  const selectedWindow = useMemo(() => {
+    if (!selectedDate) return null
+    const start = startOfDay(selectedDate)
+    return {
+      startAfter: subDays(start, 1).toISOString(),
+      startBefore: addDays(start, 2).toISOString(),
+    }
+  }, [selectedDate])
+
+  // Stable popup-tz "YYYY-MM-DD" for the selected day. Drives the on-demand
+  // selected-day query key and the detail-page `from` URL state below.
+  const selectedDayKey = selectedDate ? formatGridDayKey(selectedDate) : null
+
+  // The selected-day panel needs the full events of ONE day, fetched on
+  // demand (no cap). Shares the ["portal-events-calendar"] base key with the
+  // summary so a single RSVP invalidation refreshes both dots and panel.
+  const { data: selectedDayData, isLoading: selectedDayLoading } = useQuery({
+    queryKey: [
+      "portal-events-calendar",
+      "day",
+      popupId,
+      selectedDayKey,
+      rsvpedOnly,
+      mineOnly,
+      search,
+      tags,
+      trackIds,
+      venueIds,
+    ],
+    queryFn: () =>
+      fetchAllPortalEvents({
+        popupId: popupId!,
+        eventStatus: mineOnly ? undefined : "published",
+        startAfter: selectedWindow!.startAfter,
+        startBefore: selectedWindow!.startBefore,
+        rsvpedOnly: rsvpedOnly || undefined,
+        managedOnly: mineOnly || undefined,
+        search: search || undefined,
+        tags: tags?.length ? tags : undefined,
+        trackIds: trackIds?.length ? trackIds : undefined,
+        venueIds: venueIds?.length ? venueIds : undefined,
+      }),
+    enabled:
+      isAuthed && !useOverride && !!popupId && !tzLoading && !!selectedWindow,
+  })
+
+  const { rsvpMutation, cancelRsvpMutation, pendingRsvpKey } = useEventRsvp([
+    "portal-events-calendar",
+  ])
+
+  // Override (public) path keeps its exact prior behavior: dots and panel both
+  // derive from the in-memory ``eventsOverride`` list via ``getEventsForDate``.
+  const overrideEvents = useOverride ? (eventsOverride ?? []) : []
 
   function getEventsForDate(date: Date): EventPublic[] {
     const cellKey = formatGridDayKey(date)
-    return events.filter((e) => formatDayKey(e.start_time) === cellKey)
+    return overrideEvents.filter((e) => formatDayKey(e.start_time) === cellKey)
   }
 
   const monthStart = startOfMonth(currentMonth)
@@ -256,11 +288,26 @@ export function CalendarBody({
     day = addDays(day, 1)
   }
 
-  const selectedEvents = selectedDate ? getEventsForDate(selectedDate) : []
+  // Panel events: authed reads the on-demand selected-day query, override
+  // reads the in-memory list. Both filter to the selected popup-tz day (the
+  // fetch window pads ±1 day). Loading only applies to the authed fetch.
+  const selectedEvents = useMemo(() => {
+    if (!selectedDate) return []
+    const cellKey = formatGridDayKey(selectedDate)
+    const source = useOverride ? overrideEvents : (selectedDayData ?? [])
+    return source.filter((e) => formatDayKey(e.start_time) === cellKey)
+  }, [
+    selectedDate,
+    useOverride,
+    overrideEvents,
+    selectedDayData,
+    formatGridDayKey,
+    formatDayKey,
+  ])
+  const selectedPanelLoading = !useOverride && selectedDayLoading
 
   // `from` rebuilds the events-page URL state (view + selected day) so
   // the detail page's "Back to events" link returns the user here.
-  const selectedDayKey = selectedDate ? formatGridDayKey(selectedDate) : null
   const fromParam = selectedDayKey
     ? encodeURIComponent(`view=calendar&date=${selectedDayKey}`)
     : null
@@ -350,7 +397,12 @@ export function CalendarBody({
 
         <div className="grid grid-cols-7 gap-px">
           {days.map((d, i) => {
-            const dayEvents = getEventsForDate(d)
+            // Dot count: authed reads the summary map (no event payloads),
+            // override counts the in-memory list. Capped at 3 dots either way.
+            const dayCount = useOverride
+              ? getEventsForDate(d).length
+              : (countByDay.get(formatGridDayKey(d)) ?? 0)
+            const dotCount = Math.min(dayCount, 3)
             const isCurrentMonth = isSameMonth(d, currentMonth)
             const isSelected =
               selectedDate &&
@@ -369,9 +421,9 @@ export function CalendarBody({
                 )}
               >
                 <span>{format(d, "d")}</span>
-                {dayEvents.length > 0 && (
+                {dotCount > 0 && (
                   <div className="flex gap-px mt-px">
-                    {dayEvents.slice(0, 3).map((_, idx) => (
+                    {Array.from({ length: dotCount }, (_, idx) => (
                       <div
                         key={idx}
                         className="h-1 w-1 rounded-full bg-primary"
@@ -392,13 +444,19 @@ export function CalendarBody({
               <h3 className="text-sm font-semibold capitalize">
                 {formatSelectedDateHeader(selectedDate)}
               </h3>
-              <span className="text-xs text-muted-foreground">
-                {t("events.calendar.selected_events", {
-                  count: selectedEvents.length,
-                })}
-              </span>
+              {!selectedPanelLoading && (
+                <span className="text-xs text-muted-foreground">
+                  {t("events.calendar.selected_events", {
+                    count: selectedEvents.length,
+                  })}
+                </span>
+              )}
             </div>
-            {selectedEvents.length === 0 ? (
+            {selectedPanelLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-5 w-5 animate-spin text-primary" />
+              </div>
+            ) : selectedEvents.length === 0 ? (
               <div className="text-center py-8">
                 <CalendarIcon className="mx-auto h-6 w-6 text-muted-foreground/50 mb-2" />
                 <p className="text-sm text-muted-foreground">
@@ -409,7 +467,7 @@ export function CalendarBody({
               <div className="space-y-2">
                 {selectedEvents.map((event) => {
                   const recurrenceLabel =
-                    summarizeRrule(event.rrule) ??
+                    summarizeRrule(event.rrule, t) ??
                     (event.recurrence_master_id
                       ? t("events.list.part_of_recurring_series")
                       : null)
@@ -558,7 +616,10 @@ export function CalendarBody({
                               ) : (
                                 <button
                                   type="button"
-                                  disabled={isRsvpPending}
+                                  disabled={isRsvpPending || !canRsvp}
+                                  title={
+                                    !canRsvp ? rsvpDisabledReason : undefined
+                                  }
                                   onClick={() => rsvpMutation.mutate(event)}
                                   className="inline-flex items-center gap-1 rounded-md border bg-background px-2 py-1 text-xs font-medium hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
                                 >

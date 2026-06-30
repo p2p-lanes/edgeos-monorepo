@@ -1,4 +1,5 @@
 import uuid
+from html import escape
 
 from fastapi import APIRouter, HTTPException, status
 from sqlalchemy.exc import IntegrityError
@@ -8,8 +9,11 @@ from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, 
 from app.api.tenant import crud
 from app.api.tenant.credential_schemas import CredentialInfo, TenantCredentialResponse
 from app.api.tenant.schemas import (
+    TenantAnonymousPublic,
     TenantCreate,
     TenantPublic,
+    TenantSmtpTestRequest,
+    TenantSmtpTestResponse,
     TenantUpdate,
 )
 from app.core.config import settings
@@ -21,15 +25,59 @@ from app.core.dependencies.users import (
 )
 from app.core.redis import domain_cache
 from app.core.tenant_db import get_tenant_credential, revoke_tenant_credentials
+from app.utils.encryption import encrypt
 
 router = APIRouter(prefix="/tenants", tags=["tenants"])
 
 
-@router.get("/public/by-domain/{domain}", response_model=TenantPublic)
+def _smtp_password_configured_after_payload(
+    current_encrypted: str | None,
+    password_in_payload: bool,
+    password_value: str | None,
+) -> bool:
+    if not password_in_payload:
+        return bool(current_encrypted)
+    if password_value is None:
+        return False
+    if password_value == "":
+        return bool(current_encrypted)
+    return True
+
+
+def _validate_smtp_state(
+    *,
+    smtp_host: str | None,
+    smtp_user: str | None,
+    smtp_password_configured: bool,
+    smtp_tls: bool | None,
+    smtp_ssl: bool | None,
+) -> None:
+    if smtp_tls and smtp_ssl:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="smtp_tls and smtp_ssl cannot both be true",
+        )
+
+    if not smtp_host:
+        if smtp_user or smtp_password_configured:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="smtp_host is required when SMTP credentials are configured",
+            )
+        return
+
+    if bool(smtp_user) != smtp_password_configured:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="smtp_user and smtp_password must be configured together",
+        )
+
+
+@router.get("/public/by-domain/{domain}", response_model=TenantAnonymousPublic)
 async def get_tenant_by_domain(
     domain: str,
     db: SessionDep,
-) -> TenantPublic:
+) -> TenantAnonymousPublic:
     """Resolve an active tenant by host — custom domain or platform subdomain.
 
     Resolution order (see TenantsCRUD.resolve_by_host):
@@ -47,7 +95,7 @@ async def get_tenant_by_domain(
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail="Not found"
             )
-        return TenantPublic.model_validate_json(cached)
+        return TenantAnonymousPublic.model_validate_json(cached)
 
     # DB lookup — resolves custom domains AND *.PORTAL_DOMAIN subdomains
     tenant = crud.resolve_by_host(db, domain, settings.PORTAL_DOMAIN)
@@ -55,7 +103,7 @@ async def get_tenant_by_domain(
         domain_cache.set(domain, "null")
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
 
-    result = TenantPublic.model_validate(tenant)
+    result = TenantAnonymousPublic.model_validate(tenant)
 
     # Populate active_popup_slug for checkout-mode tenants (OI-2, R-T5, ADR — OI-2)
     # Local import avoids circular: tenant.router -> checkout.crud -> checkout.__init__ -> checkout.router -> payment.crud
@@ -70,11 +118,11 @@ async def get_tenant_by_domain(
     return result
 
 
-@router.get("/public/{slug}", response_model=TenantPublic)
+@router.get("/public/{slug}", response_model=TenantAnonymousPublic)
 async def get_tenant_by_slug(
     slug: str,
     db: SessionDep,
-) -> TenantPublic:
+) -> TenantAnonymousPublic:
     tenant = crud.get_by_slug(db, slug)
 
     if tenant is None or tenant.deleted:
@@ -83,7 +131,7 @@ async def get_tenant_by_slug(
             detail="Tenant not found",
         )
 
-    return TenantPublic.model_validate(tenant)
+    return TenantAnonymousPublic.model_validate(tenant)
 
 
 @router.get("", response_model=ListModel[TenantPublic])
@@ -145,7 +193,19 @@ async def create_tenant(
             detail="A tenant with this slug already exists",
         )
 
+    _validate_smtp_state(
+        smtp_host=tenant_in.smtp_host,
+        smtp_user=tenant_in.smtp_user,
+        smtp_password_configured=bool(tenant_in.smtp_password),
+        smtp_tls=tenant_in.smtp_tls,
+        smtp_ssl=tenant_in.smtp_ssl,
+    )
     tenant = crud.create(db, tenant_in)
+    if tenant_in.smtp_password:
+        tenant.smtp_password_encrypted = encrypt(tenant_in.smtp_password)
+        db.add(tenant)
+        db.commit()
+        db.refresh(tenant)
     return TenantPublic.model_validate(tenant)
 
 
@@ -243,9 +303,56 @@ async def update_tenant(
     old_domain = tenant.custom_domain
     old_landing_mode = tenant.landing_mode
     old_custom_domain_active = tenant.custom_domain_active
+    old_meta_tracking_enabled = tenant.meta_tracking_enabled
+    old_meta_pixel_id = tenant.meta_pixel_id
 
     # 9. Perform update (IntegrityError → unique constraint race condition)
     try:
+        if "meta_capi_access_token" in tenant_in.model_fields_set:
+            token = tenant_in.meta_capi_access_token
+            tenant.meta_capi_access_token_encrypted = encrypt(token) if token else None
+
+        smtp_password_in_payload = "smtp_password" in tenant_in.model_fields_set
+        smtp_password_configured = _smtp_password_configured_after_payload(
+            tenant.smtp_password_encrypted,
+            smtp_password_in_payload,
+            tenant_in.smtp_password,
+        )
+        effective_smtp_host = (
+            tenant_in.smtp_host
+            if "smtp_host" in tenant_in.model_fields_set
+            else tenant.smtp_host
+        )
+        effective_smtp_user = (
+            tenant_in.smtp_user
+            if "smtp_user" in tenant_in.model_fields_set
+            else tenant.smtp_user
+        )
+        effective_smtp_tls = (
+            tenant_in.smtp_tls
+            if "smtp_tls" in tenant_in.model_fields_set
+            else tenant.smtp_tls
+        )
+        effective_smtp_ssl = (
+            tenant_in.smtp_ssl
+            if "smtp_ssl" in tenant_in.model_fields_set
+            else tenant.smtp_ssl
+        )
+
+        _validate_smtp_state(
+            smtp_host=effective_smtp_host,
+            smtp_user=effective_smtp_user,
+            smtp_password_configured=smtp_password_configured,
+            smtp_tls=effective_smtp_tls,
+            smtp_ssl=effective_smtp_ssl,
+        )
+
+        if smtp_password_in_payload:
+            password = tenant_in.smtp_password
+            if password is None:
+                tenant.smtp_password_encrypted = None
+            elif password:
+                tenant.smtp_password_encrypted = encrypt(password)
         updated = crud.update(db, tenant, tenant_in)
     except IntegrityError:
         raise HTTPException(
@@ -258,6 +365,8 @@ async def update_tenant(
     new_domain = updated.custom_domain
     new_landing_mode = updated.landing_mode
     new_custom_domain_active = updated.custom_domain_active
+    new_meta_tracking_enabled = updated.meta_tracking_enabled
+    new_meta_pixel_id = updated.meta_pixel_id
 
     domains_to_invalidate: set[str] = set()
 
@@ -271,6 +380,13 @@ async def update_tenant(
 
     # Invalidate current domain when custom_domain_active flips (ADR-2 latent gap fix)
     if new_custom_domain_active != old_custom_domain_active and new_domain:
+        domains_to_invalidate.add(new_domain)
+
+    # Invalidate current domain when public marketing config changes.
+    if (
+        new_meta_tracking_enabled != old_meta_tracking_enabled
+        or new_meta_pixel_id != old_meta_pixel_id
+    ) and new_domain:
         domains_to_invalidate.add(new_domain)
 
     # Also invalidate new domain when domain changes (existing behavior)
@@ -298,6 +414,53 @@ async def delete_tenant(
         )
 
     crud.soft_delete(db, tenant)
+
+
+@router.post("/{tenant_id}/smtp-test", response_model=TenantSmtpTestResponse)
+async def send_smtp_test_email(
+    tenant_id: uuid.UUID,
+    body: TenantSmtpTestRequest,
+    db: SessionDep,
+    current_user: CurrentAdmin,
+) -> TenantSmtpTestResponse:
+    if current_user.role == UserRole.ADMIN and current_user.tenant_id != tenant_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Cannot access other tenants",
+        )
+
+    tenant = crud.get(db, tenant_id)
+    if tenant is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Tenant not found",
+        )
+
+    to_email = body.to_email or current_user.email
+    from app.services.email import get_email_service
+
+    success = await get_email_service().send_email(
+        to=to_email,
+        subject=f"SMTP test email - {tenant.name}",
+        html_content=(
+            "<p>This is a test email from "
+            f"<strong>{escape(tenant.name)}</strong>.</p>"
+            "<p>If you received it, this organization's email delivery settings "
+            "are working.</p>"
+        ),
+        from_address=tenant.sender_email,
+        from_name=tenant.sender_name,
+        tenant_id=tenant.id,
+        db_session=db,
+    )
+
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to send SMTP test email",
+        )
+
+    return TenantSmtpTestResponse(message=f"Test email sent to {to_email}")
 
 
 @router.get(
