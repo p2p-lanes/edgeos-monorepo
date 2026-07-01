@@ -8648,6 +8648,57 @@ export const FormSectionUpdateSchema = {
     title: 'FormSectionUpdate'
 } as const;
 
+export const GrantCreditRequestSchema = {
+    properties: {
+        amount: {
+            anyOf: [
+                {
+                    type: 'number'
+                },
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$'
+                }
+            ],
+            title: 'Amount'
+        },
+        note: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Note'
+        }
+    },
+    type: 'object',
+    required: ['amount'],
+    title: 'GrantCreditRequest',
+    description: 'Request body for POST /applications/{id}/credit — manual admin credit grant.'
+} as const;
+
+export const GrantCreditResponseSchema = {
+    properties: {
+        application_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Application Id'
+        },
+        credit: {
+            type: 'string',
+            pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$',
+            title: 'Credit'
+        }
+    },
+    type: 'object',
+    required: ['application_id', 'credit'],
+    title: 'GrantCreditResponse',
+    description: 'Response from POST /applications/{id}/credit.'
+} as const;
+
 export const GrantProductItemSchema = {
     properties: {
         product_id: {

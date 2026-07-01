@@ -1840,6 +1840,22 @@ export type FormSectionUpdate = {
 };
 
 /**
+ * Request body for POST /applications/{id}/credit — manual admin credit grant.
+ */
+export type GrantCreditRequest = {
+    amount: (number | string);
+    note?: (string | null);
+};
+
+/**
+ * Response from POST /applications/{id}/credit.
+ */
+export type GrantCreditResponse = {
+    application_id: string;
+    credit: string;
+};
+
+/**
  * One $0 payment created by the admin bulk-grant flow.
  */
 export type GrantedPaymentInfo = {
@@ -4271,6 +4287,14 @@ export type ApplicationsGetApplicationData = {
 };
 
 export type ApplicationsGetApplicationResponse = (ApplicationPublic);
+
+export type ApplicationsGrantApplicationCreditData = {
+    applicationId: string;
+    requestBody: GrantCreditRequest;
+    xTenantId?: (string | null);
+};
+
+export type ApplicationsGrantApplicationCreditResponse = (GrantCreditResponse);
 
 export type ApplicationsListMyApplicationsData = {
     /**

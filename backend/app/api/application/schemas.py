@@ -354,6 +354,27 @@ class ScholarshipDecisionRequest(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
 
+class GrantCreditRequest(BaseModel):
+    """Request body for POST /applications/{id}/credit — manual admin credit grant."""
+
+    amount: Decimal
+    note: str | None = None
+
+    @field_validator("amount")
+    @classmethod
+    def validate_amount(cls, v: Decimal) -> Decimal:
+        if v <= Decimal("0"):
+            raise ValueError("amount must be greater than zero")
+        return v
+
+
+class GrantCreditResponse(BaseModel):
+    """Response from POST /applications/{id}/credit."""
+
+    application_id: uuid.UUID
+    credit: Decimal
+
+
 class DetachCompanionRequest(BaseModel):
     """Request body for POST /applications/my/detach-companion."""
 
