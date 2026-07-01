@@ -144,7 +144,7 @@ export default function PassSelectionSection() {
   const { t } = useTranslation()
   const { attendeePasses, toggleProduct, isEditing, toggleEditing } =
     usePassesProvider()
-  const { editCredit } = useCheckout()
+  const { editCredit, editPassesEnabled } = useCheckout()
   const { getRelevantApplication } = useApplication()
   const { getCity } = useCityProvider()
   const policy = resolvePopupCheckoutPolicy(getCity())
@@ -182,8 +182,9 @@ export default function PassSelectionSection() {
       transition={{ duration: 0.35, ease: "easeOut" }}
       className="space-y-3"
     >
-      {/* Edit passes toggle — in-flow, only when the attendee owns passes */}
-      {somePurchased && (
+      {/* Edit passes toggle — in-flow, only when the popup enables pass
+          editing and the attendee owns purchased passes */}
+      {editPassesEnabled && somePurchased && (
         <div className="flex justify-end">
           <button
             type="button"
