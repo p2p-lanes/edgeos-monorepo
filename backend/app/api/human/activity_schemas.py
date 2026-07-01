@@ -31,6 +31,9 @@ class HumanActivityKind(str, Enum):
     CREDIT_APPLIED = "credit.applied"
     CREDIT_RESTORED = "credit.restored"
 
+    # Portal edit-passes settlement (edit-pass swap completed).
+    PASSES_EDITED = "passes.edited"
+
 
 class HumanActivityProduct(BaseModel):
     """One purchased line in a `payment.completed` item (snapshot at purchase)."""

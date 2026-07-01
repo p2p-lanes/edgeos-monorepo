@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Annotated, Any, Literal
 from fastapi import APIRouter, HTTPException, Query, Request, Response, status
 from sqlmodel import Session
 
+from app.api.audit_log.actor import actor_from_human
 from app.api.payment.crud import payments_crud
 from app.api.payment.models import Payments
 from app.api.payment.schemas import (
@@ -962,6 +963,7 @@ async def create_my_payment(
         db,
         payment_in,
         attribution=_extract_meta_attribution(request),
+        actor=actor_from_human(current_human),
     )
 
     if payment.status == PaymentStatus.APPROVED.value:

@@ -25,6 +25,9 @@ class AuditAction:
     CREDIT_APPLIED = "credit.applied"
     CREDIT_RESTORED = "credit.restored"
 
+    # Portal edit-passes settlement (edit-pass swap completed).
+    PASSES_EDITED = "passes.edited"
+
 
 class AuditEntityType:
     """Type of the primary entity an event is grouped under."""

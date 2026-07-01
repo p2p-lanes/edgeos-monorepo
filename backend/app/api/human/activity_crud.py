@@ -126,6 +126,26 @@ def credit_log_to_item(log: AuditLog) -> HumanActivityItem:
     )
 
 
+def passes_edited_log_to_item(log: AuditLog) -> HumanActivityItem:
+    """Map a passes.edited audit row to a timeline item.
+
+    Emitted by the portal edit-passes settlement (zero/negative branch and
+    positive-amount SimpleFi path) when edit_passes=True. The details dict
+    carries popup_id (via log.popup_id) and optionally payment_id.
+    """
+    details = log.details or {}
+    return HumanActivityItem(
+        id=f"passes-edited:{log.id}",
+        kind=HumanActivityKind.PASSES_EDITED,
+        occurred_at=_as_utc(log.created_at),
+        popup_id=log.popup_id,
+        note=details.get("note"),
+        actor_id=log.actor_id,
+        actor_name=log.actor_name,
+        actor_email=log.actor_email,
+    )
+
+
 def comment_to_item(comment: "HumanComment") -> HumanActivityItem:
     """Map a (non-deleted) human comment to a timeline item.
 
@@ -255,7 +275,8 @@ def build_human_activity(
             )
         )
 
-    # 4. Audit-log–backed items: manual notes + rating changes + credit movements.
+    # 4. Audit-log–backed items: manual notes + rating changes + credit movements
+    #    + passes.edited events.
     # All live in `audit_logs` (tenant-scoped, read through `session`) and are
     # told apart by their action.
     _CREDIT_ACTIONS = {
@@ -274,6 +295,7 @@ def build_human_activity(
                     AuditAction.CREDIT_GRANTED,
                     AuditAction.CREDIT_APPLIED,
                     AuditAction.CREDIT_RESTORED,
+                    AuditAction.PASSES_EDITED,
                 ]
             ),
         )
@@ -283,6 +305,8 @@ def build_human_activity(
             items.append(rating_log_to_item(log))
         elif log.action in _CREDIT_ACTIONS:
             items.append(credit_log_to_item(log))
+        elif log.action == AuditAction.PASSES_EDITED:
+            items.append(passes_edited_log_to_item(log))
         else:
             items.append(note_log_to_item(log))
 

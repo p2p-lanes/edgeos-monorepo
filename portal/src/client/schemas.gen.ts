@@ -9895,7 +9895,7 @@ timestamp the feed sorts by.`
 
 export const HumanActivityKindSchema = {
     type: 'string',
-    enum: ['application.submitted', 'application.accepted', 'payment.completed', 'ticket.added', 'note.added', 'rating.changed', 'comment.added', 'credit.granted', 'credit.applied', 'credit.restored'],
+    enum: ['application.submitted', 'application.accepted', 'payment.completed', 'ticket.added', 'note.added', 'rating.changed', 'comment.added', 'credit.granted', 'credit.applied', 'credit.restored', 'passes.edited'],
     title: 'HumanActivityKind',
     description: 'The kind of event a timeline item represents.'
 } as const;

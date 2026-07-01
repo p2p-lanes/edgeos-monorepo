@@ -2087,7 +2087,7 @@ export type HumanActivityItem = {
 /**
  * The kind of event a timeline item represents.
  */
-export type HumanActivityKind = 'application.submitted' | 'application.accepted' | 'payment.completed' | 'ticket.added' | 'note.added' | 'rating.changed' | 'comment.added' | 'credit.granted' | 'credit.applied' | 'credit.restored';
+export type HumanActivityKind = 'application.submitted' | 'application.accepted' | 'payment.completed' | 'ticket.added' | 'note.added' | 'rating.changed' | 'comment.added' | 'credit.granted' | 'credit.applied' | 'credit.restored' | 'passes.edited';
 
 /**
  * One purchased line in a `payment.completed` item (snapshot at purchase).

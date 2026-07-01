@@ -1872,6 +1872,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         session: Session,
         obj: PaymentCreate,
         attribution: dict[str, str | None] | None = None,
+        actor: AuditActor | None = None,
     ) -> tuple[Payments, PaymentPreview]:
         """
         Create a payment with all validations and discount calculations.
@@ -1882,6 +1883,12 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         Concurrent submissions for the same application are serialized via
         a row-level lock, and a request matching a recently-approved payment
         is short-circuited to that existing payment.
+
+        ``actor`` is the AuditActor for the edit-passes audit event. When
+        called from the portal, pass ``actor_from_human(current_human)`` so
+        the passes.edited row carries the correct source and identity. When
+        omitted (e.g. in background flows or tests that do not have a portal
+        user), the system actor is used as the fallback.
         """
         application_id = _require_application_id(obj.application_id)
 
@@ -2084,6 +2091,25 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             )
             session.add(payment)
             session.flush()
+
+            # Emit passes.edited audit event for the edit-passes settlement.
+            # Placed here (after flush, payment.id is available) so the row is
+            # committed atomically with the payment. One record per settlement —
+            # the zero/negative and positive-amount paths are mutually exclusive
+            # (zero-branch returns early before the SimpleFi path), so there is
+            # no double-fire risk between the two branches.
+            if obj.edit_passes:
+                _edit_actor = actor if actor is not None else actor_from_system()
+                audit_logs_crud.record(
+                    session,
+                    tenant_id=application.tenant_id,
+                    actor=_edit_actor,
+                    action=AuditAction.PASSES_EDITED,
+                    entity_type=AuditEntityType.HUMAN,
+                    entity_id=application.human_id,
+                    popup_id=application.popup_id,
+                    details={"payment_id": str(payment.id)},
+                )
 
             # Build product snapshots before approval so they're available
             # when AttendeeProducts are materialized in the finalizer.
@@ -2294,6 +2320,24 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             )
             payment.credit_applied = preview.credit_applied
             session.add(payment)
+
+        # Emit passes.edited audit event for the edit-passes settlement.
+        # Placed here (after flush, payment.id is available) so the row is
+        # committed atomically with the PENDING payment creation. The zero/negative
+        # branch returns before reaching this point, so one record is emitted
+        # exactly once per successful settlement path.
+        if obj.edit_passes:
+            _edit_actor = actor if actor is not None else actor_from_system()
+            audit_logs_crud.record(
+                session,
+                tenant_id=application.tenant_id,
+                actor=_edit_actor,
+                action=AuditAction.PASSES_EDITED,
+                entity_type=AuditEntityType.HUMAN,
+                entity_id=application.human_id,
+                popup_id=application.popup_id,
+                details={"payment_id": str(payment.id)},
+            )
 
         # Create product snapshots
         for req_prod in obj.products:
