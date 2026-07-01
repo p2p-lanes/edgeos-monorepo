@@ -680,19 +680,13 @@ function GrantCreditPanel({
     mutation.mutate()
   }
 
-  const currentCredit = Number(application.credit ?? 0)
-
+  // The current balance is already shown as "Account Credit" in the applicant
+  // details above; don't repeat it here.
   return (
     <>
       <Separator />
       <InlineSection title="Grant Credit">
-        <InlineRow
-          icon={<DollarSign className="h-4 w-4 text-muted-foreground" />}
-          label="Current Balance"
-        >
-          <span className="font-mono text-sm">${currentCredit.toFixed(2)}</span>
-        </InlineRow>
-        <div className="pt-3 space-y-3">
+        <div className="space-y-3">
           <div className="space-y-1">
             <Label htmlFor="grant-credit-amount">Amount</Label>
             <Input
