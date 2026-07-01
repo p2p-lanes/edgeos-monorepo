@@ -3394,9 +3394,7 @@ async def update_portal_event(
         if reapproval_venue_id is not None:
             from app.api.event_venue import crud as venue_crud
 
-            reapproval_venue = venue_crud.event_venues_crud.get(
-                db, reapproval_venue_id
-            )
+            reapproval_venue = venue_crud.event_venues_crud.get(db, reapproval_venue_id)
             if reapproval_venue and (
                 _resolve_effective_booking_mode(
                     db, reapproval_venue, new_start, new_end

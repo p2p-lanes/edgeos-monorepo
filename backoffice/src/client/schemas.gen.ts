@@ -965,6 +965,11 @@ export const ApplicationPublicSchema = {
             title: 'Credit',
             default: '0'
         },
+        fee_credit_granted: {
+            type: 'boolean',
+            title: 'Fee Credit Granted',
+            default: false
+        },
         submitted_at: {
             anyOf: [
                 {
@@ -4662,6 +4667,61 @@ export const CheckoutRuntimeResponseSchema = {
     required: ['popup', 'products', 'buyer_form', 'ticketing_steps'],
     title: 'CheckoutRuntimeResponse',
     description: 'Full response for GET /checkout/{slug}/runtime.'
+} as const;
+
+export const CheckoutShareMetaSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        name: {
+            type: 'string',
+            title: 'Name'
+        },
+        tagline: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Tagline'
+        },
+        location: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Location'
+        },
+        image_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Image Url'
+        }
+    },
+    type: 'object',
+    required: ['id', 'name'],
+    title: 'CheckoutShareMeta',
+    description: `Tiny, unauthenticated projection for social/OpenGraph share previews.
+
+Returned by the public \`\`/{slug}/share\`\` endpoint so social crawlers (which
+send no JWT) can render the popup name, tagline/location snippet and cover
+image without loading the full checkout runtime payload.`
 } as const;
 
 export const CompanionParticipationSchema = {
@@ -8643,6 +8703,57 @@ export const FormSectionUpdateSchema = {
     title: 'FormSectionUpdate'
 } as const;
 
+export const GrantCreditRequestSchema = {
+    properties: {
+        amount: {
+            anyOf: [
+                {
+                    type: 'number'
+                },
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$'
+                }
+            ],
+            title: 'Amount'
+        },
+        note: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Note'
+        }
+    },
+    type: 'object',
+    required: ['amount'],
+    title: 'GrantCreditRequest',
+    description: 'Request body for POST /applications/{id}/credit — manual admin credit grant.'
+} as const;
+
+export const GrantCreditResponseSchema = {
+    properties: {
+        application_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Application Id'
+        },
+        credit: {
+            type: 'string',
+            pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$',
+            title: 'Credit'
+        }
+    },
+    type: 'object',
+    required: ['application_id', 'credit'],
+    title: 'GrantCreditResponse',
+    description: 'Response from POST /applications/{id}/credit.'
+} as const;
+
 export const GrantProductItemSchema = {
     properties: {
         product_id: {
@@ -9769,6 +9880,29 @@ export const HumanActivityItemSchema = {
             ],
             title: 'Previous Rating'
         },
+        source: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Source'
+        },
+        balance_after: {
+            anyOf: [
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Balance After'
+        },
         actor_id: {
             anyOf: [
                 {
@@ -9816,7 +9950,7 @@ timestamp the feed sorts by.`
 
 export const HumanActivityKindSchema = {
     type: 'string',
-    enum: ['application.submitted', 'application.accepted', 'payment.completed', 'ticket.added', 'note.added', 'rating.changed', 'comment.added'],
+    enum: ['application.submitted', 'application.accepted', 'payment.completed', 'ticket.added', 'note.added', 'rating.changed', 'comment.added', 'credit.granted', 'credit.applied', 'credit.restored', 'passes.edited'],
     title: 'HumanActivityKind',
     description: 'The kind of event a timeline item represents.'
 } as const;
@@ -11857,6 +11991,12 @@ export const PaymentPreviewSchema = {
             title: 'Scholarship Discount',
             default: false
         },
+        credit_applied: {
+            type: 'string',
+            pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$',
+            title: 'Credit Applied',
+            default: '0'
+        },
         status: {
             anyOf: [
                 {
@@ -12303,6 +12443,12 @@ export const PaymentPublicSchema = {
                 }
             ],
             title: 'Granted By User Id'
+        },
+        credit_applied: {
+            type: 'string',
+            pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$',
+            title: 'Credit Applied',
+            default: '0'
         },
         id: {
             type: 'string',
@@ -13036,9 +13182,9 @@ export const PopupAdminSchema = {
             title: 'Show Attendee Directory',
             default: false
         },
-        credits_enabled: {
+        edit_passes_enabled: {
             type: 'boolean',
-            title: 'Credits Enabled',
+            title: 'Edit Passes Enabled',
             default: false
         },
         installments_enabled: {
@@ -13511,9 +13657,9 @@ export const PopupCreateSchema = {
             title: 'Show Attendee Directory',
             default: false
         },
-        credits_enabled: {
+        edit_passes_enabled: {
             type: 'boolean',
-            title: 'Credits Enabled',
+            title: 'Edit Passes Enabled',
             default: false
         },
         installments_enabled: {
@@ -13876,9 +14022,9 @@ export const PopupPublicSchema = {
             title: 'Show Attendee Directory',
             default: false
         },
-        credits_enabled: {
+        edit_passes_enabled: {
             type: 'boolean',
-            title: 'Credits Enabled',
+            title: 'Edit Passes Enabled',
             default: false
         },
         installments_enabled: {
@@ -14546,7 +14692,7 @@ export const PopupUpdateSchema = {
             ],
             title: 'Show Attendee Directory'
         },
-        credits_enabled: {
+        edit_passes_enabled: {
             anyOf: [
                 {
                     type: 'boolean'
@@ -14555,7 +14701,7 @@ export const PopupUpdateSchema = {
                     type: 'null'
                 }
             ],
-            title: 'Credits Enabled'
+            title: 'Edit Passes Enabled'
         },
         installments_enabled: {
             anyOf: [

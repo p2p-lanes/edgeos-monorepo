@@ -402,6 +402,20 @@ export default function CartItemList() {
         </div>
       )}
 
+      {/* Credit applied — explains why the total is lower than the item
+          prices. summary.credit already blends account balance and edit
+          give-up credit; show it whenever any credit reduces the total. */}
+      {summary.creditApplied > 0 && (
+        <div className="flex items-center justify-between py-2 border-t border-border/50">
+          <span className="text-sm font-medium text-green-700">
+            {t("checkout.credit_applied_label")}
+          </span>
+          <span className="text-sm font-medium text-green-600">
+            -{formatCurrency(summary.creditApplied)}
+          </span>
+        </div>
+      )}
+
       {!hasItems && (
         <div className="py-8 text-center">
           <p className="text-muted-foreground">

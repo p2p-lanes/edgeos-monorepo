@@ -41,7 +41,7 @@ export function describeHumanActivity(item: HumanActivityItem): string {
       const names = products.length ? formatProductList(products) : "products"
       const amount =
         item.amount != null
-          ? ` — ${item.amount}${item.currency ? ` ${item.currency}` : ""}`
+          ? ` - ${item.amount}${item.currency ? ` ${item.currency}` : ""}`
           : ""
       return `Purchased ${names}${amount}`
     }
@@ -53,6 +53,20 @@ export function describeHumanActivity(item: HumanActivityItem): string {
       return `Changed rating to ${ratingLabel(item.rating)}`
     case "comment.added":
       return item.note ?? "Commented"
+    case "credit.granted": {
+      const amt = item.amount != null ? ` +${item.amount}` : ""
+      return withPopup(`Credit granted${amt}`, item)
+    }
+    case "credit.applied": {
+      const amt = item.amount != null ? ` ${item.amount}` : ""
+      return withPopup(`Credit applied${amt}`, item)
+    }
+    case "credit.restored": {
+      const amt = item.amount != null ? ` +${item.amount}` : ""
+      return withPopup(`Credit restored${amt}`, item)
+    }
+    case "passes.edited":
+      return withPopup("Passes edited", item)
     default:
       return item.kind
   }

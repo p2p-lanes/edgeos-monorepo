@@ -2,19 +2,33 @@
 
 Endpoints:
 - GET  /checkout/{slug}/runtime  — public, anonymous, rate-limited 120/min/IP
+- GET  /checkout/{slug}/share    — public, anonymous, rate-limited 120/min/IP
 - POST /checkout/{slug}/purchase — public, anonymous, rate-limited 10/min/IP
 """
 
 import uuid
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    HTTPException,
+    Query,
+    Request,
+    status,
+)
 from loguru import logger
 
 from app.api.cart.crud import carts_crud
 from app.api.cart.schemas import CartState, OpenCartPublic, OpenCartUpsert
-from app.api.checkout.crud import get_open_ticketing_popup, runtime_for_slug
+from app.api.checkout.crud import (
+    get_open_ticketing_popup,
+    runtime_for_slug,
+    share_meta_for_slug,
+)
 from app.api.checkout.schemas import (
     CheckoutRuntimeResponse,
+    CheckoutShareMeta,
     OpenTicketingPurchaseCreate,
     OpenTicketingPurchaseResponse,
 )
@@ -101,6 +115,42 @@ async def get_runtime(
     Rate-limited 120/min/IP.
     """
     return runtime_for_slug(db, slug, tenant.id)
+
+
+@router.get(
+    "/{slug}/share",
+    response_model=CheckoutShareMeta,
+    dependencies=[
+        Depends(
+            RateLimit(limit=120, window_sec=60, key_prefix="rl:checkout-public-share")
+        ),
+    ],
+)
+async def get_checkout_share_meta(
+    slug: str,
+    db: SessionDep,
+    tenant: PublicTenant,
+) -> CheckoutShareMeta:
+    """Unauthenticated checkout metadata for social/OpenGraph share previews.
+
+    Social crawlers send no JWT, so this route is intentionally public. It
+    exposes only the popup name, tagline, location and cover image — never
+    products, buyer forms or ticketing steps.
+
+    Only active ``sale_type=direct`` popups for the resolved tenant are
+    returned; everything else gets an opaque 404.
+    """
+    try:
+        return share_meta_for_slug(db, slug, tenant.id)
+    except HTTPException as exc:
+        if exc.status_code in {
+            status.HTTP_403_FORBIDDEN,
+            status.HTTP_404_NOT_FOUND,
+        }:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Not found"
+            ) from exc
+        raise
 
 
 @router.post(

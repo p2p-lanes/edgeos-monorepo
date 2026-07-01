@@ -234,7 +234,7 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
       contribution_label: defaultValues?.contribution_label ?? "",
       contribution_description: defaultValues?.contribution_description ?? "",
       events_enabled: defaultValues?.events_enabled ?? true,
-      credits_enabled: defaultValues?.credits_enabled ?? false,
+      edit_passes_enabled: defaultValues?.edit_passes_enabled ?? false,
       self_check_in_enabled: defaultValues?.self_check_in_enabled ?? false,
       show_attendee_directory: defaultValues?.show_attendee_directory ?? false,
       installments_enabled: defaultValues?.installments_enabled ?? false,
@@ -304,7 +304,7 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
           ? value.contribution_description || null
           : null,
         events_enabled: value.events_enabled,
-        credits_enabled: value.credits_enabled,
+        edit_passes_enabled: value.edit_passes_enabled,
         self_check_in_enabled: value.self_check_in_enabled,
         show_attendee_directory:
           value.sale_type === "application" && value.show_attendee_directory,
@@ -1608,17 +1608,17 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
 
         <Separator />
 
-        {/* Credits feature flag */}
-        <InlineSection title="Credits">
-          <form.Field name="credits_enabled">
+        {/* Pass editing feature flag */}
+        <InlineSection title="Pass Editing">
+          <form.Field name="edit_passes_enabled">
             {(field) => (
               <InlineRow
                 icon={<Coins className="h-4 w-4 text-muted-foreground" />}
-                label="Enable credits"
-                description="Credit the value of previously purchased passes when attendees edit their order during checkout."
+                label="Enable pass editing"
+                description="Allow attendees to edit their already-purchased passes during checkout. Giving up a pass returns its value as credit toward a new one."
               >
                 <Switch
-                  id="credits_enabled"
+                  id="edit_passes_enabled"
                   checked={field.state.value}
                   onCheckedChange={(checked) => field.handleChange(checked)}
                   disabled={readOnly}

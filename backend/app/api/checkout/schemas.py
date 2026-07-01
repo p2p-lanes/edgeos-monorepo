@@ -94,6 +94,21 @@ class CheckoutRuntimeResponse(BaseModel):
     form_schema: dict[str, Any] | None = None
 
 
+class CheckoutShareMeta(BaseModel):
+    """Tiny, unauthenticated projection for social/OpenGraph share previews.
+
+    Returned by the public ``/{slug}/share`` endpoint so social crawlers (which
+    send no JWT) can render the popup name, tagline/location snippet and cover
+    image without loading the full checkout runtime payload.
+    """
+
+    id: uuid.UUID
+    name: str
+    tagline: str | None = None
+    location: str | None = None
+    image_url: str | None = None
+
+
 # ---------------------------------------------------------------------------
 # Purchase schemas (POST /checkout/{slug}/purchase)
 # ---------------------------------------------------------------------------

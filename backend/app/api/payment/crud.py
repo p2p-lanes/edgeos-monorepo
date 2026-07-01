@@ -10,6 +10,9 @@ from sqlalchemy.orm import selectinload
 from sqlmodel import Session, func, select
 
 from app.api.application.models import Applications
+from app.api.audit_log.actor import AuditActor, actor_from_system
+from app.api.audit_log.constants import AuditAction, AuditEntityType
+from app.api.audit_log.crud import audit_logs_crud
 from app.api.human.models import Humans
 
 if TYPE_CHECKING:
@@ -46,6 +49,78 @@ from app.utils.checkout_signing import (
 
 # Decimal precision for money calculations
 MONEY_PRECISION = Decimal("0.01")
+
+
+def adjust_application_credit(
+    session: Session,
+    application: Applications,
+    delta: Decimal,
+    *,
+    kind: str,
+    source: str,
+    actor: AuditActor,
+    payment: "Payments | None" = None,
+    note: str | None = None,
+) -> Decimal:
+    """Single mutation point for application.credit.
+
+    Atomically applies the signed delta to the application's credit balance
+    AND stages one audit_logs entry in the same transaction (no commit —
+    mirrors audit_logs_crud.record contract; caller owns the commit).
+
+    Rules:
+    - delta > 0: grant or restore (increases balance)
+    - delta < 0: debit (decreases balance; raises ValueError if result < 0)
+    - delta == 0: no-op (no write, no audit entry)
+
+    Returns the new balance.
+    """
+    current = Decimal(str(application.credit)) if application.credit else Decimal("0")
+    new = current + delta
+
+    if delta == Decimal("0"):
+        return current
+
+    if new < Decimal("0"):
+        raise ValueError(
+            f"Credit debit of {delta} would drive balance negative "
+            f"(current={current}). Debit must not exceed the available balance."
+        )
+
+    application.credit = new
+    session.add(application)
+
+    # Resolve the human label for the audit entry.
+    human_label: str | None = None
+    if application.human_id:
+        human = session.get(Humans, application.human_id)
+        if human is not None:
+            first = getattr(human, "first_name", None) or ""
+            last = getattr(human, "last_name", None) or ""
+            human_label = f"{first} {last}".strip() or getattr(human, "email", None)
+
+    details: dict[str, Any] = {
+        "application_id": str(application.id),
+        "amount": str(delta),
+        "balance_after": str(new),
+        "source": source,
+        "payment_id": str(payment.id) if payment else None,
+        "note": note,
+    }
+
+    audit_logs_crud.record(
+        session,
+        tenant_id=application.tenant_id,
+        actor=actor,
+        action=kind,
+        entity_type=AuditEntityType.HUMAN,
+        entity_id=application.human_id,
+        entity_label=human_label,
+        popup_id=application.popup_id,
+        details=details,
+    )
+
+    return new
 
 
 def _build_purchase_thank_you_payload(
@@ -245,24 +320,30 @@ def _get_discounted_price(price: Decimal, discount_value: Decimal) -> Decimal:
     )
 
 
-def _get_credit(application: Applications, discount_value: Decimal) -> Decimal:
-    """Calculate credit from previously paid products.
+def _account_credit(application: Applications) -> Decimal:
+    """Return the application's stored credit balance (always-on, no gate).
 
-    Each AttendeeProducts row represents one ticket (quantity=1). Patron rows
-    are donations, not refundable ticket purchases — they contribute nothing to
-    credit. Tickets purchased alongside a patron donation do contribute.
-
-    Only week and day passes convert into credit. Month/full passes already
-    purchased never grant credit toward a new purchase (you cannot "upgrade"
-    out of a longer duration into something larger). Mirrors the portal-side
-    filter in useCreditCalculation.
-
-    Gated by popup.credits_enabled: returns 0 when the popup has credits
-    disabled (default for new/un-migrated popups).
+    This is the ONLY source of truth for the persisted credit balance.
+    It does NOT consult edit_passes_enabled — the balance is always spent when
+    non-zero (R-BE-03). Callers guard the debit path with `if credit > 0`.
     """
-    if not application.popup or not application.popup.credits_enabled:
-        return Decimal("0")
+    return Decimal(str(application.credit)) if application.credit else Decimal("0")
 
+
+def _edit_giveup_credit(application: Applications, discount_value: Decimal) -> Decimal:
+    """Calculate the give-up value of previously purchased week/day passes.
+
+    Called ONLY when edit_passes=True. Each AttendeeProducts row represents
+    one ticket (quantity=1). Patron rows are donations — they contribute nothing
+    to credit. Month/full passes never convert to give-up credit (you cannot
+    upgrade out of a longer duration). Mirrors the portal-side filter in
+    useCreditCalculation.
+
+    This is LIVE edit math, not a stored balance. It must NEVER be added to
+    _account_credit for a non-edit purchase (that would double-count). The
+    surplus (give-up > new cart) converts to persistent balance once at
+    settlement in the zero/negative branch via adjust_application_credit.
+    """
     total = Decimal("0")
     for attendee in application.attendees:
         for ap in attendee.attendee_products:
@@ -272,8 +353,7 @@ def _get_credit(application: Applications, discount_value: Decimal) -> Decimal:
                 continue
             total += ap.product.price
 
-    credit = Decimal(str(application.credit)) if application.credit else Decimal("0")
-    return _get_discounted_price(total, discount_value) + credit
+    return _get_discounted_price(total, discount_value)
 
 
 def _calculate_amounts(
@@ -349,17 +429,43 @@ def _calculate_price(
     discount_value: Decimal,
     application: Applications,
     edit_passes: bool,
-) -> Decimal:
-    """Calculate final price with discounts and credits."""
-    credit = _get_credit(application, discount_value) if edit_passes else Decimal("0")
+) -> tuple[Decimal, Decimal]:
+    """Calculate final price with discounts and credits.
+
+    Returns (final_price, credit_applied) where credit_applied is the amount
+    consumed from application.credit (the stored balance) for this purchase.
+
+    Credit logic (R-BE-02, R-BE-03):
+    - The stored balance (_account_credit) is ALWAYS applied, regardless of
+      edit_passes_enabled. Gate removed per spec.
+    - The edit give-up (_edit_giveup_credit) is added ONLY when edit_passes=True.
+      This is live math, not a stored balance — no double-count.
+    """
+    # Always-on: apply stored balance.
+    credit = _account_credit(application)
+    # Edit-only: add give-up value of previously purchased passes.
+    if edit_passes:
+        credit += _edit_giveup_credit(application, discount_value)
+
     logger.info("Credit applied: {}", credit)
 
     discounted_standard = standard_amount
     if standard_amount > 0:
         discounted_standard = _get_discounted_price(standard_amount, discount_value)
+
+    # credit_applied is the full stored balance whenever the positive-amount
+    # path is reached. In that path, final = discounted_standard - credit +
+    # non_discountable_amount > 0, which means credit < discounted_standard +
+    # non_discountable_amount, i.e. the entire stored balance is consumed.
+    # Capping at discounted_standard only (the old behaviour) under-reported
+    # the consumed amount when non_discountable_amount > 0.
+    # The zero/negative branch in create_payment overrides preview.credit_applied
+    # itself, so this value is only used on the positive-amount (SimpleFi) path.
+    credit_applied = _account_credit(application)  # >= 0 by construction
+
     discounted_standard = discounted_standard - credit
 
-    return discounted_standard + non_discountable_amount
+    return discounted_standard + non_discountable_amount, credit_applied
 
 
 def _calculate_max_installments(
@@ -1569,7 +1675,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         )
 
         response.original_amount = standard_amount + non_discountable_amount
-        response.amount = _calculate_price(
+        response.amount, response.credit_applied = _calculate_price(
             standard_amount=standard_amount,
             non_discountable_amount=non_discountable_amount,
             discount_value=discount_assigned,
@@ -1581,7 +1687,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         if application.group:
             response.group_id = application.group.id
             group_discount = application.group.discount_percentage or Decimal("0")
-            discounted_amount = _calculate_price(
+            discounted_amount, discounted_credit_applied = _calculate_price(
                 standard_amount=standard_amount,
                 non_discountable_amount=non_discountable_amount,
                 discount_value=group_discount,
@@ -1590,6 +1696,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             )
             if discounted_amount < response.amount:
                 response.amount = discounted_amount
+                response.credit_applied = discounted_credit_applied
                 response.discount_value = group_discount
 
         # Check coupon code. Skip when there is nothing discountable in the
@@ -1603,7 +1710,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 popup_id=application.popup_id,
             )
             coupon_discount = Decimal(str(coupon.discount_value))
-            discounted_amount = _calculate_price(
+            discounted_amount, discounted_credit_applied = _calculate_price(
                 standard_amount=standard_amount,
                 non_discountable_amount=non_discountable_amount,
                 discount_value=coupon_discount,
@@ -1612,6 +1719,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             )
             if discounted_amount < response.amount:
                 response.amount = discounted_amount
+                response.credit_applied = discounted_credit_applied
                 response.coupon_id = coupon.id
                 response.coupon_code = coupon.code
                 response.discount_value = coupon_discount
@@ -1622,7 +1730,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             and application.discount_percentage
         ):
             scholarship_discount_pct = Decimal(str(application.discount_percentage))
-            discounted_amount = _calculate_price(
+            discounted_amount, discounted_credit_applied = _calculate_price(
                 standard_amount=standard_amount,
                 non_discountable_amount=non_discountable_amount,
                 discount_value=scholarship_discount_pct,
@@ -1631,6 +1739,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             )
             if discounted_amount <= response.amount:
                 response.amount = discounted_amount
+                response.credit_applied = discounted_credit_applied
                 response.discount_value = scholarship_discount_pct
                 response.coupon_id = None
                 response.coupon_code = None
@@ -1765,6 +1874,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         session: Session,
         obj: PaymentCreate,
         attribution: dict[str, str | None] | None = None,
+        actor: AuditActor | None = None,
     ) -> tuple[Payments, PaymentPreview]:
         """
         Create a payment with all validations and discount calculations.
@@ -1775,6 +1885,12 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         Concurrent submissions for the same application are serialized via
         a row-level lock, and a request matching a recently-approved payment
         is short-circuited to that existing payment.
+
+        ``actor`` is the AuditActor for the edit-passes audit event. When
+        called from the portal, pass ``actor_from_human(current_human)`` so
+        the passes.edited row carries the correct source and identity. When
+        omitted (e.g. in background flows or tests that do not have a portal
+        user), the system actor is used as the fallback.
         """
         application_id = _require_application_id(obj.application_id)
 
@@ -1902,14 +2018,50 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
 
         # Handle zero or negative amount (credit covers cost)
         if preview.amount <= 0:
+            current_stored_credit = _account_credit(application)
+            # Attribute the movement to the human who triggered it (portal),
+            # falling back to system for non-request callers. The source is a
+            # give-up only when this is an actual edit; a plain purchase whose
+            # stored credit covers the cart must read as "purchase".
+            _settlement_actor = actor if actor is not None else actor_from_system()
+            _settlement_source = "edit_passes" if obj.edit_passes else "purchase"
             if preview.amount < 0:
-                # Store remaining credit only when the popup has credits enabled.
-                # Otherwise, clamp to zero — we neither charge nor accumulate.
-                if application.popup and application.popup.credits_enabled:
-                    application.credit = -preview.amount
+                # Surplus case: give-up credit (edit math) exceeded the new cart.
+                # The surplus converts to persistent stored balance via the helper.
+                # new_balance = -preview.amount (the leftover after covering the cart)
+                # delta = new_balance - current_stored_credit (may be positive or negative)
+                new_credit_balance = -preview.amount
+                credit_delta = new_credit_balance - current_stored_credit
+                # credit_applied is how much of the stored balance was consumed
+                # (0 if the edit give-up alone covered everything and balance grew)
+                credit_consumed = max(
+                    Decimal("0"), current_stored_credit - new_credit_balance
+                )
+                if credit_delta != Decimal("0"):
+                    adjust_application_credit(
+                        session,
+                        application,
+                        credit_delta,
+                        kind=AuditAction.CREDIT_GRANTED
+                        if credit_delta > 0
+                        else AuditAction.CREDIT_APPLIED,
+                        source=_settlement_source,
+                        actor=_settlement_actor,
+                    )
+                preview.credit_applied = credit_consumed
                 preview.amount = Decimal("0")
             else:
-                application.credit = Decimal("0")
+                # Exact-zero case: all stored credit was consumed.
+                if current_stored_credit > Decimal("0"):
+                    adjust_application_credit(
+                        session,
+                        application,
+                        -current_stored_credit,
+                        kind=AuditAction.CREDIT_APPLIED,
+                        source=_settlement_source,
+                        actor=_settlement_actor,
+                    )
+                preview.credit_applied = current_stored_credit
 
             # Clear existing products if editing passes
             if obj.edit_passes:
@@ -1938,6 +2090,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 discount_value=preview.discount_value,
                 edit_passes=obj.edit_passes,
                 group_id=preview.group_id,
+                credit_applied=preview.credit_applied,
                 source=None,
                 meta_fbc=(attribution or {}).get("fbc"),
                 meta_fbp=(attribution or {}).get("fbp"),
@@ -1946,6 +2099,25 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             )
             session.add(payment)
             session.flush()
+
+            # Emit passes.edited audit event for the edit-passes settlement.
+            # Placed here (after flush, payment.id is available) so the row is
+            # committed atomically with the payment. One record per settlement —
+            # the zero/negative and positive-amount paths are mutually exclusive
+            # (zero-branch returns early before the SimpleFi path), so there is
+            # no double-fire risk between the two branches.
+            if obj.edit_passes:
+                _edit_actor = actor if actor is not None else actor_from_system()
+                audit_logs_crud.record(
+                    session,
+                    tenant_id=application.tenant_id,
+                    actor=_edit_actor,
+                    action=AuditAction.PASSES_EDITED,
+                    entity_type=AuditEntityType.HUMAN,
+                    entity_id=application.human_id,
+                    popup_id=application.popup_id,
+                    details={"payment_id": str(payment.id)},
+                )
 
             # Build product snapshots before approval so they're available
             # when AttendeeProducts are materialized in the finalizer.
@@ -2132,6 +2304,10 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             source=PaymentSource.SIMPLEFI.value,
             is_installment_plan=simplefi_response.is_installment_plan,
             installments_paid=0 if simplefi_response.is_installment_plan else None,
+            # Set credit_applied atomically with row creation so there is no
+            # window between INSERT and the separate assignment below where a
+            # crash could leave credit debited but the payment row untagged.
+            credit_applied=preview.credit_applied,
             meta_fbc=(attribution or {}).get("fbc"),
             meta_fbp=(attribution or {}).get("fbp"),
             meta_client_ip=(attribution or {}).get("client_ip"),
@@ -2140,6 +2316,38 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
 
         session.add(payment)
         session.flush()  # Get payment ID
+
+        # Debit the application's credit balance at payment creation (reservation).
+        # This must happen after flush so payment.id exists for the audit log.
+        # Guard: only when credit was actually consumed (preview.credit_applied > 0).
+        if preview.credit_applied > Decimal("0"):
+            adjust_application_credit(
+                session,
+                application,
+                -preview.credit_applied,
+                kind=AuditAction.CREDIT_APPLIED,
+                source="purchase",
+                actor=actor if actor is not None else actor_from_system(),
+                payment=payment,
+            )
+
+        # Emit passes.edited audit event for the edit-passes settlement.
+        # Placed here (after flush, payment.id is available) so the row is
+        # committed atomically with the PENDING payment creation. The zero/negative
+        # branch returns before reaching this point, so one record is emitted
+        # exactly once per successful settlement path.
+        if obj.edit_passes:
+            _edit_actor = actor if actor is not None else actor_from_system()
+            audit_logs_crud.record(
+                session,
+                tenant_id=application.tenant_id,
+                actor=_edit_actor,
+                action=AuditAction.PASSES_EDITED,
+                entity_type=AuditEntityType.HUMAN,
+                entity_id=application.human_id,
+                popup_id=application.popup_id,
+                details={"payment_id": str(payment.id)},
+            )
 
         # Create product snapshots
         for req_prod in obj.products:
@@ -2518,6 +2726,23 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             # out of scope: a paid coupon use must stay consumed.
             if payment.coupon_id:
                 coupons_crud.release_use(session, payment.coupon_id)
+            # Restore the credit balance debited when this payment was created.
+            # The PENDING-only guard above ensures idempotency (mirrors coupon/stock).
+            credit_to_restore = payment.credit_applied or Decimal("0")
+            if credit_to_restore > Decimal("0") and payment.application_id:
+                from app.api.application.crud import applications_crud
+
+                application = applications_crud.get(session, payment.application_id)
+                if application:
+                    adjust_application_credit(
+                        session,
+                        application,
+                        credit_to_restore,
+                        kind=AuditAction.CREDIT_RESTORED,
+                        source="purchase",
+                        actor=actor_from_system(),
+                        payment=payment,
+                    )
 
         payment.status = new_status.value
 
