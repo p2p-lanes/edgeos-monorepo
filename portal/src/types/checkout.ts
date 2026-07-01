@@ -157,7 +157,15 @@ export interface CheckoutCartSummary {
   dynamicSubtotal: number
   subtotal: number
   discount: number
+  /** Total credit available to spend (account balance + edit give-up). */
   credit: number
+  /**
+   * Credit that actually reduced the total this order. Equals `credit`
+   * unless the balance exceeds the discounted subtotal, in which case only
+   * the portion that brought the total to zero is applied (the rest carries
+   * over). Use this for display so the shown reduction matches the total.
+   */
+  creditApplied: number
   grandTotal: number
   itemCount: number
 }
@@ -284,6 +292,7 @@ export function createInitialSummary(): CheckoutCartSummary {
     subtotal: 0,
     discount: 0,
     credit: 0,
+    creditApplied: 0,
     grandTotal: 0,
     itemCount: 0,
   }

@@ -202,6 +202,7 @@
     },
     "to_pay": "Til greiðslu",
     "credit_label": "Inneign: {{amount}}",
+    "credit_applied_label": "Inneign notuð",
     "edit_mode_title": "Breytingarhamur",
     "edit_mode_description": "Veldu keyptan passa til að fá inneign og veldu svo nýjan.",
     "cart": {

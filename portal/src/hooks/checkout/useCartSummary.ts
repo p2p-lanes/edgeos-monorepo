@@ -143,6 +143,10 @@ export function useCartSummary({
       ? editCredit + accountCredit
       : accountCredit + monthUpgradeCredit
     const grandTotal = Math.max(0, discountedSubtotal - credit)
+    // Effective credit consumed: what actually reduced the total. Caps at the
+    // discounted subtotal so an over-large balance doesn't display more than
+    // it removed (the surplus carries over as balance).
+    const creditApplied = discountedSubtotal - grandTotal
 
     const itemCount =
       selectedPasses.length +
@@ -165,6 +169,7 @@ export function useCartSummary({
       subtotal: originalSubtotal,
       discount: promoDiscount,
       credit,
+      creditApplied,
       grandTotal,
       itemCount,
     }
