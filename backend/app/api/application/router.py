@@ -47,6 +47,7 @@ from app.core.dependencies.users import (
     AdminOrApiKey_ApplicationsWrite,
     AdminOrApiKeySession_ApplicationsRead,
     AdminOrApiKeySession_ApplicationsWrite,
+    CurrentAdmin,
     CurrentHuman,
     HumanTenantSession,
     needs,
@@ -554,7 +555,7 @@ async def grant_application_credit(
     application_id: uuid.UUID,
     payload: GrantCreditRequest,
     db: AdminOrApiKeySession_ApplicationsWrite,
-    current_user: AdminOrApiKey_ApplicationsWrite,
+    current_user: CurrentAdmin,
 ) -> GrantCreditResponse:
     """Grant credit to a specific application (BO admin only).
 

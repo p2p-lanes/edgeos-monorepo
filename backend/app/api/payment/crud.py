@@ -453,13 +453,15 @@ def _calculate_price(
     if standard_amount > 0:
         discounted_standard = _get_discounted_price(standard_amount, discount_value)
 
-    # credit_applied is the amount actually consumed from the stored balance
-    # (capped at the discounted standard; give-up is separate and not stored).
-    account_credit = _account_credit(application)
-    available_for_debit = discounted_standard
-    credit_applied = min(account_credit, available_for_debit)
-    if credit_applied < Decimal("0"):
-        credit_applied = Decimal("0")
+    # credit_applied is the full stored balance whenever the positive-amount
+    # path is reached. In that path, final = discounted_standard - credit +
+    # non_discountable_amount > 0, which means credit < discounted_standard +
+    # non_discountable_amount, i.e. the entire stored balance is consumed.
+    # Capping at discounted_standard only (the old behaviour) under-reported
+    # the consumed amount when non_discountable_amount > 0.
+    # The zero/negative branch in create_payment overrides preview.credit_applied
+    # itself, so this value is only used on the positive-amount (SimpleFi) path.
+    credit_applied = _account_credit(application)  # >= 0 by construction
 
     discounted_standard = discounted_standard - credit
 
@@ -2302,6 +2304,10 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             source=PaymentSource.SIMPLEFI.value,
             is_installment_plan=simplefi_response.is_installment_plan,
             installments_paid=0 if simplefi_response.is_installment_plan else None,
+            # Set credit_applied atomically with row creation so there is no
+            # window between INSERT and the separate assignment below where a
+            # crash could leave credit debited but the payment row untagged.
+            credit_applied=preview.credit_applied,
             meta_fbc=(attribution or {}).get("fbc"),
             meta_fbp=(attribution or {}).get("fbp"),
             meta_client_ip=(attribution or {}).get("client_ip"),
@@ -2324,8 +2330,6 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 actor=actor if actor is not None else actor_from_system(),
                 payment=payment,
             )
-            payment.credit_applied = preview.credit_applied
-            session.add(payment)
 
         # Emit passes.edited audit event for the edit-passes settlement.
         # Placed here (after flush, payment.id is available) so the row is

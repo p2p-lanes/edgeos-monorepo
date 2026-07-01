@@ -128,6 +128,26 @@ def _make_product(
     return product
 
 
+def _make_non_discountable_product(
+    db: Session, tenant: Tenants, popup: Popups, *, price: Decimal
+) -> Products:
+    slug = uuid.uuid4().hex[:8]
+    product = Products(
+        tenant_id=tenant.id,
+        popup_id=popup.id,
+        name=f"NonDisc {slug[:4]}",
+        slug=slug,
+        price=price,
+        currency="USD",
+        category="ticket",
+        duration_type="week",
+        discountable=False,
+    )
+    db.add(product)
+    db.flush()
+    return product
+
+
 def _credit_audit_entries(
     db: Session, human_id: uuid.UUID, action: str
 ) -> list[AuditLog]:
@@ -278,3 +298,58 @@ class TestCreditDebitAtCreation:
         # No audit entry for zero-credit movement
         entries = _credit_audit_entries(db, human.id, AuditAction.CREDIT_APPLIED)
         assert len(entries) == 0
+
+    def test_credit_applied_full_balance_with_non_discountable_product(
+        self, db: Session, tenant_a: Tenants
+    ) -> None:
+        """FIX-1: credit=50, discountable=$30, non-discountable=$100, edit_passes=False.
+
+        Final price: 30 + 100 - 50 = 80 (positive → SimpleFi path).
+        credit_applied must be 50 (the full stored balance), not 30 (the old
+        discounted_standard cap). Balance debited 50 -> 0.
+        """
+        popup = _make_popup(db, tenant_a, edit_passes_enabled=False)
+        human = _make_human(db, tenant_a)
+        application = _make_application(
+            db, tenant_a, popup, human, credit=Decimal("50")
+        )
+        attendee = _make_attendee(db, tenant_a, popup, application)
+        disc_product = _make_product(db, tenant_a, popup, price=Decimal("30"))
+        nondisc_product = _make_non_discountable_product(
+            db, tenant_a, popup, price=Decimal("100")
+        )
+
+        obj = PaymentCreate(
+            application_id=application.id,
+            products=[
+                PaymentProductRequest(
+                    product_id=disc_product.id,
+                    attendee_id=attendee.id,
+                    quantity=1,
+                ),
+                PaymentProductRequest(
+                    product_id=nondisc_product.id,
+                    attendee_id=attendee.id,
+                    quantity=1,
+                ),
+            ],
+        )
+
+        fake_resp = _fake_simplefi_response()
+        with patch("app.services.simplefi.get_simplefi_client") as mock_client_factory:
+            mock_client_factory.return_value.create_payment.return_value = fake_resp
+            payment, preview = payments_crud.create_payment(db, obj, attribution=None)
+
+        db.expire_all()
+        db.refresh(application)
+        db.refresh(payment)
+
+        # Final price = 30 + 100 - 50 = 80 (SimpleFi positive-amount path)
+        assert preview.amount == Decimal("80.00")
+        # Full stored balance consumed, not just the discounted standard amount
+        assert payment.credit_applied == Decimal("50")
+        assert application.credit == Decimal("0")
+
+        entries = _credit_audit_entries(db, human.id, AuditAction.CREDIT_APPLIED)
+        assert len(entries) == 1
+        assert Decimal(entries[0].details["amount"]) == Decimal("-50")

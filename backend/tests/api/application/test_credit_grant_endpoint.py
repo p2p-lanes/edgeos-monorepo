@@ -225,3 +225,22 @@ class TestCreditGrantEndpoint:
             headers=_auth(admin_token_tenant_a),
         )
         assert response.status_code == 404, response.text
+
+    def test_operator_rejected_with_403(
+        self,
+        client: TestClient,
+        db: Session,
+        operator_token_tenant_a: str,
+        tenant_a: Tenants,
+    ) -> None:
+        """OPERATOR role must be rejected with 403 — credit grant is admin-only."""
+        popup = _make_popup(db, tenant_a)
+        human = _make_human(db, tenant_a)
+        application = _make_application(db, tenant_a, popup, human)
+
+        response = client.post(
+            f"/api/v1/applications/{application.id}/credit",
+            json={"amount": "100.00"},
+            headers=_auth(operator_token_tenant_a),
+        )
+        assert response.status_code == 403, response.text
