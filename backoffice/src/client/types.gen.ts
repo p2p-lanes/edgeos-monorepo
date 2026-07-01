@@ -1072,6 +1072,7 @@ export type CheckoutRuntimeResponse = {
     products: Array<CheckoutRuntimeProduct>;
     buyer_form: Array<CheckoutBuyerSection>;
     ticketing_steps: Array<TicketingStepPublic>;
+    attendee_categories?: Array<AttendeeCategoryPublic>;
     form_schema?: ({
     [key: string]: unknown;
 } | null);
@@ -2487,12 +2488,39 @@ export type OccurrenceRef = {
 };
 
 /**
+ * Anonymous open-checkout cart response.
+ *
+ * `restore_token` is the HMAC for the signed restore link
+ * (GET /checkout/{slug}/cart?cid=<id>&sig=<restore_token>). It is only
+ * present when the popup configures an open_checkout_signing_secret; the
+ * client stores it to rebuild the cart on a later visit.
+ */
+export type OpenCartPublic = {
+    id: string;
+    popup_id: string;
+    email: string;
+    items: CartState;
+    restore_token?: (string | null);
+    created_at?: (string | null);
+    updated_at?: (string | null);
+};
+
+/**
+ * Anonymous open-checkout cart upsert request (keyed by email).
+ */
+export type OpenCartUpsert = {
+    email: string;
+    items: CartState;
+};
+
+/**
  * Request schema for POST /checkout/{slug}/purchase.
  */
 export type OpenTicketingPurchaseCreate = {
     products: Array<ProductLine>;
     buyer: BuyerInfo;
     coupon_code?: (string | null);
+    insurance?: boolean;
     fbc?: (string | null);
     fbp?: (string | null);
 };
@@ -4709,6 +4737,29 @@ export type CheckoutPurchaseOpenTicketingData = {
 };
 
 export type CheckoutPurchaseOpenTicketingResponse = (OpenTicketingPurchaseResponse);
+
+export type CheckoutUpsertOpenCartData = {
+    requestBody: OpenCartUpsert;
+    slug: string;
+    xTenantId?: (string | null);
+};
+
+export type CheckoutUpsertOpenCartResponse = (OpenCartPublic);
+
+export type CheckoutRestoreOpenCartData = {
+    /**
+     * Cart id from the signed restore link
+     */
+    cid: string;
+    /**
+     * HMAC restore token for the cart id
+     */
+    sig: string;
+    slug: string;
+    xTenantId?: (string | null);
+};
+
+export type CheckoutRestoreOpenCartResponse = (OpenCartPublic);
 
 export type CouponsValidateCouponPublicData = {
     requestBody: CouponValidatePublicRequest;

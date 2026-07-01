@@ -204,6 +204,7 @@ export function usePaymentSubmit({
                   ),
                 },
                 coupon_code: promoCodeValid ? promoCode : undefined,
+                insurance: insurance || undefined,
               },
             })
           : await PaymentsService.createMyPayment({

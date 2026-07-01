@@ -182,6 +182,46 @@ def test_runtime_valid_direct_popup(
     assert len(body["ticketing_steps"]) == 1
     assert body["ticketing_steps"][0]["step_type"] == "tickets"
     assert body["ticketing_steps"][0]["title"] == "Choose Tickets"
+    assert "attendee_categories" in body
+
+
+def test_runtime_includes_attendee_categories(
+    client: TestClient, db: Session, tenant_a: Tenants
+) -> None:
+    """Attendee categories ship in the public runtime so anonymous checkout
+    never calls the human-gated portal endpoint."""
+    from app.api.attendee_category.models import AttendeeCategories
+
+    popup = _make_direct_popup(db, tenant_a)
+    db.add(
+        AttendeeCategories(
+            tenant_id=tenant_a.id,
+            popup_id=popup.id,
+            key="main",
+            is_primary=True,
+            sort_order=0,
+        )
+    )
+    db.add(
+        AttendeeCategories(
+            tenant_id=tenant_a.id,
+            popup_id=popup.id,
+            key="spouse",
+            sort_order=1,
+            display_meta={"label": "Spouse"},
+        )
+    )
+    db.commit()
+
+    response = client.get(
+        f"/api/v1/checkout/{popup.slug}/runtime",
+        headers={"X-Tenant-Id": str(tenant_a.id)},
+    )
+
+    assert response.status_code == 200, response.text
+    categories = response.json()["attendee_categories"]
+    assert [c["key"] for c in categories] == ["main", "spouse"]
+    assert categories[1]["display_meta"] == {"label": "Spouse"}
 
 
 def test_runtime_products_use_popup_currency(

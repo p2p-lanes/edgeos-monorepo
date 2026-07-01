@@ -15,3 +15,11 @@ export { usePaymentVerification } from "./usePaymentVerification"
 export { usePromoCode } from "./usePromoCode"
 export type { StepProductResolution } from "./useStepProductResolver"
 export { useStepProductResolver } from "./useStepProductResolver"
+export type {
+  TicketAttendeeVM,
+  TicketRowVM,
+  TicketSectionVM,
+  TicketsMode,
+  TicketsStepView,
+} from "./useTicketsStep"
+export { useTicketsStep } from "./useTicketsStep"

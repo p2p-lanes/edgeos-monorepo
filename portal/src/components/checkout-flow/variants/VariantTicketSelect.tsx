@@ -1,7 +1,6 @@
 "use client"
 
-import { Check, ChevronDown, Plus, ShoppingBag, Ticket } from "lucide-react"
-import Image from "next/image"
+import { Check, ChevronDown, Ticket } from "lucide-react"
 import { useEffect, useLayoutEffect, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 import AddAttendeeButtons from "@/components/checkout-flow/shared/AddAttendeeButtons"
@@ -10,55 +9,29 @@ import QuantitySelector, {
   resolveMaxQuantity,
   supportsQuantitySelector,
 } from "@/components/ui/QuantitySelector"
+import type { TemplateSection } from "@/hooks/checkout/ticketSections"
+import {
+  buildSectionGroups,
+  isSectionVisibleForApp,
+  parseSections,
+} from "@/hooks/checkout/ticketSections"
+import {
+  type TicketRowVM,
+  type TicketSectionVM,
+  useTicketsStep,
+} from "@/hooks/checkout/useTicketsStep"
 import { useAttendeeCategories } from "@/hooks/useAttendeeCategories"
 import { deriveProductState } from "@/lib/product-state"
 import { cn } from "@/lib/utils"
 import { useApplication } from "@/providers/applicationProvider"
-import { useCheckout } from "@/providers/checkoutProvider"
 import { useCityProvider } from "@/providers/cityProvider"
 import { usePassesProvider } from "@/providers/passesProvider"
+import { isPassQuantityBased } from "@/strategies/passQuantityHelper"
 import type { AttendeePassState } from "@/types/Attendee"
 import { formatCurrency, formatPrice } from "@/types/checkout"
 import type { ProductsPass } from "@/types/Products"
 import type { VariantProps } from "../registries/variantRegistry"
 import { SaleStateBadge } from "./saleStateBadge"
-
-// ---------------------------------------------------------------------------
-// Types & constants
-// ---------------------------------------------------------------------------
-
-interface SectionVisibilityCondition {
-  field_id: string
-  value: string | string[]
-}
-
-interface TemplateSection {
-  key: string
-  label: string
-  order: number
-  product_ids: string[]
-  attendee_categories?: string[] | null
-  visible_if?: SectionVisibilityCondition | null
-}
-
-/** True when the section's visible_if matches the application's form answers.
- *  No visible_if → always visible. Missing custom_fields → visible (open-ticketing
- *  fallback: the form hasn't been answered yet, treat as no-gate). An application
- *  that never answered the gating field (applied before the field existed, or the
- *  question isn't in its form) also passes: hiding every gated section would leave
- *  the attendee unable to buy those passes at all. */
-export function isSectionVisibleForApp(
-  section: TemplateSection,
-  customFields: Record<string, unknown> | null | undefined,
-): boolean {
-  const cond = section.visible_if
-  if (!cond?.field_id) return true
-  if (!customFields) return true
-  const answer = customFields[cond.field_id]
-  if (answer == null || answer === "") return true
-  const expected = Array.isArray(cond.value) ? cond.value : [cond.value]
-  return expected.includes(answer as string)
-}
 
 const getCategoryMeta = (cat: string) => {
   // Fixed palette for well-known legacy category keys; generic fallback for all others
@@ -182,12 +155,20 @@ function attendeeHasRenderableContent(
 export default function VariantTicketSelect({
   products,
   stepType,
-  onSkip,
   templateConfig,
 }: VariantProps) {
   const passesVariant: TicketSelectVariant =
     (templateConfig?.variant as TicketSelectVariant) || "stacked"
-  const { attendeePasses, toggleProduct, isEditing } = usePassesProvider()
+
+  // Contract hook — owns all business logic: selection, exclusivity, credit,
+  // section-visibility, purchased state. Skins are pure presentation.
+  const view = useTicketsStep({ stepType, templateConfig, products })
+
+  // Raw attendee list from passesProvider — still needed for the layout
+  // filtering logic (visibleAttendees/sortedAttendees) which operates on
+  // AttendeePassState until Slice 2 migrates layouts to TicketAttendeeVM.
+  const { attendeePasses } = usePassesProvider()
+
   const [focusedAttendeeId, setFocusedAttendeeId] = useState<string | null>(
     null,
   )
@@ -201,7 +182,7 @@ export default function VariantTicketSelect({
     isSectionVisibleForApp(s, customFields),
   )
 
-  // Build category_id → sort_order map for attendee ordering.
+  // Build category_id -> sort_order map for attendee ordering.
   const { getCity } = useCityProvider()
   const cityForSort = getCity()
   const popupIdForSort = cityForSort?.id ? String(cityForSort.id) : ""
@@ -212,29 +193,43 @@ export default function VariantTicketSelect({
     categorySortOrderById.set(c.id, c.sort_order ?? 0)
   }
 
+  // Explicit open-checkout path: simple_quantity mode with no real attendees.
+  // The contract exposes view.isOpenCheckout=true and view.sections populated.
+  if (view.isOpenCheckout) {
+    return (
+      <OpenCheckoutSectionLayout
+        sections={view.sections}
+        onToggle={view.toggleRow}
+        onQuantityChange={view.setRowQuantity}
+      />
+    )
+  }
+
   // Filter attendees with no renderable content before dispatching to layouts.
-  // This covers all four layout variants in one place (DRY per design §4 ADR-6).
+  // This covers all four layout variants in one place (DRY per design ADR-6).
   const visibleAttendees = sortedAttendees(
     attendeePasses,
     categorySortOrderById,
   ).filter((a) => attendeeHasRenderableContent(a, sections))
 
-  // If no renderable attendees, fall back to legacy section-based layout.
-  if (visibleAttendees.length === 0) {
-    return (
-      <LegacySectionLayout
-        products={products}
-        templateConfig={templateConfig}
-        stepType={stepType}
-        onSkip={onSkip}
-      />
-    )
+  // Route toggle actions through the contract. The contract resolves
+  // exclusivity scope, attendee-visible product ids, and strategies
+  // internally — no business logic in the skin.
+  const contractToggleProduct = (
+    attendeeId: string,
+    product: ProductsPass,
+    _exclusivityScopeIds?: string[],
+    _attendeeVisibleProductIds?: string[],
+  ) => {
+    // Scope args are ignored here because useTicketsStep.toggleRow derives
+    // them from parsedSections internally.
+    view.toggleRow(attendeeId, product)
   }
 
   const sharedProps = {
     attendees: visibleAttendees,
-    toggleProduct,
-    isEditing,
+    toggleProduct: contractToggleProduct,
+    isEditing: view.isEditing,
     sections,
     focusedAttendeeId,
   }
@@ -283,98 +278,8 @@ function scrollToAttendeeCard(attendeeId: string) {
 // ---------------------------------------------------------------------------
 // Template config helpers
 // ---------------------------------------------------------------------------
-
-function parseSections(
-  templateConfig: VariantProps["templateConfig"],
-): TemplateSection[] {
-  const raw = templateConfig?.sections
-  if (!Array.isArray(raw) || raw.length === 0) return []
-  return [...(raw as TemplateSection[])].sort((a, b) => a.order - b.order)
-}
-
-/** Returns groups of products for an attendee based on configured sections.
- *  Products not in any section are excluded.
- *  Sections gated by attendee_categories are filtered to the current attendee.
- *  Note: visible_if (per-application gating) is evaluated upstream in the
- *  main component, so by the time sections reach this function they are
- *  already filtered by form responses. */
-export function buildSectionGroups(
-  attendee: AttendeePassState,
-  sections: TemplateSection[],
-): { section: TemplateSection; products: ProductsPass[] }[] {
-  if (sections.length === 0) {
-    // No config — fall back to duration-type grouping
-    return buildDurationGroups(attendee)
-  }
-
-  const attendeeCategoryId = attendee.category_id ?? null
-  const visibleSections = sections.filter((s) => {
-    if (s.attendee_categories == null) return true
-    if (!attendeeCategoryId) return false
-    return s.attendee_categories.includes(attendeeCategoryId)
-  })
-
-  const productMap = new Map(
-    attendee.products
-      .filter((p) => p.category !== "patreon")
-      .map((p) => [p.id, p]),
-  )
-
-  return visibleSections
-    .map((section) => ({
-      section,
-      products: section.product_ids
-        .map((id) => productMap.get(id))
-        .filter(Boolean) as ProductsPass[],
-    }))
-    .filter((g) => g.products.length > 0)
-}
-
-/** Fallback: group by duration_type when no sections configured. */
-function buildDurationGroups(
-  attendee: AttendeePassState,
-): { section: TemplateSection; products: ProductsPass[] }[] {
-  const isChild =
-    attendee.category === "kid" ||
-    attendee.category === "teen" ||
-    attendee.category === "baby"
-
-  const all = attendee.products
-    .filter((p) => p.category !== "patreon")
-    .sort(sortProductsByPriority)
-
-  const groups: { section: TemplateSection; products: ProductsPass[] }[] = []
-  const add = (key: string, label: string, items: ProductsPass[]) => {
-    if (items.length > 0)
-      groups.push({
-        section: { key, label, order: groups.length, product_ids: [] },
-        products: items,
-      })
-  }
-  if (!isChild) {
-    add(
-      "full",
-      "Full Passes",
-      all.filter((p) => p.duration_type === "full"),
-    )
-    add(
-      "month",
-      "Month Pass",
-      all.filter((p) => p.duration_type === "month"),
-    )
-  }
-  add(
-    "week",
-    "Weekly Passes",
-    all.filter((p) => p.duration_type === "week"),
-  )
-  add(
-    "day",
-    "Day Passes",
-    all.filter((p) => p.duration_type === "day"),
-  )
-  return groups
-}
+// parseSections, buildSectionGroups, and isSectionVisibleForApp are imported
+// from @/hooks/checkout/ticketSections (the shared module).
 
 // ---------------------------------------------------------------------------
 // Attendee card header
@@ -548,10 +453,10 @@ function PassRow({
     useState(false)
   // Multi-unit stepper mode — editing of purchased multi-unit passes is out
   // of scope (plan decision), so we only show the stepper for non-purchased rows.
+  // Full/month passes are always single-select in pass_system (use isPassQuantityBased
+  // so a full pass with max_per_order=null does not render as a stepper).
   const showStepper =
-    !!onQuantityChange &&
-    supportsQuantitySelector(product.max_per_order) &&
-    !purchased
+    !!onQuantityChange && isPassQuantityBased(product) && !purchased
   const currentQuantity = product.quantity ?? 0
   const maxQuantity = resolveMaxQuantity(product)
 
@@ -1174,6 +1079,160 @@ function CompactAttendeeCard({
 }
 
 // ---------------------------------------------------------------------------
+// Open-checkout section layout (explicit simple_quantity / no-attendee path)
+// ---------------------------------------------------------------------------
+
+/**
+ * Renders a flat list of sections from the contract's view.sections.
+ * Replaces the former LegacySectionLayout which read from dynamicItems directly.
+ * State (quantity, selected) is precomputed in the TicketRowVM by useTicketsStep.
+ */
+function OpenCheckoutRow({
+  row,
+  onToggle,
+  onQuantityChange,
+}: {
+  row: TicketRowVM
+  onToggle: (attendeeId: string, product: ProductsPass) => void
+  onQuantityChange: (
+    attendeeId: string,
+    product: ProductsPass,
+    qty: number,
+  ) => void
+}) {
+  const { t } = useTranslation()
+  const { product, quantity, maxQuantity, selected, disabled } = row
+  const isAdded = quantity > 0 || selected
+  const showStepper = supportsQuantitySelector(product.max_per_order)
+  const hasDiscount =
+    product.compare_price != null && product.compare_price > product.price
+  const total = product.price * (quantity > 0 ? quantity : 1)
+
+  return (
+    <div
+      className={cn("p-4 transition-colors", isAdded ? "bg-primary/10" : "")}
+    >
+      <div className="flex items-center gap-3">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <h3 className="font-medium text-foreground text-sm">
+              {product.name}
+            </h3>
+          </div>
+          {product.description && (
+            <ExpandableDescription
+              text={product.description}
+              clamp={2}
+              className="text-xs text-muted-foreground mt-0.5"
+            />
+          )}
+        </div>
+        {showStepper ? (
+          <QuantitySelector
+            size="md"
+            value={quantity}
+            min={0}
+            max={maxQuantity}
+            disabled={disabled}
+            onIncrement={() => onQuantityChange("", product, quantity + 1)}
+            onDecrement={() =>
+              onQuantityChange("", product, Math.max(0, quantity - 1))
+            }
+            onAdd={() => onQuantityChange("", product, 1)}
+          />
+        ) : (
+          <button
+            type="button"
+            onClick={() => onToggle("", product)}
+            disabled={disabled}
+            aria-label={isAdded ? "Remove from cart" : "Add to cart"}
+            className={cn(
+              "h-8 px-3 rounded-lg text-xs font-semibold transition-all flex items-center gap-1 shrink-0",
+              isAdded
+                ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                : "bg-card border border-border text-foreground hover:bg-muted",
+              disabled && "cursor-not-allowed opacity-50",
+            )}
+          >
+            {isAdded ? (
+              <>
+                <Check className="w-3.5 h-3.5" />
+                Added
+              </>
+            ) : (
+              <>+&nbsp;Add</>
+            )}
+          </button>
+        )}
+        <div className="text-right shrink-0 min-w-16">
+          {isAdded && quantity > 1 && (
+            <p className="text-xs text-muted-foreground">
+              {quantity} × {formatCurrency(product.price)}
+            </p>
+          )}
+          {hasDiscount && product.compare_price != null && (
+            <p className="text-xs text-muted-foreground line-through">
+              {formatCurrency(product.compare_price)}
+            </p>
+          )}
+          <span
+            className={cn(
+              "font-semibold text-sm",
+              isAdded ? "text-primary" : "text-foreground",
+            )}
+          >
+            {formatPrice(total, t("common.free"))}
+          </span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function OpenCheckoutSectionLayout({
+  sections,
+  onToggle,
+  onQuantityChange,
+}: {
+  sections: TicketSectionVM[]
+  onToggle: (attendeeId: string, product: ProductsPass) => void
+  onQuantityChange: (
+    attendeeId: string,
+    product: ProductsPass,
+    qty: number,
+  ) => void
+}) {
+  const showHeaders = sections.length > 1
+
+  return (
+    <div className="space-y-4">
+      {sections.map(({ key, label, rows }) => (
+        <div
+          key={key}
+          className="bg-checkout-card-bg rounded-2xl shadow-sm border border-border overflow-hidden divide-y divide-border"
+        >
+          {showHeaders && (
+            <div className="px-5 py-2 bg-muted/30">
+              <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                {label}
+              </h4>
+            </div>
+          )}
+          {rows.map((row) => (
+            <OpenCheckoutRow
+              key={row.product.id}
+              row={row}
+              onToggle={onToggle}
+              onQuantityChange={onQuantityChange}
+            />
+          ))}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Layout A: Stacked
 // ---------------------------------------------------------------------------
 
@@ -1416,225 +1475,6 @@ function AccordionLayout({
           </div>
         )
       })}
-    </div>
-  )
-}
-
-// ---------------------------------------------------------------------------
-// Legacy: section-based layout (fallback when passesProvider has no data)
-// ---------------------------------------------------------------------------
-
-function groupBySection(
-  products: ProductsPass[],
-  sections: TemplateSection[],
-): { section: TemplateSection; products: ProductsPass[] }[] {
-  const groups: { section: TemplateSection; products: ProductsPass[] }[] = []
-  for (const section of [...sections].sort((a, b) => a.order - b.order)) {
-    const sectionProducts = section.product_ids
-      .map((id) => products.find((p) => p.id === id))
-      .filter(Boolean) as ProductsPass[]
-    if (sectionProducts.length > 0)
-      groups.push({ section, products: sectionProducts })
-  }
-  const assignedIds = new Set(sections.flatMap((s) => s.product_ids))
-  const unassigned = products.filter((p) => !assignedIds.has(p.id))
-  if (unassigned.length > 0) {
-    groups.push({
-      section: { key: "__other", label: "Other", order: 999, product_ids: [] },
-      products: unassigned,
-    })
-  }
-  return groups
-}
-
-function LegacySectionLayout({
-  products,
-  templateConfig,
-  stepType,
-}: {
-  products: ProductsPass[]
-  templateConfig: VariantProps["templateConfig"]
-  stepType: string
-  onSkip?: () => void
-}) {
-  const { t } = useTranslation()
-  const { cart, addDynamicItem, removeDynamicItem, updateDynamicQuantity } =
-    useCheckout()
-  const items = cart.dynamicItems[stepType] ?? []
-  const getQuantity = (id: string): number =>
-    items.find((i) => i.productId === id)?.quantity ?? 0
-
-  const handleAdd = (p: ProductsPass, qty: number = 1) => {
-    addDynamicItem(stepType, {
-      productId: p.id,
-      product: p,
-      quantity: qty,
-      price: p.price,
-      stepType,
-    })
-  }
-
-  const handleQuantityChange = (p: ProductsPass, qty: number) => {
-    if (qty <= 0) {
-      removeDynamicItem(stepType, p.id)
-      return
-    }
-    if (getQuantity(p.id) === 0) {
-      handleAdd(p, qty)
-      return
-    }
-    updateDynamicQuantity(stepType, p.id, qty)
-  }
-
-  // Open-ticketing fallback path: no authenticated application, so visible_if
-  // can't be resolved against form answers. Treat as no-gate (return true).
-  const { getRelevantApplication } = useApplication()
-  const customFields = getRelevantApplication()?.custom_fields ?? null
-  const rawSections = (templateConfig?.sections ?? null) as
-    | TemplateSection[]
-    | null
-  const sections = rawSections
-    ? rawSections.filter((s) => isSectionVisibleForApp(s, customFields))
-    : null
-  const hasSections = Array.isArray(sections) && sections.length > 0
-  const groups = hasSections ? groupBySection(products, sections) : null
-
-  const renderItem = (p: ProductsPass) => {
-    const quantity = getQuantity(p.id)
-    const isAdded = quantity > 0
-    const showStepper = supportsQuantitySelector(p.max_per_order)
-    const max = resolveMaxQuantity({
-      max_per_order: p.max_per_order,
-      total_stock_remaining: p.total_stock_remaining,
-    })
-    const total = isAdded ? p.price * quantity : p.price
-    const hasDiscount = p.compare_price != null && p.compare_price > p.price
-
-    return (
-      <div
-        key={p.id}
-        className={cn("p-4 transition-colors", isAdded ? "bg-primary/10" : "")}
-      >
-        <div className="flex items-center gap-3">
-          <div className="relative w-14 h-14 shrink-0 rounded-xl overflow-hidden bg-muted flex items-center justify-center">
-            {p.image_url ? (
-              <Image
-                src={p.image_url}
-                alt={p.name}
-                fill
-                className="object-cover"
-              />
-            ) : (
-              <ShoppingBag className="w-6 h-6 text-muted-foreground" />
-            )}
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2">
-              <h3 className="font-medium text-foreground text-sm">{p.name}</h3>
-            </div>
-            {p.description && (
-              <ExpandableDescription
-                text={p.description}
-                clamp={2}
-                className="text-xs text-muted-foreground mt-0.5"
-              />
-            )}
-          </div>
-          {showStepper ? (
-            <QuantitySelector
-              size="md"
-              value={quantity}
-              min={0}
-              max={max}
-              onIncrement={() => handleQuantityChange(p, quantity + 1)}
-              onDecrement={() =>
-                handleQuantityChange(p, Math.max(0, quantity - 1))
-              }
-              onAdd={() => handleAdd(p, 1)}
-            />
-          ) : (
-            <button
-              type="button"
-              onClick={() =>
-                isAdded ? removeDynamicItem(stepType, p.id) : handleAdd(p, 1)
-              }
-              aria-label={isAdded ? "Remove from cart" : "Add to cart"}
-              className={cn(
-                "h-8 px-3 rounded-lg text-xs font-semibold transition-all flex items-center gap-1 shrink-0",
-                isAdded
-                  ? "bg-primary text-primary-foreground hover:bg-primary/90"
-                  : "bg-card border border-border text-foreground hover:bg-muted",
-              )}
-            >
-              {isAdded ? (
-                <>
-                  <Check className="w-3.5 h-3.5" />
-                  Added
-                </>
-              ) : (
-                <>
-                  <Plus className="w-3.5 h-3.5" />
-                  Add
-                </>
-              )}
-            </button>
-          )}
-          <div className="text-right shrink-0 min-w-16">
-            {isAdded && quantity > 1 && (
-              <p className="text-xs text-muted-foreground">
-                {quantity} × {formatCurrency(p.price)}
-              </p>
-            )}
-            {hasDiscount && p.compare_price != null && (
-              <p className="text-xs text-muted-foreground line-through">
-                {formatCurrency(p.compare_price)}
-              </p>
-            )}
-            <span
-              className={cn(
-                "font-semibold text-sm",
-                isAdded ? "text-primary" : "text-foreground",
-              )}
-            >
-              {formatPrice(total, t("common.free"))}
-            </span>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  const renderGroup = (
-    section: TemplateSection,
-    items: ProductsPass[],
-    showHeader: boolean,
-  ) => (
-    <div
-      key={section.key}
-      className="bg-checkout-card-bg rounded-2xl shadow-sm border border-border overflow-hidden divide-y divide-border"
-    >
-      {showHeader && (
-        <div className="px-5 py-2 bg-muted/30">
-          <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-            {section.label}
-          </h4>
-        </div>
-      )}
-      {items.map(renderItem)}
-    </div>
-  )
-
-  return (
-    <div className="space-y-4">
-      {groups
-        ? groups.map(({ section, products: sp }) =>
-            renderGroup(section, sp, groups.length > 1),
-          )
-        : products.length > 0 && (
-            <div className="bg-checkout-card-bg rounded-2xl shadow-sm border border-border overflow-hidden divide-y divide-border">
-              {products.map(renderItem)}
-            </div>
-          )}
     </div>
   )
 }

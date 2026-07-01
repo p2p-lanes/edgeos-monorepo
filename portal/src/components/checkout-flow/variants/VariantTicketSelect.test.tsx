@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest"
-import type { AttendeePassState } from "@/types/Attendee"
-import type { ProductsPass } from "@/types/Products"
 import {
   buildSectionGroups,
   isSectionVisibleForApp,
-} from "./VariantTicketSelect"
+} from "@/hooks/checkout/ticketSections"
+import type { AttendeePassState } from "@/types/Attendee"
+import type { ProductsPass } from "@/types/Products"
 
 // ---------------------------------------------------------------------------
 // Helpers

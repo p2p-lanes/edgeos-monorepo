@@ -2,7 +2,7 @@ import uuid
 from datetime import UTC, datetime
 
 from sqlalchemy.orm import selectinload
-from sqlmodel import Session, func, select
+from sqlmodel import Session, col, func, select
 
 from app.api.cart.models import Carts
 from app.api.cart.schemas import CartState
@@ -108,6 +108,81 @@ class CartsCRUD:
             Carts.popup_id == popup_id,
         )
         cart = session.exec(statement).first()
+        if cart:
+            session.delete(cart)
+            session.flush()
+
+    # ------------------------------------------------------------------
+    # Anonymous open-checkout carts (keyed by email, no human, human_id NULL)
+    # ------------------------------------------------------------------
+
+    def find_anonymous_by_email_popup(
+        self,
+        session: Session,
+        email: str,
+        popup_id: uuid.UUID,
+    ) -> Carts | None:
+        """Find an anonymous cart by email and popup (read-only)."""
+        statement = select(Carts).where(
+            Carts.email == email,
+            Carts.popup_id == popup_id,
+            col(Carts.human_id).is_(None),
+        )
+        return session.exec(statement).first()
+
+    def find_anonymous_by_id_popup(
+        self,
+        session: Session,
+        cart_id: uuid.UUID,
+        popup_id: uuid.UUID,
+    ) -> Carts | None:
+        """Find an anonymous cart by id, scoped to a popup (read-only)."""
+        statement = select(Carts).where(
+            Carts.id == cart_id,
+            Carts.popup_id == popup_id,
+            col(Carts.human_id).is_(None),
+        )
+        return session.exec(statement).first()
+
+    def upsert_anonymous(
+        self,
+        session: Session,
+        *,
+        tenant_id: uuid.UUID,
+        popup_id: uuid.UUID,
+        email: str,
+        items: CartState,
+    ) -> Carts:
+        """Create or update the anonymous cart for (popup, email)."""
+        cart = self.find_anonymous_by_email_popup(session, email, popup_id)
+        if cart is None:
+            cart = Carts(
+                tenant_id=tenant_id,
+                human_id=None,
+                popup_id=popup_id,
+                email=email,
+                items=items.model_dump(),
+            )
+            session.add(cart)
+            session.commit()
+            session.refresh(cart)
+            return cart
+
+        cart.items = items.model_dump()
+        cart.updated_at = datetime.now(UTC)
+        session.add(cart)
+        session.commit()
+        session.refresh(cart)
+        return cart
+
+    def delete_anonymous_by_email_popup(
+        self,
+        session: Session,
+        email: str,
+        popup_id: uuid.UUID,
+    ) -> None:
+        """Delete the anonymous cart for (popup, email) — e.g. after payment."""
+        cart = self.find_anonymous_by_email_popup(session, email, popup_id)
         if cart:
             session.delete(cart)
             session.flush()

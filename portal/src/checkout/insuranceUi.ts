@@ -1,6 +1,7 @@
 import type { PopupPublic, ProductPublic } from "@/client"
 import type {
   CheckoutInsuranceSummary,
+  SelectedDynamicItem,
   SelectedHousingItem,
   SelectedMerchItem,
   SelectedPassItem,
@@ -67,6 +68,11 @@ export function buildCheckoutInsuranceSummary(
     passes: Array<SelectedPassItem>
     housing: SelectedHousingItem | null
     merch: Array<SelectedMerchItem>
+    // Products selected via the generic catalog step (DynamicProductStep).
+    // The anonymous open-checkout flow has no per-attendee passes, so every
+    // ticket lands here — omitting it left open checkout with a $0 eligible
+    // subtotal and the InsuranceCard permanently hidden.
+    dynamicItems?: Record<string, Array<SelectedDynamicItem>>
   },
 ): CheckoutInsuranceSummary {
   const available = isCheckoutInsuranceAvailable(popup)
@@ -92,6 +98,17 @@ export function buildCheckoutInsuranceSummary(
       if (item.product.insurance_eligible) {
         eligibleProductIds.push(item.product.id)
         eligibleSubtotal += item.totalPrice
+      }
+    }
+
+    for (const items of Object.values(cart.dynamicItems ?? {})) {
+      for (const item of items) {
+        if (item.product.insurance_eligible) {
+          eligibleProductIds.push(item.product.id)
+          // `price` is already the line total (unit price * quantity), the
+          // same field the discount subtotal reads in checkoutProvider.
+          eligibleSubtotal += item.price
+        }
       }
     }
   }

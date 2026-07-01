@@ -25,7 +25,7 @@ export default function SnapSection({
     if (!el) return
     const observer = new IntersectionObserver(
       ([entry]) => setVisible(entry.isIntersecting),
-      { threshold: 0.3 },
+      { rootMargin: "-35% 0px -55% 0px", threshold: 0 },
     )
     observer.observe(el)
     return () => observer.disconnect()

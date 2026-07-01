@@ -742,9 +742,42 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 payment.coupon_id = coupon.id
                 payment.coupon_code = coupon.code
                 payment.discount_value = discount_value
-                coupons_crud.use_coupon(session, coupon.id)
+                # Consumption is deferred until the payment is persisted (the
+                # zero-amount commit or the post-SimpleFi commit below) so a
+                # provider failure never burns a single-use code. Mirrors the
+                # application flow.
 
-            payment.amount = discountable_amount + non_discountable_amount
+            # Post-discount subtotal is the shared base for BOTH optional fees.
+            # Insurance and contribution each read this same baseline so they
+            # never compound on each other (mirrors _apply_discounts / ADR-2).
+            post_discount_amount = discountable_amount + non_discountable_amount
+            payment.amount = post_discount_amount
+
+            # Insurance fee (buyer opt-in). Computed on the eligible-product
+            # subtotal at full price via the shared helper, matching the
+            # authenticated flow and the portal display. Skipped when the cart
+            # is already $0 (a fee on nothing makes no sense).
+            if obj.insurance and post_discount_amount > Decimal("0"):
+                insurance_amount = calculate_insurance_amount(
+                    popup,
+                    [
+                        (products_map[line.product_id], line.quantity)
+                        for line in obj.products
+                    ],
+                )
+                payment.insurance_amount = insurance_amount
+                payment.amount += insurance_amount
+
+            # Contribution fee (mandatory when the popup enables it — no buyer
+            # opt-in). Its base is the post-discount subtotal, NOT the
+            # insurance-inflated total, so the two fees stay independent.
+            # Mirrors the application flow in _apply_discounts.
+            if popup.contribution_enabled and popup.contribution_percentage:
+                contribution_amount = calculate_contribution_amount(
+                    popup, post_discount_amount
+                )
+                payment.contribution_amount = contribution_amount
+                payment.amount += contribution_amount
 
             # Resolve the open-checkout success redirect once, reused by the
             # zero-amount bypass (returned as redirect_url) and the paid path
@@ -778,6 +811,10 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             # this, the open-ticketing buyer never received tickets nor the
             # confirmation email).
             if payment.amount == Decimal("0"):
+                # A 100% coupon zeroed the cart: consume it now, alongside the
+                # auto-approval, since this branch never reaches SimpleFi.
+                if payment.coupon_id:
+                    coupons_crud.use_coupon(session, payment.coupon_id)
                 self._finalize_zero_amount_payment(
                     session,
                     payment,
@@ -881,6 +918,10 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 0 if simplefi_response.is_installment_plan else None
             )
             session.add(payment)
+            # Consume the coupon only now that SimpleFi accepted the payment, so
+            # a provider failure above never burns a single-use code.
+            if payment.coupon_id:
+                coupons_crud.use_coupon(session, payment.coupon_id)
             session.commit()
             session.refresh(payment)
             # Paid flow: SimpleFi performs the success redirect itself (to the
@@ -2147,6 +2188,21 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
 
         return payment, preview
 
+    def _direct_buyer_email(self, session: Session, payment: Payments) -> str | None:
+        """Resolve the buyer email for a direct-sale payment via its attendee.
+
+        Direct-sale payments have no application; the buyer is the human behind
+        the (single) attendee on the payment's product snapshot. Used to clear
+        the anonymous open-checkout cart keyed by that email.
+        """
+        snapshot = payment.products_snapshot
+        if not snapshot:
+            return None
+        attendee = session.get(Attendees, snapshot[0].attendee_id)
+        if attendee is None or attendee.human is None:
+            return None
+        return attendee.human.email
+
     def approve_payment(
         self,
         session: Session,
@@ -2210,8 +2266,9 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             if payment.application_id is not None:
                 self._create_ambassador_group(session, payment)
 
-            # Clear cart after successful payment (application flow only —
-            # direct-sale payments don't use the cart).
+            # Clear cart after successful payment. Application flow clears by
+            # human; direct-sale (open checkout) clears the anonymous cart by the
+            # buyer email so a returning buyer never restores an already-paid cart.
             from app.api.cart.crud import carts_crud
 
             if payment.application:
@@ -2220,6 +2277,12 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                     human_id=payment.application.human_id,
                     popup_id=payment.application.popup_id,
                 )
+            elif payment.popup_id:
+                buyer_email = self._direct_buyer_email(session, payment)
+                if buyer_email:
+                    carts_crud.delete_anonymous_by_email_popup(
+                        session, buyer_email, payment.popup_id
+                    )
 
             # Single atomic commit for the entire operation
             session.commit()

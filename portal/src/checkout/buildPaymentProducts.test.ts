@@ -326,3 +326,147 @@ describe("buildPaymentProducts — patron path", () => {
     expect(patronLine?.quantity).toBe(1)
   })
 })
+
+// ---------------------------------------------------------------------------
+// X.2: S-PAY-C — pass_system + 2 attendees → no firstAttendeeId collapse
+// Tickets flow through selectedPasses (per-attendee). The dynamicItems path
+// (firstAttendeeId collapse) must NOT be reached for ticket products on
+// pass_system popups.
+// ---------------------------------------------------------------------------
+
+describe("X.2 S-PAY-C: pass_system 2 attendees — tickets use per-attendee attendee_id", () => {
+  it("each ticket entry carries its own attendeeId, not firstAttendeeId", () => {
+    const ticketA = createProduct({ id: "ticket-a", category: "ticket" })
+    const ticketB = createProduct({ id: "ticket-b", category: "ticket" })
+
+    const attendeeA = { ...createAttendee([ticketA]), id: "attendee-a" }
+    const attendeeB = { ...createAttendee([ticketB]), id: "attendee-b" }
+
+    const result = buildPaymentProducts({
+      attendeePasses: [attendeeA, attendeeB],
+      selectedPasses: [
+        {
+          productId: ticketA.id,
+          product: ticketA,
+          attendeeId: "attendee-a",
+          attendee: attendeeA,
+          quantity: 1,
+          price: 100,
+        },
+        {
+          productId: ticketB.id,
+          product: ticketB,
+          attendeeId: "attendee-b",
+          attendee: attendeeB,
+          quantity: 1,
+          price: 100,
+        },
+      ],
+      housing: null,
+      merch: [],
+      patron: null,
+      dynamicItems: {},
+      isEditing: false,
+      appCredit: 0,
+      checkoutMode: CHECKOUT_MODE.PASS_SYSTEM,
+    })
+
+    const ticketALine = result.products.find((p) => p.product_id === "ticket-a")
+    const ticketBLine = result.products.find((p) => p.product_id === "ticket-b")
+
+    expect(ticketALine?.attendee_id).toBe("attendee-a")
+    expect(ticketBLine?.attendee_id).toBe("attendee-b")
+
+    // Neither ticket should collapse to the other attendee's id
+    expect(ticketALine?.attendee_id).not.toBe("attendee-b")
+    expect(ticketBLine?.attendee_id).not.toBe("attendee-a")
+  })
+})
+
+// ---------------------------------------------------------------------------
+// X.3: S-PAY-A/B — merch and meal-plan entries unchanged by this change
+// ---------------------------------------------------------------------------
+
+describe("X.3 S-PAY-A/B: merch and meal-plan entries unaffected", () => {
+  it("S-PAY-A: merch item gets firstAttendeeId (unaffected by ticket changes)", () => {
+    const ticket = createProduct({ id: "ticket-1", category: "ticket" })
+    const attendeeA = { ...createAttendee([ticket]), id: "attendee-a" }
+
+    const result = buildPaymentProducts({
+      attendeePasses: [attendeeA],
+      selectedPasses: [
+        {
+          productId: ticket.id,
+          product: ticket,
+          attendeeId: "attendee-a",
+          attendee: attendeeA,
+          quantity: 1,
+          price: 100,
+        },
+      ],
+      housing: null,
+      merch: [
+        {
+          productId: "merch-1",
+          product: createProduct({ id: "merch-1", category: "merch" }),
+          quantity: 2,
+          unitPrice: 30,
+          totalPrice: 60,
+        },
+      ],
+      patron: null,
+      dynamicItems: {},
+      isEditing: false,
+      appCredit: 0,
+      checkoutMode: CHECKOUT_MODE.PASS_SYSTEM,
+    })
+
+    const ticketLine = result.products.find((p) => p.product_id === "ticket-1")
+    const merchLine = result.products.find((p) => p.product_id === "merch-1")
+
+    // Ticket carries correct attendeeId
+    expect(ticketLine?.attendee_id).toBe("attendee-a")
+
+    // Merch attaches to firstAttendeeId (driven by selectedPasses[0].attendeeId)
+    expect(merchLine?.attendee_id).toBe("attendee-a")
+    expect(merchLine?.quantity).toBe(2)
+  })
+
+  it("S-PAY-B: meal plan entries carry their own attendeeId (per-purchase metadata preserved)", () => {
+    const attendeeB = { ...createAttendee([]), id: "attendee-b" }
+
+    const result = buildPaymentProducts({
+      attendeePasses: [attendeeB],
+      selectedPasses: [],
+      housing: null,
+      merch: [],
+      patron: null,
+      selectedMealPlans: [
+        {
+          productId: "meal-weekly-1",
+          product: createProduct({ id: "meal-weekly-1", category: "meal" }),
+          attendeeId: "attendee-b",
+          dailyChoices: { mon: "vegan" },
+          dietaryRestriction: "vegan",
+          specialRequest: null,
+        },
+      ],
+      dynamicItems: {},
+      isEditing: false,
+      appCredit: 0,
+      checkoutMode: CHECKOUT_MODE.PASS_SYSTEM,
+    })
+
+    const mealLine = result.products.find(
+      (p) => p.product_id === "meal-weekly-1",
+    )
+
+    expect(mealLine?.attendee_id).toBe("attendee-b")
+    expect(mealLine?.quantity).toBe(1)
+    expect(mealLine?.purchase_metadata).toEqual({
+      daily_choices: { mon: "vegan" },
+      dietary_restriction: "vegan",
+      special_request: null,
+    })
+  })
+})

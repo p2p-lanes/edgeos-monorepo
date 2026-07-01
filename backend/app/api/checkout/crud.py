@@ -6,6 +6,8 @@ from fastapi import HTTPException, status
 from sqlalchemy.orm import selectinload
 from sqlmodel import Session, select
 
+from app.api.attendee_category.crud import attendee_categories_crud
+from app.api.attendee_category.schemas import AttendeeCategoryPublic
 from app.api.checkout.schemas import (
     CheckoutBuyerField,
     CheckoutBuyerSection,
@@ -122,6 +124,8 @@ def runtime_for_slug(
         ).all()
     )
 
+    attendee_categories = attendee_categories_crud.list_by_popup(session, popup.id)
+
     return CheckoutRuntimeResponse(
         popup=PopupPublic.model_validate(popup),
         products=[
@@ -146,6 +150,9 @@ def runtime_for_slug(
         ],
         ticketing_steps=[
             TicketingStepPublic.model_validate(step) for step in ticketing_steps
+        ],
+        attendee_categories=[
+            AttendeeCategoryPublic.model_validate(c) for c in attendee_categories
         ],
         form_schema=form_fields_crud.build_schema_for_popup(session, popup.id),
     )

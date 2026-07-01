@@ -7,6 +7,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
+from app.api.attendee_category.schemas import AttendeeCategoryPublic
 from app.api.popup.schemas import PopupPublic
 from app.api.ticketing_step.schemas import TicketingStepPublic
 
@@ -86,6 +87,10 @@ class CheckoutRuntimeResponse(BaseModel):
     products: list[CheckoutRuntimeProduct]
     buyer_form: list[CheckoutBuyerSection]
     ticketing_steps: list[TicketingStepPublic]
+    # Per-popup attendee categories (benign config: keys, labels, sort order).
+    # Shipped in the public bootstrap so anonymous checkout never has to call
+    # the human-gated /portal/popups/{id}/attendee-categories endpoint.
+    attendee_categories: list[AttendeeCategoryPublic] = []
     form_schema: dict[str, Any] | None = None
 
 
@@ -116,6 +121,10 @@ class OpenTicketingPurchaseCreate(BaseModel):
     products: list[ProductLine] = Field(min_length=1)
     buyer: BuyerInfo
     coupon_code: str | None = None
+    # Buyer opt-in for the optional insurance fee (mirrors the authenticated
+    # flow). Insurance is charged only when this is true and the popup enables
+    # it; the amount is computed server-side from eligible products.
+    insurance: bool = False
     fbc: str | None = Field(default=None, max_length=512)
     fbp: str | None = Field(default=None, max_length=512)
 

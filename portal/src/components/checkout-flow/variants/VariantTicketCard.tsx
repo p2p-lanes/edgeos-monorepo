@@ -1,17 +1,21 @@
 "use client"
 
-import { Check, Plus, ShoppingBag } from "lucide-react"
+import { Check, CreditCard, Plus, ShoppingBag } from "lucide-react"
 import Image from "next/image"
 import type { CSSProperties } from "react"
 import { useTranslation } from "react-i18next"
 import ExpandableDescription from "@/components/ui/ExpandableDescription"
 import QuantitySelector, {
-  resolveMaxQuantity,
   supportsQuantitySelector,
 } from "@/components/ui/QuantitySelector"
+import type {
+  TicketAttendeeVM,
+  TicketRowVM,
+  TicketSectionVM,
+} from "@/hooks/checkout/useTicketsStep"
+import { useTicketsStep } from "@/hooks/checkout/useTicketsStep"
 import { stepCardSurfaceStyle } from "@/lib/stepCardSurface"
 import { cn } from "@/lib/utils"
-import { useCheckout } from "@/providers/checkoutProvider"
 import { formatCurrency } from "@/types/checkout"
 import type { ProductsPass } from "@/types/Products"
 import type { VariantProps } from "../registries/variantRegistry"
@@ -84,7 +88,7 @@ const SURFACE_STYLE: Record<
 }
 
 // ---------------------------------------------------------------------------
-// Parsers
+// Parsers (presentational config only — business logic delegated to hook)
 // ---------------------------------------------------------------------------
 
 function parseSections(
@@ -134,83 +138,238 @@ function resolveSurfaceStyle(surface: TicketCardSurface): CSSProperties {
 }
 
 // ---------------------------------------------------------------------------
-// Product row — shared by all design variants
+// ProductRow — contract-aware (pass_system path uses TicketRowVM)
 // ---------------------------------------------------------------------------
 
-function ProductRow({
-  product,
-  stepType,
+/**
+ * Pass-system product row: driven by a precomputed TicketRowVM from the hook.
+ * Business logic (disabled, purchased, credit) lives in the hook, not here.
+ */
+function PassSystemProductRow({
+  row,
+  attendeeId,
+  onToggle,
+  onQuantityChange,
+  isEditing,
 }: {
-  product: ProductsPass
-  stepType: string
+  row: TicketRowVM
+  attendeeId: string
+  onToggle: (attendeeId: string, product: ProductsPass) => void
+  onQuantityChange: (
+    attendeeId: string,
+    product: ProductsPass,
+    qty: number,
+  ) => void
+  isEditing: boolean
 }) {
   const { t } = useTranslation()
-  const { cart, addDynamicItem, removeDynamicItem, updateDynamicQuantity } =
-    useCheckout()
+  const { product } = row
 
-  const items = cart.dynamicItems[stepType] ?? []
-  const quantity = items.find((i) => i.productId === product.id)?.quantity ?? 0
-  const isAdded = quantity > 0
-  const showStepper = supportsQuantitySelector(product.max_per_order)
-  const max = resolveMaxQuantity({
-    max_per_order: product.max_per_order,
-    total_stock_remaining: product.total_stock_remaining,
-  })
-  // The product's own `disabled` flag is the only gate today — out-of-
-  // stock / not-yet-on-sale / cap-reached are folded into it upstream.
-  // Disabled rows still let the buyer adjust the quantity of an item
-  // they already added; only NEW additions are blocked.
-  const rowDisabled = !!product.disabled && !isAdded
-  const hasDiscount =
-    product.compare_price != null && product.compare_price > product.price
-  // Once a buyer adds more than one of the same product, show the line
-  // SUBTOTAL as the primary price (so the number to the right of the
-  // stepper matches what gets added to their total) and demote the unit
-  // price to a quiet "per-unit" footnote.
-  const subtotal = product.price * quantity
+  const quantity = row.quantity
+  const isAdded = row.selected || row.purchased
+  const showStepper = row.usesStepper
+  const max = row.maxQuantity
+
+  // Purchased but not in credit-edit mode: render as locked
+  const isPurchasedLocked = row.purchased && !row.editedForCredit
+  // Disabled: either precomputed exclusivity/sale-state, or purchased-locked
+  const rowDisabled = row.disabled || isPurchasedLocked
+
+  const hasDiscount = row.comparePrice != null && row.comparePrice > row.price
+  const subtotal = row.price * quantity
   const showSubtotal = quantity > 1
 
-  const handleAdd = (qty = 1) => {
-    addDynamicItem(stepType, {
-      productId: product.id,
-      product,
-      quantity: qty,
-      price: product.price,
-      stepType,
-    })
+  const handleToggle = () => {
+    onToggle(attendeeId, product)
   }
 
   const handleQuantityChange = (qty: number) => {
-    if (qty <= 0) {
-      removeDynamicItem(stepType, product.id)
-      return
-    }
-    if (quantity === 0) {
-      handleAdd(qty)
-      return
-    }
-    updateDynamicQuantity(stepType, product.id, qty)
+    onQuantityChange(attendeeId, product, qty)
   }
 
-  // CTA palette mirrors the inverted "+" tile in QuantitySelector:
-  // PRIMARY fill with ACCENT text/icon. Pops harder against light card
-  // surfaces. When added, swap to a softer accent fill so the toggle
-  // state is visually distinct.
   const ctaClass = cn(
     "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold tracking-wide shrink-0 transition-all whitespace-nowrap",
     "shadow-sm border border-[color:var(--primary,transparent)]",
     isAdded
-      ? "bg-[color:var(--accent,theme(colors.foreground))] text-[color:var(--primary,theme(colors.background))]"
-      : "bg-[color:var(--primary,theme(colors.foreground))] text-[color:var(--accent,theme(colors.background))] hover:brightness-110 active:scale-[0.98]",
+      ? "bg-[color:var(--accent,theme(colors.foreground))] text-[color:var(--primary-foreground,theme(colors.background))]"
+      : "bg-[color:var(--primary,theme(colors.foreground))] text-[color:var(--primary-foreground,theme(colors.background))] hover:brightness-110 active:scale-[0.98]",
     rowDisabled && "cursor-not-allowed opacity-50",
   )
 
-  // Row presentation: interactive controls (stepper, CTA button) are the
-  // ONLY click targets — the row wrapper stays a plain <div> so we don't
-  // nest <button>s (HTML invalid + hydration warning). Buyers tap the
-  // stepper "+" or the Add pill explicitly; that's the standard e-commerce
-  // pattern and keeps the markup a11y-clean without div role="button"
-  // workarounds.
+  return (
+    <div
+      className={cn(
+        "px-4 py-3 transition-colors",
+        isAdded && "bg-[color:var(--accent,theme(colors.muted))]/10",
+        rowDisabled && "opacity-40",
+      )}
+    >
+      <div className="flex items-center gap-3">
+        <div className="flex-1 min-w-0">
+          <h4 className="font-medium text-foreground text-sm line-clamp-2">
+            {product.name}
+          </h4>
+          {/* Credit indicator: visible when isEditing and product.edit */}
+          {isEditing && row.editedForCredit && (
+            <div className="flex items-center gap-1 mt-0.5">
+              <CreditCard className="size-3 text-[color:var(--accent,currentColor)]" />
+              <span className="text-[10px] text-[color:var(--accent,currentColor)] font-medium">
+                {t("checkout.actions.give_up_for_credit", {
+                  defaultValue: "Give up for credit",
+                })}
+              </span>
+            </div>
+          )}
+          {/* Purchased badge */}
+          {isPurchasedLocked && (
+            <div className="mt-0.5">
+              <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">
+                {t("checkout.actions.purchased", {
+                  defaultValue: "Purchased",
+                })}
+              </span>
+            </div>
+          )}
+        </div>
+        <div className="flex items-center gap-4 shrink-0">
+          <div
+            className={cn(
+              "text-right leading-tight transition-all duration-200 ease-out",
+              isAdded ? "-translate-y-0.5" : "translate-y-0",
+            )}
+          >
+            {hasDiscount && !showSubtotal && (
+              <div
+                className={cn(
+                  "text-[11px] line-through leading-none transition-colors duration-200",
+                  isAdded ? "text-foreground/60" : "text-muted-foreground",
+                )}
+              >
+                {formatCurrency(row.comparePrice ?? 0)}
+              </div>
+            )}
+            <div
+              className={cn(
+                "transition-all duration-200 ease-out leading-tight tabular-nums",
+                isAdded
+                  ? "text-base font-bold text-[color:var(--accent,theme(colors.foreground))]"
+                  : "text-sm font-medium text-muted-foreground",
+              )}
+            >
+              {formatCurrency(showSubtotal ? subtotal : row.price)}
+            </div>
+            {showSubtotal && (
+              <div className="text-[10px] text-muted-foreground leading-none mt-0.5 tabular-nums">
+                {formatCurrency(row.price)}{" "}
+                {t("checkout.actions.per_unit", { defaultValue: "ea." })}
+              </div>
+            )}
+          </div>
+          <div className="border-l border-current/10 pl-4 h-9 flex items-center">
+            {isPurchasedLocked ? (
+              // Purchased and not in edit mode: just show check icon
+              <div className="flex items-center gap-1 text-[color:var(--accent,theme(colors.foreground))]">
+                <Check className="size-4 stroke-[2.5]" />
+              </div>
+            ) : showStepper ? (
+              <QuantitySelector
+                size="md"
+                tone="accent"
+                value={quantity}
+                min={0}
+                max={max}
+                onIncrement={() => handleQuantityChange(quantity + 1)}
+                onDecrement={() =>
+                  handleQuantityChange(Math.max(0, quantity - 1))
+                }
+                onAdd={() => handleToggle()}
+              />
+            ) : (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  handleToggle()
+                }}
+                disabled={rowDisabled}
+                className={ctaClass}
+                aria-label={
+                  isAdded
+                    ? t("checkout.actions.remove_aria", {
+                        defaultValue: "Remove from cart",
+                      })
+                    : t("checkout.actions.add_aria", {
+                        defaultValue: "Add to cart",
+                      })
+                }
+              >
+                {isAdded ? (
+                  <>
+                    <Check className="size-3.5 stroke-[2.5]" />
+                    {t("checkout.actions.added", { defaultValue: "Added" })}
+                  </>
+                ) : (
+                  <>
+                    <Plus className="size-3.5 stroke-[3]" />
+                    {t("checkout.actions.add", { defaultValue: "Add" })}
+                  </>
+                )}
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Open-checkout product row: reads state from the TicketRowVM (Slice 3).
+ * All quantity/selection state is precomputed by useTicketsStep.
+ * Actions route through the contract (view.toggleRow / view.setRowQuantity).
+ */
+function OpenCheckoutProductRow({
+  row,
+  onToggle,
+  onQuantityChange,
+}: {
+  row: TicketRowVM
+  onToggle: (attendeeId: string, product: ProductsPass) => void
+  onQuantityChange: (
+    attendeeId: string,
+    product: ProductsPass,
+    qty: number,
+  ) => void
+}) {
+  const { t } = useTranslation()
+  const { product, quantity, maxQuantity, selected, disabled } = row
+
+  const isAdded = quantity > 0 || selected
+  const showStepper = supportsQuantitySelector(product.max_per_order)
+  const max = maxQuantity
+  const rowDisabled = disabled && !isAdded
+  const hasDiscount =
+    product.compare_price != null && product.compare_price > product.price
+  const subtotal = product.price * quantity
+  const showSubtotal = quantity > 1
+
+  const handleToggle = () => {
+    onToggle("", product)
+  }
+
+  const handleQuantityChange = (qty: number) => {
+    onQuantityChange("", product, qty)
+  }
+
+  const ctaClass = cn(
+    "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold tracking-wide shrink-0 transition-all whitespace-nowrap",
+    "shadow-sm border border-[color:var(--primary,transparent)]",
+    isAdded
+      ? "bg-[color:var(--accent,theme(colors.foreground))] text-[color:var(--primary-foreground,theme(colors.background))]"
+      : "bg-[color:var(--primary,theme(colors.foreground))] text-[color:var(--primary-foreground,theme(colors.background))] hover:brightness-110 active:scale-[0.98]",
+    rowDisabled && "cursor-not-allowed opacity-50",
+  )
+
   return (
     <div
       className={cn(
@@ -226,10 +385,6 @@ function ProductRow({
           </h4>
         </div>
         <div className="flex items-center gap-4 shrink-0">
-          {/* Price column: unselected → small + muted (informational);
-              selected → bigger + bold + accent-tinted so the active row
-              pops. Color transitions smoothly; size/weight snap is part
-              of the affordance. */}
           <div
             className={cn(
               "text-right leading-tight transition-all duration-200 ease-out",
@@ -263,8 +418,6 @@ function ProductRow({
               </div>
             )}
           </div>
-          {/* Thin separator so the stepper feels detached from the price
-              column instead of crowding it. */}
           <div className="border-l border-current/10 pl-4 h-9 flex items-center">
             {showStepper ? (
               <QuantitySelector
@@ -277,14 +430,14 @@ function ProductRow({
                 onDecrement={() =>
                   handleQuantityChange(Math.max(0, quantity - 1))
                 }
-                onAdd={() => handleAdd(1)}
+                onAdd={() => handleToggle()}
               />
             ) : (
               <button
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation()
-                  handleQuantityChange(isAdded ? 0 : 1)
+                  handleToggle()
                 }}
                 disabled={rowDisabled}
                 className={ctaClass}
@@ -322,41 +475,51 @@ function ProductRow({
 // Section card — image, description (with expandable), product rows
 // ---------------------------------------------------------------------------
 
-function SectionCard({
+function PassSystemSectionCard({
   section,
-  products,
-  stepType,
+  attendeeId,
+  onToggle,
+  onQuantityChange,
   surface,
   imageAspect,
+  isEditing,
 }: {
-  section: TicketCardSection
-  products: ProductsPass[]
-  stepType: string
+  section: TicketSectionVM & {
+    image_url?: string
+    image_aspect?: string
+    description?: string
+  }
+  attendeeId: string
+  onToggle: (attendeeId: string, product: ProductsPass) => void
+  onQuantityChange: (
+    attendeeId: string,
+    product: ProductsPass,
+    qty: number,
+  ) => void
   surface: TicketCardSurface
   imageAspect?: SectionImageAspect
+  isEditing: boolean
 }) {
-  if (products.length === 0) return null
+  if (section.rows.length === 0) return null
 
   return (
     <article
       style={resolveSurfaceStyle(surface)}
-      className="rounded-2xl overflow-hidden border border-border shadow-sm"
+      className="relative flex h-full w-full flex-col rounded-2xl overflow-hidden shadow-sm after:pointer-events-none after:absolute after:inset-0 after:rounded-2xl after:border after:border-border"
     >
       {section.image_url && (
         <div
           className={cn(
             "relative w-full bg-muted",
-            resolveAspectClass(section.image_aspect ?? imageAspect),
+            resolveAspectClass(
+              (section.image_aspect as SectionImageAspect) ?? imageAspect,
+            ),
           )}
         >
           <Image
             src={section.image_url}
             alt={section.label}
             fill
-            // Source thumbnails are typically 800px on the long side. Tell
-            // Next we don't need anything larger so it doesn't request a
-            // 1440px upscale of an 800px source. quality 95 preserves
-            // visible texture without the default 75% JPEG blur.
             sizes="(max-width: 768px) 100vw, 720px"
             quality={95}
             className="object-cover"
@@ -375,9 +538,6 @@ function SectionCard({
             text={section.description}
             clamp={3}
             className="text-sm text-muted-foreground whitespace-pre-line"
-            // Branded toggle: uppercase micro-caps + chevron glyph in the
-            // theme accent colour. Falls back to currentColor when the
-            // tenant didn't set an accent.
             buttonClassName={cn(
               "mt-2 inline-flex items-center gap-1 text-[10px] uppercase tracking-[0.2em] font-bold",
               "text-[color:var(--accent,currentColor)] hover:opacity-80",
@@ -387,9 +547,98 @@ function SectionCard({
           />
         </div>
       )}
-      <div className="divide-y divide-border">
-        {products.map((p) => (
-          <ProductRow key={p.id} product={p} stepType={stepType} />
+      <div className="mt-auto divide-y divide-border border-t border-border">
+        {section.rows.map((row) => (
+          <PassSystemProductRow
+            key={row.product.id}
+            row={row}
+            attendeeId={attendeeId}
+            onToggle={onToggle}
+            onQuantityChange={onQuantityChange}
+            isEditing={isEditing}
+          />
+        ))}
+      </div>
+    </article>
+  )
+}
+
+/**
+ * Legacy-compatible SectionCard for open-checkout path.
+ * Reads presentational config (image, description) from templateConfig sections.
+ */
+function OpenCheckoutSectionCard({
+  section,
+  rows,
+  surface,
+  imageAspect,
+  onToggle,
+  onQuantityChange,
+}: {
+  section: TicketCardSection
+  rows: TicketRowVM[]
+  surface: TicketCardSurface
+  imageAspect?: SectionImageAspect
+  onToggle: (attendeeId: string, product: ProductsPass) => void
+  onQuantityChange: (
+    attendeeId: string,
+    product: ProductsPass,
+    qty: number,
+  ) => void
+}) {
+  if (rows.length === 0) return null
+
+  return (
+    <article
+      style={resolveSurfaceStyle(surface)}
+      className="relative flex h-full w-full flex-col rounded-2xl overflow-hidden shadow-sm after:pointer-events-none after:absolute after:inset-0 after:rounded-2xl after:border after:border-border"
+    >
+      {section.image_url && (
+        <div
+          className={cn(
+            "relative w-full bg-muted",
+            resolveAspectClass(section.image_aspect ?? imageAspect),
+          )}
+        >
+          <Image
+            src={section.image_url}
+            alt={section.label}
+            fill
+            sizes="(max-width: 768px) 100vw, 720px"
+            quality={95}
+            className="object-cover"
+            priority={false}
+          />
+        </div>
+      )}
+      <header className="px-4 pt-4 pb-1">
+        <h3 className="font-semibold text-foreground text-base">
+          {section.label}
+        </h3>
+      </header>
+      {section.description && (
+        <div className="px-4 pt-1 pb-2">
+          <ExpandableDescription
+            text={section.description}
+            clamp={3}
+            className="text-sm text-muted-foreground whitespace-pre-line"
+            buttonClassName={cn(
+              "mt-2 inline-flex items-center gap-1 text-[10px] uppercase tracking-[0.2em] font-bold",
+              "text-[color:var(--accent,currentColor)] hover:opacity-80",
+              "transition-opacity no-underline hover:no-underline",
+              "after:content-['_›'] after:font-normal after:text-base after:leading-none after:relative after:top-[-1px]",
+            )}
+          />
+        </div>
+      )}
+      <div className="mt-auto divide-y divide-border border-t border-border">
+        {rows.map((row) => (
+          <OpenCheckoutProductRow
+            key={row.product.id}
+            row={row}
+            onToggle={onToggle}
+            onQuantityChange={onQuantityChange}
+          />
         ))}
       </div>
     </article>
@@ -397,61 +646,150 @@ function SectionCard({
 }
 
 // ---------------------------------------------------------------------------
-// Layouts
+// Layouts — pass_system (per-attendee)
 // ---------------------------------------------------------------------------
 
-interface LayoutProps {
-  groups: { section: TicketCardSection; products: ProductsPass[] }[]
-  stepType: string
+interface PassSystemLayoutProps {
+  attendees: TicketAttendeeVM[]
+  configSections: TicketCardSection[]
+  onToggle: (attendeeId: string, product: ProductsPass) => void
+  onQuantityChange: (
+    attendeeId: string,
+    product: ProductsPass,
+    qty: number,
+  ) => void
   surface: TicketCardSurface
   imageAspect?: SectionImageAspect
+  isEditing: boolean
+  variant: TicketCardVariant
 }
 
-function StackedLayout({
-  groups,
-  stepType,
+/**
+ * Merges VM section (rows + business state) with presentational config
+ * (image_url, image_aspect, description) from the templateConfig sections.
+ */
+function mergedSectionWithPresentation(
+  vmSection: TicketSectionVM,
+  configSections: TicketCardSection[],
+): TicketSectionVM & {
+  image_url?: string
+  image_aspect?: string
+  description?: string
+} {
+  const config = configSections.find((s) => s.key === vmSection.key)
+  return {
+    ...vmSection,
+    image_url: config?.image_url,
+    image_aspect: config?.image_aspect,
+    description: config?.description,
+  }
+}
+
+function PassSystemStackedLayout({
+  attendees,
+  configSections,
+  onToggle,
+  onQuantityChange,
   surface,
   imageAspect,
-}: LayoutProps) {
-  // Cards sit side by side at a fixed width and wrap, centred. Flex-wrap (not
-  // a fractional grid) keeps every card the same size regardless of how many
-  // sections exist, so a lone card doesn't stretch to fill the row. The parent
-  // step is widened (max-w-6xl) so up to three cards fit per row on desktop.
+  isEditing,
+}: PassSystemLayoutProps) {
+  const { t } = useTranslation()
+
+  // When there is only one attendee, omit the attendee header for a cleaner
+  // layout identical to the open-checkout single-bucket experience.
+  const showAttendeeHeaders = attendees.length > 1
+
   return (
-    <div className="flex flex-wrap items-start justify-center gap-4">
-      {groups.map(({ section, products }) => (
-        <div key={section.key} className="w-full sm:w-[340px]">
-          <SectionCard
-            section={section}
-            products={products}
-            stepType={stepType}
-            surface={surface}
-            imageAspect={imageAspect}
-          />
+    <div className="space-y-8">
+      {attendees.map((attendee) => (
+        <div key={attendee.id}>
+          {showAttendeeHeaders && (
+            <div className="mb-3">
+              <h3 className="font-semibold text-foreground text-sm">
+                {attendee.name ||
+                  t("checkout.attendee_label", { defaultValue: "Attendee" })}
+              </h3>
+              {attendee.category && (
+                <p className="text-xs text-muted-foreground">
+                  {attendee.category}
+                </p>
+              )}
+            </div>
+          )}
+          <div className="flex flex-wrap items-stretch justify-center gap-4">
+            {attendee.sections.map((vmSection) => {
+              const section = mergedSectionWithPresentation(
+                vmSection,
+                configSections,
+              )
+              return (
+                <div key={vmSection.key} className="flex w-full sm:w-[340px]">
+                  <PassSystemSectionCard
+                    section={section}
+                    attendeeId={attendee.id}
+                    onToggle={onToggle}
+                    onQuantityChange={onQuantityChange}
+                    surface={surface}
+                    imageAspect={imageAspect}
+                    isEditing={isEditing}
+                  />
+                </div>
+              )
+            })}
+          </div>
         </div>
       ))}
     </div>
   )
 }
 
-function CompactLayout({ groups, stepType, surface }: LayoutProps) {
-  // Compact strips the image and renders sections as dense rows. Useful
-  // when a popup has many sections and the tenant wants a "list view".
+function PassSystemCompactLayout({
+  attendees,
+  onToggle,
+  onQuantityChange,
+  surface,
+  isEditing,
+}: PassSystemLayoutProps) {
+  const { t } = useTranslation()
+  const showAttendeeHeaders = attendees.length > 1
+
   return (
-    <div
-      style={resolveSurfaceStyle(surface)}
-      className="rounded-2xl overflow-hidden border border-border divide-y divide-border"
-    >
-      {groups.map(({ section, products }) => (
-        <div key={section.key}>
-          <header className="px-4 py-2 bg-muted">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-foreground">
-              {section.label}
-            </h3>
-          </header>
-          <div className="divide-y divide-border">
-            {products.map((p) => (
-              <ProductRow key={p.id} product={p} stepType={stepType} />
+    <div className="space-y-6">
+      {attendees.map((attendee) => (
+        <div key={attendee.id}>
+          {showAttendeeHeaders && (
+            <div className="mb-2">
+              <h3 className="font-semibold text-foreground text-sm">
+                {attendee.name ||
+                  t("checkout.attendee_label", { defaultValue: "Attendee" })}
+              </h3>
+            </div>
+          )}
+          <div
+            style={resolveSurfaceStyle(surface)}
+            className="rounded-2xl overflow-hidden border border-border divide-y divide-border"
+          >
+            {attendee.sections.map((vmSection) => (
+              <div key={vmSection.key}>
+                <header className="px-4 py-2 bg-muted">
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-foreground">
+                    {vmSection.label}
+                  </h3>
+                </header>
+                <div className="divide-y divide-border">
+                  {vmSection.rows.map((row) => (
+                    <PassSystemProductRow
+                      key={row.product.id}
+                      row={row}
+                      attendeeId={attendee.id}
+                      onToggle={onToggle}
+                      onQuantityChange={onQuantityChange}
+                      isEditing={isEditing}
+                    />
+                  ))}
+                </div>
+              </div>
             ))}
           </div>
         </div>
@@ -460,9 +798,156 @@ function CompactLayout({ groups, stepType, surface }: LayoutProps) {
   )
 }
 
-function TabsLayout({ groups, stepType, surface, imageAspect }: LayoutProps) {
-  // Renders section labels as a horizontal anchor strip; sections all
-  // stay visible below. Kept server-renderable — no client-side tab state.
+function PassSystemTabsLayout({
+  attendees,
+  configSections,
+  onToggle,
+  onQuantityChange,
+  surface,
+  imageAspect,
+  isEditing,
+}: PassSystemLayoutProps) {
+  const { t } = useTranslation()
+  const showAttendeeHeaders = attendees.length > 1
+
+  return (
+    <div className="space-y-8">
+      {attendees.map((attendee) => (
+        <div key={attendee.id}>
+          {showAttendeeHeaders && (
+            <div className="mb-3">
+              <h3 className="font-semibold text-foreground text-sm">
+                {attendee.name ||
+                  t("checkout.attendee_label", { defaultValue: "Attendee" })}
+              </h3>
+            </div>
+          )}
+          <div className="space-y-3">
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              {attendee.sections.map((vmSection) => (
+                <a
+                  key={vmSection.key}
+                  href={`#${attendee.id}-${vmSection.key}`}
+                  className="px-3 py-1.5 rounded-full text-xs font-medium border border-border bg-card hover:bg-muted whitespace-nowrap"
+                  aria-label={`${t("common.show", { defaultValue: "Show" })} ${vmSection.label}`}
+                >
+                  {vmSection.label}
+                </a>
+              ))}
+            </div>
+            <div className="space-y-4">
+              {attendee.sections.map((vmSection) => {
+                const section = mergedSectionWithPresentation(
+                  vmSection,
+                  configSections,
+                )
+                return (
+                  <div
+                    key={vmSection.key}
+                    id={`${attendee.id}-${vmSection.key}`}
+                  >
+                    <PassSystemSectionCard
+                      section={section}
+                      attendeeId={attendee.id}
+                      onToggle={onToggle}
+                      onQuantityChange={onQuantityChange}
+                      surface={surface}
+                      imageAspect={imageAspect}
+                      isEditing={isEditing}
+                    />
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Layouts — open checkout (flat, no attendee axis — identical to old behavior)
+// ---------------------------------------------------------------------------
+
+interface OpenCheckoutLayoutProps {
+  groups: { section: TicketCardSection; rows: TicketRowVM[] }[]
+  surface: TicketCardSurface
+  imageAspect?: SectionImageAspect
+  onToggle: (attendeeId: string, product: ProductsPass) => void
+  onQuantityChange: (
+    attendeeId: string,
+    product: ProductsPass,
+    qty: number,
+  ) => void
+}
+
+function OpenCheckoutStackedLayout({
+  groups,
+  surface,
+  imageAspect,
+  onToggle,
+  onQuantityChange,
+}: OpenCheckoutLayoutProps) {
+  return (
+    <div className="flex flex-wrap items-stretch justify-center gap-4">
+      {groups.map(({ section, rows }) => (
+        <div key={section.key} className="flex w-full sm:w-[340px]">
+          <OpenCheckoutSectionCard
+            section={section}
+            rows={rows}
+            surface={surface}
+            imageAspect={imageAspect}
+            onToggle={onToggle}
+            onQuantityChange={onQuantityChange}
+          />
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function OpenCheckoutCompactLayout({
+  groups,
+  surface,
+  onToggle,
+  onQuantityChange,
+}: OpenCheckoutLayoutProps) {
+  return (
+    <div
+      style={resolveSurfaceStyle(surface)}
+      className="rounded-2xl overflow-hidden border border-border divide-y divide-border"
+    >
+      {groups.map(({ section, rows }) => (
+        <div key={section.key}>
+          <header className="px-4 py-2 bg-muted">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-foreground">
+              {section.label}
+            </h3>
+          </header>
+          <div className="divide-y divide-border">
+            {rows.map((row) => (
+              <OpenCheckoutProductRow
+                key={row.product.id}
+                row={row}
+                onToggle={onToggle}
+                onQuantityChange={onQuantityChange}
+              />
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function OpenCheckoutTabsLayout({
+  groups,
+  surface,
+  imageAspect,
+  onToggle,
+  onQuantityChange,
+}: OpenCheckoutLayoutProps) {
   const { t } = useTranslation()
   return (
     <div className="space-y-3">
@@ -479,14 +964,15 @@ function TabsLayout({ groups, stepType, surface, imageAspect }: LayoutProps) {
         ))}
       </div>
       <div className="space-y-4">
-        {groups.map(({ section, products }) => (
+        {groups.map(({ section, rows }) => (
           <div key={section.key} id={section.key}>
-            <SectionCard
+            <OpenCheckoutSectionCard
               section={section}
-              products={products}
-              stepType={stepType}
+              rows={rows}
               surface={surface}
               imageAspect={imageAspect}
+              onToggle={onToggle}
+              onQuantityChange={onQuantityChange}
             />
           </div>
         ))}
@@ -504,41 +990,27 @@ export default function VariantTicketCard({
   stepType,
   templateConfig,
 }: VariantProps) {
-  const sections = parseSections(templateConfig)
+  // Business logic via contract — routes to passesProvider or dynamicItems
+  const view = useTicketsStep({ stepType, templateConfig, products })
+
+  const configSections = parseSections(templateConfig)
   const variant = parseVariant(templateConfig)
   const surface = parseSurface(templateConfig)
   const imageAspect = parseImageAspect(templateConfig)
   const { t } = useTranslation()
 
-  // No sections configured — show every product in a single ungrouped
-  // card so the renderer stays safe for tenants who just dropped a
-  // tickets step in without configuring sections yet.
-  const groups = sections.length
-    ? sections
-        .map((section) => ({
-          section,
-          products: section.product_ids
-            .map((id) => products.find((p) => p.id === id))
-            .filter(Boolean) as ProductsPass[],
-        }))
-        .filter((g) => g.products.length > 0)
-    : products.length
-      ? [
-          {
-            section: {
-              key: "all",
-              label: t("checkout.steps.tickets_title", {
-                defaultValue: "Tickets",
-              }),
-              order: 0,
-              product_ids: products.map((p) => p.id),
-            } as TicketCardSection,
-            products,
-          },
-        ]
-      : []
+  // Empty state — guard against vacuous-truth: an empty attendees array makes
+  // Array.every() return true, which would falsely report empty for pass_system
+  // while data is still loading. Require at least one attendee before checking rows.
+  const isEmpty =
+    view.mode === "pass_system"
+      ? view.attendees.length > 0 &&
+        view.attendees.every((a) =>
+          a.sections.every((s) => s.rows.length === 0),
+        )
+      : products.length === 0
 
-  if (groups.length === 0) {
+  if (isEmpty) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-center">
         <ShoppingBag className="w-12 h-12 text-muted-foreground mb-4" />
@@ -551,27 +1023,88 @@ export default function VariantTicketCard({
     )
   }
 
-  if (variant === "compact") {
+  // ---------------------------------------------------------------------------
+  // pass_system path — per-attendee layout using contract VM
+  // ---------------------------------------------------------------------------
+
+  if (view.mode === "pass_system" && view.attendees.length > 0) {
+    const layoutProps: PassSystemLayoutProps = {
+      attendees: view.attendees,
+      configSections,
+      onToggle: view.toggleRow,
+      onQuantityChange: view.setRowQuantity,
+      surface,
+      imageAspect,
+      isEditing: view.isEditing,
+      variant,
+    }
+
+    if (variant === "compact") {
+      return <PassSystemCompactLayout {...layoutProps} />
+    }
+    if (variant === "tabs") {
+      return <PassSystemTabsLayout {...layoutProps} />
+    }
+    return <PassSystemStackedLayout {...layoutProps} />
+  }
+
+  // ---------------------------------------------------------------------------
+  // open-checkout / simple_quantity path — flat layout, actions via contract
+  // ---------------------------------------------------------------------------
+  // State (quantity/selection) now comes from the VM's synthetic bucket
+  // (view.sections). Presentational config (image_url, image_aspect,
+  // description) still comes from configSections (TicketCardSection).
+  // The two are zipped by section key.
+
+  const vmSectionsByKey = new Map(view.sections.map((s) => [s.key, s]))
+
+  // Build open groups: config section drives layout/image; VM section drives rows.
+  // Fall back to a single flat group when configSections is empty.
+  const openGroups = configSections.length
+    ? configSections
+        .map((section) => ({
+          section,
+          rows: vmSectionsByKey.get(section.key)?.rows ?? [],
+        }))
+        .filter((g) => g.rows.length > 0)
+    : view.sections.length
+      ? view.sections.map((vmSection) => ({
+          section: {
+            key: vmSection.key,
+            label: vmSection.label,
+            order: 0,
+            product_ids: vmSection.rows.map((r) => r.product.id),
+          } as TicketCardSection,
+          rows: vmSection.rows,
+        }))
+      : []
+
+  if (openGroups.length === 0) {
     return (
-      <CompactLayout groups={groups} stepType={stepType} surface={surface} />
+      <div className="flex flex-col items-center justify-center py-12 text-center">
+        <ShoppingBag className="w-12 h-12 text-muted-foreground mb-4" />
+        <p className="text-muted-foreground">
+          {t("checkout.tickets_empty", {
+            defaultValue: "No tickets available yet.",
+          })}
+        </p>
+      </div>
     )
+  }
+
+  const openLayoutProps: OpenCheckoutLayoutProps = {
+    groups: openGroups,
+    surface,
+    imageAspect,
+    onToggle: view.toggleRow,
+    onQuantityChange: view.setRowQuantity,
+  }
+
+  if (variant === "compact") {
+    return <OpenCheckoutCompactLayout {...openLayoutProps} />
   }
   if (variant === "tabs") {
-    return (
-      <TabsLayout
-        groups={groups}
-        stepType={stepType}
-        surface={surface}
-        imageAspect={imageAspect}
-      />
-    )
+    return <OpenCheckoutTabsLayout {...openLayoutProps} />
   }
-  return (
-    <StackedLayout
-      groups={groups}
-      stepType={stepType}
-      surface={surface}
-      imageAspect={imageAspect}
-    />
-  )
+  return <OpenCheckoutStackedLayout {...openLayoutProps} />
 }

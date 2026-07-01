@@ -3,6 +3,7 @@ import { usePathname, useRouter } from "next/navigation"
 import { Fragment, useEffect, useState } from "react"
 import { LanguageSwitcher } from "@/components/common/LanguageSwitcher"
 import { MobilePopupSwitcher } from "@/components/MobilePopupSwitcher"
+import { useIsMobile } from "@/hooks/useIsMobile"
 import { cn } from "@/lib/utils"
 import { useCityProvider } from "@/providers/cityProvider"
 import {
@@ -18,14 +19,75 @@ import useBreadcrumbNameMapping from "./hooks/useBreadcrumbNameMapping"
 import { SidebarTrigger } from "./SidebarComponents"
 
 const SHOW_THRESHOLD = 64
-const DELTA = 4
+// Cumulative scroll distance (px) in one direction before the header toggles.
+// Replaces the old bare per-event DELTA; hysteresis kills the wobble re-trigger
+// that tiny direction flips (common with touch/momentum scroll) used to cause.
+const TOGGLE_DISTANCE = 10
 const HEADER_HEIGHT = 56 // matches h-14
 
-function useHideOnScroll() {
+function useHideOnScroll(enabled: boolean) {
   const [hidden, setHidden] = useState(false)
 
   useEffect(() => {
+    // Force the header open whenever the hook is disabled (e.g. a
+    // desktop→mobile resize while hidden), then bail without attaching a
+    // listener so mobile keeps a static header.
+    if (!enabled) {
+      setHidden(false)
+      return
+    }
+
     const lastScrollMap = new WeakMap<EventTarget, number>()
+    // Signed cumulative movement per target since the last direction flip.
+    // Positive = net downscroll, negative = net upscroll.
+    const accumMap = new WeakMap<EventTarget, number>()
+
+    let frame = 0
+    let pendingTarget: EventTarget | null = null
+    let pendingEl: HTMLElement | Element | null = null
+
+    const evaluate = () => {
+      frame = 0
+      const target = pendingTarget
+      const el = pendingEl
+      pendingTarget = null
+      pendingEl = null
+      if (!target || !el) return
+
+      const currentY = el.scrollTop
+      const lastY = lastScrollMap.get(target) ?? 0
+      const diff = currentY - lastY
+      lastScrollMap.set(target, currentY)
+
+      if (currentY <= SHOW_THRESHOLD) {
+        accumMap.set(target, 0)
+        setHidden(false)
+        return
+      }
+
+      // Accumulate signed movement; reset when direction flips so a reversal
+      // starts counting from zero rather than from a stale opposite total.
+      const prevAccum = accumMap.get(target) ?? 0
+      const accum =
+        Math.sign(diff) === Math.sign(prevAccum) ? prevAccum + diff : diff
+      accumMap.set(target, accum)
+
+      if (accum >= TOGGLE_DISTANCE) {
+        // Only hide when there is at least one header's worth of room left
+        // below. Hiding collapses the header to h-0, which grows the scroll
+        // container; if scrollTop would no longer fit, the browser clamps it
+        // down and emits a scroll-up event, re-showing the header and looping
+        // every frame on short pages.
+        const roomBelow = el.scrollHeight - el.clientHeight - currentY
+        if (roomBelow >= HEADER_HEIGHT) {
+          setHidden(true)
+          accumMap.set(target, 0)
+        }
+      } else if (accum <= -TOGGLE_DISTANCE) {
+        setHidden(false)
+        accumMap.set(target, 0)
+      }
+    }
 
     const onScroll = (event: Event) => {
       const target = event.target
@@ -44,24 +106,12 @@ function useHideOnScroll() {
         target instanceof Document
           ? (document.scrollingElement ?? document.documentElement)
           : (target as HTMLElement)
-      const currentY = el.scrollTop
-      const lastY = lastScrollMap.get(target) ?? 0
-      const diff = currentY - lastY
-      lastScrollMap.set(target, currentY)
-
-      if (currentY <= SHOW_THRESHOLD) {
-        setHidden(false)
-        return
-      }
-      if (diff > DELTA) {
-        // Only hide when there is at least one header's worth of room left
-        // below. Hiding collapses the header to h-0, which grows the scroll
-        // container; if scrollTop would no longer fit, the browser clamps it
-        // down and emits a scroll-up event, re-showing the header and looping
-        // every frame on short pages.
-        const roomBelow = el.scrollHeight - el.clientHeight - currentY
-        if (roomBelow >= HEADER_HEIGHT) setHidden(true)
-      } else if (diff < -DELTA) setHidden(false)
+      // Stash the latest target and run the decision logic at most once per
+      // painted frame, so momentum scroll can't fire the toggle many times
+      // per frame.
+      pendingTarget = target
+      pendingEl = el
+      if (frame === 0) frame = requestAnimationFrame(evaluate)
     }
 
     window.addEventListener("scroll", onScroll, {
@@ -70,8 +120,9 @@ function useHideOnScroll() {
     })
     return () => {
       window.removeEventListener("scroll", onScroll, { capture: true })
+      if (frame !== 0) cancelAnimationFrame(frame)
     }
-  }, [])
+  }, [enabled])
 
   return hidden
 }
@@ -81,7 +132,8 @@ const HeaderBar = () => {
   const pathname = usePathname()
   const city = getCity()
   const router = useRouter()
-  const hidden = useHideOnScroll()
+  const isMobile = useIsMobile()
+  const hidden = useHideOnScroll(!isMobile)
 
   const handleClickCity = () => {
     router.push(`/portal/${city?.slug}`)

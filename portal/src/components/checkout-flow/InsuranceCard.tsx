@@ -33,7 +33,7 @@ export default function InsuranceCard({
     <motion.div
       whileHover={{ y: -1 }}
       transition={{ type: "spring", stiffness: 400, damping: 25 }}
-      className="rounded-2xl border border-border border-l-4 border-l-amber-400 p-5 shadow-sm"
+      className="rounded-2xl border border-amber-400/30 border-l-4 border-l-amber-400 p-5 shadow-sm"
       style={stepCardSurfaceStyle()}
     >
       <div className="flex items-start gap-3">

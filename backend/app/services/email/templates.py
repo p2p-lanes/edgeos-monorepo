@@ -59,6 +59,7 @@ class ApplicationAcceptedContext(BaseModel):
     last_name: str
     popup_name: str
     portal_url: str | None = None
+    passes_url: str | None = None
 
 
 class ApplicationRejectedContext(BaseModel):
@@ -84,6 +85,7 @@ class ApplicationAcceptedWithDiscountContext(BaseModel):
     popup_name: str
     discount_percentage: int  # e.g. 50 = "50% off", 100 = "full waiver"
     portal_url: str | None = None
+    passes_url: str | None = None
 
 
 class ApplicationAcceptedWithIncentiveContext(BaseModel):
@@ -100,6 +102,7 @@ class ApplicationAcceptedWithIncentiveContext(BaseModel):
     incentive_amount: float  # e.g. 1000.00
     incentive_currency: str  # e.g. "USD"
     portal_url: str | None = None
+    passes_url: str | None = None
 
 
 class ApplicationAcceptedScholarshipRejectedContext(BaseModel):
@@ -113,6 +116,7 @@ class ApplicationAcceptedScholarshipRejectedContext(BaseModel):
     last_name: str
     popup_name: str
     portal_url: str | None = None
+    passes_url: str | None = None
 
 
 class PaymentProductItem(BaseModel):
@@ -581,6 +585,14 @@ POPUP_TEMPLATE_METADATA: list[dict[str, Any]] = [
                 "required": False,
                 "group": "General",
             },
+            {
+                "name": "passes_url",
+                "label": "Passes URL",
+                "type": "string",
+                "description": "Deep link to this popup's passes page",
+                "required": False,
+                "group": "General",
+            },
             *_POPUP_EVENT_VARIABLES,
         ],
     },
@@ -649,6 +661,14 @@ POPUP_TEMPLATE_METADATA: list[dict[str, Any]] = [
                 "required": False,
                 "group": "General",
             },
+            {
+                "name": "passes_url",
+                "label": "Passes URL",
+                "type": "string",
+                "description": "Deep link to this popup's passes page",
+                "required": False,
+                "group": "General",
+            },
             *_POPUP_EVENT_VARIABLES,
         ],
     },
@@ -707,6 +727,14 @@ POPUP_TEMPLATE_METADATA: list[dict[str, Any]] = [
                 "required": False,
                 "group": "General",
             },
+            {
+                "name": "passes_url",
+                "label": "Passes URL",
+                "type": "string",
+                "description": "Deep link to this popup's passes page",
+                "required": False,
+                "group": "General",
+            },
             *_POPUP_EVENT_VARIABLES,
         ],
     },
@@ -738,6 +766,14 @@ POPUP_TEMPLATE_METADATA: list[dict[str, Any]] = [
                 "label": "Portal URL",
                 "type": "string",
                 "description": "Link to the attendee portal",
+                "required": False,
+                "group": "General",
+            },
+            {
+                "name": "passes_url",
+                "label": "Passes URL",
+                "type": "string",
+                "description": "Deep link to this popup's passes page",
                 "required": False,
                 "group": "General",
             },

@@ -6,10 +6,12 @@ import {
   Check,
   Heart,
   Minus,
+  Pencil,
   Plus,
   Sparkles,
   Ticket,
   User,
+  X,
 } from "lucide-react"
 import { useEffect, useMemo, useState } from "react"
 import { useTranslation } from "react-i18next"
@@ -139,7 +141,9 @@ const stripedPatternStyle = {
 }
 
 export default function PassSelectionSection() {
-  const { attendeePasses, toggleProduct, isEditing } = usePassesProvider()
+  const { t } = useTranslation()
+  const { attendeePasses, toggleProduct, isEditing, toggleEditing } =
+    usePassesProvider()
   const { editCredit } = useCheckout()
   const { getRelevantApplication } = useApplication()
   const { getCity } = useCityProvider()
@@ -148,6 +152,11 @@ export default function PassSelectionSection() {
     null,
   )
   const canManageAttendees = !isEditing && !!getRelevantApplication()
+  // Editing modifies already-purchased passes, so only offer it when the
+  // attendee actually owns something. Mirrors the legacy in-flow toggle.
+  const somePurchased = attendeePasses.some((a) =>
+    a.products.some((p) => p.purchased),
+  )
 
   const groupedByCategory = useMemo(() => {
     const map = new Map<string, AttendeePassState[]>()
@@ -173,20 +182,57 @@ export default function PassSelectionSection() {
       transition={{ duration: 0.35, ease: "easeOut" }}
       className="space-y-3"
     >
+      {/* Edit passes toggle — in-flow, only when the attendee owns passes */}
+      {somePurchased && (
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={() => toggleEditing()}
+            aria-label={
+              isEditing
+                ? t("passes.cancel_pass_editing")
+                : t("passes.edit_passes")
+            }
+            className={cn(
+              "flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all shadow-sm active:scale-95",
+              isEditing
+                ? "bg-muted text-foreground hover:bg-muted/80"
+                : "bg-card border border-border text-foreground hover:bg-muted",
+            )}
+          >
+            {isEditing ? (
+              <>
+                <X className="w-4 h-4" />
+                {t("passes.cancel_pass_editing")}
+              </>
+            ) : (
+              <>
+                <Pencil className="w-4 h-4" />
+                {t("passes.edit_passes")}
+              </>
+            )}
+          </button>
+        </div>
+      )}
+
       {/* Edit Mode Banner */}
       {isEditing && (
         <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-primary/30 rounded-2xl p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="font-semibold text-primary">Edit Mode</p>
+              <p className="font-semibold text-primary">
+                {t("checkout.edit_mode_title")}
+              </p>
               <p className="text-sm text-primary">
-                Click on a purchased pass to get credit, then select a new pass.
+                {t("checkout.edit_mode_description")}
               </p>
             </div>
             {editCredit > 0 && (
               <div className="bg-primary/20 px-3 py-1.5 rounded-lg">
                 <p className="text-sm font-semibold text-primary">
-                  Credit: {formatCurrency(editCredit)}
+                  {t("checkout.credit_label", {
+                    amount: formatCurrency(editCredit),
+                  })}
                 </p>
               </div>
             )}
