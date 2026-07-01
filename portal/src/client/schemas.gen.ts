@@ -965,6 +965,11 @@ export const ApplicationPublicSchema = {
             title: 'Credit',
             default: '0'
         },
+        fee_credit_granted: {
+            type: 'boolean',
+            title: 'Fee Credit Granted',
+            default: false
+        },
         submitted_at: {
             anyOf: [
                 {

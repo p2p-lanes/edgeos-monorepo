@@ -81,6 +81,12 @@ class ApplicationBase(SQLModel):
         sa_column=Column(Numeric(10, 2), nullable=False, server_default="0"),
     )
 
+    # Whether the application fee has already been converted to portal credit
+    fee_credit_granted: bool = Field(
+        default=False,
+        sa_column=Column(Boolean, nullable=False, server_default="false"),
+    )
+
     # Timestamps
     submitted_at: datetime | None = Field(
         default=None, nullable=True, sa_type=DateTime(timezone=True)
@@ -130,6 +136,7 @@ class ApplicationPublic(BaseModel):
 
     # Credit balance
     credit: Decimal = Decimal("0")
+    fee_credit_granted: bool = False
 
     # Timestamps
     submitted_at: datetime | None = None

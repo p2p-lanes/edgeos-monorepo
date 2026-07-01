@@ -221,6 +221,7 @@ export type ApplicationPublic = {
     [key: string]: unknown;
 } | null);
     credit?: string;
+    fee_credit_granted?: boolean;
     submitted_at?: (string | null);
     accepted_at?: (string | null);
     created_at?: (string | null);

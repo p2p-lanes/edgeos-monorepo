@@ -1022,6 +1022,9 @@ async def update_my_application(
                         human_id=current_human.id,
                     )
                 )
+            from app.api.application.crud import _maybe_grant_fee_credit
+
+            _maybe_grant_fee_credit(db, application)
     elif (
         app_update.get("status") == ApplicationStatus.IN_REVIEW.value
         and application.human
