@@ -1,5 +1,6 @@
 import uuid
 from datetime import UTC, datetime
+from decimal import Decimal
 from typing import TYPE_CHECKING
 
 from fastapi import HTTPException, status
@@ -870,6 +871,7 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
             application.status = ApplicationStatus.ACCEPTED.value
             application.accepted_at = datetime.now(UTC)
             self.create_snapshot(session, application, "auto_accepted")
+            _maybe_grant_fee_credit(session, application)
         else:
             self.create_snapshot(session, application, "submitted")
 
@@ -976,6 +978,7 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         application.accepted_at = datetime.now(UTC)
         session.add(application)
         self.create_snapshot(session, application, "admin_grant_accepted")
+        _maybe_grant_fee_credit(session, application)
         return application
 
     def create_for_admin_grant(
@@ -1038,6 +1041,7 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         session.add(attendee)
         self.create_snapshot(session, application, "admin_grant_created")
         session.flush()
+        _maybe_grant_fee_credit(session, application)
         return application
 
     def accept(
@@ -1063,6 +1067,7 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
 
         # Create snapshot — uses flush internally, caller owns the commit
         self.create_snapshot(session, application, "accepted")
+        _maybe_grant_fee_credit(session, application)
         return application
 
     def create_attendee(
@@ -1193,6 +1198,10 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         # If status doesn't change (e.g. application is already ACCEPTED, or strategy
         # keeps it IN_REVIEW), it returns without committing — the flush above is dangling.
         application = approval_calculator.recalculate_status(session, application)
+
+        # Grant fee credit if the calculator reached ACCEPTED (flush-only;
+        # the unconditional commit below persists it together with scholarship fields).
+        _maybe_grant_fee_credit(session, application)
 
         # 8. Commit unconditionally: guarantees scholarship fields are persisted
         # regardless of whether recalculate_status committed or not.
@@ -1357,6 +1366,60 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
             allowed=False,
             reason="no_access",
         )
+
+
+def _maybe_grant_fee_credit(
+    session: Session,
+    application: "Applications",
+) -> None:
+    """Grant the application fee as portal credit on the first acceptance.
+
+    Implements the fee → credit conversion (Spec R-BE-08, R-BE-09).
+    No-op when:
+    - Popup does not require an application fee.
+    - The grant has already been issued (fee_credit_granted=True, idempotency guard).
+    - The application's latest fee payment is not APPROVED.
+
+    Flush-only — caller owns the commit boundary, keeping this atomic with
+    the status transition that triggered it.
+    """
+    from app.api.audit_log.actor import actor_from_system
+    from app.api.audit_log.constants import AuditAction
+    from app.api.payment.crud import adjust_application_credit, payments_crud
+    from app.api.payment.schemas import PaymentStatus
+
+    if application.status != ApplicationStatus.ACCEPTED.value:
+        return
+
+    if application.fee_credit_granted:
+        return
+
+    # Load popup explicitly to avoid stale lazy-load after an internal commit
+    # (e.g. recalculate_status commits and refreshes the application row).
+    from app.api.popup.models import Popups
+
+    popup = session.get(Popups, application.popup_id)
+    if popup is None or not popup.requires_application_fee:
+        return
+
+    fee_payment = payments_crud.get_latest_fee_payment(session, application.id)
+    if fee_payment is None or fee_payment.status != PaymentStatus.APPROVED.value:
+        return
+
+    amount = Decimal(str(fee_payment.amount_charged or fee_payment.amount))
+
+    adjust_application_credit(
+        session,
+        application,
+        amount,
+        kind=AuditAction.CREDIT_GRANTED,
+        source="application_fee",
+        actor=actor_from_system(),
+        payment=fee_payment,
+    )
+
+    application.fee_credit_granted = True
+    session.add(application)
 
 
 applications_crud = ApplicationsCRUD()

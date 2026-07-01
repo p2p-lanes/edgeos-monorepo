@@ -211,6 +211,7 @@
     },
     "to_pay": "应付",
     "credit_label": "抵扣：{{amount}}",
+    "credit_applied_label": "已使用抵扣",
     "edit_mode_title": "编辑模式",
     "edit_mode_description": "选择已购买的通行证以获得抵扣，然后选择一张新的。",
     "cart": {

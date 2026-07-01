@@ -20,6 +20,14 @@ class AuditAction:
     # A human's rating (red/orange/green flag, star, …) was changed by a user.
     HUMAN_RATING_CHANGED = "human.rating_changed"
 
+    # Credit movements on an application (grant, debit, restore).
+    CREDIT_GRANTED = "credit.granted"
+    CREDIT_APPLIED = "credit.applied"
+    CREDIT_RESTORED = "credit.restored"
+
+    # Portal edit-passes settlement (edit-pass swap completed).
+    PASSES_EDITED = "passes.edited"
+
 
 class AuditEntityType:
     """Type of the primary entity an event is grouped under."""

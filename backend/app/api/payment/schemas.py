@@ -161,6 +161,14 @@ class PaymentBase(SQLModel):
         default=None, foreign_key="users.id", nullable=True, index=True
     )
 
+    # Credit deducted from application.credit at payment creation.
+    # 0 when no credit was consumed; restored to the application balance
+    # when the payment expires or is cancelled (PENDING-only path).
+    credit_applied: Decimal = Field(
+        default=Decimal("0"),
+        sa_column=Column(Numeric(10, 2), nullable=False, server_default="0"),
+    )
+
 
 class PaymentProductRequest(BaseModel):
     """Product selection for payment."""
@@ -251,6 +259,9 @@ class PaymentPreview(BaseModel):
     discount_value: Decimal | None = None
     group_id: uuid.UUID | None = None
     scholarship_discount: bool = False
+
+    # Credit consumed from the application balance for this payment.
+    credit_applied: Decimal = Decimal("0")
 
     # Payment provider response (populated on creation)
     status: str | None = None

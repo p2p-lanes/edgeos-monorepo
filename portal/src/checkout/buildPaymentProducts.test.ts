@@ -127,7 +127,7 @@ describe("buildPaymentProducts", () => {
       isEditing: false,
       appCredit: 0,
       checkoutMode: CHECKOUT_MODE.PASS_SYSTEM,
-      creditsEnabled: true,
+      editPassesEnabled: true,
     })
 
     expect(result.isMonthUpgrade).toBe(true)
@@ -140,7 +140,7 @@ describe("buildPaymentProducts", () => {
     ])
   })
 
-  it("disables month upgrade detection when credits_enabled is false", () => {
+  it("disables month upgrade detection when edit_passes_enabled is false", () => {
     const purchasedWeek = createProduct({
       id: "week-owned",
       duration_type: "week",
@@ -174,7 +174,7 @@ describe("buildPaymentProducts", () => {
       isEditing: false,
       appCredit: 0,
       checkoutMode: CHECKOUT_MODE.PASS_SYSTEM,
-      creditsEnabled: false,
+      editPassesEnabled: false,
     })
 
     expect(result.isMonthUpgrade).toBe(false)

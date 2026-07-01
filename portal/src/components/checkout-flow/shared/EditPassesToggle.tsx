@@ -18,13 +18,17 @@ import { formatCurrency } from "@/types/checkout"
 export default function EditPassesToggle() {
   const { t } = useTranslation()
   const { attendeePasses, isEditing, toggleEditing } = usePassesProvider()
-  const { editCredit } = useCheckout()
+  const { editCredit, editPassesEnabled } = useCheckout()
 
   const somePurchased = attendeePasses.some((a) =>
     a.products.some((p) => p.purchased),
   )
 
-  if (!somePurchased) return null
+  // Hide the edit-passes affordance entirely when the popup has pass editing
+  // disabled. Credit still applies to purchases (that behavior is decoupled);
+  // this only gates the in-flow "give up a pass for credit" UI so it never
+  // shows a control that does nothing.
+  if (!editPassesEnabled || !somePurchased) return null
 
   return (
     <>

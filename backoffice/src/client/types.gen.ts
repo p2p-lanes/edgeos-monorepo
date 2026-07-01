@@ -221,6 +221,7 @@ export type ApplicationPublic = {
     [key: string]: unknown;
 } | null);
     credit?: string;
+    fee_credit_granted?: boolean;
     submitted_at?: (string | null);
     accepted_at?: (string | null);
     created_at?: (string | null);
@@ -1839,6 +1840,22 @@ export type FormSectionUpdate = {
 };
 
 /**
+ * Request body for POST /applications/{id}/credit — manual admin credit grant.
+ */
+export type GrantCreditRequest = {
+    amount: (number | string);
+    note?: (string | null);
+};
+
+/**
+ * Response from POST /applications/{id}/credit.
+ */
+export type GrantCreditResponse = {
+    application_id: string;
+    credit: string;
+};
+
+/**
  * One $0 payment created by the admin bulk-grant flow.
  */
 export type GrantedPaymentInfo = {
@@ -2060,6 +2077,8 @@ export type HumanActivityItem = {
     products?: Array<HumanActivityProduct>;
     rating?: (string | null);
     previous_rating?: (string | null);
+    source?: (string | null);
+    balance_after?: (string | null);
     actor_id?: (string | null);
     actor_name?: (string | null);
     actor_email?: (string | null);
@@ -2068,7 +2087,7 @@ export type HumanActivityItem = {
 /**
  * The kind of event a timeline item represents.
  */
-export type HumanActivityKind = 'application.submitted' | 'application.accepted' | 'payment.completed' | 'ticket.added' | 'note.added' | 'rating.changed' | 'comment.added';
+export type HumanActivityKind = 'application.submitted' | 'application.accepted' | 'payment.completed' | 'ticket.added' | 'note.added' | 'rating.changed' | 'comment.added' | 'credit.granted' | 'credit.applied' | 'credit.restored' | 'passes.edited';
 
 /**
  * One purchased line in a `payment.completed` item (snapshot at purchase).
@@ -2579,6 +2598,7 @@ export type PaymentPreview = {
     discount_value?: (string | null);
     group_id?: (string | null);
     scholarship_discount?: boolean;
+    credit_applied?: string;
     status?: (string | null);
     external_id?: (string | null);
     checkout_url?: (string | null);
@@ -2658,6 +2678,7 @@ export type PaymentPublic = {
     group_id?: (string | null);
     payment_type?: string;
     granted_by_user_id?: (string | null);
+    credit_applied?: string;
     id: string;
     products_snapshot?: Array<PaymentProductResponse>;
     buyer_email?: (string | null);
@@ -2794,7 +2815,7 @@ export type PopupAdmin = {
     self_check_in_enabled?: boolean;
     checkin_pass_lead_days?: (number | null);
     show_attendee_directory?: boolean;
-    credits_enabled?: boolean;
+    edit_passes_enabled?: boolean;
     installments_enabled?: boolean;
     installments_deadline?: (string | null);
     installments_max?: (number | null);
@@ -2850,7 +2871,7 @@ export type PopupCreate = {
     events_enabled?: boolean;
     self_check_in_enabled?: boolean;
     show_attendee_directory?: boolean;
-    credits_enabled?: boolean;
+    edit_passes_enabled?: boolean;
     installments_enabled?: boolean;
     installments_deadline?: (string | null);
     installments_max?: (number | null);
@@ -2901,7 +2922,7 @@ export type PopupPublic = {
     application_layout?: ApplicationLayout;
     events_enabled?: boolean;
     show_attendee_directory?: boolean;
-    credits_enabled?: boolean;
+    edit_passes_enabled?: boolean;
     installments_enabled?: boolean;
     installments_deadline?: (string | null);
     installments_max?: (number | null);
@@ -2989,7 +3010,7 @@ export type PopupUpdate = {
     events_enabled?: (boolean | null);
     self_check_in_enabled?: (boolean | null);
     show_attendee_directory?: (boolean | null);
-    credits_enabled?: (boolean | null);
+    edit_passes_enabled?: (boolean | null);
     installments_enabled?: (boolean | null);
     installments_deadline?: (string | null);
     installments_max?: (number | null);
@@ -4266,6 +4287,14 @@ export type ApplicationsGetApplicationData = {
 };
 
 export type ApplicationsGetApplicationResponse = (ApplicationPublic);
+
+export type ApplicationsGrantApplicationCreditData = {
+    applicationId: string;
+    requestBody: GrantCreditRequest;
+    xTenantId?: (string | null);
+};
+
+export type ApplicationsGrantApplicationCreditResponse = (GrantCreditResponse);
 
 export type ApplicationsListMyApplicationsData = {
     /**

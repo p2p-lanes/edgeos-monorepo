@@ -51,7 +51,7 @@ interface UsePaymentSubmitParams {
     lastName: string
     formData: Record<string, unknown>
   } | null
-  creditsEnabled: boolean
+  editPassesEnabled: boolean
   popupName?: string | null
 }
 
@@ -85,7 +85,7 @@ export function usePaymentSubmit({
   paymentCompleteRef,
   submitMode,
   buyerData,
-  creditsEnabled,
+  editPassesEnabled,
   popupName,
 }: UsePaymentSubmitParams) {
   const { t } = useTranslation()
@@ -162,7 +162,7 @@ export function usePaymentSubmit({
           isEditing,
           appCredit,
           checkoutMode,
-          creditsEnabled,
+          editPassesEnabled,
         },
       )
 
@@ -364,7 +364,7 @@ export function usePaymentSubmit({
     submitMode,
     popupName,
     router,
-    creditsEnabled,
+    editPassesEnabled,
     isSubmitting,
     t,
   ])

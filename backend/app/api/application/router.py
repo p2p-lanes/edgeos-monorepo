@@ -24,6 +24,8 @@ from app.api.application.schemas import (
     CompanionParticipation,
     DetachCompanionRequest,
     DirectoryProduct,
+    GrantCreditRequest,
+    GrantCreditResponse,
     GrantedPaymentInfo,
     NoParticipation,
     ParticipationResponse,
@@ -45,6 +47,7 @@ from app.core.dependencies.users import (
     AdminOrApiKey_ApplicationsWrite,
     AdminOrApiKeySession_ApplicationsRead,
     AdminOrApiKeySession_ApplicationsWrite,
+    CurrentAdmin,
     CurrentHuman,
     HumanTenantSession,
     needs,
@@ -543,6 +546,48 @@ async def get_application(
     return _build_application_public(application)
 
 
+@router.post(
+    "/{application_id}/credit",
+    response_model=GrantCreditResponse,
+    summary="Grant credit to an application",
+)
+async def grant_application_credit(
+    application_id: uuid.UUID,
+    payload: GrantCreditRequest,
+    db: AdminOrApiKeySession_ApplicationsWrite,
+    current_user: CurrentAdmin,
+) -> GrantCreditResponse:
+    """Grant credit to a specific application (BO admin only).
+
+    Calls the central adjust_application_credit helper — the only writer of
+    application.credit — with source=manual and the authenticated admin as actor.
+    Returns the updated credit balance.
+    """
+    from app.api.audit_log.actor import actor_from_user
+    from app.api.audit_log.constants import AuditAction
+    from app.api.payment.crud import adjust_application_credit
+
+    application = crud.applications_crud.get(db, application_id)
+    if not application:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Application not found",
+        )
+
+    new_balance = adjust_application_credit(
+        db,
+        application,
+        payload.amount,
+        kind=AuditAction.CREDIT_GRANTED,
+        source="manual",
+        actor=actor_from_user(current_user),
+        note=payload.note,
+    )
+    db.commit()
+
+    return GrantCreditResponse(application_id=application_id, credit=new_balance)
+
+
 @router.get(
     "/my/applications",
     response_model=ListModel[ApplicationPublic],
@@ -1022,6 +1067,9 @@ async def update_my_application(
                         human_id=current_human.id,
                     )
                 )
+            from app.api.application.crud import _maybe_grant_fee_credit
+
+            _maybe_grant_fee_credit(db, application)
     elif (
         app_update.get("status") == ApplicationStatus.IN_REVIEW.value
         and application.human
