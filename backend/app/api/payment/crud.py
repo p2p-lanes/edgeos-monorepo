@@ -2017,6 +2017,12 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         # Handle zero or negative amount (credit covers cost)
         if preview.amount <= 0:
             current_stored_credit = _account_credit(application)
+            # Attribute the movement to the human who triggered it (portal),
+            # falling back to system for non-request callers. The source is a
+            # give-up only when this is an actual edit; a plain purchase whose
+            # stored credit covers the cart must read as "purchase".
+            _settlement_actor = actor if actor is not None else actor_from_system()
+            _settlement_source = "edit_passes" if obj.edit_passes else "purchase"
             if preview.amount < 0:
                 # Surplus case: give-up credit (edit math) exceeded the new cart.
                 # The surplus converts to persistent stored balance via the helper.
@@ -2037,8 +2043,8 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                         kind=AuditAction.CREDIT_GRANTED
                         if credit_delta > 0
                         else AuditAction.CREDIT_APPLIED,
-                        source="edit_passes",
-                        actor=actor_from_system(),
+                        source=_settlement_source,
+                        actor=_settlement_actor,
                     )
                 preview.credit_applied = credit_consumed
                 preview.amount = Decimal("0")
@@ -2050,8 +2056,8 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                         application,
                         -current_stored_credit,
                         kind=AuditAction.CREDIT_APPLIED,
-                        source="purchase",
-                        actor=actor_from_system(),
+                        source=_settlement_source,
+                        actor=_settlement_actor,
                     )
                 preview.credit_applied = current_stored_credit
 
@@ -2315,7 +2321,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 -preview.credit_applied,
                 kind=AuditAction.CREDIT_APPLIED,
                 source="purchase",
-                actor=actor_from_system(),
+                actor=actor if actor is not None else actor_from_system(),
                 payment=payment,
             )
             payment.credit_applied = preview.credit_applied

@@ -289,3 +289,53 @@ class TestZeroNegativeBranchCredit:
         granted_entries = _audit_entries_for(db, human.id, AuditAction.CREDIT_GRANTED)
         assert len(granted_entries) == 1
         assert granted_entries[0].details["source"] == "edit_passes"
+
+    def test_non_edit_surplus_uses_purchase_source_and_human_actor(
+        self, db: Session, tenant_a: Tenants
+    ) -> None:
+        """Regression: a plain purchase whose stored credit exceeds the cart
+        settles through the surplus branch. The audit movement must read as a
+        purchase attributed to the buying human, not a system-attributed
+        edit_passes give-up.
+
+        Stored credit $100, cart $30, edit_passes=False.
+        Expected: approved, balance $70, one CREDIT_APPLIED entry with
+        source=purchase and actor_type=human.
+        """
+        from app.api.audit_log.actor import actor_from_human
+
+        popup = _make_popup(db, tenant_a, edit_passes_enabled=False)
+        human = _make_human(db, tenant_a)
+        application = _make_application(
+            db, tenant_a, popup, human, credit=Decimal("100")
+        )
+        attendee = _make_attendee(db, tenant_a, popup, application)
+
+        product = _make_product(db, tenant_a, popup, price=Decimal("30"))
+
+        obj = PaymentCreate(
+            application_id=application.id,
+            products=[
+                PaymentProductRequest(
+                    product_id=product.id,
+                    attendee_id=attendee.id,
+                    quantity=1,
+                )
+            ],
+            edit_passes=False,
+        )
+
+        payment, _preview = payments_crud.create_payment(
+            db, obj, attribution=None, actor=actor_from_human(human)
+        )
+
+        db.expire_all()
+        db.refresh(payment)
+
+        assert payment.status == PaymentStatus.APPROVED.value
+        assert _fresh_credit(db, application.id) == Decimal("70")
+
+        applied = _audit_entries_for(db, human.id, AuditAction.CREDIT_APPLIED)
+        assert len(applied) == 1
+        assert applied[0].details["source"] == "purchase"
+        assert applied[0].actor_type == "human"
