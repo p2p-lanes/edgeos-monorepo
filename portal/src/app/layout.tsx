@@ -7,7 +7,10 @@ import { Toaster } from "sonner"
 import { MetaPixel } from "@/components/MetaPixel"
 import GoogleAnalytics from "@/components/utils/GoogleAnalytics"
 import { buildShareMetadata } from "@/lib/share-metadata"
-import { getMetadataBase, resolveTenantForMetadata } from "@/lib/tenant-metadata"
+import {
+  getMetadataBase,
+  resolveTenantForMetadata,
+} from "@/lib/tenant-metadata"
 import QueryProvider from "@/providers/queryProvider"
 import { TenantProvider } from "@/providers/tenantProvider"
 

@@ -1,5 +1,5 @@
 import "@/lib/api-client"
-import { ApiError, EventsService, type EventShareMeta } from "@/client"
+import { type EventShareMeta, EventsService } from "@/client"
 
 export type { EventShareMeta }
 
@@ -18,10 +18,7 @@ export async function fetchEventShareMeta(
       eventId,
       xTenantId: tenantId,
     })
-  } catch (error) {
-    if (error instanceof ApiError && error.status === 404) {
-      return null
-    }
+  } catch {
     return null
   }
 }

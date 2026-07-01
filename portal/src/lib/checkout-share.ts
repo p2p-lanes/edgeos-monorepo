@@ -1,5 +1,5 @@
 import "@/lib/api-client"
-import { ApiError, CheckoutService, type CheckoutShareMeta } from "@/client"
+import { CheckoutService, type CheckoutShareMeta } from "@/client"
 
 export type { CheckoutShareMeta }
 
@@ -18,10 +18,7 @@ export async function fetchCheckoutShareMeta(
       slug: popupSlug,
       xTenantId: tenantId,
     })
-  } catch (error) {
-    if (error instanceof ApiError && error.status === 404) {
-      return null
-    }
+  } catch {
     return null
   }
 }
