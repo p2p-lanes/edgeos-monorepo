@@ -21,7 +21,6 @@ from sqlmodel import Session
 from app.api.popup.models import Popups
 from app.api.shared.enums import SaleType
 from app.api.tenant.models import Tenants
-from tests.conftest import with_origin
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -61,6 +60,10 @@ def _share_url(slug: str) -> str:
     return f"/api/v1/checkout/{slug}/share"
 
 
+def _tenant_headers(tenant: Tenants) -> dict[str, str]:
+    return {"X-Tenant-Id": str(tenant.id)}
+
+
 # ---------------------------------------------------------------------------
 # Tests
 # ---------------------------------------------------------------------------
@@ -72,7 +75,7 @@ def test_active_direct_popup_returns_share_meta(
     tenant_a: Tenants,
 ) -> None:
     popup = _make_popup(db, tenant_a)
-    res = client.get(_share_url(popup.slug), headers=with_origin("a.edgeos.world"))
+    res = client.get(_share_url(popup.slug), headers=_tenant_headers(tenant_a))
     assert res.status_code == 200
     body = res.json()
     assert body["id"] == str(popup.id)
@@ -88,7 +91,7 @@ def test_unknown_slug_returns_opaque_404(
 ) -> None:
     res = client.get(
         _share_url("does-not-exist"),
-        headers=with_origin("a.edgeos.world"),
+        headers=_tenant_headers(tenant_a),
     )
     assert res.status_code == 404
     assert res.json()["detail"] == "Not found"
@@ -100,7 +103,7 @@ def test_application_popup_returns_opaque_404(
     tenant_a: Tenants,
 ) -> None:
     popup = _make_popup(db, tenant_a, sale_type=SaleType.application)
-    res = client.get(_share_url(popup.slug), headers=with_origin("a.edgeos.world"))
+    res = client.get(_share_url(popup.slug), headers=_tenant_headers(tenant_a))
     assert res.status_code == 404
     assert res.json()["detail"] == "Not found"
 
@@ -111,6 +114,6 @@ def test_inactive_direct_popup_returns_opaque_404(
     tenant_a: Tenants,
 ) -> None:
     popup = _make_popup(db, tenant_a, status="draft")
-    res = client.get(_share_url(popup.slug), headers=with_origin("a.edgeos.world"))
+    res = client.get(_share_url(popup.slug), headers=_tenant_headers(tenant_a))
     assert res.status_code == 404
     assert res.json()["detail"] == "Not found"

@@ -8,7 +8,15 @@ Endpoints:
 
 import uuid
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, status
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    HTTPException,
+    Query,
+    Request,
+    status,
+)
 from loguru import logger
 
 from app.api.cart.crud import carts_crud
