@@ -14,6 +14,12 @@ OpenAPI.TOKEN = async () => {
 }
 
 OpenAPI.interceptors.request.use((config) => {
+  // `localStorage` only exists in the browser. During SSR (e.g. checkout
+  // `generateMetadata`) this interceptor still runs, so guard the access or it
+  // throws `ReferenceError` and the caller silently falls back to null.
+  if (typeof window === "undefined") {
+    return config
+  }
   const tenantId = localStorage.getItem("portal_tenant_id")
   if (tenantId) {
     config.headers = { ...config.headers, "X-Tenant-Id": tenantId }
