@@ -13,6 +13,7 @@ from app.api.checkout.schemas import (
     CheckoutBuyerSection,
     CheckoutRuntimeProduct,
     CheckoutRuntimeResponse,
+    CheckoutShareMeta,
 )
 from app.api.form_field.crud import form_fields_crud
 from app.api.form_section.models import FormSections
@@ -155,4 +156,18 @@ def runtime_for_slug(
             AttendeeCategoryPublic.model_validate(c) for c in attendee_categories
         ],
         form_schema=form_fields_crud.build_schema_for_popup(session, popup.id),
+    )
+
+
+def share_meta_for_slug(
+    session: Session, slug: str, tenant_id: uuid.UUID
+) -> CheckoutShareMeta:
+    """Load the minimal popup projection for social/OpenGraph share previews."""
+    popup = get_open_ticketing_popup(session, slug, tenant_id)
+    return CheckoutShareMeta(
+        id=popup.id,
+        name=popup.name,
+        tagline=popup.tagline,
+        location=popup.location,
+        image_url=popup.image_url,
     )

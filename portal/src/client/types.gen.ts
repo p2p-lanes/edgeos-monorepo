@@ -1080,6 +1080,21 @@ export type CheckoutRuntimeResponse = {
 };
 
 /**
+ * Tiny, unauthenticated projection for social/OpenGraph share previews.
+ *
+ * Returned by the public ``/{slug}/share`` endpoint so social crawlers (which
+ * send no JWT) can render the popup name, tagline/location snippet and cover
+ * image without loading the full checkout runtime payload.
+ */
+export type CheckoutShareMeta = {
+    id: string;
+    name: string;
+    tagline?: (string | null);
+    location?: (string | null);
+    image_url?: (string | null);
+};
+
+/**
  * Response when human is a companion on someone else's application.
  */
 export type CompanionParticipation = {
@@ -4758,6 +4773,13 @@ export type CheckoutGetRuntimeData = {
 };
 
 export type CheckoutGetRuntimeResponse = (CheckoutRuntimeResponse);
+
+export type CheckoutGetCheckoutShareMetaData = {
+    slug: string;
+    xTenantId?: (string | null);
+};
+
+export type CheckoutGetCheckoutShareMetaResponse = (CheckoutShareMeta);
 
 export type CheckoutPurchaseOpenTicketingData = {
     requestBody: OpenTicketingPurchaseCreate;
