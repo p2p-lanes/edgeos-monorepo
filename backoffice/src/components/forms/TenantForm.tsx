@@ -277,247 +277,6 @@ export function TenantForm({ defaultValues, onSuccess }: TenantFormProps) {
 
         <Separator />
 
-        {/* Email Settings */}
-        <InlineSection title="Email Settings">
-          <form.Field
-            name="sender_email"
-            validators={{
-              onBlur: ({ value }) => {
-                if (value && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
-                  return "Invalid email address"
-                }
-                return undefined
-              },
-            }}
-          >
-            {(field) => (
-              <div>
-                <InlineRow
-                  icon={<Mail className="h-4 w-4 text-muted-foreground" />}
-                  label="Sender Email"
-                  description="Email for notifications"
-                >
-                  <Input
-                    placeholder="noreply@acme.com"
-                    type="email"
-                    value={field.state.value}
-                    onBlur={field.handleBlur}
-                    onChange={(e) => field.handleChange(e.target.value)}
-                    className="max-w-xs text-sm"
-                  />
-                </InlineRow>
-                <FieldError errors={field.state.meta.errors} />
-              </div>
-            )}
-          </form.Field>
-
-          <form.Field name="sender_name">
-            {(field) => (
-              <InlineRow
-                icon={<User className="h-4 w-4 text-muted-foreground" />}
-                label="Sender Name"
-                description="Display name for emails"
-              >
-                <Input
-                  placeholder="Acme Events"
-                  value={field.state.value}
-                  onBlur={field.handleBlur}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                  className="max-w-xs text-sm"
-                />
-              </InlineRow>
-            )}
-          </form.Field>
-
-          <div className="py-3">
-            <Alert>
-              <AlertDescription>
-                Leave SMTP host empty to use the platform default. If custom
-                SMTP is configured and delivery fails, emails will not fall back
-                to the default provider.
-              </AlertDescription>
-            </Alert>
-          </div>
-
-          <form.Field
-            name="smtp_host"
-            validators={{
-              onBlur: ({ value }) =>
-                validateHostname(value, "smtp.example.com"),
-              onChange: ({ value }) =>
-                validateHostname(value, "smtp.example.com"),
-            }}
-          >
-            {(field) => (
-              <div>
-                <InlineRow
-                  icon={<Mail className="h-4 w-4 text-muted-foreground" />}
-                  label="SMTP Host"
-                  description="SMTP server for this organization"
-                >
-                  <Input
-                    placeholder="smtp.example.com"
-                    value={field.state.value}
-                    onBlur={field.handleBlur}
-                    onChange={(e) => field.handleChange(e.target.value)}
-                    className="max-w-xs text-sm"
-                  />
-                </InlineRow>
-                <FieldError errors={field.state.meta.errors} />
-              </div>
-            )}
-          </form.Field>
-
-          <form.Field
-            name="smtp_port"
-            validators={{
-              onBlur: ({ value }) => {
-                if (!value || value < 1 || value > 65535) {
-                  return "Port must be between 1 and 65535"
-                }
-                return undefined
-              },
-            }}
-          >
-            {(field) => (
-              <div>
-                <InlineRow
-                  icon={<Mail className="h-4 w-4 text-muted-foreground" />}
-                  label="SMTP Port"
-                  description="Common values are 587 for STARTTLS or 465 for SSL/TLS"
-                >
-                  <Input
-                    type="number"
-                    min={1}
-                    max={65535}
-                    value={field.state.value}
-                    onBlur={field.handleBlur}
-                    onChange={(e) =>
-                      field.handleChange(Number(e.target.value) || 587)
-                    }
-                    className="max-w-xs text-sm"
-                  />
-                </InlineRow>
-                <FieldError errors={field.state.meta.errors} />
-              </div>
-            )}
-          </form.Field>
-
-          <form.Field name="smtp_user">
-            {(field) => (
-              <InlineRow
-                icon={<User className="h-4 w-4 text-muted-foreground" />}
-                label="SMTP Username"
-                description="Leave blank for SMTP servers without auth"
-              >
-                <Input
-                  placeholder="smtp-user@example.com"
-                  value={field.state.value}
-                  onBlur={field.handleBlur}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                  className="max-w-xs text-sm"
-                />
-              </InlineRow>
-            )}
-          </form.Field>
-
-          <form.Field name="smtp_password">
-            {(field) => (
-              <InlineRow
-                icon={<Lock className="h-4 w-4 text-muted-foreground" />}
-                label="SMTP Password"
-                description={
-                  defaultValues?.smtp_password_configured
-                    ? "A password is configured. Enter a new value only to replace it."
-                    : "Stored encrypted. Required when username is set."
-                }
-              >
-                <div className="flex items-center gap-2">
-                  <Input
-                    placeholder={
-                      defaultValues?.smtp_password_configured
-                        ? "Configured"
-                        : "SMTP password"
-                    }
-                    type="password"
-                    value={field.state.value}
-                    onBlur={field.handleBlur}
-                    onChange={(e) => field.handleChange(e.target.value)}
-                    className="max-w-xs text-sm"
-                  />
-                  {defaultValues?.smtp_password_configured && (
-                    <Badge variant="outline">Configured</Badge>
-                  )}
-                </div>
-              </InlineRow>
-            )}
-          </form.Field>
-
-          <form.Field name="smtp_tls">
-            {(field) => (
-              <InlineRow
-                icon={<Lock className="h-4 w-4 text-muted-foreground" />}
-                label="STARTTLS"
-                description="Upgrade the SMTP connection with STARTTLS"
-              >
-                <Switch
-                  id="smtp_tls"
-                  aria-label="STARTTLS"
-                  checked={field.state.value}
-                  onCheckedChange={(checked) => {
-                    field.handleChange(checked)
-                    if (checked) form.setFieldValue("smtp_ssl", false)
-                  }}
-                />
-              </InlineRow>
-            )}
-          </form.Field>
-
-          <form.Field name="smtp_ssl">
-            {(field) => (
-              <InlineRow
-                icon={<Lock className="h-4 w-4 text-muted-foreground" />}
-                label="SSL/TLS"
-                description="Use implicit TLS from the start of the connection"
-              >
-                <Switch
-                  id="smtp_ssl"
-                  aria-label="SSL/TLS"
-                  checked={field.state.value}
-                  onCheckedChange={(checked) => {
-                    field.handleChange(checked)
-                    if (checked) form.setFieldValue("smtp_tls", false)
-                  }}
-                />
-              </InlineRow>
-            )}
-          </form.Field>
-
-          {isEdit && (
-            <InlineRow
-              icon={<Mail className="h-4 w-4 text-muted-foreground" />}
-              label="Test Email"
-              description={
-                user?.email
-                  ? `Send a test email to ${user.email}. Save changes before testing.`
-                  : "Save changes before sending a test email."
-              }
-            >
-              <LoadingButton
-                type="button"
-                variant="outline"
-                loading={smtpTestMutation.isPending}
-                disabled={!user?.email}
-                onClick={() => smtpTestMutation.mutate()}
-              >
-                Send test email
-              </LoadingButton>
-            </InlineRow>
-          )}
-        </InlineSection>
-
-        <Separator />
-
         {/* Branding */}
         <InlineSection title="Branding">
           <form.Field name="image_url">
@@ -843,6 +602,247 @@ export function TenantForm({ defaultValues, onSuccess }: TenantFormProps) {
             )}
           </InlineSection>
         )}
+
+        <Separator />
+
+        {/* Email Settings */}
+        <InlineSection title="Email Settings">
+          <form.Field
+            name="sender_email"
+            validators={{
+              onBlur: ({ value }) => {
+                if (value && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+                  return "Invalid email address"
+                }
+                return undefined
+              },
+            }}
+          >
+            {(field) => (
+              <div>
+                <InlineRow
+                  icon={<Mail className="h-4 w-4 text-muted-foreground" />}
+                  label="Sender Email"
+                  description="Email for notifications"
+                >
+                  <Input
+                    placeholder="noreply@acme.com"
+                    type="email"
+                    value={field.state.value}
+                    onBlur={field.handleBlur}
+                    onChange={(e) => field.handleChange(e.target.value)}
+                    className="max-w-xs text-sm"
+                  />
+                </InlineRow>
+                <FieldError errors={field.state.meta.errors} />
+              </div>
+            )}
+          </form.Field>
+
+          <form.Field name="sender_name">
+            {(field) => (
+              <InlineRow
+                icon={<User className="h-4 w-4 text-muted-foreground" />}
+                label="Sender Name"
+                description="Display name for emails"
+              >
+                <Input
+                  placeholder="Acme Events"
+                  value={field.state.value}
+                  onBlur={field.handleBlur}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                  className="max-w-xs text-sm"
+                />
+              </InlineRow>
+            )}
+          </form.Field>
+
+          <div className="py-3">
+            <Alert>
+              <AlertDescription>
+                Leave SMTP host empty to use the platform default. If custom
+                SMTP is configured and delivery fails, emails will not fall back
+                to the default provider.
+              </AlertDescription>
+            </Alert>
+          </div>
+
+          <form.Field
+            name="smtp_host"
+            validators={{
+              onBlur: ({ value }) =>
+                validateHostname(value, "smtp.example.com"),
+              onChange: ({ value }) =>
+                validateHostname(value, "smtp.example.com"),
+            }}
+          >
+            {(field) => (
+              <div>
+                <InlineRow
+                  icon={<Mail className="h-4 w-4 text-muted-foreground" />}
+                  label="SMTP Host"
+                  description="SMTP server for this organization"
+                >
+                  <Input
+                    placeholder="smtp.example.com"
+                    value={field.state.value}
+                    onBlur={field.handleBlur}
+                    onChange={(e) => field.handleChange(e.target.value)}
+                    className="max-w-xs text-sm"
+                  />
+                </InlineRow>
+                <FieldError errors={field.state.meta.errors} />
+              </div>
+            )}
+          </form.Field>
+
+          <form.Field
+            name="smtp_port"
+            validators={{
+              onBlur: ({ value }) => {
+                if (!value || value < 1 || value > 65535) {
+                  return "Port must be between 1 and 65535"
+                }
+                return undefined
+              },
+            }}
+          >
+            {(field) => (
+              <div>
+                <InlineRow
+                  icon={<Mail className="h-4 w-4 text-muted-foreground" />}
+                  label="SMTP Port"
+                  description="Common values are 587 for STARTTLS or 465 for SSL/TLS"
+                >
+                  <Input
+                    type="number"
+                    min={1}
+                    max={65535}
+                    value={field.state.value}
+                    onBlur={field.handleBlur}
+                    onChange={(e) =>
+                      field.handleChange(Number(e.target.value) || 587)
+                    }
+                    className="max-w-xs text-sm"
+                  />
+                </InlineRow>
+                <FieldError errors={field.state.meta.errors} />
+              </div>
+            )}
+          </form.Field>
+
+          <form.Field name="smtp_user">
+            {(field) => (
+              <InlineRow
+                icon={<User className="h-4 w-4 text-muted-foreground" />}
+                label="SMTP Username"
+                description="Leave blank for SMTP servers without auth"
+              >
+                <Input
+                  placeholder="smtp-user@example.com"
+                  value={field.state.value}
+                  onBlur={field.handleBlur}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                  className="max-w-xs text-sm"
+                />
+              </InlineRow>
+            )}
+          </form.Field>
+
+          <form.Field name="smtp_password">
+            {(field) => (
+              <InlineRow
+                icon={<Lock className="h-4 w-4 text-muted-foreground" />}
+                label="SMTP Password"
+                description={
+                  defaultValues?.smtp_password_configured
+                    ? "A password is configured. Enter a new value only to replace it."
+                    : "Stored encrypted. Required when username is set."
+                }
+              >
+                <div className="flex items-center gap-2">
+                  <Input
+                    placeholder={
+                      defaultValues?.smtp_password_configured
+                        ? "Configured"
+                        : "SMTP password"
+                    }
+                    type="password"
+                    value={field.state.value}
+                    onBlur={field.handleBlur}
+                    onChange={(e) => field.handleChange(e.target.value)}
+                    className="max-w-xs text-sm"
+                  />
+                  {defaultValues?.smtp_password_configured && (
+                    <Badge variant="outline">Configured</Badge>
+                  )}
+                </div>
+              </InlineRow>
+            )}
+          </form.Field>
+
+          <form.Field name="smtp_tls">
+            {(field) => (
+              <InlineRow
+                icon={<Lock className="h-4 w-4 text-muted-foreground" />}
+                label="STARTTLS"
+                description="Upgrade the SMTP connection with STARTTLS"
+              >
+                <Switch
+                  id="smtp_tls"
+                  aria-label="STARTTLS"
+                  checked={field.state.value}
+                  onCheckedChange={(checked) => {
+                    field.handleChange(checked)
+                    if (checked) form.setFieldValue("smtp_ssl", false)
+                  }}
+                />
+              </InlineRow>
+            )}
+          </form.Field>
+
+          <form.Field name="smtp_ssl">
+            {(field) => (
+              <InlineRow
+                icon={<Lock className="h-4 w-4 text-muted-foreground" />}
+                label="SSL/TLS"
+                description="Use implicit TLS from the start of the connection"
+              >
+                <Switch
+                  id="smtp_ssl"
+                  aria-label="SSL/TLS"
+                  checked={field.state.value}
+                  onCheckedChange={(checked) => {
+                    field.handleChange(checked)
+                    if (checked) form.setFieldValue("smtp_tls", false)
+                  }}
+                />
+              </InlineRow>
+            )}
+          </form.Field>
+
+          {isEdit && (
+            <InlineRow
+              icon={<Mail className="h-4 w-4 text-muted-foreground" />}
+              label="Test Email"
+              description={
+                user?.email
+                  ? `Send a test email to ${user.email}. Save changes before testing.`
+                  : "Save changes before sending a test email."
+              }
+            >
+              <LoadingButton
+                type="button"
+                variant="outline"
+                loading={smtpTestMutation.isPending}
+                disabled={!user?.email}
+                onClick={() => smtpTestMutation.mutate()}
+              >
+                Send test email
+              </LoadingButton>
+            </InlineRow>
+          )}
+        </InlineSection>
 
         <Separator />
 
