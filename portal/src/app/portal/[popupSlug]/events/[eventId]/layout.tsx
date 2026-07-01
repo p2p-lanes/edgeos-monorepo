@@ -1,8 +1,7 @@
 import type { Metadata } from "next"
-import { headers } from "next/headers"
 import { fetchEventShareMeta } from "@/lib/event-share"
-import { fetchTenantBySlug } from "@/lib/tenant"
-import { resolveHostname } from "@/lib/tenant-resolution"
+import { buildShareMetadata } from "@/lib/share-metadata"
+import { resolveTenantForMetadata } from "@/lib/tenant-metadata"
 
 /**
  * Server-side metadata for the (client) event detail page.
@@ -22,62 +21,21 @@ export async function generateMetadata({
   params: Promise<{ popupSlug: string; eventId: string }>
 }): Promise<Metadata> {
   const { eventId } = await params
-
-  // Resolve the tenant exactly like the root layout's generateMetadata
-  // (src/app/layout.tsx): custom domains carry x-tenant-slug from middleware,
-  // otherwise the slug comes from the subdomain.
-  const headersList = await headers()
-  const host = headersList.get("host") ?? ""
-  const { slug, isCustomDomain } = resolveHostname(host)
-  const middlewareSlug = isCustomDomain
-    ? (headersList.get("x-tenant-slug") ?? null)
-    : null
-
-  let tenant = null
-  try {
-    tenant =
-      middlewareSlug != null
-        ? await fetchTenantBySlug(middlewareSlug)
-        : slug
-          ? await fetchTenantBySlug(slug)
-          : null
-  } catch (error) {
-    console.error("Failed to resolve tenant for event share metadata", {
-      host,
-      slug,
-      middlewareSlug,
-      isCustomDomain,
-      error,
-    })
-  }
-
+  const tenant = await resolveTenantForMetadata()
   if (!tenant) return {}
 
   const meta = await fetchEventShareMeta(eventId, tenant.id)
   if (!meta) return {}
 
   const description = meta.description ?? undefined
-  const ogTitle = `${meta.title} · ${tenant.name}`
 
-  return {
+  return buildShareMetadata({
     title: meta.title,
+    socialTitle: `${meta.title} · ${tenant.name}`,
     description,
-    openGraph: {
-      title: ogTitle,
-      description,
-      ...(meta.image_url && {
-        images: [
-          { url: meta.image_url, width: 1200, height: 630, alt: meta.title },
-        ],
-      }),
-    },
-    twitter: {
-      card: "summary_large_image",
-      title: ogTitle,
-      description,
-      ...(meta.image_url && { images: [meta.image_url] }),
-    },
-  }
+    imageUrl: meta.image_url,
+    imageAlt: meta.title,
+  })
 }
 
 export default function EventLayout({

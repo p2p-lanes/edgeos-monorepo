@@ -4669,6 +4669,61 @@ export const CheckoutRuntimeResponseSchema = {
     description: 'Full response for GET /checkout/{slug}/runtime.'
 } as const;
 
+export const CheckoutShareMetaSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        name: {
+            type: 'string',
+            title: 'Name'
+        },
+        tagline: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Tagline'
+        },
+        location: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Location'
+        },
+        image_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Image Url'
+        }
+    },
+    type: 'object',
+    required: ['id', 'name'],
+    title: 'CheckoutShareMeta',
+    description: `Tiny, unauthenticated projection for social/OpenGraph share previews.
+
+Returned by the public \`\`/{slug}/share\`\` endpoint so social crawlers (which
+send no JWT) can render the popup name, tagline/location snippet and cover
+image without loading the full checkout runtime payload.`
+} as const;
+
 export const CompanionParticipationSchema = {
     properties: {
         type: {

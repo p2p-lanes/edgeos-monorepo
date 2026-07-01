@@ -5,10 +5,9 @@ import { headers } from "next/headers"
 import "./globals.css"
 import { Toaster } from "sonner"
 import { MetaPixel } from "@/components/MetaPixel"
-import { ServiceWorkerRegistrar } from "@/components/ServiceWorkerRegistrar"
 import GoogleAnalytics from "@/components/utils/GoogleAnalytics"
-import { fetchTenantBySlug } from "@/lib/tenant"
-import { resolveHostname } from "@/lib/tenant-resolution"
+import { buildShareMetadata } from "@/lib/share-metadata"
+import { getMetadataBase, resolveTenantForMetadata } from "@/lib/tenant-metadata"
 import QueryProvider from "@/providers/queryProvider"
 import { TenantProvider } from "@/providers/tenantProvider"
 
@@ -17,34 +16,8 @@ const FALLBACK_DESCRIPTION =
   "Welcome to the Edge Portal. Log in or sign up to access events."
 
 export async function generateMetadata(): Promise<Metadata> {
-  const headersList = await headers()
-  const host = headersList.get("host") ?? ""
-  const { slug, isCustomDomain } = resolveHostname(host)
-
-  // For custom domains, the middleware already resolved the tenant and set
-  // x-tenant-slug — read it directly instead of making a redundant API call.
-  const middlewareSlug = isCustomDomain
-    ? (headersList.get("x-tenant-slug") ?? null)
-    : null
-
-  let tenant = null
-
-  try {
-    tenant =
-      middlewareSlug != null
-        ? await fetchTenantBySlug(middlewareSlug)
-        : slug
-          ? await fetchTenantBySlug(slug)
-          : null
-  } catch (error) {
-    console.error("Failed to resolve tenant metadata", {
-      host,
-      slug,
-      middlewareSlug,
-      isCustomDomain,
-      error,
-    })
-  }
+  const tenant = await resolveTenantForMetadata()
+  const metadataBase = await getMetadataBase()
 
   const name = tenant?.name ? `${tenant.name} Portal` : FALLBACK_NAME
   const description = tenant?.name
@@ -52,31 +25,16 @@ export async function generateMetadata(): Promise<Metadata> {
     : FALLBACK_DESCRIPTION
 
   return {
-    title: name,
-    description,
-    manifest: "/manifest.webmanifest",
-    appleWebApp: {
-      capable: true,
-      statusBarStyle: "default",
-      title: name,
-    },
-    icons: {
-      icon: tenant?.icon_url ?? "/icon.png",
-      apple: "/icons/icon-192.png",
-    },
-    openGraph: {
+    metadataBase,
+    ...buildShareMetadata({
       title: name,
       description,
-      ...(tenant?.image_url && {
-        images: [
-          {
-            url: tenant.image_url,
-            alt: name,
-            width: 1200,
-            height: 630,
-          },
-        ],
-      }),
+      imageUrl: tenant?.image_url,
+      imageAlt: name,
+    }),
+    icons: {
+      icon: tenant?.icon_url ?? "/icons/icon.png",
+      apple: tenant?.icon_url ?? "/icons/icon-192.png",
     },
   }
 }
@@ -115,7 +73,6 @@ export default async function RootLayout({
         suppressHydrationWarning
       >
         <GoogleAnalytics />
-        <ServiceWorkerRegistrar />
         <QueryProvider>
           <TenantProvider
             initialTenantId={middlewareTenantId}
