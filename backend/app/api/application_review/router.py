@@ -212,6 +212,17 @@ async def submit_review(
     status_before = application.status
     updated_application = approval_calculator.recalculate_status(db, application)
 
+    # If the review just accepted the application, convert the paid application
+    # fee into credit. This is the backoffice manual-accept path; without it the
+    # fee-to-credit grant never fires for popups that require manual review.
+    # Flush-only helper (idempotent no-op unless ACCEPTED with an approved fee);
+    # the commit below persists it alongside the status change.
+    from app.api.application.crud import _maybe_grant_fee_credit
+
+    _maybe_grant_fee_credit(db, updated_application)
+    db.commit()
+    db.refresh(updated_application)
+
     # Send status-change emails if the application just reached a final decision
     if updated_application.human:
         await send_application_status_email(
