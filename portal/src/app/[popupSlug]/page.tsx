@@ -14,19 +14,21 @@ export default async function PopupRoutePage({ params }: PopupRoutePageProps) {
     throw new Error("NEXT_PUBLIC_API_URL is not configured")
   }
 
-  const response = await fetch(
-    `${apiBaseUrl}/api/v1/popups/portal/${popupSlug}`,
-    {
+  let response: Response
+  try {
+    response = await fetch(`${apiBaseUrl}/api/v1/popups/portal/${popupSlug}`, {
       cache: "no-store",
-    },
-  )
-
-  if (response.status === 404) {
+    })
+  } catch {
+    // Network/backend unreachable: show the 404 page instead of a raw
+    // server-side exception.
     notFound()
   }
 
+  // Any non-OK status (404 unknown slug, 401 anonymous SSR request, etc.)
+  // resolves to the not-found page rather than throwing.
   if (!response.ok) {
-    throw new Error(`Failed to resolve popup ${popupSlug}`)
+    notFound()
   }
 
   const popup = (await response.json()) as { sale_type?: string; slug: string }

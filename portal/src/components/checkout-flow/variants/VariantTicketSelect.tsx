@@ -915,8 +915,7 @@ function CompactAttendeeCard({
         <div className="flex flex-wrap gap-2">
           {visibleProducts.map((p) => {
             const isDayPass = p.duration_type === "day"
-            const hasStepper =
-              isDayPass || supportsQuantitySelector(p.max_per_order)
+            const hasStepper = isPassQuantityBased(p)
             const pillSaleState = deriveProductState(p)
             const pillStateBlocked = pillSaleState !== "on_sale"
 

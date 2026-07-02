@@ -41,6 +41,7 @@ import useGetPassesData from "@/hooks/useGetPassesData"
 import { useIsAuthenticated } from "@/hooks/useIsAuthenticated"
 import { buildFormZodSchema } from "@/lib/form-schema-builder"
 import { trackMetaAddToCart } from "@/lib/meta-pixel"
+import { isPassQuantityBased } from "@/strategies/passQuantityHelper"
 import type { AttendeePassState } from "@/types/Attendee"
 import type {
   CheckoutCartState,
@@ -474,7 +475,7 @@ export function CheckoutProvider({
                 : 1
               : isDayPass
                 ? (product.quantity ?? 1) - (product.original_quantity ?? 0)
-                : supportsQuantitySelector(product.max_per_order)
+                : isPassQuantityBased(product)
                   ? (product.quantity ?? 1)
                   : 1
 
