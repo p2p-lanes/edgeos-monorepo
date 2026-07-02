@@ -14,7 +14,6 @@ import {
   resolvePopupCheckoutPolicy,
 } from "@/checkout/popupCheckoutPolicy"
 import type { AttendeePurchases } from "@/client"
-import { supportsQuantitySelector } from "@/components/ui/QuantitySelector"
 import { useCart } from "@/hooks/useCartApi"
 import useGetPassesData from "@/hooks/useGetPassesData"
 import { usePurchasesQuery } from "@/hooks/useGetPurchases"
@@ -198,8 +197,11 @@ function applyCartSelections(
         }
       }
       // Non-day: multi-unit products restore the persisted quantity;
-      // single-unit products stay at the legacy quantity of 1.
-      const isMultiUnit = supportsQuantitySelector(product.max_per_order)
+      // single-unit products stay at the legacy quantity of 1. Use
+      // isPassQuantityBased so full/month passes (single-select even when
+      // max_per_order is null) keep their quantity instead of adopting the
+      // saved cart quantity.
+      const isMultiUnit = isPassQuantityBased(product)
       return {
         ...product,
         selected: true,
@@ -460,8 +462,7 @@ const PassesProvider = ({
             return { ...p, selected: false, edit: false, disabled: false }
           }
           const isMultiUnit =
-            p.duration_type !== "day" &&
-            supportsQuantitySelector(p.max_per_order)
+            p.duration_type !== "day" && isPassQuantityBased(p)
           const initialQuantity =
             p.duration_type === "day"
               ? (p.original_quantity ?? 0)
