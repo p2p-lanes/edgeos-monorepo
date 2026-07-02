@@ -400,11 +400,12 @@ describe("WeekProductStrategy — attendeeVisibleProductIds (wide scope)", () =>
 })
 
 describe("ExclusivityGuard — section scope (tech-summit reproduction)", () => {
-  // Reproduces: GA + VIP both exclusive, multi-unit (max_per_order=null), duration_type=full.
-  // Pre-state: GA quantity=1 selected, VIP quantity=0 not selected.
-  // Action: user clicks +1 on VIP.
-  // Expected: VIP quantity=1 selected, GA quantity=0 NOT selected.
-  it("clicking + on VIP cancels GA when both are exclusive multi-unit full passes in same section", () => {
+  // GA + VIP both exclusive full passes (max_per_order=null) in the same
+  // section. Full passes are single-select (isPassQuantityBased=false), so
+  // selecting one clears the other via `selected` — not quantity.
+  // Pre-state: GA selected, VIP not. Action: user clicks VIP's checkbox.
+  // Expected: VIP selected, GA cleared.
+  it("clicking VIP cancels GA when both are exclusive full passes in same section", () => {
     const ga = {
       ...createProduct({
         id: "ga",
@@ -423,7 +424,7 @@ describe("ExclusivityGuard — section scope (tech-summit reproduction)", () => 
         name: "VIP Pass",
         category: "ticket",
         duration_type: "full",
-        quantity: 0,
+        quantity: 1,
         selected: false,
       }),
       max_per_order: null,
@@ -432,31 +433,29 @@ describe("ExclusivityGuard — section scope (tech-summit reproduction)", () => 
     const attendees = [createAttendee([ga, vip])]
     const strategy = getProductStrategy(vip, false, CHECKOUT_MODE.PASS_SYSTEM)
 
-    // Simulate the stepper +1: caller passes product with quantity=1 and the section scope.
+    // Checkbox toggle: caller passes the current product with the section scope.
     const result = strategy.handleSelection(
       attendees,
       "attendee-1",
-      { ...vip, quantity: 1 },
+      vip,
       undefined,
       ["ga", "vip"],
     )
 
     const updatedGa = result[0]?.products.find((p) => p.id === "ga")
     const updatedVip = result[0]?.products.find((p) => p.id === "vip")
-    expect(updatedVip?.quantity).toBe(1)
     expect(updatedVip?.selected).toBe(true)
-    expect(updatedGa?.quantity).toBe(0)
     expect(updatedGa?.selected).toBe(false)
   })
 
-  it("clicking + on GA cancels VIP (symmetric)", () => {
+  it("clicking GA cancels VIP (symmetric)", () => {
     const ga = {
       ...createProduct({
         id: "ga",
         name: "General Admission",
         category: "ticket",
         duration_type: "full",
-        quantity: 0,
+        quantity: 1,
         selected: false,
       }),
       max_per_order: null,
@@ -479,15 +478,13 @@ describe("ExclusivityGuard — section scope (tech-summit reproduction)", () => 
     const result = strategy.handleSelection(
       attendees,
       "attendee-1",
-      { ...ga, quantity: 1 },
+      ga,
       undefined,
       ["ga", "vip"],
     )
     const updatedGa = result[0]?.products.find((p) => p.id === "ga")
     const updatedVip = result[0]?.products.find((p) => p.id === "vip")
-    expect(updatedGa?.quantity).toBe(1)
     expect(updatedGa?.selected).toBe(true)
-    expect(updatedVip?.quantity).toBe(0)
     expect(updatedVip?.selected).toBe(false)
   })
 })
@@ -687,10 +684,11 @@ describe("EditProductStrategy — month upgrade while editing", () => {
     expect(result[0]?.products.find((p) => p.id === "w1")?.edit).toBeFalsy()
   })
 
-  // Reported bug: a quantity-based full pass (max_per_order null/>1) reads its
-  // selection from quantity, so upgrading credited the week but the tile never
-  // showed selected because quantity stayed 0.
-  it("upgrading to a quantity-based full pass sets its quantity and credits the week", () => {
+  // A full pass is single-select (isPassQuantityBased=false): upgrading selects
+  // it via `selected` and credits the owned week. The tile reads its state from
+  // `selected`, not quantity, so this can never regress to "selected but
+  // quantity 0" the way a quantity-driven pass could.
+  it("upgrading to a full pass selects it and credits the week", () => {
     const fullPass = createProduct({
       id: "full",
       duration_type: "full",
@@ -704,7 +702,7 @@ describe("EditProductStrategy — month upgrade while editing", () => {
           id: "full",
           duration_type: "full",
           price: 400,
-          quantity: 0,
+          quantity: 1,
           max_per_order: 5,
           selected: false,
         }),
@@ -721,7 +719,6 @@ describe("EditProductStrategy — month upgrade while editing", () => {
     const full = result[0]?.products.find((p) => p.id === "full")
     const w1 = result[0]?.products.find((p) => p.id === "w1")
     expect(full?.selected).toBe(true)
-    expect(full?.quantity).toBeGreaterThanOrEqual(1)
     expect(w1?.edit).toBe(true)
     expect(w1?.selected).toBe(false)
   })

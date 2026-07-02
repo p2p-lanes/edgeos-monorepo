@@ -73,7 +73,7 @@ class MonthProductStrategy implements ProductStrategy {
     attendeeId: string,
     product: ProductsPass,
   ): AttendeePassState[] {
-    const isMultiUnit = supportsQuantitySelector(product.max_per_order)
+    const isMultiUnit = isPassQuantityBased(product)
     // For multi-unit products, the caller passes the NEW desired quantity in
     // `product.quantity`. The selection is active when quantity > 0.
     const willSelectMonth = isMultiUnit
@@ -191,7 +191,7 @@ class WeekProductStrategy implements ProductStrategy {
     exclusivityScopeIds?: string[],
     attendeeVisibleProductIds?: string[],
   ): AttendeePassState[] {
-    const isMultiUnit = supportsQuantitySelector(product.max_per_order)
+    const isMultiUnit = isPassQuantityBased(product)
 
     // Promotion scope: prefer the WIDE scope (all attendee-visible products
     // across sections) so a week-in-section-A can promote a month-in-section-B
@@ -282,7 +282,7 @@ class FullProductStrategy implements ProductStrategy {
     attendeeId: string,
     product: ProductsPass,
   ): AttendeePassState[] {
-    const isMultiUnit = supportsQuantitySelector(product.max_per_order)
+    const isMultiUnit = isPassQuantityBased(product)
 
     return attendees.map((attendee) => {
       if (attendee.id !== attendeeId) return attendee
@@ -339,19 +339,14 @@ class ExclusivityGuard implements ProductStrategy {
   private isActive(product: ProductsPass): boolean {
     if (product.purchased) return true
     if (product.selected) return true
-    if (
-      product.duration_type === "day" ||
-      supportsQuantitySelector(product.max_per_order)
-    ) {
+    if (isPassQuantityBased(product)) {
       return (product.quantity ?? 0) > 0
     }
     return false
   }
 
   private clearSelection(product: ProductsPass): ProductsPass {
-    const usesQuantity =
-      product.duration_type === "day" ||
-      supportsQuantitySelector(product.max_per_order)
+    const usesQuantity = isPassQuantityBased(product)
 
     return {
       ...product,
@@ -476,7 +471,7 @@ class EditProductStrategy implements ProductStrategy {
   ): ProductsPass[] {
     return products.map((p) => {
       if (p.id === monthId) {
-        const quantity = supportsQuantitySelector(p.max_per_order)
+        const quantity = isPassQuantityBased(p)
           ? Math.max(1, p.quantity ?? 0)
           : p.quantity
         return { ...p, selected: true, quantity }

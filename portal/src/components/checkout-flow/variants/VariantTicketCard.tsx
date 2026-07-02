@@ -5,9 +5,7 @@ import Image from "next/image"
 import type { CSSProperties } from "react"
 import { useTranslation } from "react-i18next"
 import ExpandableDescription from "@/components/ui/ExpandableDescription"
-import QuantitySelector, {
-  supportsQuantitySelector,
-} from "@/components/ui/QuantitySelector"
+import QuantitySelector from "@/components/ui/QuantitySelector"
 import type {
   TicketAttendeeVM,
   TicketRowVM,
@@ -345,7 +343,7 @@ function OpenCheckoutProductRow({
   const { product, quantity, maxQuantity, selected, disabled } = row
 
   const isAdded = quantity > 0 || selected
-  const showStepper = supportsQuantitySelector(product.max_per_order)
+  const showStepper = row.usesStepper
   const max = maxQuantity
   const rowDisabled = disabled && !isAdded
   const hasDiscount =
