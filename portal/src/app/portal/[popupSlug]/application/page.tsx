@@ -65,7 +65,11 @@ export default function FormPage() {
   const application = getRelevantApplication()
   const router = useRouter()
   const searchParams = useSearchParams()
-  const isReturnFromCheckout = searchParams.has("checkout", "success")
+  // Capture once on mount so a later URL change doesn't tear down the fee
+  // banner while it's still polling for the payment webhook.
+  const [isReturnFromCheckout] = useState(() =>
+    searchParams.has("checkout", "success"),
+  )
 
   const {
     data: schema,
@@ -86,25 +90,19 @@ export default function FormPage() {
     }
   }, [importSource, existingApp])
 
-  // Redirect if already accepted/rejected (not for pending_fee — that stays editable)
+  // Once submitted, the application is no longer accessible from the form —
+  // same behavior as a fee-less submit. draft/pending_fee stay editable so the
+  // applicant can still finish or retry the fee payment.
   useEffect(() => {
     if (
       application &&
-      (application.status === "accepted" || application.status === "rejected")
+      (application.status === "in review" ||
+        application.status === "accepted" ||
+        application.status === "rejected")
     ) {
-      router.push(`/portal/${city?.slug}`)
+      router.replace(`/portal/${city?.slug}`)
     }
   }, [application, city, router])
-
-  // Clean up ?checkout=success from the URL after the banner mounts,
-  // so stale polling doesn't re-trigger on subsequent navigations.
-  // isReturnFromCheckout is computed synchronously above, so the banner
-  // already received the initial `true` value before this replace runs.
-  useEffect(() => {
-    if (isReturnFromCheckout) {
-      router.replace(`/portal/${city?.slug}/application`, { scroll: false })
-    }
-  }, [isReturnFromCheckout, city?.slug, router])
 
   useEffect(() => {
     if (city?.sale_type === "direct") {
@@ -132,6 +130,30 @@ export default function FormPage() {
 
   if (city.sale_type === "direct") {
     return <Loader />
+  }
+
+  // Submitted or resolved applications never render the form. The effect above
+  // redirects to the portal home; show a loader meanwhile to avoid flashing it.
+  if (
+    application?.status === "in review" ||
+    application?.status === "accepted" ||
+    application?.status === "rejected"
+  ) {
+    return <Loader />
+  }
+
+  // Returning from the fee checkout: show only the confirmation banner while we
+  // poll for the payment webhook. The form must not reappear after paying.
+  if (isReturnFromCheckout) {
+    return (
+      <main className="container py-6 md:py-12 mb-8 px-8 md:px-12">
+        {application ? (
+          <FeePaymentBanner application={application} isReturnFromCheckout />
+        ) : (
+          <Loader />
+        )}
+      </main>
+    )
   }
 
   if (isError || !schema) {
@@ -165,12 +187,6 @@ export default function FormPage() {
         <FormHeader />
         <SectionSeparator />
       </div>
-      {application?.status === "pending_fee" && isReturnFromCheckout && (
-        <FeePaymentBanner
-          application={application}
-          isReturnFromCheckout={isReturnFromCheckout}
-        />
-      )}
       <FileUploadProvider value={uploadFile}>
         <DynamicApplicationForm
           key={existingApp?.id ?? importedData?.id ?? "new"}
