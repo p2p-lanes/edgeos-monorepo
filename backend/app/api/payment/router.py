@@ -675,6 +675,19 @@ async def update_payment(
     # If status is being updated, use the special method
     old_status = payment.status
     if payment_in.status:
+        # Manual backoffice approval of an application-fee payment: route through
+        # the shared handler so the application transitions out of PENDING_FEE and
+        # credit is granted — identical to the SimpleFi webhook path.
+        if (
+            payment_in.status == PaymentStatus.APPROVED
+            and old_status != PaymentStatus.APPROVED.value
+        ):
+            from app.api.payment.schemas import PaymentType
+
+            if payment.payment_type == PaymentType.APPLICATION_FEE.value:
+                await _handle_fee_payment_approved(db, payment, source="manual")
+                return PaymentPublic.model_validate(payment)
+
         payment = payments_crud.update_status(db, payment_id, payment_in.status)
     else:
         payment = payments_crud.update(db, payment, payment_in)
@@ -1237,7 +1250,8 @@ async def _handle_fee_payment_approved(
 
     # Approve the payment record first
     payment.status = PaymentStatus.APPROVED.value
-    payment.settlement_currency = settlement_currency
+    if settlement_currency is not None:
+        payment.settlement_currency = settlement_currency
     if rate is not None:
         payment.rate = rate
     payment.source = source
