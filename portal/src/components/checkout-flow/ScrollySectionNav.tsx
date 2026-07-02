@@ -99,6 +99,10 @@ export default function ScrollySectionNav({
   // overflow. The result never truncates a label and never clips an icon at
   // any width or step count. `compact` drives both the layout and whether
   // labels render.
+  // Stable full-width wrapper used as the available-width reference. The track
+  // itself swaps between w-fit (expanded) and w-full (compact), so measuring it
+  // would couple `avail` to `compact` — see the effect below.
+  const shellRef = useRef<HTMLDivElement>(null)
   const trackRef = useRef<HTMLDivElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
   const buttonRefs = useRef<(HTMLButtonElement | null)[]>([])
@@ -110,10 +114,17 @@ export default function ScrollySectionNav({
 
   useIsomorphicLayoutEffect(() => {
     const recalc = () => {
-      const track = trackRef.current
       const list = listRef.current
-      if (track && list) {
-        const avail = track.clientWidth
+      // Measure available width from the stable shell, never the track. The
+      // track is w-fit while expanded and w-full while compact, so reading its
+      // width would make `avail` depend on `compact`. Since this effect also
+      // writes `compact` (and re-runs on it), that feedback flip-flops
+      // true<->false forever until React aborts with "Maximum update depth
+      // exceeded" (#185). The shell is always full-width, so the decision has a
+      // fixed basis and settles within a 1px hysteresis band.
+      const shell = shellRef.current
+      if (list && shell) {
+        const avail = shell.clientWidth
         if (!compact) {
           // Labels are showing → scrollWidth is the true expanded width.
           expandedWidthRef.current = list.scrollWidth
@@ -142,9 +153,10 @@ export default function ScrollySectionNav({
       track.scrollTo({ left: Math.max(0, target), behavior: "smooth" })
     }
 
-    if (!track) return
+    const shell = shellRef.current
+    if (!shell) return
     const ro = new ResizeObserver(recalc)
-    ro.observe(track)
+    ro.observe(shell)
     return () => ro.disconnect()
     // sections.length re-runs when tabs change; compact re-runs after a mode
     // flip so the measurement settles (pre-paint, so no visible flicker).
@@ -166,6 +178,7 @@ export default function ScrollySectionNav({
             />
           ) : null}
           <div
+            ref={shellRef}
             className={cn("flex min-w-0 flex-1", !compact && "justify-center")}
           >
             <div
