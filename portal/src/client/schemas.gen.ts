@@ -11747,6 +11747,18 @@ export const OpenTicketingPurchaseCreateSchema = {
                 }
             ],
             title: 'Fbp'
+        },
+        locale: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 8
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Locale'
         }
     },
     type: 'object',

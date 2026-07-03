@@ -17,6 +17,7 @@ from app.utils.checkout_signing import (
     build_signed_redirect_url,
     build_thank_you_payload,
     hash_email,
+    mask_email,
 )
 
 SECRET = "amanita-shared-secret"
@@ -42,8 +43,8 @@ def _payload() -> dict:
         order_id="order-1",
         first_name="Matias",
         email="Buyer@Test.com",
-        items=[{"name": "GA", "quantity": 2}],
-        amount_total="150.00",
+        items=[{"title": "GA", "qty": 2, "price": 75.0}],
+        amount_total=150.0,
         currency="USD",
         issued_at="2026-06-19T12:00:00+00:00",
         exp=1_781_000_000,
@@ -55,6 +56,13 @@ def test_hash_email_is_normalized_sha256() -> None:
     assert hash_email("buyer@test.com") == hashlib.sha256(b"buyer@test.com").hexdigest()
 
 
+def test_mask_email_shows_prefix_and_domain() -> None:
+    assert mask_email("Buyer@Test.com") == "Bu****@Test.com"
+    assert mask_email("a@x.io") == "a****@x.io"
+    # Malformed input (no @) is returned trimmed, not exploded.
+    assert mask_email(" no-at-sign ") == "no-at-sign"
+
+
 def test_signed_url_verifies_and_recovers_payload() -> None:
     url = build_signed_redirect_url(
         "https://brand.example.com/thank-you", _payload(), SECRET
@@ -62,13 +70,14 @@ def test_signed_url_verifies_and_recovers_payload() -> None:
     recovered = _verify_like_external_page(url, SECRET)
     assert recovered["order_id"] == "order-1"
     assert recovered["first_name"] == "Matias"
-    assert recovered["items"] == [{"name": "GA", "quantity": 2}]
-    assert recovered["amount_total"] == "150.00"
+    assert recovered["items"] == [{"title": "GA", "qty": 2, "price": 75.0}]
+    assert recovered["amount_total"] == 150.0
     assert recovered["currency"] == "USD"
     # Anti-replay expiry travels inside the signed payload.
     assert recovered["exp"] == 1_781_000_000
-    # Raw email is never present; only its hash travels.
+    # Raw email is never present; only its hash and masked form travel.
     assert recovered["email_hash"] == hash_email("buyer@test.com")
+    assert recovered["email_masked"] == "Bu****@Test.com"
     assert "buyer@test.com" not in url
 
 
@@ -80,8 +89,8 @@ def test_tampering_with_payload_breaks_signature() -> None:
         order_id="order-1",
         first_name="Matias",
         email="buyer@test.com",
-        items=[{"name": "GA", "quantity": 2}],
-        amount_total="0.01",  # spoofed total
+        items=[{"title": "GA", "qty": 2, "price": 75.0}],
+        amount_total=0.01,  # spoofed total
         currency="USD",
         issued_at="2026-06-19T12:00:00+00:00",
         exp=1_781_000_000,
