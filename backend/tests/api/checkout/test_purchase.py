@@ -576,18 +576,12 @@ def _verify_signed_redirect(url: str, secret: str) -> dict:
     """Verify a signed thank-you URL the way an external page would, returning
     the recovered payload. Raises AssertionError on a bad signature."""
     query = parse_qs(urlparse(url).query)
-    data = query["data"][0]
+    d = query["d"][0]
     sig = query["sig"][0]
-    expected = (
-        base64.urlsafe_b64encode(
-            hmac.new(secret.encode(), data.encode("ascii"), hashlib.sha256).digest()
-        )
-        .rstrip(b"=")
-        .decode("ascii")
-    )
+    expected = hmac.new(secret.encode(), d.encode("ascii"), hashlib.sha256).hexdigest()
     assert hmac.compare_digest(sig, expected), "signature mismatch"
-    padding = "=" * (-len(data) % 4)
-    return json.loads(base64.urlsafe_b64decode(data + padding))
+    padding = "=" * (-len(d) % 4)
+    return json.loads(base64.urlsafe_b64decode(d + padding))
 
 
 def test_paid_purchase_signs_order_payload_into_simplefi_success_url(
