@@ -17685,6 +17685,23 @@ export const TenantAnonymousPublicSchema = {
             ],
             title: 'Meta Pixel Id'
         },
+        ga_tracking_enabled: {
+            type: 'boolean',
+            title: 'Ga Tracking Enabled',
+            default: false
+        },
+        ga_measurement_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 64
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Ga Measurement Id'
+        },
         id: {
             type: 'string',
             format: 'uuid',
@@ -17791,6 +17808,23 @@ export const TenantCreateSchema = {
                 }
             ],
             title: 'Meta Pixel Id'
+        },
+        ga_tracking_enabled: {
+            type: 'boolean',
+            title: 'Ga Tracking Enabled',
+            default: false
+        },
+        ga_measurement_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 64
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Ga Measurement Id'
         },
         smtp_host: {
             anyOf: [
@@ -18007,6 +18041,23 @@ export const TenantPublicSchema = {
                 }
             ],
             title: 'Meta Pixel Id'
+        },
+        ga_tracking_enabled: {
+            type: 'boolean',
+            title: 'Ga Tracking Enabled',
+            default: false
+        },
+        ga_measurement_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 64
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Ga Measurement Id'
         },
         id: {
             type: 'string',
@@ -18265,6 +18316,29 @@ export const TenantUpdateSchema = {
                 }
             ],
             title: 'Meta Capi Access Token'
+        },
+        ga_tracking_enabled: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Ga Tracking Enabled'
+        },
+        ga_measurement_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 64
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Ga Measurement Id'
         },
         smtp_host: {
             anyOf: [

@@ -40,6 +40,7 @@ import { useStepProductResolver } from "@/hooks/checkout/useStepProductResolver"
 import useGetPassesData from "@/hooks/useGetPassesData"
 import { useIsAuthenticated } from "@/hooks/useIsAuthenticated"
 import { buildFormZodSchema } from "@/lib/form-schema-builder"
+import { trackGAAddToCart } from "@/lib/google-analytics"
 import { trackMetaAddToCart } from "@/lib/meta-pixel"
 import { isPassQuantityBased } from "@/strategies/passQuantityHelper"
 import type { AttendeePassState } from "@/types/Attendee"
@@ -975,6 +976,11 @@ export function CheckoutProvider({
             product: item.product,
             quantity: item.quantity - previousQuantity,
           })
+          trackGAAddToCart({
+            popup: city,
+            product: item.product,
+            quantity: item.quantity - previousQuantity,
+          })
         }
         if (idx >= 0) {
           const updated = [...existing]
@@ -1010,6 +1016,11 @@ export function CheckoutProvider({
         const item = existing.find((i) => i.productId === productId)
         if (item && qty > item.quantity && city) {
           trackMetaAddToCart({
+            popup: city,
+            product: item.product,
+            quantity: qty - item.quantity,
+          })
+          trackGAAddToCart({
             popup: city,
             product: item.product,
             quantity: qty - item.quantity,
@@ -1060,6 +1071,11 @@ export function CheckoutProvider({
         const nextQuantity = quantityOverride ?? (currentQuantity > 0 ? 0 : 1)
         if (nextQuantity > currentQuantity && city) {
           trackMetaAddToCart({
+            popup: city,
+            product,
+            quantity: nextQuantity - currentQuantity,
+          })
+          trackGAAddToCart({
             popup: city,
             product,
             quantity: nextQuantity - currentQuantity,

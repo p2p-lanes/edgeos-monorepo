@@ -52,6 +52,8 @@ class TenantBase(SQLModel):
     landing_mode: LandingMode = LandingMode.portal
     meta_tracking_enabled: bool = False
     meta_pixel_id: str | None = Field(default=None, max_length=64)
+    ga_tracking_enabled: bool = False
+    ga_measurement_id: str | None = Field(default=None, max_length=64)
 
 
 class TenantCreate(SQLModel):
@@ -64,6 +66,8 @@ class TenantCreate(SQLModel):
     logo_url: str | None = None
     meta_tracking_enabled: bool = False
     meta_pixel_id: str | None = Field(default=None, max_length=64)
+    ga_tracking_enabled: bool = False
+    ga_measurement_id: str | None = Field(default=None, max_length=64)
     smtp_host: str | None = Field(default=None, max_length=255)
     smtp_port: int | None = 587
     smtp_user: str | None = Field(default=None, max_length=255)
@@ -108,6 +112,8 @@ class TenantUpdate(SQLModel):
     meta_tracking_enabled: bool | None = None
     meta_pixel_id: str | None = Field(default=None, max_length=64)
     meta_capi_access_token: str | None = Field(default=None, exclude=True)
+    ga_tracking_enabled: bool | None = None
+    ga_measurement_id: str | None = Field(default=None, max_length=64)
     smtp_host: str | None = Field(default=None, max_length=255)
     smtp_port: int | None = None
     smtp_user: str | None = Field(default=None, max_length=255)

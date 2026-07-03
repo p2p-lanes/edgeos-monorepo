@@ -75,7 +75,6 @@ export default async function RootLayout({
         className={`${GeistSans.variable} ${GeistSans.className} ${GeistMono.variable} antialiased`}
         suppressHydrationWarning
       >
-        <GoogleAnalytics />
         <QueryProvider>
           <TenantProvider
             initialTenantId={middlewareTenantId}
@@ -83,6 +82,7 @@ export default async function RootLayout({
             initialLandingMode={middlewareLandingMode}
             initialActivePopupSlug={middlewareActivePopupSlug}
           >
+            <GoogleAnalytics />
             <MetaPixel />
             <div className="w-full">{children}</div>
           </TenantProvider>

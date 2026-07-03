@@ -7,6 +7,7 @@ import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 import type { CheckoutMode } from "@/checkout/popupCheckoutPolicy"
 import { ApiError, CheckoutService, PaymentsService } from "@/client"
+import { trackGAPurchase } from "@/lib/google-analytics"
 import { getMetaAttribution, trackMetaPurchase } from "@/lib/meta-pixel"
 import { queryKeys } from "@/lib/query-keys"
 import type { AttendeePassState } from "@/types/Attendee"
@@ -240,7 +241,7 @@ export function usePaymentSubmit({
           popupSlug &&
           paymentId
         ) {
-          trackMetaPurchase({
+          const purchasePayload = {
             paymentId,
             popup: {
               id: popupId,
@@ -250,7 +251,9 @@ export function usePaymentSubmit({
             amount: data.amount ?? 0,
             currency: data.currency ?? "USD",
             products: productsToSend,
-          })
+          }
+          trackMetaPurchase(purchasePayload)
+          trackGAPurchase(purchasePayload)
         }
         toast.success(
           isEditing
