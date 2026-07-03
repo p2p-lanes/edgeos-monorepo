@@ -6,6 +6,7 @@ from fastapi.responses import JSONResponse
 from fastapi.routing import APIRoute
 from loguru import logger
 from pydantic import ValidationError
+from sentry_sdk.integrations.loguru import LoggingLevels, LoguruIntegration
 from sqlalchemy.exc import IntegrityError, ProgrammingError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.cors import CORSMiddleware
@@ -24,8 +25,21 @@ def custom_generate_unique_id(route: APIRoute) -> str:
     return f"{route.tags[0]}-{route.name}"
 
 
-if settings.SENTRY_DSN and settings.ENVIRONMENT != Environment.DEV:
-    sentry_sdk.init(dsn=str(settings.SENTRY_DSN), enable_tracing=True)
+if settings.SENTRY_DSN and settings.ENVIRONMENT == Environment.PRODUCTION:
+    sentry_sdk.init(
+        dsn=str(settings.SENTRY_DSN),
+        environment=settings.ENVIRONMENT.value,
+        traces_sample_rate=settings.SENTRY_TRACES_SAMPLE_RATE,
+        enable_logs=True,
+        send_default_pii=False,
+        integrations=[
+            LoguruIntegration(
+                sentry_logs_level=LoggingLevels.INFO.value,
+                level=LoggingLevels.INFO.value,
+                event_level=LoggingLevels.ERROR.value,
+            ),
+        ],
+    )
 
 application = FastAPI(
     title=settings.PROJECT_NAME,
