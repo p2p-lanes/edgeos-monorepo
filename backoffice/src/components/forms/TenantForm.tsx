@@ -172,6 +172,8 @@ export function TenantForm({ defaultValues, onSuccess }: TenantFormProps) {
       meta_tracking_enabled: defaultValues?.meta_tracking_enabled ?? false,
       meta_pixel_id: defaultValues?.meta_pixel_id ?? "",
       meta_capi_access_token: "",
+      ga_tracking_enabled: defaultValues?.ga_tracking_enabled ?? false,
+      ga_measurement_id: defaultValues?.ga_measurement_id ?? "",
       smtp_host: defaultValues?.smtp_host ?? "",
       smtp_port: defaultValues?.smtp_port ?? 587,
       smtp_user: defaultValues?.smtp_user ?? "",
@@ -195,6 +197,8 @@ export function TenantForm({ defaultValues, onSuccess }: TenantFormProps) {
           custom_domain: value.custom_domain || null,
           meta_tracking_enabled: value.meta_tracking_enabled,
           meta_pixel_id: value.meta_pixel_id || null,
+          ga_tracking_enabled: value.ga_tracking_enabled,
+          ga_measurement_id: value.ga_measurement_id || null,
           smtp_host: smtpHost || null,
           smtp_port: value.smtp_port || null,
           smtp_user: smtpUser || null,
@@ -227,6 +231,8 @@ export function TenantForm({ defaultValues, onSuccess }: TenantFormProps) {
           logo_url: value.logo_url || undefined,
           meta_tracking_enabled: value.meta_tracking_enabled,
           meta_pixel_id: value.meta_pixel_id || undefined,
+          ga_tracking_enabled: value.ga_tracking_enabled,
+          ga_measurement_id: value.ga_measurement_id || undefined,
           smtp_host: smtpHost || undefined,
           smtp_port: value.smtp_port || undefined,
           smtp_user: smtpUser || undefined,
@@ -438,6 +444,58 @@ export function TenantForm({ defaultValues, onSuccess }: TenantFormProps) {
               )}
             </form.Field>
           )}
+
+          <form.Field name="ga_tracking_enabled">
+            {(field) => (
+              <InlineRow
+                icon={<Megaphone className="h-4 w-4 text-muted-foreground" />}
+                label="Google Analytics"
+                description="Load the tenant's Google Analytics on the portal and checkout."
+              >
+                <Switch
+                  id="ga_tracking_enabled"
+                  aria-label="Google Analytics"
+                  checked={field.state.value}
+                  onCheckedChange={field.handleChange}
+                />
+              </InlineRow>
+            )}
+          </form.Field>
+
+          <form.Field
+            name="ga_measurement_id"
+            validators={{
+              onBlur: ({ value, fieldApi }) => {
+                const enabled = fieldApi.form.getFieldValue(
+                  "ga_tracking_enabled",
+                )
+                if (enabled && !value)
+                  return "Measurement ID is required when tracking is enabled"
+                if (value && !/^G-[A-Z0-9]+$/i.test(value))
+                  return "Enter a valid Google Analytics measurement ID (e.g. G-XXXXXXXXXX)"
+                return undefined
+              },
+            }}
+          >
+            {(field) => (
+              <div>
+                <InlineRow
+                  icon={<Megaphone className="h-4 w-4 text-muted-foreground" />}
+                  label="Measurement ID"
+                  description="Shared by all popups in this organization."
+                >
+                  <Input
+                    placeholder="G-XXXXXXXXXX"
+                    value={field.state.value}
+                    onBlur={field.handleBlur}
+                    onChange={(e) => field.handleChange(e.target.value)}
+                    className="max-w-xs text-sm"
+                  />
+                </InlineRow>
+                <FieldError errors={field.state.meta.errors} />
+              </div>
+            )}
+          </form.Field>
         </InlineSection>
 
         <Separator />

@@ -13,6 +13,7 @@ import {
 import FaviconOverride from "@/components/checkout-flow/FaviconOverride"
 import ScrollyCheckoutFlow from "@/components/checkout-flow/ScrollyCheckoutFlow"
 import { LanguageSwitcher } from "@/components/common/LanguageSwitcher"
+import { trackGAViewItem } from "@/lib/google-analytics"
 import { trackMetaViewContent } from "@/lib/meta-pixel"
 import { queryKeys } from "@/lib/query-keys"
 import { ApplicationContext } from "@/providers/applicationProvider"
@@ -184,6 +185,7 @@ export function OpenCheckoutRuntime({
     if (trackedViewContentRef.current === popup.id) return
 
     trackMetaViewContent({ popup, products: runtime.products })
+    trackGAViewItem({ popup, products: runtime.products })
     trackedViewContentRef.current = popup.id
   }, [popup, runtime.products])
 

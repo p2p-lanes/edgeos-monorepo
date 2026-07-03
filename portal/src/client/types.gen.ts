@@ -3600,6 +3600,8 @@ export type TenantAnonymousPublic = {
     landing_mode?: LandingMode;
     meta_tracking_enabled?: boolean;
     meta_pixel_id?: (string | null);
+    ga_tracking_enabled?: boolean;
+    ga_measurement_id?: (string | null);
     id: string;
     active_popup_slug?: (string | null);
 };
@@ -3614,6 +3616,8 @@ export type TenantCreate = {
     logo_url?: (string | null);
     meta_tracking_enabled?: boolean;
     meta_pixel_id?: (string | null);
+    ga_tracking_enabled?: boolean;
+    ga_measurement_id?: (string | null);
     smtp_host?: (string | null);
     smtp_port?: (number | null);
     smtp_user?: (string | null);
@@ -3643,6 +3647,8 @@ export type TenantPublic = {
     landing_mode?: LandingMode;
     meta_tracking_enabled?: boolean;
     meta_pixel_id?: (string | null);
+    ga_tracking_enabled?: boolean;
+    ga_measurement_id?: (string | null);
     id: string;
     meta_capi_configured?: boolean;
     smtp_host?: (string | null);
@@ -3676,6 +3682,8 @@ export type TenantUpdate = {
     meta_tracking_enabled?: (boolean | null);
     meta_pixel_id?: (string | null);
     meta_capi_access_token?: (string | null);
+    ga_tracking_enabled?: (boolean | null);
+    ga_measurement_id?: (string | null);
     smtp_host?: (string | null);
     smtp_port?: (number | null);
     smtp_user?: (string | null);
