@@ -130,6 +130,7 @@ def _build_purchase_thank_you_payload(
     products_map: "dict[uuid.UUID, Products]",
     *,
     issued_at: str,
+    exp: int,
 ) -> dict:
     """Order snapshot at creation time — quoted total and items, no provider
     choices (installment count / payment method are chosen later on SimpleFi)."""
@@ -148,6 +149,7 @@ def _build_purchase_thank_you_payload(
         amount_total=str(payment.amount),
         currency=popup.currency,
         issued_at=issued_at,
+        exp=exp,
     )
 
 
@@ -895,12 +897,14 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
 
             portal_base = get_portal_url(tenant)
             landing_is_checkout = tenant.landing_mode == LandingMode.checkout
+            now = datetime.now(UTC)
             thank_you_payload = _build_purchase_thank_you_payload(
                 popup,
                 payment,
                 obj,
                 products_map,
-                issued_at=datetime.now(UTC).isoformat(),
+                issued_at=now.isoformat(),
+                exp=int(now.timestamp()) + 30 * 60,
             )
             success_redirect = _resolve_open_checkout_success_url(
                 popup,
