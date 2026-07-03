@@ -40,6 +40,7 @@ class Settings(BaseSettings):
 
     PROJECT_NAME: str = Field(...)
     SENTRY_DSN: HttpUrl | None = None
+    SENTRY_TRACES_SAMPLE_RATE: float = 0.1
     POSTGRES_SERVER: str = Field(...)
     POSTGRES_PORT: int = 5432
     POSTGRES_USER: str = Field(...)
