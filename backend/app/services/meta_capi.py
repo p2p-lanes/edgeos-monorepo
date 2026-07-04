@@ -392,7 +392,9 @@ def _safe_object_id(obj: Any) -> str:
 
 
 def _purchase_event_id(payment: Any) -> str:
-    return f"EVT_PURCHASE_{getattr(payment, 'id', '')}"
+    # Raw order id (== payment.id) so a partner that also fires its own Purchase
+    # to the same pixel with event_id=order_id deduplicates against ours in Meta.
+    return str(getattr(payment, "id", ""))
 
 
 def _initiate_checkout_event_id(payment: Any) -> str:
