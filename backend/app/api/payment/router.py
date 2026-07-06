@@ -1521,6 +1521,8 @@ async def _handle_installment_plan_activated(
 
     installment_plan = payload.data.installment_plan
     new_total = installment_plan.number_of_installments
+    new_paid = installment_plan.paid_installments_count
+    plan_source = _plan_payment_source(installment_plan)
 
     # Idempotent. The fingerprint above catches the redis-cached case, but if
     # SimpleFi re-delivers after a cache eviction we should still no-op
@@ -1529,6 +1531,16 @@ async def _handle_installment_plan_activated(
     # silently overwriting, since downstream installment-counting depends on it.
     if payment.installments_total is not None:
         if payment.installments_total == new_total:
+            changed = False
+            if getattr(payment, "installments_paid", new_paid) != new_paid:
+                payment.installments_paid = new_paid
+                changed = True
+            if plan_source is not None and getattr(payment, "source", None) != plan_source:
+                payment.source = plan_source
+                changed = True
+            if changed:
+                db.commit()
+                return {"message": "Installment plan activation synced"}
             logger.info(
                 "Payment {}: installments_total already set to {}; skipping",
                 payment.id,
@@ -1543,6 +1555,7 @@ async def _handle_installment_plan_activated(
         )
 
     payment.installments_total = new_total
+    payment.installments_paid = new_paid
 
     # SimpleFi creates a "plan" even when the buyer picks pay-in-full
     # (number_of_installments = 1). Normalize the flag so data consumers
@@ -1557,7 +1570,6 @@ async def _handle_installment_plan_activated(
     # Activation is the only webhook that exposes the plan's rail/provider,
     # so record it here. Settlement must not downgrade it later (see
     # _handle_installment_payment).
-    plan_source = _plan_payment_source(installment_plan)
     if plan_source is not None:
         payment.source = plan_source
 
