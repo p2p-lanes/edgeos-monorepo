@@ -607,8 +607,14 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         self,
         popup: "Popups",
         form_data: dict[str, Any],
+        attribution: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        """Build immutable buyer snapshot JSONB for open ticketing payments."""
+        """Build immutable buyer snapshot JSONB for open ticketing payments.
+
+        ``attribution`` carries the marketing params captured from the checkout
+        entry URL (utm_*, fbclid, landing_segment, anonymous_id). Stored under a
+        namespaced key so an outbound purchase webhook can read it back later.
+        """
         sections_snapshot: list[dict[str, Any]] = []
 
         ordered_sections = sorted(
@@ -641,11 +647,14 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 }
             )
 
-        return {
+        snapshot: dict[str, Any] = {
             "schema_version": 1,
             "submitted_at": datetime.now(UTC).isoformat(),
             "sections": sections_snapshot,
         }
+        if attribution:
+            snapshot["attribution"] = attribution
+        return snapshot
 
     def _finalize_zero_amount_payment(
         self,
@@ -766,7 +775,15 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         # Atomically decrement total-stock counters (409 if sold out).
         self._decrement_total_stocks(session, fabricated_requests, valid_products)
 
-        buyer_snapshot = self._build_buyer_snapshot(popup, obj.buyer.form_data)
+        buyer_snapshot = self._build_buyer_snapshot(
+            popup,
+            obj.buyer.form_data,
+            attribution=(
+                obj.attribution.model_dump(exclude_none=True)
+                if obj.attribution
+                else None
+            ),
+        )
         buyer_name = (
             f"{obj.buyer.first_name} {obj.buyer.last_name}".strip() or obj.buyer.email
         )

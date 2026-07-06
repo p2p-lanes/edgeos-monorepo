@@ -3191,6 +3191,103 @@ The directory is attendee-centric: one entry per ticket-holding attendee
 (any category), sourced from that attendee's own human record.`
 } as const;
 
+export const AttributionSchema = {
+    properties: {
+        utm_source: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 256
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Utm Source'
+        },
+        utm_medium: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 256
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Utm Medium'
+        },
+        utm_campaign: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 256
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Utm Campaign'
+        },
+        utm_content: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 256
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Utm Content'
+        },
+        fbclid: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 512
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Fbclid'
+        },
+        landing_segment: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 256
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Landing Segment'
+        },
+        anonymous_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 128
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Anonymous Id'
+        }
+    },
+    type: 'object',
+    title: 'Attribution',
+    description: `Marketing attribution captured from the checkout entry URL.
+
+Generic (not partner-specific): any tenant running paid ads can use these.
+Persisted on the payment so an outbound purchase webhook can return them,
+which is how a partner ties the purchase back to its web session
+(\`\`anonymous_id\`\`). All fields optional; absent ones are dropped.`
+} as const;
+
 export const AuditLogPublicSchema = {
     properties: {
         id: {
@@ -11759,6 +11856,16 @@ export const OpenTicketingPurchaseCreateSchema = {
                 }
             ],
             title: 'Locale'
+        },
+        attribution: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/Attribution'
+                },
+                {
+                    type: 'null'
+                }
+            ]
         }
     },
     type: 'object',

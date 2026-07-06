@@ -7,6 +7,7 @@ import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 import type { CheckoutMode } from "@/checkout/popupCheckoutPolicy"
 import { ApiError, CheckoutService, PaymentsService } from "@/client"
+import { getAttribution } from "@/lib/attribution"
 import { trackGAPurchase } from "@/lib/google-analytics"
 import { getMetaAttribution, trackMetaPurchase } from "@/lib/meta-pixel"
 import { queryKeys } from "@/lib/query-keys"
@@ -174,6 +175,9 @@ export function usePaymentSubmit({
               requestBody: {
                 ...getMetaAttribution(),
                 locale: i18n.language,
+                ...(Object.keys(getAttribution()).length
+                  ? { attribution: getAttribution() }
+                  : {}),
                 products: Object.values(
                   productsToSend.reduce<
                     Record<string, { product_id: string; quantity: number }>

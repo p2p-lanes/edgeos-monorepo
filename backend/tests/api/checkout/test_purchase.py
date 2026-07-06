@@ -191,6 +191,91 @@ def test_purchase_happy_path_creates_payment_and_attendees(
     assert len(attendees) == 1
 
 
+def test_purchase_persists_attribution_in_buyer_snapshot(
+    client: TestClient,
+    db: Session,
+    tenant_a: Tenants,
+) -> None:
+    """Marketing attribution from the entry URL is stored under
+    buyer_snapshot["attribution"] so a later webhook can return it. Absent
+    params are dropped (only the sent keys persist)."""
+    popup = _make_popup(db, tenant_a, slug_prefix="attribution")
+    product = _make_product(db, popup, price="100.00")
+    db.commit()
+
+    with patch("app.services.simplefi.get_simplefi_client") as mock_get_client:
+        mock_get_client.return_value.create_payment.return_value = SimpleNamespace(
+            id="sf_attr_1",
+            status="pending",
+            checkout_url="https://simplefi.test/checkout/attr",
+            is_installment_plan=False,
+        )
+        response = client.post(
+            f"/api/v1/checkout/{popup.slug}/purchase",
+            json={
+                "products": [{"product_id": str(product.id), "quantity": 1}],
+                "buyer": {
+                    "email": "buyer@test.com",
+                    "first_name": "Ana",
+                    "last_name": "Diaz",
+                    "form_data": {},
+                },
+                "attribution": {
+                    "utm_source": "meta",
+                    "utm_campaign": "amanita-launch",
+                    "anonymous_id": "f48a026b-cb27-4249-920a-281cbc5b73c4",
+                },
+            },
+            headers={"X-Tenant-Id": str(tenant_a.id)},
+        )
+
+    assert response.status_code == 200, response.text
+    payment = db.exec(select(Payments).where(Payments.popup_id == popup.id)).first()
+    assert payment is not None
+    assert payment.buyer_snapshot["attribution"] == {
+        "utm_source": "meta",
+        "utm_campaign": "amanita-launch",
+        "anonymous_id": "f48a026b-cb27-4249-920a-281cbc5b73c4",
+    }
+
+
+def test_purchase_without_attribution_omits_the_key(
+    client: TestClient,
+    db: Session,
+    tenant_a: Tenants,
+) -> None:
+    """No attribution sent → no attribution key in the snapshot (not an empty dict)."""
+    popup = _make_popup(db, tenant_a, slug_prefix="no-attribution")
+    product = _make_product(db, popup, price="100.00")
+    db.commit()
+
+    with patch("app.services.simplefi.get_simplefi_client") as mock_get_client:
+        mock_get_client.return_value.create_payment.return_value = SimpleNamespace(
+            id="sf_noattr_1",
+            status="pending",
+            checkout_url="https://simplefi.test/checkout/noattr",
+            is_installment_plan=False,
+        )
+        response = client.post(
+            f"/api/v1/checkout/{popup.slug}/purchase",
+            json={
+                "products": [{"product_id": str(product.id), "quantity": 1}],
+                "buyer": {
+                    "email": "buyer@test.com",
+                    "first_name": "Ana",
+                    "last_name": "Diaz",
+                    "form_data": {},
+                },
+            },
+            headers={"X-Tenant-Id": str(tenant_a.id)},
+        )
+
+    assert response.status_code == 200, response.text
+    payment = db.exec(select(Payments).where(Payments.popup_id == popup.id)).first()
+    assert payment is not None
+    assert "attribution" not in payment.buyer_snapshot
+
+
 def test_purchase_pending_open_checkout_sends_initiate_checkout_capi(
     client: TestClient,
     db: Session,
