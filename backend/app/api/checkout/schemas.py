@@ -130,6 +130,24 @@ class BuyerInfo(BaseModel):
     form_data: dict[str, Any] = {}
 
 
+class Attribution(BaseModel):
+    """Marketing attribution captured from the checkout entry URL.
+
+    Generic (not partner-specific): any tenant running paid ads can use these.
+    Persisted on the payment so an outbound purchase webhook can return them,
+    which is how a partner ties the purchase back to its web session
+    (``anonymous_id``). All fields optional; absent ones are dropped.
+    """
+
+    utm_source: str | None = Field(default=None, max_length=256)
+    utm_medium: str | None = Field(default=None, max_length=256)
+    utm_campaign: str | None = Field(default=None, max_length=256)
+    utm_content: str | None = Field(default=None, max_length=256)
+    fbclid: str | None = Field(default=None, max_length=512)
+    landing_segment: str | None = Field(default=None, max_length=256)
+    anonymous_id: str | None = Field(default=None, max_length=128)
+
+
 class OpenTicketingPurchaseCreate(BaseModel):
     """Request schema for POST /checkout/{slug}/purchase."""
 
@@ -145,6 +163,7 @@ class OpenTicketingPurchaseCreate(BaseModel):
     # Active checkout language (from the entry URL ?lang=), used to build the
     # locale-aware success redirect. Falls back to the popup default when absent.
     locale: str | None = Field(default=None, max_length=8)
+    attribution: Attribution | None = None
 
 
 class OpenTicketingPurchaseResponse(BaseModel):

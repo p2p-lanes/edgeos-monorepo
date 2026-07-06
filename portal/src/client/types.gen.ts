@@ -730,6 +730,24 @@ export type AttendeeWithTickets = {
 };
 
 /**
+ * Marketing attribution captured from the checkout entry URL.
+ *
+ * Generic (not partner-specific): any tenant running paid ads can use these.
+ * Persisted on the payment so an outbound purchase webhook can return them,
+ * which is how a partner ties the purchase back to its web session
+ * (``anonymous_id``). All fields optional; absent ones are dropped.
+ */
+export type Attribution = {
+    utm_source?: (string | null);
+    utm_medium?: (string | null);
+    utm_campaign?: (string | null);
+    utm_content?: (string | null);
+    fbclid?: (string | null);
+    landing_segment?: (string | null);
+    anonymous_id?: (string | null);
+};
+
+/**
  * A single audit log entry returned to the backoffice.
  */
 export type AuditLogPublic = {
@@ -2558,6 +2576,7 @@ export type OpenTicketingPurchaseCreate = {
     fbc?: (string | null);
     fbp?: (string | null);
     locale?: (string | null);
+    attribution?: (Attribution | null);
 };
 
 /**
