@@ -89,7 +89,7 @@ export function usePaymentSubmit({
   editPassesEnabled,
   popupName,
 }: UsePaymentSubmitParams) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const queryClient = useQueryClient()
   const router = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -173,6 +173,7 @@ export function usePaymentSubmit({
               slug: popupSlug!,
               requestBody: {
                 ...getMetaAttribution(),
+                locale: i18n.language,
                 products: Object.values(
                   productsToSend.reduce<
                     Record<string, { product_id: string; quantity: number }>
@@ -370,6 +371,7 @@ export function usePaymentSubmit({
     editPassesEnabled,
     isSubmitting,
     t,
+    i18n.language,
   ])
 
   return { submitPayment, isSubmitting }

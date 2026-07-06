@@ -136,8 +136,9 @@ def _build_purchase_thank_you_payload(
     choices (installment count / payment method are chosen later on SimpleFi)."""
     items = [
         {
-            "name": products_map[line.product_id].name,
-            "quantity": line.quantity,
+            "title": products_map[line.product_id].name,
+            "qty": line.quantity,
+            "price": float(products_map[line.product_id].price),
         }
         for line in obj.products
     ]
@@ -146,7 +147,7 @@ def _build_purchase_thank_you_payload(
         first_name=obj.buyer.first_name,
         email=obj.buyer.email,
         items=items,
-        amount_total=str(payment.amount),
+        amount_total=float(payment.amount),
         currency=popup.currency,
         issued_at=issued_at,
         exp=exp,
@@ -154,18 +155,21 @@ def _build_purchase_thank_you_payload(
 
 
 def _resolve_open_checkout_success_url(
-    popup: "Popups", internal_thank_you_url: str, payload: dict
+    popup: "Popups", internal_thank_you_url: str, payload: dict, *, locale: str
 ) -> str:
     """Resolve where a successful open-checkout buyer lands.
 
     A custom popup success URL overrides the portal thank-you: signed with the
     order payload when a signing secret is set (external page verifies it),
-    plain otherwise. With no custom URL, the buyer stays on the portal
-    thank-you, which carries the order data unsigned so it can render the
-    summary (our own page — no HMAC needed).
+    plain otherwise. A ``{locale}`` placeholder in the custom URL is replaced
+    with the checkout language (e.g. ``.../{locale}/gracias`` → ``.../es/gracias``).
+    With no custom URL, the buyer stays on the portal thank-you, which carries
+    the order data unsigned so it can render the summary (our own page — no HMAC
+    needed).
     """
     custom = popup.open_checkout_success_url
     if custom:
+        custom = custom.replace("{locale}", locale)
         secret = popup.open_checkout_signing_secret
         return build_signed_redirect_url(custom, payload, secret) if secret else custom
     return build_unsigned_redirect_url(internal_thank_you_url, payload)
@@ -912,6 +916,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                     portal_base, landing_is_checkout, popup, payment
                 ),
                 thank_you_payload,
+                locale=obj.locale or popup.default_language or "en",
             )
 
             # Zero-amount short-circuit: a 100% coupon zeroed the cart, so

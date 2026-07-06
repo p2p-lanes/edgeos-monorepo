@@ -142,6 +142,9 @@ class OpenTicketingPurchaseCreate(BaseModel):
     insurance: bool = False
     fbc: str | None = Field(default=None, max_length=512)
     fbp: str | None = Field(default=None, max_length=512)
+    # Active checkout language (from the entry URL ?lang=), used to build the
+    # locale-aware success redirect. Falls back to the popup default when absent.
+    locale: str | None = Field(default=None, max_length=8)
 
 
 class OpenTicketingPurchaseResponse(BaseModel):

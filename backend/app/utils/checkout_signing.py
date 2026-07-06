@@ -43,6 +43,19 @@ def hash_email(email: str) -> str:
     return hashlib.sha256(email.strip().lower().encode("utf-8")).hexdigest()
 
 
+def mask_email(email: str) -> str:
+    """Masked email for display, e.g. ``ab****@gmail.com``.
+
+    Shows the first two characters of the local part and its domain; everything
+    in between is hidden. Best-effort for malformed input (no ``@`` → returned
+    trimmed as-is).
+    """
+    local, at, domain = email.strip().partition("@")
+    if not at:
+        return local
+    return f"{local[:2]}****@{domain}"
+
+
 def _b64url_nopad(raw: bytes) -> str:
     return base64.urlsafe_b64encode(raw).rstrip(b"=").decode("ascii")
 
@@ -100,7 +113,7 @@ def build_thank_you_payload(
     first_name: str,
     email: str,
     items: list[dict[str, Any]],
-    amount_total: str,
+    amount_total: float,
     currency: str,
     issued_at: str,
     exp: int,
@@ -108,12 +121,15 @@ def build_thank_you_payload(
     """Assemble the order snapshot sent to the thank-you page.
 
     Field names form the contract with the external page; keep them stable.
-    ``exp`` is an epoch-seconds expiry (anti-replay) covered by the signature.
+    ``items`` are ``{title, qty, price}`` and ``amount_total`` is a number (no
+    thousands separators). ``exp`` is an epoch-seconds expiry (anti-replay)
+    covered by the signature.
     """
     return {
         "order_id": order_id,
         "first_name": first_name,
         "email_hash": hash_email(email),
+        "email_masked": mask_email(email),
         "items": items,
         "amount_total": amount_total,
         "currency": currency,

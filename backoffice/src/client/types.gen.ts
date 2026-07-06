@@ -2557,6 +2557,7 @@ export type OpenTicketingPurchaseCreate = {
     insurance?: boolean;
     fbc?: (string | null);
     fbp?: (string | null);
+    locale?: (string | null);
 };
 
 /**
