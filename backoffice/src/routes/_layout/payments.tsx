@@ -626,8 +626,7 @@ function PaymentSubRow({ row }: { row: Row<PaymentPublic> }) {
                   colSpan={5}
                   className="py-0.5 text-right text-muted-foreground"
                 >
-                  Adjustment (
-                  {railAdj.isDiscount ? "−" : "+"}
+                  Adjustment ({railAdj.isDiscount ? "−" : "+"}
                   {railAdj.pct}%)
                 </td>
                 <td

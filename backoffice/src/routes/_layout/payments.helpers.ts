@@ -1,4 +1,8 @@
-import type { PaymentProductResponse, PaymentPublic, PaymentStatus } from "@/client"
+import type {
+  PaymentProductResponse,
+  PaymentPublic,
+  PaymentStatus,
+} from "@/client"
 
 interface PaymentsQueryInput {
   popupId: string | null
