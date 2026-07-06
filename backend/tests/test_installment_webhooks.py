@@ -346,6 +346,76 @@ def test_activated_idempotent_when_total_already_matches(monkeypatch) -> None:
     assert db.committed == 0
 
 
+def test_activated_redelivery_syncs_paid_count_and_source(monkeypatch) -> None:
+    """If an earlier activation set the total but missed provider/paid fields,
+    a richer redelivery must complete the payment state instead of returning
+    early as a no-op."""
+    plan_id = "plan-act-sync"
+    payment = SimpleNamespace(
+        id="payment-act-sync",
+        external_id=plan_id,
+        installments_total=5,
+        installments_paid=None,
+        source="SimpleFI",
+    )
+
+    class FakePaymentsCRUD:
+        def get_by_external_id(self, _db, _ext_id):
+            return payment
+
+    monkeypatch.setattr(payment_router_module, "payments_crud", FakePaymentsCRUD())
+
+    db = FakeDBSession()
+    result = asyncio.run(
+        _handle_installment_plan_activated(
+            _make_activated_payload(
+                plan_id,
+                5,
+                payment_method="CARD",
+                stripe_subscription_id="sub_123",
+            ),
+            db,
+            FakeWebhookCache(),
+        )
+    )
+
+    assert result == {"message": "Installment plan activation synced"}
+    assert payment.installments_paid == 0
+    assert payment.source == "Stripe"
+    assert db.committed == 1
+
+
+def test_activated_payload_without_plain_plan_id_is_accepted(monkeypatch) -> None:
+    """SimpleFi plan documents may expose Mongo-style _id in the plan body;
+    routing uses the wrapper entity_id, so the nested id must not be required."""
+    plan_id = "plan-act-no-plain-id"
+    payload = _make_activated_payload(plan_id, 5)
+    plan = payload["data"]["installment_plan"]
+    del plan["id"]
+    plan["_id"] = {"$oid": plan_id}
+
+    payment = SimpleNamespace(
+        id="payment-act-no-plain-id",
+        external_id=plan_id,
+        installments_total=None,
+    )
+
+    class FakePaymentsCRUD:
+        def get_by_external_id(self, _db, _ext_id):
+            return payment
+
+    monkeypatch.setattr(payment_router_module, "payments_crud", FakePaymentsCRUD())
+
+    db = FakeDBSession()
+    asyncio.run(
+        _handle_installment_plan_activated(payload, db, FakeWebhookCache())
+    )
+
+    assert payment.installments_total == 5
+    assert payment.installments_paid == 0
+    assert db.committed == 1
+
+
 def test_activated_logs_warning_on_divergent_total(monkeypatch) -> None:
     """If the new total differs from the stored one, we overwrite (so future
     counting stays correct) but emit a warning — silently letting them drift

@@ -46,6 +46,7 @@ import { exportToCsv, fetchAllPages } from "@/lib/export"
 import {
   buildPaymentsQueryConfig,
   buildPaymentsTableState,
+  getRailAdjustment,
   resolveLineUnitPrice,
 } from "./payments.helpers"
 
@@ -319,8 +320,7 @@ function getColumns(hasInvoice: boolean): ColumnDef<PaymentPublic>[] {
               <span
                 className={`text-xs ${adj.isDiscount ? "text-green-600" : "text-amber-600"}`}
               >
-                {adj.railLabel} {adj.isDiscount ? "discount" : "surcharge"}{" "}
-                {adj.isDiscount ? "−" : "+"}
+                adjustment {adj.isDiscount ? "−" : "+"}
                 {adj.pct}%
               </span>
             ) : null}
@@ -467,49 +467,6 @@ const categoryLabels: Record<string, string> = {
   housing: "Housing",
   merch: "Merch",
   patreon: "Patron",
-}
-
-// SimpleFi merchants may configure a signed per-rail (card/crypto) price
-// adjustment, so the settled total can differ from the quoted amount. EdgeOS
-// only stores the outcome (amount vs amount_charged); the percentage is
-// derived and the rail read from `source`: provider names (Stripe, ...) mean
-// card, "Crypto" is written at plan activation, and one-shot settlements
-// keep the residual "SimpleFI" only for crypto checkouts. A *plan* whose
-// source is still "SimpleFI" predates the activation-source logic — its rail
-// is unknown, so it gets a generic label rather than a guess. `final` is
-// false while a plan is still collecting, where amount_charged is a running
-// partial and the percentage can't be derived.
-function getRailAdjustment(payment: PaymentPublic): {
-  railLabel: "card" | "crypto" | "payment method"
-  pct: string
-  isDiscount: boolean
-  delta: number
-  final: boolean
-} | null {
-  const amount = Number(payment.amount)
-  if (payment.amount_charged == null || amount <= 0) return null
-  const total = payment.installments_total
-  const isPlan =
-    payment.is_installment_plan === true && total != null && total >= 2
-  const final = !isPlan || (payment.installments_paid ?? 0) >= (total ?? 0)
-  const delta = Number(payment.amount_charged) - amount
-  const rawPct = (delta / amount) * 100
-  const rounded = Math.round(rawPct)
-  // Installment cycles round per charge, so a completed plan lands within a
-  // few cents of the exact rail percentage — snap to the integer when close.
-  const pct =
-    Math.abs(rawPct - rounded) < 0.1
-      ? String(Math.abs(rounded))
-      : Math.abs(rawPct).toFixed(1)
-  let railLabel: "card" | "crypto" | "payment method"
-  if (payment.source === "Crypto") {
-    railLabel = "crypto"
-  } else if (payment.source !== "SimpleFI") {
-    railLabel = "card"
-  } else {
-    railLabel = isPlan ? "payment method" : "crypto"
-  }
-  return { railLabel, pct, isDiscount: delta < 0, delta, final }
 }
 
 function PaymentSubRow({ row }: { row: Row<PaymentPublic> }) {
@@ -669,10 +626,7 @@ function PaymentSubRow({ row }: { row: Row<PaymentPublic> }) {
                   colSpan={5}
                   className="py-0.5 text-right text-muted-foreground"
                 >
-                  {railAdj.railLabel.charAt(0).toUpperCase() +
-                    railAdj.railLabel.slice(1)}{" "}
-                  {railAdj.isDiscount ? "discount" : "surcharge"} (
-                  {railAdj.isDiscount ? "−" : "+"}
+                  Adjustment ({railAdj.isDiscount ? "−" : "+"}
                   {railAdj.pct}%)
                 </td>
                 <td

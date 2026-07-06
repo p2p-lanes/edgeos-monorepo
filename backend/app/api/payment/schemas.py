@@ -394,7 +394,7 @@ class SimpleFIWebhookPayload(BaseModel):
 class SimpleFIInstallmentPlan(BaseModel):
     """Installment plan details from SimpleFI."""
 
-    id: str
+    id: str | None = None
     status: str
     paid_installments_count: int
     number_of_installments: int
