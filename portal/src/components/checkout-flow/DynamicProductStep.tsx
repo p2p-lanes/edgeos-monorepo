@@ -12,11 +12,13 @@ import EditPassesToggle from "./shared/EditPassesToggle"
 interface DynamicProductStepProps {
   stepConfig: TicketingStepPublic
   onSkip?: () => void
+  isFirstSection?: boolean
 }
 
 export default function DynamicProductStep({
   stepConfig,
   onSkip,
+  isFirstSection,
 }: DynamicProductStepProps) {
   const { getProductsForStep } = useCheckout()
 
@@ -76,6 +78,7 @@ export default function DynamicProductStep({
       templateConfig={
         (stepConfig.template_config as Record<string, unknown>) ?? null
       }
+      isFirstSection={isFirstSection}
     />
   )
 
