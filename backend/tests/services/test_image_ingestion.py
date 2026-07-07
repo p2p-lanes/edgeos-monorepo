@@ -701,7 +701,7 @@ def test_ingest_template_config_gallery_replaces_images() -> None:
             svc, "ingest_urls", new=AsyncMock(return_value=[cdn_a, cdn_b])
         ):
             return await svc.ingest_template_config(
-                "gallery",
+                "image-gallery",
                 {"images": ["https://ext.com/a.jpg", "https://ext.com/b.jpg"]},
                 TENANT_ID,
             )
@@ -719,7 +719,7 @@ def test_ingest_template_config_rich_text_rewrites_html() -> None:
         svc = ImageIngestionService()
         with patch.object(svc, "ingest_html", new=AsyncMock(return_value=new_html)):
             return await svc.ingest_template_config(
-                "rich_text",
+                "rich-text",
                 {"html": original_html},
                 TENANT_ID,
             )
@@ -740,7 +740,7 @@ def test_ingest_template_config_ticket_select_replaces_section_image_url() -> No
 
         with patch.object(svc, "ingest_url", new=AsyncMock(side_effect=fake_ingest)):
             return await svc.ingest_template_config(
-                "ticket_select",
+                "ticket-select",
                 {
                     "sections": [
                         {"image_url": "https://ext.com/img.jpg", "label": "VIP"}
@@ -753,6 +753,29 @@ def test_ingest_template_config_ticket_select_replaces_section_image_url() -> No
     assert result is not None
     assert result["sections"][0]["image_url"] == cdn_url
     assert result["sections"][0]["label"] == "VIP"  # non-image fields preserved
+
+
+def test_ingest_template_config_ticket_card_replaces_section_image_url() -> None:
+    """ticket-card carries the same sections[].image_url as ticket-select."""
+    cdn_url = "https://cdn.example.com/section.jpg"
+
+    async def _run() -> dict:
+        svc = ImageIngestionService()
+
+        async def fake_ingest(_url: str, _tenant_id: uuid.UUID) -> str:
+            return cdn_url
+
+        with patch.object(svc, "ingest_url", new=AsyncMock(side_effect=fake_ingest)):
+            return await svc.ingest_template_config(
+                "ticket-card",
+                {"sections": [{"image_url": "https://ext.com/c.jpg", "label": "GA"}]},
+                TENANT_ID,
+            )
+
+    result = asyncio.run(_run())
+    assert result is not None
+    assert result["sections"][0]["image_url"] == cdn_url
+    assert result["sections"][0]["label"] == "GA"
 
 
 def test_ingest_template_config_per_item_fail_isolation() -> None:
@@ -773,7 +796,7 @@ def test_ingest_template_config_per_item_fail_isolation() -> None:
             svc, "ingest_urls", new=AsyncMock(side_effect=fake_ingest_urls)
         ):
             return await svc.ingest_template_config(
-                "gallery",
+                "image-gallery",
                 {"images": ["https://ext.com/a.jpg", original_b]},
                 TENANT_ID,
             )
@@ -787,7 +810,7 @@ def test_ingest_template_config_per_item_fail_isolation() -> None:
 def test_ingest_template_config_none_config_returns_none() -> None:
     """None config is passed through unchanged."""
     svc = ImageIngestionService()
-    result = asyncio.run(svc.ingest_template_config("gallery", None, TENANT_ID))
+    result = asyncio.run(svc.ingest_template_config("image-gallery", None, TENANT_ID))
     assert result is None
 
 
