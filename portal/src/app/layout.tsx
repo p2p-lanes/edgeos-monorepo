@@ -50,9 +50,31 @@ export const viewport: Viewport = {
   themeColor: "#ffffff",
 }
 
+/**
+ * Origin of the backend API, derived from the runtime env — never
+ * hardcoded. Returns null when the env var is missing or malformed so the
+ * preconnect hint is simply skipped instead of pointing somewhere wrong.
+ */
+function getApiOrigin(): string | null {
+  try {
+    return new URL(process.env.NEXT_PUBLIC_API_URL ?? "").origin
+  } catch {
+    return null
+  }
+}
+
 export default async function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
+  // The portal is client-rendered: every page pays DNS + TCP + TLS to the
+  // API after hydration, in the critical path (tenant + checkout runtime
+  // fetches). Preconnecting from the initial HTML moves those handshakes
+  // off the critical path. Rendered as a <link> element (hoisted to <head>
+  // by React) because react-dom's preconnect() is a no-op in Server
+  // Components. `crossOrigin` matches the CORS mode of the SDK fetches so
+  // the warmed connection is actually reused.
+  const apiOrigin = getApiOrigin()
+
   const headersList = await headers()
   const isCustomDomain = headersList.get("x-custom-domain") === "true"
   const middlewareTenantId = isCustomDomain
@@ -75,6 +97,9 @@ export default async function RootLayout({
         className={`${GeistSans.variable} ${GeistSans.className} ${GeistMono.variable} antialiased`}
         suppressHydrationWarning
       >
+        {apiOrigin && (
+          <link rel="preconnect" href={apiOrigin} crossOrigin="anonymous" />
+        )}
         <QueryProvider>
           <TenantProvider
             initialTenantId={middlewareTenantId}
