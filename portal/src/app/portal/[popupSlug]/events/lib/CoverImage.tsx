@@ -1,11 +1,19 @@
 "use client"
 
+import Image from "next/image"
 import { useRef, useState } from "react"
+import { imageOptimization } from "@/lib/image-optimization"
 
 interface CoverImageProps {
   src: string | null | undefined
   alt: string
   className?: string
+  /**
+   * Rendered width hint for the optimizer. Callers size the image purely
+   * via CSS classes, so pass the slot's real width (e.g. "64px" for list
+   * thumbnails) to avoid over-fetching.
+   */
+  sizes?: string
   fallback: React.ReactNode
 }
 
@@ -15,7 +23,13 @@ interface CoverImageProps {
  * background with whatever node the caller passes (typically a lucide
  * icon sized for the slot).
  */
-export function CoverImage({ src, alt, className, fallback }: CoverImageProps) {
+export function CoverImage({
+  src,
+  alt,
+  className,
+  sizes = "100vw",
+  fallback,
+}: CoverImageProps) {
   const [errored, setErrored] = useState(false)
   // Reset the error flag during render when src changes — preferred over
   // useEffect per the React docs ("Adjusting state when a prop changes"),
@@ -39,12 +53,17 @@ export function CoverImage({ src, alt, className, fallback }: CoverImageProps) {
   }
 
   return (
-    // biome-ignore lint/performance/noImgElement: portal uses plain imgs for cover photos uploaded to S3
-    <img
+    // Callers control the rendered size through `className`, so width and
+    // height are zeroed out and only feed the optimizer via `sizes`.
+    <Image
       src={src}
       alt={alt}
+      width={0}
+      height={0}
+      sizes={sizes}
       className={className}
       onError={() => setErrored(true)}
+      {...imageOptimization(src)}
     />
   )
 }

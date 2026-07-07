@@ -12,6 +12,7 @@ import type {
   TicketSectionVM,
 } from "@/hooks/checkout/useTicketsStep"
 import { useTicketsStep } from "@/hooks/checkout/useTicketsStep"
+import { imageOptimization } from "@/lib/image-optimization"
 import { stepCardSurfaceStyle } from "@/lib/stepCardSurface"
 import { cn } from "@/lib/utils"
 import { formatCurrency } from "@/types/checkout"
@@ -519,9 +520,10 @@ function PassSystemSectionCard({
             alt={section.label}
             fill
             sizes="(max-width: 768px) 100vw, 720px"
-            quality={95}
+            quality={75}
             className="object-cover"
             priority={false}
+            {...imageOptimization(section.image_url)}
           />
         </div>
       )}
@@ -603,9 +605,10 @@ function OpenCheckoutSectionCard({
             alt={section.label}
             fill
             sizes="(max-width: 768px) 100vw, 720px"
-            quality={95}
+            quality={75}
             className="object-cover"
             priority={false}
+            {...imageOptimization(section.image_url)}
           />
         </div>
       )}

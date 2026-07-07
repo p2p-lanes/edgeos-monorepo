@@ -15,6 +15,7 @@ import { useTranslation } from "react-i18next"
 import { RiTelegram2Line } from "react-icons/ri"
 import type { HumanPublic } from "@/client"
 import uploadFileToS3 from "@/helpers/upload"
+import { imageOptimization } from "@/lib/image-optimization"
 import { Button } from "../ui/button"
 import { Card } from "../ui/card"
 import { Input } from "../ui/input"
@@ -106,7 +107,11 @@ const HumanForm = ({
                 src={editForm?.picture_url || userData?.picture_url}
                 alt="Profile"
                 fill
+                sizes="64px"
                 className="rounded-full object-cover"
+                {...imageOptimization(
+                  editForm?.picture_url || userData?.picture_url,
+                )}
               />
             ) : (
               <User className="w-8 h-8 text-primary" />

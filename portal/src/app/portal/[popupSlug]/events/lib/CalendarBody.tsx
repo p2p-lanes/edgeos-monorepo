@@ -507,6 +507,7 @@ export function CalendarBody({
                                   src={thumbUrl}
                                   alt={event.venue_title ?? ""}
                                   className="h-full w-full object-cover"
+                                  sizes="48px"
                                   fallback={
                                     <MapPin className="h-5 w-5 text-muted-foreground/40" />
                                   }

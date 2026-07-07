@@ -1,6 +1,7 @@
 "use client"
 
 import { Check } from "lucide-react"
+import Image from "next/image"
 import {
   type ReactNode,
   useEffect,
@@ -9,6 +10,7 @@ import {
   useState,
 } from "react"
 import { getRegistryIcon, resolveStepIcon } from "@/lib/checkoutStepIcons"
+import { imageOptimization } from "@/lib/image-optimization"
 import { cn } from "@/lib/utils"
 import { useCheckout } from "@/providers/checkoutProvider"
 import type { CheckoutStep } from "@/types/checkout"
@@ -167,14 +169,14 @@ export default function ScrollySectionNav({
       <div className="bg-checkout-navbar-bg/85 px-2.5 py-1.5 backdrop-blur-xl">
         <div className="flex items-center gap-1.5">
           {brandLogoUrl ? (
-            // Small tenant logo, sized 28px. Next/image not used because
-            // tenant icon URLs come from arbitrary CDNs and don't need
-            // SSR-time optimisation at this scale.
-            // biome-ignore lint/performance/noImgElement: tenant logo, sized small, no need for next/image SSR
-            <img
+            <Image
               src={brandLogoUrl}
               alt={brandLabel ?? "Tenant logo"}
+              width={28}
+              height={28}
+              priority
               className="size-7 shrink-0 rounded-md object-contain"
+              {...imageOptimization(brandLogoUrl)}
             />
           ) : null}
           <div

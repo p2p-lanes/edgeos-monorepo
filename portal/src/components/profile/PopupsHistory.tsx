@@ -2,6 +2,7 @@ import { Calendar, Clock, MapPin } from "lucide-react"
 import Image from "next/image"
 import { useTranslation } from "react-i18next"
 import type { HumanProfileStatsPopup, PopupPublic } from "@/client"
+import { imageOptimization } from "@/lib/image-optimization"
 import { cn } from "@/lib/utils"
 import { useApplication } from "@/providers/applicationProvider"
 import { useCityProvider } from "@/providers/cityProvider"
@@ -25,6 +26,7 @@ function PopupThumb({
           fill
           sizes="(max-width: 768px) 100vw, 33vw"
           className="object-cover"
+          {...imageOptimization(imageUrl)}
         />
       </div>
     )

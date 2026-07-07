@@ -3,6 +3,7 @@
 import { useParams } from "next/navigation"
 import { useEffect } from "react"
 import { PopupCheckoutContent } from "@/app/checkout/components/PopupCheckoutContent"
+import { CheckoutBackgroundImage } from "@/components/CheckoutBackgroundImage"
 import { CheckoutBackgroundVideo } from "@/components/CheckoutBackgroundVideo"
 import useGetPublicGroup from "@/hooks/useGetPublicGroup"
 import { getCheckoutBackground } from "@/lib/background-image"
@@ -89,13 +90,15 @@ const GroupCheckoutPage = () => {
   }
 
   const background = getCheckoutBackground(popup, "groups")
-  const contentBackground =
-    background.type === "image"
-      ? { className: "", style: background.style }
-      : { className: background.type === "none" ? "bg-background" : "" }
+  const contentBackground = {
+    className: background.type === "none" ? "bg-background" : "",
+  }
 
   return (
     <>
+      {background.type === "image" && (
+        <CheckoutBackgroundImage url={background.url} />
+      )}
       {background.type === "video" && (
         <CheckoutBackgroundVideo url={background.url} />
       )}

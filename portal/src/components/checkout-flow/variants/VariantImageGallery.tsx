@@ -11,6 +11,7 @@ import {
 import Image from "next/image"
 import { useCallback, useEffect, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
+import { imageOptimization } from "@/lib/image-optimization"
 import { cn } from "@/lib/utils"
 import type { VariantProps } from "../registries/variantRegistry"
 
@@ -128,6 +129,7 @@ export function LightboxOverlay({
           width={1200}
           height={800}
           className="w-full h-auto max-h-[80vh] object-contain rounded-lg"
+          {...imageOptimization(current.url)}
         />
         {current.caption && (
           <p className="text-white/80 text-sm text-center mt-3">
@@ -182,7 +184,9 @@ function CarouselGallery({
                   src={img.url}
                   alt={img.caption || ""}
                   fill
+                  sizes="(max-width: 768px) 100vw, 672px"
                   className="object-cover"
+                  {...imageOptimization(img.url)}
                 />
               </div>
             </div>
@@ -254,12 +258,16 @@ function MasonryGallery({
             aria-label={img.caption || `View image ${i + 1}`}
           >
             <div className="rounded-xl overflow-hidden shadow-sm border border-border group">
-              {/* biome-ignore lint: masonry items use native img for natural height */}
-              <img
+              {/* Masonry items keep their natural height: width/height are
+                  zeroed and CSS (w-full h-auto) drives layout. */}
+              <Image
                 src={img.url}
                 alt={img.caption || ""}
+                width={0}
+                height={0}
+                sizes="(max-width: 640px) 50vw, 33vw"
                 className="w-full h-auto block transition-transform duration-200 group-hover:scale-[1.02]"
-                loading="lazy"
+                {...imageOptimization(img.url)}
               />
               {img.caption && (
                 <div className="px-3 py-2">
@@ -313,7 +321,9 @@ function LightboxGallery({
               src={img.url}
               alt={img.caption || ""}
               fill
+              sizes="(max-width: 640px) 50vw, 224px"
               className="object-cover transition-transform duration-200 group-hover:scale-105"
+              {...imageOptimization(img.url)}
             />
           </button>
         ))}

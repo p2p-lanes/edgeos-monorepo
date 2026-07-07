@@ -3,6 +3,7 @@
 import { CalendarDays, MapPin } from "lucide-react"
 import Image from "next/image"
 import { formatDate } from "@/helpers/dates"
+import { imageOptimization } from "@/lib/image-optimization"
 import { useCityProvider } from "@/providers/cityProvider"
 
 const POPUP_DATE_FORMAT: Intl.DateTimeFormatOptions = {
@@ -30,6 +31,7 @@ export function FormHeader() {
             className="object-cover dark:invert rounded-2xl"
             fill
             sizes="(max-width: 768px) 100vw, 20vw"
+            {...imageOptimization(city.image_url)}
           />
         </div>
       ) : (

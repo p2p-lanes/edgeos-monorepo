@@ -10,6 +10,7 @@ import {
   Upload,
   X,
 } from "lucide-react"
+import Image from "next/image"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useRef, useState } from "react"
@@ -34,6 +35,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
+import { imageOptimization } from "@/lib/image-optimization"
 import { useCityProvider } from "@/providers/cityProvider"
 import { usePortalEventSettings } from "../../lib/useEventTimezone"
 import { useFileUpload } from "../../lib/useFileUpload"
@@ -264,12 +266,14 @@ export default function NewPortalVenuePage() {
             }}
           />
           {imageUrl ? (
-            <div className="relative w-full overflow-hidden rounded-lg border">
-              {/* biome-ignore lint/performance/noImgElement: user-uploaded S3 image */}
-              <img
+            <div className="relative aspect-[16/9] w-full overflow-hidden rounded-lg border">
+              <Image
                 src={imageUrl}
                 alt={t("events.venues.new.venue_cover_alt")}
-                className="aspect-[16/9] w-full object-cover"
+                fill
+                sizes="(max-width: 768px) 100vw, 672px"
+                className="object-cover"
+                {...imageOptimization(imageUrl)}
               />
               <div className="absolute top-2 right-2 flex gap-2">
                 <Button
