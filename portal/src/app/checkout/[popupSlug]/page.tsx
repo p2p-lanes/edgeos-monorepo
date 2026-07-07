@@ -2,6 +2,7 @@
 
 import { useParams } from "next/navigation"
 import { useTranslation } from "react-i18next"
+import { CheckoutBackgroundImage } from "@/components/CheckoutBackgroundImage"
 import { CheckoutBackgroundVideo } from "@/components/CheckoutBackgroundVideo"
 import { OpenCheckoutRuntime } from "@/components/checkout-flow/OpenCheckoutRuntime"
 import { SidebarProvider } from "@/components/Sidebar/SidebarComponents"
@@ -64,8 +65,10 @@ export default function OpenTicketingCheckoutPage() {
     >
       <main
         className={`h-svh overflow-y-auto no-scrollbar ${background.type === "none" ? "bg-background" : ""}`.trim()}
-        style={background.type === "image" ? background.style : undefined}
       >
+        {background.type === "image" && (
+          <CheckoutBackgroundImage url={background.url} />
+        )}
         {background.type === "video" && (
           <CheckoutBackgroundVideo url={background.url} />
         )}

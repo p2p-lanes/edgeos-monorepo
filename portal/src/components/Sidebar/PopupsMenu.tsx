@@ -10,6 +10,7 @@ import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { useCallback } from "react"
 import type { PopupPublic } from "@/client"
+import { imageOptimization } from "@/lib/image-optimization"
 import { cn } from "@/lib/utils"
 import { useCityProvider } from "@/providers/cityProvider"
 import { DropdownMenuContent, DropdownMenuItem } from "./DropdownMenu"
@@ -81,7 +82,9 @@ const PopupsMenu = () => {
                           src={city.icon_url}
                           alt={city.name ?? "Popup icon"}
                           fill
+                          sizes="48px"
                           className="rounded-lg object-cover"
+                          {...imageOptimization(city.icon_url)}
                         />
                       ) : (
                         <div

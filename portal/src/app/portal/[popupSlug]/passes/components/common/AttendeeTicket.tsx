@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query"
 import { ChevronRight, Pencil, QrCode, User } from "lucide-react"
+import Image from "next/image"
 import React, { useMemo, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { TICKET_CATEGORY } from "@/checkout/popupCheckoutPolicy"
@@ -15,6 +16,7 @@ import {
 } from "@/components/ui/collapsible"
 import { Separator } from "@/components/ui/separator"
 import useAttendee from "@/hooks/useAttendee"
+import { imageOptimization } from "@/lib/image-optimization"
 import { deriveProductState } from "@/lib/product-state"
 import { cn } from "@/lib/utils"
 import { useCityProvider } from "@/providers/cityProvider"
@@ -203,14 +205,26 @@ const AttendeeTicket = ({
         <div className="w-full rounded-3xl border border-border h-full lg:grid lg:grid-cols-[1fr_2px_2fr] bg-card">
           {/* Left panel - City & Attendee info */}
           <div className="relative flex flex-col p-6 overflow-hidden h-full min-h-[160px]">
-            <div
-              className="absolute inset-0 z-0 rounded-t-3xl lg:rounded-l-3xl lg:rounded-tr-none"
-              style={{
-                background: city?.image_url
-                  ? `linear-gradient(0deg, transparent, rgba(255, 255, 255, 0.8) 20%, rgb(255, 255, 255) 90%) center top / cover, url(${city.image_url}) center top / cover`
-                  : "linear-gradient(0deg, transparent, rgba(255, 255, 255, 0.8) 20%, rgb(255, 255, 255) 90%)",
-              }}
-            />
+            <div className="absolute inset-0 z-0 overflow-hidden rounded-t-3xl lg:rounded-l-3xl lg:rounded-tr-none">
+              {city?.image_url && (
+                <Image
+                  src={city.image_url}
+                  alt=""
+                  fill
+                  sizes="(max-width: 1024px) 100vw, 33vw"
+                  className="object-cover object-top"
+                  {...imageOptimization(city.image_url)}
+                />
+              )}
+              {/* White fade over the photo, same gradient as before. */}
+              <div
+                className="absolute inset-0"
+                style={{
+                  background:
+                    "linear-gradient(0deg, transparent, rgba(255, 255, 255, 0.8) 20%, rgb(255, 255, 255) 90%)",
+                }}
+              />
+            </div>
             <div className="relative z-10 h-full flex flex-col justify-between">
               <div className="flex justify-between items-start">
                 <div>

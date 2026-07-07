@@ -1,5 +1,6 @@
 import path from "node:path"
 import type { NextConfig } from "next"
+import { OPTIMIZED_IMAGE_HOSTS } from "./src/lib/image-optimization"
 
 const nextConfig: NextConfig = {
   output: "standalone",
@@ -10,12 +11,13 @@ const nextConfig: NextConfig = {
       process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000",
   },
   images: {
-    remotePatterns: [
-      {
-        hostname: "simplefi.s3.us-east-2.amazonaws.com",
-      },
-    ],
-    unoptimized: true,
+    remotePatterns: OPTIMIZED_IMAGE_HOSTS.map((hostname) => ({
+      protocol: "https" as const,
+      hostname,
+    })),
+    // AVIF first (best compression for the photographic tenant imagery),
+    // WebP fallback for browsers without AVIF support.
+    formats: ["image/avif", "image/webp"],
   },
 }
 

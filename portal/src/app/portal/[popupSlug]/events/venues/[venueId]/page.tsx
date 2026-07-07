@@ -10,6 +10,7 @@ import {
   Pencil,
   Users,
 } from "lucide-react"
+import Image from "next/image"
 import Link from "next/link"
 import { useParams, useSearchParams } from "next/navigation"
 import { useTranslation } from "react-i18next"
@@ -22,6 +23,7 @@ import {
 import { LucideIcon } from "@/components/LucideIcon"
 import { Pill } from "@/components/ui/pill"
 import { VenueHoursPreview } from "@/components/VenueHoursPreview"
+import { imageOptimization } from "@/lib/image-optimization"
 import { useCityProvider } from "@/providers/cityProvider"
 import { CoverImage } from "../../lib/CoverImage"
 
@@ -146,6 +148,7 @@ export default function PortalVenueDetailPage() {
             src={venue.image_url}
             alt={venue.title}
             className="aspect-[21/9] w-full object-cover"
+            sizes="(max-width: 896px) 100vw, 864px"
             fallback={<MapPin className="h-10 w-10 text-muted-foreground/40" />}
           />
         </div>
@@ -260,12 +263,17 @@ export default function PortalVenueDetailPage() {
           </h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
             {gallery.map((photo) => (
-              <div key={photo.id} className="overflow-hidden rounded-lg border">
-                {/* biome-ignore lint/performance/noImgElement: user-uploaded S3 image */}
-                <img
+              <div
+                key={photo.id}
+                className="relative aspect-square overflow-hidden rounded-lg border"
+              >
+                <Image
                   src={photo.image_url}
                   alt=""
-                  className="aspect-square w-full object-cover"
+                  fill
+                  sizes="(max-width: 640px) 50vw, 296px"
+                  className="object-cover"
+                  {...imageOptimization(photo.image_url)}
                 />
               </div>
             ))}
