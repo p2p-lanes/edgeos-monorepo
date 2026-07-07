@@ -10,6 +10,7 @@ import {
 import type { TenantPublic } from "@/client"
 import { ApiError, TenantsService } from "@/client"
 import "@/lib/api-client"
+import { Loader } from "@/components/ui/Loader"
 import { extractSubdomain } from "@/lib/tenant"
 import { resolveHostname } from "@/lib/tenant-resolution"
 
@@ -125,11 +126,7 @@ export const TenantProvider = ({
   }, [initialTenantId, initialTenantSlug])
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-neutral-100">
-        <div className="animate-spin h-8 w-8 border-4 border-gray-300 border-t-gray-900 rounded-full" />
-      </div>
-    )
+    return <Loader />
   }
 
   if (error) {

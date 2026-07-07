@@ -3,6 +3,7 @@
 import { useParams, useRouter, useSearchParams } from "next/navigation"
 import type { ReactNode } from "react"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { Loader } from "@/components/ui/Loader"
 import { readAndClearPendingPaymentRedirectState } from "@/hooks/usePaymentRedirect"
 import { useCheckout } from "@/providers/checkoutProvider"
 import CheckoutToast from "./CheckoutToast"
@@ -425,20 +426,8 @@ function ScrollyCheckoutFlowInner({
     return null
   }
 
-  if (isSimpleFIReturn) {
-    return (
-      <div className="flex min-h-[60vh] items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-current opacity-60" />
-      </div>
-    )
-  }
-
-  if (isInitialLoading) {
-    return (
-      <div className="flex min-h-[60vh] items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-current opacity-60" />
-      </div>
-    )
+  if (isSimpleFIReturn || isInitialLoading) {
+    return <Loader />
   }
 
   const lastSectionId = allSections[allSections.length - 1]?.id
