@@ -201,13 +201,15 @@ function ScrollyCheckoutFlowInner({
     const sectionsSnapshot = allSections
 
     const prevSnapType = mainEl.style.scrollSnapType
-    // `proximity` (not `mandatory`): sections here can be 2-3 viewport
-    // heights tall (ticket/housing card lists). Mandatory snap turns the
-    // gaps between snap points into dead zones — a moderate touch flick
-    // that ends mid-gap gets yanked back to the previous section, which
-    // on phones feels like the page refusing to scroll. Proximity keeps
-    // the aligned-landing behaviour near section tops and frees the rest.
-    mainEl.style.scrollSnapType = "y proximity"
+    // `mandatory`: every section has min-height equal to the scrollport, so
+    // a scroll can never rest straddling two sections — it always settles
+    // aligned to a section top. Sections TALLER than the scrollport
+    // (ticket/housing card lists) still scroll freely inside themselves:
+    // per the scroll-snap spec, a snap area larger than the snapport is a
+    // valid rest position anywhere it fully covers the snapport.
+    // `proximity` was tried before and let the scroll settle in the empty
+    // space between section content, leaving huge blank screens.
+    mainEl.style.scrollSnapType = "y mandatory"
 
     const sectionEls = sectionsSnapshot
       .map((s) => document.getElementById(s.id))
@@ -470,7 +472,11 @@ function ScrollyCheckoutFlowInner({
           <SnapSection
             key={section.id}
             id={section.id}
-            bottomPadding={section.id === lastSectionId ? "4rem" : "50vh"}
+            // Bottom padding stays small so short sections are exactly one
+            // scrollport tall (mandatory snap then has a single rest position
+            // for them). It only needs to clear the floating cart footer on
+            // tall sections.
+            bottomPadding={section.id === lastSectionId ? "4rem" : "8rem"}
             widthClass={isStackedCards ? "max-w-6xl" : "max-w-2xl"}
           >
             {/* Header and footer stay in the narrow column even when the step
