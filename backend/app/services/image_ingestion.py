@@ -523,28 +523,30 @@ class ImageIngestionService:
     ) -> dict | None:
         """Ingest image URLs inside a ticketing-step ``template_config`` dict.
 
-        Dispatch by *template* type:
-          ``gallery``      → ``config["images"]`` list via ``ingest_urls``
-          ``rich_text``    → ``config["html"]`` string via ``ingest_html``
-          ``ticket_select``→ each ``section["image_url"]`` via ``ingest_url``
-          other / unknown  → config returned unchanged (safe no-op)
+        Dispatch by *template* type (real backoffice template names):
+          ``image-gallery``            → ``config["images"]`` via ``ingest_urls``
+          ``rich-text``                → ``config["html"]`` via ``ingest_html``
+          ``ticket-select``/``ticket-card`` → each ``section["image_url"]``
+          other / unknown              → config returned unchanged (safe no-op)
 
         Returns ``None`` when *config* is ``None``.
         """
         if config is None:
             return None
 
-        if template == "gallery":
+        if template == "image-gallery":
             images: list[str] = config.get("images") or []
             new_images = await self.ingest_urls(images, tenant_id)
             return {**config, "images": new_images}
 
-        if template == "rich_text":
+        if template == "rich-text":
             html: str = config.get("html") or ""
             new_html = await self.ingest_html(html, tenant_id)
             return {**config, "html": new_html}
 
-        if template == "ticket_select":
+        # Both ticket-select and ticket-card carry sections[].image_url cover
+        # images (see portal VariantTicketCard / VariantTicketSelect).
+        if template in ("ticket-select", "ticket-card"):
             sections: list[dict] = config.get("sections") or []
             new_sections = []
             for section in sections:

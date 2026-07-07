@@ -18,6 +18,7 @@ from app.core.dependencies.users import (
     CurrentHuman,
     HumanTenantSession,
 )
+from app.services.image_ingestion import ImageIngestionService
 
 router = APIRouter(prefix="/ticketing-steps", tags=["ticketing-steps"])
 
@@ -150,10 +151,24 @@ async def create_ticketing_step(
         step_in.template, step_in.template_config, step_in.popup_id, db
     )
 
-    from app.api.ticketing_step.models import TicketingSteps
-
     step_data = step_in.model_dump()
     step_data["tenant_id"] = tenant_id
+
+    # CDN image ingestion: rewrite external image URLs to CDN before commit.
+    # Pattern B (async hook, mirrors _validate_template_config_fk precedent).
+    # Fail-open: any per-URL failure keeps the original URL; the save still succeeds.
+    _svc = ImageIngestionService()
+    if step_data.get("template_config") is not None:
+        step_data["template_config"] = await _svc.ingest_template_config(
+            step_data.get("template"), step_data["template_config"], tenant_id
+        )
+    if step_data.get("watermark") is not None:
+        step_data["watermark"] = await _svc.ingest_url(
+            step_data["watermark"], tenant_id
+        )
+
+    from app.api.ticketing_step.models import TicketingSteps
+
     step = TicketingSteps(**step_data)
 
     db.add(step)
@@ -194,6 +209,16 @@ async def update_ticketing_step(
         _validate_template_config_fk(
             effective_template, effective_config, step.popup_id, db
         )
+
+    # CDN image ingestion: rewrite external image URLs to CDN before commit.
+    # Pattern B (async hook). Fail-open: failures keep original URL; save succeeds.
+    _svc = ImageIngestionService()
+    if step_in.template_config is not None:
+        step_in.template_config = await _svc.ingest_template_config(
+            effective_template, step_in.template_config, step.tenant_id
+        )
+    if step_in.watermark is not None:
+        step_in.watermark = await _svc.ingest_url(step_in.watermark, step.tenant_id)
 
     updated = crud.ticketing_steps_crud.update(db, step, step_in)
     return TicketingStepPublic.model_validate(updated)
