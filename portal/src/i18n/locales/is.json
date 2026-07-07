@@ -231,7 +231,8 @@
       "play_aria": "Spila bakgrunnsmyndband",
       "pause_aria": "Stöðva bakgrunnsmyndband",
       "mute_aria": "Slökkva á hljóði bakgrunnsmyndbands",
-      "unmute_aria": "Kveikja á hljóði bakgrunnsmyndbands"
+      "unmute_aria": "Kveikja á hljóði bakgrunnsmyndbands",
+      "play_youtube_aria": "Spila myndband"
     },
     "housing": {
       "carousel": {
@@ -249,7 +250,8 @@
       "promo_discount_eligible_label": "Afsláttur (gjaldgengar vörur)"
     },
     "coupon_no_longer_valid": "This coupon is no longer available. Your total has been updated. Please review and try again.",
-    "payment_error": "Something went wrong with your payment. Please try again."
+    "payment_error": "Something went wrong with your payment. Please try again.",
+    "no_video": "Ekkert myndband í boði fyrir þetta skref."
   },
   "openCheckout": {
     "loading": "Hleður greiðslu...",

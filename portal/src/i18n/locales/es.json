@@ -255,7 +255,8 @@
       "play_aria": "Reproducir video de fondo",
       "pause_aria": "Pausar video de fondo",
       "mute_aria": "Silenciar video de fondo",
-      "unmute_aria": "Activar sonido del video de fondo"
+      "unmute_aria": "Activar sonido del video de fondo",
+      "play_youtube_aria": "Reproducir video"
     },
     "housing": {
       "carousel": {
@@ -273,7 +274,8 @@
       "promo_discount_eligible_label": "Descuento (items elegibles)"
     },
     "coupon_no_longer_valid": "This coupon is no longer available. Your total has been updated. Please review and try again.",
-    "payment_error": "Something went wrong with your payment. Please try again."
+    "payment_error": "Something went wrong with your payment. Please try again.",
+    "no_video": "No hay video disponible para este paso."
   },
   "openCheckout": {
     "loading": "Cargando checkout...",

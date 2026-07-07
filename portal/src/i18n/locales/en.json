@@ -255,7 +255,8 @@
       "play_aria": "Play background video",
       "pause_aria": "Pause background video",
       "mute_aria": "Mute background video",
-      "unmute_aria": "Unmute background video"
+      "unmute_aria": "Unmute background video",
+      "play_youtube_aria": "Play video"
     },
     "housing": {
       "carousel": {
@@ -273,7 +274,8 @@
       "promo_discount_eligible_label": "Promo Discount (eligible items)"
     },
     "coupon_no_longer_valid": "This coupon is no longer available. Your total has been updated. Please review and try again.",
-    "payment_error": "Something went wrong with your payment. Please try again."
+    "payment_error": "Something went wrong with your payment. Please try again.",
+    "no_video": "No video available for this step."
   },
   "openCheckout": {
     "loading": "Loading checkout...",
