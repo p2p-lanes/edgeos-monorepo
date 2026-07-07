@@ -6,6 +6,7 @@ import { CheckoutBackgroundImage } from "@/components/CheckoutBackgroundImage"
 import { CheckoutBackgroundVideo } from "@/components/CheckoutBackgroundVideo"
 import { OpenCheckoutRuntime } from "@/components/checkout-flow/OpenCheckoutRuntime"
 import { SidebarProvider } from "@/components/Sidebar/SidebarComponents"
+import { Loader } from "@/components/ui/Loader"
 import useAuth from "@/hooks/useAuth"
 import { getCheckoutBackground } from "@/lib/background-image"
 import { useCheckoutRuntime } from "./hooks/useCheckoutRuntime"
@@ -26,13 +27,7 @@ export default function OpenTicketingCheckoutPage() {
     : undefined
 
   if (isLoading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <div className="text-sm text-muted-foreground">
-          {t("openCheckout.loading")}
-        </div>
-      </div>
-    )
+    return <Loader />
   }
 
   if (isError || !runtime) {
