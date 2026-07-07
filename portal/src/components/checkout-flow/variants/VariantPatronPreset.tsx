@@ -2,6 +2,7 @@
 
 import { Heart } from "lucide-react"
 import { useState } from "react"
+import { useTranslation } from "react-i18next"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { useCheckout } from "@/providers/checkoutProvider"
@@ -39,6 +40,7 @@ export default function VariantPatronPreset({
   templateConfig,
 }: VariantProps) {
   const { cart, setPatronAmount, clearPatron } = useCheckout()
+  const { t } = useTranslation()
   const { presets, allowCustom, minimum } = parseTemplateConfig(templateConfig)
 
   const product = products[0]
@@ -91,10 +93,10 @@ export default function VariantPatronPreset({
       <div className="flex flex-col items-center justify-center py-12 text-center">
         <Heart className="w-12 h-12 text-muted-foreground mb-4" />
         <p className="text-muted-foreground mb-6">
-          No contribution options available.
+          {t("checkout.no_contributions")}
         </p>
         <Button variant="outline" onClick={onSkip}>
-          Continue
+          {t("common.continue")}
         </Button>
       </div>
     )

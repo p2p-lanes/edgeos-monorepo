@@ -10,6 +10,7 @@ import {
 } from "lucide-react"
 import Image from "next/image"
 import { useCallback, useEffect, useRef, useState } from "react"
+import { useTranslation } from "react-i18next"
 import { Button } from "@/components/ui/button"
 import { imageOptimization } from "@/lib/image-optimization"
 import { cn } from "@/lib/utils"
@@ -429,6 +430,7 @@ export default function VariantImageGallery({
   onSkip,
   templateConfig,
 }: VariantProps) {
+  const { t } = useTranslation()
   const images = parseImages(templateConfig)
   const variant = (templateConfig?.variant as string) || "carousel"
 
@@ -436,11 +438,9 @@ export default function VariantImageGallery({
     return (
       <div className="flex flex-col items-center justify-center py-12 text-center">
         <ImageIcon className="w-12 h-12 text-muted-foreground mb-4" />
-        <p className="text-muted-foreground mb-6">
-          No images available for this step.
-        </p>
+        <p className="text-muted-foreground mb-6">{t("checkout.no_images")}</p>
         <Button variant="outline" onClick={onSkip}>
-          Continue
+          {t("common.continue")}
         </Button>
       </div>
     )

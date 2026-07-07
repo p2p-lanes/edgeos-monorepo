@@ -24,6 +24,7 @@
 
 import { Sparkles } from "lucide-react"
 import { Fragment, useMemo, useState } from "react"
+import { useTranslation } from "react-i18next"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { deriveProductState, type ProductSaleState } from "@/lib/product-state"
@@ -138,6 +139,7 @@ export default function VariantMealPlanSelect({
     setMealPlanDietaryRestriction,
     setMealPlanSpecialRequest,
   } = useCheckout()
+  const { t } = useTranslation()
 
   // Filter to meal-plan products only (the registry passes the step-resolved
   // product list; we still defensively filter so a misconfigured step can't
@@ -200,7 +202,7 @@ export default function VariantMealPlanSelect({
   if (mealPlanProducts.length === 0 || weeklyProducts.length === 0) {
     return (
       <div className="rounded-2xl border border-border bg-card px-4 py-6 text-center text-sm text-muted-foreground">
-        No meal plans available.
+        {t("checkout.no_meal_plans")}
       </div>
     )
   }
