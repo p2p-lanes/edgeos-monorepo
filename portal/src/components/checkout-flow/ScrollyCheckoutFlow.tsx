@@ -406,21 +406,39 @@ function ScrollyCheckoutFlowInner({
     }
   }, [allSections, isInitialLoading, markStepVisited])
 
-  const renderSectionContent = (section: (typeof allSections)[number]) => {
+  const renderSectionContent = (
+    section: (typeof allSections)[number],
+    index: number,
+  ) => {
     const { stepType, config } = section
+    // First section is above the fold: its images are LCP candidates and
+    // must load eagerly with high priority instead of lazily.
+    const isFirstSection = index === 0
 
     if (stepType === "buyer") return <OpenCheckoutBuyerStep />
     if (stepType === "confirm") return <ConfirmStep />
 
     if (stepType === "passes" || stepType === "tickets") {
       if (shouldUseDynamicStep(config ?? undefined)) {
-        return <DynamicProductStep stepConfig={config!} onSkip={() => {}} />
+        return (
+          <DynamicProductStep
+            stepConfig={config!}
+            onSkip={() => {}}
+            isFirstSection={isFirstSection}
+          />
+        )
       }
       return <PassSelectionSection />
     }
 
     if (config) {
-      return <DynamicProductStep stepConfig={config} onSkip={() => {}} />
+      return (
+        <DynamicProductStep
+          stepConfig={config}
+          onSkip={() => {}}
+          isFirstSection={isFirstSection}
+        />
+      )
     }
 
     return null
@@ -446,7 +464,7 @@ function ScrollyCheckoutFlowInner({
         brandLabel={brandLabel}
       />
       <CheckoutToast onChipClick={scrollToStep} />
-      {allSections.map((section) => {
+      {allSections.map((section, sectionIndex) => {
         const { config } = section
         // The ticket-card "stacked" layout renders a responsive grid of cards,
         // which needs more width than the default centred column. Other steps
@@ -484,7 +502,7 @@ function ScrollyCheckoutFlowInner({
                 showWatermark={config?.show_watermark ?? true}
               />
             </div>
-            {renderSectionContent(section)}
+            {renderSectionContent(section, sectionIndex)}
             {(() => {
               const ft = (
                 config?.template_config as Record<string, unknown> | undefined

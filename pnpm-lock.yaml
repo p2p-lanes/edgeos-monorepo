@@ -427,6 +427,9 @@ importers:
       gsap:
         specifier: ^3.14.2
         version: 3.14.2
+      html-react-parser:
+        specifier: ^6.1.4
+        version: 6.1.4(@types/react@19.2.14)(react@19.2.4)
       i18next:
         specifier: ^25.8.13
         version: 25.10.10(typescript@5.9.3)
@@ -3567,11 +3570,27 @@ packages:
   dom-accessibility-api@0.6.3:
     resolution: {integrity: sha512-7ZgogeTnjuHbo+ct10G9Ffp0mif17idi0IyWNVA/wcwcm7NPOD/WEHVP3n7n3MhXqxoIYm8d6MuZohYWIZ4T3w==}
 
+  dom-serializer@3.1.1:
+    resolution: {integrity: sha512-4MEa38/QexBob6gFNwu+EGdWvhJ1OKuNwdYY3Y3NyeWDQfnGeDYQUDfIRzWu5B5gsv03so2Uxd28YC6zrsx3Lw==}
+    engines: {node: '>=20.19.0'}
+
+  domelementtype@3.0.0:
+    resolution: {integrity: sha512-umCQid3jKbDmVjx8jGaW7uUykm4DEUeyV21hPxNMo2nV955DhUThwqyOIDtreepP31hl84X7G5U9ZfsWvIB3Pg==}
+    engines: {node: '>=20.19.0'}
+
+  domhandler@6.0.1:
+    resolution: {integrity: sha512-gYzvtM72ZtxQO0T048kd6HWSbbGCNOUwcnfQ01cqIJ4X2IYKFFHZ5mKvrQETcFXxsRObZulDaKmy//R7TPtsBg==}
+    engines: {node: '>=20.19.0'}
+
   dompurify@3.2.7:
     resolution: {integrity: sha512-WhL/YuveyGXJaerVlMYGWhvQswa7myDG17P7Vu65EWC05o8vfeNbvNf4d/BOvH99+ZW+LlQsc1GDKMa1vNK6dw==}
 
   dompurify@3.4.3:
     resolution: {integrity: sha512-VVwJidIJcp1hpg2OMXML3ZVRPYSZiq4aX7qBh83BSIpOaRDqI+qxhXjjIWnpzkOXhmp0L81lnoME1mnCc9H48A==}
+
+  domutils@4.0.2:
+    resolution: {integrity: sha512-qI4JLRKnSzqFqr7hAlS5xQDusBCjKSEG4t4+7aNrIQMHBcsC2TGEhuyABJdYkgSewL57PNLYEiibY2iPKhKpaA==}
+    engines: {node: '>=20.19.0'}
 
   dotenv@16.6.1:
     resolution: {integrity: sha512-uBq4egWHTcTt33a72vpSG0z3HnPuIl6NqYcTrKEg2azoEyl2hpW0zqlxysq2pK9HlDIHyHyakeYaYnSAwd8bow==}
@@ -3934,6 +3953,9 @@ packages:
     resolution: {integrity: sha512-SFsVSjp8sj5UumXOOFlkZOG6XS9SJDKw0TbwFeV+AJ8xlST8kxK5Z/5EYa111UY8732lK2S/xB653ceuaoGwpg==}
     engines: {node: '>=16.9.0'}
 
+  html-dom-parser@8.0.0:
+    resolution: {integrity: sha512-cWLJ8mt930VceOzVfY/J+T1ou9v3ENT0BgWqy5aEZjdFp37TYLXULjX8u0vD2rBpFAkK5IofOPl0y4Gq0QLIyA==}
+
   html-encoding-sniffer@4.0.0:
     resolution: {integrity: sha512-Y22oTqIU4uuPgEemfz7NDJz6OeKf12Lsu+QC+s3BVpda64lTiMYCyGwg5ki4vFxkMwQdeZDl2adZoqUgdFuTgQ==}
     engines: {node: '>=18'}
@@ -3945,8 +3967,21 @@ packages:
   html-parse-stringify@3.0.1:
     resolution: {integrity: sha512-KknJ50kTInJ7qIScF3jeaFRpMpE8/lfiTdzf/twXyPBLAGrLRTmkz3AdTnKeh40X8k9L2fdYwEp/42WGXIRGcg==}
 
+  html-react-parser@6.1.4:
+    resolution: {integrity: sha512-oNZVIuYir7XOFuQZ7mtvcIC5cTYBVqCDOhJ1rSH4V1nVDs71bHZXFlKdpSuOm5TZT7V2uxCxA7HqTkCNHW32KQ==}
+    peerDependencies:
+      '@types/react': 0.14 || 15 || 16 || 17 || 18 || 19
+      react: 0.14 || 15 || 16 || 17 || 18 || 19
+    peerDependenciesMeta:
+      '@types/react':
+        optional: true
+
   html-url-attributes@3.0.1:
     resolution: {integrity: sha512-ol6UPyBWqsrO6EJySPz2O7ZSr856WDrEzM5zMqp+FJJLGMW35cLYmmZnl0vztAZxRUoNZJFTCohfjuIJ8I4QBQ==}
+
+  htmlparser2@12.0.0:
+    resolution: {integrity: sha512-Tz7u1i95/g2x2jz81+x0FBVhBhY5aRTvD3tXXdFaljuNdzDLJ8UGNRrTcj2cgQvAg3iW/h77Fz15nLW0L0CrZw==}
+    engines: {node: '>=20.19.0'}
 
   http-errors@2.0.1:
     resolution: {integrity: sha512-4FbRdAX+bSdmo4AUFuS0WNiPz8NgFt+r8ThgNWmlrjQjt1Q7ZR9+zTlce2859x4KSXrwIsaeTqDoKQmtP8pLmQ==}
@@ -5026,6 +5061,9 @@ packages:
       react: '>=16.8'
       react-dom: '>=16.8'
 
+  react-property@2.0.2:
+    resolution: {integrity: sha512-+PbtI3VuDV0l6CleQMsx2gtK0JZbZKbpdu5ynr+lbsuvtmgbNcS3VM0tuY2QjFNOcWxvXeHjDpy42RO+4U2rug==}
+
   react-qr-code@2.0.18:
     resolution: {integrity: sha512-v1Jqz7urLMhkO6jkgJuBYhnqvXagzceg3qJUWayuCK/c6LTIonpWbwxR1f1APGd4xrW/QcQEovNrAojbUz65Tg==}
     peerDependencies:
@@ -5369,8 +5407,14 @@ packages:
   style-to-js@1.1.21:
     resolution: {integrity: sha512-RjQetxJrrUJLQPHbLku6U/ocGtzyjbJMP9lCNK7Ag0CNh690nSH8woqWH9u16nMjYBAok+i7JO1NP2pOy8IsPQ==}
 
+  style-to-js@2.0.1:
+    resolution: {integrity: sha512-j5whjFV29FyWf+/gWc/Fax7DQqojc5CzZ2kxOCuSMoZDGdciF+Ki1HyZ/GPOxdbfIw0suKUBmG1I3qa7JZKRTA==}
+
   style-to-object@1.0.14:
     resolution: {integrity: sha512-LIN7rULI0jBscWQYaSswptyderlarFkjQ+t79nzty8tcIAceVomEVlLzH5VP4Cmsv6MtKhs7qaAiwlcp+Mgaxw==}
+
+  style-to-object@2.0.0:
+    resolution: {integrity: sha512-3zaRtBpwCy9AnYQYfgZ8tIMPn/PlQpW3wtRMB+w0xVtBzo8/m7KKGi7cR56yQ6udLz5MPzwRqfKOZ3O+Oc6VpA==}
 
   styled-jsx@5.1.6:
     resolution: {integrity: sha512-qSVyDTeMotdvQYoHWLNGwRFJHC+i+ZvdBRYosOFgC+Wg1vx4frN2/RG/NA7SYqqvKNLf39P2LSRA2pu6n0XYZA==}
@@ -8850,6 +8894,18 @@ snapshots:
 
   dom-accessibility-api@0.6.3: {}
 
+  dom-serializer@3.1.1:
+    dependencies:
+      domelementtype: 3.0.0
+      domhandler: 6.0.1
+      entities: 8.0.0
+
+  domelementtype@3.0.0: {}
+
+  domhandler@6.0.1:
+    dependencies:
+      domelementtype: 3.0.0
+
   dompurify@3.2.7:
     optionalDependencies:
       '@types/trusted-types': 2.0.7
@@ -8857,6 +8913,12 @@ snapshots:
   dompurify@3.4.3:
     optionalDependencies:
       '@types/trusted-types': 2.0.7
+
+  domutils@4.0.2:
+    dependencies:
+      dom-serializer: 3.1.1
+      domelementtype: 3.0.0
+      domhandler: 6.0.1
 
   dotenv@16.6.1: {}
 
@@ -9258,6 +9320,11 @@ snapshots:
 
   hono@4.12.3: {}
 
+  html-dom-parser@8.0.0:
+    dependencies:
+      domhandler: 6.0.1
+      htmlparser2: 12.0.0
+
   html-encoding-sniffer@4.0.0:
     dependencies:
       whatwg-encoding: 3.1.1
@@ -9272,7 +9339,24 @@ snapshots:
     dependencies:
       void-elements: 3.1.0
 
+  html-react-parser@6.1.4(@types/react@19.2.14)(react@19.2.4):
+    dependencies:
+      domhandler: 6.0.1
+      html-dom-parser: 8.0.0
+      react: 19.2.4
+      react-property: 2.0.2
+      style-to-js: 2.0.1
+    optionalDependencies:
+      '@types/react': 19.2.14
+
   html-url-attributes@3.0.1: {}
+
+  htmlparser2@12.0.0:
+    dependencies:
+      domelementtype: 3.0.0
+      domhandler: 6.0.1
+      domutils: 4.0.2
+      entities: 8.0.0
 
   http-errors@2.0.1:
     dependencies:
@@ -10614,6 +10698,8 @@ snapshots:
       react: 19.2.4
       react-dom: 19.2.4(react@19.2.4)
 
+  react-property@2.0.2: {}
+
   react-qr-code@2.0.18(react@19.2.4):
     dependencies:
       prop-types: 15.8.1
@@ -11069,7 +11155,15 @@ snapshots:
     dependencies:
       style-to-object: 1.0.14
 
+  style-to-js@2.0.1:
+    dependencies:
+      style-to-object: 2.0.0
+
   style-to-object@1.0.14:
+    dependencies:
+      inline-style-parser: 0.2.7
+
+  style-to-object@2.0.0:
     dependencies:
       inline-style-parser: 0.2.7
 
