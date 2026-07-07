@@ -275,7 +275,15 @@
     },
     "coupon_no_longer_valid": "This coupon is no longer available. Your total has been updated. Please review and try again.",
     "payment_error": "Something went wrong with your payment. Please try again.",
-    "no_video": "No hay video disponible para este paso."
+    "no_products": "No hay productos disponibles para este paso.",
+    "no_images": "No hay imágenes disponibles para este paso.",
+    "no_video": "No hay video disponible para este paso.",
+    "no_passes": "No hay pases disponibles.",
+    "no_passes_for_category": "No hay pases disponibles para esta categoría de asistente.",
+    "no_meal_plans": "No hay planes de comidas disponibles.",
+    "no_contributions": "No hay opciones de contribución disponibles.",
+    "step_config_error": "Error de configuración del paso.",
+    "step_config_error_detail": "No se asignó una plantilla a este paso. Contactá a tu administrador."
   },
   "openCheckout": {
     "loading": "Cargando checkout...",

@@ -321,6 +321,7 @@ function AttendeePassRows({
   isEditing: boolean
   sections: TemplateSection[]
 }) {
+  const { t } = useTranslation()
   const groups = buildSectionGroups(attendee, sections)
 
   // Wide scope passed to the strategy: every product id visible to this
@@ -339,7 +340,7 @@ function AttendeePassRows({
   if (groups.length === 0) {
     return (
       <div className="px-5 py-8 text-center text-sm text-muted-foreground">
-        No passes available.
+        {t("checkout.no_passes")}
       </div>
     )
   }
@@ -910,7 +911,9 @@ function CompactAttendeeCard({
       </div>
 
       {visibleProducts.length === 0 ? (
-        <p className="text-xs text-muted-foreground">No passes available.</p>
+        <p className="text-xs text-muted-foreground">
+          {t("checkout.no_passes")}
+        </p>
       ) : (
         <div className="flex flex-wrap gap-2">
           {visibleProducts.map((p) => {

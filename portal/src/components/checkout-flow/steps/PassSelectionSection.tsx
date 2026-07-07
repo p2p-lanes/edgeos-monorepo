@@ -453,6 +453,7 @@ function AttendeePassCardBody({
   isEditing,
   allAttendees,
 }: AttendeePassCardBodyProps) {
+  const { t } = useTranslation()
   const isChild =
     attendee.category === "kid" ||
     attendee.category === "teen" ||
@@ -508,7 +509,7 @@ function AttendeePassCardBody({
   if (standardProducts.length === 0) {
     return (
       <div className="text-center py-8 text-muted-foreground text-sm">
-        No passes available for this attendee category.
+        {t("checkout.no_passes_for_category")}
       </div>
     )
   }

@@ -261,7 +261,15 @@
     },
     "coupon_no_longer_valid": "This coupon is no longer available. Your total has been updated. Please review and try again.",
     "payment_error": "Something went wrong with your payment. Please try again.",
-    "no_video": "此步骤暂无可用视频。"
+    "no_products": "此步骤暂无可用产品。",
+    "no_images": "此步骤暂无可用图片。",
+    "no_video": "此步骤暂无可用视频。",
+    "no_passes": "暂无可用通行证。",
+    "no_passes_for_category": "此参与者类别暂无可用通行证。",
+    "no_meal_plans": "暂无可用餐饮计划。",
+    "no_contributions": "暂无可用捐助选项。",
+    "step_config_error": "步骤配置错误。",
+    "step_config_error_detail": "此步骤未分配模板。请联系管理员。"
   },
   "openCheckout": {
     "loading": "正在加载结账...",

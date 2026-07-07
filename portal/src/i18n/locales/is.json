@@ -251,7 +251,15 @@
     },
     "coupon_no_longer_valid": "This coupon is no longer available. Your total has been updated. Please review and try again.",
     "payment_error": "Something went wrong with your payment. Please try again.",
-    "no_video": "Ekkert myndband í boði fyrir þetta skref."
+    "no_products": "Engar vörur í boði fyrir þetta skref.",
+    "no_images": "Engar myndir í boði fyrir þetta skref.",
+    "no_video": "Ekkert myndband í boði fyrir þetta skref.",
+    "no_passes": "Engir passar í boði.",
+    "no_passes_for_category": "Engir passar í boði fyrir þennan gestaflokk.",
+    "no_meal_plans": "Engir matarpakkar í boði.",
+    "no_contributions": "Engir framlagsmöguleikar í boði.",
+    "step_config_error": "Villa í uppsetningu skrefs.",
+    "step_config_error_detail": "Ekkert sniðmát er tengt þessu skrefi. Hafðu samband við stjórnanda."
   },
   "openCheckout": {
     "loading": "Hleður greiðslu...",
