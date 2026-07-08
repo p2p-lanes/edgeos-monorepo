@@ -120,7 +120,38 @@ export function usePromoCode({
       hasRevalidatedPromoRef.current = true
       return
     }
-    if (!savedCart?.promo_code || !cityId || validatePromoCodeOverride) return
+
+    // Open-cart path: savedCart is null (cartPersistenceEnabled=false) but
+    // hydrateFromSnapshot has already called setPromoCode with the restored code.
+    // Re-validate via the override (uses public slug-based endpoint, no cityId needed).
+    if (validatePromoCodeOverride && promoCode) {
+      hasRevalidatedPromoRef.current = true
+      validatePromoCodeOverride(promoCode)
+        .then((discountValue) => {
+          const value = discountValue ?? 0
+          if (value <= 0) {
+            // Clear silently — no "invalid" flash; the code may just be expired.
+            setPromoCode("")
+            return
+          }
+          setPromoCodeValid(true)
+          setPromoCodeDiscount(value)
+          setDiscount({
+            discount_value: value,
+            discount_type: "percentage",
+            discount_code: promoCode,
+            city_id: cityId ? String(cityId) : null,
+          })
+        })
+        .catch(() => {
+          // On error, clear silently — the create-time apply is authoritative.
+          setPromoCode("")
+        })
+      return
+    }
+
+    // Portal/application path: savedCart is populated via useCartPersistence.
+    if (!savedCart?.promo_code || !cityId) return
 
     hasRevalidatedPromoRef.current = true
 
@@ -152,6 +183,7 @@ export function usePromoCode({
   }, [
     savedCart,
     cityId,
+    promoCode,
     setDiscount,
     hasRestoredCheckoutRef.current,
     validatePromoCodeOverride,

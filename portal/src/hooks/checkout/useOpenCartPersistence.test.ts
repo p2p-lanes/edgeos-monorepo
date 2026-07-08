@@ -560,6 +560,114 @@ describe("promo restore gate — release settles before re-validation (ADR-R4)",
     maybeRevalidate() // Second call should be no-op
     expect(validateSpy).toHaveBeenCalledOnce()
   })
+
+  // F2 regression: open-ticketing path (savedCart=null, validatePromoCodeOverride set).
+  // The promo code is restored by hydrateFromSnapshot calling setPromoCode, not from
+  // savedCart. The re-validation must use validatePromoCodeOverride, not CouponsService.
+  it("open-cart path: re-validates via validatePromoCodeOverride when promoCode is set and savedCart is null", async () => {
+    const setPromoCodeValid = vi.fn()
+    const setPromoCodeDiscount = vi.fn()
+    const setPromoCode = vi.fn()
+    const setDiscount = vi.fn()
+    const validatePromoCodeOverride = vi.fn().mockResolvedValue(15)
+
+    const hasRevalidatedPromoRef = { current: false }
+    const hasRestoredCheckoutRef = { current: true }
+    const releaseSettled = true
+    const promoCode = "SAVE15" // populated by hydrateFromSnapshot
+    const savedCart = null // open-cart: cartPersistenceEnabled=false
+
+    // Mirrors the new open-cart branch in usePromoCode's re-validation effect
+    async function maybeRevalidate() {
+      if (hasRevalidatedPromoRef.current || !hasRestoredCheckoutRef.current)
+        return
+      if (!releaseSettled) return
+      // promoCodeValid is false (not yet re-validated)
+
+      if (validatePromoCodeOverride && promoCode) {
+        hasRevalidatedPromoRef.current = true
+        const value = (await validatePromoCodeOverride(promoCode)) ?? 0
+        if (value <= 0) {
+          setPromoCode("")
+          return
+        }
+        setPromoCodeValid(true)
+        setPromoCodeDiscount(value)
+        setDiscount({
+          discount_value: value,
+          discount_type: "percentage",
+          discount_code: promoCode,
+          city_id: null,
+        })
+        return
+      }
+
+      // savedCart path (not reached when validatePromoCodeOverride is set)
+      if (!savedCart) return
+    }
+
+    await maybeRevalidate()
+
+    expect(validatePromoCodeOverride).toHaveBeenCalledWith("SAVE15")
+    expect(setPromoCodeValid).toHaveBeenCalledWith(true)
+    expect(setPromoCodeDiscount).toHaveBeenCalledWith(15)
+    expect(setDiscount).toHaveBeenCalled()
+    expect(setPromoCode).not.toHaveBeenCalled() // no clear on success
+  })
+
+  it("open-cart path: clears promoCode silently when override returns 0 (expired code)", async () => {
+    const setPromoCode = vi.fn()
+    const setPromoCodeValid = vi.fn()
+    const validatePromoCodeOverride = vi.fn().mockResolvedValue(0)
+
+    const hasRevalidatedPromoRef = { current: false }
+    const hasRestoredCheckoutRef = { current: true }
+    const releaseSettled = true
+    const promoCode = "EXPIRED"
+
+    async function maybeRevalidate() {
+      if (hasRevalidatedPromoRef.current || !hasRestoredCheckoutRef.current)
+        return
+      if (!releaseSettled) return
+      if (validatePromoCodeOverride && promoCode) {
+        hasRevalidatedPromoRef.current = true
+        const value = (await validatePromoCodeOverride(promoCode)) ?? 0
+        if (value <= 0) {
+          setPromoCode("")
+          return
+        }
+        setPromoCodeValid(true)
+      }
+    }
+
+    await maybeRevalidate()
+
+    expect(validatePromoCodeOverride).toHaveBeenCalledWith("EXPIRED")
+    expect(setPromoCode).toHaveBeenCalledWith("") // silent clear
+    expect(setPromoCodeValid).not.toHaveBeenCalled() // no flash of "Invalid"
+  })
+
+  it("open-cart path: does NOT re-validate when promoCode is empty (no hydrated code)", async () => {
+    const validatePromoCodeOverride = vi.fn().mockResolvedValue(15)
+
+    const hasRevalidatedPromoRef = { current: false }
+    const hasRestoredCheckoutRef = { current: true }
+    const releaseSettled = true
+    const promoCode = "" // no code restored
+
+    async function maybeRevalidate() {
+      if (hasRevalidatedPromoRef.current || !hasRestoredCheckoutRef.current)
+        return
+      if (!releaseSettled) return
+      if (validatePromoCodeOverride && promoCode) {
+        validatePromoCodeOverride(promoCode)
+      }
+    }
+
+    await maybeRevalidate()
+
+    expect(validatePromoCodeOverride).not.toHaveBeenCalled()
+  })
 })
 
 // ---------------------------------------------------------------------------

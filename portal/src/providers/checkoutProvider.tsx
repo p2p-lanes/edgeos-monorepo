@@ -643,7 +643,9 @@ export function CheckoutProvider({
     const appId = application?.id
 
     if (effectiveSubmitMode !== "open-ticketing" && !appId) {
-      // Nothing to release — settle immediately.
+      // Nothing to release — settle immediately and mark as fired so a
+      // late-arriving application (appId loading async) does not re-trigger.
+      hasFiredReleaseRef.current = true
       setPendingReleaseSettled(true)
       pendingReleaseSettledRef.current = true
       return
