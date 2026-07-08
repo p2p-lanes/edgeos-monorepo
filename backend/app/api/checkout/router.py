@@ -162,10 +162,10 @@ async def get_checkout_share_meta(
     responses={
         409: {
             "description": (
-                "Concurrent payment conflict. "
-                "detail.code is one of: "
-                "'concurrent_payment_in_progress' (another PENDING payment exists and could not be superseded) or "
-                "'previous_payment_completed' (prior payment was approved — includes redirect_url when signing is configured)."
+                "Payment conflict. detail.code is one of: "
+                "'pending_payment_exists' (a prior PENDING payment exists and no valid cart continuity proof was supplied — no cancellation attempted); "
+                "'concurrent_payment_in_progress' (another checkout is in progress under the same email right now); "
+                "'previous_payment_completed' (prior payment was already approved — includes redirect_url when a signing secret and external success URL are both configured)."
             ),
         },
         502: {

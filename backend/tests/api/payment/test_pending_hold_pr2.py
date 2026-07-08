@@ -11,6 +11,8 @@ Tasks covered:
   5.6 test_concurrent_create_same_buyer (DB + threading)
   5.7 test_double_release_protection (DB + threading)
   5.8 test_release_then_fail
+  Change 1: continuity-proof gate for anonymous supersede (TestContinuityProofGate)
+  S1 tightening: no unsigned redirect_url on open-checkout 409 even with signing secret (TestRaceLostApproved)
 """
 
 import threading
@@ -542,6 +544,57 @@ class TestRaceLostApproved:
         assert "redirect_url" in exc.detail
         assert exc.detail["redirect_url"] is None
 
+    def test_already_approved_open_checkout_redirect_url_absent_with_signing_no_external_url(
+        self,
+        db: Session,
+        tenant_a: Tenants,
+    ) -> None:
+        """Race-lost with signing secret but no external URL → redirect_url is None.
+
+        S1 tightening: even when open_checkout_signing_secret is configured, if the
+        popup has no open_checkout_success_url the 409 must omit redirect_url entirely.
+        An unsigned internal portal URL MUST NOT be returned to anonymous callers.
+        """
+        popup = Popups(
+            tenant_id=tenant_a.id,
+            name="Signing No External Popup",
+            slug=f"sign-no-ext-{uuid.uuid4().hex[:6]}",
+            sale_type=SaleType.direct.value,
+            status="active",
+            simplefi_api_key="test_simplefi_key",
+            currency="ARS",
+            open_checkout_signing_secret="test-signing-secret-s1",
+            # open_checkout_success_url deliberately absent
+        )
+        db.add(popup)
+        db.flush()
+
+        buyer_email = f"s1tight-{uuid.uuid4().hex[:8]}@example.com"
+        _make_pending_payment(db, tenant_a, popup, buyer_email=buyer_email)
+
+        with patch("app.services.simplefi.get_simplefi_client") as mock_client_factory:
+            mock_client = MagicMock()
+            mock_client.cancel_payment_request.return_value = (
+                CancelOutcome.ALREADY_APPROVED
+            )
+            mock_client_factory.return_value = mock_client
+
+            with patch.object(payments_crud, "_reconcile_approved"):
+                with pytest.raises(HTTPException) as exc_info:
+                    payments_crud.supersede_pending_payments(
+                        db,
+                        email=buyer_email,
+                        popup_id=popup.id,
+                    )
+
+        exc = exc_info.value
+        assert exc.status_code == 409
+        assert exc.detail["code"] == "previous_payment_completed"
+        # S1 tightening: signing secret set but no external URL → still None
+        assert "payment_id" not in exc.detail
+        assert "redirect_url" in exc.detail
+        assert exc.detail["redirect_url"] is None
+
 
 class TestCancelTransportFailure:
     """supersede_pending_payments on transport error → raises, no holds released, old stays PENDING.
@@ -961,3 +1014,281 @@ class TestSupersedePendingDisabled:
         assert (
             _fresh_payment_status(db, prior_payment.id) == PaymentStatus.PENDING.value
         )
+
+
+# ---------------------------------------------------------------------------
+# Change 1: continuity-proof gate for anonymous supersede
+# ---------------------------------------------------------------------------
+
+
+class TestContinuityProofGate:
+    """Anonymous supersede may ONLY run when the request carries a valid signed cart proof.
+
+    Security rule: without proof of cart ownership (cid + sig from the
+    abandoned-cart restore flow), an attacker could cancel any buyer's pending
+    payment by guessing their email.  The proof gate prevents that without
+    breaking the legitimate buyer's supersede path.
+    """
+
+    def test_attacker_no_proof_pending_exists_returns_409(
+        self,
+        db: Session,
+        tenant_a: Tenants,
+    ) -> None:
+        """Attacker request with victim's email and no proof → 409 pending_payment_exists.
+
+        Prior payment MUST stay PENDING; cancel_payment_request MUST NOT be called.
+        """
+
+        from app.api.checkout.schemas import (
+            BuyerInfo,
+            OpenTicketingPurchaseCreate,
+            ProductLine,
+        )
+
+        popup = _make_popup(db, tenant_a, slug_prefix="proof-atk")
+        product = _make_product(db, tenant_a, popup)
+        victim_email = f"victim-{uuid.uuid4().hex[:8]}@example.com"
+
+        prior_payment = _make_pending_payment(
+            db, tenant_a, popup, buyer_email=victim_email
+        )
+
+        # Attacker knows the victim's email but has no signed cart proof
+        obj = OpenTicketingPurchaseCreate(
+            buyer=BuyerInfo(email=victim_email, first_name="Evil", last_name="Bot"),
+            products=[ProductLine(product_id=product.id, quantity=1)],
+            # cid and sig deliberately absent
+        )
+
+        with patch("app.services.simplefi.get_simplefi_client") as mock_sf:
+            mock_client = MagicMock()
+            mock_sf.return_value = mock_client
+
+            with pytest.raises(HTTPException) as exc_info:
+                payments_crud.create_open_ticketing_payment(
+                    db, obj=obj, popup=popup, tenant=tenant_a
+                )
+
+        exc = exc_info.value
+        assert exc.status_code == 409
+        assert exc.detail["code"] == "pending_payment_exists"
+
+        # Prior payment untouched — still PENDING
+        assert (
+            _fresh_payment_status(db, prior_payment.id) == PaymentStatus.PENDING.value
+        )
+
+        # No SimpleFi cancel call of any kind
+        mock_client.cancel_payment_request.assert_not_called()
+        mock_client.cancel_installment_plan.assert_not_called()
+
+    def test_valid_proof_supersede_runs(
+        self,
+        db: Session,
+        tenant_a: Tenants,
+    ) -> None:
+        """Valid cid+sig proof → supersede cancels prior payment; new payment created."""
+        from types import SimpleNamespace
+
+        from app.api.cart.models import Carts
+        from app.api.checkout.schemas import (
+            BuyerInfo,
+            OpenTicketingPurchaseCreate,
+            ProductLine,
+        )
+        from app.utils.checkout_signing import build_cart_restore_token
+
+        signing_secret = "test-secret-valid-proof"
+        popup = Popups(
+            tenant_id=tenant_a.id,
+            name="Valid Proof Popup",
+            slug=f"proof-ok-{uuid.uuid4().hex[:6]}",
+            sale_type=SaleType.direct.value,
+            status="active",
+            simplefi_api_key="test_simplefi_key",
+            currency="ARS",
+            open_checkout_signing_secret=signing_secret,
+        )
+        db.add(popup)
+        db.flush()
+
+        product = _make_product(db, tenant_a, popup)
+        buyer_email = f"realbuyer-{uuid.uuid4().hex[:8]}@example.com"
+        prior_payment = _make_pending_payment(
+            db, tenant_a, popup, buyer_email=buyer_email
+        )
+
+        # Create the buyer's anonymous cart (as the abandoned-cart flow would)
+        cart = Carts(
+            tenant_id=tenant_a.id,
+            human_id=None,
+            popup_id=popup.id,
+            email=buyer_email,
+            items={},
+        )
+        db.add(cart)
+        db.commit()
+        db.refresh(cart)
+
+        valid_sig = build_cart_restore_token(str(cart.id), signing_secret)
+
+        sf_resp = SimpleNamespace(
+            id=f"sf-proof-{uuid.uuid4().hex[:8]}",
+            status="pending",
+            checkout_url="https://sf.test/proof",
+            is_installment_plan=False,
+        )
+
+        obj = OpenTicketingPurchaseCreate(
+            buyer=BuyerInfo(email=buyer_email, first_name="Real", last_name="Buyer"),
+            products=[ProductLine(product_id=product.id, quantity=1)],
+            cid=cart.id,
+            sig=valid_sig,
+        )
+
+        with patch("app.services.simplefi.get_simplefi_client") as mock_sf:
+            mock_client = MagicMock()
+            mock_client.cancel_payment_request.return_value = CancelOutcome.CANCELED
+            mock_client.create_payment.return_value = sf_resp
+            mock_sf.return_value = mock_client
+
+            new_payment, checkout_url, _ = payments_crud.create_open_ticketing_payment(
+                db, obj=obj, popup=popup, tenant=tenant_a
+            )
+
+        # Prior payment cancelled by supersede
+        assert (
+            _fresh_payment_status(db, prior_payment.id) == PaymentStatus.CANCELLED.value
+        )
+        # New payment created
+        assert new_payment is not None
+        assert checkout_url == "https://sf.test/proof"
+        # SimpleFi cancel was called once (by supersede)
+        mock_client.cancel_payment_request.assert_called_once()
+
+    def test_valid_sig_wrong_email_cart_treated_as_invalid(
+        self,
+        db: Session,
+        tenant_a: Tenants,
+    ) -> None:
+        """Valid sig for attacker's own cart but used with victim's email → invalid proof → 409."""
+        from app.api.cart.models import Carts
+        from app.api.checkout.schemas import (
+            BuyerInfo,
+            OpenTicketingPurchaseCreate,
+            ProductLine,
+        )
+        from app.utils.checkout_signing import build_cart_restore_token
+
+        signing_secret = "test-secret-cross-email"
+        popup = Popups(
+            tenant_id=tenant_a.id,
+            name="Cross Email Popup",
+            slug=f"proof-cross-{uuid.uuid4().hex[:6]}",
+            sale_type=SaleType.direct.value,
+            status="active",
+            simplefi_api_key="test_simplefi_key",
+            currency="ARS",
+            open_checkout_signing_secret=signing_secret,
+        )
+        db.add(popup)
+        db.flush()
+
+        product = _make_product(db, tenant_a, popup)
+        victim_email = f"victim-{uuid.uuid4().hex[:8]}@example.com"
+        attacker_email = f"attacker-{uuid.uuid4().hex[:8]}@example.com"
+
+        # Victim has a prior PENDING payment
+        prior_payment = _make_pending_payment(
+            db, tenant_a, popup, buyer_email=victim_email
+        )
+
+        # Attacker has a valid cart for their OWN email
+        attacker_cart = Carts(
+            tenant_id=tenant_a.id,
+            human_id=None,
+            popup_id=popup.id,
+            email=attacker_email,
+            items={},
+        )
+        db.add(attacker_cart)
+        db.commit()
+        db.refresh(attacker_cart)
+
+        # Valid HMAC for attacker's own cart
+        attacker_sig = build_cart_restore_token(str(attacker_cart.id), signing_secret)
+
+        # Submit purchase as victim but presenting attacker's cart proof
+        obj = OpenTicketingPurchaseCreate(
+            buyer=BuyerInfo(email=victim_email, first_name="Evil", last_name="Bot"),
+            products=[ProductLine(product_id=product.id, quantity=1)],
+            cid=attacker_cart.id,
+            sig=attacker_sig,
+        )
+
+        with patch("app.services.simplefi.get_simplefi_client") as mock_sf:
+            mock_client = MagicMock()
+            mock_client.cancel_payment_request.return_value = CancelOutcome.CANCELED
+            mock_sf.return_value = mock_client
+
+            with pytest.raises(HTTPException) as exc_info:
+                payments_crud.create_open_ticketing_payment(
+                    db, obj=obj, popup=popup, tenant=tenant_a
+                )
+
+        exc = exc_info.value
+        # Email mismatch → proof invalid → pending exists → 409
+        assert exc.status_code == 409
+        assert exc.detail["code"] == "pending_payment_exists"
+        # Prior payment untouched
+        assert (
+            _fresh_payment_status(db, prior_payment.id) == PaymentStatus.PENDING.value
+        )
+        # No SimpleFi cancel
+        mock_client.cancel_payment_request.assert_not_called()
+
+    def test_no_pending_no_proof_purchase_succeeds(
+        self,
+        db: Session,
+        tenant_a: Tenants,
+    ) -> None:
+        """No prior PENDING payment + no proof → purchase succeeds normally (pre-PR behavior)."""
+        from types import SimpleNamespace
+
+        from app.api.checkout.schemas import (
+            BuyerInfo,
+            OpenTicketingPurchaseCreate,
+            ProductLine,
+        )
+
+        popup = _make_popup(db, tenant_a, slug_prefix="proof-none")
+        product = _make_product(db, tenant_a, popup)
+        buyer_email = f"fresh-{uuid.uuid4().hex[:8]}@example.com"
+
+        sf_resp = SimpleNamespace(
+            id=f"sf-fresh-{uuid.uuid4().hex[:8]}",
+            status="pending",
+            checkout_url="https://sf.test/fresh",
+            is_installment_plan=False,
+        )
+
+        obj = OpenTicketingPurchaseCreate(
+            buyer=BuyerInfo(email=buyer_email, first_name="Fresh", last_name="Buyer"),
+            products=[ProductLine(product_id=product.id, quantity=1)],
+            # No cid/sig — no proof, but no pending payment either
+        )
+
+        with patch("app.services.simplefi.get_simplefi_client") as mock_sf:
+            mock_client = MagicMock()
+            mock_client.create_payment.return_value = sf_resp
+            mock_sf.return_value = mock_client
+
+            new_payment, checkout_url, _ = payments_crud.create_open_ticketing_payment(
+                db, obj=obj, popup=popup, tenant=tenant_a
+            )
+
+        assert new_payment is not None
+        assert checkout_url == "https://sf.test/fresh"
+        # No cancel call — nothing to supersede
+        mock_client.cancel_payment_request.assert_not_called()

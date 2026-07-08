@@ -164,6 +164,13 @@ class OpenTicketingPurchaseCreate(BaseModel):
     # locale-aware success redirect. Falls back to the popup default when absent.
     locale: str | None = Field(default=None, max_length=8)
     attribution: Attribution | None = None
+    # Cart continuity proof: signed cart identifier from the abandoned-cart
+    # restore link (GET /checkout/{slug}/cart?cid=&sig=).  When both are
+    # present and valid for this buyer+popup, the system is allowed to supersede
+    # a prior PENDING payment.  Missing or invalid → supersede is blocked;
+    # a 409 pending_payment_exists is returned if a PENDING payment exists.
+    cid: uuid.UUID | None = None
+    sig: str | None = None
 
 
 class OpenTicketingPurchaseResponse(BaseModel):
