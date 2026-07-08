@@ -15389,6 +15389,11 @@ export const ProductBatchResultSchema = {
             title: 'Discountable',
             default: true
         },
+        sold_out_override: {
+            type: 'boolean',
+            title: 'Sold Out Override',
+            default: false
+        },
         id: {
             type: 'string',
             format: 'uuid',
@@ -15834,6 +15839,11 @@ export const ProductPublicSchema = {
             title: 'Discountable',
             default: true
         },
+        sold_out_override: {
+            type: 'boolean',
+            title: 'Sold Out Override',
+            default: false
+        },
         id: {
             type: 'string',
             format: 'uuid',
@@ -15848,6 +15858,19 @@ export const ProductPublicSchema = {
 Sale window fields are exposed as full \`\`datetime\`\` instants (UTC), so the
 sale window can express a precise cutoff like "Friday 11:59 PM" rather than
 a whole calendar day. Clients render them in the popup's timezone.`
+} as const;
+
+export const ProductSoldOutUpdateSchema = {
+    properties: {
+        sold_out: {
+            type: 'boolean',
+            title: 'Sold Out'
+        }
+    },
+    type: 'object',
+    required: ['sold_out'],
+    title: 'ProductSoldOutUpdate',
+    description: 'Schema for manually marking a product as sold out (or back on sale).'
 } as const;
 
 export const ProductUpdateSchema = {
@@ -16258,6 +16281,11 @@ export const ProductWithQuantitySchema = {
             type: 'boolean',
             title: 'Discountable',
             default: true
+        },
+        sold_out_override: {
+            type: 'boolean',
+            title: 'Sold Out Override',
+            default: false
         },
         id: {
             type: 'string',

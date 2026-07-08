@@ -1,7 +1,21 @@
-import { keepPreviousData, useQuery } from "@tanstack/react-query"
+import {
+  keepPreviousData,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query"
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router"
 import type { ColumnDef } from "@tanstack/react-table"
-import { Check, Package, Plus, QrCode, ShieldCheck } from "lucide-react"
+import {
+  Check,
+  EllipsisVertical,
+  Package,
+  PackageCheck,
+  PackageX,
+  Plus,
+  QrCode,
+  ShieldCheck,
+} from "lucide-react"
 import { Suspense, useCallback } from "react"
 
 import { type ProductPublic, ProductsService } from "@/client"
@@ -10,7 +24,14 @@ import { EmptyState } from "@/components/Common/EmptyState"
 import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
 import { StatusBadge } from "@/components/Common/StatusBadge"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import {
   Select,
   SelectContent,
@@ -21,12 +42,23 @@ import {
 import { Skeleton } from "@/components/ui/skeleton"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
 import useAuth from "@/hooks/useAuth"
+import useCustomToast from "@/hooks/useCustomToast"
 import {
   type TableSearchParams,
   useTableSearchParams,
   validateTableSearch,
 } from "@/hooks/useTableSearchParams"
 import { cn } from "@/lib/utils"
+import { createErrorHandler } from "@/utils"
+
+// Exported for tests. A product is sold out when the manual override flag is
+// set or its remaining stock is tracked and depleted.
+export function isProductSoldOut(product: ProductPublic): boolean {
+  const remaining = product.total_stock_remaining
+  return (
+    product.sold_out_override === true || (remaining != null && remaining <= 0)
+  )
+}
 
 const DURATION_LABELS: Record<string, string> = {
   day: "Day Pass",
@@ -91,6 +123,63 @@ function AddProductButton() {
   )
 }
 
+function ProductActionsMenu({ product }: { product: ProductPublic }) {
+  const queryClient = useQueryClient()
+  const { showSuccessToast, showErrorToast } = useCustomToast()
+  const { isOperatorOrAbove } = useAuth()
+  // The menu toggles the override flag only: a naturally depleted product
+  // (override off, stock 0) still offers "Mark as sold out" so it stays
+  // sold out even if stock returns.
+  const soldOutOverride = product.sold_out_override === true
+
+  const soldOutMutation = useMutation({
+    mutationFn: (nextSoldOut: boolean) =>
+      ProductsService.setProductSoldOut({
+        productId: product.id,
+        requestBody: { sold_out: nextSoldOut },
+      }),
+    onSuccess: (_, nextSoldOut) => {
+      showSuccessToast(
+        nextSoldOut ? "Product marked as sold out" : "Product available again",
+      )
+      queryClient.invalidateQueries({ queryKey: ["products"] })
+    },
+    onError: createErrorHandler(showErrorToast),
+  })
+
+  if (!isOperatorOrAbove) return null
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon" aria-label="Product actions">
+          <EllipsisVertical className="h-4 w-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        {soldOutOverride ? (
+          <DropdownMenuItem
+            disabled={soldOutMutation.isPending}
+            onSelect={() => soldOutMutation.mutate(false)}
+          >
+            <PackageCheck className="mr-2 h-4 w-4" />
+            Unmark sold out
+          </DropdownMenuItem>
+        ) : (
+          <DropdownMenuItem
+            variant="destructive"
+            disabled={soldOutMutation.isPending}
+            onSelect={() => soldOutMutation.mutate(true)}
+          >
+            <PackageX className="mr-2 h-4 w-4" />
+            Mark as sold out
+          </DropdownMenuItem>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
+
 const columns: ColumnDef<ProductPublic>[] = [
   {
     accessorKey: "name",
@@ -107,6 +196,9 @@ const columns: ColumnDef<ProductPublic>[] = [
           )}
         />
         <span className="font-medium">{row.original.name}</span>
+        {isProductSoldOut(row.original) && (
+          <Badge variant="destructive">Sold out</Badge>
+        )}
       </div>
     ),
   },
@@ -200,6 +292,16 @@ const columns: ColumnDef<ProductPublic>[] = [
         {row.original.requires_check_in ? (
           <Check className="h-4 w-4 text-muted-foreground" aria-label="Yes" />
         ) : null}
+      </div>
+    ),
+  },
+  {
+    id: "actions",
+    header: () => <span className="sr-only">Actions</span>,
+    meta: { toggleable: false },
+    cell: ({ row }) => (
+      <div className="flex justify-end">
+        <ProductActionsMenu product={row.original} />
       </div>
     ),
   },
