@@ -159,6 +159,23 @@ async def get_checkout_share_meta(
     dependencies=[
         Depends(RateLimit(limit=10, window_sec=60, key_prefix="rl:checkout-purchase")),
     ],
+    responses={
+        409: {
+            "description": (
+                "Payment conflict. detail.code is one of: "
+                "'pending_payment_exists' (a prior PENDING payment exists and no valid cart continuity proof was supplied — no cancellation attempted); "
+                "'concurrent_payment_in_progress' (another checkout is in progress under the same email right now); "
+                "'previous_payment_completed' (prior payment was already approved — includes redirect_url when a signing secret and external success URL are both configured)."
+            ),
+        },
+        502: {
+            "description": (
+                "Payment provider error. "
+                "detail.code='payment_cancel_failed' means the prior pending payment could not be cancelled. "
+                "Retry the request."
+            ),
+        },
+    },
 )
 async def purchase_open_ticketing(
     slug: str,

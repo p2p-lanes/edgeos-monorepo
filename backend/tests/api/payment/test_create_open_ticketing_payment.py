@@ -23,10 +23,12 @@ from app.api.form_section.models import FormSections
 from app.api.human.models import Humans
 from app.api.payment.crud import payments_crud
 from app.api.payment.models import PaymentProducts, Payments
+from app.api.payment.schemas import PaymentStatus
 from app.api.popup.models import Popups
 from app.api.product.models import Products
 from app.api.shared.enums import SaleType
 from app.api.tenant.models import Tenants
+from app.services.simplefi.client import CancelOutcome
 
 
 def _make_popup(
@@ -279,8 +281,21 @@ def test_create_open_ticketing_payment_second_purchase_reuses_attendee(
     db: Session,
     tenant_a: Tenants,
 ) -> None:
-    """Second purchase by same (human, popup) reuses the existing attendee.  Design §2.1 / Spec C2."""
+    """Second purchase by same (human, popup) reuses the existing attendee.  Design §2.1 / Spec C2.
+
+    Proof gate: the second call must supply a valid cart continuity proof (cid+sig)
+    so the supersede step is allowed to cancel the first PENDING payment.  Without
+    proof the gate returns 409 pending_payment_exists (correct security behavior).
+    """
+    from app.api.cart.models import Carts
+    from app.utils.checkout_signing import build_cart_restore_token
+
+    signing_secret = "reuse-test-signing-secret"
     popup = _make_popup(db, tenant_a, slug_prefix="reuse")
+    # Give the popup a signing secret so the proof gate can validate cid+sig.
+    popup.open_checkout_signing_secret = signing_secret
+    db.add(popup)
+
     product = _make_product(db, popup, name="GA", price="50.00")
     section = _make_section(db, popup, label="Buyer Info")
     name_field = _make_field(
@@ -288,18 +303,13 @@ def test_create_open_ticketing_payment_second_purchase_reuses_attendee(
     )
     db.commit()
 
+    buyer_email = "repeat@test.com"
+
     obj1 = _purchase_create(
-        email="repeat@test.com",
+        email=buyer_email,
         first_name="Repeat",
         last_name="Buyer",
         products=[(product, 1)],
-        form_data={name_field.name: "Repeat"},
-    )
-    obj2 = _purchase_create(
-        email="repeat@test.com",
-        first_name="Repeat",
-        last_name="Buyer",
-        products=[(product, 2)],
         form_data={name_field.name: "Repeat"},
     )
 
@@ -316,15 +326,59 @@ def test_create_open_ticketing_payment_second_purchase_reuses_attendee(
         is_installment_plan=False,
     )
 
-    with patch("app.services.simplefi.get_simplefi_client") as mock_get_client:
-        mock_get_client.return_value.create_payment.side_effect = [sf_resp1, sf_resp2]
+    from unittest.mock import MagicMock
 
-        payments_crud.create_open_ticketing_payment(
+    with patch("app.services.simplefi.get_simplefi_client") as mock_get_client:
+        mock_client = MagicMock()
+        mock_client.create_payment.side_effect = [sf_resp1, sf_resp2]
+        mock_client.cancel_payment_request.return_value = CancelOutcome.CANCELED
+        mock_get_client.return_value = mock_client
+
+        p1, _, _ = payments_crud.create_open_ticketing_payment(
             db, obj=obj1, popup=popup, tenant=tenant_a
         )
-        payments_crud.create_open_ticketing_payment(
+
+        # Create an anonymous cart for the buyer to supply as continuity proof on
+        # the second purchase (mirrors the abandoned-cart restore flow).
+        buyer_cart = Carts(
+            tenant_id=tenant_a.id,
+            human_id=None,
+            popup_id=popup.id,
+            email=buyer_email,
+            items={},
+        )
+        db.add(buyer_cart)
+        db.commit()
+        db.refresh(buyer_cart)
+
+        valid_sig = build_cart_restore_token(str(buyer_cart.id), signing_secret)
+
+        obj2 = OpenTicketingPurchaseCreate(
+            products=[ProductLine(product_id=product.id, quantity=2)],
+            buyer=BuyerInfo(
+                email=buyer_email,
+                first_name="Repeat",
+                last_name="Buyer",
+                form_data={name_field.name: "Repeat"},
+            ),
+            cid=buyer_cart.id,
+            sig=valid_sig,
+        )
+
+        p2, _, _ = payments_crud.create_open_ticketing_payment(
             db, obj=obj2, popup=popup, tenant=tenant_a
         )
+
+    # Second purchase superseded the first: P1 is CANCELLED, P2 is PENDING
+    db.expire_all()
+    fresh_p1 = db.get(Payments, p1.id)
+    assert fresh_p1 is not None
+    assert fresh_p1.status == PaymentStatus.CANCELLED.value, (
+        "First payment should be CANCELLED after supersede"
+    )
+    fresh_p2 = db.get(Payments, p2.id)
+    assert fresh_p2 is not None
+    assert fresh_p2.status == PaymentStatus.PENDING.value
 
     # Still exactly 1 attendee after two purchases
     attendees = list(

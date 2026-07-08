@@ -944,6 +944,23 @@ async def preview_my_payment(
     response_model=PaymentPublic,
     status_code=status.HTTP_201_CREATED,
     dependencies=[needs("portal:applications:write")],
+    responses={
+        409: {
+            "description": (
+                "Concurrent payment conflict. "
+                "detail.code is one of: "
+                "'concurrent_payment_in_progress' (another PENDING payment exists and could not be superseded) or "
+                "'previous_payment_completed' (prior payment was completed — redirect_url points to the buyer's passes page)."
+            ),
+        },
+        502: {
+            "description": (
+                "Payment provider error. "
+                "detail.code='payment_cancel_failed' means the prior pending payment could not be cancelled. "
+                "Retry the request."
+            ),
+        },
+    },
 )
 async def create_my_payment(
     payment_in: PaymentCreate,
