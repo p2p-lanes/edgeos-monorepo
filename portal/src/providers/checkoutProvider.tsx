@@ -544,26 +544,29 @@ export function CheckoutProvider({
   const openCartBuyerEmail =
     typeof buyerValues.email === "string" ? buyerValues.email : ""
 
-  const { scheduleSave: scheduleOpenCartSave, clearOpenCart } =
-    useOpenCartPersistence({
-      popupSlug: openCartPopupSlug ?? "",
-      selectionStateRef,
-      products,
-      housingPricePerDay,
-      restorationSetters: {
-        setHousing,
-        setMerch,
-        setPatron,
-        setMealPlans: setSelectedMealPlans,
-        setInsurance,
-      },
-      hasRestoredCheckoutRef,
-      paymentCompleteRef,
-      buyerEmail: openCartBuyerEmail,
-      initialStep,
-      cid: openCartCid,
-      sig: openCartSig,
-    })
+  const {
+    scheduleSave: scheduleOpenCartSave,
+    clearOpenCart,
+    cartMetaRef: openCartMetaRef,
+  } = useOpenCartPersistence({
+    popupSlug: openCartPopupSlug ?? "",
+    selectionStateRef,
+    products,
+    housingPricePerDay,
+    restorationSetters: {
+      setHousing,
+      setMerch,
+      setPatron,
+      setMealPlans: setSelectedMealPlans,
+      setInsurance,
+    },
+    hasRestoredCheckoutRef,
+    paymentCompleteRef,
+    buyerEmail: openCartBuyerEmail,
+    initialStep,
+    cid: openCartCid,
+    sig: openCartSig,
+  })
 
   // Promo code hook
   const {
@@ -1162,6 +1165,7 @@ export function CheckoutProvider({
     submitMode,
     editPassesEnabled,
     popupName: city?.name ?? null,
+    openCartMetaRef,
     buyerData:
       submitMode === "open-ticketing"
         ? {

@@ -2577,6 +2577,8 @@ export type OpenTicketingPurchaseCreate = {
     fbp?: (string | null);
     locale?: (string | null);
     attribution?: (Attribution | null);
+    cid?: (string | null);
+    sig?: (string | null);
 };
 
 /**

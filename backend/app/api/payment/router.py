@@ -1362,7 +1362,10 @@ async def _handle_installment_plan_activated(
             if getattr(payment, "installments_paid", new_paid) != new_paid:
                 payment.installments_paid = new_paid
                 changed = True
-            if plan_source is not None and getattr(payment, "source", None) != plan_source:
+            if (
+                plan_source is not None
+                and getattr(payment, "source", None) != plan_source
+            ):
                 payment.source = plan_source
                 changed = True
             if changed:

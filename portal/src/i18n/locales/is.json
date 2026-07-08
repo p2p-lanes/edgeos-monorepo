@@ -259,7 +259,10 @@
     "no_meal_plans": "Engir matarpakkar í boði.",
     "no_contributions": "Engir framlagsmöguleikar í boði.",
     "step_config_error": "Villa í uppsetningu skrefs.",
-    "step_config_error_detail": "Ekkert sniðmát er tengt þessu skrefi. Hafðu samband við stjórnanda."
+    "step_config_error_detail": "Ekkert sniðmát er tengt þessu skrefi. Hafðu samband við stjórnanda.",
+    "previous_payment_completed": "Fyrri greiðsla þín var lokið.",
+    "pending_payment_wait": "Þú ert með greiðslu í bið. Bíddu í nokkrar mínútur.",
+    "payment_cancel_failed": "Okkur tókst ekki að afgreiða greiðsluna. Reyndu aftur."
   },
   "openCheckout": {
     "loading": "Hleður greiðslu...",
@@ -284,7 +287,10 @@
     "thank_you_description": "Takk fyrir kaupin. Við sendum staðfestingu og miðaupplýsingar með tölvupósti.",
     "thank_you_cta": "Fara í vefgátt",
     "thank_you_order_summary": "Yfirlit pöntunar",
-    "thank_you_total": "Samtals"
+    "thank_you_total": "Samtals",
+    "previous_payment_completed": "Fyrri greiðsla þín var lokið.",
+    "payment_cancel_failed": "Okkur tókst ekki að afgreiða greiðsluna. Reyndu aftur.",
+    "pending_payment_wait": "Þú ert með greiðslu í bið. Bíddu í nokkrar mínútur."
   },
   "passes": {
     "your_passes": "Passarnir þínir",

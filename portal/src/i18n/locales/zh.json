@@ -269,7 +269,10 @@
     "no_meal_plans": "暂无可用餐饮计划。",
     "no_contributions": "暂无可用捐助选项。",
     "step_config_error": "步骤配置错误。",
-    "step_config_error_detail": "此步骤未分配模板。请联系管理员。"
+    "step_config_error_detail": "此步骤未分配模板。请联系管理员。",
+    "previous_payment_completed": "您之前的付款已完成。",
+    "pending_payment_wait": "您有一笔待处理的付款，请等待几分钟。",
+    "payment_cancel_failed": "我们无法处理您的付款，请重试。"
   },
   "openCheckout": {
     "loading": "正在加载结账...",
@@ -294,7 +297,10 @@
     "thank_you_description": "感谢您的购买。我们已通过电子邮件发送您的确认信息和门票详情。",
     "thank_you_cta": "前往门户",
     "thank_you_order_summary": "订单摘要",
-    "thank_you_total": "总计"
+    "thank_you_total": "总计",
+    "previous_payment_completed": "您之前的付款已完成。",
+    "payment_cancel_failed": "我们无法处理您的付款，请重试。",
+    "pending_payment_wait": "您有一笔待处理的付款，请等待几分钟。"
   },
   "passes": {
     "your_passes": "我的通行证",
