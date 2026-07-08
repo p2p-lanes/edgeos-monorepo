@@ -62,6 +62,7 @@ def _make_product(
     is_active: bool = True,
     name: str = "General Admission",
     price: str = "100.00",
+    sold_out_override: bool = False,
 ) -> Products:
     product = Products(
         id=uuid.uuid4(),
@@ -72,6 +73,7 @@ def _make_product(
         price=price,
         is_active=is_active,
         category="ticket",
+        sold_out_override=sold_out_override,
     )
     db.add(product)
     db.flush()
@@ -333,6 +335,27 @@ def test_runtime_only_active_products(
     product_names = [p["name"] for p in body["products"]]
     assert "Active GA" in product_names
     assert "Inactive VIP" not in product_names
+
+
+def test_runtime_exposes_sold_out_override(
+    client: TestClient, db: Session, tenant_a: Tenants
+) -> None:
+    """Products carry sold_out_override so the portal can hide manually
+    sold-out products instead of deriving on_sale as available."""
+    popup = _make_direct_popup(db, tenant_a)
+    _make_product(db, popup, name="Sold Out GA", sold_out_override=True)
+    _make_product(db, popup, name="Available VIP")
+    db.commit()
+
+    response = client.get(
+        f"/api/v1/checkout/{popup.slug}/runtime",
+        headers={"X-Tenant-Id": str(tenant_a.id)},
+    )
+
+    assert response.status_code == 200, response.text
+    products = {p["name"]: p for p in response.json()["products"]}
+    assert products["Sold Out GA"]["sold_out_override"] is True
+    assert products["Available VIP"]["sold_out_override"] is False
 
 
 def test_runtime_rate_limit_triggers_429(
