@@ -704,11 +704,18 @@ export function CheckoutProvider({
 
       releasePromise
         .then((result) => {
-          if (result.released && slug) {
-            // Release succeeded — invalidate the checkout runtime so stock/availability
-            // reflects the freed hold on the next render cycle.
+          if (result.released) {
+            if (slug) {
+              // Release succeeded — invalidate the checkout runtime so
+              // stock/availability reflects the freed hold on the next render.
+              queryClient.invalidateQueries({
+                queryKey: queryKeys.checkout.runtime(slug),
+              })
+            }
+            // The freed hold also restores application credit; refetch the
+            // application so the visible balance matches the backend.
             queryClient.invalidateQueries({
-              queryKey: queryKeys.checkout.runtime(slug),
+              queryKey: queryKeys.applications.mine(),
             })
           }
         })

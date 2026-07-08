@@ -8,6 +8,7 @@
 // Tests run in node environment — no DOM, no React mounts.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
+import { getProductAvailability } from "@/lib/product-availability"
 import type { SelectedDynamicItem } from "@/types/checkout"
 import type { ProductsPass } from "@/types/Products"
 import { dispatchPaymentError } from "./errorDispatch"
@@ -48,7 +49,11 @@ interface CartItemsSnapshot {
   current_step: string | null
 }
 
-// Minimal ProductsPass for testing
+// Minimal ProductsPass for testing.
+// Fields required by getProductAvailability: sale_starts_at, sale_ends_at,
+// total_stock_cap, total_stock_remaining, max_per_order, sold_out_override.
+// All omitted optional fields default to undefined/null → deriveProductState
+// returns "on_sale" (active) or uses sold_out_override for inactive mocks.
 function makeProduct(id: string, active = true): ProductsPass {
   return {
     id,
@@ -57,20 +62,12 @@ function makeProduct(id: string, active = true): ProductsPass {
     compare_price: null,
     category: "ticket",
     is_active: active,
-    is_available: active,
-    sold_out: false,
-    sold_out_override: false,
+    sold_out_override: !active,
     max_per_order: null,
-    min_per_order: null,
     discountable: true,
     duration_type: null,
     original_price: null,
-    is_upcoming: false,
-    is_ended: false,
-    sale_start: null,
-    sale_end: null,
     description: null,
-    product_category: null,
   } as unknown as ProductsPass
 }
 
@@ -370,8 +367,8 @@ describe("hydrateFromSnapshot — dynamic_items restore (ADR-R7)", () => {
     for (const saved of snapshot.dynamic_items) {
       const product = products.find((p) => p.id === saved.product_id)
       if (!product) continue
-      // Simplified availability check matching the shipped code
-      if (!product.is_available || product.sold_out) continue
+      // MIRROR: useOpenCartPersistence.ts ~331 — uses getProductAvailability(product).canSelect
+      if (!getProductAvailability(product).canSelect) continue
       const entry: SelectedDynamicItem = {
         productId: product.id,
         product,
@@ -685,7 +682,9 @@ describe("flushSave contract (ADR-R8)", () => {
 
   it("cancels a pending debounce timer when flush is called", () => {
     const clearTimeoutSpy = vi.spyOn(global, "clearTimeout")
-    const debounceRef = { current: setTimeout(() => {}, 800) }
+    const debounceRef: { current: ReturnType<typeof setTimeout> | null } = {
+      current: setTimeout(() => {}, 800),
+    }
 
     // flushSave cancels debounce
     if (debounceRef.current) {
