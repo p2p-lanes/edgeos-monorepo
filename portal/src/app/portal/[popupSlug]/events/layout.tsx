@@ -4,6 +4,7 @@ import { useParams, useRouter } from "next/navigation"
 import { useEffect } from "react"
 import { Loader } from "@/components/ui/Loader"
 import { useApplicationsQuery } from "@/hooks/useGetApplications"
+import { useHumanPopupAccess } from "@/hooks/useHumanPopupAccess"
 import { useParticipationQuery } from "@/hooks/useParticipationQuery"
 import { useApplication } from "@/providers/applicationProvider"
 import { useCityProvider } from "@/providers/cityProvider"
@@ -19,6 +20,8 @@ export default function EventsLayout({
   const { getRelevantApplication, participation } = useApplication()
   const city = getCity()
   const popupId = city?.id ? String(city.id) : null
+  const isEnded = city?.status === "ended"
+  const endedAccess = useHumanPopupAccess(isEnded ? popupId : null)
 
   // Subscribe to the same queries the sidebar reads so this route gate matches
   // nav visibility exactly (see useResources `canSeeAttendees`). Reusing
@@ -37,12 +40,17 @@ export default function EventsLayout({
   // an attendee row but is not approved, so it is bounced here just as the nav
   // hides the link. Direct-sale popups don't run the application flow, so their
   // events access is left untouched.
-  const isEligible = isCompanion
-    ? participation?.application_status === "accepted"
-    : application?.status === "accepted"
+  const isEligible = isEnded
+    ? endedAccess.state === "allowed"
+    : isCompanion
+      ? participation?.application_status === "accepted"
+      : application?.status === "accepted"
 
   const stillLoading =
-    !city || applicationsQuery.isLoading || participationQuery.isLoading
+    !city ||
+    applicationsQuery.isLoading ||
+    participationQuery.isLoading ||
+    (isEnded && endedAccess.state === "loading")
 
   const blocked = !isDirectSale && !stillLoading && !isEligible
 
