@@ -7,7 +7,6 @@ import ExpandableDescription from "@/components/ui/ExpandableDescription"
 import QuantitySelector, {
   supportsQuantitySelector,
 } from "@/components/ui/QuantitySelector"
-import SoldOutBadge from "@/components/ui/SoldOutBadge"
 import { imageOptimization } from "@/lib/image-optimization"
 import { getProductAvailability } from "@/lib/product-availability"
 import { cn } from "@/lib/utils"
@@ -15,6 +14,7 @@ import { useCheckout } from "@/providers/checkoutProvider"
 import { formatCurrency } from "@/types/checkout"
 import type { ProductsPass } from "@/types/Products"
 import type { VariantProps } from "../registries/variantRegistry"
+import { SaleStateBadge } from "./saleStateBadge"
 
 /* ── Shared components ────────────────────────────────────── */
 
@@ -42,7 +42,7 @@ function MerchQtyControl({
   } = getProductAvailability(product)
 
   if (!canSelect) {
-    return state === "sold_out" ? <SoldOutBadge /> : null
+    return state === "sold_out" ? <SaleStateBadge state="sold_out" /> : null
   }
 
   if (showStepper) {

@@ -5,7 +5,9 @@ import Image from "next/image"
 import type { CSSProperties } from "react"
 import { useTranslation } from "react-i18next"
 import ExpandableDescription from "@/components/ui/ExpandableDescription"
-import QuantitySelector from "@/components/ui/QuantitySelector"
+import QuantitySelector, {
+  resolveBlockedStepperProps,
+} from "@/components/ui/QuantitySelector"
 import type {
   TicketAttendeeVM,
   TicketRowVM,
@@ -18,6 +20,7 @@ import { cn } from "@/lib/utils"
 import { formatCurrency } from "@/types/checkout"
 import type { ProductsPass } from "@/types/Products"
 import type { VariantProps } from "../registries/variantRegistry"
+import { SaleStateBadge } from "./saleStateBadge"
 
 // ---------------------------------------------------------------------------
 // Types
@@ -173,6 +176,13 @@ function PassSystemProductRow({
   const isPurchasedLocked = row.purchased && !row.editedForCredit
   // Disabled: either precomputed exclusivity/sale-state, or purchased-locked
   const rowDisabled = row.disabled || isPurchasedLocked
+  // Blocked rows stay removable: cart quantity must remain decrementable.
+  const stepper = resolveBlockedStepperProps({
+    blocked: row.disabled,
+    locked: isPurchasedLocked,
+    quantity,
+    max,
+  })
 
   const hasDiscount = row.comparePrice != null && row.comparePrice > row.price
   const subtotal = row.price * quantity
@@ -205,9 +215,12 @@ function PassSystemProductRow({
     >
       <div className="flex items-center gap-3">
         <div className="flex-1 min-w-0">
-          <h4 className="font-medium text-foreground text-sm line-clamp-2">
-            {product.name}
-          </h4>
+          <div className="flex items-center gap-2 min-w-0">
+            <h4 className="font-medium text-foreground text-sm line-clamp-2">
+              {product.name}
+            </h4>
+            <SaleStateBadge state={row.saleState} />
+          </div>
           {/* Credit indicator: visible when isEditing and product.edit */}
           {isEditing && row.editedForCredit && (
             <div className="flex items-center gap-1 mt-0.5">
@@ -276,7 +289,8 @@ function PassSystemProductRow({
                 tone="accent"
                 value={quantity}
                 min={0}
-                max={max}
+                max={stepper.max}
+                disabled={stepper.disabled}
                 onIncrement={() => handleQuantityChange(quantity + 1)}
                 onDecrement={() =>
                   handleQuantityChange(Math.max(0, quantity - 1))
@@ -347,6 +361,13 @@ function OpenCheckoutProductRow({
   const showStepper = row.usesStepper
   const max = maxQuantity
   const rowDisabled = disabled && !isAdded
+  // Blocked rows stay removable: cap max at the cart quantity so increment
+  // self-disables while decrement keeps working.
+  const stepperMax = resolveBlockedStepperProps({
+    blocked: row.saleState !== "on_sale",
+    quantity,
+    max,
+  }).max
   const hasDiscount =
     product.compare_price != null && product.compare_price > product.price
   const subtotal = product.price * quantity
@@ -379,9 +400,12 @@ function OpenCheckoutProductRow({
     >
       <div className="flex items-center gap-3">
         <div className="flex-1 min-w-0">
-          <h4 className="font-medium text-foreground text-sm line-clamp-2">
-            {product.name}
-          </h4>
+          <div className="flex items-center gap-2 min-w-0">
+            <h4 className="font-medium text-foreground text-sm line-clamp-2">
+              {product.name}
+            </h4>
+            <SaleStateBadge state={row.saleState} />
+          </div>
         </div>
         <div className="flex items-center gap-4 shrink-0">
           <div
@@ -424,7 +448,8 @@ function OpenCheckoutProductRow({
                 tone="accent"
                 value={quantity}
                 min={0}
-                max={max}
+                max={stepperMax}
+                disabled={rowDisabled}
                 onIncrement={() => handleQuantityChange(quantity + 1)}
                 onDecrement={() =>
                   handleQuantityChange(Math.max(0, quantity - 1))

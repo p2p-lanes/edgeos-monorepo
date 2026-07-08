@@ -166,6 +166,9 @@
   "checkout": {
     "title": "结账",
     "express_title": "快速结账",
+    "sold_out": "已售罄",
+    "sale_upcoming": "即将开售",
+    "sale_ended": "已结束",
     "buyer_step_title": "您的信息",
     "buyer_step_description": "请在付款前填写您的信息。",
     "buyer_hero_title": "就差一步！",

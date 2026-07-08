@@ -32,6 +32,36 @@ export const resolveMaxQuantity = (product: {
   return cap
 }
 
+/**
+ * Resolves the effective stepper props for a row whose product may be
+ * blocked (sold out, upcoming, ended, exclusivity).
+ *
+ * Constraint: blocked rows stay removable. Quantity already in the cart must
+ * remain decrementable, so a blocked row with quantity > 0 keeps the stepper
+ * enabled with `max` capped at the current quantity (increment self-disables
+ * at max, decrement keeps working). Locked rows (e.g. already purchased) and
+ * blocked rows with nothing in the cart stay fully disabled.
+ */
+export const resolveBlockedStepperProps = ({
+  blocked,
+  locked = false,
+  quantity,
+  max,
+}: {
+  blocked: boolean
+  locked?: boolean
+  quantity: number
+  max: number
+}): { max: number; disabled: boolean } => {
+  if (locked) return { max, disabled: true }
+  if (blocked) {
+    return quantity > 0
+      ? { max: quantity, disabled: false }
+      : { max, disabled: true }
+  }
+  return { max, disabled: false }
+}
+
 interface QuantitySelectorProps {
   value: number
   max: number
