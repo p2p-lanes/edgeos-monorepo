@@ -4680,6 +4680,11 @@ export const CheckoutRuntimeProductSchema = {
             ],
             title: 'Total Stock Remaining'
         },
+        sold_out_override: {
+            type: 'boolean',
+            title: 'Sold Out Override',
+            default: false
+        },
         max_per_order: {
             anyOf: [
                 {

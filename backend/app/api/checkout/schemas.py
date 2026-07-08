@@ -72,6 +72,7 @@ class CheckoutRuntimeProduct(BaseModel):
     sale_ends_at: datetime | None = None
     total_stock_cap: int | None = None
     total_stock_remaining: int | None = None
+    sold_out_override: bool = False
     max_per_order: int | None = None
     is_active: bool = True
     exclusive: bool = False

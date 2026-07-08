@@ -1077,6 +1077,7 @@ export type CheckoutRuntimeProduct = {
     sale_ends_at?: (string | null);
     total_stock_cap?: (number | null);
     total_stock_remaining?: (number | null);
+    sold_out_override?: boolean;
     max_per_order?: (number | null);
     is_active?: boolean;
     exclusive?: boolean;
