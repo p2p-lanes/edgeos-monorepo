@@ -623,6 +623,7 @@ export default function EventDetailPage() {
               src={coverUrl}
               alt={event.title}
               className="w-full h-full object-cover"
+              sizes="(max-width: 768px) 100vw, 640px"
               fallback={
                 <CalendarDays className="h-10 w-10 text-muted-foreground/40" />
               }

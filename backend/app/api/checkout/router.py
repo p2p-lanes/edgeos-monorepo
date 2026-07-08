@@ -31,13 +31,14 @@ from app.api.checkout.schemas import (
     CheckoutShareMeta,
     OpenTicketingPurchaseCreate,
     OpenTicketingPurchaseResponse,
+    PendingReleaseOpenRequest,
 )
 from app.api.payment.crud import payments_crud
 from app.api.payment.router import (
     _extract_meta_attribution,
     _send_payment_confirmed_email,
 )
-from app.api.payment.schemas import PaymentStatus
+from app.api.payment.schemas import PaymentStatus, PendingReleaseResponse
 from app.core.dependencies.tenants import PublicTenant
 from app.core.dependencies.users import SessionDep
 from app.core.rate_limit import RateLimit
@@ -159,6 +160,23 @@ async def get_checkout_share_meta(
     dependencies=[
         Depends(RateLimit(limit=10, window_sec=60, key_prefix="rl:checkout-purchase")),
     ],
+    responses={
+        409: {
+            "description": (
+                "Payment conflict. detail.code is one of: "
+                "'pending_payment_exists' (a prior PENDING payment exists and no valid cart continuity proof was supplied — no cancellation attempted); "
+                "'concurrent_payment_in_progress' (another checkout is in progress under the same email right now); "
+                "'previous_payment_completed' (prior payment was already approved — includes redirect_url when a signing secret and external success URL are both configured)."
+            ),
+        },
+        502: {
+            "description": (
+                "Payment provider error. "
+                "detail.code='payment_cancel_failed' means the prior pending payment could not be cancelled. "
+                "Retry the request."
+            ),
+        },
+    },
 )
 async def purchase_open_ticketing(
     slug: str,
@@ -298,3 +316,62 @@ async def restore_open_cart(
     if cart is None:
         raise HTTPException(status_code=404, detail="Cart not found")
     return _to_open_cart_public(cart, restore_token=sig)
+
+
+@router.post(
+    "/{slug}/pending/release",
+    response_model=PendingReleaseResponse,
+    dependencies=[
+        Depends(
+            RateLimit(limit=30, window_sec=60, key_prefix="rl:checkout-pending-release")
+        ),
+    ],
+    responses={
+        409: {
+            "description": (
+                "Payment conflict. detail.code='previous_payment_completed' means the prior "
+                "PENDING payment was concurrently approved — includes a signed redirect_url "
+                "when the popup has a signing secret and an external success URL configured."
+            ),
+        },
+        502: {
+            "description": (
+                "Payment provider error. detail.code='payment_cancel_failed' means the prior "
+                "pending payment could not be cancelled. Checkout should proceed — "
+                "creation-time supersede remains as a backstop."
+            ),
+        },
+    },
+)
+async def release_pending_open(
+    slug: str,
+    request_in: PendingReleaseOpenRequest,
+    db: SessionDep,
+    tenant: PublicTenant,
+) -> PendingReleaseResponse:
+    """Opportunistically release a buyer's own prior PENDING payment on checkout return.
+
+    Called by the portal on checkout mount before coupon validation or stock display.
+    This frees any coupon/stock/credit holds so the buyer can re-apply their own
+    single-use coupon without a false-invalid error (the circularity fix).
+
+    Proof: cart continuity HMAC (cid + sig), validated server-side.
+
+    Response contract (ADR-R3 enumeration-safe):
+    - HTTP 200 {released: false}: invalid/missing proof, no PENDING, or flag disabled.
+      Body is byte-identical across ALL false outcomes to prevent email enumeration.
+    - HTTP 200 {released: true}: PENDING payment cancelled, holds freed.
+    - HTTP 409 previous_payment_completed: race lost — prior payment already approved.
+    - HTTP 502 payment_cancel_failed: SimpleFi unreachable; creation-time backstop remains.
+
+    Rate-limited 30/min/IP (matching the neighboring cart endpoint).
+    """
+    popup = get_open_ticketing_popup(db, slug, tenant.id)
+    result = payments_crud.release_pending_open(
+        db,
+        popup=popup,
+        email=str(request_in.email),
+        cid=request_in.cid,
+        sig=request_in.sig,
+    )
+    return PendingReleaseResponse(released=result.released)

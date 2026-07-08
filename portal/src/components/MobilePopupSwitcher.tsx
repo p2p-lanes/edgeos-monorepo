@@ -10,6 +10,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover"
+import { imageOptimization } from "@/lib/image-optimization"
 import { cn } from "@/lib/utils"
 import { useCityProvider } from "@/providers/cityProvider"
 
@@ -48,6 +49,7 @@ export function MobilePopupSwitcher() {
               width={20}
               height={20}
               className="rounded"
+              {...imageOptimization(city.icon_url)}
             />
           ) : null}
           <span className="max-w-[6rem] truncate">{city.name}</span>

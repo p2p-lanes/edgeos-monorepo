@@ -166,6 +166,9 @@
   "checkout": {
     "title": "结账",
     "express_title": "快速结账",
+    "sold_out": "已售罄",
+    "sale_upcoming": "即将开售",
+    "sale_ended": "已结束",
     "buyer_step_title": "您的信息",
     "buyer_step_description": "请在付款前填写您的信息。",
     "buyer_hero_title": "就差一步！",
@@ -241,7 +244,8 @@
       "play_aria": "播放背景视频",
       "pause_aria": "暂停背景视频",
       "mute_aria": "静音背景视频",
-      "unmute_aria": "取消静音背景视频"
+      "unmute_aria": "取消静音背景视频",
+      "play_youtube_aria": "播放视频"
     },
     "housing": {
       "carousel": {
@@ -259,7 +263,19 @@
       "promo_discount_eligible_label": "促销折扣（符合条件的商品）"
     },
     "coupon_no_longer_valid": "This coupon is no longer available. Your total has been updated. Please review and try again.",
-    "payment_error": "Something went wrong with your payment. Please try again."
+    "payment_error": "Something went wrong with your payment. Please try again.",
+    "no_products": "此步骤暂无可用产品。",
+    "no_images": "此步骤暂无可用图片。",
+    "no_video": "此步骤暂无可用视频。",
+    "no_passes": "暂无可用通行证。",
+    "no_passes_for_category": "此参与者类别暂无可用通行证。",
+    "no_meal_plans": "暂无可用餐饮计划。",
+    "no_contributions": "暂无可用捐助选项。",
+    "step_config_error": "步骤配置错误。",
+    "step_config_error_detail": "此步骤未分配模板。请联系管理员。",
+    "previous_payment_completed": "您之前的付款已完成。",
+    "pending_payment_wait": "您有一笔待处理的付款，请等待几分钟。",
+    "payment_cancel_failed": "我们无法处理您的付款，请重试。"
   },
   "openCheckout": {
     "loading": "正在加载结账...",
@@ -284,7 +300,10 @@
     "thank_you_description": "感谢您的购买。我们已通过电子邮件发送您的确认信息和门票详情。",
     "thank_you_cta": "前往门户",
     "thank_you_order_summary": "订单摘要",
-    "thank_you_total": "总计"
+    "thank_you_total": "总计",
+    "previous_payment_completed": "您之前的付款已完成。",
+    "payment_cancel_failed": "我们无法处理您的付款，请重试。",
+    "pending_payment_wait": "您有一笔待处理的付款，请等待几分钟。"
   },
   "passes": {
     "your_passes": "我的通行证",

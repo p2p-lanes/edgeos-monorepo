@@ -13,6 +13,8 @@ import {
 import FaviconOverride from "@/components/checkout-flow/FaviconOverride"
 import ScrollyCheckoutFlow from "@/components/checkout-flow/ScrollyCheckoutFlow"
 import { LanguageSwitcher } from "@/components/common/LanguageSwitcher"
+import { captureAttribution } from "@/lib/attribution"
+import { trackGAViewItem } from "@/lib/google-analytics"
 import { trackMetaViewContent } from "@/lib/meta-pixel"
 import { queryKeys } from "@/lib/query-keys"
 import { ApplicationContext } from "@/providers/applicationProvider"
@@ -140,6 +142,12 @@ export function OpenCheckoutRuntime({
   const searchParams = useSearchParams()
   const cartCid = searchParams.get("cid")
   const cartSig = searchParams.get("sig")
+
+  // Persist marketing attribution from the entry URL before it is lost across
+  // checkout steps; read back at purchase time and forwarded to the webhook.
+  useEffect(() => {
+    captureAttribution(searchParams)
+  }, [searchParams])
   const [discountApplied, setDiscountApplied] = useState<DiscountProps>({
     discount_value: 0,
     discount_type: "percentage",
@@ -184,6 +192,7 @@ export function OpenCheckoutRuntime({
     if (trackedViewContentRef.current === popup.id) return
 
     trackMetaViewContent({ popup, products: runtime.products })
+    trackGAViewItem({ popup, products: runtime.products })
     trackedViewContentRef.current = popup.id
   }, [popup, runtime.products])
 

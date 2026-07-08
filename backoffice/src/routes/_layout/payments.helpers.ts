@@ -1,4 +1,8 @@
-import type { PaymentProductResponse, PaymentStatus } from "@/client"
+import type {
+  PaymentProductResponse,
+  PaymentPublic,
+  PaymentStatus,
+} from "@/client"
 
 interface PaymentsQueryInput {
   popupId: string | null
@@ -89,4 +93,31 @@ export function buildPaymentsTableState<TPayment>({
       pagination,
     },
   }
+}
+
+// SimpleFi can adjust the final charged total. We can derive the percentage
+// from the quoted amount and the charged amount only once the charged amount is
+// final; in-flight installment plans expose a running collected total instead.
+export function getRailAdjustment(payment: PaymentPublic): {
+  pct: string
+  isDiscount: boolean
+  delta: number
+  final: boolean
+} | null {
+  const amount = Number(payment.amount)
+  if (payment.amount_charged == null || amount <= 0) return null
+  const total = payment.installments_total
+  const isPlan =
+    payment.is_installment_plan === true && total != null && total >= 2
+  const final = !isPlan || (payment.installments_paid ?? 0) >= (total ?? 0)
+  const delta = Number(payment.amount_charged) - amount
+  const rawPct = (delta / amount) * 100
+  const rounded = Math.round(rawPct)
+  // Installment cycles round per charge, so a completed plan lands within a
+  // few cents of the exact rail percentage — snap to the integer when close.
+  const pct =
+    Math.abs(rawPct - rounded) < 0.1
+      ? String(Math.abs(rounded))
+      : Math.abs(rawPct).toFixed(1)
+  return { pct, isDiscount: delta < 0, delta, final }
 }

@@ -10,6 +10,7 @@ from app.api.product.schemas import (
     ProductBatchResult,
     ProductCreate,
     ProductPublic,
+    ProductSoldOutUpdate,
     ProductUpdate,
 )
 from app.api.shared.enums import UserRole
@@ -31,6 +32,7 @@ from app.core.dependencies.users import (
     SessionDep,
     TenantSession,
 )
+from app.services.image_ingestion import ImageIngestionService
 from app.utils.utils import slugify
 
 router = APIRouter(prefix="/products", tags=["products"])
@@ -129,6 +131,7 @@ async def create_products_batch(
         )
     tenant_id = popup.tenant_id
 
+    _svc = ImageIngestionService()
     results: list[ProductBatchResult] = []
     for idx, item in enumerate(batch.products):
         try:
@@ -142,6 +145,16 @@ async def create_products_batch(
                 product_data["tenant_id"] = tenant_id
                 product_data["popup_id"] = batch.popup_id
                 product_data["slug"] = slug
+
+                # CDN image ingestion: rewrite external URLs to CDN before commit.
+                # Fail-open: any per-URL failure keeps the original URL.
+                product_data["image_url"] = await _svc.ingest_url(
+                    product_data.get("image_url"), tenant_id
+                )
+                product_data["images"] = await _svc.ingest_urls(
+                    product_data.get("images") or [], tenant_id
+                )
+
                 product = Products(**product_data)
 
                 db.add(product)
@@ -232,6 +245,17 @@ async def create_product(
     product_data = product_in.model_dump()
     product_data["tenant_id"] = tenant_id
     product_data["slug"] = slug
+
+    # CDN image ingestion: rewrite external image URLs to CDN before commit.
+    # Pattern B (async hook). Fail-open: any per-URL failure keeps the original URL.
+    _svc = ImageIngestionService()
+    product_data["image_url"] = await _svc.ingest_url(
+        product_data.get("image_url"), tenant_id
+    )
+    product_data["images"] = await _svc.ingest_urls(
+        product_data.get("images") or [], tenant_id
+    )
+
     product = Products(**product_data)
 
     db.add(product)
@@ -269,7 +293,43 @@ async def update_product(
             db, product_in.slug, product.popup_id
         )
 
+    # CDN image ingestion: rewrite external image URLs to CDN before commit.
+    # Pattern B (async hook). Fail-open: any per-URL failure keeps the original URL.
+    _svc = ImageIngestionService()
+    if product_in.image_url is not None:
+        product_in.image_url = await _svc.ingest_url(
+            product_in.image_url, product.tenant_id
+        )
+    if product_in.images is not None:
+        product_in.images = await _svc.ingest_urls(product_in.images, product.tenant_id)
+
     updated = crud.products_crud.update(db, product, product_in)
+    return ProductPublic.model_validate(updated)
+
+
+@router.post("/{product_id}/sold-out", response_model=ProductPublic)
+async def set_product_sold_out(
+    product_id: uuid.UUID,
+    payload: ProductSoldOutUpdate,
+    db: AdminOrApiKeySession_ProductsWrite,
+    _current_user: AdminOrApiKey_ProductsWrite,
+) -> ProductPublic:
+    """Mark a product as sold out, or put it back on sale.
+
+    Sets the manual `sold_out_override` flag only. The stock counter is
+    never modified, so inventory accounting stays truthful. While the flag
+    is on, the product reports state `sold_out` and checkout rejects new
+    purchases regardless of remaining stock.
+    """
+    product = crud.products_crud.get(db, product_id)
+
+    if not product:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Product not found",
+        )
+
+    updated = crud.products_crud.set_sold_out(db, product, payload.sold_out)
     return ProductPublic.model_validate(updated)
 
 

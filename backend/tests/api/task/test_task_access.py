@@ -189,9 +189,7 @@ def test_report_bug_is_scoped_to_reporter_tenant(
     assert body["app"] is None
 
 
-def test_report_bug_accepts_classification_fields(
-    client, admin_token_tenant_a
-) -> None:
+def test_report_bug_accepts_classification_fields(client, admin_token_tenant_a) -> None:
     """A reporter can classify the report: type / priority / app."""
     r = client.post(
         "/api/v1/tasks/report-bug",

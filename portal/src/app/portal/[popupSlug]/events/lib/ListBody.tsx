@@ -427,6 +427,7 @@ export function ListBody({
                                 src={thumbUrl}
                                 alt={event.title}
                                 className="w-full h-full object-cover"
+                                sizes="64px"
                                 fallback={
                                   <CalendarDays className="h-5 w-5 text-muted-foreground/40" />
                                 }

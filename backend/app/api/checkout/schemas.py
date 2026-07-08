@@ -72,6 +72,7 @@ class CheckoutRuntimeProduct(BaseModel):
     sale_ends_at: datetime | None = None
     total_stock_cap: int | None = None
     total_stock_remaining: int | None = None
+    sold_out_override: bool = False
     max_per_order: int | None = None
     is_active: bool = True
     exclusive: bool = False
@@ -130,6 +131,24 @@ class BuyerInfo(BaseModel):
     form_data: dict[str, Any] = {}
 
 
+class Attribution(BaseModel):
+    """Marketing attribution captured from the checkout entry URL.
+
+    Generic (not partner-specific): any tenant running paid ads can use these.
+    Persisted on the payment so an outbound purchase webhook can return them,
+    which is how a partner ties the purchase back to its web session
+    (``anonymous_id``). All fields optional; absent ones are dropped.
+    """
+
+    utm_source: str | None = Field(default=None, max_length=256)
+    utm_medium: str | None = Field(default=None, max_length=256)
+    utm_campaign: str | None = Field(default=None, max_length=256)
+    utm_content: str | None = Field(default=None, max_length=256)
+    fbclid: str | None = Field(default=None, max_length=512)
+    landing_segment: str | None = Field(default=None, max_length=256)
+    anonymous_id: str | None = Field(default=None, max_length=128)
+
+
 class OpenTicketingPurchaseCreate(BaseModel):
     """Request schema for POST /checkout/{slug}/purchase."""
 
@@ -142,6 +161,17 @@ class OpenTicketingPurchaseCreate(BaseModel):
     insurance: bool = False
     fbc: str | None = Field(default=None, max_length=512)
     fbp: str | None = Field(default=None, max_length=512)
+    # Active checkout language (from the entry URL ?lang=), used to build the
+    # locale-aware success redirect. Falls back to the popup default when absent.
+    locale: str | None = Field(default=None, max_length=8)
+    attribution: Attribution | None = None
+    # Cart continuity proof: signed cart identifier from the abandoned-cart
+    # restore link (GET /checkout/{slug}/cart?cid=&sig=).  When both are
+    # present and valid for this buyer+popup, the system is allowed to supersede
+    # a prior PENDING payment.  Missing or invalid → supersede is blocked;
+    # a 409 pending_payment_exists is returned if a PENDING payment exists.
+    cid: uuid.UUID | None = None
+    sig: str | None = None
 
 
 class OpenTicketingPurchaseResponse(BaseModel):
@@ -158,3 +188,20 @@ class OpenTicketingPurchaseResponse(BaseModel):
     redirect_url: str | None = None
     amount: Decimal
     currency: str
+
+
+# ---------------------------------------------------------------------------
+# Release-on-return schemas (POST /checkout/{slug}/pending/release)
+# ---------------------------------------------------------------------------
+
+
+class PendingReleaseOpenRequest(BaseModel):
+    """Request body for POST /checkout/{slug}/pending/release (anonymous surface).
+
+    cid + sig constitute the cart continuity proof (HMAC). email is the buyer's
+    address used as the payment lookup key (must match the cart's stored email).
+    """
+
+    email: EmailStr
+    cid: uuid.UUID
+    sig: str

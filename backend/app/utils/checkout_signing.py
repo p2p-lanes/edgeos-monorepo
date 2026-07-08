@@ -7,18 +7,22 @@ track the purchase without trusting the raw query string (anti-spoof).
 
 Verification contract — the external page MUST mirror this to validate:
 
-    data = base64url_nopad(utf8(json(payload, sorted keys, compact)))
-    sig  = base64url_nopad(HMAC_SHA256(secret, data))
-    url  = success_url + "?data=<data>&sig=<sig>"
+    d   = base64url_nopad(utf8(json(payload, sorted keys, compact)))
+    sig = hex(HMAC_SHA256(secret, d))
+    url = success_url + "?d=<d>&sig=<sig>"
 
-To verify: recompute ``sig`` over the received ``data`` string with the shared
-secret, compare in constant time, then base64url-decode ``data`` to recover the
-JSON payload. The signature covers the exact transmitted ``data`` bytes, so the
+To verify: recompute ``sig`` over the received ``d`` string with the shared
+secret, compare in constant time, then base64url-decode ``d`` to recover the
+JSON payload. The signature covers the exact transmitted ``d`` bytes, so the
 verifier never has to reproduce the JSON canonicalization.
 
-The payload snapshot is taken at payment creation, so it reflects the quoted
-order (total, items) — not provider-side choices made afterwards such as the
+The payload carries an ``exp`` (epoch seconds) so the page can reject stale
+links (anti-replay); it also snapshots the quoted order (total, items) at
+payment creation — not provider-side choices made afterwards such as the
 installment count or payment method.
+
+The portal's own thank-you page uses a separate, unsigned contract (the ``data``
+query param) — see :func:`build_unsigned_redirect_url`.
 """
 
 import base64
@@ -39,6 +43,19 @@ def hash_email(email: str) -> str:
     return hashlib.sha256(email.strip().lower().encode("utf-8")).hexdigest()
 
 
+def mask_email(email: str) -> str:
+    """Masked email for display, e.g. ``ab****@gmail.com``.
+
+    Shows the first two characters of the local part and its domain; everything
+    in between is hidden. Best-effort for malformed input (no ``@`` → returned
+    trimmed as-is).
+    """
+    local, at, domain = email.strip().partition("@")
+    if not at:
+        return local
+    return f"{local[:2]}****@{domain}"
+
+
 def _b64url_nopad(raw: bytes) -> str:
     return base64.urlsafe_b64encode(raw).rstrip(b"=").decode("ascii")
 
@@ -52,11 +69,25 @@ def encode_payload(payload: Mapping[str, Any]) -> str:
 
 
 def sign_data(data: str, secret: str) -> str:
-    """HMAC-SHA256 of the encoded data string, base64url-nopad encoded."""
+    """HMAC-SHA256 of the encoded data string, base64url-nopad encoded.
+
+    Used for cart-restore tokens. The thank-you redirect uses
+    :func:`sign_data_hex` instead (its external contract expects hex).
+    """
     digest = hmac.new(
         secret.encode("utf-8"), data.encode("ascii"), hashlib.sha256
     ).digest()
     return _b64url_nopad(digest)
+
+
+def sign_data_hex(data: str, secret: str) -> str:
+    """HMAC-SHA256 of the encoded data string, hex encoded.
+
+    Matches the external thank-you page contract: sig = hex(HMAC_SHA256(secret, d)).
+    """
+    return hmac.new(
+        secret.encode("utf-8"), data.encode("ascii"), hashlib.sha256
+    ).hexdigest()
 
 
 def build_cart_restore_token(cart_id: str, secret: str) -> str:
@@ -82,22 +113,28 @@ def build_thank_you_payload(
     first_name: str,
     email: str,
     items: list[dict[str, Any]],
-    amount_total: str,
+    amount_total: float,
     currency: str,
     issued_at: str,
+    exp: int,
 ) -> dict[str, Any]:
     """Assemble the order snapshot sent to the thank-you page.
 
     Field names form the contract with the external page; keep them stable.
+    ``items`` are ``{title, qty, price}`` and ``amount_total`` is a number (no
+    thousands separators). ``exp`` is an epoch-seconds expiry (anti-replay)
+    covered by the signature.
     """
     return {
         "order_id": order_id,
         "first_name": first_name,
         "email_hash": hash_email(email),
+        "email_masked": mask_email(email),
         "items": items,
         "amount_total": amount_total,
         "currency": currency,
         "issued_at": issued_at,
+        "exp": exp,
     }
 
 
@@ -111,14 +148,14 @@ def _append_query(base_url: str, extra: list[tuple[str, str]]) -> str:
 def build_signed_redirect_url(
     base_url: str, payload: Mapping[str, Any], secret: str
 ) -> str:
-    """Append the signed ``data`` and ``sig`` query params to ``base_url``.
+    """Append the signed ``d`` and ``sig`` query params to ``base_url``.
 
     Existing query params on ``base_url`` are preserved. Use for external
     thank-you pages that must verify the payload.
     """
-    data = encode_payload(payload)
-    sig = sign_data(data, secret)
-    return _append_query(base_url, [("data", data), ("sig", sig)])
+    d = encode_payload(payload)
+    sig = sign_data_hex(d, secret)
+    return _append_query(base_url, [("d", d), ("sig", sig)])
 
 
 def build_unsigned_redirect_url(base_url: str, payload: Mapping[str, Any]) -> str:

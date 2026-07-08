@@ -16,7 +16,7 @@ import ExpandableDescription from "@/components/ui/ExpandableDescription"
 import QuantitySelector, {
   supportsQuantitySelector,
 } from "@/components/ui/QuantitySelector"
-import SoldOutBadge from "@/components/ui/SoldOutBadge"
+import { imageOptimization } from "@/lib/image-optimization"
 import { getProductAvailability } from "@/lib/product-availability"
 import { cn } from "@/lib/utils"
 import { useCheckout } from "@/providers/checkoutProvider"
@@ -28,6 +28,7 @@ import {
 } from "@/types/checkout"
 import type { ProductsPass } from "@/types/Products"
 import type { VariantProps } from "../registries/variantRegistry"
+import { SaleStateBadge } from "./saleStateBadge"
 import { LightboxOverlay } from "./VariantImageGallery"
 
 /* ── Section types & helpers ─────────────────────────────── */
@@ -190,7 +191,9 @@ function SectionHeader({ section }: { section: TemplateSection }) {
               src={section.image_url!}
               alt={section.label || ""}
               fill
+              sizes="32px"
               className="object-cover"
+              {...imageOptimization(section.image_url!)}
             />
           </div>
         ) : (
@@ -268,7 +271,7 @@ function CompactCard({
     >
       {!canSelect ? (
         soldOut ? (
-          <SoldOutBadge />
+          <SaleStateBadge state="sold_out" />
         ) : null
       ) : supportsQty ? (
         <QuantitySelector
@@ -299,7 +302,9 @@ function CompactCard({
             src={product.image_url}
             alt={product.name}
             fill
+            sizes="56px"
             className="object-cover"
+            {...imageOptimization(product.image_url)}
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center">
@@ -427,7 +432,14 @@ function ProductImageCarousel({
   return (
     <>
       <div {...imageClickProps}>
-        <Image src={images[safeIdx]} alt={alt} fill className="object-cover" />
+        <Image
+          src={images[safeIdx]}
+          alt={alt}
+          fill
+          sizes="(max-width: 768px) 100vw, 672px"
+          className="object-cover"
+          {...imageOptimization(images[safeIdx])}
+        />
         {hasMany && showChevrons && (
           <>
             <button
@@ -540,7 +552,7 @@ function GridCard({
       {!canSelect ? (
         soldOut && (
           <div className="absolute top-2 right-2">
-            <SoldOutBadge />
+            <SaleStateBadge state="sold_out" />
           </div>
         )
       ) : supportsQty ? (
@@ -649,7 +661,9 @@ function DefaultSectionCard({
               src={heroImage}
               alt={section.label}
               fill
+              sizes="(max-width: 768px) 100vw, 672px"
               className="object-cover"
+              {...imageOptimization(heroImage)}
             />
           ) : (
             <div className="absolute inset-0 flex items-center justify-center">
@@ -718,7 +732,7 @@ function DefaultSectionCard({
               <div className="flex items-center gap-3 min-w-0">
                 {!canSelect ? (
                   soldOut ? (
-                    <SoldOutBadge />
+                    <SaleStateBadge state="sold_out" />
                   ) : null
                 ) : supportsQty ? (
                   <QuantitySelector
@@ -846,7 +860,9 @@ function ShowcaseSectionCard({
             src={heroImage}
             alt={section.label || ""}
             fill
+            sizes="(max-width: 768px) 100vw, 672px"
             className="object-cover"
+            {...imageOptimization(heroImage)}
           />
           <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-transparent to-black/50" />
           {section.label && (
@@ -972,7 +988,7 @@ function ShowcaseSectionCard({
 
                 {!canSelect ? (
                   soldOut ? (
-                    <SoldOutBadge />
+                    <SaleStateBadge state="sold_out" />
                   ) : null
                 ) : supportsQty ? (
                   <QuantitySelector

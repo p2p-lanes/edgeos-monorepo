@@ -1,6 +1,7 @@
 "use client"
 
 import { AlertTriangle, Images } from "lucide-react"
+import Image from "next/image"
 import { useMemo, useState } from "react"
 import { useTranslation } from "react-i18next"
 
@@ -15,6 +16,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { VenueHoursSummary } from "@/components/VenueHoursSummary"
+import { imageOptimization } from "@/lib/image-optimization"
 import { VenueSelect } from "../../../components/VenueSelect"
 
 interface VenueSectionProps {
@@ -185,13 +187,15 @@ export function VenueSection({
               {pictures.map((photo) => (
                 <div
                   key={photo.id}
-                  className="overflow-hidden rounded-lg border"
+                  className="relative aspect-[4/3] overflow-hidden rounded-lg border"
                 >
-                  {/* biome-ignore lint/performance/noImgElement: user-uploaded S3 image */}
-                  <img
+                  <Image
                     src={photo.url}
                     alt=""
-                    className="aspect-[4/3] w-full object-cover"
+                    fill
+                    sizes="(max-width: 640px) 100vw, 250px"
+                    className="object-cover"
+                    {...imageOptimization(photo.url)}
                   />
                 </div>
               ))}

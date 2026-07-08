@@ -730,6 +730,24 @@ export type AttendeeWithTickets = {
 };
 
 /**
+ * Marketing attribution captured from the checkout entry URL.
+ *
+ * Generic (not partner-specific): any tenant running paid ads can use these.
+ * Persisted on the payment so an outbound purchase webhook can return them,
+ * which is how a partner ties the purchase back to its web session
+ * (``anonymous_id``). All fields optional; absent ones are dropped.
+ */
+export type Attribution = {
+    utm_source?: (string | null);
+    utm_medium?: (string | null);
+    utm_campaign?: (string | null);
+    utm_content?: (string | null);
+    fbclid?: (string | null);
+    landing_segment?: (string | null);
+    anonymous_id?: (string | null);
+};
+
+/**
  * A single audit log entry returned to the backoffice.
  */
 export type AuditLogPublic = {
@@ -1059,6 +1077,7 @@ export type CheckoutRuntimeProduct = {
     sale_ends_at?: (string | null);
     total_stock_cap?: (number | null);
     total_stock_remaining?: (number | null);
+    sold_out_override?: boolean;
     max_per_order?: (number | null);
     is_active?: boolean;
     exclusive?: boolean;
@@ -2557,6 +2576,10 @@ export type OpenTicketingPurchaseCreate = {
     insurance?: boolean;
     fbc?: (string | null);
     fbp?: (string | null);
+    locale?: (string | null);
+    attribution?: (Attribution | null);
+    cid?: (string | null);
+    sig?: (string | null);
 };
 
 /**
@@ -2751,6 +2774,39 @@ export type PaymentUpdate = {
     rate?: (number | string | null);
     currency?: (string | null);
     settlement_currency?: (string | null);
+};
+
+/**
+ * Request body for POST /payments/my/pending/release (authenticated surface).
+ *
+ * application_id identifies which PENDING payment to release.
+ * Ownership is verified server-side against current_human.id.
+ */
+export type PendingReleaseAuthRequest = {
+    application_id: string;
+};
+
+/**
+ * Request body for POST /checkout/{slug}/pending/release (anonymous surface).
+ *
+ * cid + sig constitute the cart continuity proof (HMAC). email is the buyer's
+ * address used as the payment lookup key (must match the cart's stored email).
+ */
+export type PendingReleaseOpenRequest = {
+    email: string;
+    cid: string;
+    sig: string;
+};
+
+/**
+ * Response body for both release-on-return endpoints.
+ *
+ * released=True only when a cancel+hold-release actually committed.
+ * released=False covers: invalid proof, no PENDING exists, flag disabled.
+ * Enumeration-safe: the body shape is identical across all False outcomes.
+ */
+export type PendingReleaseResponse = {
+    released: boolean;
 };
 
 /**
@@ -3140,6 +3196,7 @@ export type ProductBatchResult = {
     insurance_eligible?: boolean;
     requires_check_in?: boolean;
     discountable?: boolean;
+    sold_out_override?: boolean;
     id: string;
     success: boolean;
     err_msg?: (string | null);
@@ -3221,7 +3278,15 @@ export type ProductPublic = {
     insurance_eligible?: boolean;
     requires_check_in?: boolean;
     discountable?: boolean;
+    sold_out_override?: boolean;
     id: string;
+};
+
+/**
+ * Schema for manually marking a product as sold out (or back on sale).
+ */
+export type ProductSoldOutUpdate = {
+    sold_out: boolean;
 };
 
 /**
@@ -3275,6 +3340,7 @@ export type ProductWithQuantity = {
     insurance_eligible?: boolean;
     requires_check_in?: boolean;
     discountable?: boolean;
+    sold_out_override?: boolean;
     id: string;
     quantity?: number;
 };
@@ -3600,6 +3666,8 @@ export type TenantAnonymousPublic = {
     landing_mode?: LandingMode;
     meta_tracking_enabled?: boolean;
     meta_pixel_id?: (string | null);
+    ga_tracking_enabled?: boolean;
+    ga_measurement_id?: (string | null);
     id: string;
     active_popup_slug?: (string | null);
 };
@@ -3614,6 +3682,8 @@ export type TenantCreate = {
     logo_url?: (string | null);
     meta_tracking_enabled?: boolean;
     meta_pixel_id?: (string | null);
+    ga_tracking_enabled?: boolean;
+    ga_measurement_id?: (string | null);
     smtp_host?: (string | null);
     smtp_port?: (number | null);
     smtp_user?: (string | null);
@@ -3643,6 +3713,8 @@ export type TenantPublic = {
     landing_mode?: LandingMode;
     meta_tracking_enabled?: boolean;
     meta_pixel_id?: (string | null);
+    ga_tracking_enabled?: boolean;
+    ga_measurement_id?: (string | null);
     id: string;
     meta_capi_configured?: boolean;
     smtp_host?: (string | null);
@@ -3676,6 +3748,8 @@ export type TenantUpdate = {
     meta_tracking_enabled?: (boolean | null);
     meta_pixel_id?: (string | null);
     meta_capi_access_token?: (string | null);
+    ga_tracking_enabled?: (boolean | null);
+    ga_measurement_id?: (string | null);
     smtp_host?: (string | null);
     smtp_port?: (number | null);
     smtp_user?: (string | null);
@@ -4811,6 +4885,14 @@ export type CheckoutRestoreOpenCartData = {
 };
 
 export type CheckoutRestoreOpenCartResponse = (OpenCartPublic);
+
+export type CheckoutReleasePendingOpenData = {
+    requestBody: PendingReleaseOpenRequest;
+    slug: string;
+    xTenantId?: (string | null);
+};
+
+export type CheckoutReleasePendingOpenResponse = (PendingReleaseResponse);
 
 export type CouponsValidateCouponPublicData = {
     requestBody: CouponValidatePublicRequest;
@@ -6027,6 +6109,12 @@ export type PaymentsCreateMyApplicationFeeData = {
 
 export type PaymentsCreateMyApplicationFeeResponse = (PaymentPublic);
 
+export type PaymentsReleaseMyPendingPaymentData = {
+    requestBody: PendingReleaseAuthRequest;
+};
+
+export type PaymentsReleaseMyPendingPaymentResponse = (PendingReleaseResponse);
+
 export type PaymentsListMyPaymentsByPopupData = {
     /**
      * Max payments to return (max 100)
@@ -6259,6 +6347,14 @@ export type ProductsDeleteProductData = {
 };
 
 export type ProductsDeleteProductResponse = (void);
+
+export type ProductsSetProductSoldOutData = {
+    productId: string;
+    requestBody: ProductSoldOutUpdate;
+    xTenantId?: (string | null);
+};
+
+export type ProductsSetProductSoldOutResponse = (ProductPublic);
 
 export type ProductsListPortalProductsData = {
     acceptLanguage?: (string | null);

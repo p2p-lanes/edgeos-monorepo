@@ -31,9 +31,12 @@ function isVideoUrl(url: string): boolean {
 
 export type CheckoutBackground =
   | { type: "none"; className: string }
-  | { type: "image"; className: string; style: React.CSSProperties }
+  | { type: "image"; className: string; url: string }
   | { type: "video"; className: string; url: string }
 
+// Image backgrounds render through <CheckoutBackgroundImage> (a fixed
+// full-viewport next/image layer), replicating the previous CSS
+// `background-attachment: fixed` behavior with optimized loading.
 export function getCheckoutBackground(
   popup: PopupPublic | null | undefined,
   context: CheckoutBackgroundContext,
@@ -48,30 +51,5 @@ export function getCheckoutBackground(
     return { type: "video", className: "", url }
   }
 
-  return {
-    type: "image",
-    className: "",
-    style: {
-      backgroundImage: `url(${url})`,
-      backgroundSize: "cover",
-      backgroundPosition: "center",
-      backgroundRepeat: "no-repeat",
-      backgroundAttachment: "fixed",
-    },
-  }
-}
-
-// Back-compat wrapper. Returns the spread-onto-main shape image consumers
-// have always used. Video URLs now collapse to the empty/no-bg case so
-// callers that haven't migrated to <CheckoutBackgroundLayer> don't break.
-export function getBackgroundProps(
-  popup: PopupPublic | null | undefined,
-  context: CheckoutBackgroundContext,
-): {
-  className: string
-  style: React.CSSProperties | undefined
-} {
-  const bg = getCheckoutBackground(popup, context)
-  if (bg.type === "image") return { className: bg.className, style: bg.style }
-  return { className: bg.className || "bg-background", style: undefined }
+  return { type: "image", className: "", url }
 }

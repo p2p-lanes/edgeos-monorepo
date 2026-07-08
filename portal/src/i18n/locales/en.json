@@ -180,6 +180,9 @@
   "checkout": {
     "title": "Checkout",
     "express_title": "Express Checkout",
+    "sold_out": "Sold out",
+    "sale_upcoming": "Upcoming",
+    "sale_ended": "Ended",
     "buyer_step_title": "Your information",
     "buyer_step_description": "Complete your information before payment.",
     "buyer_hero_title": "You're one step away!",
@@ -255,7 +258,8 @@
       "play_aria": "Play background video",
       "pause_aria": "Pause background video",
       "mute_aria": "Mute background video",
-      "unmute_aria": "Unmute background video"
+      "unmute_aria": "Unmute background video",
+      "play_youtube_aria": "Play video"
     },
     "housing": {
       "carousel": {
@@ -273,7 +277,19 @@
       "promo_discount_eligible_label": "Promo Discount (eligible items)"
     },
     "coupon_no_longer_valid": "This coupon is no longer available. Your total has been updated. Please review and try again.",
-    "payment_error": "Something went wrong with your payment. Please try again."
+    "payment_error": "Something went wrong with your payment. Please try again.",
+    "no_products": "No products available for this step.",
+    "no_images": "No images available for this step.",
+    "no_video": "No video available for this step.",
+    "no_passes": "No passes available.",
+    "no_passes_for_category": "No passes available for this attendee category.",
+    "no_meal_plans": "No meal plans available.",
+    "no_contributions": "No contribution options available.",
+    "step_config_error": "Step configuration error.",
+    "step_config_error_detail": "No template assigned to this step. Please contact your administrator.",
+    "previous_payment_completed": "Your previous payment was completed.",
+    "pending_payment_wait": "You have a pending payment. Please wait a few minutes.",
+    "payment_cancel_failed": "We could not process your payment. Please try again."
   },
   "openCheckout": {
     "loading": "Loading checkout...",
@@ -298,7 +314,10 @@
     "thank_you_description": "Thank you for your purchase. We sent your confirmation and ticket details by email.",
     "thank_you_cta": "Go to portal",
     "thank_you_order_summary": "Order summary",
-    "thank_you_total": "Total"
+    "thank_you_total": "Total",
+    "previous_payment_completed": "Your previous payment was completed.",
+    "payment_cancel_failed": "We could not process your payment. Please try again.",
+    "pending_payment_wait": "You have a pending payment. Please wait a few minutes."
   },
   "passes": {
     "your_passes": "Your Passes",

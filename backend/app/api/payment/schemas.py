@@ -394,7 +394,7 @@ class SimpleFIWebhookPayload(BaseModel):
 class SimpleFIInstallmentPlan(BaseModel):
     """Installment plan details from SimpleFI."""
 
-    id: str
+    id: str | None = None
     status: str
     paid_installments_count: int
     number_of_installments: int
@@ -426,3 +426,29 @@ class SimpleFIInstallmentPlanPayload(BaseModel):
     entity_id: str
     merchant_id: str | None = None
     data: SimpleFIInstallmentPlanData
+
+
+# ---------------------------------------------------------------------------
+# Release-on-return schemas (POST /payments/my/pending/release)
+# ---------------------------------------------------------------------------
+
+
+class PendingReleaseAuthRequest(BaseModel):
+    """Request body for POST /payments/my/pending/release (authenticated surface).
+
+    application_id identifies which PENDING payment to release.
+    Ownership is verified server-side against current_human.id.
+    """
+
+    application_id: uuid.UUID
+
+
+class PendingReleaseResponse(BaseModel):
+    """Response body for both release-on-return endpoints.
+
+    released=True only when a cancel+hold-release actually committed.
+    released=False covers: invalid proof, no PENDING exists, flag disabled.
+    Enumeration-safe: the body shape is identical across all False outcomes.
+    """
+
+    released: bool

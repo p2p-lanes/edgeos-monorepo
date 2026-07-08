@@ -75,9 +75,7 @@ class TestFindByPopupCategoryFilter:
         assert total == 1
         assert [r.id for r in results] == [a.id]
 
-    def test_no_category_returns_all(
-        self, db: Session, tenant_a: Tenants
-    ) -> None:
+    def test_no_category_returns_all(self, db: Session, tenant_a: Tenants) -> None:
         popup = _make_popup(db, tenant_a)
         cat = _make_category(db, tenant_a, popup, key=f"c-{uuid.uuid4().hex[:6]}")
         _make_attendee(db, tenant_a, popup, name="A", category_id=cat.id)

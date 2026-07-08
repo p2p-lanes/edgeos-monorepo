@@ -38,9 +38,7 @@ def _make_popup(db: Session, tenant: Tenants) -> Popups:
     return popup
 
 
-def _make_application(
-    db: Session, tenant: Tenants, popup: Popups
-) -> Applications:
+def _make_application(db: Session, tenant: Tenants, popup: Popups) -> Applications:
     human = Humans(
         tenant_id=tenant.id,
         email=f"guard-{uuid.uuid4().hex[:8]}@test.com",
@@ -94,14 +92,10 @@ def test_no_payments_returns_none(db: Session, tenant_a: Tenants) -> None:
     popup = _make_popup(db, tenant_a)
     application = _make_application(db, tenant_a, popup)
 
-    assert (
-        payments_crud._get_in_progress_installment_plan(db, application.id) is None
-    )
+    assert payments_crud._get_in_progress_installment_plan(db, application.id) is None
 
 
-def test_non_installment_payment_does_not_block(
-    db: Session, tenant_a: Tenants
-) -> None:
+def test_non_installment_payment_does_not_block(db: Session, tenant_a: Tenants) -> None:
     popup = _make_popup(db, tenant_a)
     application = _make_application(db, tenant_a, popup)
     _make_payment(
@@ -115,14 +109,10 @@ def test_non_installment_payment_does_not_block(
         installments_paid=None,
     )
 
-    assert (
-        payments_crud._get_in_progress_installment_plan(db, application.id) is None
-    )
+    assert payments_crud._get_in_progress_installment_plan(db, application.id) is None
 
 
-def test_pending_installment_plan_blocks(
-    db: Session, tenant_a: Tenants
-) -> None:
+def test_pending_installment_plan_blocks(db: Session, tenant_a: Tenants) -> None:
     """Plan created but buyer hasn't paid any installment yet → block."""
     popup = _make_popup(db, tenant_a)
     application = _make_application(db, tenant_a, popup)
@@ -162,9 +152,7 @@ def test_partial_paid_plan_blocks(db: Session, tenant_a: Tenants) -> None:
     assert found.id == plan.id
 
 
-def test_completed_plan_does_not_block(
-    db: Session, tenant_a: Tenants
-) -> None:
+def test_completed_plan_does_not_block(db: Session, tenant_a: Tenants) -> None:
     """Fully paid plan (paid == total) is finalized → do not block."""
     popup = _make_popup(db, tenant_a)
     application = _make_application(db, tenant_a, popup)
@@ -179,14 +167,10 @@ def test_completed_plan_does_not_block(
         installments_paid=6,
     )
 
-    assert (
-        payments_crud._get_in_progress_installment_plan(db, application.id) is None
-    )
+    assert payments_crud._get_in_progress_installment_plan(db, application.id) is None
 
 
-def test_cancelled_plan_does_not_block(
-    db: Session, tenant_a: Tenants
-) -> None:
+def test_cancelled_plan_does_not_block(db: Session, tenant_a: Tenants) -> None:
     popup = _make_popup(db, tenant_a)
     application = _make_application(db, tenant_a, popup)
     _make_payment(
@@ -200,9 +184,7 @@ def test_cancelled_plan_does_not_block(
         installments_paid=2,
     )
 
-    assert (
-        payments_crud._get_in_progress_installment_plan(db, application.id) is None
-    )
+    assert payments_crud._get_in_progress_installment_plan(db, application.id) is None
 
 
 def test_rejected_and_expired_plans_do_not_block(
@@ -231,9 +213,7 @@ def test_rejected_and_expired_plans_do_not_block(
         installments_paid=0,
     )
 
-    assert (
-        payments_crud._get_in_progress_installment_plan(db, application.id) is None
-    )
+    assert payments_crud._get_in_progress_installment_plan(db, application.id) is None
 
 
 def test_other_application_plan_does_not_block_unrelated(
@@ -257,6 +237,5 @@ def test_other_application_plan_does_not_block_unrelated(
     )
 
     assert (
-        payments_crud._get_in_progress_installment_plan(db, application_two.id)
-        is None
+        payments_crud._get_in_progress_installment_plan(db, application_two.id) is None
     )

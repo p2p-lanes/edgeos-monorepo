@@ -159,6 +159,8 @@ export function trackMetaPurchase(params: {
       order_id: params.paymentId,
       value: Number(params.amount),
     },
-    `EVT_PURCHASE_${params.paymentId}`,
+    // Raw order id so a partner firing its own Purchase (event_id=order_id) to
+    // the same pixel deduplicates against ours in Meta.
+    String(params.paymentId),
   )
 }

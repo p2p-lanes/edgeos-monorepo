@@ -1,11 +1,13 @@
 "use client"
 
 import { CheckCircle, Home } from "lucide-react"
+import Image from "next/image"
 import { useParams, useRouter, useSearchParams } from "next/navigation"
 import { type CSSProperties, Suspense, useMemo } from "react"
 import { useTranslation } from "react-i18next"
 import FaviconOverride from "@/components/checkout-flow/FaviconOverride"
 import { Button } from "@/components/ui/button"
+import { imageOptimization } from "@/lib/image-optimization"
 import { useTenant } from "@/providers/tenantProvider"
 import { useCheckoutRuntime } from "../hooks/useCheckoutRuntime"
 import { decodeOrderData, interpolate, type ThankYouTheme } from "./orderData"
@@ -46,13 +48,8 @@ function ThankYouContent() {
     : t("openCheckout.thank_you_description")
 
   const background = theme?.background
-  const outerStyle: CSSProperties = background?.image_url
-    ? {
-        backgroundImage: `url(${background.image_url})`,
-        backgroundSize: "cover",
-        backgroundPosition: "center",
-      }
-    : background?.color
+  const outerStyle: CSSProperties =
+    !background?.image_url && background?.color
       ? { backgroundColor: background.color }
       : {}
 
@@ -84,12 +81,23 @@ function ThankYouContent() {
 
   return (
     <div
-      className="flex min-h-screen items-center justify-center bg-background px-6 py-12"
+      className="relative flex min-h-screen items-center justify-center bg-background px-6 py-12"
       style={outerStyle}
     >
+      {background?.image_url && (
+        <Image
+          src={background.image_url}
+          alt=""
+          fill
+          priority
+          sizes="100vw"
+          className="object-cover"
+          {...imageOptimization(background.image_url)}
+        />
+      )}
       <FaviconOverride url={popup?.favicon_url ?? null} />
       <div
-        className="w-full max-w-xl rounded-2xl border bg-card p-8 text-center shadow-sm"
+        className="relative w-full max-w-xl rounded-2xl border bg-card p-8 text-center shadow-sm"
         style={cardStyle}
       >
         {iconShow && (

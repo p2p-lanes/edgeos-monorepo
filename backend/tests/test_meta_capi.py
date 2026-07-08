@@ -79,7 +79,8 @@ def test_prepare_purchase_event_includes_popup_purchase_metadata() -> None:
     event = prepare_purchase_event(tenant, payment, popup)
 
     assert event is not None
-    assert event.event_id == f"EVT_PURCHASE_{payment_id}"
+    # event_id is the raw order id (payment.id) for cross-partner Meta dedup.
+    assert event.event_id == str(payment_id)
     payload_event = event.payload["data"][0]
     assert payload_event["event_name"] == "Purchase"
     assert payload_event["action_source"] == "website"

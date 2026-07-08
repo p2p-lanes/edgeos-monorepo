@@ -25,6 +25,7 @@ from app.core.dependencies.users import (
 )
 from app.core.redis import domain_cache
 from app.core.tenant_db import get_tenant_credential, revoke_tenant_credentials
+from app.services.image_ingestion import ImageIngestionService
 from app.utils.encryption import encrypt
 
 router = APIRouter(prefix="/tenants", tags=["tenants"])
@@ -201,11 +202,19 @@ async def create_tenant(
         smtp_ssl=tenant_in.smtp_ssl,
     )
     tenant = crud.create(db, tenant_in)
+
+    # CDN image ingestion: must happen AFTER create because tenant.id is the storage
+    # key (it is auto-generated and only available after the first commit).
+    # Fail-open: any per-URL failure keeps the original URL; the save still succeeds.
+    _svc = ImageIngestionService()
+    tenant.image_url = await _svc.ingest_url(tenant_in.image_url, tenant.id)
+    tenant.icon_url = await _svc.ingest_url(tenant_in.icon_url, tenant.id)
+    tenant.logo_url = await _svc.ingest_url(tenant_in.logo_url, tenant.id)
     if tenant_in.smtp_password:
         tenant.smtp_password_encrypted = encrypt(tenant_in.smtp_password)
-        db.add(tenant)
-        db.commit()
-        db.refresh(tenant)
+    db.add(tenant)
+    db.commit()
+    db.refresh(tenant)
     return TenantPublic.model_validate(tenant)
 
 
@@ -305,6 +314,16 @@ async def update_tenant(
     old_custom_domain_active = tenant.custom_domain_active
     old_meta_tracking_enabled = tenant.meta_tracking_enabled
     old_meta_pixel_id = tenant.meta_pixel_id
+
+    # CDN image ingestion: rewrite external image URLs to CDN before commit.
+    # Pattern B (async hook). Fail-open: any per-URL failure keeps the original URL.
+    _svc = ImageIngestionService()
+    if tenant_in.image_url is not None:
+        tenant_in.image_url = await _svc.ingest_url(tenant_in.image_url, tenant.id)
+    if tenant_in.icon_url is not None:
+        tenant_in.icon_url = await _svc.ingest_url(tenant_in.icon_url, tenant.id)
+    if tenant_in.logo_url is not None:
+        tenant_in.logo_url = await _svc.ingest_url(tenant_in.logo_url, tenant.id)
 
     # 9. Perform update (IntegrityError → unique constraint race condition)
     try:

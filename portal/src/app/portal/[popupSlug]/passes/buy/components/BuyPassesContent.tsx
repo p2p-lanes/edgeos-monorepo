@@ -2,6 +2,7 @@
 
 import { useParams, useRouter } from "next/navigation"
 import { useEffect } from "react"
+import { CheckoutBackgroundImage } from "@/components/CheckoutBackgroundImage"
 import { CheckoutBackgroundVideo } from "@/components/CheckoutBackgroundVideo"
 import ScrollyCheckoutFlow from "@/components/checkout-flow/ScrollyCheckoutFlow"
 import { Loader } from "@/components/ui/Loader"
@@ -38,12 +39,14 @@ export default function BuyPassesContent() {
   return (
     <PassesProvider attendees={attendees} restoreFromCart>
       <CheckoutProvider initialStep="passes">
+        {background.type === "image" && (
+          <CheckoutBackgroundImage url={background.url} />
+        )}
         {background.type === "video" && (
           <CheckoutBackgroundVideo url={background.url} />
         )}
         <div
           className={`min-h-full w-full ${background.type === "none" ? "bg-background" : ""}`.trim()}
-          style={background.type === "image" ? background.style : undefined}
         >
           <ScrollyCheckoutFlow
             onBack={handleBack}

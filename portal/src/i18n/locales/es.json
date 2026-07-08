@@ -180,6 +180,9 @@
   "checkout": {
     "title": "Checkout",
     "express_title": "Checkout Express",
+    "sold_out": "Agotado",
+    "sale_upcoming": "Próximamente",
+    "sale_ended": "Finalizado",
     "buyer_step_title": "Tu información",
     "buyer_step_description": "Completá tus datos antes del pago.",
     "buyer_hero_title": "¡Estás a un paso!",
@@ -255,7 +258,8 @@
       "play_aria": "Reproducir video de fondo",
       "pause_aria": "Pausar video de fondo",
       "mute_aria": "Silenciar video de fondo",
-      "unmute_aria": "Activar sonido del video de fondo"
+      "unmute_aria": "Activar sonido del video de fondo",
+      "play_youtube_aria": "Reproducir video"
     },
     "housing": {
       "carousel": {
@@ -273,7 +277,19 @@
       "promo_discount_eligible_label": "Descuento (items elegibles)"
     },
     "coupon_no_longer_valid": "This coupon is no longer available. Your total has been updated. Please review and try again.",
-    "payment_error": "Something went wrong with your payment. Please try again."
+    "payment_error": "Something went wrong with your payment. Please try again.",
+    "no_products": "No hay productos disponibles para este paso.",
+    "no_images": "No hay imágenes disponibles para este paso.",
+    "no_video": "No hay video disponible para este paso.",
+    "no_passes": "No hay pases disponibles.",
+    "no_passes_for_category": "No hay pases disponibles para esta categoría de asistente.",
+    "no_meal_plans": "No hay planes de comidas disponibles.",
+    "no_contributions": "No hay opciones de contribución disponibles.",
+    "step_config_error": "Error de configuración del paso.",
+    "step_config_error_detail": "No se asignó una plantilla a este paso. Contactá a tu administrador.",
+    "previous_payment_completed": "Tu pago anterior fue completado.",
+    "pending_payment_wait": "Tenés un pago pendiente. Por favor, esperá unos minutos.",
+    "payment_cancel_failed": "No pudimos procesar tu pago. Por favor, intentá de nuevo."
   },
   "openCheckout": {
     "loading": "Cargando checkout...",
@@ -298,7 +314,10 @@
     "thank_you_description": "Gracias por tu compra. Te enviamos la confirmación y los detalles de tus tickets por email.",
     "thank_you_cta": "Ir al portal",
     "thank_you_order_summary": "Resumen de la orden",
-    "thank_you_total": "Total"
+    "thank_you_total": "Total",
+    "previous_payment_completed": "Tu pago anterior fue completado.",
+    "payment_cancel_failed": "No pudimos procesar tu pago. Por favor, intentá de nuevo.",
+    "pending_payment_wait": "Tenés un pago pendiente. Por favor, esperá unos minutos."
   },
   "passes": {
     "your_passes": "Tus Pases",

@@ -1,5 +1,6 @@
 import urllib.parse
 from decimal import Decimal
+from enum import StrEnum
 from typing import Any
 
 import httpx
@@ -13,6 +14,38 @@ from tenacity import (
 )
 
 from app.core.config import settings
+
+# ---------------------------------------------------------------------------
+# Cancel outcome helpers (ADR-3)
+# ---------------------------------------------------------------------------
+
+# SimpleFi uses "canceled" (one L) for payment_requests and "cancelled" (two L)
+# for installment_plans. Both spellings are accepted throughout this module.
+TERMINAL_CANCEL_STATUSES: frozenset[str] = frozenset(
+    {"canceled", "cancelled", "expired", "refunded"}
+)
+APPROVED_STATUSES: frozenset[str] = frozenset({"approved", "active", "completed"})
+
+
+class CancelOutcome(StrEnum):
+    """Result of a SimpleFi cancel call, used by supersede and sweeper logic."""
+
+    CANCELED = "canceled"
+    ALREADY_APPROVED = "already_approved"
+
+
+class CancelOutcomeAmbiguousError(Exception):
+    """Raised when a cancel response cannot be classified as a definitive outcome.
+
+    Callers MUST treat this exception as 'do not release holds' — the resource
+    is in an indeterminate state (e.g. still 'pending', empty, or unknown status)
+    and releasing holds would risk a double-spend.
+    """
+
+
+def _normalize_cancel_status(status: str) -> str:
+    """Return the status string lowercased and stripped for classification."""
+    return status.lower().strip()
 
 
 class SimpleFIPaymentResponse(BaseModel):
@@ -292,6 +325,178 @@ class SimpleFIClient:
         data = self._make_request("GET", f"/payment_requests/{payment_request_id}")
 
         payload = data.get("payment_request", data)
+        return SimpleFIPaymentRequestStatus(
+            id=payload["id"],
+            status=payload["status"],
+        )
+
+    # ------------------------------------------------------------------
+    # Non-retrying request helper (ADR-3)
+    # ------------------------------------------------------------------
+
+    def _non_retrying_request(self, method: str, endpoint: str) -> httpx.Response:
+        """Make a single HTTP request without the tenacity retry loop.
+
+        Unlike ``_make_request``, this method:
+        - Returns the raw ``httpx.Response`` so callers can inspect the status
+          code before deciding how to classify the outcome.
+        - Does NOT retry on ``HTTPStatusError`` or ``RequestError`` — a 4xx
+          from a cancel call carries semantic meaning (already terminal) and
+          must not be retried away.
+        """
+        url = f"{self.base_url}{endpoint}"
+        headers = {"Authorization": f"Bearer {self.api_key}"}
+        with httpx.Client(timeout=self.timeout) as client:
+            response = client.request(method, url, headers=headers)
+        logger.info(
+            "SimpleFI {} {} -> {}",
+            method,
+            url,
+            response.status_code,
+        )
+        return response
+
+    # ------------------------------------------------------------------
+    # Outcome classifier (shared by both cancel methods)
+    # ------------------------------------------------------------------
+
+    def _non_retrying_get_status(
+        self, endpoint: str, nested_key: str
+    ) -> SimpleFIPaymentRequestStatus:
+        """Fetch a resource's status with a SINGLE non-retrying GET attempt.
+
+        Used as the 4xx-cancel fallback so the call remains bounded to one
+        attempt instead of the retrying ``_make_request`` path (3 attempts,
+        exponential back-off, up to ~30 s on a checkout-blocking call).
+
+        On failure — transport error or any non-2xx response — the exception
+        propagates directly.  Callers MUST treat any exception as
+        'do not release holds'.
+
+        Args:
+            endpoint: GET endpoint, e.g. ``/payment_requests/{id}``.
+            nested_key: Key used to unwrap a nested payload, e.g.
+                ``"payment_request"`` or ``"installment_plan"``.
+        """
+        response = self._non_retrying_request("GET", endpoint)
+        response.raise_for_status()
+        data = response.json()
+        payload = data.get(nested_key, data)
+        return SimpleFIPaymentRequestStatus(
+            id=payload["id"],
+            status=payload["status"],
+        )
+
+    def _classify_cancel_status(
+        self, status: str, resource_id: str, resource_type: str
+    ) -> CancelOutcome:
+        """Map a normalized SimpleFi status string to a ``CancelOutcome``.
+
+        Raises ``CancelOutcomeAmbiguousError`` if the status cannot be
+        classified (e.g. still 'pending', empty, or unknown after a cancel).
+        Callers MUST treat it as 'do not release holds'.
+        """
+        normalized = _normalize_cancel_status(status)
+        if normalized in TERMINAL_CANCEL_STATUSES:
+            return CancelOutcome.CANCELED
+        if normalized in APPROVED_STATUSES:
+            return CancelOutcome.ALREADY_APPROVED
+        raise CancelOutcomeAmbiguousError(
+            f"Cannot classify {resource_type} {resource_id!r}: "
+            f"unresolvable status={status!r}"
+        )
+
+    # ------------------------------------------------------------------
+    # Cancel methods (ADR-3)
+    # ------------------------------------------------------------------
+
+    def cancel_payment_request(self, payment_id: str) -> CancelOutcome:
+        """Cancel a SimpleFi payment_request without retrying.
+
+        Outcome mapping (ADR-3):
+        - 2xx with terminal status (canceled/cancelled/expired/refunded) → CANCELED
+        - 2xx or 4xx with approved/active/completed → ALREADY_APPROVED
+        - 2xx with unresolvable status (pending/empty/unknown) → raises
+          ``CancelOutcomeAmbiguousError``; callers MUST not release holds
+        - 4xx (already terminal) → single non-retrying re-read via
+          ``_non_retrying_get_status`` to classify; on re-read failure the
+          exception propagates (= do not release holds)
+        - 5xx → raise ``HTTPStatusError``
+        - Transport/timeout → raise ``RequestError``
+        """
+        response = self._non_retrying_request(
+            "PUT", f"/payment_requests/{payment_id}/cancel"
+        )
+
+        if response.status_code < 400:
+            data = response.json()
+            status = data.get("status", "")
+            return self._classify_cancel_status(status, payment_id, "payment_request")
+
+        if response.status_code < 500:
+            # 4xx: resource already in a terminal or approved state — re-read the
+            # current status with a SINGLE non-retrying attempt so this
+            # checkout-blocking path cannot stall for up to ~30 s under the
+            # retrying _make_request path. On re-read failure the exception
+            # propagates; callers must not release holds.
+            logger.warning(
+                "SimpleFI cancel payment_request {} returned {} — re-reading status (single attempt)",
+                payment_id,
+                response.status_code,
+            )
+            current = self._non_retrying_get_status(
+                f"/payment_requests/{payment_id}", "payment_request"
+            )
+            return self._classify_cancel_status(
+                current.status, payment_id, "payment_request"
+            )
+
+        # 5xx: genuine server error — raise
+        response.raise_for_status()
+        raise RuntimeError("unreachable")  # satisfy type checker
+
+    def cancel_installment_plan(self, plan_id: str) -> CancelOutcome:
+        """Cancel a SimpleFi installment_plan without retrying.
+
+        Identical outcome mapping to ``cancel_payment_request`` but targets the
+        ``/installment_plans`` endpoint. On 4xx, falls back to a SINGLE
+        non-retrying status re-read via ``_non_retrying_get_status`` (not the
+        retrying ``_make_request`` path) so the fallback stays bounded to one
+        extra attempt. On re-read failure the exception propagates; callers must
+        not release holds.
+
+        Note: SimpleFi uses 'cancelled' (two L) in installment_plan status
+        responses; the normalizer accepts both spellings.
+        """
+        response = self._non_retrying_request(
+            "PUT", f"/installment_plans/{plan_id}/cancel"
+        )
+
+        if response.status_code < 400:
+            data = response.json()
+            status = data.get("status", "")
+            return self._classify_cancel_status(status, plan_id, "installment_plan")
+
+        if response.status_code < 500:
+            logger.warning(
+                "SimpleFI cancel installment_plan {} returned {} — re-reading status (single attempt)",
+                plan_id,
+                response.status_code,
+            )
+            current = self._non_retrying_get_status(
+                f"/installment_plans/{plan_id}", "installment_plan"
+            )
+            return self._classify_cancel_status(
+                current.status, plan_id, "installment_plan"
+            )
+
+        response.raise_for_status()
+        raise RuntimeError("unreachable")
+
+    def get_installment_plan_status(self, plan_id: str) -> SimpleFIPaymentRequestStatus:
+        """Fetch the latest status for an existing SimpleFI installment plan."""
+        data = self._make_request("GET", f"/installment_plans/{plan_id}")
+        payload = data.get("installment_plan", data)
         return SimpleFIPaymentRequestStatus(
             id=payload["id"],
             status=payload["status"],

@@ -1,6 +1,7 @@
 "use client"
 
 import { Loader2, Upload, X } from "lucide-react"
+import Image from "next/image"
 import { useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
@@ -8,6 +9,7 @@ import { toast } from "sonner"
 import { CoverImageCropper } from "@/components/CoverImageCropper"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
+import { imageOptimization } from "@/lib/image-optimization"
 import { useFileUpload } from "../../../lib/useFileUpload"
 
 interface CoverImageFieldProps {
@@ -68,12 +70,14 @@ export function CoverImageField({ coverUrl, onChange }: CoverImageFieldProps) {
         }}
       />
       {coverUrl ? (
-        <div className="relative w-full overflow-hidden rounded-lg border">
-          {/* biome-ignore lint/performance/noImgElement: user-uploaded S3 image */}
-          <img
+        <div className="relative aspect-[16/9] w-full overflow-hidden rounded-lg border">
+          <Image
             src={coverUrl}
             alt={t("events.form.event_cover_alt")}
-            className="aspect-[16/9] w-full object-cover"
+            fill
+            sizes="(max-width: 768px) 100vw, 672px"
+            className="object-cover"
+            {...imageOptimization(coverUrl)}
           />
           <div className="absolute top-2 right-2 flex gap-2">
             <Button

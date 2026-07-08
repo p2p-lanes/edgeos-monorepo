@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest"
 import {
   buildPaymentsQueryConfig,
   buildPaymentsTableState,
+  getRailAdjustment,
   resolveLineUnitPrice,
 } from "./payments.helpers"
 
@@ -107,6 +108,48 @@ describe("payments.helpers", () => {
     expect(state.serverPagination).toEqual({
       total: 60,
       pagination: { pageIndex: 1, pageSize: 25 },
+    })
+  })
+
+  it("derives a final charged adjustment without inferring a reason", () => {
+    const adjustment = getRailAdjustment({
+      id: "payment-final-adjustment",
+      tenant_id: "tenant-1",
+      popup_id: "popup-1",
+      amount: "100.00",
+      amount_charged: "95.00",
+      currency: "USD",
+      source: "SimpleFI",
+      is_installment_plan: false,
+      installments_total: 1,
+      installments_paid: 1,
+    })
+
+    expect(adjustment).toMatchObject({
+      pct: "5",
+      isDiscount: true,
+      final: true,
+    })
+  })
+
+  it("treats a first installment as collected so far, not a final discount", () => {
+    const adjustment = getRailAdjustment({
+      id: "payment-installment-partial",
+      tenant_id: "tenant-1",
+      popup_id: "popup-1",
+      amount: "500.00",
+      amount_charged: "100.00",
+      currency: "USD",
+      source: "Stripe",
+      is_installment_plan: true,
+      installments_total: 5,
+      installments_paid: 1,
+    })
+
+    expect(adjustment).toMatchObject({
+      pct: "80",
+      isDiscount: true,
+      final: false,
     })
   })
 })

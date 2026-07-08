@@ -12,6 +12,7 @@ import {
   Upload,
   X,
 } from "lucide-react"
+import Image from "next/image"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useEffect, useRef, useState } from "react"
@@ -37,6 +38,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { imageOptimization } from "@/lib/image-optimization"
 import { useCityProvider } from "@/providers/cityProvider"
 import { CollaboratorsField } from "../components/CollaboratorsField"
 import { EventScheduleFields } from "../components/EventScheduleFields"
@@ -531,12 +533,14 @@ function NewPortalEventForm({
             }}
           />
           {coverUrl ? (
-            <div className="relative w-full overflow-hidden rounded-lg border">
-              {/* biome-ignore lint/performance/noImgElement: user-uploaded S3 image */}
-              <img
+            <div className="relative aspect-[16/9] w-full overflow-hidden rounded-lg border">
+              <Image
                 src={coverUrl}
                 alt={t("events.form.event_cover_alt")}
-                className="aspect-[16/9] w-full object-cover"
+                fill
+                sizes="(max-width: 768px) 100vw, 672px"
+                className="object-cover"
+                {...imageOptimization(coverUrl)}
               />
               <div className="absolute top-2 right-2 flex gap-2">
                 <Button

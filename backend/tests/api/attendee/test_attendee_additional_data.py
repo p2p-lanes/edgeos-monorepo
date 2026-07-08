@@ -24,7 +24,9 @@ from app.core.security import create_access_token
 
 
 def _auth(human: Humans) -> dict[str, str]:
-    return {"Authorization": f"Bearer {create_access_token(subject=human.id, token_type='human')}"}
+    return {
+        "Authorization": f"Bearer {create_access_token(subject=human.id, token_type='human')}"
+    }
 
 
 def _make_human(db: Session, tenant: Tenants, *, suffix: str) -> Humans:
@@ -53,7 +55,9 @@ def _make_popup(db: Session, tenant: Tenants, *, suffix: str) -> Popups:
     return popup
 
 
-def _make_application(db: Session, tenant: Tenants, popup: Popups, human: Humans) -> Applications:
+def _make_application(
+    db: Session, tenant: Tenants, popup: Popups, human: Humans
+) -> Applications:
     application = Applications(
         id=uuid.uuid4(),
         tenant_id=tenant.id,
@@ -67,7 +71,9 @@ def _make_application(db: Session, tenant: Tenants, popup: Popups, human: Humans
     return application
 
 
-def _make_kid_category(db: Session, tenant: Tenants, popup: Popups) -> AttendeeCategories:
+def _make_kid_category(
+    db: Session, tenant: Tenants, popup: Popups
+) -> AttendeeCategories:
     category = AttendeeCategories(
         tenant_id=tenant.id,
         popup_id=popup.id,

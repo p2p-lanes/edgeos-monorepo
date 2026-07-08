@@ -42,6 +42,7 @@ from app.core.dependencies.users import (
     SessionDep,
     TenantSession,
 )
+from app.services.image_ingestion import ImageIngestionService
 
 router = APIRouter(prefix="/popups", tags=["popups"])
 
@@ -188,6 +189,21 @@ async def create_popup(
             detail="A popup with this slug already exists in this tenant",
         )
 
+    # CDN image ingestion: rewrite external image URLs to CDN before commit.
+    # Pattern B (async hook). Fail-open: any per-URL failure keeps the original URL.
+    _svc = ImageIngestionService()
+    tenant_id = popup_in.tenant_id  # already resolved above
+    if popup_in.image_url is not None:
+        popup_in.image_url = await _svc.ingest_url(popup_in.image_url, tenant_id)
+    if popup_in.icon_url is not None:
+        popup_in.icon_url = await _svc.ingest_url(popup_in.icon_url, tenant_id)
+    if popup_in.favicon_url is not None:
+        popup_in.favicon_url = await _svc.ingest_url(popup_in.favicon_url, tenant_id)
+    if popup_in.express_checkout_background is not None:
+        popup_in.express_checkout_background = await _svc.ingest_url(
+            popup_in.express_checkout_background, tenant_id
+        )
+
     try:
         popup = crud.create(db, popup_in)
     except IntegrityError as exc:
@@ -256,6 +272,22 @@ async def update_popup(
     scholarship_enabling = (
         popup_in.allows_scholarship is True and not popup.allows_scholarship
     )
+
+    # CDN image ingestion: rewrite external image URLs to CDN before commit.
+    # Pattern B (async hook). Fail-open: any per-URL failure keeps the original URL.
+    _svc = ImageIngestionService()
+    if popup_in.image_url is not None:
+        popup_in.image_url = await _svc.ingest_url(popup_in.image_url, popup.tenant_id)
+    if popup_in.icon_url is not None:
+        popup_in.icon_url = await _svc.ingest_url(popup_in.icon_url, popup.tenant_id)
+    if popup_in.favicon_url is not None:
+        popup_in.favicon_url = await _svc.ingest_url(
+            popup_in.favicon_url, popup.tenant_id
+        )
+    if popup_in.express_checkout_background is not None:
+        popup_in.express_checkout_background = await _svc.ingest_url(
+            popup_in.express_checkout_background, popup.tenant_id
+        )
 
     try:
         updated = crud.update(db, popup, popup_in)

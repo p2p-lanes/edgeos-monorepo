@@ -1,5 +1,6 @@
 "use client"
 
+import { useTranslation } from "react-i18next"
 import type { TicketingStepPublic } from "@/client"
 import { Button } from "@/components/ui/button"
 import { useCheckout } from "@/providers/checkoutProvider"
@@ -12,13 +13,16 @@ import EditPassesToggle from "./shared/EditPassesToggle"
 interface DynamicProductStepProps {
   stepConfig: TicketingStepPublic
   onSkip?: () => void
+  isFirstSection?: boolean
 }
 
 export default function DynamicProductStep({
   stepConfig,
   onSkip,
+  isFirstSection,
 }: DynamicProductStepProps) {
   const { getProductsForStep } = useCheckout()
+  const { t } = useTranslation()
 
   const filtered = getProductsForStep(stepConfig)
 
@@ -38,13 +42,14 @@ export default function DynamicProductStep({
     if (filtered.length > 0) {
       return (
         <div className="flex flex-col items-center justify-center py-12 text-center">
-          <p className="text-gray-500 mb-2">Step configuration error.</p>
+          <p className="text-gray-500 mb-2">
+            {t("checkout.step_config_error")}
+          </p>
           <p className="text-xs text-gray-400 mb-6">
-            No template assigned to this step. Please contact your
-            administrator.
+            {t("checkout.step_config_error_detail")}
           </p>
           <Button variant="outline" onClick={onSkip}>
-            Continue
+            {t("common.continue")}
           </Button>
         </div>
       )
@@ -58,11 +63,9 @@ export default function DynamicProductStep({
   if (!VariantComponent || (!isContentOnly && filtered.length === 0)) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-center">
-        <p className="text-gray-500 mb-6">
-          No products available for this step.
-        </p>
+        <p className="text-gray-500 mb-6">{t("checkout.no_products")}</p>
         <Button variant="outline" onClick={onSkip}>
-          Continue
+          {t("common.continue")}
         </Button>
       </div>
     )
@@ -76,6 +79,7 @@ export default function DynamicProductStep({
       templateConfig={
         (stepConfig.template_config as Record<string, unknown>) ?? null
       }
+      isFirstSection={isFirstSection}
     />
   )
 

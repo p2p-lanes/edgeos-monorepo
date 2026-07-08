@@ -12,6 +12,9 @@ export default defineConfig({
   test: {
     environment: "jsdom",
     globals: true,
+    // Fail runs containing it.only/describe.only so a stray focus cannot
+    // silently skip suites (Vitest's equivalent of forbidOnly).
+    allowOnly: false,
     setupFiles: ["./src/test-setup.ts"],
     include: ["src/**/*.test.{ts,tsx}"],
     exclude: ["e2e/**"],

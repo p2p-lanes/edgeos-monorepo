@@ -9,6 +9,7 @@ export type AvailabilityProduct = Pick<
   | "total_stock_cap"
   | "total_stock_remaining"
   | "max_per_order"
+  | "sold_out_override"
 >
 
 export interface ProductAvailability {

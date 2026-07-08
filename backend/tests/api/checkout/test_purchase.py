@@ -191,6 +191,91 @@ def test_purchase_happy_path_creates_payment_and_attendees(
     assert len(attendees) == 1
 
 
+def test_purchase_persists_attribution_in_buyer_snapshot(
+    client: TestClient,
+    db: Session,
+    tenant_a: Tenants,
+) -> None:
+    """Marketing attribution from the entry URL is stored under
+    buyer_snapshot["attribution"] so a later webhook can return it. Absent
+    params are dropped (only the sent keys persist)."""
+    popup = _make_popup(db, tenant_a, slug_prefix="attribution")
+    product = _make_product(db, popup, price="100.00")
+    db.commit()
+
+    with patch("app.services.simplefi.get_simplefi_client") as mock_get_client:
+        mock_get_client.return_value.create_payment.return_value = SimpleNamespace(
+            id="sf_attr_1",
+            status="pending",
+            checkout_url="https://simplefi.test/checkout/attr",
+            is_installment_plan=False,
+        )
+        response = client.post(
+            f"/api/v1/checkout/{popup.slug}/purchase",
+            json={
+                "products": [{"product_id": str(product.id), "quantity": 1}],
+                "buyer": {
+                    "email": "buyer@test.com",
+                    "first_name": "Ana",
+                    "last_name": "Diaz",
+                    "form_data": {},
+                },
+                "attribution": {
+                    "utm_source": "meta",
+                    "utm_campaign": "amanita-launch",
+                    "anonymous_id": "f48a026b-cb27-4249-920a-281cbc5b73c4",
+                },
+            },
+            headers={"X-Tenant-Id": str(tenant_a.id)},
+        )
+
+    assert response.status_code == 200, response.text
+    payment = db.exec(select(Payments).where(Payments.popup_id == popup.id)).first()
+    assert payment is not None
+    assert payment.buyer_snapshot["attribution"] == {
+        "utm_source": "meta",
+        "utm_campaign": "amanita-launch",
+        "anonymous_id": "f48a026b-cb27-4249-920a-281cbc5b73c4",
+    }
+
+
+def test_purchase_without_attribution_omits_the_key(
+    client: TestClient,
+    db: Session,
+    tenant_a: Tenants,
+) -> None:
+    """No attribution sent → no attribution key in the snapshot (not an empty dict)."""
+    popup = _make_popup(db, tenant_a, slug_prefix="no-attribution")
+    product = _make_product(db, popup, price="100.00")
+    db.commit()
+
+    with patch("app.services.simplefi.get_simplefi_client") as mock_get_client:
+        mock_get_client.return_value.create_payment.return_value = SimpleNamespace(
+            id="sf_noattr_1",
+            status="pending",
+            checkout_url="https://simplefi.test/checkout/noattr",
+            is_installment_plan=False,
+        )
+        response = client.post(
+            f"/api/v1/checkout/{popup.slug}/purchase",
+            json={
+                "products": [{"product_id": str(product.id), "quantity": 1}],
+                "buyer": {
+                    "email": "buyer@test.com",
+                    "first_name": "Ana",
+                    "last_name": "Diaz",
+                    "form_data": {},
+                },
+            },
+            headers={"X-Tenant-Id": str(tenant_a.id)},
+        )
+
+    assert response.status_code == 200, response.text
+    payment = db.exec(select(Payments).where(Payments.popup_id == popup.id)).first()
+    assert payment is not None
+    assert "attribution" not in payment.buyer_snapshot
+
+
 def test_purchase_pending_open_checkout_sends_initiate_checkout_capi(
     client: TestClient,
     db: Session,
@@ -576,18 +661,12 @@ def _verify_signed_redirect(url: str, secret: str) -> dict:
     """Verify a signed thank-you URL the way an external page would, returning
     the recovered payload. Raises AssertionError on a bad signature."""
     query = parse_qs(urlparse(url).query)
-    data = query["data"][0]
+    d = query["d"][0]
     sig = query["sig"][0]
-    expected = (
-        base64.urlsafe_b64encode(
-            hmac.new(secret.encode(), data.encode("ascii"), hashlib.sha256).digest()
-        )
-        .rstrip(b"=")
-        .decode("ascii")
-    )
+    expected = hmac.new(secret.encode(), d.encode("ascii"), hashlib.sha256).hexdigest()
     assert hmac.compare_digest(sig, expected), "signature mismatch"
-    padding = "=" * (-len(data) % 4)
-    return json.loads(base64.urlsafe_b64decode(data + padding))
+    padding = "=" * (-len(d) % 4)
+    return json.loads(base64.urlsafe_b64decode(d + padding))
 
 
 def test_paid_purchase_signs_order_payload_into_simplefi_success_url(
@@ -634,10 +713,58 @@ def test_paid_purchase_signs_order_payload_into_simplefi_success_url(
     assert success_url.startswith("https://brand.example.com/thank-you")
     payload = _verify_signed_redirect(success_url, secret)
     assert payload["first_name"] == "Matias"
-    assert payload["amount_total"] == "240.00"
+    assert payload["amount_total"] == 240.0
     assert payload["currency"] == "USD"
-    assert payload["items"] == [{"name": product.name, "quantity": 2}]
+    assert payload["items"] == [{"title": product.name, "qty": 2, "price": 120.0}]
     assert payload["email_hash"] == hashlib.sha256(b"buyer@test.com").hexdigest()
+    assert payload["email_masked"] == "bu****@test.com"
+
+
+def test_signed_redirect_substitutes_locale_placeholder(
+    client: TestClient,
+    db: Session,
+    tenant_a: Tenants,
+) -> None:
+    """A {locale} placeholder in the custom success URL is replaced with the
+    popup language before signing (e.g. .../{locale}/gracias → .../es/gracias)."""
+    secret = "amanita-secret"
+    popup = _make_popup(db, tenant_a, slug_prefix="locale-signed")
+    popup.open_checkout_success_url = "https://amanita.example.com/{locale}/gracias"
+    popup.open_checkout_signing_secret = secret
+    popup.default_language = "es"  # fallback; the request locale must win
+    db.add(popup)
+    product = _make_product(db, popup, price="120.00")
+    db.commit()
+
+    with patch("app.services.simplefi.get_simplefi_client") as mock_get_client:
+        mock_get_client.return_value.create_payment.return_value = SimpleNamespace(
+            id="sf_locale_1",
+            status="pending",
+            checkout_url="https://simplefi.test/checkout/locale",
+            is_installment_plan=False,
+        )
+        response = client.post(
+            f"/api/v1/checkout/{popup.slug}/purchase",
+            json={
+                "products": [{"product_id": str(product.id), "quantity": 1}],
+                "buyer": {
+                    "email": "buyer@test.com",
+                    "first_name": "Ana",
+                    "last_name": "Diaz",
+                    "form_data": {},
+                },
+                "locale": "en",  # from the entry URL ?lang=en
+            },
+            headers={"X-Tenant-Id": str(tenant_a.id)},
+        )
+
+    assert response.status_code == 200, response.text
+    success_url = mock_get_client.return_value.create_payment.call_args.kwargs[
+        "success_path"
+    ]
+    # Request locale ("en") wins over the popup default ("es").
+    assert success_url.startswith("https://amanita.example.com/en/gracias")
+    assert "{locale}" not in success_url
 
 
 def test_zero_amount_purchase_signs_order_payload_into_redirect_url(
@@ -677,8 +804,8 @@ def test_zero_amount_purchase_signs_order_payload_into_redirect_url(
     assert body["status"] == "approved"
     assert body["checkout_url"] == ""
     payload = _verify_signed_redirect(body["redirect_url"], secret)
-    assert payload["amount_total"] == "0.00"
-    assert payload["items"] == [{"name": product.name, "quantity": 1}]
+    assert payload["amount_total"] == 0.0
+    assert payload["items"] == [{"title": product.name, "qty": 1, "price": 75.0}]
     mock_get_client.assert_not_called()
 
 
@@ -729,8 +856,8 @@ def test_paid_purchase_injects_order_data_into_portal_thank_you(
     assert "sig=" not in success_url  # portal page is ours — no signature
     payload = _decode_data_param(success_url)
     assert payload["first_name"] == "Matias"
-    assert payload["amount_total"] == "240.00"
-    assert payload["items"] == [{"name": product.name, "quantity": 2}]
+    assert payload["amount_total"] == 240.0
+    assert payload["items"] == [{"title": product.name, "qty": 2, "price": 120.0}]
 
 
 def test_zero_amount_purchase_injects_order_data_into_portal_thank_you(
@@ -767,8 +894,8 @@ def test_zero_amount_purchase_injects_order_data_into_portal_thank_you(
     redirect_url = body["redirect_url"]
     assert f"/checkout/{popup.slug}/thank-you" in redirect_url
     payload = _decode_data_param(redirect_url)
-    assert payload["amount_total"] == "0.00"
-    assert payload["items"] == [{"name": product.name, "quantity": 1}]
+    assert payload["amount_total"] == 0.0
+    assert payload["items"] == [{"title": product.name, "qty": 1, "price": 75.0}]
     mock_get_client.assert_not_called()
 
 

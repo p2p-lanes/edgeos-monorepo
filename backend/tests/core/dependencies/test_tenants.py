@@ -51,6 +51,8 @@ def _make_tenant(tenant_id: uuid.UUID = _TENANT_A_ID) -> MagicMock:
     t.landing_mode = LandingMode.portal
     t.meta_tracking_enabled = False
     t.meta_pixel_id = None
+    t.ga_tracking_enabled = False
+    t.ga_measurement_id = None
     t.active_popup_slug = None  # computed projection — not a DB column
     t.third_party_key_prefix = None  # third-party OTP display fragment
     return t
@@ -64,7 +66,8 @@ def _make_tenant_public_json(tenant_id: uuid.UUID = _TENANT_A_ID) -> str:
         f'"image_url":null,"icon_url":null,"logo_url":null,'
         f'"custom_domain":null,"custom_domain_active":false,'
         f'"landing_mode":"portal","meta_tracking_enabled":false,'
-        f'"meta_pixel_id":null,"active_popup_slug":null}}'
+        f'"meta_pixel_id":null,"ga_tracking_enabled":false,'
+        f'"ga_measurement_id":null,"active_popup_slug":null}}'
     )
 
 

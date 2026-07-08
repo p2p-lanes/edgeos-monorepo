@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from "react"
 export default function SnapSection({
   id,
   children,
-  bottomPadding = "50vh",
+  bottomPadding = "8rem",
   // Most steps read as a centred column; card-grid steps pass a wider class so
   // their cards have room to sit side by side. Both literals live here and at
   // the call site so Tailwind keeps them.
@@ -89,6 +89,14 @@ export default function SnapSection({
     }
   }, [visible])
 
+  // Single-axis scroll model. Every section is at least one viewport tall
+  // (`--snap-section-h` = the scroll container's clientHeight) and content
+  // taller than that simply extends the section — it scrolls on the MAIN
+  // axis like any web page. Combined with `scroll-snap-type: y mandatory`
+  // on the container this gives crisp per-section snapping for short
+  // sections while tall ones stay freely scrollable (a snap area larger
+  // than the snapport is a valid rest position anywhere it covers it, per
+  // the scroll-snap spec). No nested scrollers, no snap juggling.
   return (
     <section
       id={id}

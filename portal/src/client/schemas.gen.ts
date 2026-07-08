@@ -3191,6 +3191,103 @@ The directory is attendee-centric: one entry per ticket-holding attendee
 (any category), sourced from that attendee's own human record.`
 } as const;
 
+export const AttributionSchema = {
+    properties: {
+        utm_source: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 256
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Utm Source'
+        },
+        utm_medium: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 256
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Utm Medium'
+        },
+        utm_campaign: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 256
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Utm Campaign'
+        },
+        utm_content: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 256
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Utm Content'
+        },
+        fbclid: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 512
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Fbclid'
+        },
+        landing_segment: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 256
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Landing Segment'
+        },
+        anonymous_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 128
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Anonymous Id'
+        }
+    },
+    type: 'object',
+    title: 'Attribution',
+    description: `Marketing attribution captured from the checkout entry URL.
+
+Generic (not partner-specific): any tenant running paid ads can use these.
+Persisted on the payment so an outbound purchase webhook can return them,
+which is how a partner ties the purchase back to its web session
+(\`\`anonymous_id\`\`). All fields optional; absent ones are dropped.`
+} as const;
+
 export const AuditLogPublicSchema = {
     properties: {
         id: {
@@ -4582,6 +4679,11 @@ export const CheckoutRuntimeProductSchema = {
                 }
             ],
             title: 'Total Stock Remaining'
+        },
+        sold_out_override: {
+            type: 'boolean',
+            title: 'Sold Out Override',
+            default: false
         },
         max_per_order: {
             anyOf: [
@@ -11747,6 +11849,51 @@ export const OpenTicketingPurchaseCreateSchema = {
                 }
             ],
             title: 'Fbp'
+        },
+        locale: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 8
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Locale'
+        },
+        attribution: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/Attribution'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        cid: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Cid'
+        },
+        sig: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Sig'
         }
     },
     type: 'object',
@@ -12688,6 +12835,66 @@ export const PaymentUpdateSchema = {
     type: 'object',
     title: 'PaymentUpdate',
     description: 'Schema for updating a payment (mainly status updates).'
+} as const;
+
+export const PendingReleaseAuthRequestSchema = {
+    properties: {
+        application_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Application Id'
+        }
+    },
+    type: 'object',
+    required: ['application_id'],
+    title: 'PendingReleaseAuthRequest',
+    description: `Request body for POST /payments/my/pending/release (authenticated surface).
+
+application_id identifies which PENDING payment to release.
+Ownership is verified server-side against current_human.id.`
+} as const;
+
+export const PendingReleaseOpenRequestSchema = {
+    properties: {
+        email: {
+            type: 'string',
+            format: 'email',
+            title: 'Email'
+        },
+        cid: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Cid'
+        },
+        sig: {
+            type: 'string',
+            title: 'Sig'
+        }
+    },
+    type: 'object',
+    required: ['email', 'cid', 'sig'],
+    title: 'PendingReleaseOpenRequest',
+    description: `Request body for POST /checkout/{slug}/pending/release (anonymous surface).
+
+cid + sig constitute the cart continuity proof (HMAC). email is the buyer's
+address used as the payment lookup key (must match the cart's stored email).`
+} as const;
+
+export const PendingReleaseResponseSchema = {
+    properties: {
+        released: {
+            type: 'boolean',
+            title: 'Released'
+        }
+    },
+    type: 'object',
+    required: ['released'],
+    title: 'PendingReleaseResponse',
+    description: `Response body for both release-on-return endpoints.
+
+released=True only when a cancel+hold-release actually committed.
+released=False covers: invalid proof, no PENDING exists, flag disabled.
+Enumeration-safe: the body shape is identical across all False outcomes.`
 } as const;
 
 export const PersonGrantItemSchema = {
@@ -15270,6 +15477,11 @@ export const ProductBatchResultSchema = {
             title: 'Discountable',
             default: true
         },
+        sold_out_override: {
+            type: 'boolean',
+            title: 'Sold Out Override',
+            default: false
+        },
         id: {
             type: 'string',
             format: 'uuid',
@@ -15715,6 +15927,11 @@ export const ProductPublicSchema = {
             title: 'Discountable',
             default: true
         },
+        sold_out_override: {
+            type: 'boolean',
+            title: 'Sold Out Override',
+            default: false
+        },
         id: {
             type: 'string',
             format: 'uuid',
@@ -15729,6 +15946,19 @@ export const ProductPublicSchema = {
 Sale window fields are exposed as full \`\`datetime\`\` instants (UTC), so the
 sale window can express a precise cutoff like "Friday 11:59 PM" rather than
 a whole calendar day. Clients render them in the popup's timezone.`
+} as const;
+
+export const ProductSoldOutUpdateSchema = {
+    properties: {
+        sold_out: {
+            type: 'boolean',
+            title: 'Sold Out'
+        }
+    },
+    type: 'object',
+    required: ['sold_out'],
+    title: 'ProductSoldOutUpdate',
+    description: 'Schema for manually marking a product as sold out (or back on sale).'
 } as const;
 
 export const ProductUpdateSchema = {
@@ -16139,6 +16369,11 @@ export const ProductWithQuantitySchema = {
             type: 'boolean',
             title: 'Discountable',
             default: true
+        },
+        sold_out_override: {
+            type: 'boolean',
+            title: 'Sold Out Override',
+            default: false
         },
         id: {
             type: 'string',
@@ -17685,6 +17920,23 @@ export const TenantAnonymousPublicSchema = {
             ],
             title: 'Meta Pixel Id'
         },
+        ga_tracking_enabled: {
+            type: 'boolean',
+            title: 'Ga Tracking Enabled',
+            default: false
+        },
+        ga_measurement_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 64
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Ga Measurement Id'
+        },
         id: {
             type: 'string',
             format: 'uuid',
@@ -17791,6 +18043,23 @@ export const TenantCreateSchema = {
                 }
             ],
             title: 'Meta Pixel Id'
+        },
+        ga_tracking_enabled: {
+            type: 'boolean',
+            title: 'Ga Tracking Enabled',
+            default: false
+        },
+        ga_measurement_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 64
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Ga Measurement Id'
         },
         smtp_host: {
             anyOf: [
@@ -18007,6 +18276,23 @@ export const TenantPublicSchema = {
                 }
             ],
             title: 'Meta Pixel Id'
+        },
+        ga_tracking_enabled: {
+            type: 'boolean',
+            title: 'Ga Tracking Enabled',
+            default: false
+        },
+        ga_measurement_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 64
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Ga Measurement Id'
         },
         id: {
             type: 'string',
@@ -18265,6 +18551,29 @@ export const TenantUpdateSchema = {
                 }
             ],
             title: 'Meta Capi Access Token'
+        },
+        ga_tracking_enabled: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Ga Tracking Enabled'
+        },
+        ga_measurement_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 64
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Ga Measurement Id'
         },
         smtp_host: {
             anyOf: [

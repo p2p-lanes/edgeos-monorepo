@@ -40,6 +40,7 @@ class Settings(BaseSettings):
 
     PROJECT_NAME: str = Field(...)
     SENTRY_DSN: HttpUrl | None = None
+    SENTRY_TRACES_SAMPLE_RATE: float = 0.1
     POSTGRES_SERVER: str = Field(...)
     POSTGRES_PORT: int = 5432
     POSTGRES_USER: str = Field(...)
@@ -125,6 +126,28 @@ class Settings(BaseSettings):
     # SimpleFi installment plans accept max_installments in [2, 12].
     # This is a global safety net; per-popup `installments_max` may set a lower cap.
     MAX_ALLOWED_INSTALLMENTS: int = 12
+
+    # ---------------------------------------------------------------------------
+    # Pending payment sweeper + supersede (ADR-5; global, not per-popup)
+    # These are provider-level operational constants, not per-tenant product flags.
+    # ---------------------------------------------------------------------------
+
+    # Master kill-switch for the sweeper job. Set to false to disable globally.
+    PENDING_SWEEP_ENABLED: bool = True
+
+    # Age threshold (minutes) beyond which a PENDING SimpleFi payment is a
+    # candidate for status reconciliation. Default matches SimpleFi's ~15-min
+    # provider-side expiry with a safety margin.
+    PENDING_SWEEP_STALE_MINUTES: int = 20
+
+    # Maximum number of stale payments processed per sweeper run. Keeps each
+    # run bounded and predictable.
+    PENDING_SWEEP_BATCH_SIZE: int = 200
+
+    # When true, supersede_pending_payments runs at the start of create_payment
+    # and create_open_ticketing_payment to cancel the buyer's prior PENDING
+    # payment before creating a new one.
+    SUPERSEDE_PENDING_ENABLED: bool = True
 
 
 settings = Settings()

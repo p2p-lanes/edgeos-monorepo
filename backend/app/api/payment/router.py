@@ -21,6 +21,8 @@ from app.api.payment.schemas import (
     PaymentStatus,
     PaymentStatusCheck,
     PaymentUpdate,
+    PendingReleaseAuthRequest,
+    PendingReleaseResponse,
     SimpleFIInstallmentPlan,
     SimpleFIInstallmentPlanPayload,
     SimpleFIPaymentInfo,
@@ -39,15 +41,19 @@ from app.core.dependencies.users import (
     needs,
 )
 from app.core.redis import WebhookCache
-from app.services.email import (
-    EmailAttachment,
-    PaymentAttendeeItem,
-    PaymentConfirmedContext,
-    PaymentProductItem,
-    compute_order_summary,
-    get_email_service,
-)
 from app.services.email_helpers import send_application_status_email
+
+# Email notification helpers live in app.services.payment_notifications to
+# allow import by background jobs without creating a circular dependency with
+# the web layer.  The names are re-exported here under their original private
+# identifiers so existing call sites and test monkey-patches keep working.
+from app.services.payment_notifications import (  # noqa: F401
+    _build_payment_confirmed_context,
+    _send_payment_confirmed_email,
+)
+from app.services.payment_notifications import (
+    send_payment_confirmed_email_best_effort as _send_payment_confirmed_email_best_effort,
+)
 
 if TYPE_CHECKING:
     from app.api.human.models import Humans
@@ -273,200 +279,6 @@ def _installment_charged_amount(payment_request: SimpleFIPaymentRequest) -> Deci
     if card_payment is not None and card_payment.price_details is not None:
         return Decimal(str(card_payment.price_details.final_amount))
     return Decimal(str(payment_request.amount_paid))
-
-
-def _build_payment_email_products(payment: Payments) -> list[PaymentProductItem]:
-    return [
-        PaymentProductItem(
-            name=pp.product_name,
-            price=float(pp.product_price),
-            quantity=pp.quantity,
-        )
-        for pp in payment.products_snapshot
-    ]
-
-
-def _build_payment_email_attendees(
-    payment: Payments,
-) -> list[PaymentAttendeeItem] | None:
-    if not payment.products_snapshot:
-        return None
-
-    attendees_by_id: dict[uuid.UUID, PaymentAttendeeItem] = {}
-
-    for product_snapshot in payment.products_snapshot:
-        attendee = product_snapshot.attendee
-        attendee_id = product_snapshot.attendee_id
-
-        if attendee_id not in attendees_by_id:
-            attendees_by_id[attendee_id] = PaymentAttendeeItem(
-                name=(attendee.name if attendee else None)
-                or product_snapshot.attendee_name
-                or "Attendee",
-                category=(attendee.category if attendee else None) or "attendee",
-                products=[],
-            )
-
-        attendees_by_id[attendee_id].products = [
-            *(attendees_by_id[attendee_id].products or []),
-            PaymentProductItem(
-                name=product_snapshot.product_name,
-                price=float(product_snapshot.product_price),
-                quantity=product_snapshot.quantity,
-            ),
-        ]
-
-    return list(attendees_by_id.values())
-
-
-def _build_payment_confirmed_context(
-    payment: Payments,
-    popup_name: str,
-    first_name: str,
-    portal_url: str | None,
-) -> PaymentConfirmedContext:
-    products = _build_payment_email_products(payment)
-    attendees = _build_payment_email_attendees(payment)
-
-    original_amount = None
-    if payment.discount_value and payment.discount_value > 0:
-        original_amount = sum(
-            float(pp.product_price) * pp.quantity for pp in payment.products_snapshot
-        )
-
-    return PaymentConfirmedContext(
-        first_name=first_name,
-        popup_name=popup_name,
-        payment_id=str(payment.id),
-        amount=float(payment.amount),
-        currency=payment.currency,
-        products=products if products else None,
-        discount_value=int(payment.discount_value) if payment.discount_value else None,
-        original_amount=original_amount,
-        attendees=attendees,
-        order_summary=compute_order_summary(payment)
-        if payment.products_snapshot
-        else None,
-        portal_url=portal_url,
-    )
-
-
-async def _send_payment_confirmed_email(payment, db_session=None) -> None:
-    """Send payment confirmation email.
-
-    If the popup has invoice details configured (company name, address, email),
-    an invoice PDF is generated and attached to the email.
-
-    Branches on payment.application_id:
-    - application-based: resolve human via payment.application.human.
-    - direct-sale: resolve human via the attendee in the first product snapshot,
-      and popup via payment.popup.
-    """
-    from loguru import logger
-
-    payment_model: Payments = payment
-
-    if payment_model.application_id is not None:
-        # Application-based payment (existing flow)
-        application = payment_model.application
-        human = application.human if application else None
-        popup = application.popup if application else None
-    else:
-        # Direct-sale payment: no application. Human comes from the attendee
-        # linked to the first product snapshot (direct-sale only ever has one
-        # attendee per payment — the buyer).
-        popup = payment_model.popup
-        human = None
-        if payment_model.products_snapshot:
-            attendee = payment_model.products_snapshot[0].attendee
-            if attendee is not None:
-                human = attendee.human
-
-    if popup is None:
-        logger.warning(
-            f"Cannot send payment confirmed email: popup missing for payment {payment.id}"
-        )
-        return
-    tenant = popup.tenant
-
-    if not human or not human.email:
-        logger.warning(
-            f"Cannot send payment confirmed email: no human email for payment {payment.id}"
-        )
-        return
-
-    # Generate invoice PDF attachment if popup has invoice details configured
-    attachments: list[EmailAttachment] | None = None
-    popup_has_invoice = (
-        popup.invoice_company_name
-        and popup.invoice_company_address
-        and popup.invoice_company_email
-    )
-    if popup_has_invoice:
-        try:
-            from app.core.invoice import generate_invoice_pdf
-
-            client_name = f"{human.first_name or ''} {human.last_name or ''}".strip()
-
-            pdf_bytes = generate_invoice_pdf(
-                payment=payment_model,
-                client_name=client_name or "N/A",
-                invoice_company_name=popup.invoice_company_name,
-                invoice_company_address=popup.invoice_company_address,
-                invoice_company_email=popup.invoice_company_email,
-                header_image_url=popup.image_url,
-            )
-            attachments = [
-                EmailAttachment(
-                    filename=f"invoice-{payment_model.id}.pdf",
-                    content=pdf_bytes,
-                    mime_type="application/pdf",
-                )
-            ]
-            logger.info(f"Invoice PDF generated for payment {payment_model.id}")
-        except Exception as e:
-            logger.error(
-                f"Failed to generate invoice PDF for payment {payment_model.id}: {e}"
-            )
-            # Continue sending email without attachment
-
-    email_service = get_email_service()
-
-    from app.api.tenant.utils import get_portal_url
-
-    portal_url = get_portal_url(tenant)
-    context = _build_payment_confirmed_context(
-        payment_model,
-        popup_name=popup.name,
-        first_name=human.first_name or "",
-        portal_url=portal_url,
-    )
-
-    await email_service.send_payment_confirmed(
-        to=human.email,
-        subject=f"Payment Confirmed for {popup.name}",
-        context=context,
-        from_address=tenant.sender_email,
-        from_name=tenant.sender_name,
-        popup_id=popup.id,
-        db_session=db_session,
-        attachments=attachments,
-    )
-    logger.info(
-        f"Payment confirmed email sent to {human.email} for payment {payment.id}"
-    )
-
-
-async def _send_payment_confirmed_email_best_effort(payment, db_session=None) -> None:
-    from loguru import logger
-
-    try:
-        await _send_payment_confirmed_email(payment, db_session=db_session)
-    except Exception:
-        logger.exception(
-            "Failed to send payment confirmation email payment_id={}",
-            getattr(payment, "id", ""),
-        )
 
 
 def _get_portal_owned_payment_or_404(
@@ -733,6 +545,56 @@ async def create_my_application_fee(
     return PaymentPublic.model_validate(payment)
 
 
+@router.post(
+    "/my/pending/release",
+    response_model=PendingReleaseResponse,
+    dependencies=[needs("portal:applications:write")],
+    responses={
+        409: {
+            "description": (
+                "Payment conflict. detail.code='previous_payment_completed' means the prior "
+                "PENDING payment was concurrently approved — includes a redirect_url "
+                "pointing to the buyer's passes page."
+            ),
+        },
+        502: {
+            "description": (
+                "Payment provider error. detail.code='payment_cancel_failed' means the prior "
+                "pending payment could not be cancelled. Checkout should proceed — "
+                "creation-time supersede remains as a backstop."
+            ),
+        },
+    },
+)
+async def release_my_pending_payment(
+    request_in: PendingReleaseAuthRequest,
+    db: HumanTenantSession,
+    current_human: CurrentHuman,
+) -> PendingReleaseResponse:
+    """Opportunistically release a buyer's own prior PENDING payment on checkout return (authenticated).
+
+    Called by the portal on checkout mount for authenticated buyers (portal flow and
+    popup-mode direct sale) before coupon validation or stock display.
+    This frees any coupon/stock/credit holds so the buyer can re-apply their own
+    single-use coupon without a false-invalid error (the circularity fix).
+
+    Proof: application_id ownership, verified against current_human.id.
+
+    Response contract:
+    - HTTP 200 {released: false}: no PENDING for this application, or flag disabled.
+    - HTTP 200 {released: true}: PENDING payment cancelled, holds freed.
+    - HTTP 404: application not found or not owned by current_human (enumeration-safe).
+    - HTTP 409 previous_payment_completed: race lost — prior payment already approved.
+    - HTTP 502 payment_cancel_failed: SimpleFi unreachable; creation-time backstop remains.
+    """
+    result = payments_crud.release_pending_authenticated(
+        db,
+        application_id=request_in.application_id,
+        human_id=current_human.id,
+    )
+    return PendingReleaseResponse(released=result.released)
+
+
 @router.get(
     "/my/popup/{popup_id}",
     response_model=ListModel[PaymentPublic],
@@ -944,6 +806,23 @@ async def preview_my_payment(
     response_model=PaymentPublic,
     status_code=status.HTTP_201_CREATED,
     dependencies=[needs("portal:applications:write")],
+    responses={
+        409: {
+            "description": (
+                "Concurrent payment conflict. "
+                "detail.code is one of: "
+                "'concurrent_payment_in_progress' (another PENDING payment exists and could not be superseded) or "
+                "'previous_payment_completed' (prior payment was completed — redirect_url points to the buyer's passes page)."
+            ),
+        },
+        502: {
+            "description": (
+                "Payment provider error. "
+                "detail.code='payment_cancel_failed' means the prior pending payment could not be cancelled. "
+                "Retry the request."
+            ),
+        },
+    },
 )
 async def create_my_payment(
     payment_in: PaymentCreate,
@@ -1521,6 +1400,8 @@ async def _handle_installment_plan_activated(
 
     installment_plan = payload.data.installment_plan
     new_total = installment_plan.number_of_installments
+    new_paid = installment_plan.paid_installments_count
+    plan_source = _plan_payment_source(installment_plan)
 
     # Idempotent. The fingerprint above catches the redis-cached case, but if
     # SimpleFi re-delivers after a cache eviction we should still no-op
@@ -1529,6 +1410,19 @@ async def _handle_installment_plan_activated(
     # silently overwriting, since downstream installment-counting depends on it.
     if payment.installments_total is not None:
         if payment.installments_total == new_total:
+            changed = False
+            if getattr(payment, "installments_paid", new_paid) != new_paid:
+                payment.installments_paid = new_paid
+                changed = True
+            if (
+                plan_source is not None
+                and getattr(payment, "source", None) != plan_source
+            ):
+                payment.source = plan_source
+                changed = True
+            if changed:
+                db.commit()
+                return {"message": "Installment plan activation synced"}
             logger.info(
                 "Payment {}: installments_total already set to {}; skipping",
                 payment.id,
@@ -1543,6 +1437,7 @@ async def _handle_installment_plan_activated(
         )
 
     payment.installments_total = new_total
+    payment.installments_paid = new_paid
 
     # SimpleFi creates a "plan" even when the buyer picks pay-in-full
     # (number_of_installments = 1). Normalize the flag so data consumers
@@ -1557,7 +1452,6 @@ async def _handle_installment_plan_activated(
     # Activation is the only webhook that exposes the plan's rail/provider,
     # so record it here. Settlement must not downgrade it later (see
     # _handle_installment_payment).
-    plan_source = _plan_payment_source(installment_plan)
     if plan_source is not None:
         payment.source = plan_source
 

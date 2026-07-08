@@ -3,6 +3,7 @@
 import { useParams, useRouter, useSearchParams } from "next/navigation"
 import type { ReactNode } from "react"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { Loader } from "@/components/ui/Loader"
 import { readAndClearPendingPaymentRedirectState } from "@/hooks/usePaymentRedirect"
 import { useCheckout } from "@/providers/checkoutProvider"
 import CheckoutToast from "./CheckoutToast"
@@ -201,13 +202,15 @@ function ScrollyCheckoutFlowInner({
     const sectionsSnapshot = allSections
 
     const prevSnapType = mainEl.style.scrollSnapType
-    // `proximity` (not `mandatory`): sections here can be 2-3 viewport
-    // heights tall (ticket/housing card lists). Mandatory snap turns the
-    // gaps between snap points into dead zones — a moderate touch flick
-    // that ends mid-gap gets yanked back to the previous section, which
-    // on phones feels like the page refusing to scroll. Proximity keeps
-    // the aligned-landing behaviour near section tops and frees the rest.
-    mainEl.style.scrollSnapType = "y proximity"
+    // `mandatory`: every section has min-height equal to the scrollport, so
+    // a scroll can never rest straddling two sections — it always settles
+    // aligned to a section top. Sections TALLER than the scrollport
+    // (ticket/housing card lists) still scroll freely inside themselves:
+    // per the scroll-snap spec, a snap area larger than the snapport is a
+    // valid rest position anywhere it fully covers the snapport.
+    // `proximity` was tried before and let the scroll settle in the empty
+    // space between section content, leaving huge blank screens.
+    mainEl.style.scrollSnapType = "y mandatory"
 
     const sectionEls = sectionsSnapshot
       .map((s) => document.getElementById(s.id))
@@ -403,40 +406,46 @@ function ScrollyCheckoutFlowInner({
     }
   }, [allSections, isInitialLoading, markStepVisited])
 
-  const renderSectionContent = (section: (typeof allSections)[number]) => {
+  const renderSectionContent = (
+    section: (typeof allSections)[number],
+    index: number,
+  ) => {
     const { stepType, config } = section
+    // First section is above the fold: its images are LCP candidates and
+    // must load eagerly with high priority instead of lazily.
+    const isFirstSection = index === 0
 
     if (stepType === "buyer") return <OpenCheckoutBuyerStep />
     if (stepType === "confirm") return <ConfirmStep />
 
     if (stepType === "passes" || stepType === "tickets") {
       if (shouldUseDynamicStep(config ?? undefined)) {
-        return <DynamicProductStep stepConfig={config!} onSkip={() => {}} />
+        return (
+          <DynamicProductStep
+            stepConfig={config!}
+            onSkip={() => {}}
+            isFirstSection={isFirstSection}
+          />
+        )
       }
       return <PassSelectionSection />
     }
 
     if (config) {
-      return <DynamicProductStep stepConfig={config} onSkip={() => {}} />
+      return (
+        <DynamicProductStep
+          stepConfig={config}
+          onSkip={() => {}}
+          isFirstSection={isFirstSection}
+        />
+      )
     }
 
     return null
   }
 
-  if (isSimpleFIReturn) {
-    return (
-      <div className="flex min-h-[60vh] items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-current opacity-60" />
-      </div>
-    )
-  }
-
-  if (isInitialLoading) {
-    return (
-      <div className="flex min-h-[60vh] items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-current opacity-60" />
-      </div>
-    )
+  if (isSimpleFIReturn || isInitialLoading) {
+    return <Loader />
   }
 
   const lastSectionId = allSections[allSections.length - 1]?.id
@@ -455,7 +464,7 @@ function ScrollyCheckoutFlowInner({
         brandLabel={brandLabel}
       />
       <CheckoutToast onChipClick={scrollToStep} />
-      {allSections.map((section) => {
+      {allSections.map((section, sectionIndex) => {
         const { config } = section
         // The ticket-card "stacked" layout renders a responsive grid of cards,
         // which needs more width than the default centred column. Other steps
@@ -470,7 +479,11 @@ function ScrollyCheckoutFlowInner({
           <SnapSection
             key={section.id}
             id={section.id}
-            bottomPadding={section.id === lastSectionId ? "4rem" : "50vh"}
+            // Bottom padding stays small so short sections are exactly one
+            // scrollport tall (mandatory snap then has a single rest position
+            // for them). It only needs to clear the floating cart footer on
+            // tall sections.
+            bottomPadding={section.id === lastSectionId ? "4rem" : "8rem"}
             widthClass={isStackedCards ? "max-w-6xl" : "max-w-2xl"}
           >
             {/* Header and footer stay in the narrow column even when the step
@@ -489,7 +502,7 @@ function ScrollyCheckoutFlowInner({
                 showWatermark={config?.show_watermark ?? true}
               />
             </div>
-            {renderSectionContent(section)}
+            {renderSectionContent(section, sectionIndex)}
             {(() => {
               const ft = (
                 config?.template_config as Record<string, unknown> | undefined

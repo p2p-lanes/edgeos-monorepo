@@ -2,6 +2,7 @@
 
 import Image from "next/image"
 import { useTranslation } from "react-i18next"
+import { imageOptimization } from "@/lib/image-optimization"
 import { useTenant } from "@/providers/tenantProvider"
 
 export default function ComingSoonPage() {
@@ -19,6 +20,7 @@ export default function ComingSoonPage() {
               className="object-contain"
               fill
               sizes="192px"
+              {...imageOptimization(tenant.logo_url)}
             />
           </div>
         )}

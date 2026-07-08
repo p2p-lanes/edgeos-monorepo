@@ -636,9 +636,7 @@ class TestEndToEndVisibilityConsistency:
     never the visibility.
     """
 
-    def _list_ids(
-        self, client: TestClient, popup: Popups, human: Humans
-    ) -> set[str]:
+    def _list_ids(self, client: TestClient, popup: Popups, human: Humans) -> set[str]:
         resp = client.get(
             "/api/v1/events/portal/events",
             params={"popup_id": str(popup.id)},
@@ -832,9 +830,7 @@ class TestEventEditReapproval:
         )
         event = self._published_event(db, tenant_a, popup, owner, venue_id=venue.id)
 
-        resp = self._patch(
-            client, event.id, owner, {"title": "A brand new title"}
-        )
+        resp = self._patch(client, event.id, owner, {"title": "A brand new title"})
 
         assert resp.status_code == 200, resp.text
         # Non-sensitive edit on an approval venue: stays published.
@@ -859,9 +855,7 @@ class TestEventEditReapproval:
             db, tenant_a, popup, owner, venue_id=approval_venue.id
         )
 
-        resp = self._patch(
-            client, event.id, owner, {"venue_id": str(free_venue.id)}
-        )
+        resp = self._patch(client, event.id, owner, {"venue_id": str(free_venue.id)})
 
         assert resp.status_code == 200, resp.text
         # Moving to a free venue is a sensitive change but the resulting venue

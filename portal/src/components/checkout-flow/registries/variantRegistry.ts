@@ -16,6 +16,10 @@ export interface VariantProps {
   stepType: string
   onSkip?: () => void
   templateConfig?: Record<string, unknown> | null
+  /** True when the variant renders inside the first checkout section, i.e.
+   *  above the fold on first paint. Variants use it to load their images
+   *  eagerly with high fetch priority (LCP) instead of lazily. */
+  isFirstSection?: boolean
 }
 
 export const VARIANT_REGISTRY: Record<string, ComponentType<VariantProps>> = {

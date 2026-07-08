@@ -121,9 +121,7 @@ class TestVisibilityFilter:
             ids = {item["id"] for item in payload["results"]}
             assert ids == expected, value
             assert payload["paging"]["total"] == 1
-            assert all(
-                item["visibility"] == value for item in payload["results"]
-            )
+            assert all(item["visibility"] == value for item in payload["results"])
 
     def test_no_visibility_returns_all(
         self,
@@ -135,12 +133,8 @@ class TestVisibilityFilter:
         popup = _make_popup(db, tenant_a)
         host = _make_human(db, tenant_a)
         _create_portal_event(client, popup, host, title="Pub", visibility="public")
-        _create_portal_event(
-            client, popup, host, title="Unl", visibility="unlisted"
-        )
-        _create_portal_event(
-            client, popup, host, title="Priv", visibility="private"
-        )
+        _create_portal_event(client, popup, host, title="Unl", visibility="unlisted")
+        _create_portal_event(client, popup, host, title="Priv", visibility="private")
 
         resp = client.get(
             "/api/v1/events",

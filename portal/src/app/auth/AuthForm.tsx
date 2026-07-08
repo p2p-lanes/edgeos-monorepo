@@ -10,6 +10,7 @@ import { z } from "zod/v4"
 import { ApiError, AuthService } from "@/client"
 import { ButtonAnimated } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { imageOptimization } from "@/lib/image-optimization"
 import { queryKeys } from "@/lib/query-keys"
 import { getSafeReturnTo } from "@/lib/safe-return-to"
 import { useTenant } from "@/providers/tenantProvider"
@@ -183,6 +184,7 @@ export default function AuthForm() {
               className="size-full rounded-lg object-cover"
               fill
               sizes="180px"
+              {...imageOptimization(tenant.logo_url)}
             />
           ) : (
             <div className="size-full rounded-lg bg-muted flex items-center justify-center">
