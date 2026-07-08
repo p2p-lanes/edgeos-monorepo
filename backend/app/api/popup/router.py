@@ -399,11 +399,25 @@ async def delete_popup(
 @router.get("/portal/list", response_model=list[PopupPublic])
 async def list_portal_popups(
     db: HumanTenantSession,
-    _current_human: CurrentHuman,
+    current_human: CurrentHuman,
     accept_language: Annotated[str | None, Header(alias="Accept-Language")] = None,
 ) -> list[PopupPublic]:
-    """List active popups for the current human's tenant (Portal)."""
-    popups, _total = crud.find(db, status=PopupStatus.active, limit=100)
+    """List popups visible to the current human in the Portal.
+
+    Active popups are visible to everyone in the tenant. Ended popups (recap
+    mode) are visible only to humans who participated, resolved via the same
+    access ladder used by the passes/events gates.
+    """
+    from app.api.application.crud import applications_crud  # noqa: PLC0415
+
+    active_popups, _ = crud.find(db, status=PopupStatus.active, limit=100)
+    ended_popups, _ = crud.find(db, status=PopupStatus.ended, limit=100)
+    participated_ended = [
+        p
+        for p in ended_popups
+        if applications_crud.resolve_popup_access(db, current_human.id, p.id).allowed
+    ]
+    popups = list(active_popups) + participated_ended
 
     if not accept_language or accept_language == "en":
         return [PopupPublic.model_validate(p) for p in popups]
@@ -426,17 +440,27 @@ async def list_portal_popups(
 async def get_portal_popup(
     slug: str,
     db: HumanTenantSession,
-    _: CurrentHuman,
+    current_human: CurrentHuman,
     accept_language: Annotated[str | None, Header(alias="Accept-Language")] = None,
 ) -> PopupPublic:
-    """Get a popup by slug (Portal)."""
+    """Get a popup by slug (Portal). Ended popups are served only to participants."""
+    from app.api.application.crud import applications_crud  # noqa: PLC0415
+
     popup = crud.get_by_slug(db, slug)
 
-    if not popup or popup.status != PopupStatus.active:
+    if not popup or popup.status not in (PopupStatus.active, PopupStatus.ended):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Event not found",
         )
+
+    if popup.status == PopupStatus.ended:
+        access = applications_crud.resolve_popup_access(db, current_human.id, popup.id)
+        if not access.allowed:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Event not found",
+            )
 
     if not accept_language or accept_language == "en":
         return PopupPublic.model_validate(popup)
