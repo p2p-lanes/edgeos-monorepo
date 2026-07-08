@@ -8,6 +8,7 @@ import { CompanionView } from "@/components/CompanionView"
 import { ScholarshipStatusBadge } from "@/components/ScholarshipStatusBadge"
 import { useApplication } from "@/providers/applicationProvider"
 import { useCityProvider } from "@/providers/cityProvider"
+import RecapLanding from "./components/RecapLanding"
 
 export default function Home() {
   const { getCity } = useCityProvider()
@@ -17,6 +18,10 @@ export default function Home() {
   const relevantApplication = getRelevantApplication()
 
   if (!city) return null
+
+  if (city.status === "ended") {
+    return <RecapLanding popup={city} />
+  }
 
   const isDirectSale = city.sale_type === "direct"
 
