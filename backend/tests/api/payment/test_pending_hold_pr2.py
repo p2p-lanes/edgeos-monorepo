@@ -440,8 +440,9 @@ class TestSupersedeInstallmentPlan:
 class TestRaceLostApproved:
     """supersede_pending_payments with ALREADY_APPROVED outcome raises 409 previous_payment_completed.
 
-    Task 5.4: cancel → ALREADY_APPROVED → _reconcile_approved runs; 409 raised with payment_id;
-    no holds released; no new payment created.
+    Task 5.4 (strengthened — B2 + S1): cancel → ALREADY_APPROVED → _reconcile_approved runs
+    for real (no mock); prior payment ends APPROVED in DB; holds not released; no payment_id
+    in the 409 response; redirect_url points to the buyer's passes page.
     """
 
     def test_already_approved_raises_409(
@@ -449,7 +450,12 @@ class TestRaceLostApproved:
         db: Session,
         tenant_a: Tenants,
     ) -> None:
-        """Race-lost: SimpleFi returns ALREADY_APPROVED → 409 previous_payment_completed."""
+        """Race-lost (authenticated): _reconcile_approved runs for real; payment is APPROVED in DB.
+
+        B2 fix: _reconcile_approved now acquires a row lock before calling approve_payment,
+        ensuring a concurrent webhook can't add products twice.
+        S1 fix: 409 detail has no raw payment_id; redirect_url points to the passes page.
+        """
         popup = _make_popup(db, tenant_a, slug_prefix="race-lost")
         human = _make_human(db, tenant_a)
         application = _make_application(db, tenant_a, popup, human)
@@ -467,32 +473,47 @@ class TestRaceLostApproved:
             )
             mock_client_factory.return_value = mock_client
 
-            with patch.object(payments_crud, "_reconcile_approved") as mock_reconcile:
-                with pytest.raises(HTTPException) as exc_info:
-                    payments_crud.supersede_pending_payments(
-                        db,
-                        application_id=application.id,
-                    )
+            # No mock on _reconcile_approved — it runs for real (B2 strengthening)
+            with pytest.raises(HTTPException) as exc_info:
+                payments_crud.supersede_pending_payments(
+                    db,
+                    application_id=application.id,
+                )
 
         exc = exc_info.value
         assert exc.status_code == 409
         assert isinstance(exc.detail, dict)
         assert exc.detail["code"] == "previous_payment_completed"
-        assert "payment_id" in exc.detail
-        assert str(prior_payment.id) == exc.detail["payment_id"]
 
-        # _reconcile_approved must have been called
-        mock_reconcile.assert_called_once()
+        # S1: no raw payment UUID exposed in anonymous/semi-anonymous response
+        assert "payment_id" not in exc.detail
 
-        # Coupon NOT released (prior payment was approved)
+        # S1: authenticated path has redirect_url pointing to the buyer's passes page
+        assert "redirect_url" in exc.detail
+        redirect = exc.detail["redirect_url"]
+        assert redirect is not None
+        assert "/passes" in redirect
+
+        # B2: prior payment is APPROVED in the DB (reconcile ran for real)
+        db.expire_all()
+        fresh = db.get(Payments, prior_payment.id)
+        assert fresh is not None
+        assert fresh.status == PaymentStatus.APPROVED.value
+
+        # Coupon NOT released — approved payment keeps its coupon use
         assert _fresh_coupon_uses(db, coupon.id) == uses_before
 
-    def test_already_approved_open_checkout_includes_redirect_url(
+    def test_already_approved_open_checkout_redirect_url_absent_without_signing(
         self,
         db: Session,
         tenant_a: Tenants,
     ) -> None:
-        """Race-lost on open checkout: 409 detail includes redirect_url for thank-you page."""
+        """Race-lost on open checkout without signing: redirect_url is None (S1 fix).
+
+        When the popup has no open_checkout_signing_secret, the 409 response omits
+        a usable redirect_url so no unsigned navigable URL is handed to anonymous callers.
+        The portal falls back to a message-only state.
+        """
         popup = _make_popup(db, tenant_a, slug_prefix="race-oc")
         buyer_email = f"racer-{uuid.uuid4().hex[:8]}@example.com"
         _make_pending_payment(db, tenant_a, popup, buyer_email=buyer_email)
@@ -515,8 +536,11 @@ class TestRaceLostApproved:
         exc = exc_info.value
         assert exc.status_code == 409
         assert exc.detail["code"] == "previous_payment_completed"
-        # open-checkout includes redirect_url (may be None if no custom URL, but key must exist)
+        # S1: no raw payment_id exposed to anonymous caller
+        assert "payment_id" not in exc.detail
+        # S1: no signing secret → redirect_url is None (portal falls back to message-only)
         assert "redirect_url" in exc.detail
+        assert exc.detail["redirect_url"] is None
 
 
 class TestCancelTransportFailure:
@@ -735,3 +759,205 @@ class TestConcurrentCreateSameBuyer:
         exc = exc_info.value
         assert exc.status_code == 409
         assert exc.detail["code"] == "concurrent_payment_in_progress"
+        # S2: sibling 409 must NOT expose the payment UUID to anonymous callers
+        assert "payment_id" not in exc.detail
+
+
+# ---------------------------------------------------------------------------
+# B1 regression: update_status must bypass the session identity map
+# ---------------------------------------------------------------------------
+
+
+class TestUpdateStatusIdentityMapBypass:
+    """Regression for B1: update_status reads fresh DB state after acquiring lock.
+
+    Without the fix, the two-step approach (raw text() lock + self.get()) returned
+    the stale PENDING object from the session identity map even after a concurrent
+    transaction committed CANCELLED — causing a double-release of coupon/stock.
+    """
+
+    def test_second_update_status_sees_cancelled_not_pending(
+        self,
+        db: Session,
+        test_engine,
+        tenant_a: Tenants,
+    ) -> None:
+        """Session A pre-loads payment as PENDING. Session B commits CANCELLED.
+        Session A's update_status must NOT release holds again.
+
+        Proves that ``with_for_update()`` bypasses the identity map and returns
+        the post-lock DB state (CANCELLED), so the PENDING-only guard skips the
+        second release.
+        """
+        from sqlmodel import Session as Sess
+
+        popup = _make_popup(db, tenant_a, slug_prefix="b1-imap")
+        coupon = _make_coupon(db, popup, current_uses=3)
+        payment = _make_pending_payment(db, tenant_a, popup, coupon=coupon)
+
+        # Pre-load payment into Session A's identity map — it sees PENDING
+        stale = db.get(Payments, payment.id)
+        assert stale is not None
+        assert stale.status == PaymentStatus.PENDING.value
+
+        # Session B commits CANCELLED — coupon released (uses: 3 → 2)
+        with Sess(test_engine) as session_b:
+            payments_crud.update_status(session_b, payment.id, PaymentStatus.CANCELLED)
+
+        uses_after_b = _fresh_coupon_uses(db, coupon.id)
+        assert uses_after_b == 2  # One release from Session B
+
+        # Session A calls update_status again.  With the B1 fix (with_for_update()),
+        # it reads CANCELLED from DB — not stale PENDING from identity map — so the
+        # PENDING-only guard skips the second coupon release.
+        payments_crud.update_status(db, payment.id, PaymentStatus.EXPIRED)
+
+        uses_after_a = _fresh_coupon_uses(db, coupon.id)
+        # Must still be 2, not 1 (no second release)
+        assert uses_after_a == 2, (
+            "update_status released holds twice — identity map bypass (B1) is broken"
+        )
+
+
+# ---------------------------------------------------------------------------
+# W1: orphaned payment branch (popup without simplefi_api_key)
+# ---------------------------------------------------------------------------
+
+
+class TestOrphanedPayment:
+    """W1: When the popup has no simplefi_api_key, supersede releases holds directly
+    without any SimpleFi call (orphaned payment path — crud.py ~2946-2958).
+    """
+
+    def test_orphaned_payment_released_without_simplefi(
+        self,
+        db: Session,
+        tenant_a: Tenants,
+    ) -> None:
+        """Prior payment with no simplefi_api_key → CANCELLED locally; no SimpleFi call."""
+        popup = Popups(
+            tenant_id=tenant_a.id,
+            name="No-Key Popup",
+            slug=f"nokey-{uuid.uuid4().hex[:6]}",
+            sale_type=SaleType.direct.value,
+            status="active",
+            simplefi_api_key=None,  # Deliberately missing
+            currency="ARS",
+        )
+        db.add(popup)
+        db.flush()
+
+        coupon = _make_coupon(db, popup, current_uses=2)
+        prior_payment = _make_pending_payment(
+            db,
+            tenant_a,
+            popup,
+            coupon=coupon,
+            application_id=None,
+            buyer_email="orphan@test.com",
+        )
+
+        uses_before = _fresh_coupon_uses(db, coupon.id)
+
+        # Use a mock to verify SimpleFi is NOT called
+        with patch("app.services.simplefi.get_simplefi_client") as mock_sf:
+            payments_crud.supersede_pending_payments(
+                db,
+                email="orphan@test.com",
+                popup_id=popup.id,
+            )
+
+        # No SimpleFi call (orphaned payment — no API key)
+        mock_sf.assert_not_called()
+
+        # Payment released locally
+        assert (
+            _fresh_payment_status(db, prior_payment.id) == PaymentStatus.CANCELLED.value
+        )
+        # Coupon hold released
+        assert _fresh_coupon_uses(db, coupon.id) == uses_before - 1
+
+
+# ---------------------------------------------------------------------------
+# B3: SUPERSEDE_PENDING_ENABLED=False restores pre-PR sequential-purchase behavior
+# ---------------------------------------------------------------------------
+
+
+class TestSupersedePendingDisabled:
+    """B3: When SUPERSEDE_PENDING_ENABLED=False, the entire new machinery
+    (supersede call, advisory lock, sibling re-check) is bypassed.
+
+    Sequential same-buyer open-checkout purchases succeed exactly as they did
+    before the PR — the prior PENDING payment is NOT cancelled and no 409 is
+    raised by the sibling re-check.
+    """
+
+    def test_sequential_open_checkout_succeeds_when_supersede_disabled(
+        self,
+        db: Session,
+        tenant_a: Tenants,
+    ) -> None:
+        """With flag=False, a second open-checkout purchase succeeds even with a prior PENDING.
+
+        Verifies that _check_no_pending_sibling_by_email_popup is NOT invoked so
+        the pre-existing PENDING payment from the first checkout does not block the
+        second request.
+        """
+        from types import SimpleNamespace
+
+        from app.api.checkout.schemas import (
+            BuyerInfo,
+            OpenTicketingPurchaseCreate,
+            ProductLine,
+        )
+        from app.core.config import settings as _app_settings
+
+        popup = _make_popup(db, tenant_a, slug_prefix="b3-oc")
+        product = _make_product(db, tenant_a, popup)
+        buyer_email = f"b3-buyer-{uuid.uuid4().hex[:8]}@example.com"
+
+        # Prior PENDING payment — would normally block via sibling re-check
+        prior_payment = _make_pending_payment(
+            db, tenant_a, popup, buyer_email=buyer_email
+        )
+
+        sf_resp = SimpleNamespace(
+            id=f"sf-b3-{uuid.uuid4().hex[:8]}",
+            status="pending",
+            checkout_url="https://sf.test/b3",
+            is_installment_plan=False,
+        )
+
+        obj = OpenTicketingPurchaseCreate(
+            buyer=BuyerInfo(email=buyer_email, first_name="B3", last_name="Test"),
+            products=[ProductLine(product_id=product.id, quantity=1)],
+        )
+
+        with patch.object(_app_settings, "SUPERSEDE_PENDING_ENABLED", False):
+            with patch("app.services.simplefi.get_simplefi_client") as mock_get_client:
+                mock_client = MagicMock()
+                mock_client.create_payment.return_value = sf_resp
+                mock_get_client.return_value = mock_client
+
+                with patch.object(
+                    payments_crud,
+                    "_check_no_pending_sibling_by_email_popup",
+                    wraps=payments_crud._check_no_pending_sibling_by_email_popup,
+                ) as spy_check:
+                    new_payment, checkout_url, _ = (
+                        payments_crud.create_open_ticketing_payment(
+                            db, obj=obj, popup=popup, tenant=tenant_a
+                        )
+                    )
+
+        # B3: sibling re-check was never called (gated by the flag)
+        spy_check.assert_not_called()
+
+        # New purchase succeeded
+        assert new_payment is not None
+        assert checkout_url == "https://sf.test/b3"
+
+        # Prior payment still PENDING (not superseded — flag was off)
+        assert (
+            _fresh_payment_status(db, prior_payment.id) == PaymentStatus.PENDING.value
+        )

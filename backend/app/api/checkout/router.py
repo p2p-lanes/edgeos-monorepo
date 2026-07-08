@@ -165,7 +165,7 @@ async def get_checkout_share_meta(
                 "Concurrent payment conflict. "
                 "detail.code is one of: "
                 "'concurrent_payment_in_progress' (another PENDING payment exists and could not be superseded) or "
-                "'previous_payment_completed' (prior payment was approved — includes payment_id and redirect_url)."
+                "'previous_payment_completed' (prior payment was approved — includes redirect_url when signing is configured)."
             ),
         },
         502: {

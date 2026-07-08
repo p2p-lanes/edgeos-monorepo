@@ -23,10 +23,12 @@ from app.api.form_section.models import FormSections
 from app.api.human.models import Humans
 from app.api.payment.crud import payments_crud
 from app.api.payment.models import PaymentProducts, Payments
+from app.api.payment.schemas import PaymentStatus
 from app.api.popup.models import Popups
 from app.api.product.models import Products
 from app.api.shared.enums import SaleType
 from app.api.tenant.models import Tenants
+from app.services.simplefi.client import CancelOutcome
 
 
 def _make_popup(
@@ -279,7 +281,12 @@ def test_create_open_ticketing_payment_second_purchase_reuses_attendee(
     db: Session,
     tenant_a: Tenants,
 ) -> None:
-    """Second purchase by same (human, popup) reuses the existing attendee.  Design §2.1 / Spec C2."""
+    """Second purchase by same (human, popup) reuses the existing attendee.  Design §2.1 / Spec C2.
+
+    B4 fix: with supersede enabled the second call cancels the first PENDING payment before
+    creating a new one.  The mock must stub cancel_payment_request so supersede returns
+    CancelOutcome.CANCELED and the prior payment ends up CANCELLED (not blocking the new one).
+    """
     popup = _make_popup(db, tenant_a, slug_prefix="reuse")
     product = _make_product(db, popup, name="GA", price="50.00")
     section = _make_section(db, popup, label="Buyer Info")
@@ -316,15 +323,33 @@ def test_create_open_ticketing_payment_second_purchase_reuses_attendee(
         is_installment_plan=False,
     )
 
-    with patch("app.services.simplefi.get_simplefi_client") as mock_get_client:
-        mock_get_client.return_value.create_payment.side_effect = [sf_resp1, sf_resp2]
+    from unittest.mock import MagicMock
 
-        payments_crud.create_open_ticketing_payment(
+    with patch("app.services.simplefi.get_simplefi_client") as mock_get_client:
+        mock_client = MagicMock()
+        mock_client.create_payment.side_effect = [sf_resp1, sf_resp2]
+        # B4: stub cancel so supersede completes on the second purchase.
+        # Without this stub the second purchase raises 409 (prior stays PENDING).
+        mock_client.cancel_payment_request.return_value = CancelOutcome.CANCELED
+        mock_get_client.return_value = mock_client
+
+        p1, _, _ = payments_crud.create_open_ticketing_payment(
             db, obj=obj1, popup=popup, tenant=tenant_a
         )
-        payments_crud.create_open_ticketing_payment(
+        p2, _, _ = payments_crud.create_open_ticketing_payment(
             db, obj=obj2, popup=popup, tenant=tenant_a
         )
+
+    # Second purchase superseded the first: P1 is CANCELLED, P2 is PENDING
+    db.expire_all()
+    fresh_p1 = db.get(Payments, p1.id)
+    assert fresh_p1 is not None
+    assert fresh_p1.status == PaymentStatus.CANCELLED.value, (
+        "First payment should be CANCELLED after supersede"
+    )
+    fresh_p2 = db.get(Payments, p2.id)
+    assert fresh_p2 is not None
+    assert fresh_p2.status == PaymentStatus.PENDING.value
 
     # Still exactly 1 attendee after two purchases
     attendees = list(

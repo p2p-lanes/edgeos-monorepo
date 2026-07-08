@@ -770,11 +770,11 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             )
             for line in obj.products
         ]
-        # ADR-2 supersede pre-step: cancel any prior PENDING SimpleFi payment
-        # for this email+popup_id BEFORE acquiring the advisory lock and BEFORE
-        # any stock/coupon reservation.  The SimpleFi cancel HTTP call MUST NOT
-        # be made while holding any DB lock.  supersede_pending_payments commits
-        # the hold release so the subsequent reservation always sees freed holds.
+        # ADR-2 supersede pre-step + advisory lock: the ENTIRE new machinery
+        # (supersede, advisory lock, sibling re-check) is gated on
+        # SUPERSEDE_PENDING_ENABLED so that setting it to False restores exact
+        # pre-PR behavior — sequential same-buyer purchases succeed without any
+        # hold on the lock or 409 from the sibling re-check.
         from app.core.config import settings as _settings
 
         buyer_snapshot = self._build_buyer_snapshot(
@@ -790,42 +790,65 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             f"{obj.buyer.first_name} {obj.buyer.last_name}".strip() or obj.buyer.email
         )
 
+        # _got_oc_lock tracks whether the advisory lock was acquired so that
+        # the 409 guard below is only active when the lock was attempted.
+        # With transaction-level locks the finally block needs no explicit
+        # unlock, but _got_oc_lock is kept for the guard logic.
+        _got_oc_lock = False
+
         if _settings.SUPERSEDE_PENDING_ENABLED:
+            # Cancel any prior PENDING SimpleFi payment BEFORE acquiring the
+            # advisory lock and BEFORE any reservation.  SimpleFi cancel MUST
+            # NOT be called while holding any DB lock.  supersede commits the
+            # hold release so the subsequent reservation sees freed holds.
             self.supersede_pending_payments(
                 session,
                 email=obj.buyer.email,
                 popup_id=popup.id,
             )
 
-        # ADR-2 advisory lock: serialize concurrent open-checkout requests for
-        # the same email+popup_id.  The lock prevents duplicate SimpleFi cancel
-        # calls (robustness) and is the serialization point for the sibling
-        # re-check inside the try block.  pg_try_advisory_lock is non-blocking;
-        # if another request holds the lock, abort with 409.
-        _oc_lock_key = f"{popup.id}:{obj.buyer.email.lower()}"
-        _got_oc_lock = session.execute(
-            text("SELECT pg_try_advisory_lock(hashtext(:key)::bigint)"),
-            {"key": _oc_lock_key},
-        ).scalar()
-        if not _got_oc_lock:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail={
-                    "code": "concurrent_payment_in_progress",
-                    "message": (
-                        "Another checkout is currently in progress for this email. "
-                        "Please wait a moment and try again."
-                    ),
-                },
-            )
+            # ADR-2 advisory lock: serialize concurrent open-checkout requests
+            # for the same email+popup_id.  Prevents duplicate SimpleFi cancel
+            # calls (robustness) and is the serialization point for the sibling
+            # re-check inside the try block.
+            #
+            # TRANSACTION-LEVEL lock (pg_try_advisory_xact_lock): released
+            # automatically when the surrounding transaction commits or rolls
+            # back.  This avoids the connection-pooling hazard of session-level
+            # locks where session.commit() can return the connection to the pool
+            # before the explicit pg_advisory_unlock in the finally block,
+            # leaving the lock held on a pooled connection indefinitely.
+            # The transaction-level variant is semantically equivalent for our
+            # use case: the lock must span from the sibling re-check to the
+            # payment commit — which is exactly one transaction boundary.
+            # Non-blocking: abort with 409 if another request holds the lock.
+            _oc_lock_key = f"{popup.id}:{obj.buyer.email.lower()}"
+            _got_oc_lock = session.execute(
+                text("SELECT pg_try_advisory_xact_lock(hashtext(:key)::bigint)"),
+                {"key": _oc_lock_key},
+            ).scalar()
+            if not _got_oc_lock:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail={
+                        "code": "concurrent_payment_in_progress",
+                        "message": (
+                            "Another checkout is currently in progress for this email. "
+                            "Please wait a moment and try again."
+                        ),
+                    },
+                )
 
         try:
-            # ADR-2 post-lock sibling re-check (under advisory lock, NO SimpleFi
-            # call): abort if a concurrent request already started a new PENDING
-            # payment for the same email+popup_id.
-            self._check_no_pending_sibling_by_email_popup(
-                session, obj.buyer.email, popup.id
-            )
+            if _settings.SUPERSEDE_PENDING_ENABLED:
+                # ADR-2 post-lock sibling re-check (under advisory lock, NO
+                # SimpleFi call): abort if a concurrent request already created
+                # a new PENDING payment for the same email+popup_id between the
+                # supersede step and this lock acquisition.  Skipped when
+                # SUPERSEDE_PENDING_ENABLED=False to preserve pre-PR behavior.
+                self._check_no_pending_sibling_by_email_popup(
+                    session, obj.buyer.email, popup.id
+                )
 
             # Validate per-order caps (cheap in-memory check, fail fast before DB).
             self._validate_max_per_order(fabricated_requests, valid_products)
@@ -1069,6 +1092,16 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 if computed >= 2:
                     max_installments = computed
 
+            # W3/S3 invariant: SimpleFi CREATE stays inside the advisory lock.
+            # Releasing the lock before create_payment would re-open the
+            # duplicate-PENDING window: a second request could pass the sibling
+            # re-check (finding no PENDING yet) and race to create a second
+            # SimpleFi link for the same buyer.
+            # The transaction-level advisory lock (pg_try_advisory_xact_lock) is
+            # held for the entire current transaction.  session.commit() below
+            # commits the new payment row AND atomically releases the lock — so
+            # any subsequent lock holder is guaranteed to find the committed row
+            # in the sibling re-check.  No explicit unlock is needed.
             simplefi_response = simplefi_client.create_payment(
                 amount=payment.amount,
                 popup_slug=popup.slug,
@@ -1117,15 +1150,12 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 detail="Failed to create payment with payment provider",
             ) from exc
         finally:
-            # Release the session-level advisory lock acquired before this try
-            # block.  Runs on success, exception (including 409/502 from supersede
-            # that propagated here), and rollback — safe because the lock is
-            # session-level and survives transaction commits.
-            if _got_oc_lock:
-                session.execute(
-                    text("SELECT pg_advisory_unlock(hashtext(:key)::bigint)"),
-                    {"key": _oc_lock_key},
-                )
+            # Transaction-level advisory lock (pg_try_advisory_xact_lock) is
+            # released automatically on commit or rollback — no explicit unlock
+            # needed here.  The finally block is kept as documentation that this
+            # is intentionally a no-op for the lock: the commit at the end of
+            # the try block (or the rollback in the except blocks) handles it.
+            pass
 
     def find_by_human_popup(
         self,
@@ -1999,8 +2029,10 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         # ADR-2 post-lock sibling re-check: abort if a concurrent create_payment
         # call already created a new PENDING payment for the same application
         # between the supersede step above and this lock acquisition.  No
-        # SimpleFi call is made under this lock.
-        self._check_no_pending_sibling_by_application(session, application_id)
+        # SimpleFi call is made under this lock.  Gated on the same flag as
+        # supersede to restore pre-PR sequential-purchase behavior when disabled.
+        if _settings.SUPERSEDE_PENDING_ENABLED:
+            self._check_no_pending_sibling_by_application(session, application_id)
 
         preview = self.preview_payment(session, obj)
 
@@ -2807,13 +2839,36 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         """Idempotently approve a payment whose SimpleFi status is already approved.
 
         Called by supersede_pending_payments (race-lost path) and the pending
-        payment sweeper (approved-during-sweep path).  Delegates to
-        approve_payment which is idempotent (returns early if status is already
-        APPROVED).  Confirmation email dispatch is the caller's responsibility
-        because this method is synchronous.
+        payment sweeper (approved-during-sweep path).  Confirmation email
+        dispatch is the caller's responsibility because this method is
+        synchronous.
+
+        Acquires a ``SELECT ... FOR UPDATE`` row lock before reading the current
+        status so that a concurrent webhook path (which also calls approve_payment
+        via update_status) cannot add products a second time.  The lock also
+        refreshes the session identity map so approve_payment sees the current
+        DB state even when supersede_pending_payments pre-loaded the payment as
+        PENDING in the same session.
 
         Returns the (possibly freshly) approved payment.
         """
+        # Lock the row and get a fresh DB read, overriding any stale PENDING
+        # value cached in the session identity map from the earlier supersede
+        # lookup.  After this query, session.get(Payments, payment.id) returns
+        # the refreshed instance, so approve_payment's own idempotency guard
+        # sees the current status from the DB.
+        fresh = session.exec(
+            select(Payments).where(Payments.id == payment.id).with_for_update()
+        ).first()
+        if fresh is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Payment not found",
+            )
+        if fresh.status == PaymentStatus.APPROVED.value:
+            # Already approved by a concurrent transaction (e.g. webhook beat
+            # supersede to the lock).  Return without adding products again.
+            return fresh
         return self.approve_payment(session, payment.id)
 
     def _check_no_pending_sibling_by_application(
@@ -2848,7 +2903,6 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                         "Another payment for this application is currently being "
                         "processed. Please wait a moment and try again."
                     ),
-                    "payment_id": str(sibling.id),
                 },
             )
 
@@ -2887,7 +2941,6 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                         "Another checkout is currently in progress for this email. "
                         "Please wait a moment and try again."
                     ),
-                    "payment_id": str(sibling.id),
                 },
             )
 
@@ -2993,8 +3046,25 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 )
             else:
                 outcome = simplefi_client.cancel_payment_request(str(prior.external_id))
-        except (CancelOutcomeAmbiguousError, Exception) as exc:
-            # Transport error, 5xx, or unresolvable status — do NOT release holds
+        except CancelOutcomeAmbiguousError as exc:
+            # Outcome unresolvable (ambiguous response from SimpleFi) — do NOT
+            # release holds.  Distinct log from transport failures so alerts
+            # can differentiate provider-side ambiguity from network issues.
+            logger.warning(
+                "supersede_pending_payments: SimpleFi cancel outcome ambiguous "
+                "payment={}, error={!r}",
+                prior.id,
+                exc,
+            )
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail={
+                    "code": "payment_cancel_failed",
+                    "message": "We could not process your payment. Please try again.",
+                },
+            ) from exc
+        except Exception as exc:
+            # Transport error, timeout, or 5xx — do NOT release holds
             logger.warning(
                 "supersede_pending_payments: SimpleFi cancel failed "
                 "payment={}, error={!r}",
@@ -3018,23 +3088,70 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             # Idempotently approve to ensure tickets are issued.
             self._reconcile_approved(session, prior)
 
-            # Build the open-checkout thank-you redirect URL (open checkout only)
+            # Build a safe redirect URL for the 409 response.
+            # Security contract (S1):
+            #   - Never expose the raw payment UUID to anonymous callers.
+            #   - Open checkout: use the signed-redirect machinery so the link
+            #     is tamper-evident.  If no signing secret is configured, omit
+            #     redirect_url entirely (portal falls back to message-only).
+            #   - Authenticated: redirect to the buyer's own passes page; no
+            #     payment UUID is needed or included.
             redirect_url: str | None = None
-            if prior.application_id is None and _popup is not None:
-                _tenant = session.get(_Tenants, prior.tenant_id)
-                if _tenant is not None:
+            _tenant = session.get(_Tenants, prior.tenant_id) if _popup else None
+
+            if (
+                prior.application_id is None
+                and _popup is not None
+                and _tenant is not None
+            ):
+                # Open-checkout path: signed redirect only when signing is configured.
+                secret = _popup.open_checkout_signing_secret
+                if secret:
+                    from app.api.shared.enums import LandingMode  # noqa: PLC0415
+
                     portal_base = get_portal_url(_tenant)
-                    redirect_url = (
-                        f"{portal_base}/checkout/{_popup.slug}"
-                        f"/thank-you?payment_id={prior.id}"
+                    landing_is_checkout = _tenant.landing_mode == LandingMode.checkout
+                    internal_url = _internal_open_checkout_thank_you_url(
+                        portal_base, landing_is_checkout, _popup, prior
                     )
+                    payload = build_thank_you_payload(
+                        order_id=str(prior.id),
+                        first_name=str(
+                            (prior.buyer_snapshot or {}).get("first_name", "")
+                        ),
+                        email=str((prior.buyer_snapshot or {}).get("buyer_email", "")),
+                        items=[
+                            {"name": pp.product_name, "quantity": pp.quantity}
+                            for pp in prior.products_snapshot
+                        ],
+                        amount_total=str(prior.amount),
+                        currency=prior.currency or "",
+                        issued_at=datetime.now(UTC).isoformat(),
+                    )
+                    if _popup.open_checkout_success_url:
+                        redirect_url = build_signed_redirect_url(
+                            _popup.open_checkout_success_url, payload, secret
+                        )
+                    else:
+                        redirect_url = build_unsigned_redirect_url(
+                            internal_url, payload
+                        )
+                # else: no signing secret — omit redirect_url (portal message-only)
+
+            elif (
+                prior.application_id is not None
+                and _popup is not None
+                and _tenant is not None
+            ):
+                # Authenticated path: send buyer to their own passes page.
+                portal_base = get_portal_url(_tenant)
+                redirect_url = f"{portal_base}/portal/{_popup.slug}/passes"
 
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail={
                     "code": "previous_payment_completed",
                     "message": "Your previous payment was completed.",
-                    "payment_id": str(prior.id),
                     "redirect_url": redirect_url,
                 },
             )
@@ -3053,14 +3170,18 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         atomic: only one caller reads PENDING and releases holds; subsequent
         callers find the status already terminal and skip the release.
         """
-        # ADR-1: Acquire row lock before reading status.  Prevents two
-        # concurrent callers from both reading PENDING and both releasing
-        # coupon/stock/credit holds (double-release).
-        session.execute(
-            text("SELECT id FROM payments WHERE id = :id FOR UPDATE"),
-            {"id": payment_id},
-        )
-        payment = self.get(session, payment_id)
+        # ADR-1: Acquire row lock AND read fresh state in a single query.
+        # Using ``with_for_update()`` on the SELECT bypasses the session
+        # identity map, ensuring this caller sees the post-lock DB state
+        # even when the same session pre-loaded the payment as PENDING
+        # (e.g. supersede loads ``prior`` before calling update_status; a
+        # concurrent transaction could commit CANCELLED between those two
+        # points; the old two-step approach — raw text() lock + self.get() —
+        # would return the stale PENDING from the identity map and release
+        # holds a second time).
+        payment = session.exec(
+            select(Payments).where(Payments.id == payment_id).with_for_update()
+        ).first()
         if not payment:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
