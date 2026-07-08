@@ -159,6 +159,23 @@ async def get_checkout_share_meta(
     dependencies=[
         Depends(RateLimit(limit=10, window_sec=60, key_prefix="rl:checkout-purchase")),
     ],
+    responses={
+        409: {
+            "description": (
+                "Concurrent payment conflict. "
+                "detail.code is one of: "
+                "'concurrent_payment_in_progress' (another PENDING payment exists and could not be superseded) or "
+                "'previous_payment_completed' (prior payment was approved — includes payment_id and redirect_url)."
+            ),
+        },
+        502: {
+            "description": (
+                "Payment provider error. "
+                "detail.code='payment_cancel_failed' means the prior pending payment could not be cancelled. "
+                "Retry the request."
+            ),
+        },
+    },
 )
 async def purchase_open_ticketing(
     slug: str,
