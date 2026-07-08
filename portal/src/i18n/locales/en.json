@@ -283,7 +283,10 @@
     "no_meal_plans": "No meal plans available.",
     "no_contributions": "No contribution options available.",
     "step_config_error": "Step configuration error.",
-    "step_config_error_detail": "No template assigned to this step. Please contact your administrator."
+    "step_config_error_detail": "No template assigned to this step. Please contact your administrator.",
+    "previous_payment_completed": "Your previous payment was completed.",
+    "pending_payment_wait": "You have a pending payment. Please wait a few minutes.",
+    "payment_cancel_failed": "We could not process your payment. Please try again."
   },
   "openCheckout": {
     "loading": "Loading checkout...",
@@ -308,7 +311,10 @@
     "thank_you_description": "Thank you for your purchase. We sent your confirmation and ticket details by email.",
     "thank_you_cta": "Go to portal",
     "thank_you_order_summary": "Order summary",
-    "thank_you_total": "Total"
+    "thank_you_total": "Total",
+    "previous_payment_completed": "Your previous payment was completed.",
+    "payment_cancel_failed": "We could not process your payment. Please try again.",
+    "pending_payment_wait": "You have a pending payment. Please wait a few minutes."
   },
   "passes": {
     "your_passes": "Your Passes",

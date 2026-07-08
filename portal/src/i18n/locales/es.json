@@ -283,7 +283,10 @@
     "no_meal_plans": "No hay planes de comidas disponibles.",
     "no_contributions": "No hay opciones de contribución disponibles.",
     "step_config_error": "Error de configuración del paso.",
-    "step_config_error_detail": "No se asignó una plantilla a este paso. Contactá a tu administrador."
+    "step_config_error_detail": "No se asignó una plantilla a este paso. Contactá a tu administrador.",
+    "previous_payment_completed": "Tu pago anterior fue completado.",
+    "pending_payment_wait": "Tenés un pago pendiente. Por favor, esperá unos minutos.",
+    "payment_cancel_failed": "No pudimos procesar tu pago. Por favor, intentá de nuevo."
   },
   "openCheckout": {
     "loading": "Cargando checkout...",
@@ -308,7 +311,10 @@
     "thank_you_description": "Gracias por tu compra. Te enviamos la confirmación y los detalles de tus tickets por email.",
     "thank_you_cta": "Ir al portal",
     "thank_you_order_summary": "Resumen de la orden",
-    "thank_you_total": "Total"
+    "thank_you_total": "Total",
+    "previous_payment_completed": "Tu pago anterior fue completado.",
+    "payment_cancel_failed": "No pudimos procesar tu pago. Por favor, intentá de nuevo.",
+    "pending_payment_wait": "Tenés un pago pendiente. Por favor, esperá unos minutos."
   },
   "passes": {
     "your_passes": "Tus Pases",
