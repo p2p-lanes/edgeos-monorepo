@@ -452,30 +452,10 @@
     "venues": "Lugares",
     "api_keys": "API Keys",
     "api_docs": "API Docs",
-    "recap": "Recap",
     "locked_ended": "Finalizado — no disponible"
   },
   "recap": {
-    "status_badge": "Finalizado",
-    "status_pill": "Finalizado · {{date}}",
-    "hero_heading": "Gracias por ser parte de {{popupName}}",
-    "hero_subheading": "Esto es lo que pasó. Revisá todos los eventos y reconectá con la comunidad.",
-    "stats": {
-      "events_one": "{{count}} evento",
-      "events_other": "{{count}} eventos",
-      "attendees_one": "{{count}} asistente",
-      "attendees_other": "{{count}} asistentes",
-      "days_one": "{{count}} día",
-      "days_other": "{{count}} días"
-    },
-    "cta": {
-      "events_title": "Todos los eventos",
-      "events_description": "La agenda completa desde el día 1.",
-      "events_action": "Ver eventos",
-      "directory_title": "Directorio",
-      "directory_description": "Los asistentes de la comunidad.",
-      "directory_action": "Explorar"
-    }
+    "status_badge": "Finalizado"
   },
   "api_keys": {
     "title": "API Keys",

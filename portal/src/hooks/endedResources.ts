@@ -13,9 +13,10 @@ import type { Resource } from "@/types/resources"
 type Translator = (key: string, opts?: Record<string, unknown>) => string
 
 /**
- * Sidebar resources for an ended (recap) popup. Application and Passes are shown
- * but locked (`disabled`); Events and the attendee directory are open to anyone
- * who participated, honoring the popup's events/directory feature flags.
+ * Sidebar resources for an ended popup. Application points at the home card
+ * (root) and stays active; Passes is locked (`disabled`). Events and the
+ * attendee directory are open to anyone who participated, honoring the
+ * popup's events/directory feature flags.
  */
 export function buildEndedResources({
   t,
@@ -35,16 +36,10 @@ export function buildEndedResources({
 
   return [
     {
-      name: t("sidebar.recap", { defaultValue: "Recap" }),
+      name: t("sidebar.application"),
       icon: FileText,
       status: "active",
       path: `/portal/${city?.slug}`,
-    },
-    {
-      name: t("sidebar.application"),
-      icon: FileText,
-      status: "disabled",
-      path: `/portal/${city?.slug}/application`,
     },
     {
       name: t("sidebar.passes"),

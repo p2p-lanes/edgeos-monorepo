@@ -19,11 +19,11 @@ const byName = (rs: ReturnType<typeof buildEndedResources>) =>
   Object.fromEntries(rs.map((r) => [r.name, r.status]))
 
 describe("buildEndedResources", () => {
-  it("locks application and passes", () => {
+  it("keeps application active and locks passes", () => {
     const rs = byName(
       buildEndedResources({ t, city: city({}), participated: true }),
     )
-    expect(rs["sidebar.application"]).toBe("disabled")
+    expect(rs["sidebar.application"]).toBe("active")
     expect(rs["sidebar.passes"]).toBe("disabled")
   })
 

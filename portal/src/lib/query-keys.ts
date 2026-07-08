@@ -30,9 +30,6 @@ export const queryKeys = {
   humanPopupAccess: {
     byPopup: (popupId: string) => ["human-popup-access", popupId] as const,
   },
-  recapStats: {
-    byPopup: (popupId: string) => ["recap-stats", popupId] as const,
-  },
   groups: {
     mine: () => ["groups", "mine"] as const,
     detail: (groupId: string) => ["groups", "detail", groupId] as const,
