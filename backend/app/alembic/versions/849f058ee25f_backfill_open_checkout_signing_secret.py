@@ -30,15 +30,28 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
-    # Ensure pgcrypto extension is available (idempotent guard).
-    op.execute("CREATE EXTENSION IF NOT EXISTS pgcrypto")
-    # Fill NULL secrets with 256-bit base64-encoded random values.
-    # WHERE guard ensures existing non-NULL secrets are never overwritten.
-    op.execute(
-        "UPDATE popups "
-        "SET open_checkout_signing_secret = encode(gen_random_bytes(32), 'base64') "
-        "WHERE open_checkout_signing_secret IS NULL"
-    )
+    import secrets
+
+    # Fill NULL secrets with 256-bit URL-safe base64 random values using a
+    # Python loop so the alphabet matches secrets.token_urlsafe(32) exactly
+    # (characters: A-Z a-z 0-9 - _; no + / or = padding).
+    # pgcrypto's encode(..., 'base64') produces standard base64 which contains
+    # + and / — unusable in query strings without percent-encoding and
+    # inconsistent with the CRUD auto-provision path.
+    connection = op.get_bind()
+    popup_ids = connection.execute(
+        __import__("sqlalchemy").text(
+            "SELECT id FROM popups WHERE open_checkout_signing_secret IS NULL"
+        )
+    ).fetchall()
+    for (popup_id,) in popup_ids:
+        connection.execute(
+            __import__("sqlalchemy").text(
+                "UPDATE popups SET open_checkout_signing_secret = :secret "
+                "WHERE id = :id AND open_checkout_signing_secret IS NULL"
+            ),
+            {"secret": secrets.token_urlsafe(32), "id": popup_id},
+        )
 
 
 def downgrade() -> None:

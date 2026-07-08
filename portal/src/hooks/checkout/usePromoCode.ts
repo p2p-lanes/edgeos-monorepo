@@ -126,12 +126,21 @@ export function usePromoCode({
     // Re-validate via the override (uses public slug-based endpoint, no cityId needed).
     if (validatePromoCodeOverride && promoCode) {
       hasRevalidatedPromoRef.current = true
+      // Note: hasRevalidatedPromoRef is set before the async call so that a
+      // concurrent savedCart write cannot trigger a second re-validation attempt.
+      // Single-shot semantics are intentional: if the network call fails, the
+      // promo field is cleared and the user can re-enter the code manually.
+      // A retry loop would risk double-applying a single-use coupon hold.
       validatePromoCodeOverride(promoCode)
         .then((discountValue) => {
           const value = discountValue ?? 0
           if (value <= 0) {
-            // Clear silently — no "invalid" flash; the code may just be expired.
+            // P3 fix: clear silently AND reset all promo state so the UI
+            // never shows a visible code without a discount applied to it.
             setPromoCode("")
+            setPromoCodeValid(false)
+            setPromoCodeDiscount(0)
+            resetDiscount()
             return
           }
           setPromoCodeValid(true)
@@ -144,8 +153,15 @@ export function usePromoCode({
           })
         })
         .catch(() => {
-          // On error, clear silently — the create-time apply is authoritative.
+          // P3 fix: on transport error, clear all promo state (same as expired
+          // path) so the UI stays consistent — no dangling visible code without
+          // a discount applied to it. hasRevalidatedPromoRef stays true:
+          // single-shot semantics prevent a retry loop from double-applying a
+          // single-use coupon hold if the network recovers.
           setPromoCode("")
+          setPromoCodeValid(false)
+          setPromoCodeDiscount(0)
+          resetDiscount()
         })
       return
     }
@@ -189,6 +205,7 @@ export function usePromoCode({
     validatePromoCodeOverride,
     promoCodeValid,
     releaseSettled,
+    resetDiscount,
   ])
 
   return {

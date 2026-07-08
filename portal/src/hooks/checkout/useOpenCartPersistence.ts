@@ -88,6 +88,26 @@ interface UseOpenCartPersistenceParams {
   sig?: string | null
 }
 
+/** Restoration status exposed to the CheckoutProvider.
+ *
+ *  The release-on-mount effect must NOT read cartMetaRef until the async
+ *  restore path (signed-link or localStorage) has fully settled, because
+ *  cartMetaRef is populated inside Promise callbacks.  restorationPromise
+ *  resolves (always — never rejects) once all three restore paths have
+ *  finished:
+ *    - success-step: resolves immediately (paymentComplete branch)
+ *    - no products: resolves immediately (cannot restore yet — caller handles)
+ *    - signed-link: resolves after the API call resolves or rejects
+ *    - plain localStorage: resolves after hydrate + optional token-refresh kick
+ *
+ *  The release effect awaits this promise before reading cartMetaRef so that
+ *  cid/sig are always populated by the time the release decision is made.
+ */
+export interface OpenCartRestorationHandle {
+  /** Resolves once restoration has fully settled (or was skipped). */
+  restorationPromise: Promise<void>
+}
+
 function localStorageKey(slug: string): string {
   return `open-cart:${slug}`
 }
@@ -356,10 +376,31 @@ export function useOpenCartPersistence({
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  // In-flight upsert serializer: both the debounced save and the mount
+  // restore-refresh funnel through a single chained promise so cartMetaRef
+  // is never overwritten by a stale out-of-order response (P4 fix).
+  const inFlightUpsertRef = useRef<Promise<void>>(Promise.resolve())
+
+  // Restoration completion signal (P1 fix).
+  // The release effect in checkoutProvider must not read cartMetaRef until
+  // the async restore path has fully settled — signed-link API response or
+  // localStorage + optional token-refresh kick. We expose a promise that
+  // resolves once all three restore paths have finished. Never rejects.
+  const restorationResolveRef = useRef<(() => void) | null>(null)
+  const restorationPromiseRef = useRef<Promise<void>>(
+    new Promise<void>((resolve) => {
+      restorationResolveRef.current = resolve
+    }),
+  )
+
   // --- Restore: signed-link takes precedence over localStorage ---
   // biome-ignore lint/correctness/useExhaustiveDependencies: one-shot restore; products must be stable before hydrating
   useEffect(() => {
     if (hasRestoredCheckoutRef.current) return
+
+    // P5 fix: when products have not loaded yet, we cannot restore — do NOT
+    // mark as restored; leave restorationPromise pending so the release effect
+    // also waits.  The effect re-runs once products.length > 0.
     if (!products.length) return
 
     hasRestoredCheckoutRef.current = true
@@ -368,11 +409,15 @@ export function useOpenCartPersistence({
     if (initialStep === "success") {
       clearLocalStorage(popupSlug)
       paymentCompleteRef.current = true
+      // Resolve immediately — nothing to wait for.
+      restorationResolveRef.current?.()
       return
     }
 
     // Signed-link restore: cid + sig present in URL
     if (cidParam && sigParam) {
+      // Resolve restorationPromise only AFTER the async call settles so that
+      // the release effect sees the populated cartMetaRef (P1 fix).
       CheckoutService.restoreOpenCart({
         slug: popupSlug,
         cid: cidParam,
@@ -414,6 +459,11 @@ export function useOpenCartPersistence({
             )
           }
         })
+        .finally(() => {
+          // cartMetaRef is now populated (or fallback localStorage applied).
+          // Signal the release effect that it can safely read cartMetaRef.
+          restorationResolveRef.current?.()
+        })
       return
     }
 
@@ -435,6 +485,8 @@ export function useOpenCartPersistence({
       // signing secret, restoreToken is null. Issue an idempotent re-upsert with
       // the same items to obtain a fresh token now that the secret may exist.
       // Only fire when cartId is set (prior upsert succeeded) and token is absent.
+      // Serialize through inFlightUpsertRef so a concurrent debounced save does
+      // not race this call and clobber cartMetaRef with a mismatched cid/sig (P4).
       if (
         saved.cartId &&
         !saved.restoreToken &&
@@ -442,27 +494,39 @@ export function useOpenCartPersistence({
         buyerEmail &&
         buyerEmail.includes("@")
       ) {
-        CheckoutService.upsertOpenCart({
-          slug: popupSlug,
-          requestBody: { email: buyerEmail, items: saved.items },
-        })
-          .then((openCart) => {
-            if (openCart.restore_token) {
-              cartMetaRef.current = {
-                cartId: openCart.id,
-                restoreToken: openCart.restore_token,
+        // Signal restoration done before the token-refresh kick, because the
+        // existing cartId+null token is sufficient proof for the release call.
+        restorationResolveRef.current?.()
+
+        inFlightUpsertRef.current = inFlightUpsertRef.current.then(() =>
+          CheckoutService.upsertOpenCart({
+            slug: popupSlug,
+            requestBody: { email: buyerEmail, items: saved.items },
+          })
+            .then((openCart) => {
+              if (openCart.restore_token) {
+                cartMetaRef.current = {
+                  cartId: openCart.id,
+                  restoreToken: openCart.restore_token,
+                }
+                writeLocalStorage(popupSlug, {
+                  items: saved.items,
+                  cartId: openCart.id,
+                  restoreToken: openCart.restore_token,
+                })
               }
-              writeLocalStorage(popupSlug, {
-                items: saved.items,
-                cartId: openCart.id,
-                restoreToken: openCart.restore_token,
-              })
-            }
-          })
-          .catch(() => {
-            // No-op — retain existing cartId without token
-          })
+            })
+            .catch(() => {
+              // No-op — retain existing cartId without token
+            }),
+        )
+      } else {
+        // No token-refresh needed — signal restoration done immediately.
+        restorationResolveRef.current?.()
       }
+    } else {
+      // No localStorage data — nothing to restore.
+      restorationResolveRef.current?.()
     }
   }, [products, popupSlug, initialStep])
 
@@ -496,26 +560,29 @@ export function useOpenCartPersistence({
         restoreToken: cartMetaRef.current.restoreToken,
       })
 
-      // Persist to backend
-      CheckoutService.upsertOpenCart({
-        slug: popupSlug,
-        requestBody: { email, items },
-      })
-        .then((openCart) => {
-          cartMetaRef.current = {
-            cartId: openCart.id,
-            restoreToken: openCart.restore_token ?? null,
-          }
-          // Update localStorage with the backend ids
-          writeLocalStorage(popupSlug, {
-            items,
-            cartId: openCart.id,
-            restoreToken: openCart.restore_token ?? null,
+      // Serialize through inFlightUpsertRef so this call cannot race the
+      // mount restore-refresh upsert and clobber cartMetaRef (P4 fix).
+      inFlightUpsertRef.current = inFlightUpsertRef.current.then(() =>
+        CheckoutService.upsertOpenCart({
+          slug: popupSlug,
+          requestBody: { email, items },
+        })
+          .then((openCart) => {
+            cartMetaRef.current = {
+              cartId: openCart.id,
+              restoreToken: openCart.restore_token ?? null,
+            }
+            // Update localStorage with the backend ids
+            writeLocalStorage(popupSlug, {
+              items,
+              cartId: openCart.id,
+              restoreToken: openCart.restore_token ?? null,
+            })
           })
-        })
-        .catch(() => {
-          // Network failure — localStorage already has the items, nothing to do
-        })
+          .catch(() => {
+            // Network failure — localStorage already has the items, nothing to do
+          }),
+      )
     }, 800)
   }, [
     popupSlug,
@@ -614,5 +681,11 @@ export function useOpenCartPersistence({
     paymentCompleteRef,
   ])
 
-  return { scheduleSave, clearOpenCart, cartMetaRef, flushSave }
+  return {
+    scheduleSave,
+    clearOpenCart,
+    cartMetaRef,
+    flushSave,
+    restorationPromise: restorationPromiseRef.current,
+  }
 }

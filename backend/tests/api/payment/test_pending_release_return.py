@@ -1156,3 +1156,78 @@ class TestReleasePendingAuthenticatedEndpoint:
 
         assert resp.status_code == 200
         assert resp.json() == {"released": False}
+
+
+# ---------------------------------------------------------------------------
+# B2 — Lock-contention: pg_try_advisory_xact_lock returns False
+# ---------------------------------------------------------------------------
+
+
+class TestLockContentionReleasePendingOpen:
+    """B2: When pg_try_advisory_xact_lock returns False, release_pending_open
+    must return released=False immediately — no SimpleFi call, no locate.
+
+    The scenario: two concurrent callers both pass proof validation. The first
+    caller acquires the advisory lock and proceeds. The second caller's lock
+    attempt returns False → it yields immediately.
+    """
+
+    def test_lock_not_acquired_returns_false_no_simplefi(
+        self,
+        db: Session,
+        tenant_a: Tenants,
+    ) -> None:
+        """pg_try_advisory_xact_lock returns False → released=False, no SimpleFi, no locate."""
+        from unittest.mock import MagicMock, patch
+
+        popup = _make_popup(db, tenant_a, slug_prefix="lk01")
+        email = f"lock-{uuid.uuid4().hex[:6]}@example.com"
+        coupon = _make_coupon(db, popup, current_uses=3)
+        prior = _make_pending_payment(
+            db, tenant_a, popup, coupon=coupon, buyer_email=email
+        )
+
+        def _mock_exec(stmt, *args, **kwargs):
+            """Return False for the advisory lock query; pass everything else through."""
+            stmt_str = str(stmt) if not isinstance(stmt, str) else stmt
+            if "pg_try_advisory_xact_lock" in stmt_str:
+                mock_result = MagicMock()
+                mock_result.scalar.return_value = False
+                return mock_result
+            return db.exec(stmt, *args, **kwargs)
+
+        with (
+            patch.object(
+                payments_crud,
+                "_validate_cart_continuity_proof",
+                return_value=True,
+            ),
+            patch("app.services.simplefi.get_simplefi_client") as mock_simplefi,
+        ):
+            # Patch the session.exec to intercept the advisory lock query
+            original_exec = db.exec
+
+            def patched_exec(stmt, *args, **kwargs):
+                stmt_text = getattr(stmt, "text", None) or str(stmt)
+                if "pg_try_advisory_xact_lock" in str(stmt_text):
+                    mock_result = MagicMock()
+                    mock_result.scalar.return_value = False
+                    return mock_result
+                return original_exec(stmt, *args, **kwargs)
+
+            with patch.object(db, "exec", side_effect=patched_exec):
+                result = payments_crud.release_pending_open(
+                    db,
+                    popup=popup,
+                    email=email,
+                    cid=uuid.uuid4(),
+                    sig="valid-sig",
+                )
+
+        assert result.released is False
+        # SimpleFi must NOT be called — the lock was never acquired
+        mock_simplefi.assert_not_called()
+        # Payment must remain PENDING
+        assert _fresh_payment_status(db, prior.id) == PaymentStatus.PENDING.value
+        # Coupon must remain at original uses
+        assert _fresh_coupon_uses(db, coupon.id) == 3

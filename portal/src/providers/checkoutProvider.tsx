@@ -591,6 +591,7 @@ export function CheckoutProvider({
     clearOpenCart,
     cartMetaRef: openCartMetaRef,
     flushSave: flushOpenCartSave,
+    restorationPromise: openCartRestorationPromise,
   } = useOpenCartPersistence({
     popupSlug: openCartPopupSlug ?? "",
     selectionStateRef,
@@ -633,6 +634,22 @@ export function CheckoutProvider({
   const hasFiredReleaseRef = useRef(false)
   // biome-ignore lint/correctness/useExhaustiveDependencies: one-shot release; reads current values via refs; products.length used to re-run after restore
   useEffect(() => {
+    // P5 fix: when products have not loaded yet, we cannot restore and cannot
+    // release (there is no valid cid/sig yet). Settle immediately so the promo
+    // field and the UI are not permanently locked. The release fires on the next
+    // render once products arrive (products.length dep re-triggers).
+    //
+    // Note: we do NOT set hasFiredReleaseRef here so the effect can still fire
+    // once products arrive — we only settle pendingReleaseSettled so the promo
+    // field is unblocked even when products never load.
+    if (!products.length) {
+      if (!hasFiredReleaseRef.current) {
+        setPendingReleaseSettled(true)
+        pendingReleaseSettledRef.current = true
+      }
+      return
+    }
+
     // Only fire once per mount, and only after restoration is complete.
     if (hasFiredReleaseRef.current) return
     if (!hasRestoredCheckoutRef.current) return
@@ -653,76 +670,87 @@ export function CheckoutProvider({
 
     hasFiredReleaseRef.current = true
 
-    const releasePromise: Promise<{ released: boolean }> =
-      effectiveSubmitMode === "open-ticketing" && openCartEnabled && slug
-        ? (() => {
-            const cartId = openCartMetaRef.current.cartId ?? undefined
-            const restoreToken =
-              openCartMetaRef.current.restoreToken ?? undefined
-            const email = openCartBuyerEmail
-            // Only fire if we have a valid proof — otherwise settle immediately.
-            if (!cartId || !restoreToken || !email || !email.includes("@")) {
-              return Promise.resolve({ released: false })
-            }
-            return CheckoutService.releasePendingOpen({
-              slug,
-              requestBody: { cid: cartId, sig: restoreToken, email },
-            })
-          })()
-        : appId
-          ? PaymentsService.releaseMyPendingPayment({
-              requestBody: { application_id: appId },
-            })
-          : Promise.resolve({ released: false })
+    // P1 fix: await restorationPromise before reading cartMetaRef. On the
+    // signed-link path, cartMetaRef is populated inside a Promise.then() callback
+    // that runs AFTER the restore effect sets hasRestoredCheckoutRef.current = true.
+    // Without this await, the release effect reads null cid/sig and silently
+    // skips the release, with hasFiredReleaseRef blocking retries.
+    const restorationReady = openCartEnabled
+      ? openCartRestorationPromise
+      : Promise.resolve()
 
-    releasePromise
-      .then((result) => {
-        if (result.released && slug) {
-          // Release succeeded — invalidate the checkout runtime so stock/availability
-          // reflects the freed hold on the next render cycle.
-          queryClient.invalidateQueries({
-            queryKey: queryKeys.checkout.runtime(slug),
-          })
-        }
-      })
-      .catch((err: unknown) => {
-        // Route structured errors through the existing dispatchPaymentError machinery.
-        const apiBody =
-          err instanceof ApiError
-            ? (err.body as Record<string, unknown> | null)
-            : null
-        if (
-          apiBody !== null &&
-          typeof apiBody?.detail === "object" &&
-          apiBody.detail !== null
-        ) {
-          const detail = apiBody.detail as {
-            code?: string
-            redirect_url?: string
+    restorationReady.then(() => {
+      const releasePromise: Promise<{ released: boolean }> =
+        effectiveSubmitMode === "open-ticketing" && openCartEnabled && slug
+          ? (() => {
+              const cartId = openCartMetaRef.current.cartId ?? undefined
+              const restoreToken =
+                openCartMetaRef.current.restoreToken ?? undefined
+              const email = openCartBuyerEmail
+              // Only fire if we have a valid proof — otherwise settle immediately.
+              if (!cartId || !restoreToken || !email || !email.includes("@")) {
+                return Promise.resolve({ released: false })
+              }
+              return CheckoutService.releasePendingOpen({
+                slug,
+                requestBody: { cid: cartId, sig: restoreToken, email },
+              })
+            })()
+          : appId
+            ? PaymentsService.releaseMyPendingPayment({
+                requestBody: { application_id: appId },
+              })
+            : Promise.resolve({ released: false })
+
+      releasePromise
+        .then((result) => {
+          if (result.released && slug) {
+            // Release succeeded — invalidate the checkout runtime so stock/availability
+            // reflects the freed hold on the next render cycle.
+            queryClient.invalidateQueries({
+              queryKey: queryKeys.checkout.runtime(slug),
+            })
           }
-          const dispatch = dispatchPaymentError(
-            detail,
-            effectiveSubmitMode,
-            slug,
-          )
-          if (dispatch !== null) {
-            const msg = t(dispatch.messageKey)
-            toast.error(msg)
-            if (dispatch.blockResubmit) paymentCompleteRef.current = true
-            if (dispatch.navigate?.type === "href") {
-              window.location.href = dispatch.navigate.url
-            } else if (dispatch.navigate?.type === "router-push") {
-              router.push(dispatch.navigate.path)
+        })
+        .catch((err: unknown) => {
+          // Route structured errors through the existing dispatchPaymentError machinery.
+          const apiBody =
+            err instanceof ApiError
+              ? (err.body as Record<string, unknown> | null)
+              : null
+          if (
+            apiBody !== null &&
+            typeof apiBody?.detail === "object" &&
+            apiBody.detail !== null
+          ) {
+            const detail = apiBody.detail as {
+              code?: string
+              redirect_url?: string
+            }
+            const dispatch = dispatchPaymentError(
+              detail,
+              effectiveSubmitMode,
+              slug,
+            )
+            if (dispatch !== null) {
+              const msg = t(dispatch.messageKey)
+              toast.error(msg)
+              if (dispatch.blockResubmit) paymentCompleteRef.current = true
+              if (dispatch.navigate?.type === "href") {
+                window.location.href = dispatch.navigate.url
+              } else if (dispatch.navigate?.type === "router-push") {
+                router.push(dispatch.navigate.path)
+              }
             }
           }
-        }
-        // On 502 or unknown error: settle the gate anyway — the create-time
-        // supersede backstop guards the purchase itself.
-      })
-      .finally(() => {
-        setPendingReleaseSettled(true)
-        pendingReleaseSettledRef.current = true
-      })
+          // On 502 or unknown error: settle the gate anyway — the create-time
+          // supersede backstop guards the purchase itself.
+        })
+        .finally(() => {
+          setPendingReleaseSettled(true)
+          pendingReleaseSettledRef.current = true
+        })
+    })
   }, [products.length])
 
   // Step management
@@ -928,6 +956,9 @@ export function CheckoutProvider({
     setMerch([])
     setPatron(null)
     setSelectedMealPlans([])
+    // P2 fix: reset dynamicItems on city change so products from city A cannot
+    // appear in the upsert body after switching to city B.
+    setDynamicItems({})
     setPromoCode("")
     setPromoCodeValid(false)
     setPromoCodeDiscount(0)
