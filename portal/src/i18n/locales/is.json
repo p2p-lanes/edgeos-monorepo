@@ -166,6 +166,9 @@
   "checkout": {
     "title": "Greiðsla",
     "express_title": "Hraðgreiðsla",
+    "sold_out": "Uppselt",
+    "sale_upcoming": "Væntanlegt",
+    "sale_ended": "Lokið",
     "buyer_step_title": "Upplýsingar þínar",
     "buyer_step_description": "Fylltu út upplýsingar þínar áður en þú greiðir.",
     "loading_info": "Hleður upplýsingum þínum",

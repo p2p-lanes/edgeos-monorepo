@@ -8,25 +8,29 @@
  * nothing while the product is `on_sale`.
  */
 
+import { useTranslation } from "react-i18next"
 import type { ProductSaleState } from "@/lib/product-state"
 import { cn } from "@/lib/utils"
 
 export function SaleStateBadge({ state }: { state: ProductSaleState }) {
+  const { t } = useTranslation()
   if (state === "on_sale") return null
+  // Display casing (UPCOMING / ENDED / SOLD OUT) comes from the `uppercase`
+  // class below, so translations stay in natural sentence case.
   const config: Record<
     Exclude<ProductSaleState, "on_sale">,
     { label: string; classes: string }
   > = {
     upcoming: {
-      label: "UPCOMING",
+      label: t("checkout.sale_upcoming", { defaultValue: "Upcoming" }),
       classes: "bg-blue-100 text-blue-700 border-blue-200",
     },
     ended: {
-      label: "ENDED",
+      label: t("checkout.sale_ended", { defaultValue: "Ended" }),
       classes: "bg-slate-100 text-slate-500 border-slate-200",
     },
     sold_out: {
-      label: "SOLD OUT",
+      label: t("checkout.sold_out", { defaultValue: "Sold out" }),
       classes: "bg-rose-100 text-rose-700 border-rose-200",
     },
   }

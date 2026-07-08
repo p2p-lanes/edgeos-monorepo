@@ -15,7 +15,7 @@ import {
   CHECKOUT_MODE,
   resolvePopupCheckoutPolicy,
 } from "@/checkout/popupCheckoutPolicy"
-import { deriveProductState } from "@/lib/product-state"
+import { deriveProductState, type ProductSaleState } from "@/lib/product-state"
 import { useCheckout } from "@/providers/checkoutProvider"
 import { useCityProvider } from "@/providers/cityProvider"
 import { usePassesProvider } from "@/providers/passesProvider"
@@ -40,6 +40,8 @@ export interface TicketRowVM {
   editedForCredit: boolean
   /** Precomputed: exclusivity + sale-state + stock. Skins never recompute this. */
   disabled: boolean
+  /** Raw sale state so skins can tell sold_out apart from other disable reasons. */
+  saleState: ProductSaleState
   quantity: number
   maxQuantity: number
   usesStepper: boolean
@@ -142,6 +144,7 @@ function buildRowVM(
     purchased: product.purchased ?? false,
     editedForCredit: !!(product.purchased && isEditing && product.edit),
     disabled,
+    saleState,
     quantity: product.quantity ?? (usesStepper ? 0 : 1),
     maxQuantity: resolveMaxQuantityLocal(product),
     usesStepper,
@@ -393,12 +396,17 @@ export function useTicketsStep({
         rows: sectionProducts.map((p) => {
           const qty = getQty(p.id)
           const usesStepper = supportsQuantitySelectorLocal(p.max_per_order)
+          const saleState = deriveProductState(p)
           return {
             product: p,
             selected: qty > 0,
             purchased: false,
             editedForCredit: false,
-            disabled: !!p.disabled,
+            // Upstream never sets p.disabled on this path, so any non-on_sale
+            // state (upcoming/ended/sold_out) must be blocked here — matching
+            // the pass_system path's stateBlocked behavior.
+            disabled: !!p.disabled || saleState !== "on_sale",
+            saleState,
             quantity: qty,
             maxQuantity: resolveMaxQuantityLocal(p),
             usesStepper,

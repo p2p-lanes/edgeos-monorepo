@@ -6,6 +6,7 @@ import { useTranslation } from "react-i18next"
 import AddAttendeeButtons from "@/components/checkout-flow/shared/AddAttendeeButtons"
 import ExpandableDescription from "@/components/ui/ExpandableDescription"
 import QuantitySelector, {
+  resolveBlockedStepperProps,
   resolveMaxQuantity,
   supportsQuantitySelector,
 } from "@/components/ui/QuantitySelector"
@@ -934,7 +935,10 @@ function CompactAttendeeCard({
                 attendee.category === "kid" ||
                 attendee.category === "teen" ||
                 attendee.category === "baby"
-              const tileDisabled =
+              // Purchased outside edit mode is the only fully frozen case;
+              // every other reason still allows removing cart quantity.
+              const tileLocked = p.purchased && !isEditing
+              const tileBlocked =
                 !!p.disabled ||
                 pillStateBlocked ||
                 (!isDayPass &&
@@ -942,8 +946,16 @@ function CompactAttendeeCard({
                   (p.duration_type === "full" ||
                     p.duration_type === "month")) ||
                 (p.duration_type === "week" && hasFullOrMonthSelected) ||
-                (p.duration_type === "day" && hasFullOrMonthSelected) ||
-                (p.purchased && !isEditing)
+                (p.duration_type === "day" && hasFullOrMonthSelected)
+              const tileDisabled = tileBlocked || tileLocked
+              // Blocked rows stay removable: cap max at the cart quantity so
+              // increment self-disables while decrement keeps working.
+              const stepper = resolveBlockedStepperProps({
+                blocked: tileBlocked,
+                locked: tileLocked,
+                quantity: qty,
+                max,
+              })
 
               return (
                 <div
@@ -960,8 +972,8 @@ function CompactAttendeeCard({
                     size="sm"
                     value={qty}
                     min={minQty}
-                    max={max}
-                    disabled={tileDisabled}
+                    max={stepper.max}
+                    disabled={stepper.disabled}
                     onIncrement={() =>
                       toggleProduct(
                         attendee.id,

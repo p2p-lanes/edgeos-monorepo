@@ -16,7 +16,6 @@ import ExpandableDescription from "@/components/ui/ExpandableDescription"
 import QuantitySelector, {
   supportsQuantitySelector,
 } from "@/components/ui/QuantitySelector"
-import SoldOutBadge from "@/components/ui/SoldOutBadge"
 import { imageOptimization } from "@/lib/image-optimization"
 import { getProductAvailability } from "@/lib/product-availability"
 import { cn } from "@/lib/utils"
@@ -29,6 +28,7 @@ import {
 } from "@/types/checkout"
 import type { ProductsPass } from "@/types/Products"
 import type { VariantProps } from "../registries/variantRegistry"
+import { SaleStateBadge } from "./saleStateBadge"
 import { LightboxOverlay } from "./VariantImageGallery"
 
 /* ── Section types & helpers ─────────────────────────────── */
@@ -271,7 +271,7 @@ function CompactCard({
     >
       {!canSelect ? (
         soldOut ? (
-          <SoldOutBadge />
+          <SaleStateBadge state="sold_out" />
         ) : null
       ) : supportsQty ? (
         <QuantitySelector
@@ -552,7 +552,7 @@ function GridCard({
       {!canSelect ? (
         soldOut && (
           <div className="absolute top-2 right-2">
-            <SoldOutBadge />
+            <SaleStateBadge state="sold_out" />
           </div>
         )
       ) : supportsQty ? (
@@ -732,7 +732,7 @@ function DefaultSectionCard({
               <div className="flex items-center gap-3 min-w-0">
                 {!canSelect ? (
                   soldOut ? (
-                    <SoldOutBadge />
+                    <SaleStateBadge state="sold_out" />
                   ) : null
                 ) : supportsQty ? (
                   <QuantitySelector
@@ -988,7 +988,7 @@ function ShowcaseSectionCard({
 
                 {!canSelect ? (
                   soldOut ? (
-                    <SoldOutBadge />
+                    <SaleStateBadge state="sold_out" />
                   ) : null
                 ) : supportsQty ? (
                   <QuantitySelector

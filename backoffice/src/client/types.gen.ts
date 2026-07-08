@@ -3162,6 +3162,7 @@ export type ProductBatchResult = {
     insurance_eligible?: boolean;
     requires_check_in?: boolean;
     discountable?: boolean;
+    sold_out_override?: boolean;
     id: string;
     success: boolean;
     err_msg?: (string | null);
@@ -3243,7 +3244,15 @@ export type ProductPublic = {
     insurance_eligible?: boolean;
     requires_check_in?: boolean;
     discountable?: boolean;
+    sold_out_override?: boolean;
     id: string;
+};
+
+/**
+ * Schema for manually marking a product as sold out (or back on sale).
+ */
+export type ProductSoldOutUpdate = {
+    sold_out: boolean;
 };
 
 /**
@@ -3297,6 +3306,7 @@ export type ProductWithQuantity = {
     insurance_eligible?: boolean;
     requires_check_in?: boolean;
     discountable?: boolean;
+    sold_out_override?: boolean;
     id: string;
     quantity?: number;
 };
@@ -6289,6 +6299,14 @@ export type ProductsDeleteProductData = {
 };
 
 export type ProductsDeleteProductResponse = (void);
+
+export type ProductsSetProductSoldOutData = {
+    productId: string;
+    requestBody: ProductSoldOutUpdate;
+    xTenantId?: (string | null);
+};
+
+export type ProductsSetProductSoldOutResponse = (ProductPublic);
 
 export type ProductsListPortalProductsData = {
     acceptLanguage?: (string | null);

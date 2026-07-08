@@ -10,6 +10,7 @@ from app.api.product.schemas import (
     ProductBatchResult,
     ProductCreate,
     ProductPublic,
+    ProductSoldOutUpdate,
     ProductUpdate,
 )
 from app.api.shared.enums import UserRole
@@ -303,6 +304,32 @@ async def update_product(
         product_in.images = await _svc.ingest_urls(product_in.images, product.tenant_id)
 
     updated = crud.products_crud.update(db, product, product_in)
+    return ProductPublic.model_validate(updated)
+
+
+@router.post("/{product_id}/sold-out", response_model=ProductPublic)
+async def set_product_sold_out(
+    product_id: uuid.UUID,
+    payload: ProductSoldOutUpdate,
+    db: AdminOrApiKeySession_ProductsWrite,
+    _current_user: AdminOrApiKey_ProductsWrite,
+) -> ProductPublic:
+    """Mark a product as sold out, or put it back on sale.
+
+    Sets the manual `sold_out_override` flag only. The stock counter is
+    never modified, so inventory accounting stays truthful. While the flag
+    is on, the product reports state `sold_out` and checkout rejects new
+    purchases regardless of remaining stock.
+    """
+    product = crud.products_crud.get(db, product_id)
+
+    if not product:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Product not found",
+        )
+
+    updated = crud.products_crud.set_sold_out(db, product, payload.sold_out)
     return ProductPublic.model_validate(updated)
 
 

@@ -1214,3 +1214,125 @@ describe("S5: amanita regression — simple_quantity with virtual buyer attendee
     )
   })
 })
+
+// ---------------------------------------------------------------------------
+// saleState exposure — sold-out badge support on ticket-card rows
+// ---------------------------------------------------------------------------
+
+describe("saleState exposure on row VMs", () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockDynamicItems = {}
+    mockIsEditing = false
+    mockEditCredit = 0
+  })
+
+  afterEach(() => {
+    mockCheckoutMode = "pass_system"
+    mockAttendeePasses = []
+  })
+
+  it("open-checkout: sold_out_override → saleState='sold_out' and disabled=true", () => {
+    mockCheckoutMode = "simple_quantity"
+    mockAttendeePasses = []
+    const pSoldOut = makeProduct("p-week", {
+      duration_type: "week",
+      sold_out_override: true,
+    })
+
+    const { result } = renderHook(() =>
+      useTicketsStep({
+        stepType: "passes",
+        templateConfig: null,
+        products: [pSoldOut],
+      }),
+    )
+
+    const row = result.current.sections.flatMap((s) => s.rows)[0]
+    expect(row?.saleState).toBe("sold_out")
+    expect(row?.disabled).toBe(true)
+  })
+
+  it("open-checkout: on-sale product → saleState='on_sale' and disabled=false", () => {
+    mockCheckoutMode = "simple_quantity"
+    mockAttendeePasses = []
+    const pWeek = makeProduct("p-week", { duration_type: "week" })
+
+    const { result } = renderHook(() =>
+      useTicketsStep({
+        stepType: "passes",
+        templateConfig: null,
+        products: [pWeek],
+      }),
+    )
+
+    const row = result.current.sections.flatMap((s) => s.rows)[0]
+    expect(row?.saleState).toBe("on_sale")
+    expect(row?.disabled).toBe(false)
+  })
+
+  it("open-checkout: upcoming product → saleState='upcoming' and disabled=true", () => {
+    mockCheckoutMode = "simple_quantity"
+    mockAttendeePasses = []
+    const pUpcoming = makeProduct("p-week", {
+      duration_type: "week",
+      sale_starts_at: new Date(Date.now() + 86_400_000).toISOString(),
+    })
+
+    const { result } = renderHook(() =>
+      useTicketsStep({
+        stepType: "passes",
+        templateConfig: null,
+        products: [pUpcoming],
+      }),
+    )
+
+    const row = result.current.sections.flatMap((s) => s.rows)[0]
+    expect(row?.saleState).toBe("upcoming")
+    expect(row?.disabled).toBe(true)
+  })
+
+  it("open-checkout: ended product → saleState='ended' and disabled=true", () => {
+    mockCheckoutMode = "simple_quantity"
+    mockAttendeePasses = []
+    const pEnded = makeProduct("p-week", {
+      duration_type: "week",
+      sale_ends_at: new Date(Date.now() - 86_400_000).toISOString(),
+    })
+
+    const { result } = renderHook(() =>
+      useTicketsStep({
+        stepType: "passes",
+        templateConfig: null,
+        products: [pEnded],
+      }),
+    )
+
+    const row = result.current.sections.flatMap((s) => s.rows)[0]
+    expect(row?.saleState).toBe("ended")
+    expect(row?.disabled).toBe(true)
+  })
+
+  it("pass_system: sold_out_override → saleState='sold_out' and disabled=true", () => {
+    mockCheckoutMode = "pass_system"
+    const pSoldOut = makeProduct("p-week", {
+      duration_type: "week",
+      sold_out_override: true,
+    })
+    mockAttendeePasses = [makeAttendee("a", [pSoldOut])]
+
+    const { result } = renderHook(() =>
+      useTicketsStep({
+        stepType: "passes",
+        templateConfig,
+        products: [pSoldOut],
+      }),
+    )
+
+    const row = result.current.attendees[0]?.sections
+      .flatMap((s) => s.rows)
+      .find((r) => r.product.id === "p-week")
+    expect(row?.saleState).toBe("sold_out")
+    expect(row?.disabled).toBe(true)
+  })
+})
