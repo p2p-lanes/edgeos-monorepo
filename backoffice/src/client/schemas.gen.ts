@@ -12837,6 +12837,66 @@ export const PaymentUpdateSchema = {
     description: 'Schema for updating a payment (mainly status updates).'
 } as const;
 
+export const PendingReleaseAuthRequestSchema = {
+    properties: {
+        application_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Application Id'
+        }
+    },
+    type: 'object',
+    required: ['application_id'],
+    title: 'PendingReleaseAuthRequest',
+    description: `Request body for POST /payments/my/pending/release (authenticated surface).
+
+application_id identifies which PENDING payment to release.
+Ownership is verified server-side against current_human.id.`
+} as const;
+
+export const PendingReleaseOpenRequestSchema = {
+    properties: {
+        email: {
+            type: 'string',
+            format: 'email',
+            title: 'Email'
+        },
+        cid: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Cid'
+        },
+        sig: {
+            type: 'string',
+            title: 'Sig'
+        }
+    },
+    type: 'object',
+    required: ['email', 'cid', 'sig'],
+    title: 'PendingReleaseOpenRequest',
+    description: `Request body for POST /checkout/{slug}/pending/release (anonymous surface).
+
+cid + sig constitute the cart continuity proof (HMAC). email is the buyer's
+address used as the payment lookup key (must match the cart's stored email).`
+} as const;
+
+export const PendingReleaseResponseSchema = {
+    properties: {
+        released: {
+            type: 'boolean',
+            title: 'Released'
+        }
+    },
+    type: 'object',
+    required: ['released'],
+    title: 'PendingReleaseResponse',
+    description: `Response body for both release-on-return endpoints.
+
+released=True only when a cancel+hold-release actually committed.
+released=False covers: invalid proof, no PENDING exists, flag disabled.
+Enumeration-safe: the body shape is identical across all False outcomes.`
+} as const;
+
 export const PersonGrantItemSchema = {
     properties: {
         email: {
