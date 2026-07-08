@@ -453,7 +453,30 @@
     "tracks": "Tracks",
     "venues": "Venues",
     "api_keys": "API Keys",
-    "api_docs": "API Docs"
+    "api_docs": "API Docs",
+    "recap": "Recap",
+    "locked_ended": "Ended — not available"
+  },
+  "recap": {
+    "status_pill": "Ended · {{date}}",
+    "hero_heading": "Thanks for being part of {{popupName}}",
+    "hero_subheading": "Here's what happened. Revisit every event and reconnect with the community.",
+    "stats": {
+      "events_one": "{{count}} event",
+      "events_other": "{{count}} events",
+      "attendees_one": "{{count}} attendee",
+      "attendees_other": "{{count}} attendees",
+      "days_one": "{{count}} day",
+      "days_other": "{{count}} days"
+    },
+    "cta": {
+      "events_title": "All events",
+      "events_description": "The full agenda from day one.",
+      "events_action": "View events",
+      "directory_title": "Attendee directory",
+      "directory_description": "The people from the community.",
+      "directory_action": "Explore"
+    }
   },
   "api_keys": {
     "title": "API Keys",
