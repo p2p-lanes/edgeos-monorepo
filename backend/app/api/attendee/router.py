@@ -564,9 +564,9 @@ async def list_attendees(
     least one purchased/granted ticket when True, those without when False.
     """
     if application_id:
-        attendees = crud.attendees_crud.find_by_application(db, application_id)
-        total = len(attendees)
-        attendees = attendees[skip : skip + limit]
+        attendees, total = crud.attendees_crud.find_by_application(
+            db, application_id, skip=skip, limit=limit
+        )
     elif popup_id:
         attendees, total = crud.attendees_crud.find_by_popup(
             db,
@@ -892,11 +892,8 @@ async def get_tickets_by_email(
 
         # Resolve popup — direct-sale attendees have attendee.popup directly
         # Application-linked attendees may have attendee.application.popup
-        popup = None
-        if attendee.popup_id:
-            from app.api.popup.models import Popups
-
-            popup = db.get(Popups, attendee.popup_id)
+        # Both relationships are eager-loaded by find_by_email.
+        popup = attendee.popup
         if popup is None and attendee.application:
             popup = attendee.application.popup
         popup_name = popup.name if popup else "Unknown"
