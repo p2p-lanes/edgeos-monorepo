@@ -11866,6 +11866,29 @@ export const OpenTicketingPurchaseCreateSchema = {
                     type: 'null'
                 }
             ]
+        },
+        cid: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Cid'
+        },
+        sig: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Sig'
         }
     },
     type: 'object',
