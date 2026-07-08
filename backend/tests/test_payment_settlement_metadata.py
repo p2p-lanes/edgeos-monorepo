@@ -282,8 +282,17 @@ def test_regular_payment_webhook_schedules_meta_capi_purchase(monkeypatch) -> No
         calls["meta"] = payment_arg
 
     payment_router = importlib.import_module("app.api.payment.router")
+    payment_notifications = importlib.import_module(
+        "app.services.payment_notifications"
+    )
     monkeypatch.setattr(payment_router, "payments_crud", FakePaymentsCRUD())
-    monkeypatch.setattr(payment_router, "_send_payment_confirmed_email", fake_email)
+    # _send_payment_confirmed_email_best_effort (called by _handle_regular_payment
+    # via the webhook path) now lives in app.services.payment_notifications and
+    # calls _send_payment_confirmed_email from the same module.  Patch at the
+    # service-module level so the mock is visible to the service function.
+    monkeypatch.setattr(
+        payment_notifications, "_send_payment_confirmed_email", fake_email
+    )
     monkeypatch.setattr(payment_router, "_schedule_meta_capi_purchase", fake_schedule)
 
     result = asyncio.run(
@@ -362,8 +371,13 @@ def test_regular_payment_webhook_schedules_meta_capi_when_email_fails(
         calls["meta"] = payment_arg
 
     payment_router = importlib.import_module("app.api.payment.router")
+    payment_notifications = importlib.import_module(
+        "app.services.payment_notifications"
+    )
     monkeypatch.setattr(payment_router, "payments_crud", FakePaymentsCRUD())
-    monkeypatch.setattr(payment_router, "_send_payment_confirmed_email", failing_email)
+    monkeypatch.setattr(
+        payment_notifications, "_send_payment_confirmed_email", failing_email
+    )
     monkeypatch.setattr(payment_router, "_schedule_meta_capi_purchase", fake_schedule)
 
     result = asyncio.run(
