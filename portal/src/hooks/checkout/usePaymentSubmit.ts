@@ -2,7 +2,7 @@
 
 import { useQueryClient } from "@tanstack/react-query"
 import { useRouter } from "next/navigation"
-import { useCallback, useEffect, useState } from "react"
+import { type MutableRefObject, useCallback, useEffect, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 import type { CheckoutMode } from "@/checkout/popupCheckoutPolicy"
@@ -22,6 +22,7 @@ import type {
   SelectedPatronItem,
 } from "@/types/checkout"
 import { buildPaymentProducts } from "./buildPaymentProducts"
+import { dispatchPaymentError, extractCartMeta } from "./errorDispatch"
 
 interface UsePaymentSubmitParams {
   applicationId: string | undefined
@@ -55,6 +56,13 @@ interface UsePaymentSubmitParams {
   } | null
   editPassesEnabled: boolean
   popupName?: string | null
+  /** Ref from useOpenCartPersistence exposing cartId and restoreToken for the
+   *  continuity-proof gate. Must be provided for open-ticketing flows; ignored
+   *  in application mode. */
+  openCartMetaRef?: MutableRefObject<{
+    cartId: string | null
+    restoreToken: string | null
+  }> | null
 }
 
 interface PaymentSubmitResult {
@@ -89,6 +97,7 @@ export function usePaymentSubmit({
   buyerData,
   editPassesEnabled,
   popupName,
+  openCartMetaRef = null,
 }: UsePaymentSubmitParams) {
   const { t, i18n } = useTranslation()
   const queryClient = useQueryClient()
@@ -211,6 +220,10 @@ export function usePaymentSubmit({
                 },
                 coupon_code: promoCodeValid ? promoCode : undefined,
                 insurance: insurance || undefined,
+                // Cart continuity proof: allows the backend to supersede an
+                // existing PENDING payment for the same email+popup pair.
+                // The backend ignores these fields when no PENDING payment exists.
+                ...extractCartMeta(openCartMetaRef),
               },
             })
           : await PaymentsService.createMyPayment({
@@ -324,12 +337,46 @@ export function usePaymentSubmit({
       return { success: true }
     } catch (err: unknown) {
       console.error("Payment failed:", err)
-      const apiDetail =
-        err instanceof ApiError &&
-        typeof (err.body as Record<string, unknown> | null)?.detail === "string"
-          ? ((err.body as Record<string, unknown>).detail as string)
+
+      const apiBody =
+        err instanceof ApiError
+          ? (err.body as Record<string, unknown> | null)
           : null
-      const isCouponError = apiDetail?.startsWith("Coupon code")
+
+      // Machine-code branch: detail is an object carrying a .code field.
+      // Checked before the string-detail coupon branch so structured errors
+      // are never mis-classified by the startsWith("Coupon code") guard.
+      if (
+        apiBody !== null &&
+        typeof apiBody?.detail === "object" &&
+        apiBody.detail !== null
+      ) {
+        const detail = apiBody.detail as {
+          code?: string
+          redirect_url?: string
+        }
+        const dispatch = dispatchPaymentError(detail, submitMode, popupSlug)
+        if (dispatch !== null) {
+          const msg = t(dispatch.messageKey)
+          toast.error(msg)
+          if (dispatch.blockResubmit) paymentCompleteRef.current = true
+          if (dispatch.setPersistentError) setPromoError(msg)
+          if (dispatch.navigate?.type === "href") {
+            window.location.href = dispatch.navigate.url
+          } else if (dispatch.navigate?.type === "router-push") {
+            router.push(dispatch.navigate.path)
+          }
+          setIsSubmitting(false)
+          return { success: false, error: msg }
+        }
+      }
+
+      // String-detail branch: coupon error and generic fallback.
+      const apiDetailStr =
+        apiBody !== null && typeof apiBody?.detail === "string"
+          ? (apiBody.detail as string)
+          : null
+      const isCouponError = apiDetailStr?.startsWith("Coupon code")
       if (isCouponError) {
         clearPromoCode()
         const errorMsg = t("checkout.coupon_no_longer_valid")
@@ -376,6 +423,7 @@ export function usePaymentSubmit({
     isSubmitting,
     t,
     i18n.language,
+    openCartMetaRef,
   ])
 
   return { submitPayment, isSubmitting }

@@ -464,5 +464,5 @@ export function useOpenCartPersistence({
     cartMetaRef.current = { cartId: null, restoreToken: null }
   }, [popupSlug])
 
-  return { scheduleSave, clearOpenCart }
+  return { scheduleSave, clearOpenCart, cartMetaRef }
 }
