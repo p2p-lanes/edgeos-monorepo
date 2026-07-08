@@ -262,9 +262,13 @@ class TestSupersedeLocatedPendingCore:
                 CancelOutcome.ALREADY_APPROVED
             )
             mock_factory.return_value = mock_client
-            with patch.object(payments_crud, "_reconcile_approved"):
+            mock_reconcile = MagicMock()
+            with patch.object(payments_crud, "_reconcile_approved", mock_reconcile):
                 with pytest.raises(HTTPException) as exc_info:
                     payments_crud._supersede_located_pending(db, prior, anonymous=True)
+
+        # _reconcile_approved MUST be called exactly once with the located prior
+        mock_reconcile.assert_called_once_with(db, prior)
 
         assert exc_info.value.status_code == 409
         detail = exc_info.value.detail
@@ -359,6 +363,47 @@ class TestSupersedeLocatedPendingCore:
         # Both coupons released exactly once
         assert _fresh_coupon_uses(db, coupon_a.id) == 4
         assert _fresh_coupon_uses(db, coupon_c.id) == 4
+
+    def test_already_approved_builds_signed_redirect_url(
+        self,
+        db: Session,
+        tenant_a: Tenants,
+    ) -> None:
+        """ALREADY_APPROVED with signing secret + success URL → 409 detail contains redirect_url.
+
+        Regression guard for the build_thank_you_payload contract violations
+        (missing exp=, wrong item keys, str vs float amount_total) that would
+        cause a TypeError at runtime when both popup fields are configured.
+        """
+        popup = _make_popup(db, tenant_a, slug_prefix="slp06")
+        # Configure the popup for signed redirect (both fields required)
+        popup.open_checkout_signing_secret = "test-secret-32-chars-long-xxxxxxxx"
+        popup.open_checkout_success_url = "https://example.com/thank-you"
+        db.add(popup)
+        db.flush()
+        prior = _make_pending_payment(db, tenant_a, popup)
+
+        with patch("app.services.simplefi.get_simplefi_client") as mock_factory:
+            mock_client = MagicMock()
+            mock_client.cancel_payment_request.return_value = (
+                CancelOutcome.ALREADY_APPROVED
+            )
+            mock_factory.return_value = mock_client
+            with patch.object(payments_crud, "_reconcile_approved"):
+                with pytest.raises(HTTPException) as exc_info:
+                    payments_crud._supersede_located_pending(db, prior, anonymous=True)
+
+        detail = exc_info.value.detail
+        assert exc_info.value.status_code == 409
+        assert detail["code"] == "previous_payment_completed"
+        # redirect_url must be present and be a signed URL (non-None, non-empty)
+        redirect_url = detail.get("redirect_url")
+        assert redirect_url is not None, (
+            "redirect_url must be present when secret+URL configured"
+        )
+        assert "example.com/thank-you" in redirect_url
+        # Signed URL carries base64 payload + sig — must not contain the raw payment UUID
+        assert str(prior.id) not in redirect_url
 
 
 # ---------------------------------------------------------------------------
@@ -518,6 +563,7 @@ class TestReleasePendingOpen:
         email = f"race-{uuid.uuid4().hex[:6]}@example.com"
         prior = _make_pending_payment(db, tenant_a, popup, buyer_email=email)
 
+        mock_reconcile = MagicMock()
         with (
             patch.object(
                 payments_crud,
@@ -525,7 +571,7 @@ class TestReleasePendingOpen:
                 return_value=True,
             ),
             patch("app.services.simplefi.get_simplefi_client") as mock_factory,
-            patch.object(payments_crud, "_reconcile_approved"),
+            patch.object(payments_crud, "_reconcile_approved", mock_reconcile),
         ):
             mock_client = MagicMock()
             mock_client.cancel_payment_request.return_value = (
@@ -537,6 +583,9 @@ class TestReleasePendingOpen:
                 payments_crud.release_pending_open(
                     db, popup=popup, email=email, cid=uuid.uuid4(), sig="valid-sig"
                 )
+
+        # _reconcile_approved MUST be called exactly once with the located prior
+        mock_reconcile.assert_called_once_with(db, prior)
 
         assert exc_info.value.status_code == 409
         detail = exc_info.value.detail
@@ -908,6 +957,8 @@ class TestReleasePendingOpenEndpoint:
             )
 
         assert resp.status_code == 200
+        # Enumeration-safe: response body must be byte-identical across all false paths
+        assert resp.text == '{"released":false}'
         assert resp.json() == {"released": False}
 
     def test_valid_proof_no_pending_200_released_false(
@@ -930,6 +981,8 @@ class TestReleasePendingOpenEndpoint:
             )
 
         assert resp.status_code == 200
+        # Enumeration-safe: response body must be byte-identical across all false paths
+        assert resp.text == '{"released":false}'
         assert resp.json() == {"released": False}
 
     def test_already_approved_race_409(

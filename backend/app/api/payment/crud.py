@@ -3285,6 +3285,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 # Open-checkout path: signed external redirect only.
                 secret = _popup.open_checkout_signing_secret
                 if secret and _popup.open_checkout_success_url:
+                    _now = datetime.now(UTC)
                     payload = build_thank_you_payload(
                         order_id=str(prior.id),
                         first_name=str(
@@ -3292,12 +3293,21 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                         ),
                         email=str((prior.buyer_snapshot or {}).get("buyer_email", "")),
                         items=[
-                            {"name": pp.product_name, "quantity": pp.quantity}
+                            {
+                                "title": pp.product_name,
+                                "qty": pp.quantity,
+                                "price": float(
+                                    pp.effective_unit_price
+                                    if pp.effective_unit_price is not None
+                                    else pp.product_price
+                                ),
+                            }
                             for pp in prior.products_snapshot
                         ],
-                        amount_total=str(prior.amount),
+                        amount_total=float(prior.amount),
                         currency=prior.currency or "",
-                        issued_at=datetime.now(UTC).isoformat(),
+                        issued_at=_now.isoformat(),
+                        exp=int(_now.timestamp()) + 30 * 60,
                     )
                     redirect_url = build_signed_redirect_url(
                         _popup.open_checkout_success_url, payload, secret
@@ -3381,9 +3391,9 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         from sqlalchemy import text as _text
 
         got_lock = session.exec(
-            _text("SELECT pg_try_advisory_xact_lock(hashtext(:key))").bindparams(
-                key=f"{popup.id}:{email.lower()}"
-            )
+            _text(
+                "SELECT pg_try_advisory_xact_lock(hashtext(:key)::bigint)"
+            ).bindparams(key=f"{popup.id}:{email.lower()}")
         ).scalar()
 
         if not got_lock:
