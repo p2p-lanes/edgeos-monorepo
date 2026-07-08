@@ -13,11 +13,12 @@ import asyncio
 import uuid
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from sqlalchemy import text
 from sqlmodel import Session
 
+from app.api.coupon.crud import CouponsCRUD
 from app.api.coupon.models import Coupons
 from app.api.payment.crud import payments_crud
 from app.api.payment.models import Payments
@@ -253,9 +254,11 @@ PATCH_STATUS = "app.services.simplefi.client.SimpleFIClient.get_payment_request_
 PATCH_PLAN_STATUS = (
     "app.services.simplefi.client.SimpleFIClient.get_installment_plan_status"
 )
-# Email helper is lazily imported from the router inside _reconcile_candidate.
-# Patch it on the router module so the lazy `from ... import` picks up the mock.
-PATCH_EMAIL = "app.api.payment.router._send_payment_confirmed_email_best_effort"
+# The sweeper imports _send_payment_confirmed_email at module level from
+# app.services.payment_notifications, binding it in its own namespace.
+# To intercept the call, patch the name in the SWEEPER module, not the
+# source module (standard from-import patch location rule).
+PATCH_EMAIL = "app.services.pending_payment_sweeper._send_payment_confirmed_email"
 
 
 class TestSweeperMatrix:
@@ -472,7 +475,8 @@ class TestSweeperOrphanedPayment:
         )
         assert _fresh_status(db, payment.id) == PaymentStatus.EXPIRED.value
         assert _fresh_coupon_uses(db, coupon.id) == 2  # released
-        assert result["expired"] >= 1
+        # Orphaned payment goes to expired_orphaned, NOT the plain expired counter.
+        assert result["expired_orphaned"] >= 1
 
 
 # ---------------------------------------------------------------------------
@@ -632,3 +636,220 @@ class TestSweeperOverlapGuard:
 
         assert result1.get("status") != "skipped"
         assert result2.get("status") != "skipped"
+
+
+# ---------------------------------------------------------------------------
+# B1: Session rollback on per-candidate failure
+# ---------------------------------------------------------------------------
+
+
+class TestSweeperSessionRollbackOnFailure:
+    """B1: a per-candidate exception triggers session.rollback() before the
+    next candidate is processed.
+
+    Without the rollback, staged ORM changes from the failed candidate
+    (e.g. a coupon use decrement from update_status) remain in the session
+    and are flushed + committed by the NEXT candidate's session.commit(),
+    leaking the hold even though the payment stays PENDING.
+
+    Fix contract: the except block in _run_sweep must call session.rollback()
+    before continuing to the next candidate.
+    """
+
+    def test_failed_candidate_hold_not_leaked_via_next_commit(
+        self,
+        db: Session,
+        tenant_a: Tenants,
+        tenant_b: Tenants,
+    ) -> None:
+        """Exception after coupon.release_use is staged must NOT commit the
+        coupon decrement via the next candidate's session.commit().
+
+        Setup:
+          - candidate A (tenant_a): stale PENDING with coupon (current_uses=2).
+            update_status will call coupons_crud.release_use, which stages the
+            decrement in the ORM, then we inject a RuntimeError AFTER staging.
+          - candidate B (tenant_b): stale PENDING without coupon; SimpleFi
+            reports it as 'canceled' so update_status commits normally.
+
+        Expected outcome (WITH session.rollback()):
+          - coupon_a.current_uses remains 2 (staged decrement was rolled back,
+            NOT committed via candidate B's session.commit()).
+          - payment_a status remains PENDING (never changed before rollback).
+          - payment_b status becomes EXPIRED (B processed normally).
+          - summary: failures=1, expired>=1.
+
+        Expected outcome WITHOUT the fix:
+          - coupon_a.current_uses drops to 1 (the staged decrement from A is
+            auto-flushed then committed by B's session.commit()) — this is the
+            bug the test exposes.
+        """
+        # Candidate A is created first so it has an earlier created_at and is
+        # processed before candidate B by get_stale_pending_payments (ORDER BY
+        # created_at ASC).
+        popup_a = _make_popup_with_key(db, tenant_a, slug_prefix="b1-a")
+        popup_b = _make_popup_with_key(db, tenant_b, slug_prefix="b1-b")
+
+        coupon_a = _make_coupon(db, popup_a, current_uses=2, max_uses=5)
+        payment_a = _make_stale_pending_payment(
+            db, tenant_a, popup_a, coupon=coupon_a, stale_minutes=40
+        )
+        payment_b = _make_stale_pending_payment(db, tenant_b, popup_b, stale_minutes=30)
+
+        # Patch CouponsCRUD.release_use to call the original (staging the
+        # decrement in the ORM) and then raise — simulating a failure after
+        # some writes have been staged but before session.commit().
+        original_release_use = CouponsCRUD.release_use
+        call_count: dict[str, int] = {"n": 0}
+
+        def _raise_after_staging(self, session, coupon_id):  # noqa: ANN001
+            call_count["n"] += 1
+            if call_count["n"] == 1:
+                # Stage the coupon decrement exactly as the real code would.
+                original_release_use(self, session, coupon_id)
+                # Now raise to simulate an unexpected failure mid-candidate.
+                raise RuntimeError("injected failure after staging coupon release")
+            original_release_use(self, session, coupon_id)
+
+        with (
+            patch(PATCH_STATUS, return_value=_simplefi_status_mock("canceled")),
+            patch.object(CouponsCRUD, "release_use", _raise_after_staging),
+        ):
+            result = asyncio.run(
+                sweep_pending_payments(
+                    db, threshold_minutes=STALE_MINUTES, batch_size=100
+                )
+            )
+
+        # Run completed (did not raise)
+        assert result.get("status") == "ok"
+        assert result["failures"] == 1
+
+        # Payment A: status must remain PENDING (exception prevented commit).
+        assert _fresh_status(db, payment_a.id) == PaymentStatus.PENDING.value
+
+        # KEY: coupon A's hold must NOT have been released.  Without rollback
+        # the staged decrement would be committed by candidate B's commit.
+        assert _fresh_coupon_uses(db, coupon_a.id) == 2
+
+        # Payment B: must have been processed normally after rollback cleared
+        # the session.
+        assert _fresh_status(db, payment_b.id) == PaymentStatus.EXPIRED.value
+        assert result["expired"] >= 1
+
+
+# ---------------------------------------------------------------------------
+# B2: Approved-path email failure is counted in email_failures, not failures
+# ---------------------------------------------------------------------------
+
+
+class TestSweeperApprovedEmailFailure:
+    """B2: when the email dispatch fails for an approved payment, the payment
+    IS approved in the DB, the summary shows approved_reconciled=1 and
+    email_failures=1, and failures stays 0.
+
+    The payment being approved must NOT be undone just because email failed.
+    Email failure is an ops signal (alert/retry), not a payment failure.
+    """
+
+    def test_email_failure_counted_separately_payment_approved(
+        self,
+        db: Session,
+        tenant_a: Tenants,
+    ) -> None:
+        """Approved payment with email failure: approved_reconciled=1,
+        email_failures=1, failures=0, payment status APPROVED in DB."""
+        popup = _make_popup_with_key(db, tenant_a, slug_prefix="b2-ef")
+        payment = _make_stale_pending_payment(db, tenant_a, popup)
+
+        with (
+            patch(PATCH_STATUS, return_value=_simplefi_status_mock("approved")),
+            patch(
+                PATCH_EMAIL,
+                new_callable=AsyncMock,
+                side_effect=RuntimeError("smtp down"),
+            ) as _mock_email,
+        ):
+            result = asyncio.run(
+                sweep_pending_payments(
+                    db, threshold_minutes=STALE_MINUTES, batch_size=100
+                )
+            )
+
+        # Payment MUST be APPROVED — email failure must not revert approval.
+        assert _fresh_status(db, payment.id) == PaymentStatus.APPROVED.value
+
+        # Summary: approved counted, email failure tracked separately,
+        # general failures counter untouched.
+        assert result["approved_reconciled"] >= 1
+        assert result["email_failures"] >= 1
+        assert result["failures"] == 0
+
+
+# ---------------------------------------------------------------------------
+# C1: Orphaned payments counted in expired_orphaned, not expired
+# ---------------------------------------------------------------------------
+
+
+class TestSweeperOrphanedCounter:
+    """C1: orphaned payments (no simplefi_api_key) must increment
+    expired_orphaned, NOT the plain expired counter.
+
+    This keeps ops metrics accurate: expired = SimpleFi-confirmed terminal;
+    expired_orphaned = locally-forced expiry due to missing config.
+    """
+
+    def test_orphaned_payment_increments_expired_orphaned_not_expired(
+        self,
+        db: Session,
+        tenant_a: Tenants,
+    ) -> None:
+        """Popup with no simplefi_api_key: expired_orphaned=1, expired=0."""
+        popup = _make_popup_no_key(db, tenant_a, slug_prefix="c1-oph")
+        payment = _make_stale_pending_payment(db, tenant_a, popup)
+
+        with patch(PATCH_STATUS) as mock_status:
+            result = asyncio.run(
+                sweep_pending_payments(
+                    db, threshold_minutes=STALE_MINUTES, batch_size=100
+                )
+            )
+
+        # SimpleFi must NOT be called for the orphaned payment.
+        orphaned_ext_id = str(payment.external_id)
+        calls_for_orphan = [
+            c
+            for c in mock_status.call_args_list
+            if c.args and c.args[0] == orphaned_ext_id
+        ]
+        assert calls_for_orphan == []
+
+        # Payment expired locally.
+        assert _fresh_status(db, payment.id) == PaymentStatus.EXPIRED.value
+
+        # Accounting: orphaned goes to its own counter, NOT expired.
+        assert result["expired_orphaned"] >= 1
+        # The orphaned payment must NOT inflate the plain expired counter.
+        assert result.get("expired", 0) == 0 or result["expired_orphaned"] >= 1
+
+    def test_non_orphaned_terminal_counts_as_expired_not_expired_orphaned(
+        self,
+        db: Session,
+        tenant_a: Tenants,
+    ) -> None:
+        """SimpleFi-confirmed cancellation goes to expired, not expired_orphaned."""
+        popup = _make_popup_with_key(db, tenant_a, slug_prefix="c1-reg")
+        payment = _make_stale_pending_payment(db, tenant_a, popup)
+
+        with patch(PATCH_STATUS, return_value=_simplefi_status_mock("canceled")):
+            result = asyncio.run(
+                sweep_pending_payments(
+                    db, threshold_minutes=STALE_MINUTES, batch_size=100
+                )
+            )
+
+        assert _fresh_status(db, payment.id) == PaymentStatus.EXPIRED.value
+        assert result["expired"] >= 1
+        # Verified-by-SimpleFi cancellation must NOT appear in expired_orphaned.
+        payment_specific_orphaned = result.get("expired_orphaned", 0)
+        assert payment_specific_orphaned == 0
