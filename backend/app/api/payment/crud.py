@@ -3043,6 +3043,36 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 },
             )
 
+    def get_stale_pending_payments(
+        self,
+        session: Session,
+        threshold_minutes: int,
+        batch_size: int,
+    ) -> list["Payments"]:
+        """Return PENDING SimpleFi payments older than ``threshold_minutes``.
+
+        Query consumes the ``ix_payments_pending_queue`` partial index
+        (``WHERE status = 'pending'``) so the full payments table is never
+        scanned.  Results are ordered by ``created_at`` (oldest first) so
+        each batch makes progress and the same rows are not repeatedly skipped.
+
+        Used by the pending-payment sweeper (ADR-5).
+        """
+        threshold = datetime.now(UTC) - timedelta(minutes=threshold_minutes)
+        return list(
+            session.exec(
+                select(Payments)
+                .where(
+                    Payments.status == PaymentStatus.PENDING.value,  # type: ignore[arg-type]
+                    Payments.source == PaymentSource.SIMPLEFI.value,  # type: ignore[arg-type]
+                    Payments.external_id.is_not(None),  # type: ignore[union-attr]
+                    Payments.created_at < threshold,
+                )
+                .order_by(Payments.created_at)
+                .limit(batch_size)
+            ).all()
+        )
+
     def supersede_pending_payments(
         self,
         session: Session,
