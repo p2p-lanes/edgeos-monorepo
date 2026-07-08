@@ -63,6 +63,10 @@ interface UsePaymentSubmitParams {
     cartId: string | null
     restoreToken: string | null
   }> | null
+  /** Flush function from useOpenCartPersistence — called at the START of
+   *  submitPayment in open-ticketing mode to ensure cartMetaRef has fresh
+   *  cid/restore_token before the purchase body is built (ADR-R8). */
+  flushOpenCartSave?: (() => Promise<void>) | null
 }
 
 interface PaymentSubmitResult {
@@ -98,6 +102,7 @@ export function usePaymentSubmit({
   editPassesEnabled,
   popupName,
   openCartMetaRef = null,
+  flushOpenCartSave = null,
 }: UsePaymentSubmitParams) {
   const { t, i18n } = useTranslation()
   const queryClient = useQueryClient()
@@ -159,6 +164,12 @@ export function usePaymentSubmit({
 
     setIsSubmitting(true)
     setPromoError(null)
+
+    // Flush any pending debounced save BEFORE building the purchase body so
+    // cartMetaRef has fresh cid/restore_token (ADR-R8).
+    if (submitMode === "open-ticketing" && flushOpenCartSave) {
+      await flushOpenCartSave()
+    }
 
     try {
       const { products: productsToSend, isMonthUpgrade } = buildPaymentProducts(
@@ -424,6 +435,7 @@ export function usePaymentSubmit({
     t,
     i18n.language,
     openCartMetaRef,
+    flushOpenCartSave,
   ])
 
   return { submitPayment, isSubmitting }

@@ -5,13 +5,15 @@ import { CheckoutService } from "@/client"
 import { getProductAvailability } from "@/lib/product-availability"
 import type {
   CheckoutStep,
-  SelectedHousingItem,
+  SelectedDynamicItem,
   SelectedMealPlanItem,
   SelectedMerchItem,
-  SelectedPatronItem,
 } from "@/types/checkout"
 import type { ProductsPass } from "@/types/Products"
-import type { CartSelectionState } from "./useCartPersistence"
+import type {
+  CartSelectionState,
+  RestorationSetters,
+} from "./useCartPersistence"
 
 /**
  * What we persist in localStorage per popup slug.
@@ -48,17 +50,16 @@ interface CartItemsSnapshot {
     dietary_restriction: string | null
     special_request: string | null
   }[]
+  /** Flat array of dynamic-step items, keyed by step_type for reconstruction. */
+  dynamic_items: {
+    step_type: string
+    product_id: string
+    quantity: number
+    price: number
+  }[]
   promo_code: string | null
   insurance: boolean
   current_step: string | null
-}
-
-interface RestorationSetters {
-  setHousing: (item: SelectedHousingItem | null) => void
-  setMerch: (items: SelectedMerchItem[]) => void
-  setPatron: (item: SelectedPatronItem | null) => void
-  setMealPlans: (items: SelectedMealPlanItem[]) => void
-  setInsurance: (value: boolean) => void
 }
 
 interface UseOpenCartPersistenceParams {
@@ -154,6 +155,16 @@ function buildItemsSnapshot(state: CartSelectionState): CartItemsSnapshot {
       dietary_restriction: m.dietaryRestriction,
       special_request: m.specialRequest,
     })),
+    // Flat array — step_type is the grouping key used to reconstruct the
+    // Record<string, SelectedDynamicItem[]> during hydration.
+    dynamic_items: Object.values(state.dynamicItems)
+      .flat()
+      .map((item) => ({
+        step_type: item.stepType,
+        product_id: item.productId,
+        quantity: item.quantity,
+        price: item.price,
+      })),
     promo_code: state.promoCodeValid ? state.promoCode : null,
     insurance: state.insurance,
     current_step: state.currentStep !== "success" ? state.currentStep : null,
@@ -167,7 +178,8 @@ function hasCartItems(state: CartSelectionState): boolean {
     state.housing !== null ||
     state.merch.length > 0 ||
     state.patron !== null ||
-    state.selectedMealPlans.length > 0
+    state.selectedMealPlans.length > 0 ||
+    Object.values(state.dynamicItems).some((items) => items.length > 0)
   )
 }
 
@@ -178,8 +190,15 @@ function hydrateFromSnapshot(
   housingPricePerDay: boolean,
   restorationSetters: RestorationSetters,
 ): void {
-  const { setHousing, setMerch, setPatron, setMealPlans, setInsurance } =
-    restorationSetters
+  const {
+    setHousing,
+    setMerch,
+    setPatron,
+    setMealPlans,
+    setInsurance,
+    setDynamicItems,
+    setPromoCode,
+  } = restorationSetters
 
   // Restore housing — skip products that are sold_out / ended / upcoming.
   if (snapshot.housing) {
@@ -280,6 +299,35 @@ function hydrateFromSnapshot(
   // Restore insurance
   if (snapshot.insurance) {
     setInsurance(true)
+  }
+
+  // Restore dynamic items — group flat array back into Record<string, SelectedDynamicItem[]>
+  // keyed by step_type. Skip entries whose product is no longer available.
+  if (snapshot.dynamic_items?.length) {
+    const grouped: Record<string, SelectedDynamicItem[]> = {}
+    for (const saved of snapshot.dynamic_items) {
+      const product = products.find((p) => p.id === saved.product_id)
+      if (!product) continue
+      if (!getProductAvailability(product).canSelect) continue
+      const entry: SelectedDynamicItem = {
+        productId: product.id,
+        product,
+        quantity: saved.quantity,
+        price: saved.price,
+        stepType: saved.step_type,
+      }
+      grouped[saved.step_type] = [...(grouped[saved.step_type] ?? []), entry]
+    }
+    if (Object.keys(grouped).length > 0) {
+      setDynamicItems(grouped)
+    }
+  }
+
+  // Restore promo code — populate the input field so the gated re-validation
+  // (after release settles) can confirm the code is still valid. setPromoCode
+  // is optional (not present on non-open-cart flows).
+  if (snapshot.promo_code && setPromoCode) {
+    setPromoCode(snapshot.promo_code)
   }
 }
 
@@ -382,6 +430,39 @@ export function useOpenCartPersistence({
         housingPricePerDay,
         restorationSetters,
       )
+
+      // restore_token refresh: when a cart was saved before the popup had a
+      // signing secret, restoreToken is null. Issue an idempotent re-upsert with
+      // the same items to obtain a fresh token now that the secret may exist.
+      // Only fire when cartId is set (prior upsert succeeded) and token is absent.
+      if (
+        saved.cartId &&
+        !saved.restoreToken &&
+        saved.items &&
+        buyerEmail &&
+        buyerEmail.includes("@")
+      ) {
+        CheckoutService.upsertOpenCart({
+          slug: popupSlug,
+          requestBody: { email: buyerEmail, items: saved.items },
+        })
+          .then((openCart) => {
+            if (openCart.restore_token) {
+              cartMetaRef.current = {
+                cartId: openCart.id,
+                restoreToken: openCart.restore_token,
+              }
+              writeLocalStorage(popupSlug, {
+                items: saved.items,
+                cartId: openCart.id,
+                restoreToken: openCart.restore_token,
+              })
+            }
+          })
+          .catch(() => {
+            // No-op — retain existing cartId without token
+          })
+      }
     }
   }, [products, popupSlug, initialStep])
 
@@ -464,5 +545,74 @@ export function useOpenCartPersistence({
     cartMetaRef.current = { cartId: null, restoreToken: null }
   }, [popupSlug])
 
-  return { scheduleSave, clearOpenCart, cartMetaRef }
+  // --- Synchronous flush: cancel debounce and persist immediately ---
+  // Called by usePaymentSubmit at the START of submitPayment (open-ticketing mode)
+  // so that cartMetaRef has fresh cid/restore_token before the purchase body is built.
+  const flushSave = useCallback(async (): Promise<void> => {
+    if (!hasRestoredCheckoutRef.current) return
+    if (paymentCompleteRef.current) return
+
+    // Cancel any pending debounce
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current)
+      debounceRef.current = null
+    }
+
+    const state = selectionStateRef.current
+    const email = buyerEmail
+
+    if (!email || !email.includes("@")) return
+    if (!hasCartItems(state)) return
+
+    const items = buildItemsSnapshot(state)
+
+    // Synchronous localStorage write — guarantees cid is readable even if the
+    // backend call below fails.
+    writeLocalStorage(popupSlug, {
+      items,
+      cartId: cartMetaRef.current.cartId,
+      restoreToken: cartMetaRef.current.restoreToken,
+    })
+
+    // Best-effort backend upsert with a 1500ms timeout.
+    const FLUSH_TIMEOUT_MS = 1500
+    try {
+      const openCart = await Promise.race([
+        CheckoutService.upsertOpenCart({
+          slug: popupSlug,
+          requestBody: { email, items },
+        }),
+        new Promise<never>((_, reject) =>
+          setTimeout(
+            () => reject(new Error("flush timeout")),
+            FLUSH_TIMEOUT_MS,
+          ),
+        ),
+      ])
+      cartMetaRef.current = {
+        cartId: openCart.id,
+        restoreToken: openCart.restore_token ?? null,
+      }
+      // Update localStorage with the fresh ids so the purchase body picks them up
+      writeLocalStorage(popupSlug, {
+        items,
+        cartId: openCart.id,
+        restoreToken: openCart.restore_token ?? null,
+      })
+    } catch {
+      // Timeout or network failure — localStorage already has the snapshot.
+      // cartMetaRef retains its previous cid if it had one.
+      console.warn(
+        "[useOpenCartPersistence] flushSave: upsert failed or timed out",
+      )
+    }
+  }, [
+    popupSlug,
+    buyerEmail,
+    selectionStateRef,
+    hasRestoredCheckoutRef,
+    paymentCompleteRef,
+  ])
+
+  return { scheduleSave, clearOpenCart, cartMetaRef, flushSave }
 }
