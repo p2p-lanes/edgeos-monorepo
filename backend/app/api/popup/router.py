@@ -21,6 +21,7 @@ from app.api.popup.schemas import (
     PopupAdmin,
     PopupCreate,
     PopupPublic,
+    PopupRecapStats,
     PopupStatus,
     PopupUpdate,
 )
@@ -445,3 +446,32 @@ async def get_portal_popup(
     data = PopupPublic.model_validate(popup).model_dump()
     data = apply_translation_overlay(data, translation, TRANSLATABLE_FIELDS["popup"])
     return PopupPublic.model_validate(data)
+
+
+@router.get("/{popup_id}/recap-stats", response_model=PopupRecapStats)
+async def get_popup_recap_stats(
+    popup_id: uuid.UUID,
+    db: HumanTenantSession,
+    current_human: CurrentHuman,
+) -> PopupRecapStats:
+    """Aggregate recap numbers for a popup — participants only."""
+    from app.api.application.crud import applications_crud  # noqa: PLC0415
+
+    popup = crud.get(db, popup_id)
+    if not popup:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Popup not found"
+        )
+
+    access = applications_crud.resolve_popup_access(db, current_human.id, popup_id)
+    if not access.allowed:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Popup not found"
+        )
+
+    events_count, attendees_count, days = crud.get_recap_stats(db, popup)
+    return PopupRecapStats(
+        events_count=events_count,
+        attendees_count=attendees_count,
+        days=days,
+    )
