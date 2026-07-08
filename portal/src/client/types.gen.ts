@@ -2969,15 +2969,6 @@ export type PopupPublic = {
 };
 
 /**
- * Aggregate numbers for the ended-popup recap hero.
- */
-export type PopupRecapStats = {
-    events_count: number;
-    attendees_count: number;
-    days: number;
-};
-
-/**
  * Schema for adding a reviewer to a popup.
  */
 export type PopupReviewerCreate = {
@@ -6241,12 +6232,6 @@ export type PopupsGetPortalPopupData = {
 };
 
 export type PopupsGetPortalPopupResponse = (PopupPublic);
-
-export type PopupsGetPopupRecapStatsData = {
-    popupId: string;
-};
-
-export type PopupsGetPopupRecapStatsResponse = (PopupRecapStats);
 
 export type PortalGetPopupAccessData = {
     popupId: string;

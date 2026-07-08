@@ -86,41 +86,5 @@ class PopupsCRUD(BaseCRUD[Popups, PopupCreate, PopupUpdate]):
         )
         return list(session.exec(statement).all())
 
-    def get_recap_stats(self, session: Session, popup: Popups) -> tuple[int, int, int]:
-        """Return (published_events, directory_attendees, inclusive_days) for a popup.
-
-        Attendees are counted only when the popup's attendee directory is
-        enabled. ``days`` is the inclusive calendar span between start_date and
-        end_date, or 0 when either is missing.
-        """
-        from sqlalchemy import func  # noqa: PLC0415
-
-        from app.api.attendee.models import Attendees  # noqa: PLC0415
-        from app.api.event.models import Events  # noqa: PLC0415
-        from app.api.event.schemas import EventStatus  # noqa: PLC0415
-
-        events_count = session.exec(
-            select(func.count())
-            .select_from(Events)
-            .where(
-                Events.popup_id == popup.id,
-                Events.status == EventStatus.PUBLISHED.value,
-            )
-        ).one()
-
-        attendees_count = 0
-        if popup.show_attendee_directory:
-            attendees_count = session.exec(
-                select(func.count())
-                .select_from(Attendees)
-                .where(Attendees.popup_id == popup.id)
-            ).one()
-
-        days = 0
-        if popup.start_date and popup.end_date:
-            days = (popup.end_date.date() - popup.start_date.date()).days + 1
-
-        return int(events_count), int(attendees_count), int(days)
-
 
 popups_crud = PopupsCRUD()

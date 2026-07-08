@@ -523,11 +523,3 @@ class PopupAdmin(PopupBase):
     """Admin popup schema — all fields including sensitive ones."""
 
     id: uuid.UUID
-
-
-class PopupRecapStats(SQLModel):
-    """Aggregate numbers for the ended-popup recap hero."""
-
-    events_count: int
-    attendees_count: int
-    days: int

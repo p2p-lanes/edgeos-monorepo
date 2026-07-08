@@ -14218,27 +14218,6 @@ export const PopupPublicSchema = {
     description: 'Public popup schema — excludes sensitive/internal fields.'
 } as const;
 
-export const PopupRecapStatsSchema = {
-    properties: {
-        events_count: {
-            type: 'integer',
-            title: 'Events Count'
-        },
-        attendees_count: {
-            type: 'integer',
-            title: 'Attendees Count'
-        },
-        days: {
-            type: 'integer',
-            title: 'Days'
-        }
-    },
-    type: 'object',
-    required: ['events_count', 'attendees_count', 'days'],
-    title: 'PopupRecapStats',
-    description: 'Aggregate numbers for the ended-popup recap hero.'
-} as const;
-
 export const PopupReviewerCreateSchema = {
     properties: {
         user_id: {
