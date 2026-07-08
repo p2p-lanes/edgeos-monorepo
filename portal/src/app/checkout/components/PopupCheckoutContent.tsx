@@ -357,7 +357,7 @@ export const PopupCheckoutContent = ({
         }
       >
         <PassesProvider attendees={attendees} restoreFromCart>
-          <CheckoutProvider initialStep="passes">
+          <CheckoutProvider initialStep="passes" openCartPopupSlug={popup.slug}>
             <div
               className={`h-dvh overflow-y-auto no-scrollbar ${background.className}`}
               style={background.style}
