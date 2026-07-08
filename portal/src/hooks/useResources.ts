@@ -26,7 +26,7 @@ const useResources = () => {
     city?.status === "ended" && city?.id ? String(city.id) : null,
   )
 
-  if (city?.status === "ended") {
+  if (city?.status === "ended" && city?.sale_type !== "direct") {
     const resources = buildEndedResources({
       t,
       city,

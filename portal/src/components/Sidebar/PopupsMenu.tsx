@@ -138,7 +138,7 @@ const PopupsMenu = () => {
                     <span className="truncate">{popup.name}</span>
                     {popup.status === "ended" && (
                       <Badge variant="secondary" className="shrink-0">
-                        {t("status.completed", { defaultValue: "Ended" })}
+                        {t("recap.status_badge")}
                       </Badge>
                     )}
                   </span>

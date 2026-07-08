@@ -19,7 +19,7 @@ export default function Home() {
 
   if (!city) return null
 
-  if (city.status === "ended") {
+  if (city.status === "ended" && city.sale_type !== "direct") {
     return <RecapLanding popup={city} />
   }
 

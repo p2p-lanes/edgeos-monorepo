@@ -456,6 +456,7 @@
     "locked_ended": "Finalizado — no disponible"
   },
   "recap": {
+    "status_badge": "Finalizado",
     "status_pill": "Finalizado · {{date}}",
     "hero_heading": "Gracias por ser parte de {{popupName}}",
     "hero_subheading": "Esto es lo que pasó. Revisá todos los eventos y reconectá con la comunidad.",
