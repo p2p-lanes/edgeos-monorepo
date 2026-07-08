@@ -55,7 +55,9 @@ def test_enrich_adds_popup_specific_passes_url(monkeypatch):
 
     assert "portal_url" in enriched
     assert "passes_url" in enriched
-    assert enriched["passes_url"] == f"{enriched['portal_url']}/portal/edge-summit/passes"
+    assert (
+        enriched["passes_url"] == f"{enriched['portal_url']}/portal/edge-summit/passes"
+    )
     assert enriched["passes_url"].endswith("/portal/edge-summit/passes")
 
 

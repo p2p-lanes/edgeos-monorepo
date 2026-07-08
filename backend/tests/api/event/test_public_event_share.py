@@ -192,9 +192,7 @@ def test_sibling_tenant_event_returns_404(
     assert resp.status_code == 404, resp.text
 
 
-def test_unknown_event_returns_404(
-    client: TestClient, tenant_a: Tenants
-) -> None:
+def test_unknown_event_returns_404(client: TestClient, tenant_a: Tenants) -> None:
     """A random id resolves to an opaque 404, not a 500."""
     resp = client.get(_url(uuid.uuid4()), headers={"X-Tenant-Id": str(tenant_a.id)})
 
