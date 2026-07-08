@@ -188,3 +188,20 @@ class OpenTicketingPurchaseResponse(BaseModel):
     redirect_url: str | None = None
     amount: Decimal
     currency: str
+
+
+# ---------------------------------------------------------------------------
+# Release-on-return schemas (POST /checkout/{slug}/pending/release)
+# ---------------------------------------------------------------------------
+
+
+class PendingReleaseOpenRequest(BaseModel):
+    """Request body for POST /checkout/{slug}/pending/release (anonymous surface).
+
+    cid + sig constitute the cart continuity proof (HMAC). email is the buyer's
+    address used as the payment lookup key (must match the cart's stored email).
+    """
+
+    email: EmailStr
+    cid: uuid.UUID
+    sig: str

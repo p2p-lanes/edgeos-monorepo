@@ -1,6 +1,7 @@
 "use client"
 
-import { useQuery } from "@tanstack/react-query"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { useRouter } from "next/navigation"
 import {
   createContext,
   type ReactNode,
@@ -12,12 +13,18 @@ import {
   useState,
 } from "react"
 import { useTranslation } from "react-i18next"
+import { toast } from "sonner"
 import {
   CHECKOUT_MODE,
   resolvePopupCheckoutPolicy,
 } from "@/checkout/popupCheckoutPolicy"
-import type { TicketingStepPublic } from "@/client"
-import { TicketingStepsService } from "@/client"
+import {
+  ApiError,
+  CheckoutService,
+  PaymentsService,
+  type TicketingStepPublic,
+  TicketingStepsService,
+} from "@/client"
 import { CONTENT_ONLY_TEMPLATES } from "@/components/checkout-flow/registries/variantRegistry"
 import { supportsQuantitySelector } from "@/components/ui/QuantitySelector"
 import type { StepProductResolution } from "@/hooks/checkout"
@@ -35,6 +42,7 @@ import {
   usePaymentSubmit,
   usePromoCode,
 } from "@/hooks/checkout"
+import { dispatchPaymentError } from "@/hooks/checkout/errorDispatch"
 import { useOpenCartPersistence } from "@/hooks/checkout/useOpenCartPersistence"
 import { useStepProductResolver } from "@/hooks/checkout/useStepProductResolver"
 import useGetPassesData from "@/hooks/useGetPassesData"
@@ -42,6 +50,7 @@ import { useIsAuthenticated } from "@/hooks/useIsAuthenticated"
 import { buildFormZodSchema } from "@/lib/form-schema-builder"
 import { trackGAAddToCart } from "@/lib/google-analytics"
 import { trackMetaAddToCart } from "@/lib/meta-pixel"
+import { queryKeys } from "@/lib/query-keys"
 import { isPassQuantityBased } from "@/strategies/passQuantityHelper"
 import type { AttendeePassState } from "@/types/Attendee"
 import type {
@@ -508,6 +517,7 @@ export function CheckoutProvider({
     merch,
     patron,
     selectedMealPlans,
+    dynamicItems: {},
     promoCode: "",
     promoCodeValid: false,
     insurance,
@@ -533,42 +543,20 @@ export function CheckoutProvider({
       setPatron,
       setMealPlans: setSelectedMealPlans,
       setInsurance,
+      setDynamicItems,
     },
     hasRestoredCheckoutRef,
     paymentCompleteRef,
   })
 
-  // Anonymous open-cart persistence (localStorage + backend upsert).
-  // Only active when openCartPopupSlug is provided (open-checkout flow).
-  const openCartEnabled = !!openCartPopupSlug
-  const openCartBuyerEmail =
-    typeof buyerValues.email === "string" ? buyerValues.email : ""
+  // Whether a pending-release attempt has settled (success, no-op, or error).
+  // Gates promo re-validation and auto-apply of restored promo codes so the
+  // coupon field never flashes "Invalid" before the hold is freed.
+  const [pendingReleaseSettled, setPendingReleaseSettled] = useState(false)
+  const pendingReleaseSettledRef = useRef(false)
 
-  const {
-    scheduleSave: scheduleOpenCartSave,
-    clearOpenCart,
-    cartMetaRef: openCartMetaRef,
-  } = useOpenCartPersistence({
-    popupSlug: openCartPopupSlug ?? "",
-    selectionStateRef,
-    products,
-    housingPricePerDay,
-    restorationSetters: {
-      setHousing,
-      setMerch,
-      setPatron,
-      setMealPlans: setSelectedMealPlans,
-      setInsurance,
-    },
-    hasRestoredCheckoutRef,
-    paymentCompleteRef,
-    buyerEmail: openCartBuyerEmail,
-    initialStep,
-    cid: openCartCid,
-    sig: openCartSig,
-  })
-
-  // Promo code hook
+  // Promo code hook — must run BEFORE useOpenCartPersistence so setPromoCode
+  // is stable when passed as a restoration setter.
   const {
     promoCode,
     promoCodeValid,
@@ -589,7 +577,181 @@ export function CheckoutProvider({
     savedCart,
     hasRestoredCheckoutRef,
     validatePromoCodeOverride,
+    releaseSettled: pendingReleaseSettled,
   })
+
+  // Anonymous open-cart persistence (localStorage + backend upsert).
+  // Only active when openCartPopupSlug is provided (open-checkout flow).
+  const openCartEnabled = !!openCartPopupSlug
+  const openCartBuyerEmail =
+    typeof buyerValues.email === "string" ? buyerValues.email : ""
+
+  const {
+    scheduleSave: scheduleOpenCartSave,
+    clearOpenCart,
+    cartMetaRef: openCartMetaRef,
+    flushSave: flushOpenCartSave,
+    restorationPromise: openCartRestorationPromise,
+  } = useOpenCartPersistence({
+    popupSlug: openCartPopupSlug ?? "",
+    selectionStateRef,
+    products,
+    housingPricePerDay,
+    restorationSetters: {
+      setHousing,
+      setMerch,
+      setPatron,
+      setMealPlans: setSelectedMealPlans,
+      setInsurance,
+      setDynamicItems,
+      setPromoCode,
+    },
+    hasRestoredCheckoutRef,
+    paymentCompleteRef,
+    buyerEmail: openCartBuyerEmail,
+    initialStep,
+    cid: openCartCid,
+    sig: openCartSig,
+  })
+
+  const queryClient = useQueryClient()
+  const router = useRouter()
+
+  // Release-on-mount: fire the surface-appropriate pending-release endpoint
+  // once per mount, AFTER the cart has been restored (hasRestoredCheckoutRef.current),
+  // and BEFORE the promo re-validation runs. The pendingReleaseSettled flag/ref
+  // gates usePromoCode's re-validation so coupons never flash "Invalid" before
+  // the hold is freed (the circularity fix — ADR-R4/R6).
+  //
+  // apply-time validation #3: availability refetch target is
+  //   queryKeys.checkout.runtime(slug) — the open-checkout products come via
+  //   productsOverride from the runtime query in the parent component.
+  //
+  // apply-time validation #4: hasRestoredCheckoutRef.current is set to true
+  //   inside useOpenCartPersistence's one-shot restore effect (runs after
+  //   products load). We guard on it here so cartMetaRef is populated before
+  //   we try to extract cid/sig.
+  const hasFiredReleaseRef = useRef(false)
+  // biome-ignore lint/correctness/useExhaustiveDependencies: one-shot release; reads current values via refs; products.length used to re-run after restore
+  useEffect(() => {
+    // P5 fix: when products have not loaded yet, we cannot restore and cannot
+    // release (there is no valid cid/sig yet). Settle immediately so the promo
+    // field and the UI are not permanently locked. The release fires on the next
+    // render once products arrive (products.length dep re-triggers).
+    //
+    // Note: we do NOT set hasFiredReleaseRef here so the effect can still fire
+    // once products arrive — we only settle pendingReleaseSettled so the promo
+    // field is unblocked even when products never load.
+    if (!products.length) {
+      if (!hasFiredReleaseRef.current) {
+        setPendingReleaseSettled(true)
+        pendingReleaseSettledRef.current = true
+      }
+      return
+    }
+
+    // Only fire once per mount, and only after restoration is complete.
+    if (hasFiredReleaseRef.current) return
+    if (!hasRestoredCheckoutRef.current) return
+
+    // Only fire in open-cart mode or authenticated mode with an application.
+    const effectiveSubmitMode = submitMode
+    const slug = submitPopupSlug ?? city?.slug ?? null
+    const appId = application?.id
+
+    if (effectiveSubmitMode !== "open-ticketing" && !appId) {
+      // Nothing to release — settle immediately and mark as fired so a
+      // late-arriving application (appId loading async) does not re-trigger.
+      hasFiredReleaseRef.current = true
+      setPendingReleaseSettled(true)
+      pendingReleaseSettledRef.current = true
+      return
+    }
+
+    hasFiredReleaseRef.current = true
+
+    // P1 fix: await restorationPromise before reading cartMetaRef. On the
+    // signed-link path, cartMetaRef is populated inside a Promise.then() callback
+    // that runs AFTER the restore effect sets hasRestoredCheckoutRef.current = true.
+    // Without this await, the release effect reads null cid/sig and silently
+    // skips the release, with hasFiredReleaseRef blocking retries.
+    const restorationReady = openCartEnabled
+      ? openCartRestorationPromise
+      : Promise.resolve()
+
+    restorationReady.then(() => {
+      const releasePromise: Promise<{ released: boolean }> =
+        effectiveSubmitMode === "open-ticketing" && openCartEnabled && slug
+          ? (() => {
+              const cartId = openCartMetaRef.current.cartId ?? undefined
+              const restoreToken =
+                openCartMetaRef.current.restoreToken ?? undefined
+              const email = openCartBuyerEmail
+              // Only fire if we have a valid proof — otherwise settle immediately.
+              if (!cartId || !restoreToken || !email || !email.includes("@")) {
+                return Promise.resolve({ released: false })
+              }
+              return CheckoutService.releasePendingOpen({
+                slug,
+                requestBody: { cid: cartId, sig: restoreToken, email },
+              })
+            })()
+          : appId
+            ? PaymentsService.releaseMyPendingPayment({
+                requestBody: { application_id: appId },
+              })
+            : Promise.resolve({ released: false })
+
+      releasePromise
+        .then((result) => {
+          if (result.released && slug) {
+            // Release succeeded — invalidate the checkout runtime so stock/availability
+            // reflects the freed hold on the next render cycle.
+            queryClient.invalidateQueries({
+              queryKey: queryKeys.checkout.runtime(slug),
+            })
+          }
+        })
+        .catch((err: unknown) => {
+          // Route structured errors through the existing dispatchPaymentError machinery.
+          const apiBody =
+            err instanceof ApiError
+              ? (err.body as Record<string, unknown> | null)
+              : null
+          if (
+            apiBody !== null &&
+            typeof apiBody?.detail === "object" &&
+            apiBody.detail !== null
+          ) {
+            const detail = apiBody.detail as {
+              code?: string
+              redirect_url?: string
+            }
+            const dispatch = dispatchPaymentError(
+              detail,
+              effectiveSubmitMode,
+              slug,
+            )
+            if (dispatch !== null) {
+              const msg = t(dispatch.messageKey)
+              toast.error(msg)
+              if (dispatch.blockResubmit) paymentCompleteRef.current = true
+              if (dispatch.navigate?.type === "href") {
+                window.location.href = dispatch.navigate.url
+              } else if (dispatch.navigate?.type === "router-push") {
+                router.push(dispatch.navigate.path)
+              }
+            }
+          }
+          // On 502 or unknown error: settle the gate anyway — the create-time
+          // supersede backstop guards the purchase itself.
+        })
+        .finally(() => {
+          setPendingReleaseSettled(true)
+          pendingReleaseSettledRef.current = true
+        })
+    })
+  }, [products.length])
 
   // Step management
   const {
@@ -611,14 +773,15 @@ export function CheckoutProvider({
     buyerInfoComplete: isBuyerInfoComplete,
   })
 
-  // Keep selection state ref in sync — promoCode, promoCodeValid, currentStep
-  // are defined after useCartPersistence, so we update the ref each render.
+  // Keep selection state ref in sync — promoCode, promoCodeValid, currentStep,
+  // and dynamicItems are defined after useCartPersistence, so we update each render.
   selectionStateRef.current = {
     selectedPasses,
     housing,
     merch,
     patron,
     selectedMealPlans,
+    dynamicItems,
     promoCode,
     promoCodeValid,
     insurance,
@@ -638,6 +801,7 @@ export function CheckoutProvider({
     merch,
     patron,
     selectedMealPlans,
+    dynamicItems,
     promoCode,
     promoCodeValid,
     insurance,
@@ -792,6 +956,9 @@ export function CheckoutProvider({
     setMerch([])
     setPatron(null)
     setSelectedMealPlans([])
+    // P2 fix: reset dynamicItems on city change so products from city A cannot
+    // appear in the upsert body after switching to city B.
+    setDynamicItems({})
     setPromoCode("")
     setPromoCodeValid(false)
     setPromoCodeDiscount(0)
@@ -1166,6 +1333,7 @@ export function CheckoutProvider({
     editPassesEnabled,
     popupName: city?.name ?? null,
     openCartMetaRef,
+    flushOpenCartSave: openCartEnabled ? flushOpenCartSave : null,
     buyerData:
       submitMode === "open-ticketing"
         ? {

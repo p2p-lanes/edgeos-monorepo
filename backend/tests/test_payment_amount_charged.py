@@ -158,7 +158,9 @@ def test_installment_charged_amount_card_checkout_uses_final_amount() -> None:
 # ----------------------------------------------------------------------------
 
 
-def _make_regular_card_payload(pr_id: str, final_amount: float) -> SimpleFIWebhookPayload:
+def _make_regular_card_payload(
+    pr_id: str, final_amount: float
+) -> SimpleFIWebhookPayload:
     return SimpleFIWebhookPayload.model_validate(
         {
             "id": "evt-regular-1",
@@ -239,9 +241,7 @@ def test_regular_payment_expiry_leaves_amount_charged_null(monkeypatch) -> None:
     payload = _make_regular_card_payload(pr_id, 75.0)
     payload.data.payment_request.status = "expired"
 
-    asyncio.run(
-        _handle_regular_payment(payload, FakeDBSession(), FakeWebhookCache())
-    )
+    asyncio.run(_handle_regular_payment(payload, FakeDBSession(), FakeWebhookCache()))
 
     assert payment.status == PaymentStatus.EXPIRED.value
     assert payment.amount_charged is None
