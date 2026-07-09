@@ -42,6 +42,7 @@ export default function ConfirmStep() {
     buyerValues,
     buyerGeneralError,
     removeMealPlan,
+    housingDatesShown,
   } = useCheckout()
   const { getCity } = useCityProvider()
   const popup = getCity()
@@ -334,10 +335,14 @@ export default function ConfirmStep() {
                       ? `${cart.housing.nights} night${cart.housing.nights !== 1 ? "s" : ""}`
                       : "Full stay"}
                   </p>
-                  <p className="text-xs text-muted-foreground">
-                    {formatCheckoutDate(cart.housing.checkIn)} –{" "}
-                    {formatCheckoutDate(cart.housing.checkOut)}
-                  </p>
+                  {/* With the date picker hidden these are just the popup's
+                      default dates, not a stay the buyer chose. */}
+                  {housingDatesShown && (
+                    <p className="text-xs text-muted-foreground">
+                      {formatCheckoutDate(cart.housing.checkIn)} –{" "}
+                      {formatCheckoutDate(cart.housing.checkOut)}
+                    </p>
+                  )}
                   {isNonDiscountable(cart.housing.product) && (
                     <p className="text-xs text-muted-foreground/70">
                       {notEligibleCaption}

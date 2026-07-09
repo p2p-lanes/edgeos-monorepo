@@ -93,6 +93,9 @@ interface CheckoutContextValue {
   selectHousing: (productId: string, checkIn: string, checkOut: string) => void
   updateHousingQuantity: (quantity: number) => void
   clearHousing: () => void
+  /** False when the housing step hides its date picker (show_dates: false) —
+   * cart check-in/out are then popup defaults, not user-chosen stay dates. */
+  housingDatesShown: boolean
   updateMerchQuantity: (productId: string, quantity: number) => void
   setPatronAmount: (
     productId: string,
@@ -379,15 +382,25 @@ export function CheckoutProvider({
   )
 
   // Item selection hooks
+  // With the date picker hidden the check-in/out stored in the cart are just
+  // the popup's start/end dates, never user-chosen — summaries shouldn't
+  // present them as stay dates.
+  const housingDatesShown = useMemo(() => {
+    const step = configuredSteps.find((s) => s.step_type === "housing")
+    if (!step?.template_config) return true
+    const cfg = step.template_config as Record<string, unknown>
+    return cfg.show_dates !== false
+  }, [configuredSteps])
+
   const housingPricePerDay = useMemo(() => {
     const step = configuredSteps.find((s) => s.step_type === "housing")
     if (!step?.template_config) return true
     const cfg = step.template_config as Record<string, unknown>
     // When the housing step hides the date picker, the per-night multiplication
     // is meaningless — force flat pricing so totals use product.price directly.
-    if (cfg.show_dates === false) return false
+    if (!housingDatesShown) return false
     return cfg.price_per_day !== false
-  }, [configuredSteps])
+  }, [configuredSteps, housingDatesShown])
 
   const {
     housing,
@@ -1374,6 +1387,7 @@ export function CheckoutProvider({
     selectHousing,
     updateHousingQuantity,
     clearHousing,
+    housingDatesShown,
     updateMerchQuantity,
     setPatronAmount,
     clearPatron,
