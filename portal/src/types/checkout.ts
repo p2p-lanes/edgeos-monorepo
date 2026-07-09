@@ -230,10 +230,16 @@ export function formatPrice(
 }
 
 export function formatCheckoutDate(date: string | Date): string {
+  // Date-only strings ("YYYY-MM-DD") parse as UTC midnight, so they must be
+  // formatted in UTC too — formatting them in the viewer's zone shifts the
+  // calendar date back a day anywhere west of UTC and makes SSR (UTC) and
+  // client render different text.
+  const isDateOnly = typeof date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(date)
   const d = typeof date === "string" ? new Date(date) : date
   return d.toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
+    ...(isDateOnly ? { timeZone: "UTC" } : {}),
   })
 }
 

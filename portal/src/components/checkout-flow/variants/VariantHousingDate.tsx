@@ -81,7 +81,13 @@ function buildHousingSectionGroups(
 }
 
 function formatDateInput(date: Date): string {
-  return date.toISOString().split("T")[0]
+  // Local calendar components, NOT toISOString(): these Dates are local
+  // midnights (see parseDate), and the UTC rendering of a local midnight
+  // falls on the previous day anywhere east of UTC.
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, "0")
+  const d = String(date.getDate()).padStart(2, "0")
+  return `${y}-${m}-${d}`
 }
 
 function parseDate(dateStr: string): Date {
