@@ -338,14 +338,30 @@ export function useTicketsStep({
         removeDynamicItem(stepType, product.id)
         return
       }
-      updateDynamicQuantity(stepType, product.id, qty)
+      const alreadyInCart = (cart.dynamicItems[stepType] ?? []).some(
+        (i) => i.productId === product.id,
+      )
+      if (alreadyInCart) {
+        updateDynamicQuantity(stepType, product.id, qty)
+        return
+      }
+      // updateDynamicQuantity can only mutate existing items; first add must insert
+      addDynamicItem(stepType, {
+        productId: product.id,
+        product,
+        quantity: qty,
+        price: product.price * qty,
+        stepType,
+      })
     },
     [
       checkoutMode,
       attendeePasses,
       parsedSections,
       toggleProduct,
+      cart,
       stepType,
+      addDynamicItem,
       removeDynamicItem,
       updateDynamicQuantity,
     ],
