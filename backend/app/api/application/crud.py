@@ -215,6 +215,55 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
 
         return results, total
 
+    def find_pending_review(
+        self,
+        session: Session,
+        reviewer_id: uuid.UUID,
+        popup_ids: list[uuid.UUID] | None = None,
+        skip: int = 0,
+        limit: int = 100,
+    ) -> tuple[list[Applications], int]:
+        """Find IN_REVIEW applications the reviewer has not reviewed yet.
+
+        The reviewed-by-me exclusion and pagination run in SQL so the count is
+        exact and no oversized candidate list is loaded into Python.
+        """
+        already_reviewed = (
+            exists()
+            .where(ApplicationReviews.application_id == Applications.id)
+            .where(ApplicationReviews.reviewer_id == reviewer_id)
+        )
+        base_statement = select(Applications).where(
+            Applications.status == ApplicationStatus.IN_REVIEW.value,
+            ~already_reviewed,
+        )
+
+        if popup_ids is not None:
+            base_statement = base_statement.where(
+                col(Applications.popup_id).in_(popup_ids)
+            )
+
+        count_statement = select(func.count()).select_from(base_statement.subquery())
+        total = session.exec(count_statement).one()
+
+        statement = (
+            base_statement.options(
+                selectinload(Applications.attendees)  # type: ignore[arg-type]
+                .selectinload(Attendees.attendee_products)  # type: ignore[arg-type]
+                .selectinload(AttendeeProducts.product),  # type: ignore[arg-type]
+                selectinload(Applications.attendees).selectinload(  # type: ignore[arg-type]
+                    Attendees.category_ref  # type: ignore[arg-type]
+                ),
+                selectinload(Applications.human),  # type: ignore[arg-type]
+            )
+            .order_by(desc(Applications.created_at))  # type: ignore[arg-type]
+            .offset(skip)
+            .limit(limit)
+        )
+        results = list(session.exec(statement).all())
+
+        return results, total
+
     def find_directory(
         self,
         session: Session,

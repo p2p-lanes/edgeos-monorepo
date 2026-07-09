@@ -514,15 +514,19 @@ async def grant_tickets_admin(
     # Best-effort post-commit confirmation emails. A mail failure here does
     # NOT undo the grant — the rows are already persisted and the admin can
     # resend manually if a recipient reports a missing email.
+    # IN (...) does not preserve input order — re-sort the batch fetch so
+    # emails go out in grant order. Missing ids are silently skipped.
+    payments_by_id = {p.id: p for p in payments_crud.get_many(db, payment_ids)}
     for payment_id in payment_ids:
+        payment = payments_by_id.get(payment_id)
+        if payment is None:
+            continue
         try:
-            payment = payments_crud.get(db, payment_id)
-            if payment is not None:
-                await _send_payment_confirmed_email(payment, db_session=db)
+            await _send_payment_confirmed_email(payment, db_session=db)
         except Exception:
             logger.exception(
                 "Failed to send PAYMENT_CONFIRMED for granted payment {}",
-                payment_id,
+                payment.id,
             )
 
     return AdminGrantTicketsResponse(granted=granted)
