@@ -1,5 +1,6 @@
 import { useCallback, useState } from "react"
 import { UploadsService } from "@/client"
+import { compressImage } from "@/lib/compress-image"
 
 export type UploadStatus =
   | "idle"
@@ -68,11 +69,15 @@ export function useFileUpload(options: UseFileUploadOptions = {}) {
       try {
         setUploadProgress({ status: "getting-url", progress: 0 })
 
+        // Downscale/re-encode before requesting the URL so the presigned
+        // content type matches the bytes actually sent.
+        const upload = await compressImage(file)
+
         const { upload_url, public_url, key } =
           await UploadsService.getPresignedUploadUrl({
             requestBody: {
-              filename: file.name,
-              content_type: file.type,
+              filename: upload.name,
+              content_type: upload.type,
             },
           })
 
@@ -105,8 +110,8 @@ export function useFileUpload(options: UseFileUploadOptions = {}) {
           })
 
           xhr.open("PUT", upload_url)
-          xhr.setRequestHeader("Content-Type", file.type)
-          xhr.send(file)
+          xhr.setRequestHeader("Content-Type", upload.type)
+          xhr.send(upload)
         })
 
         setUploadProgress({ status: "success", progress: 100 })
