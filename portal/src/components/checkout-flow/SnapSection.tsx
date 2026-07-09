@@ -18,7 +18,14 @@ export default function SnapSection({
   widthClass?: string
 }) {
   const ref = useRef<HTMLElement>(null)
-  const [visible, setVisible] = useState(false)
+  // null until the IntersectionObserver reports for the first time. The
+  // distinction matters: a section that is ALREADY on screen at that first
+  // report (the above-the-fold one) must keep its server-rendered, fully
+  // visible state — hiding it to replay the entrance animation makes the
+  // title flash: paint → hide → animate back in. Entrance animations are
+  // only for sections the user scrolls INTO.
+  const [visible, setVisible] = useState<boolean | null>(null)
+  const hasBeenHiddenRef = useRef(false)
 
   useEffect(() => {
     const el = ref.current
@@ -32,6 +39,7 @@ export default function SnapSection({
   }, [])
 
   useEffect(() => {
+    if (visible === null) return
     const el = ref.current
     if (!el) return
 
@@ -41,7 +49,7 @@ export default function SnapSection({
     const titleEl = el.querySelector<HTMLElement>("[data-section-title]")
     const subtitleEl = el.querySelector<HTMLElement>("[data-section-subtitle]")
 
-    if (visible) {
+    if (visible && hasBeenHiddenRef.current) {
       if (watermarkChars.length > 0) {
         gsap.fromTo(
           watermarkChars,
@@ -70,7 +78,8 @@ export default function SnapSection({
           { opacity: 1, y: 0, duration: 0.45, ease: "power1.out", delay: 0.3 },
         )
       }
-    } else {
+    } else if (!visible) {
+      hasBeenHiddenRef.current = true
       if (watermarkChars.length > 0) {
         gsap.set(watermarkChars, { opacity: 0, y: 60, filter: "blur(8px)" })
       }
