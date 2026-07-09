@@ -33,7 +33,8 @@ class Attendees(AttendeeBase, table=True):
 
     __table_args__ = (
         Index("ix_attendees_popup_id", "popup_id"),
-        # ix_attendees_category_id is created by the migration
+        Index("ix_attendees_human_popup", "human_id", "popup_id"),
+        Index("ix_attendees_email", "email"),
     )
 
     id: uuid.UUID = Field(

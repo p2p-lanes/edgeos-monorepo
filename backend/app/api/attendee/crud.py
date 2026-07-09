@@ -66,10 +66,30 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
         self,
         session: Session,
         application_id: uuid.UUID,
-    ) -> list[Attendees]:
-        """Get all attendees for an application."""
+        skip: int = 0,
+        limit: int = 100,
+    ) -> tuple[list[Attendees], int]:
+        """Find attendees for an application with pagination and eager loading."""
         statement = select(Attendees).where(Attendees.application_id == application_id)
-        return list(session.exec(statement).all())
+
+        count_statement = select(func.count()).select_from(statement.subquery())
+        total = session.exec(count_statement).one()
+
+        statement = (
+            statement.options(
+                selectinload(Attendees.attendee_products).selectinload(  # type: ignore[arg-type]
+                    AttendeeProducts.product  # ty: ignore[invalid-argument-type]
+                ),
+                selectinload(Attendees.category_ref),  # type: ignore[arg-type]
+            )
+            # Stable ordering so OFFSET/LIMIT pages are deterministic.
+            .order_by(Attendees.created_at, Attendees.id)  # type: ignore[arg-type]
+            .offset(skip)
+            .limit(limit)
+        )
+        results = list(session.exec(statement).all())
+
+        return results, total
 
     def find_by_email(
         self,
@@ -79,6 +99,8 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
         limit: int = 100,
     ) -> tuple[list[Attendees], int]:
         """Find attendees by email."""
+        from app.api.application.models import Applications
+
         statement = select(Attendees).where(Attendees.email == email.lower())
 
         count_statement = select(func.count()).select_from(statement.subquery())
@@ -89,6 +111,10 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
                 selectinload(Attendees.attendee_products).selectinload(  # type: ignore[arg-type]
                     AttendeeProducts.product  # ty: ignore[invalid-argument-type]
                 ),
+                selectinload(Attendees.application).selectinload(  # type: ignore[arg-type]
+                    Applications.popup  # ty: ignore[invalid-argument-type]
+                ),
+                selectinload(Attendees.popup),  # type: ignore[arg-type]
                 selectinload(Attendees.category_ref),  # type: ignore[arg-type]
             )
             .offset(skip)

@@ -548,6 +548,13 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         statement = select(Payments).where(Payments.external_id == external_id)
         return session.exec(statement).first()
 
+    def get_many(self, session: Session, ids: list[uuid.UUID]) -> list[Payments]:
+        """Get payments by id in a single query. Missing ids are skipped."""
+        if not ids:
+            return []
+        statement = select(Payments).where(Payments.id.in_(ids))  # type: ignore[attr-defined]
+        return list(session.exec(statement).all())
+
     def _get_in_progress_installment_plan(
         self,
         session: Session,
