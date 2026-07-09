@@ -10,6 +10,7 @@ import {
 } from "lucide-react"
 import Image from "next/image"
 import { useCallback, useEffect, useRef, useState } from "react"
+import { createPortal } from "react-dom"
 import { useTranslation } from "react-i18next"
 import { Button } from "@/components/ui/button"
 import { imageOptimization } from "@/lib/image-optimization"
@@ -82,7 +83,10 @@ export function LightboxOverlay({
   const current = images[index]
   if (!current) return null
 
-  return (
+  // Portal to <body>: hosts like a sold-out product card carry opacity < 1,
+  // which creates a stacking context that would trap this fixed overlay and
+  // render it semi-transparent over the page.
+  return createPortal(
     <div
       className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center"
       onClick={(e) => {
@@ -141,7 +145,8 @@ export function LightboxOverlay({
           {index + 1} / {images.length}
         </p>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }
 
