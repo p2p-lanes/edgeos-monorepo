@@ -8,7 +8,6 @@ import ExpandableDescription from "@/components/ui/ExpandableDescription"
 import QuantitySelector, {
   resolveBlockedStepperProps,
   resolveMaxQuantity,
-  supportsQuantitySelector,
 } from "@/components/ui/QuantitySelector"
 import type { TemplateSection } from "@/hooks/checkout/ticketSections"
 import {
