@@ -6801,6 +6801,7 @@ export type TranslationsDeleteTranslationResponse = (void);
 
 export type UploadsGetPresignedUploadUrlData = {
     requestBody: PresignedUrlRequest;
+    xTenantId?: (string | null);
 };
 
 export type UploadsGetPresignedUploadUrlResponse = (PresignedUrlResponse);
