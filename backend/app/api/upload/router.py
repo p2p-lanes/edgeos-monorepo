@@ -1,13 +1,19 @@
 """Upload API router."""
 
 import uuid
+from typing import Annotated
 from uuid import uuid4
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Header, HTTPException
 
 from app.api.upload.schemas import PresignedUrlRequest, PresignedUrlResponse
 from app.core.config import settings
-from app.core.dependencies.users import CurrentHuman, CurrentUser
+from app.core.dependencies.users import (
+    CurrentHuman,
+    CurrentUser,
+    SessionDep,
+    get_current_tenant,
+)
 from app.services.storage import storage_service
 
 router = APIRouter(prefix="/uploads", tags=["uploads"])
@@ -65,12 +71,23 @@ def _build_presigned_url(
 async def get_presigned_upload_url(
     request: PresignedUrlRequest,
     current_user: CurrentUser,
+    db: SessionDep,
+    x_tenant_id: Annotated[str | None, Header(alias="X-Tenant-Id")] = None,
 ) -> PresignedUrlResponse:
     """Generate a presigned URL for direct upload (backoffice staff)."""
+    # SUPERADMIN users have no tenant of their own, so their uploads would
+    # always key under superadmin/. The backoffice sends the active workspace
+    # in X-Tenant-Id on every request: honor it so assets land in that
+    # tenant's folder. Tenant-level uploads without a workspace (e.g. tenant
+    # logos) keep the superadmin/ fallback. Admins keep their own tenant and
+    # cannot be redirected by the header.
+    tenant_id: uuid.UUID | str | None = current_user.tenant_id
+    if tenant_id is None and x_tenant_id:
+        tenant_id = get_current_tenant(db, x_tenant_id).id
     return _build_presigned_url(
         request.filename,
         request.content_type,
-        current_user.tenant_id,
+        tenant_id,
         ALLOWED_BACKOFFICE_TYPES,
     )
 

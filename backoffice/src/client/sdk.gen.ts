@@ -8467,6 +8467,7 @@ export class UploadsService {
      * Generate a presigned URL for direct upload (backoffice staff).
      * @param data The data for the request.
      * @param data.requestBody
+     * @param data.xTenantId
      * @returns PresignedUrlResponse Successful Response
      * @throws ApiError
      */
@@ -8474,6 +8475,9 @@ export class UploadsService {
         return __request(OpenAPI, {
             method: 'POST',
             url: '/api/v1/uploads/presigned-url',
+            headers: {
+                'X-Tenant-Id': data.xTenantId
+            },
             body: data.requestBody,
             mediaType: 'application/json',
             errors: {
