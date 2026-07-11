@@ -138,6 +138,24 @@ describe("fetchCheckoutRuntime", () => {
       }),
     )
   })
+
+  it("percent-encodes the slug in the requested URL", async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve(runtimeData),
+    })
+
+    await fetchCheckoutRuntime("festival/2026", "tenant-abc")
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      expect.stringContaining("/api/v1/checkout/festival%2F2026/runtime"),
+      expect.anything(),
+    )
+    expect(global.fetch).not.toHaveBeenCalledWith(
+      expect.stringContaining("/api/v1/checkout/festival/2026/runtime"),
+      expect.anything(),
+    )
+  })
 })
 
 describe("useCheckoutRuntime opts", () => {

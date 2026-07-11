@@ -24,19 +24,29 @@ export async function fetchCheckoutRuntime(
   const timeout = setTimeout(() => controller.abort(), 1500)
 
   try {
-    const res = await fetch(`${API_BASE}/api/v1/checkout/${slug}/runtime`, {
-      cache: "no-store",
-      headers: {
-        "X-Tenant-Id": tenantId,
-        Accept: "application/json",
+    const res = await fetch(
+      `${API_BASE}/api/v1/checkout/${encodeURIComponent(slug)}/runtime`,
+      {
+        cache: "no-store",
+        headers: {
+          "X-Tenant-Id": tenantId,
+          Accept: "application/json",
+        },
+        signal: controller.signal,
       },
-      signal: controller.signal,
-    })
+    )
 
-    if (!res.ok) return null
+    if (!res.ok) {
+      console.error("Checkout runtime SSR fetch degraded", {
+        slug,
+        status: res.status,
+      })
+      return null
+    }
 
     return (await res.json()) as CheckoutRuntimeResponse
-  } catch {
+  } catch (error) {
+    console.error("Checkout runtime SSR fetch degraded", { slug, error })
     return null
   } finally {
     clearTimeout(timeout)
