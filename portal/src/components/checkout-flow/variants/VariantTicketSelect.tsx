@@ -8,7 +8,6 @@ import ExpandableDescription from "@/components/ui/ExpandableDescription"
 import QuantitySelector, {
   resolveBlockedStepperProps,
   resolveMaxQuantity,
-  supportsQuantitySelector,
 } from "@/components/ui/QuantitySelector"
 import type { TemplateSection } from "@/hooks/checkout/ticketSections"
 import {
@@ -200,7 +199,6 @@ export default function VariantTicketSelect({
     return (
       <OpenCheckoutSectionLayout
         sections={view.sections}
-        onToggle={view.toggleRow}
         onQuantityChange={view.setRowQuantity}
       />
     )
@@ -1103,11 +1101,9 @@ function CompactAttendeeCard({
  */
 function OpenCheckoutRow({
   row,
-  onToggle,
   onQuantityChange,
 }: {
   row: TicketRowVM
-  onToggle: (attendeeId: string, product: ProductsPass) => void
   onQuantityChange: (
     attendeeId: string,
     product: ProductsPass,
@@ -1117,7 +1113,6 @@ function OpenCheckoutRow({
   const { t } = useTranslation()
   const { product, quantity, maxQuantity, selected, disabled } = row
   const isAdded = quantity > 0 || selected
-  const showStepper = supportsQuantitySelector(product.max_per_order)
   const hasDiscount =
     product.compare_price != null && product.compare_price > product.price
   const total = product.price * (quantity > 0 ? quantity : 1)
@@ -1141,53 +1136,42 @@ function OpenCheckoutRow({
             />
           )}
         </div>
-        {showStepper ? (
-          <QuantitySelector
-            size="md"
-            value={quantity}
-            min={0}
-            max={maxQuantity}
-            disabled={disabled}
-            onIncrement={() => onQuantityChange("", product, quantity + 1)}
-            onDecrement={() =>
-              onQuantityChange("", product, Math.max(0, quantity - 1))
-            }
-            onAdd={() => onQuantityChange("", product, 1)}
-          />
-        ) : (
-          <button
-            type="button"
-            onClick={() => onToggle("", product)}
-            disabled={disabled}
-            aria-label={isAdded ? "Remove from cart" : "Add to cart"}
-            className={cn(
-              "h-8 px-3 rounded-lg text-xs font-semibold transition-all flex items-center gap-1 shrink-0",
-              isAdded
-                ? "bg-primary text-primary-foreground hover:bg-primary/90"
-                : "bg-card border border-border text-foreground hover:bg-muted",
-              disabled && "cursor-not-allowed opacity-50",
-            )}
-          >
-            {isAdded ? (
-              <>
-                <Check className="w-3.5 h-3.5" />
-                Added
-              </>
-            ) : (
-              <>+&nbsp;Add</>
-            )}
-          </button>
-        )}
+        {/* Single add affordance for every row: the stepper degrades
+            gracefully for max_per_order = 1 products (the "+" disables at
+            the cap, "−" removes), so no separate Add/Added toggle needed. */}
+        <QuantitySelector
+          size="md"
+          value={quantity}
+          min={0}
+          max={maxQuantity}
+          disabled={disabled}
+          onIncrement={() => onQuantityChange("", product, quantity + 1)}
+          onDecrement={() =>
+            onQuantityChange("", product, Math.max(0, quantity - 1))
+          }
+          onAdd={() => onQuantityChange("", product, 1)}
+        />
         <div className="text-right shrink-0 min-w-16">
-          {isAdded && quantity > 1 && (
+          {/* The compare price is a per-unit anchor, so it must sit next to
+              the unit price. Stacking it against the line total reads as if
+              it were the pre-discount total. */}
+          {isAdded && quantity > 1 ? (
             <p className="text-xs text-muted-foreground">
-              {quantity} × {formatCurrency(product.price)}
+              {quantity} ×{" "}
+              {hasDiscount && product.compare_price != null && (
+                <span className="line-through">
+                  {formatCurrency(product.compare_price)}
+                </span>
+              )}{" "}
+              {formatCurrency(product.price)}
             </p>
-          )}
-          {hasDiscount && product.compare_price != null && (
-            <p className="text-xs text-muted-foreground line-through">
-              {formatCurrency(product.compare_price)}
-            </p>
+          ) : (
+            hasDiscount &&
+            product.compare_price != null && (
+              <p className="text-xs text-muted-foreground line-through">
+                {formatCurrency(product.compare_price)}
+              </p>
+            )
           )}
           <span
             className={cn(
@@ -1205,11 +1189,9 @@ function OpenCheckoutRow({
 
 function OpenCheckoutSectionLayout({
   sections,
-  onToggle,
   onQuantityChange,
 }: {
   sections: TicketSectionVM[]
-  onToggle: (attendeeId: string, product: ProductsPass) => void
   onQuantityChange: (
     attendeeId: string,
     product: ProductsPass,
@@ -1236,7 +1218,6 @@ function OpenCheckoutSectionLayout({
             <OpenCheckoutRow
               key={row.product.id}
               row={row}
-              onToggle={onToggle}
               onQuantityChange={onQuantityChange}
             />
           ))}

@@ -1,3 +1,4 @@
+import secrets
 from datetime import datetime
 from typing import Any
 
@@ -22,6 +23,14 @@ class PopupsCRUD(BaseCRUD[Popups, PopupCreate, PopupUpdate]):
         from app.api.attendee_category.crud import attendee_categories_crud
 
         popup = self.model(**obj_in.model_dump())
+
+        # Auto-provision the open_checkout_signing_secret when not explicitly set.
+        # This CRUD hook (not a model default) ensures every new popup is immediately
+        # capable of signing cart restore tokens and return-release proofs.
+        # Uses secrets.token_urlsafe(32) for 256-bit URL-safe randomness.
+        if popup.open_checkout_signing_secret is None:
+            popup.open_checkout_signing_secret = secrets.token_urlsafe(32)
+
         session.add(popup)
         session.flush()  # Get the popup id without committing
 

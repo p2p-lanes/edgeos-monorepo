@@ -138,9 +138,7 @@ class FormFieldsCRUD(BaseCRUD[FormFields, FormFieldCreate, FormFieldUpdate]):
         from app.api.form_section.crud import form_sections_crud
 
         configs = base_field_configs_crud.find_by_popup(session, popup_id)
-        sections, _ = form_sections_crud.find_by_popup(
-            session, popup_id, skip=0, limit=1000
-        )
+        sections, _ = form_sections_crud.find_by_popup(session, popup_id, limit=None)
         hidden_section_ids = {s.id for s in sections if s.hidden}
         errors: list[str] = []
 
@@ -205,9 +203,7 @@ class FormFieldsCRUD(BaseCRUD[FormFields, FormFieldCreate, FormFieldUpdate]):
         # validation for fields belonging to them.
         from app.api.form_section.crud import form_sections_crud
 
-        sections, _ = form_sections_crud.find_by_popup(
-            session, popup_id, skip=0, limit=1000
-        )
+        sections, _ = form_sections_crud.find_by_popup(session, popup_id, limit=None)
         hidden_section_ids = {s.id for s in sections if s.hidden}
 
         # When the request comes from the /groups Express Checkout, only
@@ -365,9 +361,7 @@ class FormFieldsCRUD(BaseCRUD[FormFields, FormFieldCreate, FormFieldUpdate]):
         # Load sections for this popup
         from app.api.form_section.crud import form_sections_crud
 
-        db_sections, _ = form_sections_crud.find_by_popup(
-            session, popup_id, skip=0, limit=100
-        )
+        db_sections, _ = form_sections_crud.find_by_popup(session, popup_id, limit=None)
 
         # Hidden sections are dropped from the schema entirely (and so are
         # their fields). The data + section row stay in the DB so the admin

@@ -185,9 +185,12 @@ export default function VariantRichText({
 
   return (
     <div
+      // Typography colors follow the tenant theme tokens instead of the
+      // fixed light-on-dark `prose-invert` palette, which is illegible the
+      // moment a popup picks a light theme.
       className={`${WIDTH_CLASSES[config.max_width ?? "wide"]} ${
         ALIGNMENT_CLASSES[config.alignment ?? "center"]
-      } prose prose-invert prose-headings:font-semibold prose-a:underline`}
+      } prose prose-headings:font-semibold prose-a:underline [--tw-prose-body:var(--foreground)] [--tw-prose-headings:var(--foreground)] [--tw-prose-lead:var(--muted-foreground)] [--tw-prose-links:var(--primary)] [--tw-prose-bold:var(--foreground)] [--tw-prose-counters:var(--muted-foreground)] [--tw-prose-bullets:var(--muted-foreground)] [--tw-prose-hr:var(--border)] [--tw-prose-quotes:var(--foreground)] [--tw-prose-quote-borders:var(--border)] [--tw-prose-captions:var(--muted-foreground)] [--tw-prose-code:var(--foreground)] [--tw-prose-pre-code:var(--foreground)] [--tw-prose-pre-bg:var(--muted)] [--tw-prose-th-borders:var(--border)] [--tw-prose-td-borders:var(--border)]`}
     >
       {content}
     </div>

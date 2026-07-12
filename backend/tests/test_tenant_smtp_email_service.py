@@ -41,8 +41,12 @@ def test_send_email_uses_tenant_smtp(monkeypatch):
     monkeypatch.setattr("app.services.email.service.settings.SMTP_TLS", True)
     monkeypatch.setattr("app.services.email.service.settings.SMTP_SSL", False)
     monkeypatch.setattr("app.services.email.service.settings.SMTP_USER", "global-user")
-    monkeypatch.setattr("app.services.email.service.settings.SMTP_PASSWORD", "global-pass")
-    monkeypatch.setattr("app.services.email.service.settings.SENDER_EMAIL", "global@test.com")
+    monkeypatch.setattr(
+        "app.services.email.service.settings.SMTP_PASSWORD", "global-pass"
+    )
+    monkeypatch.setattr(
+        "app.services.email.service.settings.SENDER_EMAIL", "global@test.com"
+    )
 
     tenant_id = uuid.uuid4()
     tenant = _tenant(
@@ -90,8 +94,12 @@ def test_send_email_falls_back_to_global_when_tenant_has_no_smtp(monkeypatch):
     monkeypatch.setattr("app.services.email.service.settings.SMTP_TLS", True)
     monkeypatch.setattr("app.services.email.service.settings.SMTP_SSL", False)
     monkeypatch.setattr("app.services.email.service.settings.SMTP_USER", "global-user")
-    monkeypatch.setattr("app.services.email.service.settings.SMTP_PASSWORD", "global-pass")
-    monkeypatch.setattr("app.services.email.service.settings.SENDER_EMAIL", "global@test.com")
+    monkeypatch.setattr(
+        "app.services.email.service.settings.SMTP_PASSWORD", "global-pass"
+    )
+    monkeypatch.setattr(
+        "app.services.email.service.settings.SENDER_EMAIL", "global@test.com"
+    )
 
     ok = asyncio.run(
         EmailService().send_email(
@@ -117,7 +125,9 @@ def test_tenant_smtp_failure_does_not_fallback_to_global(monkeypatch):
 
     monkeypatch.setattr(aiosmtplib, "send", fake_send)
     monkeypatch.setattr("app.services.email.service.settings.SMTP_HOST", "global-smtp")
-    monkeypatch.setattr("app.services.email.service.settings.SENDER_EMAIL", "global@test.com")
+    monkeypatch.setattr(
+        "app.services.email.service.settings.SENDER_EMAIL", "global@test.com"
+    )
 
     tenant = _tenant(smtp_host="tenant-smtp", smtp_tls=False, smtp_ssl=False)
     ok = asyncio.run(
@@ -142,7 +152,9 @@ def test_incomplete_tenant_smtp_fails_without_global_fallback(monkeypatch):
 
     monkeypatch.setattr(aiosmtplib, "send", fake_send)
     monkeypatch.setattr("app.services.email.service.settings.SMTP_HOST", "global-smtp")
-    monkeypatch.setattr("app.services.email.service.settings.SENDER_EMAIL", "global@test.com")
+    monkeypatch.setattr(
+        "app.services.email.service.settings.SENDER_EMAIL", "global@test.com"
+    )
 
     tenant = _tenant(smtp_host="tenant-smtp", smtp_user="missing-password")
     ok = asyncio.run(

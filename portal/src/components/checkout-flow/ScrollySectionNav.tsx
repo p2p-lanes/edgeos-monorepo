@@ -1,5 +1,6 @@
 "use client"
 
+import { motion } from "framer-motion"
 import { Check } from "lucide-react"
 import Image from "next/image"
 import {
@@ -24,8 +25,8 @@ export type WatermarkStyle = "none" | "ghost" | "stroke" | "bold"
 const resolveIcon = (section: { id: string; template?: string | null }) =>
   resolveStepIcon({ stepType: section.id, template: section.template })
 
-// Measuring the active tab to place the sliding pill must happen before the
-// browser paints (otherwise the pill lands a frame late on first render).
+// The expanded/compact decision must happen before the browser paints
+// (otherwise the row flashes in the wrong mode on first render).
 // useLayoutEffect does that on the client; fall back to useEffect on the
 // server so SSR doesn't warn about a no-op layout effect.
 const useIsomorphicLayoutEffect =
@@ -108,7 +109,6 @@ export default function ScrollySectionNav({
   const trackRef = useRef<HTMLDivElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
   const buttonRefs = useRef<(HTMLButtonElement | null)[]>([])
-  const [pill, setPill] = useState<{ left: number; width: number } | null>(null)
   const [compact, setCompact] = useState(false)
   // Width the labelled row needs, captured while expanded. Used as the
   // hysteresis threshold so the boundary doesn't flap between modes.
@@ -139,8 +139,6 @@ export default function ScrollySectionNav({
           setCompact(false)
         }
       }
-      const btn = buttonRefs.current[activeIndex]
-      if (btn) setPill({ left: btn.offsetLeft, width: btn.offsetWidth })
     }
 
     recalc()
@@ -202,16 +200,6 @@ export default function ScrollySectionNav({
                   compact ? "w-full" : "w-max",
                 )}
               >
-                {pill && (
-                  <div
-                    aria-hidden
-                    className="pointer-events-none absolute inset-y-0 left-0 rounded-lg bg-checkout-badge-bg shadow-sm transition-[transform,width] duration-300 ease-out"
-                    style={{
-                      width: `${pill.width}px`,
-                      transform: `translateX(${pill.left}px)`,
-                    }}
-                  />
-                )}
                 {sections.map((section, index) => {
                   const Icon = resolveIcon(section)
                   const isActive = section.id === activeSection
@@ -238,7 +226,7 @@ export default function ScrollySectionNav({
                       aria-current={isActive ? "step" : undefined}
                       aria-invalid={isIncomplete || undefined}
                       className={cn(
-                        "relative z-10 flex h-7 items-center justify-center text-xs font-semibold transition-[color,opacity] duration-200",
+                        "relative z-0 flex h-7 items-center justify-center text-xs font-semibold transition-[color,opacity] duration-200",
                         // Compact equal-width icons vs. expanded content-width
                         // labelled tabs.
                         compact
@@ -254,6 +242,17 @@ export default function ScrollySectionNav({
                             : "text-checkout-badge-title-disabled hover:opacity-70",
                       )}
                     >
+                      {isActive && (
+                        <motion.div
+                          aria-hidden
+                          layoutId="checkout-nav-active-pill"
+                          className="pointer-events-none absolute inset-0 -z-10 bg-checkout-badge-bg shadow-sm"
+                          // Style (not a class) so framer can scale-correct the
+                          // corners while the pill morphs between tabs.
+                          style={{ borderRadius: 8 }}
+                          transition={{ duration: 0.3, ease: "easeOut" }}
+                        />
+                      )}
                       {RegistryIcon ? (
                         <RegistryIcon className="size-3.5 shrink-0" />
                       ) : emoji ? (

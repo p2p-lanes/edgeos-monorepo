@@ -52,6 +52,19 @@ from app.utils.checkout_signing import (
 MONEY_PRECISION = Decimal("0.01")
 
 
+class ReleaseResult:
+    """Result of a release-on-return operation.
+
+    released=True: a PENDING payment was cancelled and all holds freed.
+    released=False: no action taken (invalid proof, no PENDING, flag off).
+    """
+
+    __slots__ = ("released",)
+
+    def __init__(self, *, released: bool) -> None:
+        self.released = released
+
+
 def adjust_application_credit(
     session: Session,
     application: Applications,
@@ -534,6 +547,13 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         """Get a payment by external ID."""
         statement = select(Payments).where(Payments.external_id == external_id)
         return session.exec(statement).first()
+
+    def get_many(self, session: Session, ids: list[uuid.UUID]) -> list[Payments]:
+        """Get payments by id in a single query. Missing ids are skipped."""
+        if not ids:
+            return []
+        statement = select(Payments).where(Payments.id.in_(ids))  # type: ignore[attr-defined]
+        return list(session.exec(statement).all())
 
     def _get_in_progress_installment_plan(
         self,
@@ -3115,14 +3135,6 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             email: Buyer email for open-checkout lookup (requires popup_id).
             popup_id: Required when email is provided.
         """
-        from app.api.popup.models import Popups as _Popups
-        from app.api.tenant.models import Tenants as _Tenants
-        from app.api.tenant.utils import get_portal_url
-        from app.services.simplefi import get_simplefi_client
-        from app.services.simplefi.client import (
-            CancelOutcome,
-            CancelOutcomeAmbiguousError,
-        )
 
         # Locate the prior PENDING SimpleFi payment for this buyer
         prior: Payments | None = None
@@ -3142,13 +3154,68 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         if prior is None:
             return  # No prior pending payment — nothing to supersede
 
+        self._supersede_located_pending(
+            session, prior, anonymous=(application_id is None)
+        )
+
+    def _supersede_located_pending(
+        self,
+        session: Session,
+        prior: "Payments",
+        *,
+        anonymous: bool,
+    ) -> None:
+        """Cancel an already-located PENDING SimpleFi payment and release its holds.
+
+        This is the shared release core called by both:
+        - ``supersede_pending_payments`` (create-time backstop, locate+delegate),
+        - ``release_pending_open`` / ``release_pending_authenticated`` (return-time).
+
+        The caller is responsible for:
+        1. Locating ``prior`` (the PENDING payment object).
+        2. Validating any ownership/proof before calling this method.
+        3. Acquiring any advisory lock needed for the open-checkout path
+           (return-time callers must hold ``pg_try_advisory_xact_lock`` around
+           this call when the anonymous path is used; create-time callers
+           already do so in ``create_open_ticketing_payment``).
+
+        Outcomes (identical to the original ``supersede_pending_payments`` logic):
+        - CANCELED: ``update_status(CANCELLED)`` commits hold release. Returns normally.
+        - ALREADY_APPROVED: ``_reconcile_approved`` + raises HTTP 409
+          ``previous_payment_completed``. The 409 detail carries:
+          - ``anonymous=True``: signed-or-omitted redirect_url, NO payment_id.
+          - ``anonymous=False``: passes-page redirect, NO payment_id.
+        - Any exception (CancelOutcomeAmbiguousError, transport, 5xx): raises
+          HTTP 502 ``payment_cancel_failed``. Holds are NOT released.
+
+        ADR invariants:
+        - ALL releases go through ``update_status`` (ADR-1 row lock).
+        - SimpleFi cancel is called OUTSIDE any DB lock (ADR-2, ADR-3).
+
+        Args:
+            session: Active DB session.
+            prior: The located PENDING payment.  Must be a SIMPLEFI PENDING payment
+                   with a non-NULL external_id (caller's responsibility to verify).
+            anonymous: True for the open-checkout path (no application_id);
+                       False for the authenticated path.  Controls how the
+                       ALREADY_APPROVED redirect URL is constructed.
+        """
+        from app.api.popup.models import Popups as _Popups
+        from app.api.tenant.models import Tenants as _Tenants
+        from app.api.tenant.utils import get_portal_url
+        from app.services.simplefi import get_simplefi_client
+        from app.services.simplefi.client import (
+            CancelOutcome,
+            CancelOutcomeAmbiguousError,
+        )
+
         # Resolve the SimpleFi API key from the payment's popup
         _popup = session.get(_Popups, prior.popup_id)
         if _popup is None or not _popup.simplefi_api_key:
             # No API key: the payment was never sent to SimpleFi (orphaned).
             # Release holds anyway since there is no live link to protect.
             logger.warning(
-                "supersede_pending_payments: no simplefi_api_key for popup={}, "
+                "_supersede_located_pending: no simplefi_api_key for popup={}, "
                 "releasing holds on orphaned payment={}",
                 prior.popup_id,
                 prior.id,
@@ -3171,7 +3238,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             # release holds.  Distinct log from transport failures so alerts
             # can differentiate provider-side ambiguity from network issues.
             logger.warning(
-                "supersede_pending_payments: SimpleFi cancel outcome ambiguous "
+                "_supersede_located_pending: SimpleFi cancel outcome ambiguous "
                 "payment={}, error={!r}",
                 prior.id,
                 exc,
@@ -3186,7 +3253,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         except Exception as exc:
             # Transport error, timeout, or 5xx — do NOT release holds
             logger.warning(
-                "supersede_pending_payments: SimpleFi cancel failed "
+                "_supersede_located_pending: SimpleFi cancel failed "
                 "payment={}, error={!r}",
                 prior.id,
                 exc,
@@ -3221,14 +3288,11 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             redirect_url: str | None = None
             _tenant = session.get(_Tenants, prior.tenant_id) if _popup else None
 
-            if (
-                prior.application_id is None
-                and _popup is not None
-                and _tenant is not None
-            ):
+            if anonymous and _popup is not None and _tenant is not None:
                 # Open-checkout path: signed external redirect only.
                 secret = _popup.open_checkout_signing_secret
                 if secret and _popup.open_checkout_success_url:
+                    _now = datetime.now(UTC)
                     payload = build_thank_you_payload(
                         order_id=str(prior.id),
                         first_name=str(
@@ -3236,23 +3300,28 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                         ),
                         email=str((prior.buyer_snapshot or {}).get("buyer_email", "")),
                         items=[
-                            {"name": pp.product_name, "quantity": pp.quantity}
+                            {
+                                "title": pp.product_name,
+                                "qty": pp.quantity,
+                                "price": float(
+                                    pp.effective_unit_price
+                                    if pp.effective_unit_price is not None
+                                    else pp.product_price
+                                ),
+                            }
                             for pp in prior.products_snapshot
                         ],
-                        amount_total=str(prior.amount),
+                        amount_total=float(prior.amount),
                         currency=prior.currency or "",
-                        issued_at=datetime.now(UTC).isoformat(),
+                        issued_at=_now.isoformat(),
+                        exp=int(_now.timestamp()) + 30 * 60,
                     )
                     redirect_url = build_signed_redirect_url(
                         _popup.open_checkout_success_url, payload, secret
                     )
                 # else: no signing secret or no external URL — omit redirect_url
 
-            elif (
-                prior.application_id is not None
-                and _popup is not None
-                and _tenant is not None
-            ):
+            elif not anonymous and _popup is not None and _tenant is not None:
                 # Authenticated path: send buyer to their own passes page.
                 portal_base = get_portal_url(_tenant)
                 redirect_url = f"{portal_base}/portal/{_popup.slug}/passes"
@@ -3265,6 +3334,147 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                     "redirect_url": redirect_url,
                 },
             )
+
+    def release_pending_open(
+        self,
+        session: Session,
+        *,
+        popup: "Popups",
+        email: str,
+        cid: uuid.UUID | None,
+        sig: str | None,
+    ) -> "ReleaseResult":
+        """Release a PENDING payment for an anonymous open-checkout buyer on return.
+
+        Return-time entry point for the anonymous (cid/sig) proof surface.
+        Validates the cart continuity proof before any release attempt; on
+        invalid/missing proof returns released=False without any SimpleFi call
+        (enumeration-safe — no signal about PENDING existence).
+
+        Feature-flag guard: if SUPERSEDE_PENDING_ENABLED is False, returns
+        released=False immediately with no SimpleFi call.
+
+        ADR-R3: All False outcomes produce identical response bodies (no oracle).
+        ADR-R1: The advisory lock is transaction-scoped; acquired here around
+                _supersede_located_pending to protect against concurrent returns.
+
+        Args:
+            session: Active DB session.
+            popup: The resolved popup (required for secret lookup + lock key).
+            email: Buyer email (used as the payment lookup key).
+            cid: Cart ID from the cart restore token.
+            sig: HMAC signature from the cart restore token.
+
+        Returns:
+            ReleaseResult(released=True) if a PENDING payment was cancelled.
+            ReleaseResult(released=False) otherwise (proof invalid, no PENDING, flag off).
+
+        Raises:
+            HTTPException 409: ALREADY_APPROVED race (reuses ADR-4 contract).
+            HTTPException 502: SimpleFi transport failure.
+        """
+        from app.core.config import settings as _settings
+
+        if not _settings.SUPERSEDE_PENDING_ENABLED:
+            return ReleaseResult(released=False)
+
+        # Validate proof BEFORE any DB read that could leak payment existence.
+        # Invalid/missing proof → immediate no-op (enumeration-safe).
+        if not self._validate_cart_continuity_proof(session, popup, email, cid, sig):
+            return ReleaseResult(released=False)
+
+        # Locate PENDING payment for this email+popup.
+        prior = self._find_pending_by_email_popup(session, email, popup.id)
+        if prior is None:
+            return ReleaseResult(released=False)
+
+        # Acquire transaction-scoped advisory lock keyed by (popup_id, email).
+        # pg_try_advisory_xact_lock returns False if another caller already holds
+        # the lock for this email — we yield to them and return released=False.
+        # This protects against concurrent return-release callers on the same
+        # email.  The FOR UPDATE inside update_status remains the final serializer
+        # (ADR-1) and handles any concurrent callers that don't acquire this lock
+        # (e.g. the sweeper or webhook path).
+        from sqlalchemy import text as _text
+
+        got_lock = session.exec(
+            _text(
+                "SELECT pg_try_advisory_xact_lock(hashtext(:key)::bigint)"
+            ).bindparams(key=f"{popup.id}:{email.lower()}")
+        ).scalar()
+
+        if not got_lock:
+            # Another concurrent return-release is in progress for this email.
+            # Yield to them; update_status's FOR UPDATE ensures exactly-once release.
+            return ReleaseResult(released=False)
+
+        # Re-locate after lock: a concurrent caller may have cancelled it already.
+        prior = self._find_pending_by_email_popup(session, email, popup.id)
+        if prior is None:
+            return ReleaseResult(released=False)
+
+        self._supersede_located_pending(session, prior, anonymous=True)
+        return ReleaseResult(released=True)
+
+    def release_pending_authenticated(
+        self,
+        session: Session,
+        *,
+        application_id: uuid.UUID,
+        human_id: uuid.UUID,
+    ) -> "ReleaseResult":
+        """Release a PENDING payment for an authenticated buyer on return.
+
+        Return-time entry point for the authenticated (application_id) proof
+        surface.  Verifies the application belongs to human_id before any
+        release attempt (ownership check mirrors create_my_payment at router.py:796).
+
+        Feature-flag guard: if SUPERSEDE_PENDING_ENABLED is False, returns
+        released=False immediately.
+
+        Args:
+            session: Active DB session.
+            application_id: The application whose PENDING payment to release.
+            human_id: The current human's ID (from auth token).
+
+        Returns:
+            ReleaseResult(released=True) if a PENDING payment was cancelled.
+            ReleaseResult(released=False) if no PENDING exists or flag is off.
+
+        Raises:
+            HTTPException 404: application not found or not owned by human_id.
+            HTTPException 409: ALREADY_APPROVED race (reuses ADR-4 contract).
+            HTTPException 502: SimpleFi transport failure.
+        """
+        from app.api.application.crud import applications_crud
+        from app.core.config import settings as _settings
+
+        if not _settings.SUPERSEDE_PENDING_ENABLED:
+            return ReleaseResult(released=False)
+
+        # Verify ownership (mirrors create_my_payment ownership check).
+        application = applications_crud.get(session, application_id)
+        if not application or application.human_id != human_id:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Application not found",
+            )
+
+        # Locate PENDING payment for this application.
+        prior = session.exec(
+            select(Payments).where(
+                Payments.application_id == application_id,
+                Payments.status == PaymentStatus.PENDING.value,  # type: ignore[arg-type]
+                Payments.source == PaymentSource.SIMPLEFI.value,  # type: ignore[arg-type]
+                Payments.external_id.is_not(None),  # type: ignore[union-attr]
+            )
+        ).first()
+
+        if prior is None:
+            return ReleaseResult(released=False)
+
+        self._supersede_located_pending(session, prior, anonymous=False)
+        return ReleaseResult(released=True)
 
     def update_status(
         self,

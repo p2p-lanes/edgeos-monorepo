@@ -21,6 +21,8 @@ from app.api.payment.schemas import (
     PaymentStatus,
     PaymentStatusCheck,
     PaymentUpdate,
+    PendingReleaseAuthRequest,
+    PendingReleaseResponse,
     SimpleFIInstallmentPlan,
     SimpleFIInstallmentPlanPayload,
     SimpleFIPaymentInfo,
@@ -541,6 +543,56 @@ async def create_my_application_fee(
     popup = application.popup
     payment = payments_crud.create_fee_payment(db, application, popup)
     return PaymentPublic.model_validate(payment)
+
+
+@router.post(
+    "/my/pending/release",
+    response_model=PendingReleaseResponse,
+    dependencies=[needs("portal:applications:write")],
+    responses={
+        409: {
+            "description": (
+                "Payment conflict. detail.code='previous_payment_completed' means the prior "
+                "PENDING payment was concurrently approved — includes a redirect_url "
+                "pointing to the buyer's passes page."
+            ),
+        },
+        502: {
+            "description": (
+                "Payment provider error. detail.code='payment_cancel_failed' means the prior "
+                "pending payment could not be cancelled. Checkout should proceed — "
+                "creation-time supersede remains as a backstop."
+            ),
+        },
+    },
+)
+async def release_my_pending_payment(
+    request_in: PendingReleaseAuthRequest,
+    db: HumanTenantSession,
+    current_human: CurrentHuman,
+) -> PendingReleaseResponse:
+    """Opportunistically release a buyer's own prior PENDING payment on checkout return (authenticated).
+
+    Called by the portal on checkout mount for authenticated buyers (portal flow and
+    popup-mode direct sale) before coupon validation or stock display.
+    This frees any coupon/stock/credit holds so the buyer can re-apply their own
+    single-use coupon without a false-invalid error (the circularity fix).
+
+    Proof: application_id ownership, verified against current_human.id.
+
+    Response contract:
+    - HTTP 200 {released: false}: no PENDING for this application, or flag disabled.
+    - HTTP 200 {released: true}: PENDING payment cancelled, holds freed.
+    - HTTP 404: application not found or not owned by current_human (enumeration-safe).
+    - HTTP 409 previous_payment_completed: race lost — prior payment already approved.
+    - HTTP 502 payment_cancel_failed: SimpleFi unreachable; creation-time backstop remains.
+    """
+    result = payments_crud.release_pending_authenticated(
+        db,
+        application_id=request_in.application_id,
+        human_id=current_human.id,
+    )
+    return PendingReleaseResponse(released=result.released)
 
 
 @router.get(

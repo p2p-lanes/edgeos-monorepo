@@ -407,9 +407,7 @@ def test_activated_payload_without_plain_plan_id_is_accepted(monkeypatch) -> Non
     monkeypatch.setattr(payment_router_module, "payments_crud", FakePaymentsCRUD())
 
     db = FakeDBSession()
-    asyncio.run(
-        _handle_installment_plan_activated(payload, db, FakeWebhookCache())
-    )
+    asyncio.run(_handle_installment_plan_activated(payload, db, FakeWebhookCache()))
 
     assert payment.installments_total == 5
     assert payment.installments_paid == 0

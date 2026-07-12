@@ -15,9 +15,12 @@ const nextConfig: NextConfig = {
       protocol: "https" as const,
       hostname,
     })),
-    // AVIF first (best compression for the photographic tenant imagery),
-    // WebP fallback for browsers without AVIF support.
-    formats: ["image/avif", "image/webp"],
+    // WebP only: AVIF shaves a few KB but its encode costs seconds of
+    // server CPU on every cold (image, width) variant, which shows up as
+    // 1-3s first renders in carousels and lightboxes. Sources are already
+    // compressed WebP at upload time, so AVIF's marginal savings never pay
+    // for that latency.
+    formats: ["image/webp"],
   },
 }
 

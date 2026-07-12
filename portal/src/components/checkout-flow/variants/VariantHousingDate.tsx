@@ -9,7 +9,7 @@ import {
   Home,
 } from "lucide-react"
 import Image from "next/image"
-import { useEffect, useMemo, useRef, useState } from "react"
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { Button } from "@/components/ui/button"
 import ExpandableDescription from "@/components/ui/ExpandableDescription"
@@ -81,7 +81,13 @@ function buildHousingSectionGroups(
 }
 
 function formatDateInput(date: Date): string {
-  return date.toISOString().split("T")[0]
+  // Local calendar components, NOT toISOString(): these Dates are local
+  // midnights (see parseDate), and the UTC rendering of a local midnight
+  // falls on the previous day anywhere east of UTC.
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, "0")
+  const d = String(date.getDate()).padStart(2, "0")
+  return `${y}-${m}-${d}`
 }
 
 function parseDate(dateStr: string): Date {
@@ -214,6 +220,51 @@ function SectionHeader({ section }: { section: TemplateSection }) {
   )
 }
 
+/* ── Selectable card shell ───────────────────────────────── */
+
+/**
+ * Card-level select target rendered as a div with button semantics instead
+ * of a native <button>: these cards contain interactive children (carousel
+ * arrows, quantity steppers, "See more") and nesting buttons is invalid
+ * HTML — React logs hydration errors for it. All inner controls call
+ * stopPropagation, so card activation only fires on the surface itself.
+ */
+function SelectableCard({
+  disabled,
+  onActivate,
+  className,
+  children,
+}: {
+  disabled: boolean
+  onActivate: () => void
+  className?: string
+  children: ReactNode
+}) {
+  return (
+    // biome-ignore lint/a11y/useSemanticElements: a native <button> cannot contain the card's inner buttons
+    <div
+      role="button"
+      tabIndex={disabled ? -1 : 0}
+      aria-disabled={disabled || undefined}
+      onClick={() => {
+        if (!disabled) onActivate()
+      }}
+      onKeyDown={(e) => {
+        // Only when the card surface itself is focused — inner controls
+        // own their keyboard behavior.
+        if (disabled || e.target !== e.currentTarget) return
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault()
+          onActivate()
+        }
+      }}
+      className={cn(!disabled && "cursor-pointer", className)}
+    >
+      {children}
+    </div>
+  )
+}
+
 /* ── Compact card row (single product) ───────────────────── */
 
 function CompactCard({
@@ -250,11 +301,9 @@ function CompactCard({
   const soldOut = state === "sold_out"
 
   return (
-    <button
-      type="button"
+    <SelectableCard
       disabled={!canSelect}
-      onClick={() => {
-        if (!canSelect) return
+      onActivate={() => {
         if (supportsQty && quantity === 0) {
           onIncrement()
         } else {
@@ -341,7 +390,7 @@ function CompactCard({
           {formatCurrency(totalPrice)}
         </p>
       </div>
-    </button>
+    </SelectableCard>
   )
 }
 
@@ -371,6 +420,19 @@ function ProductImageCarousel({
   const hasMany = images.length > 1
 
   const safeIdx = idx < images.length ? idx : 0
+
+  // Adjacent slides stay mounted (transparent) so their variants are already
+  // in the browser cache when the user navigates; swapping src on a single
+  // <Image> keeps showing the old picture until the new one finishes
+  // downloading otherwise.
+  const neighborIdxs = hasMany
+    ? [
+        ...new Set([
+          (safeIdx + 1) % images.length,
+          (safeIdx - 1 + images.length) % images.length,
+        ]),
+      ].filter((i) => i !== safeIdx)
+    : []
 
   const next = (e: React.MouseEvent | React.KeyboardEvent) => {
     e.stopPropagation()
@@ -432,6 +494,18 @@ function ProductImageCarousel({
   return (
     <>
       <div {...imageClickProps}>
+        {neighborIdxs.map((i) => (
+          <Image
+            key={images[i]}
+            src={images[i]}
+            alt=""
+            aria-hidden
+            fill
+            sizes="(max-width: 768px) 100vw, 672px"
+            className="object-cover opacity-0 pointer-events-none"
+            {...imageOptimization(images[i])}
+          />
+        ))}
         <Image
           src={images[safeIdx]}
           alt={alt}
@@ -499,6 +573,7 @@ function GridCard({
   onSelect,
   onIncrement,
   onDecrement,
+  horizontal = false,
 }: {
   product: ProductsPass
   nights: number
@@ -508,6 +583,12 @@ function GridCard({
   onSelect: () => void
   onIncrement: () => void
   onDecrement: () => void
+  /**
+   * Full-width horizontal layout (image left, content right) for sections
+   * holding a single product, so the 2-column grid doesn't leave half a
+   * row empty. Stacks vertically again on mobile.
+   */
+  horizontal?: boolean
 }) {
   const totalPrice = pricePerDay ? product.price * nights : product.price
   const compareTotal = product.compare_price
@@ -524,11 +605,9 @@ function GridCard({
   const soldOut = state === "sold_out"
 
   return (
-    <button
-      type="button"
+    <SelectableCard
       disabled={!canSelect}
-      onClick={() => {
-        if (!canSelect) return
+      onActivate={() => {
         if (supportsQty && quantity === 0) {
           onIncrement()
         } else {
@@ -537,44 +616,28 @@ function GridCard({
       }}
       className={cn(
         "relative flex flex-col rounded-2xl border overflow-hidden text-left transition-all bg-checkout-card-bg",
+        horizontal && "sm:col-span-2 sm:flex-row",
         isSelected
           ? "border-primary ring-2 ring-primary/20"
           : "border-border hover:border-muted-foreground/30",
         !canSelect && "opacity-60 cursor-not-allowed hover:border-border",
       )}
     >
-      <ProductImageCarousel
-        images={productImages(product)}
-        alt={product.name}
-        aspectClass="aspect-[4/3]"
-      />
+      <div className={cn("relative", horizontal && "sm:w-2/5 sm:shrink-0")}>
+        <ProductImageCarousel
+          images={productImages(product)}
+          alt={product.name}
+          aspectClass="aspect-[4/3]"
+        />
 
-      {!canSelect ? (
-        soldOut && (
+        {!canSelect && soldOut && (
           <div className="absolute top-2 right-2">
             <SaleStateBadge state="sold_out" />
           </div>
-        )
-      ) : supportsQty ? (
-        <div className="absolute top-2 right-2 rounded-full bg-background/90 backdrop-blur-sm shadow-sm px-1.5 py-0.5">
-          <QuantitySelector
-            value={quantity}
-            max={maxQty}
-            onIncrement={onIncrement}
-            onDecrement={onDecrement}
-            onAdd={onIncrement}
-            size="sm"
-          />
-        </div>
-      ) : (
-        isSelected && (
-          <div className="absolute top-2 right-2 w-6 h-6 rounded-full bg-primary flex items-center justify-center">
-            <Check className="w-3.5 h-3.5 text-primary-foreground" />
-          </div>
-        )
-      )}
+        )}
+      </div>
 
-      <div className="p-3">
+      <div className={cn("p-3", horizontal && "sm:flex-1 sm:self-center")}>
         <p className="font-semibold text-pass-title text-sm leading-tight">
           {product.name}
         </p>
@@ -610,19 +673,34 @@ function GridCard({
               {formatCurrency(totalPrice)}
             </span>
           )}
-          <span
-            className={cn(
-              "text-xs px-2 py-0.5 rounded-full font-medium",
-              isSelected
-                ? "bg-primary/15 text-primary"
-                : "bg-muted text-muted-foreground",
-            )}
-          >
-            {isSelected ? "Selected" : "Select"}
-          </span>
+          {canSelect && supportsQty ? (
+            // Single add affordance: the "+" lives where "Select" used to
+            // be and expands into the -/n/+ stepper once in the cart. The
+            // card border/ring carries the selected state.
+            <QuantitySelector
+              value={quantity}
+              max={maxQty}
+              onIncrement={onIncrement}
+              onDecrement={onDecrement}
+              onAdd={onIncrement}
+              size="sm"
+              tone="accent"
+            />
+          ) : (
+            <span
+              className={cn(
+                "text-xs px-2 py-0.5 rounded-full font-medium",
+                isSelected
+                  ? "bg-primary/15 text-primary"
+                  : "bg-muted text-muted-foreground",
+              )}
+            >
+              {isSelected ? "Selected" : "Select"}
+            </span>
+          )}
         </div>
       </div>
-    </button>
+    </SelectableCard>
   )
 }
 
@@ -708,12 +786,10 @@ function DefaultSectionCard({
           const quantity = getQuantity(product.id)
 
           return (
-            <button
+            <SelectableCard
               key={product.id}
-              type="button"
               disabled={!canSelect}
-              onClick={() => {
-                if (!canSelect) return
+              onActivate={() => {
                 if (supportsQty && quantity === 0) {
                   onIncrement(product.id)
                 } else {
@@ -786,7 +862,7 @@ function DefaultSectionCard({
                   {formatCurrency(totalPrice)}
                 </p>
               </div>
-            </button>
+            </SelectableCard>
           )
         })}
       </div>
@@ -919,12 +995,10 @@ function ShowcaseSectionCard({
             const quantity = getQuantity(product.id)
 
             return (
-              <button
+              <SelectableCard
                 key={product.id}
-                type="button"
                 disabled={!canSelect}
-                onClick={() => {
-                  if (!canSelect) return
+                onActivate={() => {
                   if (supportsQty && quantity === 0) {
                     onIncrement(product.id)
                   } else {
@@ -1014,7 +1088,7 @@ function ShowcaseSectionCard({
                     )}
                   </div>
                 )}
-              </button>
+              </SelectableCard>
             )
           })}
         </div>
@@ -1124,6 +1198,7 @@ function HousingGrid({
                 onSelect={() => onProductSelect(product.id)}
                 onIncrement={() => onIncrement(product.id)}
                 onDecrement={() => onDecrement(product.id)}
+                horizontal={products.length === 1}
               />
             ))}
           </div>

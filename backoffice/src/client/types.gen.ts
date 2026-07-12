@@ -2777,6 +2777,39 @@ export type PaymentUpdate = {
 };
 
 /**
+ * Request body for POST /payments/my/pending/release (authenticated surface).
+ *
+ * application_id identifies which PENDING payment to release.
+ * Ownership is verified server-side against current_human.id.
+ */
+export type PendingReleaseAuthRequest = {
+    application_id: string;
+};
+
+/**
+ * Request body for POST /checkout/{slug}/pending/release (anonymous surface).
+ *
+ * cid + sig constitute the cart continuity proof (HMAC). email is the buyer's
+ * address used as the payment lookup key (must match the cart's stored email).
+ */
+export type PendingReleaseOpenRequest = {
+    email: string;
+    cid: string;
+    sig: string;
+};
+
+/**
+ * Response body for both release-on-return endpoints.
+ *
+ * released=True only when a cancel+hold-release actually committed.
+ * released=False covers: invalid proof, no PENDING exists, flag disabled.
+ * Enumeration-safe: the body shape is identical across all False outcomes.
+ */
+export type PendingReleaseResponse = {
+    released: boolean;
+};
+
+/**
  * One row of the admin bulk-grant CSV: a person to grant tickets to.
  */
 export type PersonGrantItem = {
@@ -4853,6 +4886,14 @@ export type CheckoutRestoreOpenCartData = {
 
 export type CheckoutRestoreOpenCartResponse = (OpenCartPublic);
 
+export type CheckoutReleasePendingOpenData = {
+    requestBody: PendingReleaseOpenRequest;
+    slug: string;
+    xTenantId?: (string | null);
+};
+
+export type CheckoutReleasePendingOpenResponse = (PendingReleaseResponse);
+
 export type CouponsValidateCouponPublicData = {
     requestBody: CouponValidatePublicRequest;
     xTenantId?: (string | null);
@@ -6068,6 +6109,12 @@ export type PaymentsCreateMyApplicationFeeData = {
 
 export type PaymentsCreateMyApplicationFeeResponse = (PaymentPublic);
 
+export type PaymentsReleaseMyPendingPaymentData = {
+    requestBody: PendingReleaseAuthRequest;
+};
+
+export type PaymentsReleaseMyPendingPaymentResponse = (PendingReleaseResponse);
+
 export type PaymentsListMyPaymentsByPopupData = {
     /**
      * Max payments to return (max 100)
@@ -6754,6 +6801,7 @@ export type TranslationsDeleteTranslationResponse = (void);
 
 export type UploadsGetPresignedUploadUrlData = {
     requestBody: PresignedUrlRequest;
+    xTenantId?: (string | null);
 };
 
 export type UploadsGetPresignedUploadUrlResponse = (PresignedUrlResponse);

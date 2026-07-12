@@ -49,9 +49,7 @@ class TestHumanComments:
         assert created["author_user_id"] is not None
         assert created["edited_at"] is None
 
-        resp = client.get(
-            f"/api/v1/humans/{human.id}/comments", headers=headers
-        )
+        resp = client.get(f"/api/v1/humans/{human.id}/comments", headers=headers)
         assert resp.status_code == 200, resp.text
         results = resp.json()["results"]
         assert len(results) == 1
@@ -120,7 +118,5 @@ class TestHumanComments:
         other_human = _make_human(db, tenant_b)
         headers = {"Authorization": f"Bearer {admin_token_tenant_a}"}
 
-        resp = client.get(
-            f"/api/v1/humans/{other_human.id}/comments", headers=headers
-        )
+        resp = client.get(f"/api/v1/humans/{other_human.id}/comments", headers=headers)
         assert resp.status_code == 404, resp.text
