@@ -286,6 +286,11 @@ async def update_my_group(
 
     _check_leader_permission(group, current_human.id)
 
+    from app.api.popup.crud import popups_crud
+    from app.api.popup.guards import ensure_popup_writable
+
+    ensure_popup_writable(popups_crud.get(db, group.popup_id))
+
     updated = crud.groups_crud.update(db, group, group_in)
     return GroupPublic.model_validate(updated)
 
@@ -314,6 +319,11 @@ async def add_group_member(
         )
 
     _check_leader_permission(group, current_human.id)
+
+    from app.api.popup.crud import popups_crud
+    from app.api.popup.guards import ensure_popup_writable
+
+    ensure_popup_writable(popups_crud.get(db, group.popup_id))
 
     # Get or create human (Human stores identity only, profile goes in Application)
     human = humans_crud.get_by_email(db, member_in.email, group.tenant_id)
@@ -425,6 +435,11 @@ async def add_group_members_batch(
 
     _check_leader_permission(group, current_human.id)
 
+    from app.api.popup.crud import popups_crud
+    from app.api.popup.guards import ensure_popup_writable
+
+    ensure_popup_writable(popups_crud.get(db, group.popup_id))
+
     results = []
     for member in batch.members:
         try:
@@ -479,6 +494,11 @@ async def update_group_member(
         )
 
     _check_leader_permission(group, current_human.id)
+
+    from app.api.popup.crud import popups_crud
+    from app.api.popup.guards import ensure_popup_writable
+
+    ensure_popup_writable(popups_crud.get(db, group.popup_id))
 
     # Check if human is a member
     if not crud.groups_crud.is_member(db, group.id, human_id):
@@ -555,6 +575,11 @@ async def remove_group_member(
         )
 
     _check_leader_permission(group, current_human.id)
+
+    from app.api.popup.crud import popups_crud
+    from app.api.popup.guards import ensure_popup_writable
+
+    ensure_popup_writable(popups_crud.get(db, group.popup_id))
 
     # Check if human is a member
     if not crud.groups_crud.is_member(db, group.id, human_id):

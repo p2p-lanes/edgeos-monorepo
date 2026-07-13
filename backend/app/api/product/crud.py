@@ -112,6 +112,58 @@ class ProductsCRUD(BaseCRUD[Products, ProductCreate, ProductUpdate]):
         results = list(session.exec(statement).all())
         return results, total
 
+    def find_excluding_ended_popups(
+        self,
+        session: Session,
+        skip: int = 0,
+        limit: int = 100,
+        search: str | None = None,
+        search_fields: list[str] | None = None,
+        sort_by: str | None = None,
+        sort_order: str = "desc",
+        **filters: object,
+    ) -> tuple[list[Products], int]:
+        """Find live products, excluding those of ended (read-only) popups.
+
+        Mirrors :meth:`find` (filters, search, sorting) with an extra join
+        that hides products belonging to ended popups.
+        """
+        from sqlalchemy import or_
+        from sqlmodel import func
+
+        from app.api.popup.models import Popups
+        from app.api.popup.schemas import PopupStatus
+
+        statement = (
+            select(Products)
+            .join(Popups, Products.popup_id == Popups.id)  # type: ignore[arg-type]
+            .where(
+                col(Products.deleted_at).is_(None),
+                Popups.status != PopupStatus.ended,
+            )
+        )
+        for field, value in filters.items():
+            if value is not None:
+                statement = statement.where(getattr(Products, field) == value)
+
+        if search and search_fields:
+            search_term = f"%{search}%"
+            search_conditions = [
+                getattr(Products, field).ilike(search_term)
+                for field in search_fields
+                if hasattr(Products, field)
+            ]
+            if search_conditions:
+                statement = statement.where(or_(*search_conditions))
+
+        count_statement = select(func.count()).select_from(statement.subquery())
+        total = session.exec(count_statement).one()
+
+        statement = self._apply_sorting(statement, sort_by, sort_order)
+        statement = statement.offset(skip).limit(limit)
+        results = list(session.exec(statement).all())
+        return results, total
+
     def get_by_slug(
         self, session: Session, slug: str, popup_id: uuid.UUID
     ) -> Products | None:
