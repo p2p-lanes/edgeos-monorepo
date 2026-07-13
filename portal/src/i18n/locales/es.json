@@ -809,6 +809,8 @@
       "required_start": "Elegí una hora de inicio",
       "creation_restricted_heading": "La creación de eventos está restringida",
       "creation_restricted_message": "Solo los admins pueden crear eventos para este pop-up.",
+      "popup_ended_heading": "Este pop-up finalizó",
+      "popup_ended_message": "Ahora es de solo lectura, por lo que ya no es posible crear ni editar contenido.",
       "no_popup_error": "Sin popup",
       "no_timezone_error": "El popup no tiene zona horaria configurada",
       "no_venue_option": "Reunión virtual",

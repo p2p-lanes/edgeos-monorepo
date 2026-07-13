@@ -230,6 +230,11 @@ export default function EventDetailPage() {
 
   const canManage = !!event && canManageEvent(event, currentHuman?.id)
 
+  // Ended popups are read-only in the portal: every write affordance (RSVP,
+  // check-in, edit, cancel, invitations) is hidden. Mirrors the backend
+  // ensure_popup_writable guard.
+  const isEnded = city?.status === "ended"
+
   // RSVP state is sourced from the event's own `my_rsvp_status` field so
   // this page agrees with the list/day/calendar views (which read the
   // same field). The participants list above is still used for the
@@ -276,6 +281,18 @@ export default function EventDetailPage() {
     queryClient.invalidateQueries({ queryKey: ["portal-events-calendar"] })
   }
 
+  // Surface backend rejections (e.g. ended popups answering 403) instead of
+  // failing silently. Mirrors toastRsvpError in ../lib/useEventRsvp.ts.
+  const toastRsvpError = (err: unknown) => {
+    const fallback = t("events.rsvp.action_error") as string
+    let detail = fallback
+    if (err instanceof ApiError && err.body && typeof err.body === "object") {
+      const body = err.body as { detail?: unknown }
+      if (typeof body.detail === "string") detail = body.detail
+    }
+    toast.error(detail)
+  }
+
   const registerMutation = useMutation({
     mutationFn: () =>
       EventParticipantsService.registerForEvent({
@@ -283,6 +300,7 @@ export default function EventDetailPage() {
         requestBody: rsvpBody,
       }),
     onSuccess: invalidateRsvpQueries,
+    onError: toastRsvpError,
   })
 
   const cancelMutation = useMutation({
@@ -292,6 +310,7 @@ export default function EventDetailPage() {
         requestBody: rsvpBody,
       }),
     onSuccess: invalidateRsvpQueries,
+    onError: toastRsvpError,
   })
 
   const [cancelEventOpen, setCancelEventOpen] = useState(false)
@@ -328,6 +347,7 @@ export default function EventDetailPage() {
         requestBody: rsvpBody,
       }),
     onSuccess: invalidateRsvpQueries,
+    onError: toastRsvpError,
   })
 
   const { data: invitations = [] } = useQuery<EventInvitationPublic[]>({
@@ -530,7 +550,7 @@ export default function EventDetailPage() {
           <ArrowLeft className="h-4 w-4" /> {t("events.common.back_to_events")}
         </Link>
         <div className="flex items-center gap-2 shrink-0">
-          {canManage && event.status !== "cancelled" && (
+          {canManage && !isEnded && event.status !== "cancelled" && (
             <Dialog open={cancelEventOpen} onOpenChange={setCancelEventOpen}>
               <DialogTrigger asChild>
                 <Button
@@ -574,7 +594,7 @@ export default function EventDetailPage() {
               </DialogContent>
             </Dialog>
           )}
-          {canManage && (
+          {canManage && !isEnded && (
             <Button asChild variant="outline" size="sm">
               <Link
                 href={`/portal/${city?.slug}/events/${event.id}/edit`}
@@ -724,17 +744,19 @@ export default function EventDetailPage() {
                       ? t("events.rsvp.checked_in")
                       : t("events.rsvp.going")}
                   </div>
-                  {myRsvpStatus === "registered" && eventStarted && (
-                    <Button
-                      size="sm"
-                      onClick={() => checkInMutation.mutate()}
-                      disabled={isPending}
-                    >
-                      {t("events.rsvp.check_in")}
-                    </Button>
-                  )}
+                  {!isEnded &&
+                    myRsvpStatus === "registered" &&
+                    eventStarted && (
+                      <Button
+                        size="sm"
+                        onClick={() => checkInMutation.mutate()}
+                        disabled={isPending}
+                      >
+                        {t("events.rsvp.check_in")}
+                      </Button>
+                    )}
                 </>
-              ) : isFull ? (
+              ) : isEnded ? null : isFull ? (
                 <Button
                   disabled
                   variant="secondary"
@@ -999,30 +1021,32 @@ export default function EventDetailPage() {
 
       {/* Below-card RSVP utilities: hint on the left, Cancel RSVP on the right.
           Separated by justify-between so they don't visually crowd each other. */}
-      {event.status === "published" && myRsvpStatus === "registered" && (
-        <div className="flex items-center justify-between gap-4">
-          {!eventStarted ? (
-            <span className="text-xs text-muted-foreground">
-              {t("events.rsvp.check_in_opens_at_start")}
-            </span>
-          ) : (
-            <span />
-          )}
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => cancelMutation.mutate()}
-            disabled={isPending}
-            className="border-destructive/30 bg-destructive/10 text-destructive shadow-none hover:border-destructive/50 hover:bg-destructive/20 hover:text-destructive dark:border-destructive/40 dark:bg-destructive/20 dark:hover:bg-destructive/30"
-          >
-            <X className="h-3.5 w-3.5" />
-            {t("events.rsvp.cancel")}
-          </Button>
-        </div>
-      )}
+      {!isEnded &&
+        event.status === "published" &&
+        myRsvpStatus === "registered" && (
+          <div className="flex items-center justify-between gap-4">
+            {!eventStarted ? (
+              <span className="text-xs text-muted-foreground">
+                {t("events.rsvp.check_in_opens_at_start")}
+              </span>
+            ) : (
+              <span />
+            )}
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => cancelMutation.mutate()}
+              disabled={isPending}
+              className="border-destructive/30 bg-destructive/10 text-destructive shadow-none hover:border-destructive/50 hover:bg-destructive/20 hover:text-destructive dark:border-destructive/40 dark:bg-destructive/20 dark:hover:bg-destructive/30"
+            >
+              <X className="h-3.5 w-3.5" />
+              {t("events.rsvp.cancel")}
+            </Button>
+          </div>
+        )}
 
       {/* Managers only (owner / host / collaborators): paste attendees to invite */}
-      {canManage && (
+      {canManage && !isEnded && (
         <div className="rounded-xl border bg-card p-4 space-y-3">
           <div className="flex items-center gap-2">
             <Mail className="h-4 w-4 text-primary" />

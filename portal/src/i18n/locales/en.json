@@ -820,6 +820,8 @@
       "required_start": "Pick a start time",
       "creation_restricted_heading": "Event creation is restricted",
       "creation_restricted_message": "Only admins can create events for this pop-up.",
+      "popup_ended_heading": "This pop-up has ended",
+      "popup_ended_message": "It is now read-only, so creating or editing content is no longer available.",
       "no_popup_error": "No popup",
       "no_timezone_error": "No timezone configured for this popup",
       "no_venue_option": "Virtual meeting",
