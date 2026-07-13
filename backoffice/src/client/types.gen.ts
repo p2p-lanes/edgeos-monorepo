@@ -2859,6 +2859,7 @@ export type PopupAdmin = {
     blog_url?: (string | null);
     twitter_url?: (string | null);
     simplefi_api_key?: (string | null);
+    simplefi_success_behavior?: SimpleFiSuccessBehavior;
     terms_and_conditions_url?: (string | null);
     open_checkout_success_url?: (string | null);
     open_checkout_cancel_url?: (string | null);
@@ -2916,6 +2917,7 @@ export type PopupCreate = {
     blog_url?: (string | null);
     twitter_url?: (string | null);
     simplefi_api_key?: (string | null);
+    simplefi_success_behavior?: SimpleFiSuccessBehavior;
     terms_and_conditions_url?: (string | null);
     open_checkout_success_url?: (string | null);
     open_checkout_cancel_url?: (string | null);
@@ -3055,6 +3057,7 @@ export type PopupUpdate = {
     blog_url?: (string | null);
     twitter_url?: (string | null);
     simplefi_api_key?: (string | null);
+    simplefi_success_behavior?: (SimpleFiSuccessBehavior | null);
     terms_and_conditions_url?: (string | null);
     open_checkout_success_url?: (string | null);
     open_checkout_cancel_url?: (string | null);
@@ -3487,6 +3490,16 @@ export type SendTestRequest = {
 } | null);
     popup_id?: (string | null);
 };
+
+/**
+ * How SimpleFi redirects the buyer to the success URL after payment.
+ *
+ * Mirrors SimpleFi's ``redirect_urls.success_behavior``:
+ * - manual: the buyer clicks a button on SimpleFi's checkout to continue
+ * (SimpleFi's default, and ours).
+ * - automatic: SimpleFi redirects the buyer immediately after approval.
+ */
+export type SimpleFiSuccessBehavior = 'manual' | 'automatic';
 
 /**
  * Which surface a task relates to. Optional (NULL = unspecified).

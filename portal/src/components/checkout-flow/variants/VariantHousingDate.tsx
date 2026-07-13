@@ -421,6 +421,19 @@ function ProductImageCarousel({
 
   const safeIdx = idx < images.length ? idx : 0
 
+  // Adjacent slides stay mounted (transparent) so their variants are already
+  // in the browser cache when the user navigates; swapping src on a single
+  // <Image> keeps showing the old picture until the new one finishes
+  // downloading otherwise.
+  const neighborIdxs = hasMany
+    ? [
+        ...new Set([
+          (safeIdx + 1) % images.length,
+          (safeIdx - 1 + images.length) % images.length,
+        ]),
+      ].filter((i) => i !== safeIdx)
+    : []
+
   const next = (e: React.MouseEvent | React.KeyboardEvent) => {
     e.stopPropagation()
     setIdx((i) => (i + 1) % images.length)
@@ -481,6 +494,18 @@ function ProductImageCarousel({
   return (
     <>
       <div {...imageClickProps}>
+        {neighborIdxs.map((i) => (
+          <Image
+            key={images[i]}
+            src={images[i]}
+            alt=""
+            aria-hidden
+            fill
+            sizes="(max-width: 768px) 100vw, 672px"
+            className="object-cover opacity-0 pointer-events-none"
+            {...imageOptimization(images[i])}
+          />
+        ))}
         <Image
           src={images[safeIdx]}
           alt={alt}

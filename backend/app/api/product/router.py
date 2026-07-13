@@ -394,6 +394,9 @@ async def list_portal_products(
 ) -> ListModel[ProductPublic]:
     """List products visible to the current human (Portal)."""
     if popup_id:
+        # Ended popups keep their products visible here: the portal recap
+        # views still need them, and purchasing is blocked at the payment,
+        # cart, and application layers.
         products, total = crud.products_crud.find_by_popup(
             db,
             popup_id=popup_id,
@@ -403,10 +406,14 @@ async def list_portal_products(
             category=category,
         )
     else:
-        products, total = crud.products_crud.find(
+        # Same read-only contract without popup_id: ended-popup products are
+        # excluded so they cannot be enumerated through the unscoped listing.
+        products, total = crud.products_crud.find_excluding_ended_popups(
             db,
             skip=skip,
             limit=limit,
+            is_active=is_active,
+            category=category,
         )
 
     lang = None

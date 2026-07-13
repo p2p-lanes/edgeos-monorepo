@@ -99,6 +99,15 @@ export default function NewPortalEventPage() {
       />
     )
   }
+  // Ended popups are read-only: no new events, whatever the settings say.
+  if (city?.status === "ended") {
+    return (
+      <GatedMessage
+        title={t("events.form.popup_ended_heading")}
+        message={t("events.form.popup_ended_message")}
+      />
+    )
+  }
   if (!canCreate) {
     return (
       <GatedMessage

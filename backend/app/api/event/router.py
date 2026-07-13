@@ -48,6 +48,7 @@ from app.api.event.schemas import (
 )
 from app.api.event_audit.crud import build_event_snapshot, record_event_audit
 from app.api.event_audit.schemas import EventAuditAction
+from app.api.popup.guards import ensure_popup_writable
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
 from app.core.dependencies.tenants import PublicTenant
 from app.core.dependencies.users import (
@@ -2478,6 +2479,9 @@ async def bulk_invite_portal(
     current_human: CurrentHuman,
 ) -> EventInvitationBulkResult:
     event = _ensure_portal_event_owner(db, event_id, current_human)
+    from app.api.popup.crud import popups_crud
+
+    ensure_popup_writable(popups_crud.get(db, event.popup_id))
     result = _run_bulk_invite(db, event, payload.emails, current_human.id)
     await _send_event_invitation_emails(db, event, result.invited)
     invite_snapshot = build_event_snapshot(db, event)
@@ -2503,6 +2507,9 @@ async def delete_portal_invitation(
     current_human: CurrentHuman,
 ) -> None:
     event = _ensure_portal_event_owner(db, event_id, current_human)
+    from app.api.popup.crud import popups_crud
+
+    ensure_popup_writable(popups_crud.get(db, event.popup_id))
     inv = crud.invitations_crud.get(db, invitation_id)
     if not inv or inv.event_id != event_id:
         raise HTTPException(status_code=404, detail="Invitation not found")
@@ -3173,6 +3180,7 @@ async def create_portal_event(
     from app.api.popup.crud import popups_crud
 
     popup = popups_crud.get(db, event_in.popup_id)
+    ensure_popup_writable(popup)
     _check_event_within_popup_window(
         popup, start_time=event_in.start_time, end_time=event_in.end_time
     )
@@ -3305,6 +3313,11 @@ async def update_portal_event(
             detail="Only the event owner or host can edit",
         )
 
+    from app.api.popup.crud import popups_crud
+
+    popup = popups_crud.get(db, event.popup_id)
+    ensure_popup_writable(popup)
+
     audit_before = build_event_snapshot(db, event)
 
     new_venue_id = (
@@ -3318,9 +3331,6 @@ async def update_portal_event(
         or event_in.end_time is not None
     )
     if event_in.start_time is not None or event_in.end_time is not None:
-        from app.api.popup.crud import popups_crud
-
-        popup = popups_crud.get(db, event.popup_id)
         _check_event_within_popup_window(popup, start_time=new_start, end_time=new_end)
     if new_venue_id is not None and timing_or_venue_changed:
         _check_recurrence_conflicts(
@@ -3462,6 +3472,9 @@ async def cancel_portal_event(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only the event owner or host can cancel",
         )
+    from app.api.popup.crud import popups_crud
+
+    ensure_popup_writable(popups_crud.get(db, event.popup_id))
     if event.status == EventStatus.CANCELLED:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

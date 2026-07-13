@@ -10,6 +10,14 @@ export type CartMeta = {
   restoreToken: string | null
 }
 
+/**
+ * Exact string detail returned by the backend's ended-popup write guard
+ * (`ensure_popup_writable`, HTTP 403). Matched verbatim so the checkout can
+ * surface a specific message instead of the generic payment error.
+ */
+export const POPUP_ENDED_READ_ONLY_DETAIL =
+  "This popup has ended and is read-only."
+
 export type NavigateAction =
   | { type: "href"; url: string }
   | { type: "router-push"; path: string }

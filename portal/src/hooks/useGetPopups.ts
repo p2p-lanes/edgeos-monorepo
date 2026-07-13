@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query"
 import { useParams, usePathname, useRouter } from "next/navigation"
 import { useEffect } from "react"
 import { type PopupPublic, PopupsService } from "@/client"
+import { visiblePortalPopups } from "@/hooks/portalPopupList"
 import { useIsAuthenticated } from "@/hooks/useIsAuthenticated"
 import { queryKeys } from "@/lib/query-keys"
 
@@ -31,9 +32,7 @@ export function usePopupsQuery(enabled = true) {
     queryKey: queryKeys.popups.portal(),
     queryFn: async () => {
       const result = await PopupsService.listPortalPopups()
-      return sortPopupsByUpcomingDate(
-        result.filter((popup) => popup.status === "active"),
-      )
+      return visiblePortalPopups(result)
     },
     enabled: enabled && isAuthenticated,
   })

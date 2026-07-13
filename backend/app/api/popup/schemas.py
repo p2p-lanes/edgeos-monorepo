@@ -14,6 +14,7 @@ from app.api.shared.enums import (
     CheckoutMode,
     InstallmentInterval,
     SaleType,
+    SimpleFiSuccessBehavior,
     derive_checkout_mode,
 )
 from app.core.config import settings
@@ -163,6 +164,13 @@ class PopupBase(SQLModel):
     blog_url: str | None = None
     twitter_url: str | None = None
     simplefi_api_key: str | None = None
+    # Forwarded to SimpleFi as redirect_urls.success_behavior on every payment
+    # created for this popup. Manual (SimpleFi's default) keeps the buyer on
+    # SimpleFi's checkout until they click through to the success URL.
+    simplefi_success_behavior: SimpleFiSuccessBehavior = Field(
+        default=SimpleFiSuccessBehavior.manual,
+        sa_column=Column(String, nullable=False, server_default="manual"),
+    )
     terms_and_conditions_url: str | None = None
     # Per-popup redirect URLs for the open-checkout flow. When set, they
     # override the default portal thank-you / cancel pages forwarded to
@@ -283,6 +291,7 @@ class PopupCreate(SQLModel):
     blog_url: str | None = None
     twitter_url: str | None = None
     simplefi_api_key: str | None = None
+    simplefi_success_behavior: SimpleFiSuccessBehavior = SimpleFiSuccessBehavior.manual
     terms_and_conditions_url: str | None = None
     open_checkout_success_url: str | None = None
     open_checkout_cancel_url: str | None = None
@@ -381,6 +390,7 @@ class PopupUpdate(SQLModel):
     blog_url: str | None = None
     twitter_url: str | None = None
     simplefi_api_key: str | None = None
+    simplefi_success_behavior: SimpleFiSuccessBehavior | None = None
     terms_and_conditions_url: str | None = None
     open_checkout_success_url: str | None = None
     open_checkout_cancel_url: str | None = None

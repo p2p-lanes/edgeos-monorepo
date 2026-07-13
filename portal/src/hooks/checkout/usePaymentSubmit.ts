@@ -22,7 +22,11 @@ import type {
   SelectedPatronItem,
 } from "@/types/checkout"
 import { buildPaymentProducts } from "./buildPaymentProducts"
-import { dispatchPaymentError, extractCartMeta } from "./errorDispatch"
+import {
+  dispatchPaymentError,
+  extractCartMeta,
+  POPUP_ENDED_READ_ONLY_DETAIL,
+} from "./errorDispatch"
 
 interface UsePaymentSubmitParams {
   applicationId: string | undefined
@@ -387,6 +391,13 @@ export function usePaymentSubmit({
         apiBody !== null && typeof apiBody?.detail === "string"
           ? (apiBody.detail as string)
           : null
+      if (apiDetailStr === POPUP_ENDED_READ_ONLY_DETAIL) {
+        const errorMsg = t("checkout.popup_ended_error")
+        setPromoError(errorMsg)
+        toast.error(errorMsg)
+        setIsSubmitting(false)
+        return { success: false, error: errorMsg }
+      }
       const isCouponError = apiDetailStr?.startsWith("Coupon code")
       if (isCouponError) {
         clearPromoCode()

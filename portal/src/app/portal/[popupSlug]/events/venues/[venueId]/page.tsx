@@ -64,8 +64,12 @@ export default function PortalVenueDetailPage() {
   const venue: EventVenuePublic | undefined = data?.results.find(
     (v) => v.id === params.venueId,
   )
+  // Ended popups are read-only: the owner's edit affordance is hidden.
   const isOwner =
-    venue != null && currentHuman != null && venue.owner_id === currentHuman.id
+    venue != null &&
+    currentHuman != null &&
+    venue.owner_id === currentHuman.id &&
+    city?.status !== "ended"
 
   if (isLoading) {
     return (

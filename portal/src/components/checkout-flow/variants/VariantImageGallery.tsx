@@ -83,6 +83,19 @@ export function LightboxOverlay({
   const current = images[index]
   if (!current) return null
 
+  // Fetch the adjacent full-size images while the current one is on screen
+  // so prev/next swaps come from the browser cache. display:none images
+  // never load under native lazy loading, hence the explicit eager.
+  const neighbors =
+    images.length > 1
+      ? [
+          ...new Set([
+            (index + 1) % images.length,
+            (index - 1 + images.length) % images.length,
+          ]),
+        ].filter((i) => i !== index)
+      : []
+
   // Portal to <body>: hosts like a sold-out product card carry opacity < 1,
   // which creates a stacking context that would trap this fixed overlay and
   // render it semi-transparent over the page.
@@ -128,6 +141,19 @@ export function LightboxOverlay({
       )}
 
       <div className="max-w-4xl max-h-[80vh] w-full mx-4 relative">
+        {neighbors.map((i) => (
+          <Image
+            key={images[i].id}
+            src={images[i].url}
+            alt=""
+            aria-hidden
+            width={1200}
+            height={800}
+            loading="eager"
+            className="hidden"
+            {...imageOptimization(images[i].url)}
+          />
+        ))}
         <Image
           src={current.url}
           alt={current.caption || ""}

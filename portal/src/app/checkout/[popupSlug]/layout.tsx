@@ -7,12 +7,13 @@ import { buildShareMetadata } from "@/lib/share-metadata"
 import { resolveTenantForMetadata } from "@/lib/tenant-metadata"
 
 /**
- * Server-side metadata for the (client) open-ticketing checkout page.
+ * Server-side metadata for the open-ticketing checkout route.
  *
- * The sibling `page.tsx` is a client component, so it can't own
- * `generateMetadata`. This layout supplies popup-level OpenGraph/Twitter tags
- * so a shared checkout link shows the event name, tagline and cover image
- * instead of the generic portal preview.
+ * Share-preview metadata is owned by this layout: the sibling `page.tsx` is a
+ * dynamic server component focused on rendering runtime data, so keeping the
+ * OpenGraph/Twitter tags here isolates the popup-level share concern. This
+ * layout supplies those tags so a shared checkout link shows the event name,
+ * tagline and cover image instead of the generic portal preview.
  */
 export async function generateMetadata({
   params,

@@ -8,7 +8,9 @@ import {
 } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { OpenClaw } from "@/components/Icons/OpenClaw"
+import { buildEndedResources } from "@/hooks/endedResources"
 import useAuth from "@/hooks/useAuth"
+import { useHumanPopupAccess } from "@/hooks/useHumanPopupAccess"
 import { useApplication } from "@/providers/applicationProvider"
 import { useCityProvider } from "@/providers/cityProvider"
 import type { Resource } from "@/types/resources"
@@ -20,6 +22,19 @@ const useResources = () => {
   const { user } = useAuth()
   const application = getRelevantApplication()
   const city = getCity()
+  const endedAccess = useHumanPopupAccess(
+    city?.status === "ended" && city?.id ? String(city.id) : null,
+  )
+
+  if (city?.status === "ended" && city?.sale_type !== "direct") {
+    const resources = buildEndedResources({
+      t,
+      city,
+      participated: endedAccess.state === "allowed",
+    })
+    return { resources }
+  }
+
   // Popup-level feature flag: hides the entire events module when off.
   // Whether humans can *create* events is a separate setting handled
   // inside the events page itself (event_settings.event_enabled).
