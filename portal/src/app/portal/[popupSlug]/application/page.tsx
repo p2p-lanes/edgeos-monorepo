@@ -110,6 +110,12 @@ export default function FormPage() {
     }
   }, [city, router])
 
+  useEffect(() => {
+    if (city?.status === "ended") {
+      router.replace(`/portal/${city.slug}`)
+    }
+  }, [city, router])
+
   const { uploadFile } = useFileUpload()
 
   const handleImport = () => {
@@ -129,6 +135,10 @@ export default function FormPage() {
   }
 
   if (city.sale_type === "direct") {
+    return <Loader />
+  }
+
+  if (city.status === "ended") {
     return <Loader />
   }
 

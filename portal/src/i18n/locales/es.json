@@ -451,7 +451,11 @@
     "events": "Calendario de Eventos",
     "venues": "Lugares",
     "api_keys": "API Keys",
-    "api_docs": "API Docs"
+    "api_docs": "API Docs",
+    "locked_ended": "Finalizado — no disponible"
+  },
+  "recap": {
+    "status_badge": "Finalizado"
   },
   "api_keys": {
     "title": "API Keys",

@@ -1,4 +1,5 @@
 import secrets
+from datetime import datetime
 from typing import Any
 
 from sqlalchemy import case
@@ -75,6 +76,22 @@ class PopupsCRUD(BaseCRUD[Popups, PopupCreate, PopupUpdate]):
                 Popups.start_date.is_not(None),  # type: ignore[union-attr]
             )
             .options(selectinload(Popups.tenant))  # type: ignore[arg-type]
+        )
+        return list(session.exec(statement).all())
+
+    def list_active_past_end_date(
+        self, session: Session, now: datetime
+    ) -> list[Popups]:
+        """Active popups whose end_date is in the past — due to transition to ended.
+
+        ``end_date`` is stored timezone-naive (treated as UTC); the aware ``now``
+        is stripped to naive for the comparison.
+        """
+        naive_now = now.replace(tzinfo=None) if now.tzinfo else now
+        statement = select(Popups).where(
+            Popups.status == PopupStatus.active,
+            Popups.end_date.is_not(None),  # type: ignore[union-attr]
+            Popups.end_date < naive_now,  # type: ignore[operator]
         )
         return list(session.exec(statement).all())
 

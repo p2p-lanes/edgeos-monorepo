@@ -453,7 +453,11 @@
     "tracks": "Tracks",
     "venues": "Venues",
     "api_keys": "API Keys",
-    "api_docs": "API Docs"
+    "api_docs": "API Docs",
+    "locked_ended": "Ended — not available"
+  },
+  "recap": {
+    "status_badge": "Ended"
   },
   "api_keys": {
     "title": "API Keys",

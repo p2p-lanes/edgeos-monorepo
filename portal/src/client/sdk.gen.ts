@@ -6589,7 +6589,11 @@ export class PopupsService {
     
     /**
      * List Portal Popups
-     * List active popups for the current human's tenant (Portal).
+     * List popups visible to the current human in the Portal.
+     *
+     * Active popups are visible to everyone in the tenant. Ended popups (recap
+     * mode) are visible only to humans who participated, resolved via the same
+     * access ladder used by the passes/events gates.
      * @param data The data for the request.
      * @param data.acceptLanguage
      * @returns PopupPublic Successful Response
@@ -6610,7 +6614,7 @@ export class PopupsService {
     
     /**
      * Get Portal Popup
-     * Get a popup by slug (Portal).
+     * Get a popup by slug (Portal). Ended popups are served only to participants.
      * @param data The data for the request.
      * @param data.slug
      * @param data.acceptLanguage
