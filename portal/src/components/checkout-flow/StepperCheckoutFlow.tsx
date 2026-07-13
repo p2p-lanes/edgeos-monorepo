@@ -215,6 +215,7 @@ export default function StepperCheckoutFlow({
     [faqSections],
   )
   const [faqsOpen, setFaqsOpen] = useState(false)
+  const closeFaqs = useCallback(() => setFaqsOpen(false), [])
 
   const [active, setActive] = useState(0)
   const last = Math.max(0, sections.length - 1)
@@ -375,11 +376,7 @@ export default function StepperCheckoutFlow({
       </nav>
 
       {isAmanita && (
-        <FaqsDrawer
-          open={faqsOpen}
-          items={faqItems}
-          onClose={() => setFaqsOpen(false)}
-        />
+        <FaqsDrawer open={faqsOpen} items={faqItems} onClose={closeFaqs} />
       )}
 
       <CheckoutToast onChipClick={scrollToStep} />
