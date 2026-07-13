@@ -1,6 +1,7 @@
 import type { ComponentType } from "react"
 import type { ProductsPass } from "@/types/Products"
 import VariantFaqs from "../variants/VariantFaqs"
+import VariantHero from "../variants/VariantHero"
 import VariantHousingDate from "../variants/VariantHousingDate"
 import VariantImageGallery from "../variants/VariantImageGallery"
 import VariantMealPlanSelect from "../variants/VariantMealPlanSelect"
@@ -33,6 +34,7 @@ export const VARIANT_REGISTRY: Record<string, ComponentType<VariantProps>> = {
   "image-gallery": VariantImageGallery,
   faqs: VariantFaqs,
   "rich-text": VariantRichText,
+  hero: VariantHero,
 }
 
 export const CONTENT_ONLY_TEMPLATES = new Set([
@@ -40,4 +42,5 @@ export const CONTENT_ONLY_TEMPLATES = new Set([
   "image-gallery",
   "faqs",
   "rich-text",
+  "hero",
 ])
