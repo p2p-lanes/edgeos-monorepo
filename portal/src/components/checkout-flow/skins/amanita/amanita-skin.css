@@ -201,6 +201,22 @@
   color: var(--color-sand);
 }
 
+/* `hover:` variants of the above — Tailwind never generates these
+   because mint/cream/sand aren't real Tailwind theme colors in this
+   repo (see the bare utilities above), so the escaped-colon selector
+   form has to be hand-authored too. Only the combinations actually
+   used in StepperCheckoutFlow.tsx's Amanita branches (inactive pills,
+   Back button) are defined here. */
+.checkout-amanita .hover\:border-mint:hover {
+  border-color: var(--color-mint);
+}
+.checkout-amanita .hover\:text-mint:hover {
+  color: var(--color-mint);
+}
+.checkout-amanita .hover\:text-cream:hover {
+  color: var(--color-cream);
+}
+
 /* ── 9 · Font-family utilities (bound to fonts.ts CSS vars) ────────── */
 .checkout-amanita .font-display {
   font-family: var(--font-amanita-display), serif;
