@@ -138,7 +138,13 @@ def build_thank_you_payload(
     }
 
 
-def _append_query(base_url: str, extra: list[tuple[str, str]]) -> str:
+def append_query_params(base_url: str, extra: list[tuple[str, str]]) -> str:
+    """Append query params to ``base_url``, preserving any existing ones.
+
+    Also used to forward the checkout language (``lang``) on the success
+    redirect — it travels as a plain query param, outside the signed payload,
+    so it never affects HMAC verification.
+    """
     parts = urlparse(base_url)
     query = parse_qsl(parts.query, keep_blank_values=True)
     query.extend(extra)
@@ -155,7 +161,7 @@ def build_signed_redirect_url(
     """
     d = encode_payload(payload)
     sig = sign_data_hex(d, secret)
-    return _append_query(base_url, [("d", d), ("sig", sig)])
+    return append_query_params(base_url, [("d", d), ("sig", sig)])
 
 
 def build_unsigned_redirect_url(base_url: str, payload: Mapping[str, Any]) -> str:
@@ -165,4 +171,4 @@ def build_unsigned_redirect_url(base_url: str, payload: Mapping[str, Any]) -> st
     order summary on a confirmation screen we control), so it needs no HMAC.
     Existing query params are preserved.
     """
-    return _append_query(base_url, [("data", encode_payload(payload))])
+    return append_query_params(base_url, [("data", encode_payload(payload))])

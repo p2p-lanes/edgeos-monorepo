@@ -653,7 +653,9 @@ def test_zero_amount_purchase_returns_custom_success_redirect_url(
     body = response.json()
     assert body["status"] == "approved"
     assert body["checkout_url"] == ""
-    assert body["redirect_url"] == "https://brand.example.com/thank-you"
+    # The checkout language always travels as a lang query param (popup
+    # default when the request carries no locale).
+    assert body["redirect_url"] == "https://brand.example.com/thank-you?lang=en"
     mock_get_client.assert_not_called()
 
 
@@ -711,7 +713,12 @@ def test_paid_purchase_signs_order_payload_into_simplefi_success_url(
         ]
 
     assert success_url.startswith("https://brand.example.com/thank-you")
+    # lang travels as a plain query param, OUTSIDE the signed payload, so it
+    # never affects HMAC verification (contract with the external page).
+    query = parse_qs(urlparse(success_url).query)
+    assert query["lang"] == ["en"]
     payload = _verify_signed_redirect(success_url, secret)
+    assert "lang" not in payload
     assert payload["first_name"] == "Matias"
     assert payload["amount_total"] == 240.0
     assert payload["currency"] == "USD"
@@ -765,6 +772,57 @@ def test_signed_redirect_substitutes_locale_placeholder(
     # Request locale ("en") wins over the popup default ("es").
     assert success_url.startswith("https://amanita.example.com/en/gracias")
     assert "{locale}" not in success_url
+    # The same locale is forwarded as the lang query param.
+    assert parse_qs(urlparse(success_url).query)["lang"] == ["en"]
+
+
+def test_signed_redirect_forwards_lang_on_fixed_path_success_url(
+    client: TestClient,
+    db: Session,
+    tenant_a: Tenants,
+) -> None:
+    """Fixed-path external thank-you contract: the checkout language travels
+    as .../gracias?lang=<es|en>&d=...&sig=... — lang outside the signed payload,
+    so signature verification is untouched."""
+    secret = "amanita-secret"
+    popup = _make_popup(db, tenant_a, slug_prefix="lang-fixed-path")
+    popup.open_checkout_success_url = "https://amanita.example.com/gracias"
+    popup.open_checkout_signing_secret = secret
+    db.add(popup)
+    product = _make_product(db, popup, price="120.00")
+    db.commit()
+
+    with patch("app.services.simplefi.get_simplefi_client") as mock_get_client:
+        mock_get_client.return_value.create_payment.return_value = SimpleNamespace(
+            id="sf_lang_1",
+            status="pending",
+            checkout_url="https://simplefi.test/checkout/lang",
+            is_installment_plan=False,
+        )
+        response = client.post(
+            f"/api/v1/checkout/{popup.slug}/purchase",
+            json={
+                "products": [{"product_id": str(product.id), "quantity": 1}],
+                "buyer": {
+                    "email": "buyer@test.com",
+                    "first_name": "Ana",
+                    "last_name": "Diaz",
+                    "form_data": {},
+                },
+                "locale": "es",  # from the entry URL ?lang=es
+            },
+            headers={"X-Tenant-Id": str(tenant_a.id)},
+        )
+
+    assert response.status_code == 200, response.text
+    success_url = mock_get_client.return_value.create_payment.call_args.kwargs[
+        "success_path"
+    ]
+    assert success_url.startswith("https://amanita.example.com/gracias?")
+    query = parse_qs(urlparse(success_url).query)
+    assert query["lang"] == ["es"]
+    payload = _verify_signed_redirect(success_url, secret)
+    assert "lang" not in payload
 
 
 def test_zero_amount_purchase_signs_order_payload_into_redirect_url(
@@ -854,6 +912,9 @@ def test_paid_purchase_injects_order_data_into_portal_thank_you(
 
     assert f"/checkout/{popup.slug}/thank-you" in success_url
     assert "sig=" not in success_url  # portal page is ours — no signature
+    # The internal thank-you also receives lang so the portal keeps the
+    # buyer's checkout language after the provider redirect.
+    assert parse_qs(urlparse(success_url).query)["lang"] == ["en"]
     payload = _decode_data_param(success_url)
     assert payload["first_name"] == "Matias"
     assert payload["amount_total"] == 240.0
