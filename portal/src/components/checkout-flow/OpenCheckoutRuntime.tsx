@@ -198,6 +198,11 @@ export function OpenCheckoutRuntime({
     trackedViewContentRef.current = popup.id
   }, [popup, runtime.products])
 
+  const Flow =
+    resolveCheckoutShell(popup) === "stepper"
+      ? StepperCheckoutFlow
+      : ScrollyCheckoutFlow
+
   return (
     <CityContext.Provider
       value={{
@@ -271,23 +276,13 @@ export function OpenCheckoutRuntime({
                       null
                     }
                   />
-                  {resolveCheckoutShell(popup) === "stepper" ? (
-                    <StepperCheckoutFlow
-                      navExtraContent={<LanguageSwitcher compact />}
-                      brandLogoUrl={
-                        (popup as { icon_url?: string | null }).icon_url ?? null
-                      }
-                      brandLabel={popup.name}
-                    />
-                  ) : (
-                    <ScrollyCheckoutFlow
-                      navExtraContent={<LanguageSwitcher compact />}
-                      brandLogoUrl={
-                        (popup as { icon_url?: string | null }).icon_url ?? null
-                      }
-                      brandLabel={popup.name}
-                    />
-                  )}
+                  <Flow
+                    navExtraContent={<LanguageSwitcher compact />}
+                    brandLogoUrl={
+                      (popup as { icon_url?: string | null }).icon_url ?? null
+                    }
+                    brandLabel={popup.name}
+                  />
                 </CheckoutProvider>
               </PassesProvider>
             </DiscountContext.Provider>
