@@ -12,8 +12,10 @@ import {
 } from "@/client"
 import FaviconOverride from "@/components/checkout-flow/FaviconOverride"
 import ScrollyCheckoutFlow from "@/components/checkout-flow/ScrollyCheckoutFlow"
+import StepperCheckoutFlow from "@/components/checkout-flow/StepperCheckoutFlow"
 import { LanguageSwitcher } from "@/components/common/LanguageSwitcher"
 import { captureAttribution } from "@/lib/attribution"
+import { resolveCheckoutShell } from "@/lib/checkout-shell"
 import { trackGAViewItem } from "@/lib/google-analytics"
 import { trackMetaViewContent } from "@/lib/meta-pixel"
 import { queryKeys } from "@/lib/query-keys"
@@ -269,13 +271,23 @@ export function OpenCheckoutRuntime({
                       null
                     }
                   />
-                  <ScrollyCheckoutFlow
-                    navExtraContent={<LanguageSwitcher compact />}
-                    brandLogoUrl={
-                      (popup as { icon_url?: string | null }).icon_url ?? null
-                    }
-                    brandLabel={popup.name}
-                  />
+                  {resolveCheckoutShell(popup) === "stepper" ? (
+                    <StepperCheckoutFlow
+                      navExtraContent={<LanguageSwitcher compact />}
+                      brandLogoUrl={
+                        (popup as { icon_url?: string | null }).icon_url ?? null
+                      }
+                      brandLabel={popup.name}
+                    />
+                  ) : (
+                    <ScrollyCheckoutFlow
+                      navExtraContent={<LanguageSwitcher compact />}
+                      brandLogoUrl={
+                        (popup as { icon_url?: string | null }).icon_url ?? null
+                      }
+                      brandLabel={popup.name}
+                    />
+                  )}
                 </CheckoutProvider>
               </PassesProvider>
             </DiscountContext.Provider>
