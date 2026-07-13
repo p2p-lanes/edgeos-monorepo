@@ -13,6 +13,7 @@ from app.api.event_participant.schemas import (
     ParticipantStatus,
     RegisterRequest,
 )
+from app.api.popup.guards import ensure_popup_writable
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
 from app.core.dependencies.users import (
     AdminOrApiKey_EventsRead,
@@ -327,12 +328,14 @@ async def register_for_event(
     from app.api.event.crud import events_crud
     from app.api.event.schemas import EventStatus
     from app.api.event_participant.models import EventParticipants
+    from app.api.popup.crud import popups_crud
 
     event = events_crud.get(db, event_id)
     if not event:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Event not found"
         )
+    ensure_popup_writable(popups_crud.get(db, event.popup_id))
     if event.status != EventStatus.PUBLISHED:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Event is not published"
@@ -482,12 +485,14 @@ async def cancel_registration(
     field; ``role``/``message`` are ignored on cancel.
     """
     from app.api.event.crud import events_crud
+    from app.api.popup.crud import popups_crud
 
     event = events_crud.get(db, event_id)
     if not event:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Event not found"
         )
+    ensure_popup_writable(popups_crud.get(db, event.popup_id))
     occ_start = _resolve_occurrence_start(
         event, body.occurrence_start if body else None
     )
@@ -521,12 +526,14 @@ async def check_in(
 ) -> EventParticipantPublic:
     """Check in current human for an event (portal)."""
     from app.api.event.crud import events_crud
+    from app.api.popup.crud import popups_crud
 
     event = events_crud.get(db, event_id)
     if not event:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Event not found"
         )
+    ensure_popup_writable(popups_crud.get(db, event.popup_id))
     occ_start = _resolve_occurrence_start(
         event, body.occurrence_start if body else None
     )

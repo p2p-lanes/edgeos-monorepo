@@ -35,6 +35,7 @@ from app.api.event_venue.schemas import (
     VenueStatus,
     VenueWeeklyHoursUpdate,
 )
+from app.api.popup.guards import ensure_popup_writable
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
 from app.core.dependencies.users import (
     AdminOrApiKey_EventsRead,
@@ -868,6 +869,9 @@ async def update_portal_venue(
             status_code=403,
             detail="Only the venue's owner can edit it from the portal",
         )
+    from app.api.popup.crud import popups_crud
+
+    ensure_popup_writable(popups_crud.get(db, venue.popup_id))
 
     update_data = venue_in.model_dump(
         exclude_unset=True, exclude={"property_type_ids", "status"}
@@ -902,6 +906,9 @@ async def delete_portal_venue(
             status_code=403,
             detail="Only the venue's owner can delete it from the portal",
         )
+    from app.api.popup.crud import popups_crud
+
+    ensure_popup_writable(popups_crud.get(db, venue.popup_id))
 
     active_event = db.exec(
         select(Events)
@@ -930,6 +937,9 @@ async def create_portal_venue(
 ) -> EventVenuePublic:
     """Create a venue as a human (portal). Respects popup event settings."""
     from app.api.event_settings.crud import event_settings_crud
+    from app.api.popup.crud import popups_crud
+
+    ensure_popup_writable(popups_crud.get(db, venue_in.popup_id))
 
     settings = event_settings_crud.get_by_popup_id(db, venue_in.popup_id)
     if not settings or not settings.humans_can_create_venues:
@@ -951,7 +961,6 @@ async def create_portal_venue(
     db.refresh(venue)
 
     if pending:
-        from app.api.popup.crud import popups_crud
         from app.services.approval_notify import notify_venue_pending_approval
 
         popup = popups_crud.get(db, venue.popup_id)
