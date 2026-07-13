@@ -17,6 +17,7 @@ import { shouldUseDynamicStep } from "./registries/stepRegistry"
 import type { ScrollyCheckoutFlowProps } from "./ScrollyCheckoutFlow"
 import SectionHeader from "./SectionHeader"
 import { AmanitaBackground } from "./skins/amanita/AmanitaBackground"
+import AmanitaBuyerStep from "./skins/amanita/AmanitaBuyerStep"
 import "./skins/amanita/amanita-skin.css"
 import { amanitaFontVars } from "./skins/amanita/fonts"
 import ConfirmStep from "./steps/ConfirmStep"
@@ -221,7 +222,8 @@ export default function StepperCheckoutFlow({
   const renderStepContent = (section: (typeof sections)[number]) => {
     const { stepType, config } = section
     const isFirstSection = active === 0
-    if (stepType === "buyer") return <OpenCheckoutBuyerStep />
+    if (stepType === "buyer")
+      return isAmanita ? <AmanitaBuyerStep /> : <OpenCheckoutBuyerStep />
     if (stepType === "confirm") return <ConfirmStep />
     if (stepType === "passes" || stepType === "tickets") {
       if (shouldUseDynamicStep(config ?? undefined)) {

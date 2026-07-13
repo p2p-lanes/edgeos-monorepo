@@ -5,6 +5,7 @@ import StepperCheckoutFlow from "./StepperCheckoutFlow"
 const submitPayment = vi.fn().mockResolvedValue({ success: true })
 
 let cityOverride: Record<string, unknown> | null = null
+let availableStepsOverride: string[] | null = null
 
 vi.mock("next/navigation", () => ({
   useParams: () => ({ popupSlug: "popup-a" }),
@@ -23,7 +24,7 @@ vi.mock("next/font/google", () => ({
 
 vi.mock("@/providers/checkoutProvider", () => ({
   useCheckout: () => ({
-    availableSteps: ["passes", "confirm"],
+    availableSteps: availableStepsOverride ?? ["passes", "confirm"],
     stepConfigs: [],
     submitPayment,
     isInitialLoading: false,
@@ -56,6 +57,9 @@ vi.mock("./steps/PassSelectionSection", () => ({
 vi.mock("./steps/OpenCheckoutBuyerStep", () => ({
   default: () => <div>buyer-step</div>,
 }))
+vi.mock("./skins/amanita/AmanitaBuyerStep", () => ({
+  default: () => <div>amanita-buyer-step</div>,
+}))
 vi.mock("./steps/ConfirmStep", () => ({
   default: () => <div>confirm-step</div>,
 }))
@@ -69,6 +73,7 @@ describe("StepperCheckoutFlow", () => {
   beforeEach(() => {
     submitPayment.mockClear()
     cityOverride = null
+    availableStepsOverride = null
   })
 
   it("renders only the first section initially", () => {
@@ -103,6 +108,24 @@ describe("StepperCheckoutFlow", () => {
     it("does not apply the checkout-amanita wrapper class for the default skin", () => {
       const { container } = render(<StepperCheckoutFlow />)
       expect(container.querySelector(".checkout-amanita")).toBeNull()
+    })
+
+    it("routes the buyer step to AmanitaBuyerStep when the skin is amanita", () => {
+      cityOverride = {
+        terms_and_conditions_url: null,
+        theme_config: { checkout_skin: "amanita" },
+      }
+      availableStepsOverride = ["buyer", "confirm"]
+      render(<StepperCheckoutFlow />)
+      expect(screen.getByText("amanita-buyer-step")).toBeTruthy()
+      expect(screen.queryByText("buyer-step")).toBeNull()
+    })
+
+    it("routes the buyer step to OpenCheckoutBuyerStep for the default skin", () => {
+      availableStepsOverride = ["buyer", "confirm"]
+      render(<StepperCheckoutFlow />)
+      expect(screen.getByText("buyer-step")).toBeTruthy()
+      expect(screen.queryByText("amanita-buyer-step")).toBeNull()
     })
   })
 })
