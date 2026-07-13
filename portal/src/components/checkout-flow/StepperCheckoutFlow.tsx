@@ -18,6 +18,7 @@ import type { ScrollyCheckoutFlowProps } from "./ScrollyCheckoutFlow"
 import SectionHeader from "./SectionHeader"
 import { AmanitaBackground } from "./skins/amanita/AmanitaBackground"
 import AmanitaBuyerStep from "./skins/amanita/AmanitaBuyerStep"
+import AmanitaConfirmSection from "./skins/amanita/AmanitaConfirmSection"
 import "./skins/amanita/amanita-skin.css"
 import { amanitaFontVars } from "./skins/amanita/fonts"
 import ConfirmStep from "./steps/ConfirmStep"
@@ -201,6 +202,15 @@ export default function StepperCheckoutFlow({
     [sections, goTo],
   )
 
+  // Amanita Confirm section's empty-cart CTA ("Ver tickets") — jump to the
+  // first product step (i.e. the first section that isn't buyer/confirm).
+  const goToFirstProductSection = useCallback(() => {
+    const idx = sections.findIndex(
+      (s) => s.stepType !== "buyer" && s.stepType !== "confirm",
+    )
+    goTo(idx >= 0 ? idx : 0)
+  }, [sections, goTo])
+
   const handlePayment = useCallback(async () => {
     const result = await submitPayment()
     if (result.success) onPaymentComplete?.()
@@ -224,7 +234,12 @@ export default function StepperCheckoutFlow({
     const isFirstSection = active === 0
     if (stepType === "buyer")
       return isAmanita ? <AmanitaBuyerStep /> : <OpenCheckoutBuyerStep />
-    if (stepType === "confirm") return <ConfirmStep />
+    if (stepType === "confirm")
+      return isAmanita ? (
+        <AmanitaConfirmSection onGoToTickets={goToFirstProductSection} />
+      ) : (
+        <ConfirmStep />
+      )
     if (stepType === "passes" || stepType === "tickets") {
       if (shouldUseDynamicStep(config ?? undefined)) {
         return (
