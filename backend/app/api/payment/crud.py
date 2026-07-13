@@ -42,6 +42,7 @@ from app.api.product.product_state import ProductSaleState, derive_product_state
 from app.api.product.schemas import ProductPublic
 from app.api.shared.crud import BaseCRUD
 from app.utils.checkout_signing import (
+    append_query_params,
     build_signed_redirect_url,
     build_thank_you_payload,
     build_unsigned_redirect_url,
@@ -180,13 +181,19 @@ def _resolve_open_checkout_success_url(
     With no custom URL, the buyer stays on the portal thank-you, which carries
     the order data unsigned so it can render the summary (our own page — no HMAC
     needed).
+
+    The checkout language is always forwarded as a ``lang`` query param —
+    external and internal alike — outside the signed payload, so the landing
+    page can render in the buyer's language without touching HMAC verification.
     """
     custom = popup.open_checkout_success_url
     if custom:
         custom = custom.replace("{locale}", locale)
+        custom = append_query_params(custom, [("lang", locale)])
         secret = popup.open_checkout_signing_secret
         return build_signed_redirect_url(custom, payload, secret) if secret else custom
-    return build_unsigned_redirect_url(internal_thank_you_url, payload)
+    internal = append_query_params(internal_thank_you_url, [("lang", locale)])
+    return build_unsigned_redirect_url(internal, payload)
 
 
 def _internal_open_checkout_thank_you_url(
@@ -843,6 +850,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                     session,
                     email=obj.buyer.email,
                     popup_id=popup.id,
+                    locale=obj.locale,
                 )
 
                 # ADR-2 advisory lock: serialize concurrent open-checkout
@@ -1174,6 +1182,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 installment_interval_count=popup.installments_interval_count,
                 user_email=buyer.email,
                 plan_name=popup.name,
+                success_behavior=popup.simplefi_success_behavior,
             )
 
             payment.external_id = simplefi_response.id
@@ -1507,6 +1516,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 portal_base_override=portal_base,
                 success_path=success_path,
                 cancel_path=cancel_path,
+                success_behavior=popup.simplefi_success_behavior,
             )
             logger.info(
                 "SimpleFI application fee payment created: application_id={} external_id={} provider_status={} checkout_url={}",
@@ -2454,6 +2464,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 installment_interval_count=popup.installments_interval_count,
                 user_email=application.human.email if application.human else None,
                 plan_name=popup.name,
+                success_behavior=popup.simplefi_success_behavior,
             )
             logger.info(
                 "SimpleFI pass payment created: application_id={} external_id={} provider_status={} checkout_url={} is_installment_plan={}",
@@ -3100,6 +3111,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         application_id: uuid.UUID | None = None,
         email: str | None = None,
         popup_id: uuid.UUID | None = None,
+        locale: str | None = None,
     ) -> None:
         """Cancel any prior PENDING SimpleFi payment for this buyer before creating a new one.
 
@@ -3134,6 +3146,8 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             application_id: Lookup key for authenticated checkout.
             email: Buyer email for open-checkout lookup (requires popup_id).
             popup_id: Required when email is provided.
+            locale: Checkout language of the new purchase attempt, forwarded
+                to the 409 signed redirect. Falls back to the popup default.
         """
 
         # Locate the prior PENDING SimpleFi payment for this buyer
@@ -3155,7 +3169,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             return  # No prior pending payment — nothing to supersede
 
         self._supersede_located_pending(
-            session, prior, anonymous=(application_id is None)
+            session, prior, anonymous=(application_id is None), locale=locale
         )
 
     def _supersede_located_pending(
@@ -3164,6 +3178,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         prior: "Payments",
         *,
         anonymous: bool,
+        locale: str | None = None,
     ) -> None:
         """Cancel an already-located PENDING SimpleFi payment and release its holds.
 
@@ -3316,8 +3331,13 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                         issued_at=_now.isoformat(),
                         exp=int(_now.timestamp()) + 30 * 60,
                     )
+                    lang = locale or _popup.default_language or "en"
+                    success_base = _popup.open_checkout_success_url.replace(
+                        "{locale}", lang
+                    )
+                    success_base = append_query_params(success_base, [("lang", lang)])
                     redirect_url = build_signed_redirect_url(
-                        _popup.open_checkout_success_url, payload, secret
+                        success_base, payload, secret
                     )
                 # else: no signing secret or no external URL — omit redirect_url
 

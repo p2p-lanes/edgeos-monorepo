@@ -103,6 +103,13 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
       searchParams.get("lang"),
       supportedLanguages,
     )
+    // An explicit ?lang= is a user choice made on the referring site (same
+    // class as the manual selector), so persist it: the language must survive
+    // in-session navigations that drop the query param, e.g. returning from
+    // the payment provider after a cancel.
+    if (urlLanguage && typeof window !== "undefined") {
+      localStorage.setItem(STORAGE_KEY, urlLanguage)
+    }
     const storedLanguage =
       typeof window === "undefined"
         ? null
@@ -124,8 +131,9 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
     }
   }, [searchParams, supportedLanguages, defaultLanguage, currentLanguage])
 
-  // localStorage is written only by setLanguage (manual choice) — not here, to avoid
-  // clobbering the popup default during auto-resolve and bouncing back on next render.
+  // localStorage is written only on explicit signals — setLanguage (manual
+  // choice) and an incoming ?lang= param — never by auto-resolve, to avoid
+  // clobbering the popup default and bouncing back on next render.
   useEffect(() => {
     if (i18n.language !== currentLanguage) {
       i18n.changeLanguage(currentLanguage)
