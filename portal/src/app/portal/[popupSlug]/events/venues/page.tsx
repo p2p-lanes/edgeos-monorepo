@@ -24,7 +24,9 @@ export default function PortalVenuesPage() {
     enabled: !!city?.id,
   })
   const { data: settings } = usePortalEventSettings(city?.id)
-  const canCreateVenue = settings?.humans_can_create_venues === true
+  // Ended popups are read-only: venue creation is hidden in recap mode.
+  const canCreateVenue =
+    settings?.humans_can_create_venues === true && city?.status !== "ended"
 
   const venues: EventVenuePublic[] = data?.results ?? []
 

@@ -118,6 +118,11 @@ interface ListBodyProps {
   canRsvp?: boolean
   /** Tooltip text shown on the disabled RSVP button explaining why. */
   rsvpDisabledReason?: string
+  /**
+   * When false, the RSVP and "Going"/cancel buttons are hidden entirely —
+   * used for ended (read-only) popups. Defaults to true.
+   */
+  showRsvp?: boolean
   onHide?: (eventId: string) => void
   onUnhide?: (eventId: string) => void
   /** Popup-scoped fallback image when an event has no cover/venue image. */
@@ -160,6 +165,7 @@ export function ListBody({
   pendingRsvpKey,
   canRsvp = true,
   rsvpDisabledReason,
+  showRsvp = true,
   onHide,
   onUnhide,
   placeholderUrl,
@@ -508,7 +514,8 @@ export function ListBody({
                         </Link>
                         {isAuthed && (
                           <div className="absolute bottom-2 right-2 flex items-center gap-1.5">
-                            {event.status === "published" &&
+                            {showRsvp &&
+                              event.status === "published" &&
                               (() => {
                                 const rsvpKey = `${event.id}:${event.start_time}`
                                 const isRsvpPending = pendingRsvpKey === rsvpKey

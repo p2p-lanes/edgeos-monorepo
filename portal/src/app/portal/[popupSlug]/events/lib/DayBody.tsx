@@ -100,6 +100,11 @@ interface DayBodyProps {
   canRsvp?: boolean
   /** Tooltip text shown on the disabled RSVP button explaining why. */
   rsvpDisabledReason?: string
+  /**
+   * When false, the RSVP and "Going"/cancel buttons are hidden entirely —
+   * used for ended (read-only) popups. Defaults to true.
+   */
+  showRsvp?: boolean
 }
 
 const HOUR_PX = 56
@@ -165,6 +170,7 @@ export function DayBody({
   timezoneOverride,
   canRsvp = true,
   rsvpDisabledReason,
+  showRsvp = true,
 }: DayBodyProps) {
   const isAuthed = mode === "authed"
   const useOverride = eventsOverride !== undefined
@@ -801,6 +807,7 @@ export function DayBody({
                                 </div>
                               )}
                             {isAuthed &&
+                              showRsvp &&
                               !isShort &&
                               event.status === "published" &&
                               (() => {

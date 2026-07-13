@@ -99,6 +99,11 @@ interface CalendarBodyProps {
   canRsvp?: boolean
   /** Tooltip text shown on the disabled RSVP button explaining why. */
   rsvpDisabledReason?: string
+  /**
+   * When false, the RSVP and "Going"/cancel buttons are hidden entirely —
+   * used for ended (read-only) popups. Defaults to true.
+   */
+  showRsvp?: boolean
 }
 
 /**
@@ -124,6 +129,7 @@ export function CalendarBody({
   placeholderUrl,
   canRsvp = true,
   rsvpDisabledReason,
+  showRsvp = true,
 }: CalendarBodyProps) {
   const isAuthed = mode === "authed"
   const useOverride = eventsOverride !== undefined
@@ -589,6 +595,7 @@ export function CalendarBody({
                         </div>
                       </Link>
                       {isAuthed &&
+                        showRsvp &&
                         event.status === "published" &&
                         (() => {
                           const rsvpKey = `${event.id}:${event.start_time}`

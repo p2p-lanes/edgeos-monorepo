@@ -190,6 +190,28 @@ export default function EditPortalVenuePage() {
     )
   }
 
+  // Ended popups are read-only: venues can no longer be edited.
+  if (city?.status === "ended") {
+    return (
+      <div className="max-w-xl mx-auto p-6 text-center">
+        <CircleAlert className="mx-auto h-10 w-10 text-muted-foreground/50 mb-3" />
+        <h1 className="text-lg font-semibold">
+          {t("events.form.popup_ended_heading")}
+        </h1>
+        <p className="text-sm text-muted-foreground mt-2">
+          {t("events.form.popup_ended_message")}
+        </p>
+        <Link
+          href={`/portal/${popupSlug}/events/venues/${venue.id}`}
+          className="inline-flex items-center gap-1 text-sm text-primary mt-6"
+        >
+          <ArrowLeft className="h-4 w-4" />{" "}
+          {t("events.venues.edit.back_to_venue")}
+        </Link>
+      </div>
+    )
+  }
+
   const isOwner = currentHuman != null && venue.owner_id === currentHuman.id
 
   if (!isOwner) {

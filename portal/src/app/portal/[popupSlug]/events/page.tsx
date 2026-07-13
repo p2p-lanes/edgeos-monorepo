@@ -364,6 +364,10 @@ export default function EventsPage() {
   // event_settings.event_enabled gates creation only; existing events
   // stay browsable so users can review what's already published.
   const creationEnabled = eventSettings?.event_enabled ?? true
+  // Ended popups are read-only in the portal: creation and RSVP affordances
+  // are hidden while the list stays browsable (recap mode). Mirrors the
+  // backend ensure_popup_writable guard.
+  const isEnded = city?.status === "ended"
 
   // Only surface tracks that actually have events in the window — the
   // curated track list often contains tracks no published event uses yet,
@@ -725,7 +729,8 @@ export default function EventsPage() {
           </h1>
           <div className="flex shrink-0 items-center gap-2">
             {city?.id && <SubscribeCalendarButton popupId={city.id} />}
-            {creationEnabled &&
+            {!isEnded &&
+              creationEnabled &&
               (eventSettings?.can_publish_event ?? "everyone") ===
                 "everyone" && (
                 <Button asChild size="sm" className="shrink-0 px-2 sm:px-3">
@@ -806,6 +811,7 @@ export default function EventsPage() {
             placeholderUrl={eventSettings?.placeholder_url}
             canRsvp={canRsvp}
             rsvpDisabledReason={rsvpDisabledReason}
+            showRsvp={!isEnded}
           />
         ) : view === "day" ? (
           isDayFullscreen ? null : (
@@ -826,6 +832,7 @@ export default function EventsPage() {
               onToggleFullscreen={toggleDayFullscreen}
               canRsvp={canRsvp}
               rsvpDisabledReason={rsvpDisabledReason}
+              showRsvp={!isEnded}
             />
           )
         ) : (
@@ -844,6 +851,7 @@ export default function EventsPage() {
             pendingRsvpKey={pendingRsvpKey}
             canRsvp={canRsvp}
             rsvpDisabledReason={rsvpDisabledReason}
+            showRsvp={!isEnded}
             onHide={(id) => hideMutation.mutate(id)}
             onUnhide={(id) => unhideMutation.mutate(id)}
             placeholderUrl={eventSettings?.placeholder_url}
@@ -903,6 +911,7 @@ export default function EventsPage() {
               onToggleFullscreen={toggleDayFullscreen}
               canRsvp={canRsvp}
               rsvpDisabledReason={rsvpDisabledReason}
+              showRsvp={!isEnded}
             />
           </div>,
           document.body,

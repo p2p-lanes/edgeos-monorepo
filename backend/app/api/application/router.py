@@ -847,6 +847,10 @@ async def detach_companion(
     (money decisions handled by support, not by a checkout button).
     """
     from app.api.attendee.crud import attendees_crud
+    from app.api.popup.crud import popups_crud
+    from app.api.popup.guards import ensure_popup_writable
+
+    ensure_popup_writable(popups_crud.get(db, body.popup_id))
 
     companion = attendees_crud.find_companion_for_popup(
         db, human_id=current_human.id, popup_id=body.popup_id
@@ -890,6 +894,11 @@ async def create_my_application(
     current_human: CurrentHuman,
 ) -> ApplicationPublic:
     """Create an application for the current human (Portal)."""
+    from app.api.popup.crud import popups_crud
+    from app.api.popup.guards import ensure_popup_writable
+
+    ensure_popup_writable(popups_crud.get(db, app_in.popup_id))
+
     # Check for existing application
     existing = crud.applications_crud.get_by_human_popup(
         db, human_id=current_human.id, popup_id=app_in.popup_id
@@ -914,8 +923,6 @@ async def create_my_application(
 
     # Validate scholarship request against popup settings
     if app_in.scholarship_request is True:
-        from app.api.popup.crud import popups_crud
-
         popup = popups_crud.get(db, app_in.popup_id)
         if not popup or not popup.allows_scholarship:
             raise HTTPException(
@@ -950,6 +957,11 @@ async def update_my_application(
     current_human: CurrentHuman,
 ) -> ApplicationPublic:
     """Update current human's application (Portal)."""
+    from app.api.popup.crud import popups_crud
+    from app.api.popup.guards import ensure_popup_writable
+
+    ensure_popup_writable(popups_crud.get(db, popup_id))
+
     application = crud.applications_crud.get_by_human_popup(
         db, human_id=current_human.id, popup_id=popup_id
     )
@@ -1321,6 +1333,11 @@ async def add_my_attendee(
             detail="Application not found",
         )
 
+    from app.api.popup.crud import popups_crud
+    from app.api.popup.guards import ensure_popup_writable
+
+    ensure_popup_writable(popups_crud.get(db, popup_id))
+
     crud.applications_crud.create_attendee(
         db,
         application=application,
@@ -1367,6 +1384,11 @@ async def update_my_attendee(
             detail="Attendee not found",
         )
 
+    from app.api.popup.crud import popups_crud
+    from app.api.popup.guards import ensure_popup_writable
+
+    ensure_popup_writable(popups_crud.get(db, popup_id))
+
     # Check for duplicate email
     if attendee_in.email:
         existing_emails = [
@@ -1406,6 +1428,11 @@ async def delete_my_attendee(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Application not found",
         )
+
+    from app.api.popup.crud import popups_crud
+    from app.api.popup.guards import ensure_popup_writable
+
+    ensure_popup_writable(popups_crud.get(db, popup_id))
 
     crud.applications_crud.delete_attendee(db, application, attendee_id)
 
