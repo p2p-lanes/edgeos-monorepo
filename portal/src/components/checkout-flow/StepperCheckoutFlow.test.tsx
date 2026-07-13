@@ -6,6 +6,7 @@ const submitPayment = vi.fn().mockResolvedValue({ success: true })
 
 let cityOverride: Record<string, unknown> | null = null
 let availableStepsOverride: string[] | null = null
+let stepConfigsOverride: Record<string, unknown>[] | null = null
 
 vi.mock("next/navigation", () => ({
   useParams: () => ({ popupSlug: "popup-a" }),
@@ -25,7 +26,7 @@ vi.mock("next/font/google", () => ({
 vi.mock("@/providers/checkoutProvider", () => ({
   useCheckout: () => ({
     availableSteps: availableStepsOverride ?? ["passes", "confirm"],
-    stepConfigs: [],
+    stepConfigs: stepConfigsOverride ?? [],
     submitPayment,
     isInitialLoading: false,
     markStepVisited: vi.fn(),
@@ -74,6 +75,7 @@ describe("StepperCheckoutFlow", () => {
     submitPayment.mockClear()
     cityOverride = null
     availableStepsOverride = null
+    stepConfigsOverride = null
   })
 
   it("renders only the first section initially", () => {
@@ -96,6 +98,24 @@ describe("StepperCheckoutFlow", () => {
   })
 
   describe("skin", () => {
+    const AMANITA_CITY = {
+      terms_and_conditions_url: null,
+      theme_config: { checkout_skin: "amanita" },
+    }
+    const FAQS_STEP_CONFIG = {
+      id: "faqs-config-1",
+      step_type: "faqs",
+      title: "FAQs",
+      template: "faqs",
+      show_in_navbar: true,
+      template_config: {
+        items: [
+          { question: "When does it start?", answer: "Noon sharp." },
+          { question: "Can I camp?", answer: "Yes, camping included." },
+        ],
+      },
+    }
+
     it("applies the checkout-amanita wrapper class when the popup's skin is amanita", () => {
       cityOverride = {
         terms_and_conditions_url: null,
@@ -126,6 +146,91 @@ describe("StepperCheckoutFlow", () => {
       render(<StepperCheckoutFlow />)
       expect(screen.getByText("buyer-step")).toBeTruthy()
       expect(screen.queryByText("amanita-buyer-step")).toBeNull()
+    })
+
+    describe("FAQs global drawer (amanita only)", () => {
+      beforeEach(() => {
+        cityOverride = AMANITA_CITY
+        availableStepsOverride = ["faqs", "passes"]
+        stepConfigsOverride = [FAQS_STEP_CONFIG]
+      })
+
+      it("excludes the faqs step from the linear pills/sections and shows a separate FAQs pill", () => {
+        render(<StepperCheckoutFlow />)
+        // the faqs step is not a linear step: no pill carries its title verbatim
+        expect(screen.queryByText("FAQs", { selector: "button" })).toBeNull()
+        // the pass step (next in line) renders immediately, active index 0
+        expect(screen.getByText("pass-step")).toBeTruthy()
+        // the dedicated FAQs pill exists instead
+        expect(
+          screen.getByRole("button", {
+            name: "checkout.amanita.faqs_pill_label",
+          }),
+        ).toBeTruthy()
+        // dialog is closed until the pill is clicked
+        expect(screen.queryByRole("dialog")).toBeNull()
+      })
+
+      it("opens the dialog when the FAQs pill is clicked, and Escape closes it", () => {
+        render(<StepperCheckoutFlow />)
+        fireEvent.click(
+          screen.getByRole("button", {
+            name: "checkout.amanita.faqs_pill_label",
+          }),
+        )
+        const dialog = screen.getByRole("dialog")
+        expect(dialog).toBeTruthy()
+        expect(screen.getByText("When does it start?")).toBeTruthy()
+
+        fireEvent.keyDown(document, { key: "Escape" })
+        expect(screen.queryByRole("dialog")).toBeNull()
+      })
+    })
+
+    it("renders the faqs step inline (no drawer) for the default skin", () => {
+      availableStepsOverride = ["faqs", "passes"]
+      stepConfigsOverride = [FAQS_STEP_CONFIG]
+      render(<StepperCheckoutFlow />)
+      // faqs stays a normal step: rendered inline via DynamicProductStep
+      expect(screen.getByText("dynamic-step")).toBeTruthy()
+      expect(
+        screen.queryByRole("button", {
+          name: "checkout.amanita.faqs_pill_label",
+        }),
+      ).toBeNull()
+    })
+
+    it("renders the logo-hongo image (not text) as the first pill for amanita", () => {
+      cityOverride = AMANITA_CITY
+      const { container } = render(<StepperCheckoutFlow />)
+      const nav = screen.getByRole("navigation", {
+        name: "Checkout sections",
+      })
+      const firstPillImg = nav.querySelector("button img")
+      expect(firstPillImg).toBeTruthy()
+      expect(screen.getByText("checkout.amanita.nav_home_sr")).toBeTruthy()
+      expect(container).toBeTruthy()
+    })
+
+    it("does not render a logo image as the first pill for the default skin", () => {
+      render(<StepperCheckoutFlow />)
+      const nav = screen.getByRole("navigation", {
+        name: "Checkout sections",
+      })
+      expect(nav.querySelector("button img")).toBeNull()
+    })
+
+    it("shows a cart-count badge on the Confirm pill for amanita when items are in the cart", () => {
+      cityOverride = AMANITA_CITY
+      render(<StepperCheckoutFlow />)
+      const nav = screen.getByRole("navigation", {
+        name: "Checkout sections",
+      })
+      const confirmPill = Array.from(nav.querySelectorAll("button")).find(
+        (btn) => btn.textContent?.includes("Review & Confirm"),
+      )
+      expect(confirmPill).toBeTruthy()
+      expect(confirmPill?.textContent).toContain("1")
     })
   })
 })

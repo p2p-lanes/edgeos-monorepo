@@ -332,7 +332,13 @@
       "confirm_credit_label": "Credit",
       "confirm_account_credit_label": "Account Credit",
       "confirm_total_label": "Total",
-      "confirm_free_note": "You don't need to pay, your order is covered"
+      "confirm_free_note": "You don't need to pay, your order is covered",
+      "nav_home_sr": "Home",
+      "faqs_pill_label": "FAQs",
+      "faqs_kicker": "Frequently asked questions",
+      "faqs_title": "FAQs",
+      "faqs_intro": "What people ask most before getting their pass. Close and pick up right where you left off.",
+      "faqs_close_aria": "Close frequently asked questions"
     }
   },
   "openCheckout": {

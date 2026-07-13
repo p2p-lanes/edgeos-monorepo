@@ -20,6 +20,7 @@ import { AmanitaBackground } from "./skins/amanita/AmanitaBackground"
 import AmanitaBuyerStep from "./skins/amanita/AmanitaBuyerStep"
 import AmanitaConfirmSection from "./skins/amanita/AmanitaConfirmSection"
 import "./skins/amanita/amanita-skin.css"
+import FaqsDrawer, { type FaqDrawerItem } from "./skins/amanita/FaqsDrawer"
 import { amanitaFontVars } from "./skins/amanita/fonts"
 import ConfirmStep from "./steps/ConfirmStep"
 import OpenCheckoutBuyerStep from "./steps/OpenCheckoutBuyerStep"
@@ -149,6 +150,20 @@ const CTA_BUTTON_CLASSES: Record<CheckoutSkin, string> = {
     "btn-ornate flex shrink-0 items-center justify-center whitespace-nowrap !px-4 py-2.5 font-condensed text-xs font-medium uppercase tracking-[0.1em] md:!px-6 md:text-sm disabled:cursor-not-allowed disabled:opacity-50",
 }
 
+/** `faqs`-template step's `template_config.items` — same `{question,
+ * answer}[]` shape VariantFaqs.tsx parses for the default skin's inline
+ * rendering. Defensive parsing since `template_config` is untyped JSON. */
+function parseFaqDrawerItems(raw: unknown): FaqDrawerItem[] {
+  if (!Array.isArray(raw)) return []
+  return raw.map((item) => {
+    const rec = (item ?? {}) as Record<string, unknown>
+    return {
+      question: typeof rec.question === "string" ? rec.question : "",
+      answer: typeof rec.answer === "string" ? rec.answer : "",
+    }
+  })
+}
+
 export default function StepperCheckoutFlow({
   onPaymentComplete,
   navExtraContent,
@@ -172,14 +187,34 @@ export default function StepperCheckoutFlow({
   const skin = resolveCheckoutSkin(popup)
   const isAmanita = skin === "amanita"
 
-  const sections = useMemo(
+  const rawSections = useMemo(
     () => deriveCheckoutSections(availableSteps as string[], stepConfigs),
     [availableSteps, stepConfigs],
+  )
+  // Amanita: `faqs`-template steps aren't a linear step — they're pulled out
+  // of the sequential flow and surfaced via the global FaqsDrawer, opened
+  // from a separate "FAQs" pill (mockup pattern). `default` skin keeps them
+  // inline, unchanged.
+  const faqSections = useMemo(
+    () => rawSections.filter((s) => s.template === "faqs"),
+    [rawSections],
+  )
+  const sections = useMemo(
+    () =>
+      isAmanita
+        ? rawSections.filter((s) => s.template !== "faqs")
+        : rawSections,
+    [rawSections, isAmanita],
   )
   const navSections = useMemo(
     () => sections.filter((s) => s.showInNavbar !== false),
     [sections],
   )
+  const faqItems = useMemo(
+    () => parseFaqDrawerItems(faqSections[0]?.config?.template_config?.items),
+    [faqSections],
+  )
+  const [faqsOpen, setFaqsOpen] = useState(false)
 
   const [active, setActive] = useState(0)
   const last = Math.max(0, sections.length - 1)
@@ -274,10 +309,16 @@ export default function StepperCheckoutFlow({
         className={NAV[skin].className}
         style={NAV[skin].style}
       >
-        {navSections.map((section) => {
+        {navSections.map((section, navIdx) => {
           const idx = sections.findIndex((s) => s.id === section.id)
           const isActive = idx === active
           const pill = PILL[skin]
+          // Amanita mockup detail (Task 5 review, folded in here): the first
+          // pill shows the brand mark instead of a text label, and the
+          // Confirm pill carries a cart-count badge once items are added.
+          const isFirstPill = isAmanita && navIdx === 0
+          const showCartBadge =
+            isAmanita && section.stepType === "confirm" && itemCount > 0
           return (
             <button
               key={section.id}
@@ -287,12 +328,59 @@ export default function StepperCheckoutFlow({
               className={`${pill.base} ${isActive ? pill.active : pill.inactive}`}
               style={isActive ? pill.activeStyle : pill.inactiveStyle}
             >
-              {section.label}
+              {isFirstPill ? (
+                <>
+                  <Image
+                    src="/checkout-skins/amanita/logo-hongo.webp"
+                    alt=""
+                    aria-hidden
+                    width={647}
+                    height={360}
+                    className="h-4 w-auto"
+                  />
+                  <span className="sr-only">
+                    {t("checkout.amanita.nav_home_sr")}
+                  </span>
+                </>
+              ) : (
+                section.label
+              )}
+              {showCartBadge && (
+                <span className="ml-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-sand px-1 font-condensed text-[0.6rem] font-semibold text-deep">
+                  {itemCount}
+                </span>
+              )}
             </button>
           )
         })}
+        {isAmanita && faqSections.length > 0 && (
+          <>
+            <span aria-hidden className="mx-1 h-4 w-px shrink-0 bg-white/25" />
+            <button
+              type="button"
+              onClick={() => setFaqsOpen(true)}
+              aria-haspopup="dialog"
+              aria-expanded={faqsOpen}
+              className="shrink-0 whitespace-nowrap rounded-full border border-dashed bg-transparent px-3.5 py-1.5 font-condensed text-xs font-medium uppercase tracking-[0.08em] transition-colors hover:border-mint hover:text-mint"
+              style={{
+                borderColor: "rgba(241,235,227,0.4)",
+                color: "rgba(241,235,227,0.85)",
+              }}
+            >
+              {t("checkout.amanita.faqs_pill_label")}
+            </button>
+          </>
+        )}
         {navExtraContent}
       </nav>
+
+      {isAmanita && (
+        <FaqsDrawer
+          open={faqsOpen}
+          items={faqItems}
+          onClose={() => setFaqsOpen(false)}
+        />
+      )}
 
       <CheckoutToast onChipClick={scrollToStep} />
 

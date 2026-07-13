@@ -332,7 +332,13 @@
       "confirm_credit_label": "Crédito",
       "confirm_account_credit_label": "Crédito de cuenta",
       "confirm_total_label": "Total",
-      "confirm_free_note": "No necesitás pagar, tu pedido ya está cubierto"
+      "confirm_free_note": "No necesitás pagar, tu pedido ya está cubierto",
+      "nav_home_sr": "Inicio",
+      "faqs_pill_label": "FAQs",
+      "faqs_kicker": "Dudas frecuentes",
+      "faqs_title": "FAQs",
+      "faqs_intro": "Lo que más nos preguntan antes de sacar la entrada. Cerrá y seguís justo donde estabas.",
+      "faqs_close_aria": "Cerrar las preguntas frecuentes"
     }
   },
   "openCheckout": {
