@@ -840,6 +840,8 @@ export type BuyerInfo = {
     email: string;
     first_name: string;
     last_name: string;
+    phone?: (string | null);
+    phone_country?: (string | null);
     form_data?: {
         [key: string]: unknown;
     };
@@ -2169,6 +2171,8 @@ export type HumanCreate = {
     first_name?: (string | null);
     last_name?: (string | null);
     telegram?: (string | null);
+    phone?: (string | null);
+    phone_country?: (string | null);
     gender?: (string | null);
     age?: (string | null);
     residence?: (string | null);
@@ -2245,6 +2249,8 @@ export type HumanProfileUpdate = {
     first_name?: (string | null);
     last_name?: (string | null);
     telegram?: (string | null);
+    phone?: (string | null);
+    phone_country?: (string | null);
     gender?: (string | null);
     age?: (string | null);
     residence?: (string | null);
@@ -2261,6 +2267,8 @@ export type HumanPublic = {
     first_name?: (string | null);
     last_name?: (string | null);
     telegram?: (string | null);
+    phone?: (string | null);
+    phone_country?: (string | null);
     gender?: (string | null);
     age?: (string | null);
     residence?: (string | null);
@@ -2288,6 +2296,8 @@ export type HumanUpdate = {
     first_name?: (string | null);
     last_name?: (string | null);
     telegram?: (string | null);
+    phone?: (string | null);
+    phone_country?: (string | null);
     gender?: (string | null);
     age?: (string | null);
     residence?: (string | null);

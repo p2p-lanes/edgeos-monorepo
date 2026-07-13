@@ -126,6 +126,13 @@ function buildOpenBuyerSchema(
       target: "human",
       position: 2,
     },
+    phone: {
+      type: "text",
+      label: t("form.phone"),
+      required: false,
+      target: "human",
+      position: 3,
+    },
   }
 
   return {
