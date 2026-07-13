@@ -118,6 +118,13 @@ describe("StepperCheckoutFlow", () => {
         ],
       },
     }
+    const PASSES_STEP_CONFIG = {
+      id: "passes-config-1",
+      step_type: "passes",
+      title: "Select Your Passes",
+      template: "catalog",
+      template_config: null,
+    }
 
     it("applies the checkout-amanita wrapper class when the popup's skin is amanita", () => {
       cityOverride = {
@@ -154,10 +161,32 @@ describe("StepperCheckoutFlow", () => {
     describe("product steps", () => {
       it("routes a passes/tickets product step to AmanitaCatalogSection for amanita", () => {
         cityOverride = AMANITA_CITY
+        stepConfigsOverride = [
+          {
+            id: "passes-config-1",
+            step_type: "passes",
+            title: "Select Your Passes",
+            template: "catalog",
+            template_config: null,
+          },
+        ]
         render(<StepperCheckoutFlow />)
         expect(screen.getByText("amanita-catalog")).toBeTruthy()
         expect(screen.queryByText("pass-step")).toBeNull()
         expect(screen.queryByText("dynamic-step")).toBeNull()
+      })
+
+      it("falls through to PassSelectionSection (not AmanitaCatalogSection) for a config-less amanita passes step", () => {
+        // Regression test (final-review fix): a `passes` step with no
+        // matching stepConfig must NOT be routed to AmanitaCatalogSection —
+        // that component dereferences `stepConfig.step_type`/
+        // `.template_config` and crashes on a null/undefined stepConfig.
+        cityOverride = AMANITA_CITY
+        availableStepsOverride = ["passes"]
+        stepConfigsOverride = []
+        expect(() => render(<StepperCheckoutFlow />)).not.toThrow()
+        expect(screen.queryByText("amanita-catalog")).toBeNull()
+        expect(screen.getByText("pass-step")).toBeTruthy()
       })
 
       it("routes a non-passes config-carrying product step to AmanitaCatalogSection for amanita", () => {
@@ -205,7 +234,7 @@ describe("StepperCheckoutFlow", () => {
       beforeEach(() => {
         cityOverride = AMANITA_CITY
         availableStepsOverride = ["faqs", "passes"]
-        stepConfigsOverride = [FAQS_STEP_CONFIG]
+        stepConfigsOverride = [FAQS_STEP_CONFIG, PASSES_STEP_CONFIG]
       })
 
       it("excludes the faqs step from the linear pills/sections and shows a separate FAQs pill", () => {
