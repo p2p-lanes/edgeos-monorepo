@@ -82,6 +82,7 @@ interface PopupFormProps {
 const POPUP_STATUSES = [
   { value: "draft", label: "Draft" },
   { value: "active", label: "Active" },
+  { value: "ended", label: "Ended" },
 ] as const
 
 const AVAILABLE_LANGUAGES = [
