@@ -1174,6 +1174,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 installment_interval_count=popup.installments_interval_count,
                 user_email=buyer.email,
                 plan_name=popup.name,
+                success_behavior=popup.simplefi_success_behavior,
             )
 
             payment.external_id = simplefi_response.id
@@ -1507,6 +1508,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 portal_base_override=portal_base,
                 success_path=success_path,
                 cancel_path=cancel_path,
+                success_behavior=popup.simplefi_success_behavior,
             )
             logger.info(
                 "SimpleFI application fee payment created: application_id={} external_id={} provider_status={} checkout_url={}",
@@ -2454,6 +2456,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 installment_interval_count=popup.installments_interval_count,
                 user_email=application.human.email if application.human else None,
                 plan_name=popup.name,
+                success_behavior=popup.simplefi_success_behavior,
             )
             logger.info(
                 "SimpleFI pass payment created: application_id={} external_id={} provider_status={} checkout_url={} is_installment_plan={}",
