@@ -278,6 +278,7 @@
     },
     "coupon_no_longer_valid": "This coupon is no longer available. Your total has been updated. Please review and try again.",
     "payment_error": "Something went wrong with your payment. Please try again.",
+    "popup_ended_error": "Este popup ha finalizado. Las compras ya no están disponibles.",
     "no_products": "No hay productos disponibles para este paso.",
     "no_images": "No hay imágenes disponibles para este paso.",
     "no_video": "No hay video disponible para este paso.",
