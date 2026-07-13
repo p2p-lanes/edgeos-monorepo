@@ -128,6 +128,8 @@ class BuyerInfo(BaseModel):
     email: EmailStr
     first_name: str
     last_name: str
+    phone: str | None = None
+    phone_country: str | None = None
     form_data: dict[str, Any] = {}
 
 

@@ -751,6 +751,8 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             tenant_id=tenant.id,
             default_first_name=obj.buyer.first_name,
             default_last_name=obj.buyer.last_name,
+            default_phone=obj.buyer.phone,
+            default_phone_country=obj.buyer.phone_country,
         )
 
         self._validate_open_ticketing_form_data(popup, obj.buyer.form_data)

@@ -1171,3 +1171,47 @@ def test_purchase_one_shot_when_installments_deadline_too_close(
     assert payment is not None
     assert payment.is_installment_plan is False
     assert payment.installments_paid is None
+
+
+def test_purchase_persists_buyer_phone_on_human(
+    client: TestClient,
+    db: Session,
+    tenant_a: Tenants,
+) -> None:
+    """The WhatsApp phone from the buyer payload lands on the Humans row."""
+    from app.api.human.models import Humans
+
+    popup = _make_popup(db, tenant_a, slug_prefix="phone")
+    product = _make_product(db, popup, price="100.00")
+    db.commit()
+
+    with patch("app.services.simplefi.get_simplefi_client") as mock_get_client:
+        mock_get_client.return_value.create_payment.return_value = SimpleNamespace(
+            id="sf_phone_1",
+            status="pending",
+            checkout_url="https://simplefi.test/checkout/phone",
+            is_installment_plan=False,
+        )
+        response = client.post(
+            f"/api/v1/checkout/{popup.slug}/purchase",
+            json={
+                "products": [{"product_id": str(product.id), "quantity": 1}],
+                "buyer": {
+                    "email": "wa-buyer@test.com",
+                    "first_name": "Ana",
+                    "last_name": "Diaz",
+                    "phone": "1122334455",
+                    "phone_country": "AR",
+                    "form_data": {},
+                },
+            },
+            headers={"X-Tenant-Id": str(tenant_a.id)},
+        )
+
+    assert response.status_code == 200, response.text
+    human = db.exec(
+        select(Humans).where(Humans.email == "wa-buyer@test.com")
+    ).first()
+    assert human is not None
+    assert human.phone == "1122334455"
+    assert human.phone_country == "AR"
