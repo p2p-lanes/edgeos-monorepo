@@ -1,5 +1,3 @@
-import Image from "next/image"
-import { imageOptimization } from "@/lib/image-optimization"
 import { Stars } from "./Stars"
 
 /**
@@ -8,39 +6,29 @@ import { Stars } from "./Stars"
  *
  * Ported from the `<div aria-hidden className="fixed inset-0 z-0">` block in
  * checkout-amanita/codigo/checkout/CheckoutExperience.tsx. The mockup's
- * `<picture>`/`<source media="(max-width: 767px)">` art direction (mobile
- * vs. desktop crop) doesn't have a next/image equivalent, so it's
- * reproduced with two `fill` Image elements toggled via the same `md:`
- * breakpoint Tailwind/next.js use by default (768px), matching the
- * mockup's 767px cutoff.
+ * art-directed `<picture>`/`<source media="(max-width: 767px)">` swap
+ * (mobile vs. desktop crop) is reproduced verbatim with a native
+ * `<picture>` + plain `<img>` rather than two `next/image` elements: two
+ * `fill` Images toggled via `md:` classes both got `priority`, so the
+ * browser preloaded/downloaded BOTH crops on every viewport. A `<picture>`
+ * only ever fetches the one matching source, so this is both simpler and
+ * avoids the double download — a legitimate use of raw `<img>` for a
+ * decorative, full-bleed, art-directed background image.
  */
 export function AmanitaBackground() {
   return (
     <div aria-hidden className="fixed inset-0 z-0">
-      <div className="absolute inset-0 md:hidden">
-        <Image
-          src="/checkout-skins/amanita/artist-hero-bg-mobile.webp"
-          alt=""
-          fill
-          priority
-          sizes="100vw"
-          className="object-cover"
-          {...imageOptimization(
-            "/checkout-skins/amanita/artist-hero-bg-mobile.webp",
-          )}
+      <picture>
+        <source
+          media="(max-width: 767px)"
+          srcSet="/checkout-skins/amanita/artist-hero-bg-mobile.webp"
         />
-      </div>
-      <div className="absolute inset-0 hidden md:block">
-        <Image
+        <img
           src="/checkout-skins/amanita/artist-hero-bg.webp"
           alt=""
-          fill
-          priority
-          sizes="100vw"
-          className="object-cover"
-          {...imageOptimization("/checkout-skins/amanita/artist-hero-bg.webp")}
+          className="absolute inset-0 h-full w-full object-cover"
         />
-      </div>
+      </picture>
       <div
         className="absolute inset-0"
         style={{

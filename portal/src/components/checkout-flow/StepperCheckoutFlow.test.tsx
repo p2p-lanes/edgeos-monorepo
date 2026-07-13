@@ -4,10 +4,21 @@ import StepperCheckoutFlow from "./StepperCheckoutFlow"
 
 const submitPayment = vi.fn().mockResolvedValue({ success: true })
 
+let cityOverride: Record<string, unknown> | null = null
+
 vi.mock("next/navigation", () => ({
   useParams: () => ({ popupSlug: "popup-a" }),
   useSearchParams: () => new URLSearchParams(),
   useRouter: () => ({ replace: vi.fn() }),
+}))
+
+// next/font/google relies on the Next.js SWC compiler plugin and throws
+// when imported through plain Vite/Vitest — stub it with the shape
+// StepperCheckoutFlow/fonts.ts actually reads (`.variable`).
+vi.mock("next/font/google", () => ({
+  Amarante: () => ({ variable: "--font-amanita-display" }),
+  Oswald: () => ({ variable: "--font-amanita-condensed" }),
+  Quicksand: () => ({ variable: "--font-amanita-sans" }),
 }))
 
 vi.mock("@/providers/checkoutProvider", () => ({
@@ -26,7 +37,7 @@ vi.mock("@/providers/checkoutProvider", () => ({
 
 vi.mock("@/providers/cityProvider", () => ({
   useCityProvider: () => ({
-    getCity: () => ({ terms_and_conditions_url: null }),
+    getCity: () => cityOverride ?? { terms_and_conditions_url: null },
   }),
 }))
 
@@ -55,7 +66,10 @@ vi.mock("@/components/ui/Loader", () => ({ Loader: () => <div>loading</div> }))
 vi.mock("@/types/checkout", () => ({ formatCurrency: (n: number) => `$${n}` }))
 
 describe("StepperCheckoutFlow", () => {
-  beforeEach(() => submitPayment.mockClear())
+  beforeEach(() => {
+    submitPayment.mockClear()
+    cityOverride = null
+  })
 
   it("renders only the first section initially", () => {
     render(<StepperCheckoutFlow />)
@@ -74,5 +88,21 @@ describe("StepperCheckoutFlow", () => {
     fireEvent.click(screen.getByTestId("stepper-next")) // → confirm (last)
     fireEvent.click(screen.getByTestId("stepper-next")) // → pay
     await waitFor(() => expect(submitPayment).toHaveBeenCalledTimes(1))
+  })
+
+  describe("skin", () => {
+    it("applies the checkout-amanita wrapper class when the popup's skin is amanita", () => {
+      cityOverride = {
+        terms_and_conditions_url: null,
+        theme_config: { checkout_skin: "amanita" },
+      }
+      const { container } = render(<StepperCheckoutFlow />)
+      expect(container.querySelector(".checkout-amanita")).toBeTruthy()
+    })
+
+    it("does not apply the checkout-amanita wrapper class for the default skin", () => {
+      const { container } = render(<StepperCheckoutFlow />)
+      expect(container.querySelector(".checkout-amanita")).toBeNull()
+    })
   })
 })
