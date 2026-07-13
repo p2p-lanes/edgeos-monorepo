@@ -18,6 +18,7 @@ import type { ScrollyCheckoutFlowProps } from "./ScrollyCheckoutFlow"
 import SectionHeader from "./SectionHeader"
 import { AmanitaBackground } from "./skins/amanita/AmanitaBackground"
 import AmanitaBuyerStep from "./skins/amanita/AmanitaBuyerStep"
+import AmanitaCatalogSection from "./skins/amanita/AmanitaCatalogSection"
 import AmanitaConfirmSection from "./skins/amanita/AmanitaConfirmSection"
 import "./skins/amanita/amanita-skin.css"
 import FaqsDrawer, { type FaqDrawerItem } from "./skins/amanita/FaqsDrawer"
@@ -276,6 +277,21 @@ export default function StepperCheckoutFlow({
       ) : (
         <ConfirmStep />
       )
+    // Amanita: route product steps (passes/tickets, or any other
+    // config-carrying step) to the pixel-perfect catalog card layout.
+    // Excludes `hero`/`faqs`-template steps: `hero` is a content-only,
+    // skin-agnostic template (Task 9, no products to catalog) that keeps
+    // rendering via DynamicProductStep below for both skins; `faqs` steps
+    // never reach here for Amanita since they're already filtered out of
+    // `sections` above (Task 10) and surfaced via the FAQs drawer instead.
+    const isContentOnlyTemplate =
+      config?.template === "hero" || config?.template === "faqs"
+    const isProductStep =
+      (stepType === "passes" || stepType === "tickets" || !!config) &&
+      !isContentOnlyTemplate
+    if (isProductStep && isAmanita) {
+      return <AmanitaCatalogSection stepConfig={config!} />
+    }
     if (stepType === "passes" || stepType === "tickets") {
       if (shouldUseDynamicStep(config ?? undefined)) {
         return (

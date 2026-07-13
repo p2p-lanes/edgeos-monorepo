@@ -61,6 +61,9 @@ vi.mock("./steps/OpenCheckoutBuyerStep", () => ({
 vi.mock("./skins/amanita/AmanitaBuyerStep", () => ({
   default: () => <div>amanita-buyer-step</div>,
 }))
+vi.mock("./skins/amanita/AmanitaCatalogSection", () => ({
+  default: () => <div>amanita-catalog</div>,
+}))
 vi.mock("./steps/ConfirmStep", () => ({
   default: () => <div>confirm-step</div>,
 }))
@@ -148,6 +151,56 @@ describe("StepperCheckoutFlow", () => {
       expect(screen.queryByText("amanita-buyer-step")).toBeNull()
     })
 
+    describe("product steps", () => {
+      it("routes a passes/tickets product step to AmanitaCatalogSection for amanita", () => {
+        cityOverride = AMANITA_CITY
+        render(<StepperCheckoutFlow />)
+        expect(screen.getByText("amanita-catalog")).toBeTruthy()
+        expect(screen.queryByText("pass-step")).toBeNull()
+        expect(screen.queryByText("dynamic-step")).toBeNull()
+      })
+
+      it("routes a non-passes config-carrying product step to AmanitaCatalogSection for amanita", () => {
+        cityOverride = AMANITA_CITY
+        availableStepsOverride = ["housing", "confirm"]
+        stepConfigsOverride = [
+          {
+            id: "housing-config-1",
+            step_type: "housing",
+            title: "Housing",
+            template: "housing-date",
+            template_config: null,
+          },
+        ]
+        render(<StepperCheckoutFlow />)
+        expect(screen.getByText("amanita-catalog")).toBeTruthy()
+        expect(screen.queryByText("dynamic-step")).toBeNull()
+      })
+
+      it("keeps hero-template steps on DynamicProductStep for amanita (not the catalog)", () => {
+        cityOverride = AMANITA_CITY
+        availableStepsOverride = ["housing", "confirm"]
+        stepConfigsOverride = [
+          {
+            id: "hero-config-1",
+            step_type: "housing",
+            title: "Hero",
+            template: "hero",
+            template_config: null,
+          },
+        ]
+        render(<StepperCheckoutFlow />)
+        expect(screen.getByText("dynamic-step")).toBeTruthy()
+        expect(screen.queryByText("amanita-catalog")).toBeNull()
+      })
+
+      it("keeps the default skin's product-step rendering unchanged (no AmanitaCatalogSection)", () => {
+        render(<StepperCheckoutFlow />)
+        expect(screen.getByText("pass-step")).toBeTruthy()
+        expect(screen.queryByText("amanita-catalog")).toBeNull()
+      })
+    })
+
     describe("FAQs global drawer (amanita only)", () => {
       beforeEach(() => {
         cityOverride = AMANITA_CITY
@@ -159,8 +212,10 @@ describe("StepperCheckoutFlow", () => {
         render(<StepperCheckoutFlow />)
         // the faqs step is not a linear step: no pill carries its title verbatim
         expect(screen.queryByText("FAQs", { selector: "button" })).toBeNull()
-        // the pass step (next in line) renders immediately, active index 0
-        expect(screen.getByText("pass-step")).toBeTruthy()
+        // the pass step (next in line) renders immediately, active index 0 —
+        // routed to the Amanita catalog (Task 12) since this describe block
+        // runs under the amanita skin
+        expect(screen.getByText("amanita-catalog")).toBeTruthy()
         // the dedicated FAQs pill exists instead
         expect(
           screen.getByRole("button", {

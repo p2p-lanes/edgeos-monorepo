@@ -17,7 +17,9 @@ export function SectionShell({
   children,
 }: {
   gem: GemVariant
-  kicker: string
+  /** Optional — omitted (no `<p>` rendered) when there's no distinct kicker
+   *  copy, so callers never fall back to repeating `title` as the kicker. */
+  kicker?: string
   title: string
   intro?: string
   children: ReactNode
@@ -26,9 +28,11 @@ export function SectionShell({
     <section className="ck-section pt-2">
       <Gem variant={gem} />
       <div className="mt-5 text-center">
-        <p className="font-condensed text-xs font-medium uppercase tracking-[0.22em] text-sand md:text-sm">
-          {kicker}
-        </p>
+        {kicker && (
+          <p className="font-condensed text-xs font-medium uppercase tracking-[0.22em] text-sand md:text-sm">
+            {kicker}
+          </p>
+        )}
         <h2
           className="mt-1.5 font-display uppercase leading-tight text-cream"
           style={{ fontSize: "clamp(1.7rem,4.6vw,2.4rem)" }}

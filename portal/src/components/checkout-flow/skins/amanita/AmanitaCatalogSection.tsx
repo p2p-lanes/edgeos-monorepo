@@ -330,6 +330,14 @@ export default function AmanitaCatalogSection({
     categoryBySectionKey,
   )
 
+  // Task 12 review fix: SectionShell's `kicker` used to be bound to the same
+  // `stepConfig.title` as `title`, duplicating the text visually. Prefer a
+  // distinct `template_config.kicker` string, else fall back to the step's
+  // `watermark`, else omit the kicker entirely rather than repeat the title.
+  const templateKicker =
+    typeof templateConfig?.kicker === "string" ? templateConfig.kicker : null
+  const kicker = templateKicker ?? stepConfig.watermark ?? undefined
+
   const handleInc = (row: TicketRowVM) => {
     view.setRowQuantity(
       OPEN_CHECKOUT_ATTENDEE_ID,
@@ -351,7 +359,7 @@ export default function AmanitaCatalogSection({
   return (
     <SectionShell
       gem={gem}
-      kicker={stepConfig.title}
+      kicker={kicker}
       title={stepConfig.title}
       intro={stepConfig.description ?? undefined}
     >
