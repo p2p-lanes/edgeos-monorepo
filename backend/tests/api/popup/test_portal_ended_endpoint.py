@@ -8,6 +8,7 @@ popups while non-participants must not.
 """
 
 import uuid
+from datetime import datetime
 
 from fastapi.testclient import TestClient
 from sqlmodel import Session
@@ -35,6 +36,12 @@ def _make_popup(
         sale_type="application",
         status=status,
         currency="USD",
+        # Far-future start_date so this popup sorts to the top of its status
+        # group (list_portal_popups orders start_date DESC NULLS LAST and caps
+        # at limit=100). The session-scoped test DB accumulates >100 active
+        # popups across the full suite; without a start_date this popup would
+        # sort last (NULLS LAST) and fall outside the top-100 window in CI.
+        start_date=datetime(2999, 1, 1),
     )
     db.add(popup)
     db.commit()
