@@ -164,7 +164,10 @@ export default function ScrollySectionNav({
 
   return (
     <div data-snap-nav className="sticky top-0 z-20">
-      <div className="bg-checkout-navbar-bg/85 px-2.5 py-1.5 backdrop-blur-xl">
+      <div
+        className="bg-checkout-navbar-bg/85 px-2.5 py-1.5 backdrop-blur-xl"
+        style={{ backgroundImage: "var(--checkout-navbar-image, none)" }}
+      >
         <div className="flex items-center gap-1.5">
           {brandLogoUrl ? (
             <Image
@@ -184,7 +187,7 @@ export default function ScrollySectionNav({
             <div
               ref={trackRef}
               className={cn(
-                "relative overflow-x-auto rounded-xl border border-white/10 bg-checkout-badge-bg-disabled/60 p-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+                "relative overflow-x-auto rounded-xl border border-checkout-navbar-border bg-checkout-badge-bg-disabled/60 p-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
                 // Expanded: the bar hugs the centred tab group, so the sides
                 // show the page background instead of an empty track. Compact:
                 // fill the row so equal-width icon tabs distribute.
@@ -246,7 +249,7 @@ export default function ScrollySectionNav({
                         <motion.div
                           aria-hidden
                           layoutId="checkout-nav-active-pill"
-                          className="pointer-events-none absolute inset-0 -z-10 bg-checkout-badge-bg shadow-sm"
+                          className="pointer-events-none absolute inset-0 -z-10 bg-checkout-badge-bg border border-checkout-badge-border shadow-sm"
                           // Style (not a class) so framer can scale-correct the
                           // corners while the pill morphs between tabs.
                           style={{ borderRadius: 8 }}

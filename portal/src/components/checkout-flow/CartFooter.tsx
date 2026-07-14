@@ -241,7 +241,7 @@ export default function CartFooter({
 
       {/* Floating Footer */}
       <div className="mb-4">
-        <div className="backdrop-blur-xl bg-checkout-bottom-bar-bg rounded-2xl shadow-2xl border border-white/10 p-3 lg:p-4">
+        <div className="backdrop-blur-xl bg-checkout-bottom-bar-bg rounded-2xl shadow-2xl border border-checkout-bottom-bar-border p-3 lg:p-4">
           <div className="flex items-center gap-2 lg:gap-3">
             {/* Back button — hidden on the first step when there's no upstream onBack handler */}
             {(!isFirstStep || onBack) && (
@@ -271,7 +271,7 @@ export default function CartFooter({
             >
               <div className="flex flex-col items-start min-w-0 overflow-hidden">
                 <div className="flex items-center gap-1.5">
-                  <span className="text-[10px] lg:text-xs text-checkout-bottom-bar-text/60 uppercase tracking-wider font-medium">
+                  <span className="text-[10px] lg:text-xs text-checkout-bottom-bar-accent uppercase tracking-wider font-medium">
                     {isEditing ? t("checkout.to_pay") : t("common.total")}
                   </span>
                   {cartUiEnabled &&
@@ -306,7 +306,7 @@ export default function CartFooter({
               className={cn(
                 "flex items-center justify-center gap-1.5 lg:gap-2 px-3 lg:px-6 py-3 lg:py-3.5 rounded-xl text-sm font-semibold transition-all shrink-0 whitespace-nowrap",
                 !isHardDisabled
-                  ? "bg-checkout-button text-checkout-button-title shadow-lg active:scale-95 hover:opacity-90"
+                  ? "bg-checkout-button text-checkout-button-title border border-checkout-button-border shadow-lg active:scale-95 hover:opacity-90"
                   : "bg-checkout-button-disabled text-checkout-button-title-disabled cursor-not-allowed",
               )}
             >
