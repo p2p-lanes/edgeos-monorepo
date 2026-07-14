@@ -140,6 +140,82 @@ function resolveSurfaceStyle(surface: TicketCardSurface): CSSProperties {
 }
 
 // ---------------------------------------------------------------------------
+// Showcase variant — bespoke horizontal card (pixel-copy of client mockup;
+// colours pulled from the theme surface, not hardcoded)
+// ---------------------------------------------------------------------------
+
+/** Round `+` (qty 0) or `− n +` pill (qty ≥ 1). Geometry copied from the
+ *  mockup's VariantRow; colours come from --primary / --accent. */
+export function ShowcaseStepper({
+  quantity,
+  max,
+  disabled,
+  onAdd,
+  onIncrement,
+  onDecrement,
+  label,
+}: {
+  quantity: number
+  max: number
+  disabled: boolean
+  onAdd: () => void
+  onIncrement: () => void
+  onDecrement: () => void
+  label: string
+}) {
+  const { t } = useTranslation()
+  const atMax = quantity >= max
+
+  if (quantity === 0) {
+    return (
+      <button
+        type="button"
+        aria-label={`${t("checkout.actions.add", { defaultValue: "Add" })} ${label}`}
+        onClick={onAdd}
+        disabled={disabled}
+        className={cn(
+          "flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-xl leading-none transition-all",
+          "bg-[color:var(--primary,theme(colors.foreground))] text-[color:var(--primary-foreground,theme(colors.background))]",
+          "hover:brightness-110 active:scale-[0.98]",
+          disabled && "cursor-not-allowed opacity-50",
+        )}
+      >
+        +
+      </button>
+    )
+  }
+
+  return (
+    <div className="flex shrink-0 items-center gap-0.5 rounded-full border border-[color:var(--primary,currentColor)]/35 bg-[color:var(--accent,currentColor)]/10 p-1">
+      <button
+        type="button"
+        aria-label={`${t("checkout.actions.remove", { defaultValue: "Remove" })} ${label}`}
+        onClick={onDecrement}
+        className="flex h-8 w-8 items-center justify-center rounded-full text-lg leading-none text-[color:var(--primary,currentColor)] transition-colors hover:bg-[color:var(--primary,currentColor)] hover:text-[color:var(--primary-foreground,white)]"
+      >
+        −
+      </button>
+      <span className="min-w-7 text-center text-base font-medium tabular-nums text-foreground">
+        {quantity}
+      </span>
+      <button
+        type="button"
+        aria-label={`${t("checkout.actions.add", { defaultValue: "Add" })} ${label}`}
+        onClick={onIncrement}
+        disabled={atMax}
+        className={cn(
+          "flex h-8 w-8 items-center justify-center rounded-full text-lg leading-none text-[color:var(--primary,currentColor)] transition-colors",
+          "hover:bg-[color:var(--primary,currentColor)] hover:text-[color:var(--primary-foreground,white)]",
+          atMax && "cursor-not-allowed opacity-40",
+        )}
+      >
+        +
+      </button>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // ProductRow — contract-aware (pass_system path uses TicketRowVM)
 // ---------------------------------------------------------------------------
 
