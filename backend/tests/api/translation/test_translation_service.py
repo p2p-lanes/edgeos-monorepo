@@ -11,7 +11,7 @@ from app.api.translation.service import (
     extract_translatable_leaves,
     parse_accept_language,
 )
-from app.services.ai_translation import _map_translation_response
+from app.services.ai_translation import _field_hint, _map_translation_response
 
 
 class TestParseAcceptLanguage:
@@ -137,6 +137,17 @@ class TestApplyTicketingStepOverlay:
             "label": "Passes",
         }
         assert result["template_config"]["footer_text"] == "Pie"
+
+
+class TestFieldHint:
+    def test_flat_key(self):
+        assert _field_hint("name") == "name"
+        assert _field_hint("help_text") == "help text"
+
+    def test_nested_key_drops_indices(self):
+        assert _field_hint("sections.0.label") == "sections label"
+        assert _field_hint("insurance.card_title") == "insurance card title"
+        assert _field_hint("items.3.question") == "items question"
 
 
 class TestMapTranslationResponse:
