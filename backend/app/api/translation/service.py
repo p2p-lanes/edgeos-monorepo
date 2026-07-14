@@ -119,6 +119,10 @@ _TEXT_LEAF_KEYS = frozenset(
         "card_subtitle",
         "toggle_label",
         "footer_text",
+        "question",
+        "answer",
+        "caption",
+        "html",
     }
 )
 _TEXT_LIST_KEYS = frozenset({"benefits"})

@@ -14,6 +14,10 @@ const TEXT_LEAF_KEYS = new Set([
   "card_subtitle",
   "toggle_label",
   "footer_text",
+  "question",
+  "answer",
+  "caption",
+  "html",
 ])
 
 // Keys holding an array of user-visible strings (each item is a leaf).
@@ -23,6 +27,8 @@ const MULTILINE_LEAF_KEYS = new Set([
   "description",
   "subtitle",
   "card_subtitle",
+  "answer",
+  "html",
 ])
 
 export interface ConfigLeaf {

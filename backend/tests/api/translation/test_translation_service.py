@@ -88,6 +88,18 @@ class TestExtractTranslatableLeaves:
             "footer_text": "Términos y condiciones",
         }
 
+    def test_faq_items_question_and_answer(self):
+        config = {
+            "variant": "accordion",
+            "items": [
+                {"id": "a", "question": "¿Otra duda?", "answer": "Escribinos"},
+            ],
+        }
+        assert extract_translatable_leaves(config) == {
+            "items.0.question": "¿Otra duda?",
+            "items.0.answer": "Escribinos",
+        }
+
     def test_ignores_non_text_and_blank_values(self):
         config = {"presets": [10, 20], "label": "  ", "minimum": 5}
         assert extract_translatable_leaves(config) == {}
