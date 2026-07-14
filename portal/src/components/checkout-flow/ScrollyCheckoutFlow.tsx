@@ -6,11 +6,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Loader } from "@/components/ui/Loader"
 import { readAndClearPendingPaymentRedirectState } from "@/hooks/usePaymentRedirect"
 import { useCheckout } from "@/providers/checkoutProvider"
+import { useCityProvider } from "@/providers/cityProvider"
 import CheckoutToast from "./CheckoutToast"
 import DynamicProductStep from "./DynamicProductStep"
+import { resolveNavVariant } from "./navVariant"
 import { shouldUseDynamicStep } from "./registries/stepRegistry"
 import type { WatermarkStyle } from "./ScrollySectionNav"
 import ScrollySectionNav from "./ScrollySectionNav"
+import ScrollyPillNav from "./ScrollyPillNav"
 import SectionHeader from "./SectionHeader"
 import SnapDotNav from "./SnapDotNav"
 import SnapFooter from "./SnapFooter"
@@ -74,6 +77,9 @@ function ScrollyCheckoutFlowInner({
     availableSteps[0] ?? "passes",
   )
   const scrollToIndexRef = useRef<((index: number) => void) | null>(null)
+
+  const { getCity } = useCityProvider()
+  const navVariant = resolveNavVariant(getCity()?.theme_config)
 
   const footerDesign = "pill" as const
   const watermarkStyle: WatermarkStyle = "bold"
@@ -450,9 +456,12 @@ function ScrollyCheckoutFlowInner({
 
   const lastSectionId = allSections[allSections.length - 1]?.id
 
+  const NavComponent =
+    navVariant === "pills" ? ScrollyPillNav : ScrollySectionNav
+
   return (
     <div className="relative font-sans">
-      <ScrollySectionNav
+      <NavComponent
         sections={navSections}
         activeSection={activeSection}
         onSectionClick={(sectionId) => {

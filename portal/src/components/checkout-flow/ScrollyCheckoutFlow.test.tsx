@@ -33,6 +33,14 @@ vi.mock("./ScrollySectionNav", () => ({
   default: () => <div>nav</div>,
 }))
 
+vi.mock("./ScrollyPillNav", () => ({
+  default: () => <div>pill-nav</div>,
+}))
+
+vi.mock("@/providers/cityProvider", () => ({
+  useCityProvider: () => ({ getCity: () => ({ theme_config: null }) }),
+}))
+
 vi.mock("./SectionHeader", () => ({
   default: () => <div>section-header</div>,
 }))
