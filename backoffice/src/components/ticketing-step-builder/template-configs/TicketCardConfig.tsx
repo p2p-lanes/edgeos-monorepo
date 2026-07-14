@@ -27,8 +27,8 @@ import {
 } from "./SortableSectionCard"
 import type { TemplateConfigProps } from "./types"
 
-/** Design variants for ticket-card. The portal also supports `tabs` and
- *  `compact`; the default is `stacked`. */
+/** Design variants for ticket-card. The portal also supports `tabs`,
+ *  `compact`, and `showcase`; the default is `stacked`. */
 const TICKET_CARD_VARIANTS = [
   {
     value: "stacked",
@@ -44,6 +44,11 @@ const TICKET_CARD_VARIANTS = [
     value: "compact",
     label: "Compact",
     description: "Image-less list view for many sections",
+  },
+  {
+    value: "showcase",
+    label: "Showcase",
+    description: "Horizontal card, image beside details",
   },
 ] as const
 
@@ -161,7 +166,7 @@ export function TicketCardConfig({
             How section cards are arranged in the checkout
           </p>
         </div>
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           {TICKET_CARD_VARIANTS.map((v) => {
             const isActive = variant === v.value
             return (
