@@ -54,21 +54,12 @@ export default function HomePasses() {
     }
   }, [access.state, isDirectSale, params.popupSlug, router])
 
-  useEffect(() => {
-    if (city?.status === "ended") {
-      router.replace(`/portal/${params.popupSlug}`)
-    }
-  }, [city?.status, params.popupSlug, router])
-
   // Show loader while access is being resolved (and, for non-direct popups,
   // while redirecting after denial).
   if (access.state === "loading") {
     return <Loader />
   }
   if (!isDirectSale && access.state === "denied") {
-    return <Loader />
-  }
-  if (city?.status === "ended") {
     return <Loader />
   }
 
