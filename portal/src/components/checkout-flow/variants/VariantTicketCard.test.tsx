@@ -60,4 +60,25 @@ describe("ShowcaseStepper", () => {
     fireEvent.click(plus)
     expect(inc).toBe(0)
   })
+
+  it("disables both pill buttons when disabled", () => {
+    let dec = 0
+    let inc = 0
+    render(
+      <ShowcaseStepper
+        quantity={2}
+        max={5}
+        disabled={true}
+        label="GA"
+        onAdd={() => {}}
+        onIncrement={() => { inc += 1 }}
+        onDecrement={() => { dec += 1 }}
+      />,
+    )
+    const btns = screen.getAllByRole("button")
+    fireEvent.click(btns[0])
+    fireEvent.click(btns[1])
+    expect(dec).toBe(0)
+    expect(inc).toBe(0)
+  })
 })

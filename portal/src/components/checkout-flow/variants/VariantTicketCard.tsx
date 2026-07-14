@@ -191,7 +191,11 @@ export function ShowcaseStepper({
         type="button"
         aria-label={`${t("checkout.actions.remove", { defaultValue: "Remove" })} ${label}`}
         onClick={onDecrement}
-        className="flex h-8 w-8 items-center justify-center rounded-full text-lg leading-none text-[color:var(--primary,currentColor)] transition-colors hover:bg-[color:var(--primary,currentColor)] hover:text-[color:var(--primary-foreground,white)]"
+        disabled={disabled}
+        className={cn(
+          "flex h-8 w-8 items-center justify-center rounded-full text-lg leading-none text-[color:var(--primary,currentColor)] transition-colors hover:bg-[color:var(--primary,currentColor)] hover:text-[color:var(--primary-foreground,white)]",
+          disabled && "cursor-not-allowed opacity-40",
+        )}
       >
         −
       </button>
@@ -202,11 +206,11 @@ export function ShowcaseStepper({
         type="button"
         aria-label={`${t("checkout.actions.add", { defaultValue: "Add" })} ${label}`}
         onClick={onIncrement}
-        disabled={atMax}
+        disabled={disabled || atMax}
         className={cn(
           "flex h-8 w-8 items-center justify-center rounded-full text-lg leading-none text-[color:var(--primary,currentColor)] transition-colors",
           "hover:bg-[color:var(--primary,currentColor)] hover:text-[color:var(--primary-foreground,white)]",
-          atMax && "cursor-not-allowed opacity-40",
+          (disabled || atMax) && "cursor-not-allowed opacity-40",
         )}
       >
         +
