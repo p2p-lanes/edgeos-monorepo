@@ -161,6 +161,31 @@ describe("ShowcaseProductRow", () => {
     expect(quantityChanged).toBe(0)
   })
 
+  it("renders a single add/remove toggle (not a stepper pill) when usesStepper is false and quantity >= 1", () => {
+    const row = makeRow({ usesStepper: false, quantity: 1 })
+    let toggled = 0
+    let quantityChanged = 0
+    render(
+      <ShowcaseProductRow
+        row={row}
+        attendeeId="attendee-1"
+        onToggle={() => {
+          toggled += 1
+        }}
+        onQuantityChange={() => {
+          quantityChanged += 1
+        }}
+      />,
+    )
+    const btns = screen.getAllByRole("button")
+    expect(btns).toHaveLength(1)
+    expect(screen.queryByText("−")).toBeNull()
+
+    fireEvent.click(btns[0])
+    expect(toggled).toBe(1)
+    expect(quantityChanged).toBe(0)
+  })
+
   it("renders the stepper pill when usesStepper is true", () => {
     const row = makeRow({ usesStepper: true, quantity: 1 })
     render(
