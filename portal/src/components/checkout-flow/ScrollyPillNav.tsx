@@ -29,8 +29,9 @@ const resolveIcon = (section: { id: string; template?: string | null }) =>
   resolveStepIcon({ stepType: section.id, template: section.template })
 
 // Pills nav variant — individually-bordered pills in a horizontally scrollable
-// row, matching the amanita mockup. Colors are theme-driven; business state
-// (complete / incomplete) mirrors ScrollySectionNav's segmented variant.
+// row (an alternative to the segmented ScrollySectionNav). Colors are
+// theme-driven; business state (complete / incomplete) mirrors
+// ScrollySectionNav's segmented variant.
 export default function ScrollyPillNav({
   sections,
   activeSection,
