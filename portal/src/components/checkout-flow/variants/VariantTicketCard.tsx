@@ -193,7 +193,7 @@ export function ShowcaseStepper({
         onClick={onDecrement}
         disabled={disabled}
         className={cn(
-          "flex h-8 w-8 items-center justify-center rounded-full text-lg leading-none text-[color:var(--primary,currentColor)] transition-colors hover:bg-[color:var(--primary,currentColor)] hover:text-[color:var(--primary-foreground,white)]",
+          "flex h-8 w-8 items-center justify-center rounded-full text-lg leading-none text-[color:var(--primary,currentColor)] transition-colors hover:bg-[color:var(--primary,currentColor)] hover:text-[color:var(--primary-foreground,theme(colors.background))]",
           disabled && "cursor-not-allowed opacity-40",
         )}
       >
@@ -209,7 +209,7 @@ export function ShowcaseStepper({
         disabled={disabled || atMax}
         className={cn(
           "flex h-8 w-8 items-center justify-center rounded-full text-lg leading-none text-[color:var(--primary,currentColor)] transition-colors",
-          "hover:bg-[color:var(--primary,currentColor)] hover:text-[color:var(--primary-foreground,white)]",
+          "hover:bg-[color:var(--primary,currentColor)] hover:text-[color:var(--primary-foreground,theme(colors.background))]",
           (disabled || atMax) && "cursor-not-allowed opacity-40",
         )}
       >
@@ -219,10 +219,48 @@ export function ShowcaseStepper({
   )
 }
 
+/** Single-select add/remove toggle for non-stepper products (full/month
+ *  passes): a round `+` that becomes a check once added. Mirrors the
+ *  usesStepper=false branch of the sibling rows, in the showcase style. */
+function ShowcaseAddToggle({
+  isAdded,
+  disabled,
+  onToggle,
+  label,
+}: {
+  isAdded: boolean
+  disabled: boolean
+  onToggle: () => void
+  label: string
+}) {
+  const { t } = useTranslation()
+  return (
+    <button
+      type="button"
+      aria-label={
+        isAdded
+          ? `${t("checkout.actions.remove", { defaultValue: "Remove" })} ${label}`
+          : `${t("checkout.actions.add", { defaultValue: "Add" })} ${label}`
+      }
+      onClick={onToggle}
+      disabled={disabled}
+      className={cn(
+        "flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-xl leading-none transition-all",
+        isAdded
+          ? "bg-[color:var(--accent,theme(colors.foreground))] text-[color:var(--primary-foreground,theme(colors.background))]"
+          : "bg-[color:var(--primary,theme(colors.foreground))] text-[color:var(--primary-foreground,theme(colors.background))] hover:brightness-110 active:scale-[0.98]",
+        disabled && "cursor-not-allowed opacity-50",
+      )}
+    >
+      {isAdded ? <Check className="size-5 stroke-[2.5]" /> : "+"}
+    </button>
+  )
+}
+
 /** One price line: label + price stacked on the left, ShowcaseStepper on the
  *  right, separated from the previous row by a top border. Geometry copied
  *  from the mockup's VariantRow. Purchased/disabled states come from the VM. */
-function ShowcaseProductRow({
+export function ShowcaseProductRow({
   row,
   attendeeId,
   onToggle,
@@ -244,6 +282,7 @@ function ShowcaseProductRow({
 
   const isPurchasedLocked = row.purchased && !row.editedForCredit
   const rowDisabled = row.disabled || isPurchasedLocked
+  const isAdded = row.selected || quantity > 0
   // Blocked rows stay removable: cart quantity must remain decrementable.
   const stepper = resolveBlockedStepperProps({
     blocked: row.disabled,
@@ -282,7 +321,7 @@ function ShowcaseProductRow({
         <div className="flex h-10 w-10 shrink-0 items-center justify-center text-[color:var(--accent,currentColor)]">
           <Check className="size-5 stroke-[2.5]" />
         </div>
-      ) : (
+      ) : row.usesStepper ? (
         <ShowcaseStepper
           quantity={quantity}
           max={stepper.max}
@@ -295,6 +334,13 @@ function ShowcaseProductRow({
           onDecrement={() =>
             onQuantityChange(attendeeId, product, Math.max(0, quantity - 1))
           }
+        />
+      ) : (
+        <ShowcaseAddToggle
+          isAdded={isAdded}
+          disabled={rowDisabled && !isAdded}
+          label={product.name}
+          onToggle={() => onToggle(attendeeId, product)}
         />
       )}
     </div>
