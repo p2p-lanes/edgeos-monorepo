@@ -11,6 +11,7 @@ from app.api.translation.service import (
     extract_translatable_leaves,
     parse_accept_language,
 )
+from app.services.ai_translation import _map_translation_response
 
 
 class TestParseAcceptLanguage:
@@ -124,3 +125,23 @@ class TestApplyTicketingStepOverlay:
             "label": "Passes",
         }
         assert result["template_config"]["footer_text"] == "Pie"
+
+
+class TestMapTranslationResponse:
+    def test_tokens_map_back_to_real_keys(self):
+        real_by_token = {"t0": "title", "t1": "sections.0.label"}
+        raw = {"t0": "Accommodation", "t1": "Camping right"}
+        assert _map_translation_response(raw, real_by_token) == {
+            "title": "Accommodation",
+            "sections.0.label": "Camping right",
+        }
+
+    def test_unknown_tokens_are_dropped(self):
+        assert _map_translation_response({"t9": "x"}, {"t0": "title"}) == {}
+
+    def test_nested_or_non_string_values_are_dropped(self):
+        # A model that ignored the opaque keys and nested its output must not
+        # leak structural objects back as translations.
+        raw = {"t0": {"sections": [{"label": "x"}]}, "t1": "Ok"}
+        real_by_token = {"t0": "sections.0.label", "t1": "title"}
+        assert _map_translation_response(raw, real_by_token) == {"title": "Ok"}
