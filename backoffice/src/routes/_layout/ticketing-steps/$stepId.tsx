@@ -641,6 +641,8 @@ function StepConfigContent({ stepId }: { stepId: string }) {
               title: step.title,
               description: step.description,
             }}
+            nestedField="template_config"
+            nestedSource={step.template_config}
             supportedLanguages={popup!.supported_languages!}
             defaultLanguage={popup!.default_language!}
           />

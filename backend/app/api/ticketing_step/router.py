@@ -12,8 +12,7 @@ from app.api.ticketing_step.schemas import (
     TicketingStepUpdate,
 )
 from app.api.translation.service import (
-    TRANSLATABLE_FIELDS,
-    apply_translation_overlay,
+    apply_ticketing_step_overlay,
     delete_translations_for_entity,
     get_translations_bulk,
     parse_accept_language,
@@ -49,9 +48,7 @@ async def list_portal_ticketing_steps(
     results = []
     for s in steps:
         data = TicketingStepPublic.model_validate(s).model_dump()
-        data = apply_translation_overlay(
-            data, translations_map.get(s.id), TRANSLATABLE_FIELDS["ticketing_step"]
-        )
+        data = apply_ticketing_step_overlay(data, translations_map.get(s.id))
         results.append(TicketingStepPublic.model_validate(data))
     return ListModel[TicketingStepPublic](
         results=results,

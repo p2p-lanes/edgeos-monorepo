@@ -1,4 +1,5 @@
 import uuid
+from typing import Any
 
 from sqlmodel import Session, select
 
@@ -76,6 +77,55 @@ def apply_translation_overlay(
     for field in translatable_fields:
         if field in translation:
             result[field] = translation[field]
+    return result
+
+
+def deep_merge_translation(source: Any, overlay: Any) -> Any:
+    """Recursively overlay translated text over a source structure.
+
+    Used for nested config such as a ticketing step's ``template_config``: the
+    translation stores a partial mirror holding only the translated text
+    leaves, and everything it omits (ids, prices, flags, icons) is preserved
+    from the source. Dicts merge key-wise, lists merge element-wise by index,
+    and a non-empty string leaf in the overlay replaces the source value.
+    """
+    if isinstance(source, dict) and isinstance(overlay, dict):
+        merged = dict(source)
+        for key, ov in overlay.items():
+            merged[key] = deep_merge_translation(source.get(key), ov)
+        return merged
+    if isinstance(source, list) and isinstance(overlay, list):
+        merged = list(source)
+        for index, ov in enumerate(overlay):
+            if index < len(merged):
+                merged[index] = deep_merge_translation(merged[index], ov)
+            else:
+                merged.append(ov)
+        return merged
+    if isinstance(overlay, str):
+        return overlay if overlay.strip() else source
+    return source
+
+
+def apply_ticketing_step_overlay(data: dict, translation: dict | None) -> dict:
+    """Overlay a ticketing step's translated flat fields and nested config.
+
+    Title/description use the flat overlay; ``template_config`` is deep-merged
+    so translated labels replace their source text while non-text config is
+    preserved. A no-op when ``translation`` is None.
+    """
+    if not translation:
+        return data
+    result = apply_translation_overlay(
+        data, translation, TRANSLATABLE_FIELDS["ticketing_step"]
+    )
+    config_overlay = translation.get("template_config")
+    source_config = result.get("template_config")
+    if isinstance(config_overlay, dict) and isinstance(source_config, dict):
+        result = dict(result)
+        result["template_config"] = deep_merge_translation(
+            source_config, config_overlay
+        )
     return result
 
 

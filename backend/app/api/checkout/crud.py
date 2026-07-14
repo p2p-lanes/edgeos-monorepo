@@ -25,6 +25,7 @@ from app.api.ticketing_step.models import TicketingSteps
 from app.api.ticketing_step.schemas import TicketingStepPublic
 from app.api.translation.service import (
     TRANSLATABLE_FIELDS,
+    apply_ticketing_step_overlay,
     apply_translation_overlay,
     get_translations_bulk,
     get_translations_for_entity,
@@ -166,9 +167,7 @@ def runtime_for_slug(
 
     def _step(step: TicketingSteps) -> TicketingStepPublic:
         data = TicketingStepPublic.model_validate(step).model_dump()
-        data = apply_translation_overlay(
-            data, step_translations.get(step.id), TRANSLATABLE_FIELDS["ticketing_step"]
-        )
+        data = apply_ticketing_step_overlay(data, step_translations.get(step.id))
         return TicketingStepPublic.model_validate(data)
 
     return CheckoutRuntimeResponse(
