@@ -232,7 +232,11 @@ function ShowcaseProductRow({
   row: TicketRowVM
   attendeeId: string
   onToggle: (attendeeId: string, product: ProductsPass) => void
-  onQuantityChange: (attendeeId: string, product: ProductsPass, qty: number) => void
+  onQuantityChange: (
+    attendeeId: string,
+    product: ProductsPass,
+    qty: number,
+  ) => void
   isEditing?: boolean
 }) {
   const { t } = useTranslation()
@@ -285,7 +289,9 @@ function ShowcaseProductRow({
           disabled={stepper.disabled}
           label={product.name}
           onAdd={() => onToggle(attendeeId, product)}
-          onIncrement={() => onQuantityChange(attendeeId, product, quantity + 1)}
+          onIncrement={() =>
+            onQuantityChange(attendeeId, product, quantity + 1)
+          }
           onDecrement={() =>
             onQuantityChange(attendeeId, product, Math.max(0, quantity - 1))
           }
@@ -320,7 +326,11 @@ function ShowcaseSectionCard({
   isEditing: boolean
   surface: TicketCardSurface
   onToggle: (attendeeId: string, product: ProductsPass) => void
-  onQuantityChange: (attendeeId: string, product: ProductsPass, qty: number) => void
+  onQuantityChange: (
+    attendeeId: string,
+    product: ProductsPass,
+    qty: number,
+  ) => void
 }) {
   if (rows.length === 0) return null
 
@@ -333,7 +343,9 @@ function ShowcaseSectionCard({
         <div
           className={cn(
             "relative w-full bg-muted md:aspect-auto md:w-[40%] md:shrink-0",
-            resolveAspectClass((imageAspect as SectionImageAspect) ?? defaultAspect),
+            resolveAspectClass(
+              (imageAspect as SectionImageAspect) ?? defaultAspect,
+            ),
           )}
         >
           <Image
@@ -1134,6 +1146,65 @@ function PassSystemTabsLayout({
   )
 }
 
+function PassSystemShowcaseLayout({
+  attendees,
+  configSections,
+  onToggle,
+  onQuantityChange,
+  surface,
+  imageAspect,
+  isEditing,
+}: PassSystemLayoutProps) {
+  const { t } = useTranslation()
+  const showAttendeeHeaders = attendees.length > 1
+
+  return (
+    <div className="space-y-8">
+      {attendees.map((attendee) => (
+        <div key={attendee.id}>
+          {showAttendeeHeaders && (
+            <div className="mx-auto mb-3 max-w-xl">
+              <h3 className="text-sm font-semibold text-foreground">
+                {attendee.name ||
+                  t("checkout.attendee_label", { defaultValue: "Attendee" })}
+              </h3>
+              {attendee.category && (
+                <p className="text-xs text-muted-foreground">
+                  {attendee.category}
+                </p>
+              )}
+            </div>
+          )}
+          <div className="mx-auto flex max-w-xl flex-col gap-6 md:gap-5">
+            {attendee.sections.map((vmSection) => {
+              const section = mergedSectionWithPresentation(
+                vmSection,
+                configSections,
+              )
+              return (
+                <ShowcaseSectionCard
+                  key={vmSection.key}
+                  label={section.label}
+                  imageUrl={section.image_url}
+                  imageAspect={section.image_aspect}
+                  defaultAspect={imageAspect}
+                  description={section.description}
+                  rows={section.rows}
+                  attendeeId={attendee.id}
+                  isEditing={isEditing}
+                  surface={surface}
+                  onToggle={onToggle}
+                  onQuantityChange={onQuantityChange}
+                />
+              )
+            })}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 // ---------------------------------------------------------------------------
 // Layouts — open checkout (flat, no attendee axis — identical to old behavior)
 // ---------------------------------------------------------------------------
@@ -1249,6 +1320,35 @@ function OpenCheckoutTabsLayout({
   )
 }
 
+function OpenCheckoutShowcaseLayout({
+  groups,
+  surface,
+  imageAspect,
+  onToggle,
+  onQuantityChange,
+}: OpenCheckoutLayoutProps) {
+  return (
+    <div className="mx-auto flex max-w-xl flex-col gap-6 md:gap-5">
+      {groups.map(({ section, rows }) => (
+        <ShowcaseSectionCard
+          key={section.key}
+          label={section.label}
+          imageUrl={section.image_url}
+          imageAspect={section.image_aspect}
+          defaultAspect={imageAspect}
+          description={section.description}
+          rows={rows}
+          attendeeId=""
+          isEditing={false}
+          surface={surface}
+          onToggle={onToggle}
+          onQuantityChange={onQuantityChange}
+        />
+      ))}
+    </div>
+  )
+}
+
 // ---------------------------------------------------------------------------
 // Main export
 // ---------------------------------------------------------------------------
@@ -1313,6 +1413,9 @@ export default function VariantTicketCard({
     if (variant === "tabs") {
       return <PassSystemTabsLayout {...layoutProps} />
     }
+    if (variant === "showcase") {
+      return <PassSystemShowcaseLayout {...layoutProps} />
+    }
     return <PassSystemStackedLayout {...layoutProps} />
   }
 
@@ -1373,6 +1476,9 @@ export default function VariantTicketCard({
   }
   if (variant === "tabs") {
     return <OpenCheckoutTabsLayout {...openLayoutProps} />
+  }
+  if (variant === "showcase") {
+    return <OpenCheckoutShowcaseLayout {...openLayoutProps} />
   }
   return <OpenCheckoutStackedLayout {...openLayoutProps} />
 }
