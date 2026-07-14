@@ -54,6 +54,7 @@ export function ThemePreview({
   activeTab,
   onTabChange,
   previewEvent,
+  navVariant = "segmented",
 }: ThemePreviewProps) {
   const [expanded, setExpanded] = useState(false)
 
@@ -149,6 +150,7 @@ export function ThemePreview({
             event={previewEvent}
             highlightedKeys={highlightedKeys}
             headingScale={headingScale}
+            navVariant={navVariant}
           >
             {tabContent}
           </PreviewProvider>
@@ -166,6 +168,7 @@ export function ThemePreview({
           event={previewEvent}
           highlightedKeys={highlightedKeys}
           headingScale={headingScale}
+          navVariant={navVariant}
         >
           {tabContent}
         </PreviewProvider>

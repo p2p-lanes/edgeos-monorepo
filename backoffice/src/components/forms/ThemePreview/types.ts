@@ -22,6 +22,7 @@ export interface ThemePreviewProps {
   activeTab: PreviewTab
   onTabChange: (tab: PreviewTab) => void
   previewEvent: PreviewEvent
+  navVariant?: "segmented" | "pills"
 }
 
 export interface ViewProps {

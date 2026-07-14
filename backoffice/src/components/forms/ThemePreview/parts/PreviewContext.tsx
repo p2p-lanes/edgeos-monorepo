@@ -5,6 +5,7 @@ interface PreviewContextValue {
   event: PreviewEvent
   highlightedKeys: Set<string>
   headingScale: number
+  navVariant: "segmented" | "pills"
 }
 
 const PreviewContext = createContext<PreviewContextValue | null>(null)
@@ -14,10 +15,11 @@ export function PreviewProvider({
   event,
   highlightedKeys,
   headingScale,
+  navVariant,
 }: PreviewContextValue & { children: ReactNode }) {
   const value = useMemo(
-    () => ({ event, highlightedKeys, headingScale }),
-    [event, highlightedKeys, headingScale],
+    () => ({ event, highlightedKeys, headingScale, navVariant }),
+    [event, highlightedKeys, headingScale, navVariant],
   )
   return (
     <PreviewContext.Provider value={value}>{children}</PreviewContext.Provider>

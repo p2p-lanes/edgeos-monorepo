@@ -12,11 +12,14 @@ export function PreviewCheckoutBottomBar() {
   return (
     <div
       className={cn(
-        "flex items-center gap-3 rounded-2xl px-3 py-3 shadow-2xl",
-        ringIf(isHl("checkout_bottom_bar_bg_color")),
+        "flex items-center gap-3 rounded-2xl border px-3 py-3 shadow-2xl",
+        ringIf(
+          isHl("checkout_bottom_bar_bg_color", "checkout_bottom_bar_border"),
+        ),
       )}
       style={{
         backgroundColor: "var(--checkout-bottom-bar-bg)",
+        borderColor: "var(--checkout-bottom-bar-border)",
         borderRadius: "calc(var(--radius) + 8px)",
       }}
     >
@@ -35,10 +38,10 @@ export function PreviewCheckoutBottomBar() {
       <div className="flex min-w-0 flex-1 flex-col">
         <span
           className={cn(
-            "text-[10px] font-medium uppercase tracking-wider opacity-60",
-            ringIf(isHl("checkout_bottom_bar_text_color")),
+            "text-[10px] font-medium uppercase tracking-wider",
+            ringIf(isHl("checkout_bottom_bar_accent_color")),
           )}
-          style={{ color: "var(--checkout-bottom-bar-text)" }}
+          style={{ color: "var(--checkout-bottom-bar-accent)" }}
         >
           Total
         </span>
@@ -57,11 +60,18 @@ export function PreviewCheckoutBottomBar() {
         tabIndex={-1}
         className={cn(
           "inline-flex shrink-0 items-center justify-center rounded-xl px-5 py-2.5 text-sm font-semibold shadow-lg",
-          ringIf(isHl("checkout_button_color", "checkout_button_title_color")),
+          ringIf(
+            isHl(
+              "checkout_button_color",
+              "checkout_button_title_color",
+              "checkout_button_border",
+            ),
+          ),
         )}
         style={{
           backgroundColor: "var(--checkout-button)",
           color: "var(--checkout-button-title)",
+          border: "1px solid var(--checkout-button-border)",
           borderRadius: "var(--radius)",
         }}
       >
