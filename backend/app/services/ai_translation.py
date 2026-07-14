@@ -9,6 +9,7 @@ LANGUAGE_NAMES: dict[str, str] = {
     "en": "English",
     "es": "Spanish (Latin America)",
     "zh": "Simplified Chinese",
+    "is": "Icelandic",
 }
 
 

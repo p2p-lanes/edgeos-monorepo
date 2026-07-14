@@ -174,7 +174,22 @@ function LanguageTab({
   }
 
   const handleAITranslated = (data: Record<string, string>) => {
-    setDraft((prev) => ({ ...prev, ...data }))
+    // The AI response mixes flat fields (title, description) with nested config
+    // leaf paths (sections.0.label). Route each key to its own draft.
+    const leafPaths = new Set(leaves.map((l) => l.path))
+    const flat: Record<string, string> = {}
+    const nested: Record<string, string> = {}
+    for (const [key, value] of Object.entries(data)) {
+      if (leafPaths.has(key)) {
+        nested[key] = value
+      } else {
+        flat[key] = value
+      }
+    }
+    setDraft((prev) => ({ ...prev, ...flat }))
+    if (Object.keys(nested).length > 0) {
+      setNestedDraft((prev) => ({ ...prev, ...nested }))
+    }
   }
 
   const formatFieldLabel = (field: string) =>

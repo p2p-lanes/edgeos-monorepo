@@ -107,6 +107,52 @@ def deep_merge_translation(source: Any, overlay: Any) -> Any:
     return source
 
 
+# Nested template_config keys whose value is user-visible copy. Kept in sync
+# with the backoffice extractor (components/translations/templateConfigLeaves.ts).
+_TEXT_LEAF_KEYS = frozenset(
+    {
+        "label",
+        "description",
+        "title",
+        "subtitle",
+        "card_title",
+        "card_subtitle",
+        "toggle_label",
+        "footer_text",
+    }
+)
+_TEXT_LIST_KEYS = frozenset({"benefits"})
+
+
+def extract_translatable_leaves(config: Any, prefix: str = "") -> dict[str, str]:
+    """Flatten a nested template_config into path -> source text.
+
+    Mirrors the backoffice leaf extractor: only known text keys are collected,
+    keyed by a dot/index path ("sections.0.label", "insurance.benefits.2"), so
+    the AI translator receives every visible string and nothing structural.
+    """
+    leaves: dict[str, str] = {}
+    if isinstance(config, list):
+        items: Any = enumerate(config)
+    elif isinstance(config, dict):
+        items = config.items()
+    else:
+        return leaves
+
+    for key, value in items:
+        path = f"{prefix}.{key}" if prefix else str(key)
+        if key in _TEXT_LEAF_KEYS and isinstance(value, str):
+            if value.strip():
+                leaves[path] = value
+        elif key in _TEXT_LIST_KEYS and isinstance(value, list):
+            for index, item in enumerate(value):
+                if isinstance(item, str) and item.strip():
+                    leaves[f"{path}.{index}"] = item
+        elif isinstance(value, (dict, list)):
+            leaves.update(extract_translatable_leaves(value, path))
+    return leaves
+
+
 def apply_ticketing_step_overlay(data: dict, translation: dict | None) -> dict:
     """Overlay a ticketing step's translated flat fields and nested config.
 
