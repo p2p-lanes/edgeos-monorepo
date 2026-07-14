@@ -20,6 +20,12 @@ export interface ThemeColors {
   checkout_bottom_bar_text_color?: string
   card_background_color?: string
   card_foreground_color?: string
+  checkout_navbar_bg_to?: string
+  checkout_navbar_border?: string
+  checkout_badge_border?: string
+  checkout_bottom_bar_border?: string
+  checkout_bottom_bar_accent_color?: string
+  checkout_button_border?: string
 }
 
 // Editable keys shown in the backoffice form. Anything else in
@@ -39,6 +45,12 @@ export const NEW_THEME_KEYS = [
   "checkout_bottom_bar_text_color",
   "card_background_color",
   "card_foreground_color",
+  "checkout_navbar_bg_to",
+  "checkout_navbar_border",
+  "checkout_badge_border",
+  "checkout_bottom_bar_border",
+  "checkout_bottom_bar_accent_color",
+  "checkout_button_border",
 ] as const
 
 export type NewThemeKey = (typeof NEW_THEME_KEYS)[number]
@@ -57,6 +69,12 @@ export const NEW_KEY_DEFAULTS: Record<NewThemeKey, string> = {
   checkout_bottom_bar_text_color: "",
   card_background_color: "",
   card_foreground_color: "",
+  checkout_navbar_bg_to: "",
+  checkout_navbar_border: "",
+  checkout_badge_border: "",
+  checkout_bottom_bar_border: "",
+  checkout_bottom_bar_accent_color: "",
+  checkout_button_border: "",
 }
 
 const LIGHT = {
@@ -101,6 +119,27 @@ export function computeThemeVars(
   // theme.
   if (colors.checkout_subtitle_color) {
     overrides["--checkout-subtitle"] = colors.checkout_subtitle_color
+  }
+  if (colors.checkout_navbar_bg_to) {
+    overrides["--checkout-navbar-bg-to"] = colors.checkout_navbar_bg_to
+    overrides["--checkout-navbar-image"] =
+      "linear-gradient(180deg, var(--checkout-navbar-bg), var(--checkout-navbar-bg-to))"
+  }
+  if (colors.checkout_navbar_border) {
+    overrides["--checkout-navbar-border"] = colors.checkout_navbar_border
+  }
+  if (colors.checkout_badge_border) {
+    overrides["--checkout-badge-border"] = colors.checkout_badge_border
+  }
+  if (colors.checkout_bottom_bar_border) {
+    overrides["--checkout-bottom-bar-border"] = colors.checkout_bottom_bar_border
+  }
+  if (colors.checkout_bottom_bar_accent_color) {
+    overrides["--checkout-bottom-bar-accent"] =
+      colors.checkout_bottom_bar_accent_color
+  }
+  if (colors.checkout_button_border) {
+    overrides["--checkout-button-border"] = colors.checkout_button_border
   }
 
   if (!colors.mode && !colors.primary_color) return overrides
@@ -194,6 +233,8 @@ export function computeThemeVars(
     vars["--step-card-fg"] = colors.card_foreground_color
   }
 
+  Object.assign(vars, overrides)
+
   return vars
 }
 
@@ -259,4 +300,10 @@ export const LEGACY_HIGHLIGHT_FROM_NEW: Record<string, string[]> = {
   checkout_bottom_bar_text: ["checkout_bottom_bar_text_color", "mode"],
   checkout_button: ["primary_color"],
   checkout_button_title: ["primary_foreground_color"],
+  checkout_navbar_bg_to: ["checkout_navbar_bg_to"],
+  checkout_navbar_border: ["checkout_navbar_border"],
+  checkout_badge_border: ["checkout_badge_border"],
+  checkout_bottom_bar_border: ["checkout_bottom_bar_border"],
+  checkout_bottom_bar_accent: ["checkout_bottom_bar_accent_color"],
+  checkout_button_border: ["checkout_button_border"],
 }
