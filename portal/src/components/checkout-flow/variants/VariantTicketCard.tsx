@@ -52,7 +52,7 @@ interface TicketCardSection {
   description?: string
 }
 
-type TicketCardVariant = "stacked" | "tabs" | "compact"
+type TicketCardVariant = "stacked" | "tabs" | "compact" | "showcase"
 
 /** Surface for the section card.
  *
@@ -101,11 +101,11 @@ function parseSections(
   return [...(raw as TicketCardSection[])].sort((a, b) => a.order - b.order)
 }
 
-function parseVariant(
+export function parseVariant(
   templateConfig: VariantProps["templateConfig"],
 ): TicketCardVariant {
   const v = templateConfig?.variant
-  if (v === "tabs" || v === "compact") return v
+  if (v === "tabs" || v === "compact" || v === "showcase") return v
   return "stacked"
 }
 
