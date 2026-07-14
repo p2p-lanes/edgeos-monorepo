@@ -5,6 +5,10 @@ import { OPTIMIZED_IMAGE_HOSTS } from "./src/lib/image-optimization"
 const nextConfig: NextConfig = {
   output: "standalone",
   outputFileTracingRoot: path.resolve(__dirname, ".."),
+  // CDN for /_next/static chunks (e.g. https://static.edgeos.world). One
+  // static domain serves every tenant custom domain, so immutable assets get
+  // edge caching without per-tenant certificates or DNS. Unset = same-origin.
+  assetPrefix: process.env.ASSET_PREFIX || undefined,
   transpilePackages: ["@edgeos/shared-form-ui", "@edgeos/shared-events"],
   env: {
     NEXT_PUBLIC_API_URL:
