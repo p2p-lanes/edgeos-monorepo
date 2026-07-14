@@ -51,6 +51,11 @@
   --color-checkout-watermark: var(--checkout-watermark);
   --color-checkout-subtitle: var(--checkout-subtitle);
   --color-checkout-navbar-bg: var(--checkout-navbar-bg);
+  --color-checkout-navbar-border: var(--checkout-navbar-border);
+  --color-checkout-badge-border: var(--checkout-badge-border);
+  --color-checkout-bottom-bar-border: var(--checkout-bottom-bar-border);
+  --color-checkout-bottom-bar-accent: var(--checkout-bottom-bar-accent);
+  --color-checkout-button-border: var(--checkout-button-border);
   --color-checkout-footer-bg: var(--checkout-footer-bg);
   --color-checkout-badge-bg: var(--checkout-badge-bg);
   --color-checkout-badge-title: var(--checkout-badge-title);
@@ -134,6 +139,12 @@
   --checkout-button: #ffffff;
   --checkout-button-title: #1e2a4d;
   --checkout-bottom-bar-text: #ffffff;
+  --checkout-navbar-image: none;
+  --checkout-navbar-border: rgba(255, 255, 255, 0.1);
+  --checkout-badge-border: transparent;
+  --checkout-bottom-bar-border: rgba(255, 255, 255, 0.1);
+  --checkout-bottom-bar-accent: color-mix(in srgb, var(--checkout-bottom-bar-text) 60%, transparent);
+  --checkout-button-border: transparent;
   /* Disabled states ride the neutral muted palette so contrast holds in
      both light and dark without depending on whatever brand color the
      admin set for the active state. */
@@ -208,6 +219,12 @@
   --checkout-button: oklch(0.985 0 0);
   --checkout-button-title: oklch(0.145 0 0);
   --checkout-bottom-bar-text: oklch(0.985 0 0);
+  --checkout-navbar-image: none;
+  --checkout-navbar-border: rgba(255, 255, 255, 0.1);
+  --checkout-badge-border: transparent;
+  --checkout-bottom-bar-border: rgba(255, 255, 255, 0.1);
+  --checkout-bottom-bar-accent: color-mix(in srgb, var(--checkout-bottom-bar-text) 60%, transparent);
+  --checkout-button-border: transparent;
   /* Same rationale as the light theme: disabled states ride the neutral
      muted palette for consistent contrast regardless of the admin's
      brand colors. */

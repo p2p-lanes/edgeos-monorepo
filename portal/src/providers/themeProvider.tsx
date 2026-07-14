@@ -61,6 +61,20 @@ interface ThemeColors {
    *  a dark popup with cream-on-teal cards. */
   card_background_color?: string
   card_foreground_color?: string
+  /** Bottom stop of the topbar gradient. When set, the navbar renders
+   *  linear-gradient(180deg, navbar_bg, navbar_bg_to) as an overlay image;
+   *  when unset the navbar stays a solid fill (current behavior). */
+  checkout_navbar_bg_to?: string
+  /** Border/hairline color of the pill track/container in the top nav. */
+  checkout_navbar_border?: string
+  /** Outline color of the active step pill. */
+  checkout_badge_border?: string
+  /** Border color of the floating bottom bar. */
+  checkout_bottom_bar_border?: string
+  /** Color of the "TOTAL" kicker label in the bottom bar. */
+  checkout_bottom_bar_accent_color?: string
+  /** Border color of the bottom-bar CTA button. */
+  checkout_button_border?: string
 }
 
 interface ThemeConfig {
@@ -104,7 +118,7 @@ const DARK = {
 const mix = (a: string, b: string, pctA: number): string =>
   `color-mix(in oklab, ${a} ${pctA}%, ${b} ${100 - pctA}%)`
 
-function computeThemeVars(
+export function computeThemeVars(
   colors: ThemeColors | undefined,
 ): Record<string, string> {
   if (!colors) return {}
@@ -118,6 +132,28 @@ function computeThemeVars(
   if (colors.checkout_navbar_bg) {
     vars["--checkout-navbar-bg"] = colors.checkout_navbar_bg
     vars["--checkout-nav-bg"] = colors.checkout_navbar_bg
+  }
+  if (colors.checkout_navbar_bg_to) {
+    vars["--checkout-navbar-bg-to"] = colors.checkout_navbar_bg_to
+    // A background-IMAGE gradient composited over the solid --checkout-navbar-bg
+    // color, so solid-only tenants are unaffected.
+    vars["--checkout-navbar-image"] =
+      "linear-gradient(180deg, var(--checkout-navbar-bg), var(--checkout-navbar-bg-to))"
+  }
+  if (colors.checkout_navbar_border) {
+    vars["--checkout-navbar-border"] = colors.checkout_navbar_border
+  }
+  if (colors.checkout_badge_border) {
+    vars["--checkout-badge-border"] = colors.checkout_badge_border
+  }
+  if (colors.checkout_bottom_bar_border) {
+    vars["--checkout-bottom-bar-border"] = colors.checkout_bottom_bar_border
+  }
+  if (colors.checkout_bottom_bar_accent_color) {
+    vars["--checkout-bottom-bar-accent"] = colors.checkout_bottom_bar_accent_color
+  }
+  if (colors.checkout_button_border) {
+    vars["--checkout-button-border"] = colors.checkout_button_border
   }
   if (colors.checkout_subtitle_color) {
     vars["--checkout-subtitle"] = colors.checkout_subtitle_color
