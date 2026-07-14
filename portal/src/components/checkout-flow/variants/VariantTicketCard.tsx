@@ -219,6 +219,168 @@ export function ShowcaseStepper({
   )
 }
 
+/** One price line: label + price stacked on the left, ShowcaseStepper on the
+ *  right, separated from the previous row by a top border. Geometry copied
+ *  from the mockup's VariantRow. Purchased/disabled states come from the VM. */
+function ShowcaseProductRow({
+  row,
+  attendeeId,
+  onToggle,
+  onQuantityChange,
+  isEditing = false,
+}: {
+  row: TicketRowVM
+  attendeeId: string
+  onToggle: (attendeeId: string, product: ProductsPass) => void
+  onQuantityChange: (attendeeId: string, product: ProductsPass, qty: number) => void
+  isEditing?: boolean
+}) {
+  const { t } = useTranslation()
+  const { product, quantity } = row
+
+  const isPurchasedLocked = row.purchased && !row.editedForCredit
+  const rowDisabled = row.disabled || isPurchasedLocked
+  // Blocked rows stay removable: cart quantity must remain decrementable.
+  const stepper = resolveBlockedStepperProps({
+    blocked: row.disabled,
+    locked: isPurchasedLocked,
+    quantity,
+    max: row.maxQuantity,
+  })
+
+  return (
+    <div
+      className={cn(
+        "flex items-center justify-between gap-3 border-t border-border py-3.5 md:py-3",
+        rowDisabled && "opacity-50",
+      )}
+    >
+      <div className="min-w-0">
+        <div className="flex min-w-0 items-center gap-2">
+          <p className="line-clamp-2 text-sm font-semibold leading-snug text-foreground">
+            {product.name}
+          </p>
+          <SaleStateBadge state={row.saleState} />
+        </div>
+        <p className="mt-0.5 text-lg leading-none tabular-nums text-[color:var(--primary,currentColor)]">
+          {formatCurrency(row.price)}
+        </p>
+        {isEditing && row.editedForCredit && (
+          <span className="mt-0.5 inline-flex items-center gap-1 text-[10px] font-medium text-[color:var(--accent,currentColor)]">
+            <CreditCard className="size-3" />
+            {t("checkout.actions.give_up_for_credit", {
+              defaultValue: "Give up for credit",
+            })}
+          </span>
+        )}
+      </div>
+      {isPurchasedLocked ? (
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center text-[color:var(--accent,currentColor)]">
+          <Check className="size-5 stroke-[2.5]" />
+        </div>
+      ) : (
+        <ShowcaseStepper
+          quantity={quantity}
+          max={stepper.max}
+          disabled={stepper.disabled}
+          label={product.name}
+          onAdd={() => onToggle(attendeeId, product)}
+          onIncrement={() => onQuantityChange(attendeeId, product, quantity + 1)}
+          onDecrement={() =>
+            onQuantityChange(attendeeId, product, Math.max(0, quantity - 1))
+          }
+        />
+      )}
+    </div>
+  )
+}
+
+/** Horizontal card: image left (40% on desktop, 16:9 on top for mobile),
+ *  title + expandable description + price rows on the right. */
+function ShowcaseSectionCard({
+  label,
+  imageUrl,
+  imageAspect,
+  defaultAspect,
+  description,
+  rows,
+  attendeeId,
+  isEditing,
+  surface,
+  onToggle,
+  onQuantityChange,
+}: {
+  label: string
+  imageUrl?: string
+  imageAspect?: string
+  defaultAspect?: SectionImageAspect
+  description?: string
+  rows: TicketRowVM[]
+  attendeeId: string
+  isEditing: boolean
+  surface: TicketCardSurface
+  onToggle: (attendeeId: string, product: ProductsPass) => void
+  onQuantityChange: (attendeeId: string, product: ProductsPass, qty: number) => void
+}) {
+  if (rows.length === 0) return null
+
+  return (
+    <article
+      style={resolveSurfaceStyle(surface)}
+      className="relative overflow-hidden rounded-2xl shadow-sm after:pointer-events-none after:absolute after:inset-0 after:rounded-2xl after:border after:border-border md:flex"
+    >
+      {imageUrl && (
+        <div
+          className={cn(
+            "relative w-full bg-muted md:aspect-auto md:w-[40%] md:shrink-0",
+            resolveAspectClass((imageAspect as SectionImageAspect) ?? defaultAspect),
+          )}
+        >
+          <Image
+            src={imageUrl}
+            alt={label}
+            fill
+            sizes="(max-width: 768px) 100vw, 320px"
+            quality={75}
+            className="object-cover"
+            priority={false}
+            {...imageOptimization(imageUrl)}
+          />
+        </div>
+      )}
+      <div className="p-5 md:min-w-0 md:flex-1">
+        <h3 className="text-xl uppercase leading-tight tracking-wide text-foreground">
+          {label}
+        </h3>
+        {description && (
+          <ExpandableDescription
+            text={description}
+            clamp={3}
+            className="mt-2 whitespace-pre-line text-sm leading-relaxed text-muted-foreground"
+            buttonClassName={cn(
+              "mt-2 inline-flex items-center text-xs font-medium uppercase tracking-[0.14em]",
+              "text-[color:var(--primary,currentColor)] underline underline-offset-4",
+              "transition-colors hover:text-[color:var(--accent,currentColor)]",
+            )}
+          />
+        )}
+        <div className="mt-4 md:mt-3">
+          {rows.map((row) => (
+            <ShowcaseProductRow
+              key={row.product.id}
+              row={row}
+              attendeeId={attendeeId}
+              isEditing={isEditing}
+              onToggle={onToggle}
+              onQuantityChange={onQuantityChange}
+            />
+          ))}
+        </div>
+      </div>
+    </article>
+  )
+}
+
 // ---------------------------------------------------------------------------
 // ProductRow — contract-aware (pass_system path uses TicketRowVM)
 // ---------------------------------------------------------------------------
