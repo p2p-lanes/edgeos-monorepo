@@ -19,19 +19,27 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL
 export async function fetchCheckoutRuntime(
   slug: string,
   tenantId: string,
+  lang?: string,
 ): Promise<CheckoutRuntimeResponse | null> {
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), 1500)
 
   try {
+    // Forward an explicit ?lang= deep link as Accept-Language so the SSR render
+    // is already translated. localStorage is not available server-side; the
+    // in-session switch path is covered by the client refetch on language change.
+    const headers: Record<string, string> = {
+      "X-Tenant-Id": tenantId,
+      Accept: "application/json",
+    }
+    if (lang) {
+      headers["Accept-Language"] = lang
+    }
     const res = await fetch(
       `${API_BASE}/api/v1/checkout/${encodeURIComponent(slug)}/runtime`,
       {
         cache: "no-store",
-        headers: {
-          "X-Tenant-Id": tenantId,
-          Accept: "application/json",
-        },
+        headers,
         signal: controller.signal,
       },
     )
