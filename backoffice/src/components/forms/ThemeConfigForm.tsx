@@ -52,6 +52,7 @@ interface ThemeConfig {
   radius?: string
   border_radius?: string
   checkout_background_contexts?: CheckoutBackgroundContext[]
+  checkout_nav_variant?: "segmented" | "pills"
   thank_you?: ThankYouConfig
 }
 
@@ -151,6 +152,9 @@ export function ThemeConfigForm({
   const [backgroundContexts, setBackgroundContexts] = useState<
     CheckoutBackgroundContext[]
   >(() => sanitizeContexts(themeConfig?.checkout_background_contexts))
+  const [navVariant, setNavVariant] = useState<"segmented" | "pills">(
+    themeConfig?.checkout_nav_variant === "pills" ? "pills" : "segmented",
+  )
   const [typographyExpanded, setTypographyExpanded] = useState(false)
   const [thankYouExpanded, setThankYouExpanded] = useState(false)
   const [thankYouEnabled, setThankYouEnabled] = useState(
@@ -216,6 +220,7 @@ export function ThemeConfigForm({
     setRadius("")
     setBorderRadius("")
     setBackgroundContexts([])
+    setNavVariant("segmented")
     setThankYouEnabled(false)
     setThankYou({})
   }
@@ -226,6 +231,7 @@ export function ThemeConfigForm({
     const hasRadius = !!radius
     const hasBorderRadius = !!borderRadius
     const hasBackgroundContexts = backgroundContexts.length > 0
+    const hasNavVariant = navVariant !== "segmented"
 
     const config: Record<string, unknown> | null =
       hasColors ||
@@ -233,6 +239,7 @@ export function ThemeConfigForm({
       hasRadius ||
       hasBorderRadius ||
       hasBackgroundContexts ||
+      hasNavVariant ||
       thankYouEnabled
         ? {
             ...(hasColors && { colors }),
@@ -249,6 +256,7 @@ export function ThemeConfigForm({
             ...(hasBackgroundContexts && {
               checkout_background_contexts: backgroundContexts,
             }),
+            ...(hasNavVariant && { checkout_nav_variant: navVariant }),
             ...(thankYouEnabled && {
               thank_you: buildThankYouConfig(thankYou),
             }),
@@ -271,6 +279,8 @@ export function ThemeConfigForm({
     radius !== (themeConfig?.radius ?? "") ||
     borderRadius !== (themeConfig?.border_radius ?? "") ||
     JSON.stringify(backgroundContexts) !== JSON.stringify(savedContexts) ||
+    navVariant !==
+      (themeConfig?.checkout_nav_variant === "pills" ? "pills" : "segmented") ||
     thankYouEnabled !== (themeConfig?.thank_you !== undefined) ||
     (thankYouEnabled &&
       JSON.stringify(buildThankYouConfig(thankYou)) !==
@@ -451,6 +461,86 @@ export function ThemeConfigForm({
               disabled={readOnly}
             />
             <ColorField
+              colorKey="checkout_navbar_bg_to"
+              label="Checkout navbar gradient (bottom)"
+              description="Optional bottom color of the checkout topbar gradient. Set it (e.g. a transparent version of the navbar color) to make the topbar fade; leave empty for a solid navbar."
+              value={colors.checkout_navbar_bg_to ?? ""}
+              defaultValue=""
+              onChange={(v) => handleColorChange("checkout_navbar_bg_to", v)}
+              onReset={() => handleResetColor("checkout_navbar_bg_to")}
+              onHover={handleHover}
+              isHighlighted={highlightedKeys.has("checkout_navbar_bg_to")}
+              disabled={readOnly}
+            />
+            <ColorField
+              colorKey="checkout_navbar_border"
+              label="Checkout navbar border"
+              description="Optional border/hairline color for the checkout top nav container. Leave empty for the default subtle line."
+              value={colors.checkout_navbar_border ?? ""}
+              defaultValue=""
+              onChange={(v) => handleColorChange("checkout_navbar_border", v)}
+              onReset={() => handleResetColor("checkout_navbar_border")}
+              onHover={handleHover}
+              isHighlighted={highlightedKeys.has("checkout_navbar_border")}
+              disabled={readOnly}
+            />
+            <ColorField
+              colorKey="checkout_badge_border"
+              label="Checkout active pill border"
+              description="Optional outline color for the active step pill in the checkout nav. Leave empty for no outline."
+              value={colors.checkout_badge_border ?? ""}
+              defaultValue=""
+              onChange={(v) => handleColorChange("checkout_badge_border", v)}
+              onReset={() => handleResetColor("checkout_badge_border")}
+              onHover={handleHover}
+              isHighlighted={highlightedKeys.has("checkout_badge_border")}
+              disabled={readOnly}
+            />
+            <ColorField
+              colorKey="checkout_bottom_bar_border"
+              label="Checkout footer border"
+              description="Optional border color for the floating bottom bar. Leave empty for the default subtle line."
+              value={colors.checkout_bottom_bar_border ?? ""}
+              defaultValue=""
+              onChange={(v) =>
+                handleColorChange("checkout_bottom_bar_border", v)
+              }
+              onReset={() => handleResetColor("checkout_bottom_bar_border")}
+              onHover={handleHover}
+              isHighlighted={highlightedKeys.has("checkout_bottom_bar_border")}
+              disabled={readOnly}
+            />
+            <ColorField
+              colorKey="checkout_bottom_bar_accent_color"
+              label="Checkout footer accent (Total)"
+              description='Optional color for the "Total" kicker label in the bottom bar. Leave empty to derive a muted version of the footer text color.'
+              value={colors.checkout_bottom_bar_accent_color ?? ""}
+              defaultValue=""
+              onChange={(v) =>
+                handleColorChange("checkout_bottom_bar_accent_color", v)
+              }
+              onReset={() =>
+                handleResetColor("checkout_bottom_bar_accent_color")
+              }
+              onHover={handleHover}
+              isHighlighted={highlightedKeys.has(
+                "checkout_bottom_bar_accent_color",
+              )}
+              disabled={readOnly}
+            />
+            <ColorField
+              colorKey="checkout_button_border"
+              label="Checkout button border"
+              description="Optional border color for the checkout CTA button. Leave empty for no border."
+              value={colors.checkout_button_border ?? ""}
+              defaultValue=""
+              onChange={(v) => handleColorChange("checkout_button_border", v)}
+              onReset={() => handleResetColor("checkout_button_border")}
+              onHover={handleHover}
+              isHighlighted={highlightedKeys.has("checkout_button_border")}
+              disabled={readOnly}
+            />
+            <ColorField
               colorKey="card_background_color"
               label="Checkout card background"
               description="Optional background for cards in the checkout (ticket cards, summary, insurance). Leave empty to use the mode's card surface."
@@ -486,6 +576,34 @@ export function ThemeConfigForm({
               isHighlighted={highlightedKeys.has("checkout_watermark_color")}
               disabled={readOnly}
             />
+          </div>
+
+          {/* Checkout nav layout */}
+          <div className="flex items-center justify-between rounded-md border bg-background px-3 py-2.5">
+            <div className="flex flex-col">
+              <Label className="text-sm font-medium">Checkout nav layout</Label>
+              <span className="text-[11px] text-muted-foreground">
+                Segmented control (default) or individually-bordered pills.
+              </span>
+            </div>
+            <div className="flex items-center gap-1 rounded-md border p-0.5">
+              {(["segmented", "pills"] as const).map((v) => (
+                <button
+                  key={v}
+                  type="button"
+                  onClick={() => setNavVariant(v)}
+                  disabled={readOnly}
+                  className={cn(
+                    "rounded px-3 py-1 text-xs font-medium capitalize transition-colors",
+                    navVariant === v
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  {v}
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Typography */}
@@ -559,6 +677,7 @@ export function ThemeConfigForm({
               highlightedKeys={highlightedKeys}
               activeTab={previewTab}
               onTabChange={setPreviewTab}
+              navVariant={navVariant}
               previewEvent={{
                 ...(previewEvent ?? EMPTY_PREVIEW_EVENT),
                 checkout_background_contexts: backgroundContexts,
