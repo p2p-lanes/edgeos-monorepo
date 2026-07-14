@@ -489,6 +489,7 @@
     "revoke_failed": "Failed to revoke API key",
     "scopes_label": "Permissions",
     "scopes_description": "New keys start with read-only access. Only enable broader permissions when you really need them.",
+    "ended_read_only_note": "This popup has ended, so new API keys can only have read access.",
     "scope": {
       "events_read": {
         "label": "Read events",
@@ -501,6 +502,10 @@
       "rsvp_write": {
         "label": "RSVP to events",
         "description": "Register or cancel attendance for events."
+      },
+      "venues_write": {
+        "label": "Manage own venues",
+        "description": "Create, edit, and delete venues you own."
       }
     }
   },
