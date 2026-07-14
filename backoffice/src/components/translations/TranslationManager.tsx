@@ -175,7 +175,9 @@ function LanguageTab({
 
   const handleAITranslated = (data: Record<string, string>) => {
     // The AI response mixes flat fields (title, description) with nested config
-    // leaf paths (sections.0.label). Route each key to its own draft.
+    // leaf paths (sections.0.label). Route each key to its own draft, and only
+    // fill blanks: a value the user already typed is never overwritten, so AI
+    // Translate completes what is missing instead of replacing manual work.
     const leafPaths = new Set(leaves.map((l) => l.path))
     const flat: Record<string, string> = {}
     const nested: Record<string, string> = {}
@@ -186,9 +188,22 @@ function LanguageTab({
         flat[key] = value
       }
     }
-    setDraft((prev) => ({ ...prev, ...flat }))
+
+    const fillBlanks =
+      (incoming: Record<string, string>) =>
+      (prev: Record<string, string>): Record<string, string> => {
+        const next = { ...prev }
+        for (const [key, value] of Object.entries(incoming)) {
+          if (!next[key]?.trim()) {
+            next[key] = value
+          }
+        }
+        return next
+      }
+
+    setDraft(fillBlanks(flat))
     if (Object.keys(nested).length > 0) {
-      setNestedDraft((prev) => ({ ...prev, ...nested }))
+      setNestedDraft(fillBlanks(nested))
     }
   }
 
