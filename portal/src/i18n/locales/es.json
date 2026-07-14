@@ -487,6 +487,7 @@
     "revoke_failed": "Error al revocar la API key",
     "scopes_label": "Permisos",
     "scopes_description": "Las keys nuevas arrancan solo con acceso de lectura. Activá permisos más amplios solo cuando realmente los necesites.",
+    "ended_read_only_note": "Este popup ha finalizado, por lo que las nuevas API keys solo pueden tener acceso de lectura.",
     "scope": {
       "events_read": {
         "label": "Leer eventos",
@@ -499,6 +500,10 @@
       "rsvp_write": {
         "label": "Registrarse a eventos",
         "description": "Registrar o cancelar la asistencia a eventos."
+      },
+      "venues_write": {
+        "label": "Gestionar tus venues",
+        "description": "Crear, editar y eliminar los venues que te pertenecen."
       }
     }
   },

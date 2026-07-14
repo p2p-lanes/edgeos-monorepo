@@ -41,6 +41,14 @@ class ApiKeys(SQLModel, table=True):
         foreign_key="users.id",
         index=True,
     )
+    # Popup the key is bound to. Human-owned keys are attendee keys
+    # (identity = human_id + popup_id) and always carry one going forward;
+    # nullable at the table level only because admin-owned keys have no popup.
+    popup_id: uuid.UUID | None = Field(
+        default=None,
+        foreign_key="popups.id",
+        index=True,
+    )
     name: str = Field(max_length=100)
     key_hash: str = Field(max_length=64, unique=True)
     prefix: str = Field(max_length=20)
