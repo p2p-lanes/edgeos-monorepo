@@ -17,6 +17,7 @@ COPY ./packages/shared-form-ui /app/packages/shared-form-ui
 COPY ./packages/shared-events /app/packages/shared-events
 COPY ./portal /app/portal
 ARG NEXT_PUBLIC_API_URL
+ARG ASSET_PREFIX
 ENV NODE_ENV=production
 
 RUN pnpm --filter portal run build

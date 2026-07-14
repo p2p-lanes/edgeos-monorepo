@@ -78,3 +78,6 @@ services:
       dockerfile: portal/Dockerfile
       args:
         - NEXT_PUBLIC_API_URL=${BACKEND_URL?Variable not set}
+        # CDN for /_next/static (e.g. https://static.edgeos.world). Optional:
+        # unset serves assets same-origin, as before.
+        - ASSET_PREFIX=${ASSET_PREFIX-}
