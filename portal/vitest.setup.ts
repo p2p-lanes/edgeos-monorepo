@@ -1,3 +1,4 @@
+import "@testing-library/jest-dom"
 import { vi } from "vitest"
 
 // Provide a test-time fallback for the API URL env var.
