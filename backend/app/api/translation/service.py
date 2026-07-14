@@ -13,6 +13,21 @@ TRANSLATABLE_FIELDS: dict[str, list[str]] = {
 }
 
 
+def parse_accept_language(accept_language: str | None) -> str | None:
+    """Extract the primary language subtag from an Accept-Language header.
+
+    Returns the base subtag ("es-AR" -> "es") of the first listed language,
+    or None when the header is absent or empty. This is default-agnostic on
+    purpose: it never special-cases English. When the requested language
+    matches the entity's default, the overlay lookup simply finds no rows and
+    the untranslated source is returned.
+    """
+    if not accept_language:
+        return None
+    lang = accept_language.split(",")[0].split("-")[0].strip()
+    return lang or None
+
+
 def get_translations_for_entity(
     session: Session,
     entity_type: str,

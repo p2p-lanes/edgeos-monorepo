@@ -38,6 +38,7 @@ from app.api.translation.service import (
     delete_translations_for_entity,
     get_translations_bulk,
     get_translations_for_entity,
+    parse_accept_language,
 )
 from app.core.dependencies.users import (
     CurrentCheckInOperator,
@@ -428,10 +429,10 @@ async def list_portal_popups(
     if is_popup_scoped_api_key(token_payload):
         popups = [p for p in popups if p.id == token_payload.popup_id]
 
-    if not accept_language or accept_language == "en":
+    lang = parse_accept_language(accept_language)
+    if lang is None:
         return [PopupPublic.model_validate(p) for p in popups]
 
-    lang = accept_language.split(",")[0].split("-")[0].strip()
     popup_ids = [p.id for p in popups]
     translations_map = get_translations_bulk(db, "popup", popup_ids, lang)
 
@@ -473,10 +474,10 @@ async def get_portal_popup(
                 detail="Event not found",
             )
 
-    if not accept_language or accept_language == "en":
+    lang = parse_accept_language(accept_language)
+    if lang is None:
         return PopupPublic.model_validate(popup)
 
-    lang = accept_language.split(",")[0].split("-")[0].strip()
     translation = get_translations_for_entity(db, "popup", popup.id, lang)
     data = PopupPublic.model_validate(popup).model_dump()
     data = apply_translation_overlay(data, translation, TRANSLATABLE_FIELDS["popup"])
