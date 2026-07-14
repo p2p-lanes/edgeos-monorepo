@@ -8,7 +8,7 @@ from app.core.config import settings
 # Stable (GA) flash model: production rate limits, unlike the preview variants
 # whose separate, tighter quotas were causing 429s. Swap to a *-flash-lite id
 # for higher throughput at a small quality cost.
-TRANSLATION_MODEL = "gemini-3.5-flash"
+TRANSLATION_MODEL = "gemini-2.5-flash"
 
 LANGUAGE_NAMES: dict[str, str] = {
     "en": "English",
