@@ -5,6 +5,11 @@ from google import genai
 
 from app.core.config import settings
 
+# Stable (GA) flash model: production rate limits, unlike the preview variants
+# whose separate, tighter quotas were causing 429s. Swap to a *-flash-lite id
+# for higher throughput at a small quality cost.
+TRANSLATION_MODEL = "gemini-3.5-flash"
+
 LANGUAGE_NAMES: dict[str, str] = {
     "en": "English",
     "es": "Spanish (Latin America)",
@@ -84,7 +89,7 @@ async def translate_fields(
 
     client = genai.Client(api_key=settings.GEMINI_API_KEY)
     response = await client.aio.models.generate_content(
-        model="gemini-3-flash-preview",
+        model=TRANSLATION_MODEL,
         contents=prompt,
     )
     if not response.text:
