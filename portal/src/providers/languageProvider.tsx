@@ -1,7 +1,7 @@
 "use client"
 
 import { useQueryClient } from "@tanstack/react-query"
-import { useSearchParams } from "next/navigation"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import {
   createContext,
   type ReactNode,
@@ -86,6 +86,8 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
   const { i18n } = useTranslation()
   const cityContext = useContext(CityContext)
   const searchParams = useSearchParams()
+  const router = useRouter()
+  const pathname = usePathname()
   const queryClient = useQueryClient()
   const prevLanguageRef = useRef<string | null>(null)
   const popup = cityContext?.getCity() ?? null
@@ -153,12 +155,17 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
 
   const setLanguage = (lang: string) => {
     const resolvedLanguage = resolveLanguageCandidate(lang, supportedLanguages)
-    if (resolvedLanguage) {
-      if (typeof window !== "undefined") {
-        localStorage.setItem(STORAGE_KEY, resolvedLanguage)
-      }
-      setCurrentLanguage(resolvedLanguage)
+    if (!resolvedLanguage) return
+    if (typeof window !== "undefined") {
+      localStorage.setItem(STORAGE_KEY, resolvedLanguage)
     }
+    // The URL is the single source of truth: write ?lang and let the resolver
+    // effect apply it. Setting state here too would let the effect briefly
+    // revert to the stale ?lang before the navigation lands. This also keeps
+    // the selected language forwardable in the URL.
+    const params = new URLSearchParams(searchParams.toString())
+    params.set("lang", resolvedLanguage)
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false })
   }
 
   return (

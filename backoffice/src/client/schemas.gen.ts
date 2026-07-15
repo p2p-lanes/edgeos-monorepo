@@ -55,8 +55,26 @@ export const AbandonedCartPublicSchema = {
             ],
             title: 'Updated At'
         },
+        email: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Email'
+        },
         human: {
-            '$ref': '#/components/schemas/CartHumanInfo'
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/CartHumanInfo'
+                },
+                {
+                    type: 'null'
+                }
+            ]
         },
         popup: {
             '$ref': '#/components/schemas/CartPopupInfo'
@@ -71,7 +89,7 @@ export const AbandonedCartPublicSchema = {
         }
     },
     type: 'object',
-    required: ['id', 'items', 'human', 'popup'],
+    required: ['id', 'items', 'popup'],
     title: 'AbandonedCartPublic',
     description: 'Abandoned cart with enriched info for backoffice.'
 } as const;

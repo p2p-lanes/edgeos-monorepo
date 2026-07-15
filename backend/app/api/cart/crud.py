@@ -122,9 +122,14 @@ class CartsCRUD:
         email: str,
         popup_id: uuid.UUID,
     ) -> Carts | None:
-        """Find an anonymous cart by email and popup (read-only)."""
+        """Find an anonymous cart by email and popup (read-only).
+
+        Email match is case-insensitive so the payment-approval cleanup finds
+        the cart regardless of how the buyer typed the address here versus at
+        checkout — the rest of the open-checkout flow normalizes to lowercase.
+        """
         statement = select(Carts).where(
-            Carts.email == email,
+            func.lower(Carts.email) == email.lower(),
             Carts.popup_id == popup_id,
             col(Carts.human_id).is_(None),
         )
@@ -160,7 +165,9 @@ class CartsCRUD:
                 tenant_id=tenant_id,
                 human_id=None,
                 popup_id=popup_id,
-                email=email,
+                # Store normalized so the unique (tenant, popup, email) index and
+                # later case-insensitive lookups stay consistent.
+                email=email.lower(),
                 items=items.model_dump(),
             )
             session.add(cart)

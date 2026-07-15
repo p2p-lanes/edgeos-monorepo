@@ -158,6 +158,43 @@ def test_upsert_open_cart_is_idempotent_per_email(
     assert len(carts) == 1
 
 
+def test_upsert_open_cart_email_is_case_insensitive(
+    client: TestClient,
+    db: Session,
+    tenant_a: Tenants,
+) -> None:
+    """A different email casing resolves to the same cart, stored lowercased.
+
+    Guards the payment-approval cleanup: it looks the cart up by the buyer
+    email, so a casing mismatch must never leave an already-paid cart behind.
+    """
+    popup = _make_popup(db, tenant_a, slug_prefix="case", signing_secret="s3cr3t")
+    product = _make_product(db, popup)
+    db.commit()
+
+    first = client.put(
+        f"/api/v1/checkout/{popup.slug}/cart",
+        json={"email": "Buyer@Test.com", "items": _items(product, promo_code="A")},
+        headers={"X-Tenant-Id": str(tenant_a.id)},
+    )
+    second = client.put(
+        f"/api/v1/checkout/{popup.slug}/cart",
+        json={"email": "BUYER@test.com", "items": _items(product, promo_code="B")},
+        headers={"X-Tenant-Id": str(tenant_a.id)},
+    )
+
+    assert first.status_code == 200 and second.status_code == 200
+    assert first.json()["id"] == second.json()["id"]
+
+    carts = list(
+        db.exec(
+            select(Carts).where(Carts.popup_id == popup.id, Carts.human_id.is_(None))
+        ).all()
+    )
+    assert len(carts) == 1
+    assert carts[0].email == "buyer@test.com"
+
+
 def test_restore_open_cart_with_valid_signature_returns_items(
     client: TestClient,
     db: Session,
