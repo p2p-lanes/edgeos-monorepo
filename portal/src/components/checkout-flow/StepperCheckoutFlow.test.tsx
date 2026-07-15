@@ -214,6 +214,46 @@ describe("StepperCheckoutFlow", () => {
       expect(cta.classList.contains("btn-ornate")).toBe(false)
     })
 
+    it("omits the generic header for amanita steps that render their own", () => {
+      cityOverride = AMANITA_CITY
+      stepConfigsOverride = [PASSES_STEP_CONFIG]
+      render(<StepperCheckoutFlow />)
+
+      // AmanitaCatalogSection wraps itself in SectionShell, which already
+      // renders the step's title + description in the skin's design.
+      expect(screen.getByText("amanita-catalog")).toBeTruthy()
+      expect(screen.queryByText("section-header")).toBeNull()
+    })
+
+    it("keeps the generic header for amanita content-only steps", () => {
+      // Setup copied from the existing "keeps hero-template steps on
+      // DynamicProductStep" test: the step_type stays a real one and the
+      // `hero` goes in `template`, which is what the routing reads.
+      cityOverride = AMANITA_CITY
+      availableStepsOverride = ["housing", "confirm"]
+      stepConfigsOverride = [
+        {
+          id: "hero-config-1",
+          step_type: "housing",
+          title: "Hero",
+          template: "hero",
+          template_config: null,
+        },
+      ]
+      render(<StepperCheckoutFlow />)
+
+      // hero/rich-text/gallery/video render bare variants with no
+      // SectionShell — they'd have no title at all without this.
+      expect(screen.getByText("dynamic-step")).toBeTruthy()
+      expect(screen.getByText("section-header")).toBeTruthy()
+    })
+
+    it("keeps the generic header for the default skin", () => {
+      stepConfigsOverride = [PASSES_STEP_CONFIG]
+      render(<StepperCheckoutFlow />)
+      expect(screen.getByText("section-header")).toBeTruthy()
+    })
+
     it("routes the buyer step to AmanitaBuyerStep when the skin is amanita", () => {
       cityOverride = {
         terms_and_conditions_url: null,

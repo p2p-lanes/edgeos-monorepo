@@ -313,11 +313,15 @@ export default function StepperCheckoutFlow({
   // `active === 0` — so popups that open straight into a product step keep
   // their standard bar.
   const currentTemplate = current?.config?.template
-  const isIntro =
-    !isLast &&
-    active === 0 &&
-    !!currentTemplate &&
-    CONTENT_ONLY_TEMPLATES.has(currentTemplate)
+  const isCurrentContentOnly =
+    !!currentTemplate && CONTENT_ONLY_TEMPLATES.has(currentTemplate)
+  const isIntro = !isLast && active === 0 && isCurrentContentOnly
+  // Amanita's own renderers (catalog/buyer/confirm) each wrap their content in
+  // SectionShell, which already draws the step's title and description in the
+  // skin's design — the generic header above them duplicates both, in the
+  // default theme's colors. Content-only templates render bare variants with
+  // no SectionShell, so they keep it or they'd have no title at all.
+  const contentOwnsHeader = isAmanita && !isCurrentContentOnly
   const introConfig = (current?.config?.template_config ?? {}) as {
     cta_label?: string
     cta_hint?: string
@@ -474,16 +478,18 @@ export default function StepperCheckoutFlow({
         )}
         {current && (
           <>
-            <div className="mb-8">
-              <SectionHeader
-                title={current.config?.title ?? current.label}
-                subtitle={current.config?.description ?? undefined}
-                variant="snap"
-                watermark={current.config?.watermark ?? current.label}
-                showTitle={current.config?.show_title ?? true}
-                showWatermark={current.config?.show_watermark ?? true}
-              />
-            </div>
+            {!contentOwnsHeader && (
+              <div className="mb-8">
+                <SectionHeader
+                  title={current.config?.title ?? current.label}
+                  subtitle={current.config?.description ?? undefined}
+                  variant="snap"
+                  watermark={current.config?.watermark ?? current.label}
+                  showTitle={current.config?.show_title ?? true}
+                  showWatermark={current.config?.show_watermark ?? true}
+                />
+              </div>
+            )}
             {renderStepContent(current)}
           </>
         )}
