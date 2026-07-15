@@ -8,6 +8,9 @@
  * - The `hero` template is wired into VARIANT_REGISTRY + CONTENT_ONLY_TEMPLATES
  */
 
+import { readFile } from "node:fs/promises"
+import { dirname, join } from "node:path"
+import { fileURLToPath } from "node:url"
 import { render, screen } from "@testing-library/react"
 import { describe, expect, it } from "vitest"
 import {
@@ -69,5 +72,59 @@ describe("VariantHero", () => {
 
   it("is marked content-only (non-purchasable)", () => {
     expect(CONTENT_ONLY_TEMPLATES.has("hero")).toBe(true)
+  })
+
+  it("renders the bullet ornament from config as a masked span", () => {
+    const { container } = renderVariant({
+      bullets: ["+10 escenarios"],
+      bullet_icon_url: "/checkout-skins/amanita/ornaments/star.svg",
+    })
+
+    const bullet = container.querySelector("li > span[aria-hidden]")
+    expect(bullet).toBeTruthy()
+    const style = (bullet as HTMLElement).style
+    expect(style.maskImage).toContain(
+      "/checkout-skins/amanita/ornaments/star.svg",
+    )
+    // Tint comes from the skin, never a hardcoded brand hex.
+    expect(style.backgroundColor).toBe("var(--hero-bullet-color, currentColor)")
+  })
+
+  it("omits the bullet ornament when no bullet_icon_url is configured", () => {
+    const { container } = renderVariant({ bullets: ["+10 escenarios"] })
+
+    expect(container.querySelector("li > span[aria-hidden]")).toBeNull()
+    expect(screen.getByText("+10 escenarios")).toBeTruthy()
+  })
+
+  it("renders the divider ornament from config alongside the subtitle", () => {
+    const { container } = renderVariant({
+      subtitle: "Una celebración de amor, apertura y conexión",
+      divider_url: "/checkout-skins/amanita/ornaments/divider-1-dark.webp",
+    })
+
+    const divider = container.querySelector('img[aria-hidden="true"]')
+    expect(divider).toBeTruthy()
+    expect((divider as HTMLImageElement).getAttribute("alt")).toBe("")
+  })
+
+  it("omits the divider when no divider_url is configured", () => {
+    const { container } = renderVariant({
+      subtitle: "Una celebración de amor, apertura y conexión",
+    })
+
+    expect(container.querySelector('img[aria-hidden="true"]')).toBeNull()
+    expect(
+      screen.getByText("Una celebración de amor, apertura y conexión"),
+    ).toBeTruthy()
+  })
+
+  it("does not import from any skin package (generic template)", async () => {
+    const filePath = join(
+      dirname(fileURLToPath(import.meta.url)),
+      "VariantHero.tsx",
+    )
+    const source = await readFile(filePath, "utf8")
+    expect(source).not.toContain("skins/")
   })
 })

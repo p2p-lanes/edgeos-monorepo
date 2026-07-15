@@ -3,8 +3,6 @@
 import Image from "next/image"
 import { imageOptimization } from "@/lib/image-optimization"
 import type { VariantProps } from "../registries/variantRegistry"
-import { GoldStar } from "../skins/amanita/GoldStar"
-import { Divider } from "../skins/amanita/Ornaments"
 
 // ---------------------------------------------------------------------------
 // VariantHero
@@ -12,29 +10,30 @@ import { Divider } from "../skins/amanita/Ornaments"
 // Content-only step template (no products, non-purchasable — see
 // CONTENT_ONLY_TEMPLATES in variantRegistry.ts). Ported from the Amanita
 // mockup's `HeroSection` (checkout-amanita/codigo/checkout/sections.tsx),
-// but every piece of copy/artwork comes from `stepConfig.template_config`
-// instead of being hardcoded — the admin authors it in the backoffice
-// (Plan 4). The Amanita look (fonts, colors, .ck-section entrance) comes
-// from the scoped `.checkout-amanita` CSS (Task 3); this component only
-// supplies the markup + config wiring.
+// but every piece of copy AND artwork comes from
+// `stepConfig.template_config` — the admin authors it in the backoffice
+// (HeroConfig.tsx). This file must stay client-agnostic: no skin package
+// imports, no brand hexes.
 //
 // Schema (`template_config`), all fields optional — render only what's
 // present, never throw on an empty/undefined config:
 //   {
-//     "logo_url": "https://…",       // brand mark (top)
-//     "date_logo_url": "https://…",  // wordmark + date banner image
-//     "edition_url": "https://…",    // edition banner image (e.g. "3rd ed.")
-//     "headline": "string",          // main H1
-//     "subtitle": "string",          // italic tagline under the headline
-//     "date_badge": "string",        // pill text (e.g. extended dates)
-//     "bullets": ["string", …]       // GoldStar bullet list
+//     "logo_url": "https://…",        // brand mark (top)
+//     "date_logo_url": "https://…",   // wordmark + date banner image
+//     "edition_url": "https://…",     // edition banner image (e.g. "3rd ed.")
+//     "headline": "string",           // main H1
+//     "subtitle": "string",           // italic tagline under the headline
+//     "date_badge": "string",         // pill text (e.g. extended dates)
+//     "bullets": ["string", …],       // bullet list
+//     "bullet_icon_url": "https://…", // bullet ornament (CSS mask, see below)
+//     "divider_url": "https://…"      // ornament above the subtitle
 //   }
 //
-// Images: sourced from config URLs via next/image + imageOptimization()
-// (unknown hosts fall back to `unoptimized`, same as the other variants/
-// primitives). No mockup asset defaults are wired in — an admin who wants
-// the Amanita mockup art simply points `logo_url`/`date_logo_url`/
-// `edition_url` at the already-ported `/checkout-skins/amanita/…` files.
+// `cta_label` / `cta_hint` also live in this template_config but are read by
+// StepperCheckoutFlow's intro bottom bar, not by this component.
+//
+// The look (fonts, colors, .ck-section entrance) comes from the active skin's
+// scoped CSS; this component only supplies markup + config wiring.
 // ---------------------------------------------------------------------------
 
 interface HeroConfig {
@@ -45,6 +44,8 @@ interface HeroConfig {
   subtitle?: string
   date_badge?: string
   bullets?: string[]
+  bullet_icon_url?: string
+  divider_url?: string
 }
 
 function HeroImage({
@@ -69,6 +70,51 @@ function HeroImage({
       priority={eager}
       className={`h-auto ${className}`}
       {...imageOptimization(src)}
+    />
+  )
+}
+
+/** Ornament above the subtitle. Classes match the mockup's `Divider`
+ *  (checkout-amanita/codigo/compartidos/Ornaments.tsx) with `h-auto` added
+ *  for next/image's width={0}/height={0} sizing. */
+function HeroDivider({ src, eager }: { src: string; eager: boolean }) {
+  return (
+    <Image
+      src={src}
+      alt=""
+      aria-hidden="true"
+      width={0}
+      height={0}
+      sizes="(max-width: 768px) 240px, 360px"
+      loading={eager ? undefined : "lazy"}
+      priority={eager}
+      className="mx-auto block h-auto w-full max-w-[240px] opacity-90 md:max-w-[360px]"
+      {...imageOptimization(src)}
+    />
+  )
+}
+
+/** Bullet ornament. Stays a CSS-masked <span> rather than an <img> because
+ *  ornament artwork is typically a single-color SVG that must be recolored to
+ *  the skin's palette (the mockup's star.svg is petrol on a navy page). The
+ *  tint comes from the skin via `--hero-bullet-color`; skins that don't set it
+ *  fall back to the surrounding text color. */
+function HeroBullet({ src }: { src: string }) {
+  return (
+    <span
+      aria-hidden
+      className="inline-block h-3.5 w-3.5 shrink-0"
+      style={{
+        backgroundColor: "var(--hero-bullet-color, currentColor)",
+        WebkitMaskImage: `url(${src})`,
+        maskImage: `url(${src})`,
+        WebkitMaskRepeat: "no-repeat",
+        maskRepeat: "no-repeat",
+        WebkitMaskSize: "contain",
+        maskSize: "contain",
+        WebkitMaskPosition: "center",
+        maskPosition: "center",
+      }}
     />
   )
 }
@@ -136,7 +182,9 @@ export default function VariantHero({
 
       {config.subtitle && (
         <>
-          <Divider variant="cream" eager={isFirstSection} />
+          {config.divider_url && (
+            <HeroDivider src={config.divider_url} eager={isFirstSection} />
+          )}
           <p className="max-w-[34ch] text-lg italic text-mint md:text-xl">
             {config.subtitle}
           </p>
@@ -163,7 +211,9 @@ export default function VariantHero({
               className="flex items-center gap-2.5 text-sm md:text-base"
               style={{ color: "rgba(241,235,227,0.85)" }}
             >
-              <GoldStar />
+              {config.bullet_icon_url && (
+                <HeroBullet src={config.bullet_icon_url} />
+              )}
               {bullet}
             </li>
           ))}

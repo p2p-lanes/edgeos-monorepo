@@ -32,6 +32,9 @@
   --color-forest: #153b34;
   --color-violet: #736b93;
 
+  /* ornament tints consumed by generic templates (VariantHero's bullet) */
+  --hero-bullet-color: var(--color-sand);
+
   /* semantic tokens (light theme base) */
   --color-bg: var(--color-cream);
   --color-surface: #faf6ef;
