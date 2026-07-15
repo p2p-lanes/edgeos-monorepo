@@ -123,9 +123,16 @@ _TEXT_LEAF_KEYS = frozenset(
         "answer",
         "caption",
         "html",
+        # Hero copy. `cta_label` is the button a visitor actually clicks and
+        # `headline` is the largest text on the page, so leaving them out made
+        # a "translated" checkout still open in the source language.
+        "headline",
+        "date_badge",
+        "cta_label",
+        "cta_hint",
     }
 )
-_TEXT_LIST_KEYS = frozenset({"benefits"})
+_TEXT_LIST_KEYS = frozenset({"benefits", "bullets"})
 
 
 def extract_translatable_leaves(config: Any, prefix: str = "") -> dict[str, str]:

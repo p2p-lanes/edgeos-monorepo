@@ -5,6 +5,9 @@
 // that partial over the source, preserving ids, prices, flags and icons.
 
 // Object keys whose string value is user-visible copy.
+// Kept in sync with the backend extractor (app/api/translation/service.py):
+// a key missing here hides the field from the organizer, and a key missing
+// there means the AI never drafts it — the two lists must not drift.
 const TEXT_LEAF_KEYS = new Set([
   "label",
   "description",
@@ -18,10 +21,17 @@ const TEXT_LEAF_KEYS = new Set([
   "answer",
   "caption",
   "html",
+  // Hero copy. `cta_label` is the button a visitor actually clicks and
+  // `headline` is the largest text on the page, so leaving them out made a
+  // "translated" checkout still open in the source language.
+  "headline",
+  "date_badge",
+  "cta_label",
+  "cta_hint",
 ])
 
 // Keys holding an array of user-visible strings (each item is a leaf).
-const TEXT_LIST_KEYS = new Set(["benefits"])
+const TEXT_LIST_KEYS = new Set(["benefits", "bullets"])
 
 const MULTILINE_LEAF_KEYS = new Set([
   "description",
