@@ -45,6 +45,7 @@ import {
 import { Separator } from "@/components/ui/separator"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Switch } from "@/components/ui/switch"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import useCustomToast from "@/hooks/useCustomToast"
 import { useGoBack } from "@/hooks/useGoBack"
@@ -238,442 +239,470 @@ function StepConfigContent({ stepId }: { stepId: string }) {
     ? TEMPLATE_CONFIG_REGISTRY[template]
     : undefined
 
+  const hasTranslations = (popup?.supported_languages?.length ?? 0) > 1
+
   return (
     <div className="flex flex-col gap-6 max-w-2xl">
-      {/* General Settings */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">General</CardTitle>
-          <CardDescription>Basic step configuration</CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-4">
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="step-title">Title</Label>
-            <div className="flex gap-1.5">
-              <div className="relative w-16">
-                <Input
-                  id="step-emoji"
-                  aria-label="Step emoji"
-                  value={emoji}
-                  onChange={(e) => setEmoji(e.target.value.slice(0, 8))}
-                  className="w-full text-center text-lg"
-                />
-                {/* When the operator hasn't picked a custom emoji, render the
+      <Tabs defaultValue="general" className="flex flex-col gap-6">
+        <TabsList>
+          <TabsTrigger value="general">General</TabsTrigger>
+          <TabsTrigger value="translations">Translations</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="general" className="flex flex-col gap-6">
+          {/* General Settings */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">General</CardTitle>
+              <CardDescription>Basic step configuration</CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-4">
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="step-title">Title</Label>
+                <div className="flex gap-1.5">
+                  <div className="relative w-16">
+                    <Input
+                      id="step-emoji"
+                      aria-label="Step emoji"
+                      value={emoji}
+                      onChange={(e) => setEmoji(e.target.value.slice(0, 8))}
+                      className="w-full text-center text-lg"
+                    />
+                    {/* When the operator hasn't picked a custom emoji, render the
                     step-type's resolved default icon inside the input so the
                     preview matches what the checkout nav will actually show.
                     Replaces the legacy hardcoded "🎟️" placeholder which made
                     every step look like Tickets by default. */}
-                {!emoji &&
-                  (() => {
-                    const DefaultIcon = getStepTypeDefinition(
-                      step.step_type,
-                    )?.icon
-                    return DefaultIcon ? (
-                      <DefaultIcon
-                        className="absolute inset-0 m-auto h-4 w-4 text-muted-foreground pointer-events-none"
-                        aria-hidden="true"
-                      />
-                    ) : null
-                  })()}
-              </div>
-              <Input
-                id="step-title"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                className="flex-1"
-              />
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Optional emoji replaces the default icon in the checkout step nav.
-              Leave blank to keep the built-in icon (shown faded above).
-            </p>
-          </div>
-
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="step-description">Description</Label>
-            <Textarea
-              id="step-description"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Optional description shown to customers"
-              rows={3}
-            />
-          </div>
-
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="step-watermark">Watermark Text</Label>
-            <Input
-              id="step-watermark"
-              value={watermark}
-              onChange={(e) => setWatermark(e.target.value)}
-              placeholder="Short text shown as background watermark (e.g., Passes)"
-            />
-            <p className="text-xs text-muted-foreground">
-              Large decorative text shown behind the section header in snap
-              layout.
-            </p>
-          </div>
-
-          <div className="flex items-center justify-between gap-4 rounded-lg border p-3">
-            <div className="flex flex-col gap-0.5">
-              <Label>Show Title</Label>
-              <p className="text-xs text-muted-foreground">
-                Display the section title in the checkout
-              </p>
-            </div>
-            <Switch
-              checked={showTitle}
-              onCheckedChange={setShowTitle}
-              aria-label="Toggle title visibility"
-            />
-          </div>
-
-          <div className="flex items-center justify-between gap-4 rounded-lg border p-3">
-            <div className="flex flex-col gap-0.5">
-              <Label>Show Watermark</Label>
-              <p className="text-xs text-muted-foreground">
-                Display the decorative watermark text behind the header
-              </p>
-            </div>
-            <Switch
-              checked={showWatermark}
-              onCheckedChange={setShowWatermark}
-              aria-label="Toggle watermark visibility"
-            />
-          </div>
-
-          <div className="flex items-center justify-between gap-4 rounded-lg border p-3">
-            <div className="flex flex-col gap-0.5">
-              <Label>Show in Navbar</Label>
-              <p className="text-xs text-muted-foreground">
-                Whether the step appears in the top section nav. Hidden steps
-                still render and are reachable by scroll — useful for
-                informational sections that shouldn't clutter the nav.
-              </p>
-            </div>
-            <Switch
-              checked={showInNavbar}
-              onCheckedChange={setShowInNavbar}
-              aria-label="Toggle navbar visibility"
-            />
-          </div>
-
-          {!CONTENT_ONLY_TEMPLATES.has(template) &&
-            step.step_type !== "confirm" && (
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="step-product-category">Product Category</Label>
-                <Select
-                  value={productCategory}
-                  onValueChange={(val) => setProductCategory(val)}
-                >
-                  <SelectTrigger id="step-product-category">
-                    <SelectValue placeholder="None" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {productCategory &&
-                      !(categorySuggestions ?? []).includes(
-                        productCategory,
-                      ) && (
-                        <SelectItem value={productCategory}>
-                          {productCategory}
-                        </SelectItem>
-                      )}
-                    {(categorySuggestions ?? []).map((cat) => (
-                      <SelectItem key={cat} value={cat}>
-                        {cat}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                    {!emoji &&
+                      (() => {
+                        const DefaultIcon = getStepTypeDefinition(
+                          step.step_type,
+                        )?.icon
+                        return DefaultIcon ? (
+                          <DefaultIcon
+                            className="absolute inset-0 m-auto h-4 w-4 text-muted-foreground pointer-events-none"
+                            aria-hidden="true"
+                          />
+                        ) : null
+                      })()}
+                  </div>
+                  <Input
+                    id="step-title"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    className="flex-1"
+                  />
+                </div>
                 <p className="text-xs text-muted-foreground">
-                  Which product category this step displays. Must match a
-                  product's category field.
+                  Optional emoji replaces the default icon in the checkout step
+                  nav. Leave blank to keep the built-in icon (shown faded
+                  above).
                 </p>
               </div>
-            )}
 
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="step-footer">Footer Note</Label>
-            <Textarea
-              id="step-footer"
-              value={(templateConfig?.footer_text as string) ?? ""}
-              onChange={(e) =>
-                setTemplateConfig({
-                  ...templateConfig,
-                  footer_text: e.target.value || undefined,
-                })
-              }
-              placeholder="Optional note shown below this step's content (e.g., pricing clarifications, terms)"
-              rows={2}
-            />
-            <p className="text-xs text-muted-foreground">
-              Small text displayed at the bottom of this section in the
-              checkout.
-            </p>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Insurance Card Content (only for confirm step) */}
-      {step.step_type === "confirm" &&
-        (popup?.insurance_enabled ? (
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Insurance Card</CardTitle>
-              <CardDescription>
-                Text displayed inside the insurance toggle card in this step
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-4">
               <div className="flex flex-col gap-1.5">
-                <Label htmlFor="insurance-card-title">Card Title</Label>
-                <Input
-                  id="insurance-card-title"
-                  value={
-                    ((templateConfig?.insurance as Record<string, unknown>)
-                      ?.card_title as string) ?? ""
-                  }
-                  onChange={(e) =>
-                    setTemplateConfig({
-                      ...templateConfig,
-                      insurance: {
-                        ...(templateConfig?.insurance as Record<
-                          string,
-                          unknown
-                        >),
-                        card_title: e.target.value || undefined,
-                      },
-                    })
-                  }
-                  placeholder="Insurance"
-                />
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="insurance-card-subtitle">Card Subtitle</Label>
-                <Input
-                  id="insurance-card-subtitle"
-                  value={
-                    ((templateConfig?.insurance as Record<string, unknown>)
-                      ?.card_subtitle as string) ?? ""
-                  }
-                  onChange={(e) =>
-                    setTemplateConfig({
-                      ...templateConfig,
-                      insurance: {
-                        ...(templateConfig?.insurance as Record<
-                          string,
-                          unknown
-                        >),
-                        card_subtitle: e.target.value || undefined,
-                      },
-                    })
-                  }
-                  placeholder="Change of plans coverage"
-                />
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="insurance-toggle-label">Toggle Label</Label>
-                <Input
-                  id="insurance-toggle-label"
-                  value={
-                    ((templateConfig?.insurance as Record<string, unknown>)
-                      ?.toggle_label as string) ?? ""
-                  }
-                  onChange={(e) =>
-                    setTemplateConfig({
-                      ...templateConfig,
-                      insurance: {
-                        ...(templateConfig?.insurance as Record<
-                          string,
-                          unknown
-                        >),
-                        toggle_label: e.target.value || undefined,
-                      },
-                    })
-                  }
-                  placeholder="Add insurance"
-                />
-                <p className="text-xs text-muted-foreground">
-                  Accessible label for the insurance toggle button.
-                </p>
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="insurance-benefits">
-                  Benefits (one per line)
-                </Label>
+                <Label htmlFor="step-description">Description</Label>
                 <Textarea
-                  id="insurance-benefits"
-                  value={
-                    Array.isArray(
-                      (templateConfig?.insurance as Record<string, unknown>)
-                        ?.benefits,
-                    )
-                      ? (
-                          (templateConfig?.insurance as Record<string, unknown>)
-                            ?.benefits as string[]
-                        ).join("\n")
-                      : ""
-                  }
+                  id="step-description"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="Optional description shown to customers"
+                  rows={3}
+                />
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="step-watermark">Watermark Text</Label>
+                <Input
+                  id="step-watermark"
+                  value={watermark}
+                  onChange={(e) => setWatermark(e.target.value)}
+                  placeholder="Short text shown as background watermark (e.g., Passes)"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Large decorative text shown behind the section header in snap
+                  layout.
+                </p>
+              </div>
+
+              <div className="flex items-center justify-between gap-4 rounded-lg border p-3">
+                <div className="flex flex-col gap-0.5">
+                  <Label>Show Title</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Display the section title in the checkout
+                  </p>
+                </div>
+                <Switch
+                  checked={showTitle}
+                  onCheckedChange={setShowTitle}
+                  aria-label="Toggle title visibility"
+                />
+              </div>
+
+              <div className="flex items-center justify-between gap-4 rounded-lg border p-3">
+                <div className="flex flex-col gap-0.5">
+                  <Label>Show Watermark</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Display the decorative watermark text behind the header
+                  </p>
+                </div>
+                <Switch
+                  checked={showWatermark}
+                  onCheckedChange={setShowWatermark}
+                  aria-label="Toggle watermark visibility"
+                />
+              </div>
+
+              <div className="flex items-center justify-between gap-4 rounded-lg border p-3">
+                <div className="flex flex-col gap-0.5">
+                  <Label>Show in Navbar</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Whether the step appears in the top section nav. Hidden
+                    steps still render and are reachable by scroll — useful for
+                    informational sections that shouldn't clutter the nav.
+                  </p>
+                </div>
+                <Switch
+                  checked={showInNavbar}
+                  onCheckedChange={setShowInNavbar}
+                  aria-label="Toggle navbar visibility"
+                />
+              </div>
+
+              {!CONTENT_ONLY_TEMPLATES.has(template) &&
+                step.step_type !== "confirm" && (
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="step-product-category">
+                      Product Category
+                    </Label>
+                    <Select
+                      value={productCategory}
+                      onValueChange={(val) => setProductCategory(val)}
+                    >
+                      <SelectTrigger id="step-product-category">
+                        <SelectValue placeholder="None" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {productCategory &&
+                          !(categorySuggestions ?? []).includes(
+                            productCategory,
+                          ) && (
+                            <SelectItem value={productCategory}>
+                              {productCategory}
+                            </SelectItem>
+                          )}
+                        {(categorySuggestions ?? []).map((cat) => (
+                          <SelectItem key={cat} value={cat}>
+                            {cat}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      Which product category this step displays. Must match a
+                      product's category field.
+                    </p>
+                  </div>
+                )}
+
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="step-footer">Footer Note</Label>
+                <Textarea
+                  id="step-footer"
+                  value={(templateConfig?.footer_text as string) ?? ""}
                   onChange={(e) =>
                     setTemplateConfig({
                       ...templateConfig,
-                      insurance: {
-                        ...(templateConfig?.insurance as Record<
-                          string,
-                          unknown
-                        >),
-                        benefits: e.target.value
-                          ? e.target.value
-                              .split("\n")
-                              .map((l) => l.trim())
-                              .filter(Boolean)
-                          : [],
-                      },
+                      footer_text: e.target.value || undefined,
                     })
                   }
-                  placeholder={
-                    "Full refund up to 14 days before the event\n50% refund up to 7 days before\nFree date change at no extra cost"
-                  }
-                  rows={4}
+                  placeholder="Optional note shown below this step's content (e.g., pricing clarifications, terms)"
+                  rows={2}
                 />
                 <p className="text-xs text-muted-foreground">
-                  Each line becomes a benefit bullet in the card.
+                  Small text displayed at the bottom of this section in the
+                  checkout.
                 </p>
               </div>
             </CardContent>
           </Card>
-        ) : (
-          <Alert>
-            <Info className="h-4 w-4" />
-            <AlertDescription>
-              Enable insurance in popup settings to configure the card content.{" "}
-              <Link
-                to="/popups/$id/edit"
-                params={{ id: step.popup_id }}
-                className="underline font-medium"
-              >
-                Go to Popup Settings
-              </Link>
-            </AlertDescription>
-          </Alert>
-        ))}
 
-      {/* Template Selection & Configuration (hidden for confirm step) */}
-      {step.step_type !== "confirm" && (
-        <>
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Template</CardTitle>
-              <CardDescription>
-                Choose how products are displayed in the checkout
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 gap-2">
-                {TEMPLATE_DEFINITIONS.map((def) => {
-                  const Icon = def.icon
-                  const isSelected = template === def.key
-                  return (
-                    <button
-                      key={def.key}
-                      type="button"
-                      onClick={() => {
-                        setTemplate(isSelected ? "" : def.key)
-                        if (isSelected) setTemplateConfig(null)
-                      }}
-                      className={cn(
-                        "relative flex flex-col gap-1 rounded-lg border p-3 text-left text-sm transition-all",
-                        isSelected
-                          ? "border-primary bg-primary/5 ring-1 ring-primary"
-                          : "border-border hover:border-primary/50 hover:bg-accent/50",
-                      )}
-                    >
-                      {isSelected && (
-                        <Check className="absolute top-2 right-2 h-3.5 w-3.5 text-primary" />
-                      )}
-                      <Icon className="h-4 w-4 text-muted-foreground" />
-                      <span className="font-medium leading-tight">
-                        {def.label}
-                      </span>
-                      <span className="text-xs text-muted-foreground leading-tight">
-                        {def.description}
-                      </span>
-                    </button>
-                  )
-                })}
-              </div>
-            </CardContent>
-          </Card>
+          {/* Insurance Card Content (only for confirm step) */}
+          {step.step_type === "confirm" &&
+            (popup?.insurance_enabled ? (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Insurance Card</CardTitle>
+                  <CardDescription>
+                    Text displayed inside the insurance toggle card in this step
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="flex flex-col gap-4">
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="insurance-card-title">Card Title</Label>
+                    <Input
+                      id="insurance-card-title"
+                      value={
+                        ((templateConfig?.insurance as Record<string, unknown>)
+                          ?.card_title as string) ?? ""
+                      }
+                      onChange={(e) =>
+                        setTemplateConfig({
+                          ...templateConfig,
+                          insurance: {
+                            ...(templateConfig?.insurance as Record<
+                              string,
+                              unknown
+                            >),
+                            card_title: e.target.value || undefined,
+                          },
+                        })
+                      }
+                      placeholder="Insurance"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="insurance-card-subtitle">
+                      Card Subtitle
+                    </Label>
+                    <Input
+                      id="insurance-card-subtitle"
+                      value={
+                        ((templateConfig?.insurance as Record<string, unknown>)
+                          ?.card_subtitle as string) ?? ""
+                      }
+                      onChange={(e) =>
+                        setTemplateConfig({
+                          ...templateConfig,
+                          insurance: {
+                            ...(templateConfig?.insurance as Record<
+                              string,
+                              unknown
+                            >),
+                            card_subtitle: e.target.value || undefined,
+                          },
+                        })
+                      }
+                      placeholder="Change of plans coverage"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="insurance-toggle-label">Toggle Label</Label>
+                    <Input
+                      id="insurance-toggle-label"
+                      value={
+                        ((templateConfig?.insurance as Record<string, unknown>)
+                          ?.toggle_label as string) ?? ""
+                      }
+                      onChange={(e) =>
+                        setTemplateConfig({
+                          ...templateConfig,
+                          insurance: {
+                            ...(templateConfig?.insurance as Record<
+                              string,
+                              unknown
+                            >),
+                            toggle_label: e.target.value || undefined,
+                          },
+                        })
+                      }
+                      placeholder="Add insurance"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Accessible label for the insurance toggle button.
+                    </p>
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="insurance-benefits">
+                      Benefits (one per line)
+                    </Label>
+                    <Textarea
+                      id="insurance-benefits"
+                      value={
+                        Array.isArray(
+                          (templateConfig?.insurance as Record<string, unknown>)
+                            ?.benefits,
+                        )
+                          ? (
+                              (
+                                templateConfig?.insurance as Record<
+                                  string,
+                                  unknown
+                                >
+                              )?.benefits as string[]
+                            ).join("\n")
+                          : ""
+                      }
+                      onChange={(e) =>
+                        setTemplateConfig({
+                          ...templateConfig,
+                          insurance: {
+                            ...(templateConfig?.insurance as Record<
+                              string,
+                              unknown
+                            >),
+                            benefits: e.target.value
+                              ? e.target.value
+                                  .split("\n")
+                                  .map((l) => l.trim())
+                                  .filter(Boolean)
+                              : [],
+                          },
+                        })
+                      }
+                      placeholder={
+                        "Full refund up to 14 days before the event\n50% refund up to 7 days before\nFree date change at no extra cost"
+                      }
+                      rows={4}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Each line becomes a benefit bullet in the card.
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : (
+              <Alert>
+                <Info className="h-4 w-4" />
+                <AlertDescription>
+                  Enable insurance in popup settings to configure the card
+                  content.{" "}
+                  <Link
+                    to="/popups/$id/edit"
+                    params={{ id: step.popup_id }}
+                    className="underline font-medium"
+                  >
+                    Go to Popup Settings
+                  </Link>
+                </AlertDescription>
+              </Alert>
+            ))}
 
-          {TemplateConfigComponent && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">
-                  Template Configuration
-                </CardTitle>
-                <CardDescription>
-                  Settings specific to the{" "}
-                  {TEMPLATE_DEFINITIONS.find((d) => d.key === template)?.label}{" "}
-                  template
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <TemplateConfigComponent
-                  config={templateConfig}
-                  onChange={setTemplateConfig}
-                  popupId={step.popup_id}
-                  productCategory={productCategory || null}
-                />
-              </CardContent>
-            </Card>
+          {/* Template Selection & Configuration (hidden for confirm step) */}
+          {step.step_type !== "confirm" && (
+            <>
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Template</CardTitle>
+                  <CardDescription>
+                    Choose how products are displayed in the checkout
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 gap-2">
+                    {TEMPLATE_DEFINITIONS.map((def) => {
+                      const Icon = def.icon
+                      const isSelected = template === def.key
+                      return (
+                        <button
+                          key={def.key}
+                          type="button"
+                          onClick={() => {
+                            setTemplate(isSelected ? "" : def.key)
+                            if (isSelected) setTemplateConfig(null)
+                          }}
+                          className={cn(
+                            "relative flex flex-col gap-1 rounded-lg border p-3 text-left text-sm transition-all",
+                            isSelected
+                              ? "border-primary bg-primary/5 ring-1 ring-primary"
+                              : "border-border hover:border-primary/50 hover:bg-accent/50",
+                          )}
+                        >
+                          {isSelected && (
+                            <Check className="absolute top-2 right-2 h-3.5 w-3.5 text-primary" />
+                          )}
+                          <Icon className="h-4 w-4 text-muted-foreground" />
+                          <span className="font-medium leading-tight">
+                            {def.label}
+                          </span>
+                          <span className="text-xs text-muted-foreground leading-tight">
+                            {def.description}
+                          </span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {TemplateConfigComponent && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">
+                      Template Configuration
+                    </CardTitle>
+                    <CardDescription>
+                      Settings specific to the{" "}
+                      {
+                        TEMPLATE_DEFINITIONS.find((d) => d.key === template)
+                          ?.label
+                      }{" "}
+                      template
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <TemplateConfigComponent
+                      config={templateConfig}
+                      onChange={setTemplateConfig}
+                      popupId={step.popup_id}
+                      productCategory={productCategory || null}
+                    />
+                  </CardContent>
+                </Card>
+              )}
+            </>
           )}
-        </>
-      )}
 
-      {(popup?.supported_languages?.length ?? 0) > 1 && (
-        <>
+          {/* Actions */}
           <Separator />
-          <TranslationManager
-            entityType="ticketing_step"
-            entityId={step.id}
-            translatableFields={["title", "description"]}
-            sourceData={{
-              title: step.title,
-              description: step.description,
-            }}
-            nestedField="template_config"
-            nestedSource={step.template_config}
-            supportedLanguages={popup!.supported_languages!}
-            defaultLanguage={popup!.default_language!}
-          />
-        </>
-      )}
+          <div className="flex items-center gap-2">
+            {!step.protected && (
+              <LoadingButton
+                variant="destructive"
+                size="icon"
+                loading={deleteMutation.isPending}
+                onClick={() => deleteMutation.mutate()}
+                className="h-9 w-9 shrink-0"
+              >
+                <Trash2 className="h-4 w-4" />
+              </LoadingButton>
+            )}
+            <div className="flex-1" />
+            <Button variant="outline" onClick={goBack}>
+              Cancel
+            </Button>
+            <LoadingButton
+              loading={updateMutation.isPending}
+              onClick={() => updateMutation.mutate()}
+            >
+              Save
+            </LoadingButton>
+          </div>
+        </TabsContent>
 
-      {/* Actions */}
-      <Separator />
-      <div className="flex items-center gap-2">
-        {!step.protected && (
-          <LoadingButton
-            variant="destructive"
-            size="icon"
-            loading={deleteMutation.isPending}
-            onClick={() => deleteMutation.mutate()}
-            className="h-9 w-9 shrink-0"
-          >
-            <Trash2 className="h-4 w-4" />
-          </LoadingButton>
-        )}
-        <div className="flex-1" />
-        <Button variant="outline" onClick={goBack}>
-          Cancel
-        </Button>
-        <LoadingButton
-          loading={updateMutation.isPending}
-          onClick={() => updateMutation.mutate()}
-        >
-          Save
-        </LoadingButton>
-      </div>
+        <TabsContent value="translations" className="flex flex-col gap-4">
+          {!hasTranslations ? (
+            <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
+              Enable a second language on the event to translate this step.
+            </div>
+          ) : isDirty ? (
+            <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
+              Save your changes first to translate the latest content.
+            </div>
+          ) : (
+            <TranslationManager
+              entityType="ticketing_step"
+              entityId={step.id}
+              translatableFields={["title", "description"]}
+              sourceData={{ title: step.title, description: step.description }}
+              nestedField="template_config"
+              nestedSource={step.template_config}
+              supportedLanguages={popup!.supported_languages!}
+              defaultLanguage={popup!.default_language!}
+            />
+          )}
+        </TabsContent>
+      </Tabs>
 
       <UnsavedChangesDialog blocker={blocker} />
     </div>
