@@ -144,6 +144,70 @@ export function buildPartialConfig(
   return hasAny ? partial : null
 }
 
+export interface LeafGroup {
+  key: string
+  label: string
+  leaves: ConfigLeaf[]
+}
+
+function singularize(word: string): string {
+  return word.endsWith("s") ? word.slice(0, -1) : word
+}
+
+// Friendly group headers per config key. Array-record keys get the item number
+// appended ("FAQ 1"); named-object keys are used as-is. Anything not listed
+// falls back to the humanized (and, for records, singularized) key.
+const GROUP_ALIASES: Record<string, string> = {
+  items: "FAQ",
+  sections: "Section",
+  menu_options: "Meal option",
+  products: "Product",
+  insurance: "Insurance",
+  chef_choice_option: "Chef's choice",
+  benefits: "Benefits",
+}
+
+/**
+ * Derive the group a leaf belongs to from its path. Array records group under
+ * "<Name> <n>" ("items.0.question" -> "FAQ 1"); named objects group under their
+ * friendly key ("insurance.card_title" -> "Insurance"); top-level leaves fall
+ * under "General".
+ */
+function deriveGroup(path: string): { key: string; label: string } {
+  const parent = path.split(".").slice(0, -1)
+  if (parent.length === 0) {
+    return { key: "__general", label: "General" }
+  }
+  const last = parent[parent.length - 1]
+  if (/^\d+$/.test(last)) {
+    const name = parent[parent.length - 2] ?? "item"
+    const alias = GROUP_ALIASES[name] ?? singularize(humanizeKey(name))
+    return { key: parent.join("."), label: `${alias} ${Number(last) + 1}` }
+  }
+  return {
+    key: parent.join("."),
+    label: GROUP_ALIASES[last] ?? humanizeKey(last),
+  }
+}
+
+/**
+ * Group flat leaves back into their parent records so the editor can render a
+ * card per FAQ item, section, insurance block, etc., in document order.
+ */
+export function groupLeaves(leaves: ConfigLeaf[]): LeafGroup[] {
+  const groups = new Map<string, LeafGroup>()
+  for (const leaf of leaves) {
+    const { key, label } = deriveGroup(leaf.path)
+    const existing = groups.get(key)
+    if (existing) {
+      existing.leaves.push(leaf)
+    } else {
+      groups.set(key, { key, label, leaves: [leaf] })
+    }
+  }
+  return Array.from(groups.values())
+}
+
 /** Flatten a stored partial config back to path->value for editing. */
 export function flattenConfigValues(
   config: unknown,

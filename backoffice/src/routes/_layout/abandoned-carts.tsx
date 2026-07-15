@@ -67,8 +67,8 @@ const columns: ColumnDef<AbandonedCartPublic>[] = [
     cell: ({ row }) => (
       <span className="font-medium">
         {formatName(
-          row.original.human.first_name,
-          row.original.human.last_name,
+          row.original.human?.first_name,
+          row.original.human?.last_name,
         )}
       </span>
     ),
@@ -77,7 +77,7 @@ const columns: ColumnDef<AbandonedCartPublic>[] = [
     id: "human_email",
     header: ({ column }) => <SortableHeader label="Email" column={column} />,
     cell: ({ row }) => (
-      <span className="text-muted-foreground">{row.original.human.email}</span>
+      <span className="text-muted-foreground">{row.original.email ?? "—"}</span>
     ),
   },
   {
@@ -187,9 +187,9 @@ function AbandonedCartsTableContent() {
     ? carts.results.filter((c) => {
         const term = search.toLowerCase()
         return (
-          c.human.email.toLowerCase().includes(term) ||
-          (c.human.first_name ?? "").toLowerCase().includes(term) ||
-          (c.human.last_name ?? "").toLowerCase().includes(term) ||
+          (c.email ?? "").toLowerCase().includes(term) ||
+          (c.human?.first_name ?? "").toLowerCase().includes(term) ||
+          (c.human?.last_name ?? "").toLowerCase().includes(term) ||
           c.popup.name.toLowerCase().includes(term)
         )
       })
@@ -246,8 +246,8 @@ function AbandonedCarts() {
       exportToCsv(
         "abandoned-carts",
         results.map((c) => ({
-          name: formatName(c.human.first_name, c.human.last_name),
-          email: c.human.email,
+          name: formatName(c.human?.first_name, c.human?.last_name),
+          email: c.email ?? "",
           event: c.popup.name,
           items: getCartItemCount(c.items),
           payment_attempts: (c.payments ?? []).length,

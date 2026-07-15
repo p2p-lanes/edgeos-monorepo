@@ -32,35 +32,63 @@ async def list_abandoned_carts(
     limit: PaginationLimit = 100,
 ) -> ListModel[AbandonedCartPublic]:
     """List all abandoned carts with human, popup and payment info (BO only)."""
+    from sqlalchemy import text
+    from sqlmodel import select
+
     from app.api.application.models import Applications
     from app.api.payment.models import Payments
     from app.api.payment.schemas import PaymentStatus
 
     carts, total = carts_crud.find_all(db, popup_id=popup_id, skip=skip, limit=limit)
 
+    pending_statuses = [PaymentStatus.PENDING.value, PaymentStatus.EXPIRED.value]
+
     results = []
     for cart in carts:
         human = cart.human
         popup = cart.popup
 
-        # Find pending/expired payments for this human+popup
-        from sqlmodel import select
-
-        payment_stmt = (
-            select(Payments)
-            .join(Applications, Payments.application_id == Applications.id)  # type: ignore[arg-type]
-            .where(
-                Applications.human_id == cart.human_id,
-                Applications.popup_id == cart.popup_id,
-                Payments.status.in_(  # type: ignore[attr-defined]
-                    [PaymentStatus.PENDING.value, PaymentStatus.EXPIRED.value]
-                ),
+        # Find pending/expired payments for this cart. Authenticated carts link
+        # payments through the human's applications; anonymous open-checkout
+        # carts have no application, so correlate by the buyer email stored in
+        # the payment's buyer_snapshot.
+        if cart.human_id is not None:
+            payment_stmt = (
+                select(Payments)
+                .join(Applications, Payments.application_id == Applications.id)  # type: ignore[arg-type]
+                .where(
+                    Applications.human_id == cart.human_id,
+                    Applications.popup_id == cart.popup_id,
+                    Payments.status.in_(pending_statuses),  # type: ignore[attr-defined]
+                )
+                .order_by(Payments.created_at.desc())  # type: ignore[union-attr]
             )
-            .order_by(Payments.created_at.desc())  # type: ignore[union-attr]
-        )
+        else:
+            payment_stmt = (
+                select(Payments)
+                .where(
+                    Payments.application_id.is_(None),  # type: ignore[union-attr]
+                    Payments.popup_id == cart.popup_id,
+                    Payments.status.in_(pending_statuses),  # type: ignore[attr-defined]
+                    text("buyer_snapshot->>'buyer_email' = :buyer_email"),
+                )
+                .params(buyer_email=(cart.email or "").lower())
+                .order_by(Payments.created_at.desc())  # type: ignore[union-attr]
+            )
         payments = list(db.exec(payment_stmt).all())
 
         items = CartState.model_validate(cart.items) if cart.items else CartState()
+
+        human_info = (
+            CartHumanInfo(
+                id=human.id,
+                email=human.email,
+                first_name=human.first_name,
+                last_name=human.last_name,
+            )
+            if human is not None
+            else None
+        )
 
         results.append(
             AbandonedCartPublic(
@@ -68,12 +96,8 @@ async def list_abandoned_carts(
                 items=items,
                 created_at=cart.created_at,
                 updated_at=cart.updated_at,
-                human=CartHumanInfo(
-                    id=human.id,
-                    email=human.email,
-                    first_name=human.first_name,
-                    last_name=human.last_name,
-                ),
+                email=human.email if human is not None else cart.email,
+                human=human_info,
                 popup=CartPopupInfo(
                     id=popup.id,
                     name=popup.name,

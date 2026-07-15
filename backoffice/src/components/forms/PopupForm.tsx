@@ -66,6 +66,7 @@ import {
 } from "@/components/ui/select"
 import { Separator } from "@/components/ui/separator"
 import { Switch } from "@/components/ui/switch"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import useAuth from "@/hooks/useAuth"
 import useCustomToast from "@/hooks/useCustomToast"
@@ -346,880 +347,270 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
 
   return (
     <div className="space-y-6">
-      <form
-        noValidate
-        onSubmit={(e) => {
-          e.preventDefault()
-          if (!readOnly) {
-            form.handleSubmit()
-          }
-        }}
-        className="mx-auto max-w-2xl space-y-6"
-      >
-        <FormErrorSummary
-          form={form}
-          fieldLabels={{
-            name: "Pop-up Name",
-            tagline: "Tagline",
-            location: "Location",
-            slug: "Slug",
-            start_date: "Start Date",
-            end_date: "End Date",
-          }}
-        />
-
-        {/* Hero: Name + Status */}
-        <div className="space-y-3">
-          <form.Field
-            name="name"
-            validators={{
-              onBlur: ({ value }) =>
-                !readOnly && !value ? "Name is required" : undefined,
+      <Tabs defaultValue="general" className="mx-auto max-w-2xl space-y-6">
+        <TabsList>
+          <TabsTrigger value="general">General</TabsTrigger>
+          <TabsTrigger value="translations">Translations</TabsTrigger>
+        </TabsList>
+        <TabsContent value="general" className="space-y-6">
+          <form
+            noValidate
+            onSubmit={(e) => {
+              e.preventDefault()
+              if (!readOnly) {
+                form.handleSubmit()
+              }
             }}
+            className="mx-auto max-w-2xl space-y-6"
           >
-            {(field) => (
-              <div>
-                <HeroInput
-                  placeholder="Pop-up Name"
-                  value={field.state.value}
-                  onBlur={field.handleBlur}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                  disabled={readOnly}
-                />
-                <FieldError errors={field.state.meta.errors} />
-              </div>
-            )}
-          </form.Field>
-
-          <form.Field name="tagline">
-            {(field) => (
-              <div className="space-y-2">
-                <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                  Tagline
-                </Label>
-                <Input
-                  placeholder="Short description or slogan"
-                  value={field.state.value}
-                  onBlur={field.handleBlur}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                  disabled={readOnly}
-                  className="text-sm"
-                />
-                <FieldError errors={field.state.meta.errors} />
-              </div>
-            )}
-          </form.Field>
-
-          <form.Field name="location">
-            {(field) => (
-              <div className="space-y-2">
-                <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                  Location
-                </Label>
-                <Input
-                  placeholder="Pop-up location or venue"
-                  value={field.state.value}
-                  onBlur={field.handleBlur}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                  disabled={readOnly}
-                  className="text-sm"
-                />
-                <FieldError errors={field.state.meta.errors} />
-              </div>
-            )}
-          </form.Field>
-
-          <form.Field name="status">
-            {(field) => (
-              <div className="flex items-center gap-2">
-                <Select
-                  value={field.state.value}
-                  onValueChange={(value) =>
-                    field.handleChange(value as typeof field.state.value)
-                  }
-                  disabled={readOnly}
-                >
-                  <SelectTrigger className="w-auto border-0 bg-transparent p-0 shadow-none focus:ring-0">
-                    <Badge
-                      variant={
-                        field.state.value === "active" ? "default" : "secondary"
-                      }
-                    >
-                      <SelectValue />
-                    </Badge>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {POPUP_STATUSES.map((status) => (
-                      <SelectItem key={status.value} value={status.value}>
-                        {status.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-          </form.Field>
-        </div>
-
-        {/* Popup Details - right after identity (edit only) */}
-        {isEdit && (
-          <div className="flex gap-6 text-sm text-muted-foreground">
-            <div>
-              <span className="text-xs uppercase tracking-wider">Slug</span>
-              <p className="font-mono">{defaultValues.slug}</p>
-            </div>
-          </div>
-        )}
-
-        <Separator />
-
-        {/* Sale Model — keep commerce decisions near the event identity,
-            like the previous implementation. */}
-        <div className="space-y-3">
-          <div className="space-y-1 px-1">
-            <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-              Commerce setup
-            </h3>
-            <p className="text-sm text-muted-foreground">
-              Decide how people will access this event. This is the primary
-              identity of the popup. Checkout mode is always derived from this
-              choice by the backend.
-            </p>
-          </div>
-
-          <InlineSection title="How this event sells">
-            <form.Field name="sale_type">
-              {(field) => (
-                <InlineRow
-                  icon={
-                    isEdit ? (
-                      <Lock className="h-4 w-4 text-muted-foreground" />
-                    ) : (
-                      <ShoppingCart className="h-4 w-4 text-muted-foreground" />
-                    )
-                  }
-                  label="Sale Type"
-                  description={
-                    isEdit
-                      ? "Change sale type only if this popup has no approved payments yet"
-                      : "Choose whether people apply first or buy tickets directly"
-                  }
-                >
-                  <Select
-                    value={field.state.value}
-                    onValueChange={(value) =>
-                      field.handleChange(value as SaleType)
-                    }
-                    disabled={readOnly}
-                  >
-                    <SelectTrigger className="w-[220px] text-sm" size="sm">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="application">
-                        {SALE_TYPE_COPY.application.label}
-                      </SelectItem>
-                      <SelectItem value="direct">
-                        {SALE_TYPE_COPY.direct.label}
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                </InlineRow>
-              )}
-            </form.Field>
-          </InlineSection>
-
-          <form.Subscribe selector={(state) => state.values.sale_type}>
-            {(saleType) => {
-              const copy = SALE_TYPE_COPY[saleType]
-              const guidance = getSaleTypeGuidance(saleType)
-              return (
-                <div className="rounded-xl border bg-muted/30 p-4">
-                  <p className="text-sm font-semibold">{copy.label}</p>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    {copy.description}
-                  </p>
-                  <div className="mt-3 border-t pt-3">
-                    <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                      {guidance.title}
-                    </p>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      {guidance.description}
-                    </p>
-                  </div>
-                </div>
-              )
-            }}
-          </form.Subscribe>
-
-          <InlineSection>
-            <form.Field name="currency">
-              {(field) => (
-                <InlineRow
-                  icon={
-                    <DollarSign className="h-4 w-4 text-muted-foreground" />
-                  }
-                  label="Currency"
-                  description="Currency used for products, fees, invoices, and checkout totals"
-                >
-                  <Select
-                    value={field.state.value}
-                    onValueChange={(value) => field.handleChange(value)}
-                    disabled={readOnly}
-                  >
-                    <SelectTrigger className="w-[220px] text-sm" size="sm">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {CURRENCIES.map((currency) => (
-                        <SelectItem key={currency.value} value={currency.value}>
-                          {currency.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </InlineRow>
-              )}
-            </form.Field>
-          </InlineSection>
-        </div>
-
-        <Separator />
-
-        {/* Event Details */}
-        <InlineSection title="Pop-up Details">
-          <form.Field
-            name="start_date"
-            validators={{
-              onChange: ({ value }) => {
-                if (readOnly || !value || isEdit) return undefined
-                const today = new Date()
-                today.setHours(0, 0, 0, 0)
-                const startDate = new Date(value)
-                startDate.setHours(0, 0, 0, 0)
-                if (startDate < today) {
-                  return "Start date must be today or in the future"
-                }
-                return undefined
-              },
-            }}
-          >
-            {(field) => (
-              <div>
-                <InlineRow
-                  icon={<Calendar className="h-4 w-4 text-muted-foreground" />}
-                  label="Start Date"
-                >
-                  <DatePicker
-                    id="start_date"
-                    value={field.state.value}
-                    onChange={field.handleChange}
-                    disabled={readOnly}
-                    placeholder="Select date"
-                    className="w-auto"
-                  />
-                </InlineRow>
-                <FieldError errors={field.state.meta.errors} />
-              </div>
-            )}
-          </form.Field>
-
-          <form.Subscribe selector={(state) => state.values.start_date}>
-            {(startDate) => {
-              const startDateAsDate = startDate
-                ? (() => {
-                    const [y, m, d] = startDate
-                      .slice(0, 10)
-                      .split("-")
-                      .map(Number)
-                    return new Date(y, m - 1, d)
-                  })()
-                : undefined
-              return (
-                <form.Field
-                  name="end_date"
-                  validators={{
-                    onChange: ({ value, fieldApi }) => {
-                      if (readOnly || !value) return undefined
-                      const startDateValue =
-                        fieldApi.form.getFieldValue("start_date")
-                      if (!startDateValue) return undefined
-                      const sd = new Date(startDateValue)
-                      const endDate = new Date(value)
-                      if (endDate < sd) {
-                        return "End date cannot be before start date"
-                      }
-                      return undefined
-                    },
-                  }}
-                >
-                  {(field) => (
-                    <div>
-                      <InlineRow
-                        icon={
-                          <Calendar className="h-4 w-4 text-muted-foreground" />
-                        }
-                        label="End Date"
-                      >
-                        <DatePicker
-                          id="end_date"
-                          value={field.state.value}
-                          onChange={field.handleChange}
-                          disabled={readOnly}
-                          placeholder="Select date"
-                          defaultMonth={startDateAsDate}
-                          className="w-auto"
-                        />
-                      </InlineRow>
-                      <FieldError errors={field.state.meta.errors} />
-                    </div>
-                  )}
-                </form.Field>
-              )
-            }}
-          </form.Subscribe>
-        </InlineSection>
-
-        <Separator />
-
-        {/* Event Options */}
-        <InlineSection title="Pop-up Options">
-          <form.Field name="allows_coupons">
-            {(field) => (
-              <InlineRow
-                icon={<Ticket className="h-4 w-4 text-muted-foreground" />}
-                label="Discount Coupons"
-                description="Enable discount coupons for this pop-up"
-              >
-                <Switch
-                  id="allows_coupons"
-                  checked={field.state.value}
-                  onCheckedChange={(checked) => field.handleChange(checked)}
-                  disabled={readOnly}
-                />
-              </InlineRow>
-            )}
-          </form.Field>
-
-          <form.Field name="allows_scholarship">
-            {(field) => (
-              <InlineRow
-                icon={
-                  <GraduationCap className="h-4 w-4 text-muted-foreground" />
-                }
-                label="Scholarship Requests"
-                description="Allow applicants to request financial assistance"
-              >
-                <Switch
-                  id="allows_scholarship"
-                  checked={!!field.state.value}
-                  onCheckedChange={(checked) => field.handleChange(checked)}
-                  disabled={readOnly}
-                />
-              </InlineRow>
-            )}
-          </form.Field>
-
-          <form.Subscribe selector={(state) => state.values.allows_scholarship}>
-            {(allowsScholarship) =>
-              allowsScholarship ? (
-                <form.Field name="allows_incentive">
-                  {(field) => (
-                    <InlineRow
-                      icon={
-                        <DollarSign className="h-4 w-4 text-muted-foreground" />
-                      }
-                      label="Cash Incentives"
-                      description="Allow assigning a cash grant alongside scholarship approval"
-                    >
-                      <Switch
-                        id="allows_incentive"
-                        checked={!!field.state.value}
-                        onCheckedChange={(checked) =>
-                          field.handleChange(checked)
-                        }
-                        disabled={readOnly}
-                      />
-                    </InlineRow>
-                  )}
-                </form.Field>
-              ) : null
-            }
-          </form.Subscribe>
-
-          <form.Field name="requires_application_fee">
-            {(field) => (
-              <InlineRow
-                icon={<DollarSign className="h-4 w-4 text-muted-foreground" />}
-                label="Require Application Fee"
-                description="Applicants must pay a refundable fee before their application is reviewed"
-              >
-                <Switch
-                  id="requires_application_fee"
-                  checked={!!field.state.value}
-                  onCheckedChange={(checked) => field.handleChange(checked)}
-                  disabled={readOnly}
-                />
-              </InlineRow>
-            )}
-          </form.Field>
-
-          <form.Subscribe
-            selector={(state) => ({
-              requiresFee: state.values.requires_application_fee,
-              currency: state.values.currency,
-            })}
-          >
-            {({ requiresFee, currency }) =>
-              requiresFee ? (
-                <form.Field name="application_fee_amount">
-                  {(field) => (
-                    <InlineRow
-                      icon={
-                        <DollarSign className="h-4 w-4 text-muted-foreground" />
-                      }
-                      label={`Fee Amount (${currency})`}
-                      description={`Amount in ${currency} that applicants must pay`}
-                    >
-                      <Input
-                        id="application_fee_amount"
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        placeholder="0.00"
-                        value={field.state.value}
-                        onChange={(e) => field.handleChange(e.target.value)}
-                        disabled={readOnly}
-                        className="max-w-[120px] text-sm"
-                      />
-                    </InlineRow>
-                  )}
-                </form.Field>
-              ) : null
-            }
-          </form.Subscribe>
-
-          <form.Field name="checkin_pass_lead_days">
-            {(field) => (
-              <InlineRow
-                icon={<QrCode className="h-4 w-4 text-muted-foreground" />}
-                label="Check-in Pass Email"
-                description="Days before the event start to email attendees their check-in QR code. Leave empty to disable."
-              >
-                <Input
-                  id="checkin_pass_lead_days"
-                  type="number"
-                  min="1"
-                  step="1"
-                  placeholder="e.g. 3"
-                  value={field.state.value}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                  disabled={readOnly}
-                  className="max-w-[120px] text-sm"
-                />
-              </InlineRow>
-            )}
-          </form.Field>
-        </InlineSection>
-
-        <Separator />
-
-        {/* Companion Types — only available when editing an existing popup */}
-        {isEdit && defaultValues && (
-          <>
-            <AttendeeCategoriesEditor
-              popupId={defaultValues.id}
-              readOnly={readOnly}
+            <FormErrorSummary
+              form={form}
+              fieldLabels={{
+                name: "Pop-up Name",
+                tagline: "Tagline",
+                location: "Location",
+                slug: "Slug",
+                start_date: "Start Date",
+                end_date: "End Date",
+              }}
             />
-            <Separator />
-          </>
-        )}
 
-        {/* Branding */}
-        <InlineSection title="Branding">
-          <form.Field name="image_url">
-            {(field) => (
-              <div className="space-y-2 py-3">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted">
-                    <Image className="h-4 w-4 text-muted-foreground" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium">Cover Image</p>
-                    <p className="text-xs text-muted-foreground">
-                      Main event image used in cards, tickets, application
-                      headers, invoices, and emails
-                    </p>
-                  </div>
-                </div>
-                <ImageUpload
-                  value={field.state.value || null}
-                  onChange={(url) => field.handleChange(url ?? "")}
-                  disabled={readOnly}
-                />
-              </div>
-            )}
-          </form.Field>
-
-          <form.Field name="icon_url">
-            {(field) => (
-              <div className="space-y-2 py-3">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted">
-                    <Image className="h-4 w-4 text-muted-foreground" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium">Icon</p>
-                    <p className="text-xs text-muted-foreground">
-                      Small icon shown in the portal sidebar popup menu
-                    </p>
-                  </div>
-                </div>
-                <ImageUpload
-                  value={field.state.value || null}
-                  onChange={(url) => field.handleChange(url ?? "")}
-                  disabled={readOnly}
-                />
-              </div>
-            )}
-          </form.Field>
-
-          <form.Field name="favicon_url">
-            {(field) => (
-              <div className="space-y-2 py-3">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted">
-                    <Image className="h-4 w-4 text-muted-foreground" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium">Favicon</p>
-                    <p className="text-xs text-muted-foreground">
-                      Browser tab icon shown on the public checkout for this
-                      popup. Overrides the tenant default.
-                    </p>
-                  </div>
-                </div>
-                <ImageUpload
-                  value={field.state.value || null}
-                  onChange={(url) => field.handleChange(url ?? "")}
-                  disabled={readOnly}
-                />
-              </div>
-            )}
-          </form.Field>
-
-          <form.Field name="express_checkout_background">
-            {(field) => (
-              <div className="space-y-2 py-3">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted">
-                    <Image className="h-4 w-4 text-muted-foreground" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium">Checkout Background</p>
-                    <p className="text-xs text-muted-foreground">
-                      Full-screen background for checkout, invite, and success
-                      pages. Image or MP4 video (autoplay + audio toggle). Falls
-                      back to Cover Image, then tenant background.
-                    </p>
-                  </div>
-                </div>
-                <ImageUpload
-                  value={field.state.value || null}
-                  onChange={(url) => field.handleChange(url ?? "")}
-                  disabled={readOnly}
-                  accept="image+video"
-                />
-              </div>
-            )}
-          </form.Field>
-        </InlineSection>
-
-        <Separator />
-
-        {/* Links */}
-        <InlineSection title="Links">
-          <form.Field name="web_url">
-            {(field) => (
-              <InlineRow
-                icon={<Globe className="h-4 w-4 text-muted-foreground" />}
-                label="Website"
-              >
-                <Input
-                  id="web_url"
-                  type="url"
-                  placeholder="https://example.com"
-                  value={field.state.value}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                  disabled={readOnly}
-                  className="max-w-xs text-sm"
-                />
-              </InlineRow>
-            )}
-          </form.Field>
-
-          <form.Field name="blog_url">
-            {(field) => (
-              <InlineRow
-                icon={<FileText className="h-4 w-4 text-muted-foreground" />}
-                label="Blog"
-              >
-                <Input
-                  id="blog_url"
-                  type="url"
-                  placeholder="https://example.com/blog"
-                  value={field.state.value}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                  disabled={readOnly}
-                  className="max-w-xs text-sm"
-                />
-              </InlineRow>
-            )}
-          </form.Field>
-
-          <form.Field name="twitter_url">
-            {(field) => (
-              <InlineRow
-                icon={<LinkIcon className="h-4 w-4 text-muted-foreground" />}
-                label="Twitter"
-              >
-                <Input
-                  id="twitter_url"
-                  type="url"
-                  placeholder="https://twitter.com/example"
-                  value={field.state.value}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                  disabled={readOnly}
-                  className="max-w-xs text-sm"
-                />
-              </InlineRow>
-            )}
-          </form.Field>
-
-          <form.Field name="terms_and_conditions_url">
-            {(field) => (
-              <InlineRow
-                icon={<Scale className="h-4 w-4 text-muted-foreground" />}
-                label="Terms & Conditions"
-              >
-                <Input
-                  id="terms_and_conditions_url"
-                  type="url"
-                  placeholder="https://example.com/terms"
-                  value={field.state.value}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                  disabled={readOnly}
-                  className="max-w-xs text-sm"
-                />
-              </InlineRow>
-            )}
-          </form.Field>
-        </InlineSection>
-
-        <Separator />
-
-        {/* Integrations */}
-        <InlineSection title="Integrations">
-          <form.Field name="simplefi_api_key">
-            {(field) => (
-              <InlineRow
-                icon={<Key className="h-4 w-4 text-muted-foreground" />}
-                label="SimpleFi"
-                description="Payment integration API key"
-              >
-                <Input
-                  id="simplefi_api_key"
-                  type="password"
-                  placeholder="Enter API key"
-                  value={field.state.value}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                  disabled={readOnly}
-                  className="max-w-xs text-sm"
-                />
-              </InlineRow>
-            )}
-          </form.Field>
-          <form.Field name="simplefi_success_behavior">
-            {(field) => (
-              <InlineRow
-                icon={<LinkIcon className="h-4 w-4 text-muted-foreground" />}
-                label="SimpleFi success redirect"
-                description="How the buyer reaches the success URL after paying. Manual keeps them on SimpleFi's checkout until they click through; automatic redirects them immediately."
-              >
-                <Select
-                  value={field.state.value}
-                  onValueChange={(v) =>
-                    field.handleChange(v as SimpleFiSuccessBehavior)
-                  }
-                  disabled={readOnly}
-                >
-                  <SelectTrigger
-                    id="simplefi_success_behavior"
-                    className="w-[140px]"
-                  >
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="manual">Manual</SelectItem>
-                    <SelectItem value="automatic">Automatic</SelectItem>
-                  </SelectContent>
-                </Select>
-              </InlineRow>
-            )}
-          </form.Field>
-          <form.Field name="open_checkout_success_url">
-            {(field) => (
-              <InlineRow
-                icon={<LinkIcon className="h-4 w-4 text-muted-foreground" />}
-                label="Open checkout success URL"
-                description="Where the buyer is redirected after a successful open-checkout payment. Defaults to the portal thank-you page."
-              >
-                <Input
-                  id="open_checkout_success_url"
-                  type="url"
-                  placeholder="https://example.com/thank-you"
-                  value={field.state.value}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                  disabled={readOnly}
-                  className="max-w-xs text-sm"
-                />
-              </InlineRow>
-            )}
-          </form.Field>
-          <form.Field name="open_checkout_cancel_url">
-            {(field) => (
-              <InlineRow
-                icon={<LinkIcon className="h-4 w-4 text-muted-foreground" />}
-                label="Open checkout cancel URL"
-                description="Where the buyer is redirected after a cancelled open-checkout payment. Defaults to the portal checkout page."
-              >
-                <Input
-                  id="open_checkout_cancel_url"
-                  type="url"
-                  placeholder="https://example.com/checkout"
-                  value={field.state.value}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                  disabled={readOnly}
-                  className="max-w-xs text-sm"
-                />
-              </InlineRow>
-            )}
-          </form.Field>
-          <form.Field name="open_checkout_signing_secret">
-            {(field) => (
-              <InlineRow
-                icon={<Key className="h-4 w-4 text-muted-foreground" />}
-                label="Open checkout signing secret"
-                description="Shared secret to HMAC-sign the order data sent to the success URL. Set the same value on the external thank-you page to verify it. Leave empty to send the redirect without a signed payload."
-              >
-                <Input
-                  id="open_checkout_signing_secret"
-                  type="password"
-                  placeholder="Enter signing secret"
-                  value={field.state.value}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                  disabled={readOnly}
-                  className="max-w-xs text-sm"
-                />
-              </InlineRow>
-            )}
-          </form.Field>
-        </InlineSection>
-
-        <Separator />
-
-        {/* Invoice Settings */}
-        <InlineSection title="Invoice Settings">
-          <form.Field name="invoice_company_name">
-            {(field) => (
-              <InlineRow
-                icon={<Building2 className="h-4 w-4 text-muted-foreground" />}
-                label="Company Name"
-              >
-                <Input
-                  id="invoice_company_name"
-                  placeholder="Acme Inc"
-                  value={field.state.value}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                  disabled={readOnly}
-                  className="max-w-xs text-sm"
-                />
-              </InlineRow>
-            )}
-          </form.Field>
-
-          <form.Field name="invoice_company_address">
-            {(field) => (
-              <InlineRow
-                icon={<MapPin className="h-4 w-4 text-muted-foreground" />}
-                label="Address"
-              >
-                <Input
-                  id="invoice_company_address"
-                  placeholder="123 Main St, City, Country"
-                  value={field.state.value}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                  disabled={readOnly}
-                  className="max-w-xs text-sm"
-                />
-              </InlineRow>
-            )}
-          </form.Field>
-
-          <form.Field name="invoice_company_email">
-            {(field) => (
-              <InlineRow
-                icon={<Mail className="h-4 w-4 text-muted-foreground" />}
-                label="Email"
-              >
-                <Input
-                  id="invoice_company_email"
-                  type="email"
-                  placeholder="billing@example.com"
-                  value={field.state.value}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                  disabled={readOnly}
-                  className="max-w-xs text-sm"
-                />
-              </InlineRow>
-            )}
-          </form.Field>
-        </InlineSection>
-
-        <Separator />
-
-        {/* Insurance */}
-        <InlineSection title="Insurance">
-          <form.Field name="insurance_enabled">
-            {(field) => (
-              <InlineRow
-                icon={<ShieldCheck className="h-4 w-4 text-muted-foreground" />}
-                label="Enable Insurance"
-                description="Offer insurance for eligible products during checkout"
-              >
-                <Switch
-                  id="insurance_enabled"
-                  checked={field.state.value}
-                  onCheckedChange={(checked) => field.handleChange(checked)}
-                  disabled={readOnly}
-                />
-              </InlineRow>
-            )}
-          </form.Field>
-
-          <form.Subscribe selector={(state) => state.values.insurance_enabled}>
-            {(insuranceEnabled) => (
+            {/* Hero: Name + Status */}
+            <div className="space-y-3">
               <form.Field
-                name="insurance_percentage"
+                name="name"
                 validators={{
-                  onBlur: ({ value }) => {
-                    if (readOnly || !insuranceEnabled) return undefined
-                    const num = Number.parseFloat(value)
-                    if (!value || Number.isNaN(num) || num <= 0) {
-                      return "Insurance percentage must be greater than 0 when insurance is enabled"
-                    }
-                    if (num > 100) {
-                      return "Insurance percentage cannot exceed 100"
+                  onBlur: ({ value }) =>
+                    !readOnly && !value ? "Name is required" : undefined,
+                }}
+              >
+                {(field) => (
+                  <div>
+                    <HeroInput
+                      placeholder="Pop-up Name"
+                      value={field.state.value}
+                      onBlur={field.handleBlur}
+                      onChange={(e) => field.handleChange(e.target.value)}
+                      disabled={readOnly}
+                    />
+                    <FieldError errors={field.state.meta.errors} />
+                  </div>
+                )}
+              </form.Field>
+
+              <form.Field name="tagline">
+                {(field) => (
+                  <div className="space-y-2">
+                    <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                      Tagline
+                    </Label>
+                    <Input
+                      placeholder="Short description or slogan"
+                      value={field.state.value}
+                      onBlur={field.handleBlur}
+                      onChange={(e) => field.handleChange(e.target.value)}
+                      disabled={readOnly}
+                      className="text-sm"
+                    />
+                    <FieldError errors={field.state.meta.errors} />
+                  </div>
+                )}
+              </form.Field>
+
+              <form.Field name="location">
+                {(field) => (
+                  <div className="space-y-2">
+                    <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                      Location
+                    </Label>
+                    <Input
+                      placeholder="Pop-up location or venue"
+                      value={field.state.value}
+                      onBlur={field.handleBlur}
+                      onChange={(e) => field.handleChange(e.target.value)}
+                      disabled={readOnly}
+                      className="text-sm"
+                    />
+                    <FieldError errors={field.state.meta.errors} />
+                  </div>
+                )}
+              </form.Field>
+
+              <form.Field name="status">
+                {(field) => (
+                  <div className="flex items-center gap-2">
+                    <Select
+                      value={field.state.value}
+                      onValueChange={(value) =>
+                        field.handleChange(value as typeof field.state.value)
+                      }
+                      disabled={readOnly}
+                    >
+                      <SelectTrigger className="w-auto border-0 bg-transparent p-0 shadow-none focus:ring-0">
+                        <Badge
+                          variant={
+                            field.state.value === "active"
+                              ? "default"
+                              : "secondary"
+                          }
+                        >
+                          <SelectValue />
+                        </Badge>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {POPUP_STATUSES.map((status) => (
+                          <SelectItem key={status.value} value={status.value}>
+                            {status.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </form.Field>
+            </div>
+
+            {/* Popup Details - right after identity (edit only) */}
+            {isEdit && (
+              <div className="flex gap-6 text-sm text-muted-foreground">
+                <div>
+                  <span className="text-xs uppercase tracking-wider">Slug</span>
+                  <p className="font-mono">{defaultValues.slug}</p>
+                </div>
+              </div>
+            )}
+
+            <Separator />
+
+            {/* Sale Model — keep commerce decisions near the event identity,
+            like the previous implementation. */}
+            <div className="space-y-3">
+              <div className="space-y-1 px-1">
+                <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                  Commerce setup
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  Decide how people will access this event. This is the primary
+                  identity of the popup. Checkout mode is always derived from
+                  this choice by the backend.
+                </p>
+              </div>
+
+              <InlineSection title="How this event sells">
+                <form.Field name="sale_type">
+                  {(field) => (
+                    <InlineRow
+                      icon={
+                        isEdit ? (
+                          <Lock className="h-4 w-4 text-muted-foreground" />
+                        ) : (
+                          <ShoppingCart className="h-4 w-4 text-muted-foreground" />
+                        )
+                      }
+                      label="Sale Type"
+                      description={
+                        isEdit
+                          ? "Change sale type only if this popup has no approved payments yet"
+                          : "Choose whether people apply first or buy tickets directly"
+                      }
+                    >
+                      <Select
+                        value={field.state.value}
+                        onValueChange={(value) =>
+                          field.handleChange(value as SaleType)
+                        }
+                        disabled={readOnly}
+                      >
+                        <SelectTrigger className="w-[220px] text-sm" size="sm">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="application">
+                            {SALE_TYPE_COPY.application.label}
+                          </SelectItem>
+                          <SelectItem value="direct">
+                            {SALE_TYPE_COPY.direct.label}
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </InlineRow>
+                  )}
+                </form.Field>
+              </InlineSection>
+
+              <form.Subscribe selector={(state) => state.values.sale_type}>
+                {(saleType) => {
+                  const copy = SALE_TYPE_COPY[saleType]
+                  const guidance = getSaleTypeGuidance(saleType)
+                  return (
+                    <div className="rounded-xl border bg-muted/30 p-4">
+                      <p className="text-sm font-semibold">{copy.label}</p>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        {copy.description}
+                      </p>
+                      <div className="mt-3 border-t pt-3">
+                        <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                          {guidance.title}
+                        </p>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          {guidance.description}
+                        </p>
+                      </div>
+                    </div>
+                  )
+                }}
+              </form.Subscribe>
+
+              <InlineSection>
+                <form.Field name="currency">
+                  {(field) => (
+                    <InlineRow
+                      icon={
+                        <DollarSign className="h-4 w-4 text-muted-foreground" />
+                      }
+                      label="Currency"
+                      description="Currency used for products, fees, invoices, and checkout totals"
+                    >
+                      <Select
+                        value={field.state.value}
+                        onValueChange={(value) => field.handleChange(value)}
+                        disabled={readOnly}
+                      >
+                        <SelectTrigger className="w-[220px] text-sm" size="sm">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {CURRENCIES.map((currency) => (
+                            <SelectItem
+                              key={currency.value}
+                              value={currency.value}
+                            >
+                              {currency.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </InlineRow>
+                  )}
+                </form.Field>
+              </InlineSection>
+            </div>
+
+            <Separator />
+
+            {/* Event Details */}
+            <InlineSection title="Pop-up Details">
+              <form.Field
+                name="start_date"
+                validators={{
+                  onChange: ({ value }) => {
+                    if (readOnly || !value || isEdit) return undefined
+                    const today = new Date()
+                    today.setHours(0, 0, 0, 0)
+                    const startDate = new Date(value)
+                    startDate.setHours(0, 0, 0, 0)
+                    if (startDate < today) {
+                      return "Start date must be today or in the future"
                     }
                     return undefined
                   },
@@ -1229,589 +620,1270 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
                   <div>
                     <InlineRow
                       icon={
-                        <ShieldCheck className="h-4 w-4 text-muted-foreground" />
+                        <Calendar className="h-4 w-4 text-muted-foreground" />
                       }
-                      label="Insurance Rate (%)"
-                      description="Percentage of eligible product price applied as insurance fee"
+                      label="Start Date"
                     >
-                      <Input
-                        id="insurance_percentage"
-                        type="number"
-                        min="0.01"
-                        max="100"
-                        step="0.01"
-                        placeholder="e.g. 5.00"
+                      <DatePicker
+                        id="start_date"
                         value={field.state.value}
-                        onBlur={field.handleBlur}
-                        onChange={(e) => field.handleChange(e.target.value)}
-                        disabled={readOnly || !insuranceEnabled}
-                        className="max-w-[120px] text-sm"
+                        onChange={field.handleChange}
+                        disabled={readOnly}
+                        placeholder="Select date"
+                        className="w-auto"
                       />
                     </InlineRow>
                     <FieldError errors={field.state.meta.errors} />
                   </div>
                 )}
               </form.Field>
-            )}
-          </form.Subscribe>
-        </InlineSection>
 
-        <Separator />
-
-        {/* Contribution fee */}
-        <InlineSection title="Contribution">
-          <form.Field name="contribution_enabled">
-            {(field) => (
-              <InlineRow
-                icon={<HandCoins className="h-4 w-4 text-muted-foreground" />}
-                label="Enable Contribution"
-                description="Add an optional contribution fee to orders at checkout"
-              >
-                <Switch
-                  id="contribution_enabled"
-                  checked={field.state.value}
-                  onCheckedChange={(checked) => field.handleChange(checked)}
-                  disabled={readOnly}
-                />
-              </InlineRow>
-            )}
-          </form.Field>
-
-          <form.Subscribe
-            selector={(state) => state.values.contribution_enabled}
-          >
-            {(contributionEnabled) => (
-              <>
-                <form.Field
-                  name="contribution_percentage"
-                  validators={{
-                    onBlur: ({ value }) => {
-                      if (readOnly || !contributionEnabled) return undefined
-                      const num = Number.parseFloat(value)
-                      if (!value || Number.isNaN(num) || num < 0) {
-                        return "Contribution percentage must be 0 or greater when contribution is enabled"
-                      }
-                      if (num > 100) {
-                        return "Contribution percentage cannot exceed 100"
-                      }
-                      return undefined
-                    },
-                  }}
-                >
-                  {(field) => (
-                    <div>
-                      <InlineRow
-                        icon={
-                          <HandCoins className="h-4 w-4 text-muted-foreground" />
-                        }
-                        label="Contribution Rate (%)"
-                        description="Percentage of the total order applied as a contribution fee"
-                      >
-                        <Input
-                          id="contribution_percentage"
-                          type="number"
-                          min="0"
-                          max="100"
-                          step="0.01"
-                          placeholder="e.g. 2.50"
-                          value={field.state.value}
-                          onBlur={field.handleBlur}
-                          onChange={(e) => field.handleChange(e.target.value)}
-                          disabled={readOnly || !contributionEnabled}
-                          className="max-w-[120px] text-sm"
-                        />
-                      </InlineRow>
-                      <FieldError errors={field.state.meta.errors} />
-                    </div>
-                  )}
-                </form.Field>
-
-                <form.Field name="contribution_label">
-                  {(field) => (
-                    <InlineRow
-                      icon={
-                        <HandCoins className="h-4 w-4 text-muted-foreground" />
-                      }
-                      label="Contribution Label"
-                      description="Short name shown as the line item in the checkout summary"
+              <form.Subscribe selector={(state) => state.values.start_date}>
+                {(startDate) => {
+                  const startDateAsDate = startDate
+                    ? (() => {
+                        const [y, m, d] = startDate
+                          .slice(0, 10)
+                          .split("-")
+                          .map(Number)
+                        return new Date(y, m - 1, d)
+                      })()
+                    : undefined
+                  return (
+                    <form.Field
+                      name="end_date"
+                      validators={{
+                        onChange: ({ value, fieldApi }) => {
+                          if (readOnly || !value) return undefined
+                          const startDateValue =
+                            fieldApi.form.getFieldValue("start_date")
+                          if (!startDateValue) return undefined
+                          const sd = new Date(startDateValue)
+                          const endDate = new Date(value)
+                          if (endDate < sd) {
+                            return "End date cannot be before start date"
+                          }
+                          return undefined
+                        },
+                      }}
                     >
-                      <Input
-                        id="contribution_label"
-                        type="text"
-                        placeholder="e.g. Event support contribution"
-                        value={field.state.value}
-                        onBlur={field.handleBlur}
-                        onChange={(e) => field.handleChange(e.target.value)}
-                        disabled={readOnly || !contributionEnabled}
-                        className="max-w-xs text-sm"
-                      />
-                    </InlineRow>
-                  )}
-                </form.Field>
-
-                <form.Field name="contribution_description">
-                  {(field) => (
-                    <InlineRow
-                      icon={
-                        <HandCoins className="h-4 w-4 text-muted-foreground" />
-                      }
-                      label="Contribution Description"
-                      description="Longer explanation shown under the line item in the portal order summary"
-                    >
-                      <Textarea
-                        id="contribution_description"
-                        placeholder="e.g. This contribution helps fund scholarships and community programs."
-                        value={field.state.value}
-                        onBlur={field.handleBlur}
-                        onChange={(e) => field.handleChange(e.target.value)}
-                        disabled={readOnly || !contributionEnabled}
-                        className="w-80 max-w-xs text-sm field-sizing-fixed"
-                        rows={3}
-                      />
-                    </InlineRow>
-                  )}
-                </form.Field>
-              </>
-            )}
-          </form.Subscribe>
-        </InlineSection>
-
-        <Separator />
-
-        {/* Installment plans (SimpleFi) */}
-        <InlineSection title="Installment plans">
-          <form.Field name="installments_enabled">
-            {(field) => (
-              <InlineRow
-                icon={<CreditCard className="h-4 w-4 text-muted-foreground" />}
-                label="Enable installment plans"
-                description="Offer buyers the option to pay in scheduled installments. SimpleFi renders the per-cycle selector at checkout."
-              >
-                <Switch
-                  id="installments_enabled"
-                  checked={field.state.value}
-                  onCheckedChange={(checked) => field.handleChange(checked)}
-                  disabled={readOnly}
-                />
-              </InlineRow>
-            )}
-          </form.Field>
-
-          <form.Subscribe
-            selector={(state) => state.values.installments_enabled}
-          >
-            {(installmentsEnabled) =>
-              installmentsEnabled ? (
-                <>
-                  <form.Field
-                    name="installments_deadline"
-                    validators={{
-                      onBlur: ({ value }) => {
-                        if (readOnly) return undefined
-                        if (!value) {
-                          return "Deadline is required when installments are enabled"
-                        }
-                        return undefined
-                      },
-                    }}
-                  >
-                    {(field) => (
-                      <div>
-                        <InlineRow
-                          icon={
-                            <Calendar className="h-4 w-4 text-muted-foreground" />
-                          }
-                          label="Deadline"
-                          description="All installments must be paid by this date. New plans created after the deadline fall back to one-shot payment."
-                        >
-                          <DatePicker
-                            id="installments_deadline"
-                            value={field.state.value}
-                            onChange={field.handleChange}
-                            disabled={readOnly}
-                            placeholder="Select date"
-                            className="w-auto"
-                          />
-                        </InlineRow>
-                        <FieldError errors={field.state.meta.errors} />
-                      </div>
-                    )}
-                  </form.Field>
-
-                  <form.Field
-                    name="installments_max"
-                    validators={{
-                      onBlur: ({ value }) => {
-                        if (readOnly) return undefined
-                        if (!value) {
-                          return "Max installments is required when installments are enabled"
-                        }
-                        const num = Number.parseInt(value, 10)
-                        if (Number.isNaN(num) || num < 2 || num > 12) {
-                          return "Max installments must be between 2 and 12 (SimpleFi limit)"
-                        }
-                        return undefined
-                      },
-                    }}
-                  >
-                    {(field) => (
-                      <div>
-                        <InlineRow
-                          icon={
-                            <Ticket className="h-4 w-4 text-muted-foreground" />
-                          }
-                          label="Max installments"
-                          description="Ceiling shown to buyers. SimpleFi accepts 2–12; the actual number is picked by the buyer at checkout."
-                        >
-                          <Input
-                            id="installments_max"
-                            type="number"
-                            min="2"
-                            max="12"
-                            step="1"
-                            placeholder="e.g. 6"
-                            value={field.state.value}
-                            onBlur={field.handleBlur}
-                            onChange={(e) => field.handleChange(e.target.value)}
-                            disabled={readOnly}
-                            className="max-w-[120px] text-sm"
-                          />
-                        </InlineRow>
-                        <FieldError errors={field.state.meta.errors} />
-                      </div>
-                    )}
-                  </form.Field>
-
-                  <form.Field name="installments_interval">
-                    {(field) => (
-                      <InlineRow
-                        icon={
-                          <CalendarDays className="h-4 w-4 text-muted-foreground" />
-                        }
-                        label="Billing interval"
-                        description="Cadence between installments."
-                      >
-                        <Select
-                          value={field.state.value}
-                          onValueChange={(v) =>
-                            field.handleChange(v as InstallmentInterval)
-                          }
-                          disabled={readOnly}
-                        >
-                          <SelectTrigger
-                            id="installments_interval"
-                            className="w-[140px]"
+                      {(field) => (
+                        <div>
+                          <InlineRow
+                            icon={
+                              <Calendar className="h-4 w-4 text-muted-foreground" />
+                            }
+                            label="End Date"
                           >
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="day">Day</SelectItem>
-                            <SelectItem value="week">Week</SelectItem>
-                            <SelectItem value="month">Month</SelectItem>
-                            <SelectItem value="year">Year</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </InlineRow>
-                    )}
-                  </form.Field>
+                            <DatePicker
+                              id="end_date"
+                              value={field.state.value}
+                              onChange={field.handleChange}
+                              disabled={readOnly}
+                              placeholder="Select date"
+                              defaultMonth={startDateAsDate}
+                              className="w-auto"
+                            />
+                          </InlineRow>
+                          <FieldError errors={field.state.meta.errors} />
+                        </div>
+                      )}
+                    </form.Field>
+                  )
+                }}
+              </form.Subscribe>
+            </InlineSection>
 
-                  <form.Field
-                    name="installments_interval_count"
-                    validators={{
-                      onBlur: ({ value }) => {
-                        if (readOnly) return undefined
-                        const num = Number.parseInt(value, 10)
-                        if (!value || Number.isNaN(num) || num < 1) {
-                          return "Interval count must be at least 1"
-                        }
-                        return undefined
-                      },
-                    }}
+            <Separator />
+
+            {/* Event Options */}
+            <InlineSection title="Pop-up Options">
+              <form.Field name="allows_coupons">
+                {(field) => (
+                  <InlineRow
+                    icon={<Ticket className="h-4 w-4 text-muted-foreground" />}
+                    label="Discount Coupons"
+                    description="Enable discount coupons for this pop-up"
                   >
-                    {(field) => (
-                      <div>
+                    <Switch
+                      id="allows_coupons"
+                      checked={field.state.value}
+                      onCheckedChange={(checked) => field.handleChange(checked)}
+                      disabled={readOnly}
+                    />
+                  </InlineRow>
+                )}
+              </form.Field>
+
+              <form.Field name="allows_scholarship">
+                {(field) => (
+                  <InlineRow
+                    icon={
+                      <GraduationCap className="h-4 w-4 text-muted-foreground" />
+                    }
+                    label="Scholarship Requests"
+                    description="Allow applicants to request financial assistance"
+                  >
+                    <Switch
+                      id="allows_scholarship"
+                      checked={!!field.state.value}
+                      onCheckedChange={(checked) => field.handleChange(checked)}
+                      disabled={readOnly}
+                    />
+                  </InlineRow>
+                )}
+              </form.Field>
+
+              <form.Subscribe
+                selector={(state) => state.values.allows_scholarship}
+              >
+                {(allowsScholarship) =>
+                  allowsScholarship ? (
+                    <form.Field name="allows_incentive">
+                      {(field) => (
                         <InlineRow
                           icon={
-                            <CalendarDays className="h-4 w-4 text-muted-foreground" />
+                            <DollarSign className="h-4 w-4 text-muted-foreground" />
                           }
-                          label="Interval count"
-                          description="Multiplier on the interval (e.g. interval = week + count = 2 → bi-weekly)."
+                          label="Cash Incentives"
+                          description="Allow assigning a cash grant alongside scholarship approval"
+                        >
+                          <Switch
+                            id="allows_incentive"
+                            checked={!!field.state.value}
+                            onCheckedChange={(checked) =>
+                              field.handleChange(checked)
+                            }
+                            disabled={readOnly}
+                          />
+                        </InlineRow>
+                      )}
+                    </form.Field>
+                  ) : null
+                }
+              </form.Subscribe>
+
+              <form.Field name="requires_application_fee">
+                {(field) => (
+                  <InlineRow
+                    icon={
+                      <DollarSign className="h-4 w-4 text-muted-foreground" />
+                    }
+                    label="Require Application Fee"
+                    description="Applicants must pay a refundable fee before their application is reviewed"
+                  >
+                    <Switch
+                      id="requires_application_fee"
+                      checked={!!field.state.value}
+                      onCheckedChange={(checked) => field.handleChange(checked)}
+                      disabled={readOnly}
+                    />
+                  </InlineRow>
+                )}
+              </form.Field>
+
+              <form.Subscribe
+                selector={(state) => ({
+                  requiresFee: state.values.requires_application_fee,
+                  currency: state.values.currency,
+                })}
+              >
+                {({ requiresFee, currency }) =>
+                  requiresFee ? (
+                    <form.Field name="application_fee_amount">
+                      {(field) => (
+                        <InlineRow
+                          icon={
+                            <DollarSign className="h-4 w-4 text-muted-foreground" />
+                          }
+                          label={`Fee Amount (${currency})`}
+                          description={`Amount in ${currency} that applicants must pay`}
                         >
                           <Input
-                            id="installments_interval_count"
+                            id="application_fee_amount"
                             type="number"
-                            min="1"
-                            step="1"
+                            min="0"
+                            step="0.01"
+                            placeholder="0.00"
                             value={field.state.value}
-                            onBlur={field.handleBlur}
                             onChange={(e) => field.handleChange(e.target.value)}
                             disabled={readOnly}
                             className="max-w-[120px] text-sm"
                           />
                         </InlineRow>
-                        <FieldError errors={field.state.meta.errors} />
-                      </div>
-                    )}
-                  </form.Field>
-                </>
-              ) : null
-            }
-          </form.Subscribe>
-        </InlineSection>
+                      )}
+                    </form.Field>
+                  ) : null
+                }
+              </form.Subscribe>
 
-        <Separator />
+              <form.Field name="checkin_pass_lead_days">
+                {(field) => (
+                  <InlineRow
+                    icon={<QrCode className="h-4 w-4 text-muted-foreground" />}
+                    label="Check-in Pass Email"
+                    description="Days before the event start to email attendees their check-in QR code. Leave empty to disable."
+                  >
+                    <Input
+                      id="checkin_pass_lead_days"
+                      type="number"
+                      min="1"
+                      step="1"
+                      placeholder="e.g. 3"
+                      value={field.state.value}
+                      onChange={(e) => field.handleChange(e.target.value)}
+                      disabled={readOnly}
+                      className="max-w-[120px] text-sm"
+                    />
+                  </InlineRow>
+                )}
+              </form.Field>
+            </InlineSection>
 
-        {/* Self-service check-in feature flag */}
-        <InlineSection title="Self-service check-in">
-          <form.Field name="self_check_in_enabled">
-            {(field) => (
-              <InlineRow
-                icon={<QrCode className="h-4 w-4 text-muted-foreground" />}
-                label="Enable attendee self check-in"
-                description="Allow authenticated attendees to check themselves in from the hidden QR-code portal page."
-              >
-                <Switch
-                  id="self_check_in_enabled"
-                  checked={field.state.value}
-                  onCheckedChange={(checked) => field.handleChange(checked)}
-                  disabled={readOnly}
-                />
-              </InlineRow>
-            )}
-          </form.Field>
-        </InlineSection>
+            <Separator />
 
-        <Separator />
-
-        {/* Attendee directory feature flag */}
-        <form.Subscribe selector={(state) => state.values.sale_type}>
-          {(saleType) =>
-            saleType === "application" ? (
+            {/* Companion Types — only available when editing an existing popup */}
+            {isEdit && defaultValues && (
               <>
-                <InlineSection title="Attendee directory">
-                  <form.Field name="show_attendee_directory">
-                    {(field) => (
-                      <InlineRow
-                        icon={
-                          <Users className="h-4 w-4 text-muted-foreground" />
-                        }
-                        label="Show attendee directory"
-                        description="Show the directory in the portal for accepted applicants."
-                      >
-                        <Switch
-                          id="show_attendee_directory"
-                          checked={field.state.value}
-                          onCheckedChange={(checked) =>
-                            field.handleChange(checked)
-                          }
-                          disabled={readOnly}
-                        />
-                      </InlineRow>
-                    )}
-                  </form.Field>
-                </InlineSection>
-
+                <AttendeeCategoriesEditor
+                  popupId={defaultValues.id}
+                  readOnly={readOnly}
+                />
                 <Separator />
               </>
-            ) : null
-          }
-        </form.Subscribe>
-
-        {/* Events module feature flag */}
-        <InlineSection title="Events module">
-          <form.Field name="events_enabled">
-            {(field) => (
-              <InlineRow
-                icon={
-                  <CalendarDays className="h-4 w-4 text-muted-foreground" />
-                }
-                label="Enable events module"
-                description="Show the Events section in the portal (calendar, venues, RSVPs). When off, the entire section is hidden — to only block creating new events without hiding existing ones, use the Event Settings page instead."
-              >
-                <Switch
-                  id="events_enabled"
-                  checked={field.state.value}
-                  onCheckedChange={(checked) => field.handleChange(checked)}
-                  disabled={readOnly}
-                />
-              </InlineRow>
             )}
-          </form.Field>
-        </InlineSection>
 
-        <Separator />
-
-        {/* Pass editing feature flag */}
-        <InlineSection title="Pass Editing">
-          <form.Field name="edit_passes_enabled">
-            {(field) => (
-              <InlineRow
-                icon={<Coins className="h-4 w-4 text-muted-foreground" />}
-                label="Enable pass editing"
-                description="Allow attendees to edit their already-purchased passes during checkout. Giving up a pass returns its value as credit toward a new one."
-              >
-                <Switch
-                  id="edit_passes_enabled"
-                  checked={field.state.value}
-                  onCheckedChange={(checked) => field.handleChange(checked)}
-                  disabled={readOnly}
-                />
-              </InlineRow>
-            )}
-          </form.Field>
-        </InlineSection>
-
-        <Separator />
-
-        {/* Languages */}
-        <InlineSection title="Languages">
-          <form.Field name="default_language">
-            {(field) => (
-              <InlineRow
-                icon={<Languages className="h-4 w-4 text-muted-foreground" />}
-                label="Default Language"
-                description="The primary language for this event"
-              >
-                <Select
-                  value={field.state.value}
-                  onValueChange={(value) => field.handleChange(value)}
-                  disabled={readOnly}
-                >
-                  <SelectTrigger className="w-auto">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {AVAILABLE_LANGUAGES.map((lang) => (
-                      <SelectItem key={lang.value} value={lang.value}>
-                        {lang.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </InlineRow>
-            )}
-          </form.Field>
-
-          <form.Field name="supported_languages">
-            {(field) => (
-              <InlineRow
-                icon={<Globe className="h-4 w-4 text-muted-foreground" />}
-                label="Supported Languages"
-                description="Languages available in the portal"
-              >
-                <div className="flex flex-col gap-2">
-                  {AVAILABLE_LANGUAGES.map((lang) => (
-                    <div
-                      key={lang.value}
-                      className="flex items-center gap-2 text-sm"
-                    >
-                      <Checkbox
-                        id={`lang-${lang.value}`}
-                        checked={field.state.value.includes(lang.value)}
-                        disabled={readOnly}
-                        onCheckedChange={(checked) => {
-                          const current = field.state.value
-                          if (checked) {
-                            field.handleChange([...current, lang.value])
-                          } else {
-                            const defaultLang =
-                              form.getFieldValue("default_language")
-                            if (lang.value === defaultLang) return
-                            field.handleChange(
-                              current.filter((l: string) => l !== lang.value),
-                            )
-                          }
-                        }}
-                      />
-                      <Label htmlFor={`lang-${lang.value}`}>{lang.label}</Label>
+            {/* Branding */}
+            <InlineSection title="Branding">
+              <form.Field name="image_url">
+                {(field) => (
+                  <div className="space-y-2 py-3">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted">
+                        <Image className="h-4 w-4 text-muted-foreground" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium">Cover Image</p>
+                        <p className="text-xs text-muted-foreground">
+                          Main event image used in cards, tickets, application
+                          headers, invoices, and emails
+                        </p>
+                      </div>
                     </div>
-                  ))}
-                </div>
-              </InlineRow>
-            )}
-          </form.Field>
-        </InlineSection>
+                    <ImageUpload
+                      value={field.state.value || null}
+                      onChange={(url) => field.handleChange(url ?? "")}
+                      disabled={readOnly}
+                    />
+                  </div>
+                )}
+              </form.Field>
 
-        <Separator />
+              <form.Field name="icon_url">
+                {(field) => (
+                  <div className="space-y-2 py-3">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted">
+                        <Image className="h-4 w-4 text-muted-foreground" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium">Icon</p>
+                        <p className="text-xs text-muted-foreground">
+                          Small icon shown in the portal sidebar popup menu
+                        </p>
+                      </div>
+                    </div>
+                    <ImageUpload
+                      value={field.state.value || null}
+                      onChange={(url) => field.handleChange(url ?? "")}
+                      disabled={readOnly}
+                    />
+                  </div>
+                )}
+              </form.Field>
 
-        {/* Approval strategy + Reviewers (edit only, application sale_type only —
-            direct-sale popups have no application flow, so these are meaningless) */}
-        {isEdit && (
-          <form.Subscribe selector={(state) => state.values.sale_type}>
-            {(saleType) =>
-              saleType === "application" ? (
-                <>
-                  <Separator />
+              <form.Field name="favicon_url">
+                {(field) => (
+                  <div className="space-y-2 py-3">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted">
+                        <Image className="h-4 w-4 text-muted-foreground" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium">Favicon</p>
+                        <p className="text-xs text-muted-foreground">
+                          Browser tab icon shown on the public checkout for this
+                          popup. Overrides the tenant default.
+                        </p>
+                      </div>
+                    </div>
+                    <ImageUpload
+                      value={field.state.value || null}
+                      onChange={(url) => field.handleChange(url ?? "")}
+                      disabled={readOnly}
+                    />
+                  </div>
+                )}
+              </form.Field>
 
-                  <ApprovalStrategyForm
-                    popupId={defaultValues!.id}
-                    readOnly={readOnly}
-                    variant="inline"
-                  />
+              <form.Field name="express_checkout_background">
+                {(field) => (
+                  <div className="space-y-2 py-3">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted">
+                        <Image className="h-4 w-4 text-muted-foreground" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium">
+                          Checkout Background
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Full-screen background for checkout, invite, and
+                          success pages. Image or MP4 video (autoplay + audio
+                          toggle). Falls back to Cover Image, then tenant
+                          background.
+                        </p>
+                      </div>
+                    </div>
+                    <ImageUpload
+                      value={field.state.value || null}
+                      onChange={(url) => field.handleChange(url ?? "")}
+                      disabled={readOnly}
+                      accept="image+video"
+                    />
+                  </div>
+                )}
+              </form.Field>
+            </InlineSection>
 
-                  <Separator />
-
-                  <ConditionalReviewersManager
-                    popupId={defaultValues!.id}
-                    tenantId={defaultValues!.tenant_id}
-                    readOnly={readOnly}
-                    variant="inline"
-                  />
-                </>
-              ) : null
-            }
-          </form.Subscribe>
-        )}
-
-        {isEdit && (defaultValues?.supported_languages?.length ?? 0) > 1 && (
-          <>
             <Separator />
-            <TranslationManager
-              entityType="popup"
-              entityId={defaultValues!.id}
-              translatableFields={["name", "tagline", "location"]}
-              sourceData={{
-                name: defaultValues!.name,
-                tagline: defaultValues!.tagline,
-                location: defaultValues!.location,
-              }}
-              supportedLanguages={defaultValues!.supported_languages!}
-              defaultLanguage={defaultValues!.default_language!}
-            />
-          </>
-        )}
 
-        <Separator />
+            {/* Links */}
+            <InlineSection title="Links">
+              <form.Field name="web_url">
+                {(field) => (
+                  <InlineRow
+                    icon={<Globe className="h-4 w-4 text-muted-foreground" />}
+                    label="Website"
+                  >
+                    <Input
+                      id="web_url"
+                      type="url"
+                      placeholder="https://example.com"
+                      value={field.state.value}
+                      onChange={(e) => field.handleChange(e.target.value)}
+                      disabled={readOnly}
+                      className="max-w-xs text-sm"
+                    />
+                  </InlineRow>
+                )}
+              </form.Field>
 
-        {/* Form Actions */}
-        <div className="flex gap-4">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => navigate({ to: "/popups" })}
-          >
-            {readOnly ? "Back" : "Cancel"}
-          </Button>
-          {!readOnly && (
-            <LoadingButton type="submit" loading={isPending}>
-              {isEdit ? "Save Changes" : "Create Event"}
-            </LoadingButton>
+              <form.Field name="blog_url">
+                {(field) => (
+                  <InlineRow
+                    icon={
+                      <FileText className="h-4 w-4 text-muted-foreground" />
+                    }
+                    label="Blog"
+                  >
+                    <Input
+                      id="blog_url"
+                      type="url"
+                      placeholder="https://example.com/blog"
+                      value={field.state.value}
+                      onChange={(e) => field.handleChange(e.target.value)}
+                      disabled={readOnly}
+                      className="max-w-xs text-sm"
+                    />
+                  </InlineRow>
+                )}
+              </form.Field>
+
+              <form.Field name="twitter_url">
+                {(field) => (
+                  <InlineRow
+                    icon={
+                      <LinkIcon className="h-4 w-4 text-muted-foreground" />
+                    }
+                    label="Twitter"
+                  >
+                    <Input
+                      id="twitter_url"
+                      type="url"
+                      placeholder="https://twitter.com/example"
+                      value={field.state.value}
+                      onChange={(e) => field.handleChange(e.target.value)}
+                      disabled={readOnly}
+                      className="max-w-xs text-sm"
+                    />
+                  </InlineRow>
+                )}
+              </form.Field>
+
+              <form.Field name="terms_and_conditions_url">
+                {(field) => (
+                  <InlineRow
+                    icon={<Scale className="h-4 w-4 text-muted-foreground" />}
+                    label="Terms & Conditions"
+                  >
+                    <Input
+                      id="terms_and_conditions_url"
+                      type="url"
+                      placeholder="https://example.com/terms"
+                      value={field.state.value}
+                      onChange={(e) => field.handleChange(e.target.value)}
+                      disabled={readOnly}
+                      className="max-w-xs text-sm"
+                    />
+                  </InlineRow>
+                )}
+              </form.Field>
+            </InlineSection>
+
+            <Separator />
+
+            {/* Integrations */}
+            <InlineSection title="Integrations">
+              <form.Field name="simplefi_api_key">
+                {(field) => (
+                  <InlineRow
+                    icon={<Key className="h-4 w-4 text-muted-foreground" />}
+                    label="SimpleFi"
+                    description="Payment integration API key"
+                  >
+                    <Input
+                      id="simplefi_api_key"
+                      type="password"
+                      placeholder="Enter API key"
+                      value={field.state.value}
+                      onChange={(e) => field.handleChange(e.target.value)}
+                      disabled={readOnly}
+                      className="max-w-xs text-sm"
+                    />
+                  </InlineRow>
+                )}
+              </form.Field>
+              <form.Field name="simplefi_success_behavior">
+                {(field) => (
+                  <InlineRow
+                    icon={
+                      <LinkIcon className="h-4 w-4 text-muted-foreground" />
+                    }
+                    label="SimpleFi success redirect"
+                    description="How the buyer reaches the success URL after paying. Manual keeps them on SimpleFi's checkout until they click through; automatic redirects them immediately."
+                  >
+                    <Select
+                      value={field.state.value}
+                      onValueChange={(v) =>
+                        field.handleChange(v as SimpleFiSuccessBehavior)
+                      }
+                      disabled={readOnly}
+                    >
+                      <SelectTrigger
+                        id="simplefi_success_behavior"
+                        className="w-[140px]"
+                      >
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="manual">Manual</SelectItem>
+                        <SelectItem value="automatic">Automatic</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </InlineRow>
+                )}
+              </form.Field>
+              <form.Field name="open_checkout_success_url">
+                {(field) => (
+                  <InlineRow
+                    icon={
+                      <LinkIcon className="h-4 w-4 text-muted-foreground" />
+                    }
+                    label="Open checkout success URL"
+                    description="Where the buyer is redirected after a successful open-checkout payment. Defaults to the portal thank-you page."
+                  >
+                    <Input
+                      id="open_checkout_success_url"
+                      type="url"
+                      placeholder="https://example.com/thank-you"
+                      value={field.state.value}
+                      onChange={(e) => field.handleChange(e.target.value)}
+                      disabled={readOnly}
+                      className="max-w-xs text-sm"
+                    />
+                  </InlineRow>
+                )}
+              </form.Field>
+              <form.Field name="open_checkout_cancel_url">
+                {(field) => (
+                  <InlineRow
+                    icon={
+                      <LinkIcon className="h-4 w-4 text-muted-foreground" />
+                    }
+                    label="Open checkout cancel URL"
+                    description="Where the buyer is redirected after a cancelled open-checkout payment. Defaults to the portal checkout page."
+                  >
+                    <Input
+                      id="open_checkout_cancel_url"
+                      type="url"
+                      placeholder="https://example.com/checkout"
+                      value={field.state.value}
+                      onChange={(e) => field.handleChange(e.target.value)}
+                      disabled={readOnly}
+                      className="max-w-xs text-sm"
+                    />
+                  </InlineRow>
+                )}
+              </form.Field>
+              <form.Field name="open_checkout_signing_secret">
+                {(field) => (
+                  <InlineRow
+                    icon={<Key className="h-4 w-4 text-muted-foreground" />}
+                    label="Open checkout signing secret"
+                    description="Shared secret to HMAC-sign the order data sent to the success URL. Set the same value on the external thank-you page to verify it. Leave empty to send the redirect without a signed payload."
+                  >
+                    <Input
+                      id="open_checkout_signing_secret"
+                      type="password"
+                      placeholder="Enter signing secret"
+                      value={field.state.value}
+                      onChange={(e) => field.handleChange(e.target.value)}
+                      disabled={readOnly}
+                      className="max-w-xs text-sm"
+                    />
+                  </InlineRow>
+                )}
+              </form.Field>
+            </InlineSection>
+
+            <Separator />
+
+            {/* Invoice Settings */}
+            <InlineSection title="Invoice Settings">
+              <form.Field name="invoice_company_name">
+                {(field) => (
+                  <InlineRow
+                    icon={
+                      <Building2 className="h-4 w-4 text-muted-foreground" />
+                    }
+                    label="Company Name"
+                  >
+                    <Input
+                      id="invoice_company_name"
+                      placeholder="Acme Inc"
+                      value={field.state.value}
+                      onChange={(e) => field.handleChange(e.target.value)}
+                      disabled={readOnly}
+                      className="max-w-xs text-sm"
+                    />
+                  </InlineRow>
+                )}
+              </form.Field>
+
+              <form.Field name="invoice_company_address">
+                {(field) => (
+                  <InlineRow
+                    icon={<MapPin className="h-4 w-4 text-muted-foreground" />}
+                    label="Address"
+                  >
+                    <Input
+                      id="invoice_company_address"
+                      placeholder="123 Main St, City, Country"
+                      value={field.state.value}
+                      onChange={(e) => field.handleChange(e.target.value)}
+                      disabled={readOnly}
+                      className="max-w-xs text-sm"
+                    />
+                  </InlineRow>
+                )}
+              </form.Field>
+
+              <form.Field name="invoice_company_email">
+                {(field) => (
+                  <InlineRow
+                    icon={<Mail className="h-4 w-4 text-muted-foreground" />}
+                    label="Email"
+                  >
+                    <Input
+                      id="invoice_company_email"
+                      type="email"
+                      placeholder="billing@example.com"
+                      value={field.state.value}
+                      onChange={(e) => field.handleChange(e.target.value)}
+                      disabled={readOnly}
+                      className="max-w-xs text-sm"
+                    />
+                  </InlineRow>
+                )}
+              </form.Field>
+            </InlineSection>
+
+            <Separator />
+
+            {/* Insurance */}
+            <InlineSection title="Insurance">
+              <form.Field name="insurance_enabled">
+                {(field) => (
+                  <InlineRow
+                    icon={
+                      <ShieldCheck className="h-4 w-4 text-muted-foreground" />
+                    }
+                    label="Enable Insurance"
+                    description="Offer insurance for eligible products during checkout"
+                  >
+                    <Switch
+                      id="insurance_enabled"
+                      checked={field.state.value}
+                      onCheckedChange={(checked) => field.handleChange(checked)}
+                      disabled={readOnly}
+                    />
+                  </InlineRow>
+                )}
+              </form.Field>
+
+              <form.Subscribe
+                selector={(state) => state.values.insurance_enabled}
+              >
+                {(insuranceEnabled) => (
+                  <form.Field
+                    name="insurance_percentage"
+                    validators={{
+                      onBlur: ({ value }) => {
+                        if (readOnly || !insuranceEnabled) return undefined
+                        const num = Number.parseFloat(value)
+                        if (!value || Number.isNaN(num) || num <= 0) {
+                          return "Insurance percentage must be greater than 0 when insurance is enabled"
+                        }
+                        if (num > 100) {
+                          return "Insurance percentage cannot exceed 100"
+                        }
+                        return undefined
+                      },
+                    }}
+                  >
+                    {(field) => (
+                      <div>
+                        <InlineRow
+                          icon={
+                            <ShieldCheck className="h-4 w-4 text-muted-foreground" />
+                          }
+                          label="Insurance Rate (%)"
+                          description="Percentage of eligible product price applied as insurance fee"
+                        >
+                          <Input
+                            id="insurance_percentage"
+                            type="number"
+                            min="0.01"
+                            max="100"
+                            step="0.01"
+                            placeholder="e.g. 5.00"
+                            value={field.state.value}
+                            onBlur={field.handleBlur}
+                            onChange={(e) => field.handleChange(e.target.value)}
+                            disabled={readOnly || !insuranceEnabled}
+                            className="max-w-[120px] text-sm"
+                          />
+                        </InlineRow>
+                        <FieldError errors={field.state.meta.errors} />
+                      </div>
+                    )}
+                  </form.Field>
+                )}
+              </form.Subscribe>
+            </InlineSection>
+
+            <Separator />
+
+            {/* Contribution fee */}
+            <InlineSection title="Contribution">
+              <form.Field name="contribution_enabled">
+                {(field) => (
+                  <InlineRow
+                    icon={
+                      <HandCoins className="h-4 w-4 text-muted-foreground" />
+                    }
+                    label="Enable Contribution"
+                    description="Add an optional contribution fee to orders at checkout"
+                  >
+                    <Switch
+                      id="contribution_enabled"
+                      checked={field.state.value}
+                      onCheckedChange={(checked) => field.handleChange(checked)}
+                      disabled={readOnly}
+                    />
+                  </InlineRow>
+                )}
+              </form.Field>
+
+              <form.Subscribe
+                selector={(state) => state.values.contribution_enabled}
+              >
+                {(contributionEnabled) => (
+                  <>
+                    <form.Field
+                      name="contribution_percentage"
+                      validators={{
+                        onBlur: ({ value }) => {
+                          if (readOnly || !contributionEnabled) return undefined
+                          const num = Number.parseFloat(value)
+                          if (!value || Number.isNaN(num) || num < 0) {
+                            return "Contribution percentage must be 0 or greater when contribution is enabled"
+                          }
+                          if (num > 100) {
+                            return "Contribution percentage cannot exceed 100"
+                          }
+                          return undefined
+                        },
+                      }}
+                    >
+                      {(field) => (
+                        <div>
+                          <InlineRow
+                            icon={
+                              <HandCoins className="h-4 w-4 text-muted-foreground" />
+                            }
+                            label="Contribution Rate (%)"
+                            description="Percentage of the total order applied as a contribution fee"
+                          >
+                            <Input
+                              id="contribution_percentage"
+                              type="number"
+                              min="0"
+                              max="100"
+                              step="0.01"
+                              placeholder="e.g. 2.50"
+                              value={field.state.value}
+                              onBlur={field.handleBlur}
+                              onChange={(e) =>
+                                field.handleChange(e.target.value)
+                              }
+                              disabled={readOnly || !contributionEnabled}
+                              className="max-w-[120px] text-sm"
+                            />
+                          </InlineRow>
+                          <FieldError errors={field.state.meta.errors} />
+                        </div>
+                      )}
+                    </form.Field>
+
+                    <form.Field name="contribution_label">
+                      {(field) => (
+                        <InlineRow
+                          icon={
+                            <HandCoins className="h-4 w-4 text-muted-foreground" />
+                          }
+                          label="Contribution Label"
+                          description="Short name shown as the line item in the checkout summary"
+                        >
+                          <Input
+                            id="contribution_label"
+                            type="text"
+                            placeholder="e.g. Event support contribution"
+                            value={field.state.value}
+                            onBlur={field.handleBlur}
+                            onChange={(e) => field.handleChange(e.target.value)}
+                            disabled={readOnly || !contributionEnabled}
+                            className="max-w-xs text-sm"
+                          />
+                        </InlineRow>
+                      )}
+                    </form.Field>
+
+                    <form.Field name="contribution_description">
+                      {(field) => (
+                        <InlineRow
+                          icon={
+                            <HandCoins className="h-4 w-4 text-muted-foreground" />
+                          }
+                          label="Contribution Description"
+                          description="Longer explanation shown under the line item in the portal order summary"
+                        >
+                          <Textarea
+                            id="contribution_description"
+                            placeholder="e.g. This contribution helps fund scholarships and community programs."
+                            value={field.state.value}
+                            onBlur={field.handleBlur}
+                            onChange={(e) => field.handleChange(e.target.value)}
+                            disabled={readOnly || !contributionEnabled}
+                            className="w-80 max-w-xs text-sm field-sizing-fixed"
+                            rows={3}
+                          />
+                        </InlineRow>
+                      )}
+                    </form.Field>
+                  </>
+                )}
+              </form.Subscribe>
+            </InlineSection>
+
+            <Separator />
+
+            {/* Installment plans (SimpleFi) */}
+            <InlineSection title="Installment plans">
+              <form.Field name="installments_enabled">
+                {(field) => (
+                  <InlineRow
+                    icon={
+                      <CreditCard className="h-4 w-4 text-muted-foreground" />
+                    }
+                    label="Enable installment plans"
+                    description="Offer buyers the option to pay in scheduled installments. SimpleFi renders the per-cycle selector at checkout."
+                  >
+                    <Switch
+                      id="installments_enabled"
+                      checked={field.state.value}
+                      onCheckedChange={(checked) => field.handleChange(checked)}
+                      disabled={readOnly}
+                    />
+                  </InlineRow>
+                )}
+              </form.Field>
+
+              <form.Subscribe
+                selector={(state) => state.values.installments_enabled}
+              >
+                {(installmentsEnabled) =>
+                  installmentsEnabled ? (
+                    <>
+                      <form.Field
+                        name="installments_deadline"
+                        validators={{
+                          onBlur: ({ value }) => {
+                            if (readOnly) return undefined
+                            if (!value) {
+                              return "Deadline is required when installments are enabled"
+                            }
+                            return undefined
+                          },
+                        }}
+                      >
+                        {(field) => (
+                          <div>
+                            <InlineRow
+                              icon={
+                                <Calendar className="h-4 w-4 text-muted-foreground" />
+                              }
+                              label="Deadline"
+                              description="All installments must be paid by this date. New plans created after the deadline fall back to one-shot payment."
+                            >
+                              <DatePicker
+                                id="installments_deadline"
+                                value={field.state.value}
+                                onChange={field.handleChange}
+                                disabled={readOnly}
+                                placeholder="Select date"
+                                className="w-auto"
+                              />
+                            </InlineRow>
+                            <FieldError errors={field.state.meta.errors} />
+                          </div>
+                        )}
+                      </form.Field>
+
+                      <form.Field
+                        name="installments_max"
+                        validators={{
+                          onBlur: ({ value }) => {
+                            if (readOnly) return undefined
+                            if (!value) {
+                              return "Max installments is required when installments are enabled"
+                            }
+                            const num = Number.parseInt(value, 10)
+                            if (Number.isNaN(num) || num < 2 || num > 12) {
+                              return "Max installments must be between 2 and 12 (SimpleFi limit)"
+                            }
+                            return undefined
+                          },
+                        }}
+                      >
+                        {(field) => (
+                          <div>
+                            <InlineRow
+                              icon={
+                                <Ticket className="h-4 w-4 text-muted-foreground" />
+                              }
+                              label="Max installments"
+                              description="Ceiling shown to buyers. SimpleFi accepts 2–12; the actual number is picked by the buyer at checkout."
+                            >
+                              <Input
+                                id="installments_max"
+                                type="number"
+                                min="2"
+                                max="12"
+                                step="1"
+                                placeholder="e.g. 6"
+                                value={field.state.value}
+                                onBlur={field.handleBlur}
+                                onChange={(e) =>
+                                  field.handleChange(e.target.value)
+                                }
+                                disabled={readOnly}
+                                className="max-w-[120px] text-sm"
+                              />
+                            </InlineRow>
+                            <FieldError errors={field.state.meta.errors} />
+                          </div>
+                        )}
+                      </form.Field>
+
+                      <form.Field name="installments_interval">
+                        {(field) => (
+                          <InlineRow
+                            icon={
+                              <CalendarDays className="h-4 w-4 text-muted-foreground" />
+                            }
+                            label="Billing interval"
+                            description="Cadence between installments."
+                          >
+                            <Select
+                              value={field.state.value}
+                              onValueChange={(v) =>
+                                field.handleChange(v as InstallmentInterval)
+                              }
+                              disabled={readOnly}
+                            >
+                              <SelectTrigger
+                                id="installments_interval"
+                                className="w-[140px]"
+                              >
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="day">Day</SelectItem>
+                                <SelectItem value="week">Week</SelectItem>
+                                <SelectItem value="month">Month</SelectItem>
+                                <SelectItem value="year">Year</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </InlineRow>
+                        )}
+                      </form.Field>
+
+                      <form.Field
+                        name="installments_interval_count"
+                        validators={{
+                          onBlur: ({ value }) => {
+                            if (readOnly) return undefined
+                            const num = Number.parseInt(value, 10)
+                            if (!value || Number.isNaN(num) || num < 1) {
+                              return "Interval count must be at least 1"
+                            }
+                            return undefined
+                          },
+                        }}
+                      >
+                        {(field) => (
+                          <div>
+                            <InlineRow
+                              icon={
+                                <CalendarDays className="h-4 w-4 text-muted-foreground" />
+                              }
+                              label="Interval count"
+                              description="Multiplier on the interval (e.g. interval = week + count = 2 → bi-weekly)."
+                            >
+                              <Input
+                                id="installments_interval_count"
+                                type="number"
+                                min="1"
+                                step="1"
+                                value={field.state.value}
+                                onBlur={field.handleBlur}
+                                onChange={(e) =>
+                                  field.handleChange(e.target.value)
+                                }
+                                disabled={readOnly}
+                                className="max-w-[120px] text-sm"
+                              />
+                            </InlineRow>
+                            <FieldError errors={field.state.meta.errors} />
+                          </div>
+                        )}
+                      </form.Field>
+                    </>
+                  ) : null
+                }
+              </form.Subscribe>
+            </InlineSection>
+
+            <Separator />
+
+            {/* Self-service check-in feature flag */}
+            <InlineSection title="Self-service check-in">
+              <form.Field name="self_check_in_enabled">
+                {(field) => (
+                  <InlineRow
+                    icon={<QrCode className="h-4 w-4 text-muted-foreground" />}
+                    label="Enable attendee self check-in"
+                    description="Allow authenticated attendees to check themselves in from the hidden QR-code portal page."
+                  >
+                    <Switch
+                      id="self_check_in_enabled"
+                      checked={field.state.value}
+                      onCheckedChange={(checked) => field.handleChange(checked)}
+                      disabled={readOnly}
+                    />
+                  </InlineRow>
+                )}
+              </form.Field>
+            </InlineSection>
+
+            <Separator />
+
+            {/* Attendee directory feature flag */}
+            <form.Subscribe selector={(state) => state.values.sale_type}>
+              {(saleType) =>
+                saleType === "application" ? (
+                  <>
+                    <InlineSection title="Attendee directory">
+                      <form.Field name="show_attendee_directory">
+                        {(field) => (
+                          <InlineRow
+                            icon={
+                              <Users className="h-4 w-4 text-muted-foreground" />
+                            }
+                            label="Show attendee directory"
+                            description="Show the directory in the portal for accepted applicants."
+                          >
+                            <Switch
+                              id="show_attendee_directory"
+                              checked={field.state.value}
+                              onCheckedChange={(checked) =>
+                                field.handleChange(checked)
+                              }
+                              disabled={readOnly}
+                            />
+                          </InlineRow>
+                        )}
+                      </form.Field>
+                    </InlineSection>
+
+                    <Separator />
+                  </>
+                ) : null
+              }
+            </form.Subscribe>
+
+            {/* Events module feature flag */}
+            <InlineSection title="Events module">
+              <form.Field name="events_enabled">
+                {(field) => (
+                  <InlineRow
+                    icon={
+                      <CalendarDays className="h-4 w-4 text-muted-foreground" />
+                    }
+                    label="Enable events module"
+                    description="Show the Events section in the portal (calendar, venues, RSVPs). When off, the entire section is hidden — to only block creating new events without hiding existing ones, use the Event Settings page instead."
+                  >
+                    <Switch
+                      id="events_enabled"
+                      checked={field.state.value}
+                      onCheckedChange={(checked) => field.handleChange(checked)}
+                      disabled={readOnly}
+                    />
+                  </InlineRow>
+                )}
+              </form.Field>
+            </InlineSection>
+
+            <Separator />
+
+            {/* Pass editing feature flag */}
+            <InlineSection title="Pass Editing">
+              <form.Field name="edit_passes_enabled">
+                {(field) => (
+                  <InlineRow
+                    icon={<Coins className="h-4 w-4 text-muted-foreground" />}
+                    label="Enable pass editing"
+                    description="Allow attendees to edit their already-purchased passes during checkout. Giving up a pass returns its value as credit toward a new one."
+                  >
+                    <Switch
+                      id="edit_passes_enabled"
+                      checked={field.state.value}
+                      onCheckedChange={(checked) => field.handleChange(checked)}
+                      disabled={readOnly}
+                    />
+                  </InlineRow>
+                )}
+              </form.Field>
+            </InlineSection>
+
+            <Separator />
+
+            {/* Languages */}
+            <InlineSection title="Languages">
+              <form.Field name="default_language">
+                {(field) => (
+                  <InlineRow
+                    icon={
+                      <Languages className="h-4 w-4 text-muted-foreground" />
+                    }
+                    label="Default Language"
+                    description="The primary language for this event"
+                  >
+                    <Select
+                      value={field.state.value}
+                      onValueChange={(value) => field.handleChange(value)}
+                      disabled={readOnly}
+                    >
+                      <SelectTrigger className="w-auto">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {AVAILABLE_LANGUAGES.map((lang) => (
+                          <SelectItem key={lang.value} value={lang.value}>
+                            {lang.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </InlineRow>
+                )}
+              </form.Field>
+
+              <form.Field name="supported_languages">
+                {(field) => (
+                  <InlineRow
+                    icon={<Globe className="h-4 w-4 text-muted-foreground" />}
+                    label="Supported Languages"
+                    description="Languages available in the portal"
+                  >
+                    <div className="flex flex-col gap-2">
+                      {AVAILABLE_LANGUAGES.map((lang) => (
+                        <div
+                          key={lang.value}
+                          className="flex items-center gap-2 text-sm"
+                        >
+                          <Checkbox
+                            id={`lang-${lang.value}`}
+                            checked={field.state.value.includes(lang.value)}
+                            disabled={readOnly}
+                            onCheckedChange={(checked) => {
+                              const current = field.state.value
+                              if (checked) {
+                                field.handleChange([...current, lang.value])
+                              } else {
+                                const defaultLang =
+                                  form.getFieldValue("default_language")
+                                if (lang.value === defaultLang) return
+                                field.handleChange(
+                                  current.filter(
+                                    (l: string) => l !== lang.value,
+                                  ),
+                                )
+                              }
+                            }}
+                          />
+                          <Label htmlFor={`lang-${lang.value}`}>
+                            {lang.label}
+                          </Label>
+                        </div>
+                      ))}
+                    </div>
+                  </InlineRow>
+                )}
+              </form.Field>
+            </InlineSection>
+
+            <Separator />
+
+            {/* Approval strategy + Reviewers (edit only, application sale_type only —
+            direct-sale popups have no application flow, so these are meaningless) */}
+            {isEdit && (
+              <form.Subscribe selector={(state) => state.values.sale_type}>
+                {(saleType) =>
+                  saleType === "application" ? (
+                    <>
+                      <Separator />
+
+                      <ApprovalStrategyForm
+                        popupId={defaultValues!.id}
+                        readOnly={readOnly}
+                        variant="inline"
+                      />
+
+                      <Separator />
+
+                      <ConditionalReviewersManager
+                        popupId={defaultValues!.id}
+                        tenantId={defaultValues!.tenant_id}
+                        readOnly={readOnly}
+                        variant="inline"
+                      />
+                    </>
+                  ) : null
+                }
+              </form.Subscribe>
+            )}
+
+            <Separator />
+
+            {/* Form Actions */}
+            <div className="flex gap-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => navigate({ to: "/popups" })}
+              >
+                {readOnly ? "Back" : "Cancel"}
+              </Button>
+              {!readOnly && (
+                <LoadingButton type="submit" loading={isPending}>
+                  {isEdit ? "Save Changes" : "Create Event"}
+                </LoadingButton>
+              )}
+            </div>
+          </form>
+
+          {isEdit && !readOnly && (
+            <div className="mx-auto max-w-2xl">
+              <DangerZone
+                description="Once you delete this event, all associated products, groups, coupons, and attendee data will be permanently removed. This action cannot be undone."
+                onDelete={() => deleteMutation.mutate()}
+                isDeleting={deleteMutation.isPending}
+                confirmText="Delete Event"
+                resourceName={defaultValues.name}
+                variant="inline"
+              />
+            </div>
           )}
-        </div>
-      </form>
+        </TabsContent>
 
-      {isEdit && !readOnly && (
-        <div className="mx-auto max-w-2xl">
-          <DangerZone
-            description="Once you delete this event, all associated products, groups, coupons, and attendee data will be permanently removed. This action cannot be undone."
-            onDelete={() => deleteMutation.mutate()}
-            isDeleting={deleteMutation.isPending}
-            confirmText="Delete Event"
-            resourceName={defaultValues.name}
-            variant="inline"
-          />
-        </div>
-      )}
+        <TabsContent value="translations">
+          {!isEdit ? (
+            <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
+              Save the event first to add translations.
+            </div>
+          ) : (defaultValues?.supported_languages?.length ?? 0) <= 1 ? (
+            <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
+              Enable a second language to translate this event.
+            </div>
+          ) : (
+            <form.Subscribe selector={(state) => state.isDirty}>
+              {(isDirty) =>
+                isDirty ? (
+                  <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
+                    Save your changes first to translate the latest content.
+                  </div>
+                ) : (
+                  <TranslationManager
+                    entityType="popup"
+                    entityId={defaultValues!.id}
+                    translatableFields={["name", "tagline", "location"]}
+                    sourceData={{
+                      name: defaultValues!.name,
+                      tagline: defaultValues!.tagline,
+                      location: defaultValues!.location,
+                    }}
+                    supportedLanguages={defaultValues!.supported_languages!}
+                    defaultLanguage={defaultValues!.default_language!}
+                  />
+                )
+              }
+            </form.Subscribe>
+          )}
+        </TabsContent>
+      </Tabs>
 
       <UnsavedChangesDialog blocker={blocker} />
     </div>
