@@ -211,8 +211,31 @@ function LanguageTab({
   const formatFieldLabel = (field: string) =>
     field.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
 
+  const nestedGroups = groupLeaves(leaves)
+  const totalCount = translatableFields.length + leaves.length
+  const doneCount =
+    translatableFields.filter((f) => draft[f]?.trim()).length +
+    leaves.filter((l) => nestedDraft[l.path]?.trim()).length
+  const isComplete = totalCount > 0 && doneCount === totalCount
+
   return (
     <div className="space-y-4 pt-4">
+      <div className="flex items-center gap-3">
+        <span className="text-xs font-medium text-muted-foreground">
+          {doneCount}/{totalCount} translated
+        </span>
+        <div className="h-1.5 max-w-[160px] flex-1 overflow-hidden rounded-full bg-muted">
+          <div
+            className={`h-full rounded-full transition-all ${
+              isComplete ? "bg-green-600" : "bg-primary"
+            }`}
+            style={{
+              width: `${totalCount ? (doneCount / totalCount) * 100 : 0}%`,
+            }}
+          />
+        </div>
+      </div>
+
       {translatableFields.map((field) => (
         <TranslationFieldEditor
           key={field}
@@ -232,24 +255,37 @@ function LanguageTab({
           <p className="text-sm font-medium text-muted-foreground">
             Step content
           </p>
-          {groupLeaves(leaves).map((group) => (
-            <div key={group.key} className="space-y-3 rounded-lg border p-4">
-              <p className="text-sm font-semibold">{group.label}</p>
-              {group.leaves.map((leaf) => (
-                <TranslationFieldEditor
-                  key={leaf.path}
-                  fieldName={leaf.path}
-                  label={leaf.label}
-                  originalValue={leaf.value}
-                  translatedValue={nestedDraft[leaf.path] ?? ""}
-                  onChange={(value) =>
-                    setNestedDraft((prev) => ({ ...prev, [leaf.path]: value }))
-                  }
-                  multiline={leaf.multiline}
-                />
-              ))}
-            </div>
-          ))}
+          {nestedGroups.map((group) => {
+            const groupDone = group.leaves.filter((l) =>
+              nestedDraft[l.path]?.trim(),
+            ).length
+            return (
+              <div key={group.key} className="space-y-3 rounded-lg border p-4">
+                <p className="text-sm font-semibold">
+                  {group.label}
+                  <span className="ml-2 text-xs font-normal text-muted-foreground">
+                    {groupDone}/{group.leaves.length}
+                  </span>
+                </p>
+                {group.leaves.map((leaf) => (
+                  <TranslationFieldEditor
+                    key={leaf.path}
+                    fieldName={leaf.path}
+                    label={leaf.label}
+                    originalValue={leaf.value}
+                    translatedValue={nestedDraft[leaf.path] ?? ""}
+                    onChange={(value) =>
+                      setNestedDraft((prev) => ({
+                        ...prev,
+                        [leaf.path]: value,
+                      }))
+                    }
+                    multiline={leaf.multiline}
+                  />
+                ))}
+              </div>
+            )
+          })}
         </div>
       )}
 

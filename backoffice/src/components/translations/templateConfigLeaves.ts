@@ -154,11 +154,24 @@ function singularize(word: string): string {
   return word.endsWith("s") ? word.slice(0, -1) : word
 }
 
+// Friendly group headers per config key. Array-record keys get the item number
+// appended ("FAQ 1"); named-object keys are used as-is. Anything not listed
+// falls back to the humanized (and, for records, singularized) key.
+const GROUP_ALIASES: Record<string, string> = {
+  items: "FAQ",
+  sections: "Section",
+  menu_options: "Meal option",
+  products: "Product",
+  insurance: "Insurance",
+  chef_choice_option: "Chef's choice",
+  benefits: "Benefits",
+}
+
 /**
  * Derive the group a leaf belongs to from its path. Array records group under
- * "<Singular> <n>" ("items.0.question" -> "Item 1"); named objects group under
- * their humanized key ("insurance.card_title" -> "Insurance"); top-level leaves
- * fall under "General".
+ * "<Name> <n>" ("items.0.question" -> "FAQ 1"); named objects group under their
+ * friendly key ("insurance.card_title" -> "Insurance"); top-level leaves fall
+ * under "General".
  */
 function deriveGroup(path: string): { key: string; label: string } {
   const parent = path.split(".").slice(0, -1)
@@ -168,12 +181,13 @@ function deriveGroup(path: string): { key: string; label: string } {
   const last = parent[parent.length - 1]
   if (/^\d+$/.test(last)) {
     const name = parent[parent.length - 2] ?? "item"
-    return {
-      key: parent.join("."),
-      label: `${singularize(humanizeKey(name))} ${Number(last) + 1}`,
-    }
+    const alias = GROUP_ALIASES[name] ?? singularize(humanizeKey(name))
+    return { key: parent.join("."), label: `${alias} ${Number(last) + 1}` }
   }
-  return { key: parent.join("."), label: humanizeKey(last) }
+  return {
+    key: parent.join("."),
+    label: GROUP_ALIASES[last] ?? humanizeKey(last),
+  }
 }
 
 /**
