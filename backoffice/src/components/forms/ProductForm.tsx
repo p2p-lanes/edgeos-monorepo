@@ -59,6 +59,7 @@ import {
 } from "@/components/ui/select"
 import { Separator } from "@/components/ui/separator"
 import { Switch } from "@/components/ui/switch"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
 import useAuth from "@/hooks/useAuth"
@@ -327,595 +328,639 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
 
   return (
     <div className="space-y-6">
-      <form
-        noValidate
-        onSubmit={(e) => {
-          e.preventDefault()
-          if (!readOnly) {
-            form.handleSubmit()
-          }
-        }}
-        className="mx-auto max-w-2xl space-y-6"
-      >
-        {/* Hero: Name + Category Badge */}
-        <div className="space-y-3">
-          <form.Field
-            name="name"
-            validators={{
-              onBlur: ({ value }) =>
-                !readOnly && !value ? "Name is required" : undefined,
+      <Tabs defaultValue="general" className="mx-auto max-w-2xl space-y-6">
+        <TabsList>
+          <TabsTrigger value="general">General</TabsTrigger>
+          <TabsTrigger value="translations">Translations</TabsTrigger>
+        </TabsList>
+        <TabsContent value="general" className="space-y-6">
+          <form
+            noValidate
+            onSubmit={(e) => {
+              e.preventDefault()
+              if (!readOnly) {
+                form.handleSubmit()
+              }
             }}
+            className="mx-auto max-w-2xl space-y-6"
           >
-            {(field) => (
-              <div>
-                <HeroInput
-                  placeholder="Product Name"
-                  value={field.state.value}
-                  onBlur={field.handleBlur}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                  disabled={readOnly}
-                />
-                <FieldError errors={field.state.meta.errors} />
-              </div>
-            )}
-          </form.Field>
-
-          <form.Field name="category">
-            {(field) => (
-              <div className="flex items-center gap-2">
-                <Select
-                  value={field.state.value}
-                  onValueChange={(val) => {
-                    if (val === "__add_new__") {
-                      setNewCategoryName("")
-                      setAddCategoryOpen(true)
-                      return
-                    }
-                    field.handleChange(val as ProductCategory)
-                  }}
-                  disabled={readOnly}
-                >
-                  <SelectTrigger className="w-auto border-0 bg-transparent p-0 shadow-none focus:ring-0">
-                    <Badge variant="secondary">
-                      <SelectValue />
-                    </Badge>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {allCategories.map((cat) => {
-                      const known = PRODUCT_CATEGORIES.find(
-                        (c) => c.value === cat,
-                      )
-                      const isDisabled =
-                        cat === "patreon" && hasActivePatreonProduct
-                      return (
-                        <SelectItem
-                          key={cat}
-                          value={cat}
-                          disabled={isDisabled}
-                          title={
-                            isDisabled
-                              ? "This popup already has a Patron product"
-                              : undefined
-                          }
-                        >
-                          {known?.label ?? cat}
-                        </SelectItem>
-                      )
-                    })}
-                    <SelectItem value="__add_new__" className="text-primary">
-                      <span className="flex items-center gap-1.5">
-                        <Plus className="h-3.5 w-3.5" />
-                        Add category
-                      </span>
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-          </form.Field>
-        </div>
-
-        {/* Product Details metadata (edit only) */}
-        {isEdit && (
-          <div className="flex gap-6 text-sm text-muted-foreground">
-            <div>
-              <span className="text-xs uppercase tracking-wider">Slug</span>
-              <p className="font-mono">{defaultValues.slug}</p>
-            </div>
-          </div>
-        )}
-
-        <Separator />
-
-        {/* Description */}
-        <form.Field name="description">
-          {(field) => (
-            <div className="space-y-2">
-              <p className="px-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                Description
-              </p>
-              <Textarea
-                placeholder="Product description..."
-                rows={2}
-                value={field.state.value}
-                onBlur={field.handleBlur}
-                onChange={(e) => field.handleChange(e.target.value)}
-                disabled={readOnly}
-              />
-            </div>
-          )}
-        </form.Field>
-
-        {/* Image */}
-        <form.Field name="image_url">
-          {(field) => (
-            <div className="space-y-2">
-              <p className="px-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                Image
-              </p>
-              <ImageUpload
-                value={field.state.value || null}
-                onChange={(url) => field.handleChange(url ?? "")}
-                disabled={readOnly}
-              />
-            </div>
-          )}
-        </form.Field>
-
-        {/* Additional images — housing-only, rendered as a carousel in the
-            grid/showcase checkout variants. The cover above is image #1. */}
-        <form.Subscribe selector={(state) => state.values.category}>
-          {(category) =>
-            category === "housing" ? (
-              <form.Field name="images">
+            {/* Hero: Name + Category Badge */}
+            <div className="space-y-3">
+              <form.Field
+                name="name"
+                validators={{
+                  onBlur: ({ value }) =>
+                    !readOnly && !value ? "Name is required" : undefined,
+                }}
+              >
                 {(field) => (
-                  <div className="space-y-2">
-                    <p className="px-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                      Additional images
-                    </p>
-                    <p className="px-1 text-xs text-muted-foreground">
-                      Shown after the cover in the grid/showcase carousel. Tap
-                      enlarges to a lightbox.
-                    </p>
-                    <MultiImageUpload
+                  <div>
+                    <HeroInput
+                      placeholder="Product Name"
                       value={field.state.value}
-                      onChange={field.handleChange}
+                      onBlur={field.handleBlur}
+                      onChange={(e) => field.handleChange(e.target.value)}
                       disabled={readOnly}
                     />
+                    <FieldError errors={field.state.meta.errors} />
                   </div>
                 )}
               </form.Field>
-            ) : null
-          }
-        </form.Subscribe>
 
-        <Separator />
-
-        {/* Pricing & Inventory */}
-        <InlineSection title="Pricing & Inventory">
-          <form.Subscribe selector={(state) => state.values.category}>
-            {(category) =>
-              category !== "patreon" && (
-                <>
-                  <form.Field
-                    name="price"
-                    validators={{
-                      onBlur: ({ value }) =>
-                        !readOnly && !value ? "Price is required" : undefined,
-                    }}
-                  >
-                    {(field) => (
-                      <div>
-                        <InlineRow
-                          icon={
-                            <DollarSign className="h-4 w-4 text-muted-foreground" />
-                          }
-                          label="Price"
-                        >
-                          <Input
-                            placeholder="100.00"
-                            type="text"
-                            inputMode="decimal"
-                            value={field.state.value}
-                            onBlur={field.handleBlur}
-                            onChange={(e) => field.handleChange(e.target.value)}
-                            disabled={readOnly}
-                            className="max-w-32 text-sm"
-                          />
-                        </InlineRow>
-                        <FieldError errors={field.state.meta.errors} />
-                      </div>
-                    )}
-                  </form.Field>
-
-                  <form.Field
-                    name="compare_price"
-                    validators={{
-                      onBlur: ({ value, fieldApi }) => {
-                        if (readOnly || !value) return undefined
-                        const num = Number(value)
-                        if (Number.isNaN(num) || num < 0) {
-                          return "Compare-at price must be a positive number."
+              <form.Field name="category">
+                {(field) => (
+                  <div className="flex items-center gap-2">
+                    <Select
+                      value={field.state.value}
+                      onValueChange={(val) => {
+                        if (val === "__add_new__") {
+                          setNewCategoryName("")
+                          setAddCategoryOpen(true)
+                          return
                         }
-                        const rawPrice = fieldApi.form.getFieldValue("price")
-                        if (rawPrice) {
-                          const price = Number(rawPrice)
-                          if (!Number.isNaN(price) && num <= price) {
-                            return "Compare-at price must be higher than price."
-                          }
-                        }
-                        return undefined
-                      },
-                    }}
-                  >
-                    {(field) => (
-                      <div>
-                        <InlineRow
-                          icon={
-                            <DollarSign className="h-4 w-4 text-muted-foreground" />
-                          }
-                          label="Compare-at price"
-                          description="Crossed-out original price shown next to the current price. Leave empty for no discount."
-                        >
-                          <Input
-                            placeholder="120.00"
-                            type="text"
-                            inputMode="decimal"
-                            value={field.state.value}
-                            onBlur={field.handleBlur}
-                            onChange={(e) => field.handleChange(e.target.value)}
-                            disabled={readOnly}
-                            className="max-w-32 text-sm"
-                          />
-                        </InlineRow>
-                        <FieldError errors={field.state.meta.errors} />
-                      </div>
-                    )}
-                  </form.Field>
-                </>
-              )
-            }
-          </form.Subscribe>
-
-          <form.Field
-            name="total_stock_cap"
-            validators={{
-              onBlur: ({ value }) => {
-                if (readOnly || !value) return undefined
-                const num = Number.parseInt(value, 10)
-                if (Number.isNaN(num) || num < 1) {
-                  return "Total stock must be a positive number. Leave empty for unlimited."
-                }
-                return undefined
-              },
-            }}
-          >
-            {(field) => (
-              <div>
-                <InlineRow
-                  icon={<Hash className="h-4 w-4 text-muted-foreground" />}
-                  label="Total stock"
-                  description="Maximum units available. Leave empty for unlimited."
-                >
-                  <Input
-                    id="total_stock_cap"
-                    aria-label="Total stock"
-                    placeholder="Unlimited"
-                    type="number"
-                    min="1"
-                    value={field.state.value}
-                    onBlur={field.handleBlur}
-                    onChange={(e) => field.handleChange(e.target.value)}
-                    disabled={readOnly}
-                    className="max-w-32 text-sm"
-                  />
-                </InlineRow>
-                <FieldError errors={field.state.meta.errors} />
-              </div>
-            )}
-          </form.Field>
-
-          <form.Field
-            name="max_per_order"
-            validators={{
-              onBlur: ({ value, fieldApi }) => {
-                if (readOnly || !value) return undefined
-                const num = Number.parseInt(value, 10)
-                if (Number.isNaN(num) || num < 1) {
-                  return "Max per order must be a positive number. Leave empty for unlimited."
-                }
-                const rawCap = fieldApi.form.getFieldValue("total_stock_cap")
-                if (rawCap) {
-                  const cap = Number.parseInt(rawCap, 10)
-                  if (!Number.isNaN(cap) && num > cap) {
-                    return `Cannot exceed total stock cap (${cap})`
-                  }
-                }
-                return undefined
-              },
-            }}
-          >
-            {(field) => (
-              <div>
-                <InlineRow
-                  icon={<Hash className="h-4 w-4 text-muted-foreground" />}
-                  label="Max per order"
-                  description="Per-cart cap. Leave empty for unlimited."
-                >
-                  <Input
-                    id="max_per_order"
-                    aria-label="Max per order"
-                    placeholder="Unlimited"
-                    type="number"
-                    min="1"
-                    value={field.state.value}
-                    onBlur={field.handleBlur}
-                    onChange={(e) => field.handleChange(e.target.value)}
-                    disabled={readOnly}
-                    className="max-w-32 text-sm"
-                  />
-                </InlineRow>
-                <FieldError errors={field.state.meta.errors} />
-              </div>
-            )}
-          </form.Field>
-
-          <form.Field name="insurance_eligible">
-            {(field) => (
-              <InlineRow
-                icon={<ShieldCheck className="h-4 w-4 text-muted-foreground" />}
-                label="Insurance Eligible"
-                description="Include this product in the insurance calculation when popup insurance is enabled"
-              >
-                <div className="flex items-center gap-2">
-                  <Checkbox
-                    id="insurance_eligible"
-                    checked={field.state.value}
-                    onCheckedChange={(checked) =>
-                      field.handleChange(checked === true)
-                    }
-                    disabled={readOnly}
-                  />
-                  <Label htmlFor="insurance_eligible" className="text-sm">
-                    Eligible
-                  </Label>
-                </div>
-              </InlineRow>
-            )}
-          </form.Field>
-
-          <form.Subscribe selector={(state) => state.values.category}>
-            {(category) => (
-              <form.Field name="discountable">
-                {(field) => {
-                  // Patreon donations are never discountable by policy — the
-                  // backend coerces the field on write, so mirror that in the
-                  // form: force value=false, disable the checkbox, and show
-                  // why.
-                  const isPatreon = category === "patreon"
-                  const isDisabled = readOnly || isPatreon
-                  const effectiveChecked = isPatreon ? false : field.state.value
-
-                  return (
-                    <InlineRow
-                      icon={
-                        <TicketPercent className="h-4 w-4 text-muted-foreground" />
-                      }
-                      label="Discountable"
-                      description={
-                        isPatreon
-                          ? "Patreon donations are never discountable"
-                          : "When off, coupons and group/scholarship discounts never reduce this product's price (e.g. mandatory meal plans)"
-                      }
+                        field.handleChange(val as ProductCategory)
+                      }}
+                      disabled={readOnly}
                     >
-                      <div className="flex items-center gap-2">
-                        <Checkbox
-                          id="discountable"
-                          checked={effectiveChecked}
-                          onCheckedChange={(checked) =>
-                            field.handleChange(checked === true)
+                      <SelectTrigger className="w-auto border-0 bg-transparent p-0 shadow-none focus:ring-0">
+                        <Badge variant="secondary">
+                          <SelectValue />
+                        </Badge>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {allCategories.map((cat) => {
+                          const known = PRODUCT_CATEGORIES.find(
+                            (c) => c.value === cat,
+                          )
+                          const isDisabled =
+                            cat === "patreon" && hasActivePatreonProduct
+                          return (
+                            <SelectItem
+                              key={cat}
+                              value={cat}
+                              disabled={isDisabled}
+                              title={
+                                isDisabled
+                                  ? "This popup already has a Patron product"
+                                  : undefined
+                              }
+                            >
+                              {known?.label ?? cat}
+                            </SelectItem>
+                          )
+                        })}
+                        <SelectItem
+                          value="__add_new__"
+                          className="text-primary"
+                        >
+                          <span className="flex items-center gap-1.5">
+                            <Plus className="h-3.5 w-3.5" />
+                            Add category
+                          </span>
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </form.Field>
+            </div>
+
+            {/* Product Details metadata (edit only) */}
+            {isEdit && (
+              <div className="flex gap-6 text-sm text-muted-foreground">
+                <div>
+                  <span className="text-xs uppercase tracking-wider">Slug</span>
+                  <p className="font-mono">{defaultValues.slug}</p>
+                </div>
+              </div>
+            )}
+
+            <Separator />
+
+            {/* Description */}
+            <form.Field name="description">
+              {(field) => (
+                <div className="space-y-2">
+                  <p className="px-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                    Description
+                  </p>
+                  <Textarea
+                    placeholder="Product description..."
+                    rows={2}
+                    value={field.state.value}
+                    onBlur={field.handleBlur}
+                    onChange={(e) => field.handleChange(e.target.value)}
+                    disabled={readOnly}
+                  />
+                </div>
+              )}
+            </form.Field>
+
+            {/* Image */}
+            <form.Field name="image_url">
+              {(field) => (
+                <div className="space-y-2">
+                  <p className="px-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                    Image
+                  </p>
+                  <ImageUpload
+                    value={field.state.value || null}
+                    onChange={(url) => field.handleChange(url ?? "")}
+                    disabled={readOnly}
+                  />
+                </div>
+              )}
+            </form.Field>
+
+            {/* Additional images — housing-only, rendered as a carousel in the
+            grid/showcase checkout variants. The cover above is image #1. */}
+            <form.Subscribe selector={(state) => state.values.category}>
+              {(category) =>
+                category === "housing" ? (
+                  <form.Field name="images">
+                    {(field) => (
+                      <div className="space-y-2">
+                        <p className="px-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                          Additional images
+                        </p>
+                        <p className="px-1 text-xs text-muted-foreground">
+                          Shown after the cover in the grid/showcase carousel.
+                          Tap enlarges to a lightbox.
+                        </p>
+                        <MultiImageUpload
+                          value={field.state.value}
+                          onChange={field.handleChange}
+                          disabled={readOnly}
+                        />
+                      </div>
+                    )}
+                  </form.Field>
+                ) : null
+              }
+            </form.Subscribe>
+
+            <Separator />
+
+            {/* Pricing & Inventory */}
+            <InlineSection title="Pricing & Inventory">
+              <form.Subscribe selector={(state) => state.values.category}>
+                {(category) =>
+                  category !== "patreon" && (
+                    <>
+                      <form.Field
+                        name="price"
+                        validators={{
+                          onBlur: ({ value }) =>
+                            !readOnly && !value
+                              ? "Price is required"
+                              : undefined,
+                        }}
+                      >
+                        {(field) => (
+                          <div>
+                            <InlineRow
+                              icon={
+                                <DollarSign className="h-4 w-4 text-muted-foreground" />
+                              }
+                              label="Price"
+                            >
+                              <Input
+                                placeholder="100.00"
+                                type="text"
+                                inputMode="decimal"
+                                value={field.state.value}
+                                onBlur={field.handleBlur}
+                                onChange={(e) =>
+                                  field.handleChange(e.target.value)
+                                }
+                                disabled={readOnly}
+                                className="max-w-32 text-sm"
+                              />
+                            </InlineRow>
+                            <FieldError errors={field.state.meta.errors} />
+                          </div>
+                        )}
+                      </form.Field>
+
+                      <form.Field
+                        name="compare_price"
+                        validators={{
+                          onBlur: ({ value, fieldApi }) => {
+                            if (readOnly || !value) return undefined
+                            const num = Number(value)
+                            if (Number.isNaN(num) || num < 0) {
+                              return "Compare-at price must be a positive number."
+                            }
+                            const rawPrice =
+                              fieldApi.form.getFieldValue("price")
+                            if (rawPrice) {
+                              const price = Number(rawPrice)
+                              if (!Number.isNaN(price) && num <= price) {
+                                return "Compare-at price must be higher than price."
+                              }
+                            }
+                            return undefined
+                          },
+                        }}
+                      >
+                        {(field) => (
+                          <div>
+                            <InlineRow
+                              icon={
+                                <DollarSign className="h-4 w-4 text-muted-foreground" />
+                              }
+                              label="Compare-at price"
+                              description="Crossed-out original price shown next to the current price. Leave empty for no discount."
+                            >
+                              <Input
+                                placeholder="120.00"
+                                type="text"
+                                inputMode="decimal"
+                                value={field.state.value}
+                                onBlur={field.handleBlur}
+                                onChange={(e) =>
+                                  field.handleChange(e.target.value)
+                                }
+                                disabled={readOnly}
+                                className="max-w-32 text-sm"
+                              />
+                            </InlineRow>
+                            <FieldError errors={field.state.meta.errors} />
+                          </div>
+                        )}
+                      </form.Field>
+                    </>
+                  )
+                }
+              </form.Subscribe>
+
+              <form.Field
+                name="total_stock_cap"
+                validators={{
+                  onBlur: ({ value }) => {
+                    if (readOnly || !value) return undefined
+                    const num = Number.parseInt(value, 10)
+                    if (Number.isNaN(num) || num < 1) {
+                      return "Total stock must be a positive number. Leave empty for unlimited."
+                    }
+                    return undefined
+                  },
+                }}
+              >
+                {(field) => (
+                  <div>
+                    <InlineRow
+                      icon={<Hash className="h-4 w-4 text-muted-foreground" />}
+                      label="Total stock"
+                      description="Maximum units available. Leave empty for unlimited."
+                    >
+                      <Input
+                        id="total_stock_cap"
+                        aria-label="Total stock"
+                        placeholder="Unlimited"
+                        type="number"
+                        min="1"
+                        value={field.state.value}
+                        onBlur={field.handleBlur}
+                        onChange={(e) => field.handleChange(e.target.value)}
+                        disabled={readOnly}
+                        className="max-w-32 text-sm"
+                      />
+                    </InlineRow>
+                    <FieldError errors={field.state.meta.errors} />
+                  </div>
+                )}
+              </form.Field>
+
+              <form.Field
+                name="max_per_order"
+                validators={{
+                  onBlur: ({ value, fieldApi }) => {
+                    if (readOnly || !value) return undefined
+                    const num = Number.parseInt(value, 10)
+                    if (Number.isNaN(num) || num < 1) {
+                      return "Max per order must be a positive number. Leave empty for unlimited."
+                    }
+                    const rawCap =
+                      fieldApi.form.getFieldValue("total_stock_cap")
+                    if (rawCap) {
+                      const cap = Number.parseInt(rawCap, 10)
+                      if (!Number.isNaN(cap) && num > cap) {
+                        return `Cannot exceed total stock cap (${cap})`
+                      }
+                    }
+                    return undefined
+                  },
+                }}
+              >
+                {(field) => (
+                  <div>
+                    <InlineRow
+                      icon={<Hash className="h-4 w-4 text-muted-foreground" />}
+                      label="Max per order"
+                      description="Per-cart cap. Leave empty for unlimited."
+                    >
+                      <Input
+                        id="max_per_order"
+                        aria-label="Max per order"
+                        placeholder="Unlimited"
+                        type="number"
+                        min="1"
+                        value={field.state.value}
+                        onBlur={field.handleBlur}
+                        onChange={(e) => field.handleChange(e.target.value)}
+                        disabled={readOnly}
+                        className="max-w-32 text-sm"
+                      />
+                    </InlineRow>
+                    <FieldError errors={field.state.meta.errors} />
+                  </div>
+                )}
+              </form.Field>
+
+              <form.Field name="insurance_eligible">
+                {(field) => (
+                  <InlineRow
+                    icon={
+                      <ShieldCheck className="h-4 w-4 text-muted-foreground" />
+                    }
+                    label="Insurance Eligible"
+                    description="Include this product in the insurance calculation when popup insurance is enabled"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Checkbox
+                        id="insurance_eligible"
+                        checked={field.state.value}
+                        onCheckedChange={(checked) =>
+                          field.handleChange(checked === true)
+                        }
+                        disabled={readOnly}
+                      />
+                      <Label htmlFor="insurance_eligible" className="text-sm">
+                        Eligible
+                      </Label>
+                    </div>
+                  </InlineRow>
+                )}
+              </form.Field>
+
+              <form.Subscribe selector={(state) => state.values.category}>
+                {(category) => (
+                  <form.Field name="discountable">
+                    {(field) => {
+                      // Patreon donations are never discountable by policy — the
+                      // backend coerces the field on write, so mirror that in the
+                      // form: force value=false, disable the checkbox, and show
+                      // why.
+                      const isPatreon = category === "patreon"
+                      const isDisabled = readOnly || isPatreon
+                      const effectiveChecked = isPatreon
+                        ? false
+                        : field.state.value
+
+                      return (
+                        <InlineRow
+                          icon={
+                            <TicketPercent className="h-4 w-4 text-muted-foreground" />
                           }
-                          disabled={isDisabled}
-                          title={
+                          label="Discountable"
+                          description={
                             isPatreon
                               ? "Patreon donations are never discountable"
-                              : undefined
+                              : "When off, coupons and group/scholarship discounts never reduce this product's price (e.g. mandatory meal plans)"
                           }
-                        />
-                        <Label htmlFor="discountable" className="text-sm">
-                          Eligible for discounts
-                        </Label>
-                      </div>
-                    </InlineRow>
-                  )
-                }}
-              </form.Field>
-            )}
-          </form.Subscribe>
-
-          <form.Field name="requires_check_in">
-            {(field) => (
-              <InlineRow
-                icon={<QrCode className="h-4 w-4 text-muted-foreground" />}
-                label="Requires Check-in"
-                description="Enable for products that need scanning at the venue"
-              >
-                <Switch
-                  id="requires_check_in"
-                  checked={field.state.value}
-                  onCheckedChange={(checked) => field.handleChange(checked)}
-                  disabled={readOnly}
-                />
-              </InlineRow>
-            )}
-          </form.Field>
-
-          <form.Field name="is_active">
-            {(field) => (
-              <InlineRow
-                icon={<Power className="h-4 w-4 text-muted-foreground" />}
-                label="Active"
-                description="Product is available for purchase"
-              >
-                <Switch
-                  checked={field.state.value}
-                  onCheckedChange={(checked) => field.handleChange(checked)}
-                  disabled={readOnly}
-                />
-              </InlineRow>
-            )}
-          </form.Field>
-
-          <form.Field name="exclusive">
-            {(field) => (
-              <InlineRow
-                icon={<Shield className="h-4 w-4 text-muted-foreground" />}
-                label="Exclusive"
-                description="Only one exclusive product can be selected at a time"
-              >
-                <Switch
-                  checked={field.state.value}
-                  onCheckedChange={(checked) => field.handleChange(checked)}
-                  disabled={readOnly}
-                />
-              </InlineRow>
-            )}
-          </form.Field>
-        </InlineSection>
-
-        {/* Ticket Options (conditional) */}
-        <form.Subscribe selector={(state) => state.values.category}>
-          {(category) =>
-            category === "ticket" && (
-              <>
-                <Separator />
-                <InlineSection title="Ticket Options">
-                  <form.Field name="duration_type">
-                    {(field) => (
-                      <InlineRow
-                        icon={
-                          <Clock className="h-4 w-4 text-muted-foreground" />
-                        }
-                        label="Duration"
-                        description="How long the ticket is valid"
-                      >
-                        <Select
-                          value={field.state.value}
-                          onValueChange={(val) =>
-                            field.handleChange(val as TicketDuration)
-                          }
-                          disabled={readOnly}
                         >
-                          <SelectTrigger className="w-auto text-sm">
-                            <SelectValue placeholder="Select duration" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {TICKET_DURATIONS.map((dur) => (
-                              <SelectItem key={dur.value} value={dur.value}>
-                                {dur.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </InlineRow>
-                    )}
+                          <div className="flex items-center gap-2">
+                            <Checkbox
+                              id="discountable"
+                              checked={effectiveChecked}
+                              onCheckedChange={(checked) =>
+                                field.handleChange(checked === true)
+                              }
+                              disabled={isDisabled}
+                              title={
+                                isPatreon
+                                  ? "Patreon donations are never discountable"
+                                  : undefined
+                              }
+                            />
+                            <Label htmlFor="discountable" className="text-sm">
+                              Eligible for discounts
+                            </Label>
+                          </div>
+                        </InlineRow>
+                      )
+                    }}
                   </form.Field>
-                </InlineSection>
-              </>
-            )
-          }
-        </form.Subscribe>
+                )}
+              </form.Subscribe>
 
-        {/* Sale Window — applies to every product category. Times are entered
+              <form.Field name="requires_check_in">
+                {(field) => (
+                  <InlineRow
+                    icon={<QrCode className="h-4 w-4 text-muted-foreground" />}
+                    label="Requires Check-in"
+                    description="Enable for products that need scanning at the venue"
+                  >
+                    <Switch
+                      id="requires_check_in"
+                      checked={field.state.value}
+                      onCheckedChange={(checked) => field.handleChange(checked)}
+                      disabled={readOnly}
+                    />
+                  </InlineRow>
+                )}
+              </form.Field>
+
+              <form.Field name="is_active">
+                {(field) => (
+                  <InlineRow
+                    icon={<Power className="h-4 w-4 text-muted-foreground" />}
+                    label="Active"
+                    description="Product is available for purchase"
+                  >
+                    <Switch
+                      checked={field.state.value}
+                      onCheckedChange={(checked) => field.handleChange(checked)}
+                      disabled={readOnly}
+                    />
+                  </InlineRow>
+                )}
+              </form.Field>
+
+              <form.Field name="exclusive">
+                {(field) => (
+                  <InlineRow
+                    icon={<Shield className="h-4 w-4 text-muted-foreground" />}
+                    label="Exclusive"
+                    description="Only one exclusive product can be selected at a time"
+                  >
+                    <Switch
+                      checked={field.state.value}
+                      onCheckedChange={(checked) => field.handleChange(checked)}
+                      disabled={readOnly}
+                    />
+                  </InlineRow>
+                )}
+              </form.Field>
+            </InlineSection>
+
+            {/* Ticket Options (conditional) */}
+            <form.Subscribe selector={(state) => state.values.category}>
+              {(category) =>
+                category === "ticket" && (
+                  <>
+                    <Separator />
+                    <InlineSection title="Ticket Options">
+                      <form.Field name="duration_type">
+                        {(field) => (
+                          <InlineRow
+                            icon={
+                              <Clock className="h-4 w-4 text-muted-foreground" />
+                            }
+                            label="Duration"
+                            description="How long the ticket is valid"
+                          >
+                            <Select
+                              value={field.state.value}
+                              onValueChange={(val) =>
+                                field.handleChange(val as TicketDuration)
+                              }
+                              disabled={readOnly}
+                            >
+                              <SelectTrigger className="w-auto text-sm">
+                                <SelectValue placeholder="Select duration" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {TICKET_DURATIONS.map((dur) => (
+                                  <SelectItem key={dur.value} value={dur.value}>
+                                    {dur.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </InlineRow>
+                        )}
+                      </form.Field>
+                    </InlineSection>
+                  </>
+                )
+              }
+            </form.Subscribe>
+
+            {/* Sale Window — applies to every product category. Times are entered
             in the popup's timezone and stored as precise instants, so a cutoff
             like a meal-plan "Friday 11:59 PM" deadline is enforced exactly. */}
-        <Separator />
-        <InlineSection title="Sale Window">
-          <form.Field name="sale_starts_at">
-            {(field) => (
-              <InlineRow
-                icon={<Calendar className="h-4 w-4 text-muted-foreground" />}
-                label="Sale Starts At"
-                description={`When the product goes on sale (${popupTimezone}). Blank = no limit.`}
-              >
-                <Input
-                  type="datetime-local"
-                  value={field.state.value}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                  disabled={readOnly}
-                  className="max-w-60"
-                />
-              </InlineRow>
-            )}
-          </form.Field>
-
-          <form.Field name="sale_ends_at">
-            {(field) => (
-              <InlineRow
-                icon={<Calendar className="h-4 w-4 text-muted-foreground" />}
-                label="Sale Ends At"
-                description={`Order cutoff — sales close at this exact time (${popupTimezone}).`}
-              >
-                <Input
-                  type="datetime-local"
-                  value={field.state.value}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                  disabled={readOnly}
-                  className="max-w-60"
-                />
-              </InlineRow>
-            )}
-          </form.Field>
-        </InlineSection>
-
-        {isEdit && (popupData?.supported_languages?.length ?? 0) > 1 && (
-          <>
             <Separator />
-            <TranslationManager
-              entityType="product"
-              entityId={defaultValues!.id}
-              translatableFields={["name", "description"]}
-              sourceData={{
-                name: defaultValues!.name,
-                description: defaultValues!.description,
-              }}
-              supportedLanguages={popupData!.supported_languages!}
-              defaultLanguage={popupData!.default_language!}
-            />
-          </>
-        )}
+            <InlineSection title="Sale Window">
+              <form.Field name="sale_starts_at">
+                {(field) => (
+                  <InlineRow
+                    icon={
+                      <Calendar className="h-4 w-4 text-muted-foreground" />
+                    }
+                    label="Sale Starts At"
+                    description={`When the product goes on sale (${popupTimezone}). Blank = no limit.`}
+                  >
+                    <Input
+                      type="datetime-local"
+                      value={field.state.value}
+                      onChange={(e) => field.handleChange(e.target.value)}
+                      disabled={readOnly}
+                      className="max-w-60"
+                    />
+                  </InlineRow>
+                )}
+              </form.Field>
 
-        <Separator />
+              <form.Field name="sale_ends_at">
+                {(field) => (
+                  <InlineRow
+                    icon={
+                      <Calendar className="h-4 w-4 text-muted-foreground" />
+                    }
+                    label="Sale Ends At"
+                    description={`Order cutoff — sales close at this exact time (${popupTimezone}).`}
+                  >
+                    <Input
+                      type="datetime-local"
+                      value={field.state.value}
+                      onChange={(e) => field.handleChange(e.target.value)}
+                      disabled={readOnly}
+                      className="max-w-60"
+                    />
+                  </InlineRow>
+                )}
+              </form.Field>
+            </InlineSection>
 
-        {/* Form Actions */}
-        <div className="flex gap-4">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => navigate({ to: "/products" })}
-          >
-            {readOnly ? "Back" : "Cancel"}
-          </Button>
-          {!readOnly && (
-            <LoadingButton type="submit" loading={isPending}>
-              {isEdit ? "Save Changes" : "Create Product"}
-            </LoadingButton>
+            <Separator />
+
+            {/* Form Actions */}
+            <div className="flex gap-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => navigate({ to: "/products" })}
+              >
+                {readOnly ? "Back" : "Cancel"}
+              </Button>
+              {!readOnly && (
+                <LoadingButton type="submit" loading={isPending}>
+                  {isEdit ? "Save Changes" : "Create Product"}
+                </LoadingButton>
+              )}
+            </div>
+          </form>
+
+          {isEdit && !readOnly && (
+            <div className="mx-auto max-w-2xl">
+              <DangerZone
+                description="Once you delete this product, it will be permanently removed. Existing purchases will not be affected."
+                onDelete={() => deleteMutation.mutate()}
+                isDeleting={deleteMutation.isPending}
+                confirmText="Delete Product"
+                resourceName={defaultValues.name}
+                variant="inline"
+              />
+            </div>
           )}
-        </div>
-      </form>
+        </TabsContent>
 
-      {isEdit && !readOnly && (
-        <div className="mx-auto max-w-2xl">
-          <DangerZone
-            description="Once you delete this product, it will be permanently removed. Existing purchases will not be affected."
-            onDelete={() => deleteMutation.mutate()}
-            isDeleting={deleteMutation.isPending}
-            confirmText="Delete Product"
-            resourceName={defaultValues.name}
-            variant="inline"
-          />
-        </div>
-      )}
+        <TabsContent value="translations">
+          {!isEdit ? (
+            <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
+              Save the product first to add translations.
+            </div>
+          ) : (popupData?.supported_languages?.length ?? 0) <= 1 ? (
+            <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
+              Enable a second language on the event to translate this product.
+            </div>
+          ) : (
+            <form.Subscribe selector={(state) => state.isDirty}>
+              {(isDirty) =>
+                isDirty ? (
+                  <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
+                    Save your changes first to translate the latest content.
+                  </div>
+                ) : (
+                  <TranslationManager
+                    entityType="product"
+                    entityId={defaultValues!.id}
+                    translatableFields={["name", "description"]}
+                    sourceData={{
+                      name: defaultValues!.name,
+                      description: defaultValues!.description,
+                    }}
+                    supportedLanguages={popupData!.supported_languages!}
+                    defaultLanguage={popupData!.default_language!}
+                  />
+                )
+              }
+            </form.Subscribe>
+          )}
+        </TabsContent>
+      </Tabs>
       <UnsavedChangesDialog blocker={blocker} />
 
       <Dialog open={addCategoryOpen} onOpenChange={setAddCategoryOpen}>
