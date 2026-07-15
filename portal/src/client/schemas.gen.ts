@@ -305,6 +305,11 @@ export const ApiKeyCreateSchema = {
             minLength: 1,
             title: 'Name'
         },
+        popup_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Popup Id'
+        },
         expires_at: {
             anyOf: [
                 {
@@ -327,7 +332,7 @@ export const ApiKeyCreateSchema = {
         }
     },
     type: 'object',
-    required: ['name'],
+    required: ['name', 'popup_id'],
     title: 'ApiKeyCreate',
     description: 'Request body for creating a new API key.'
 } as const;
@@ -346,6 +351,18 @@ export const ApiKeyCreatedSchema = {
         prefix: {
             type: 'string',
             title: 'Prefix'
+        },
+        popup_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Popup Id'
         },
         scopes: {
             items: {
@@ -422,6 +439,18 @@ export const ApiKeyPublicSchema = {
         prefix: {
             type: 'string',
             title: 'Prefix'
+        },
+        popup_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Popup Id'
         },
         scopes: {
             items: {

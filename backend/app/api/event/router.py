@@ -48,7 +48,12 @@ from app.api.event.schemas import (
 )
 from app.api.event_audit.crud import build_event_snapshot, record_event_audit
 from app.api.event_audit.schemas import EventAuditAction
-from app.api.popup.guards import ensure_popup_writable
+from app.api.popup.guards import (
+    CallerToken,
+    ensure_api_key_popup,
+    ensure_popup_writable,
+    resolve_api_key_popup_filter,
+)
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
 from app.core.dependencies.tenants import PublicTenant
 from app.core.dependencies.users import (
@@ -1810,8 +1815,14 @@ async def check_availability_portal(
     payload: EventAvailabilityCheck,
     db: HumanTenantSession,
     _: CurrentHuman,
+    token_payload: CallerToken,
 ) -> EventAvailabilityResult:
     """Portal-facing variant of /check-availability authenticated as a human."""
+    from app.api.event_venue.models import EventVenues
+
+    # Popup-scoped API keys may only probe venues of their own popup.
+    venue = db.get(EventVenues, payload.venue_id)
+    ensure_api_key_popup(token_payload, venue.popup_id if venue else None)
     return _run_availability_check(db, payload)
 
 
@@ -2271,13 +2282,15 @@ async def list_portal_invitations(
     event_id: uuid.UUID,
     db: HumanTenantSession,
     current_human: CurrentHuman,
+    token_payload: CallerToken,
 ) -> list[EventInvitationPublic]:
     from sqlmodel import select
 
     from app.api.event.models import EventInvitations
     from app.api.human.models import Humans
 
-    _ensure_portal_event_owner(db, event_id, current_human)
+    event = _ensure_portal_event_owner(db, event_id, current_human)
+    ensure_api_key_popup(token_payload, event.popup_id)
     rows = db.exec(
         select(EventInvitations, Humans)
         .where(EventInvitations.event_id == event_id)
@@ -2477,8 +2490,10 @@ async def bulk_invite_portal(
     payload: EventInvitationBulkCreate,
     db: HumanTenantSession,
     current_human: CurrentHuman,
+    token_payload: CallerToken,
 ) -> EventInvitationBulkResult:
     event = _ensure_portal_event_owner(db, event_id, current_human)
+    ensure_api_key_popup(token_payload, event.popup_id)
     from app.api.popup.crud import popups_crud
 
     ensure_popup_writable(popups_crud.get(db, event.popup_id))
@@ -2505,8 +2520,10 @@ async def delete_portal_invitation(
     invitation_id: uuid.UUID,
     db: HumanTenantSession,
     current_human: CurrentHuman,
+    token_payload: CallerToken,
 ) -> None:
     event = _ensure_portal_event_owner(db, event_id, current_human)
+    ensure_api_key_popup(token_payload, event.popup_id)
     from app.api.popup.crud import popups_crud
 
     ensure_popup_writable(popups_crud.get(db, event.popup_id))
@@ -2669,6 +2686,7 @@ def _filter_rsvped_events(db, events: list, human_id: uuid.UUID) -> list:
 async def list_portal_events(
     db: HumanTenantSession,
     current_human: CurrentHuman,
+    token_payload: CallerToken,
     popup_id: uuid.UUID | None = None,
     event_status: EventStatus | None = None,
     kind: str | None = None,
@@ -2683,6 +2701,9 @@ async def list_portal_events(
     managed_only: bool = False,
     include_hidden: bool = False,
 ) -> ListModel[EventPublic]:
+    # Popup-scoped API keys never see tenant-wide data: an omitted popup_id
+    # is forced to the key's popup, a mismatching one raises 403.
+    popup_id = resolve_api_key_popup_filter(token_payload, popup_id)
     if popup_id:
         # The portal list always consumes the full window (it groups by day and
         # sorts globally client-side), so we fetch every matching row in one
@@ -2820,6 +2841,7 @@ async def list_portal_popup_tags(
 async def portal_hidden_events_count(
     db: HumanTenantSession,
     current_human: CurrentHuman,
+    token_payload: CallerToken,
     popup_id: uuid.UUID | None = None,
 ) -> dict[str, int]:
     """Return how many events the human has hidden (optionally for a popup).
@@ -2831,6 +2853,8 @@ async def portal_hidden_events_count(
     from sqlmodel import select
 
     from app.api.event.models import EventHiddenByHuman, Events
+
+    popup_id = resolve_api_key_popup_filter(token_payload, popup_id)
 
     # We count by distinct hide targets: each hide row is already unique per
     # (human, event), so a plain count of matching events = number of
@@ -2854,6 +2878,7 @@ async def portal_hidden_events_count(
 async def list_portal_track_event_counts(
     db: HumanTenantSession,
     _: CurrentHuman,
+    token_payload: CallerToken,
     popup_id: uuid.UUID,
 ) -> list[TrackEventCount]:
     """Distinct published-event count per track for a popup.
@@ -2862,6 +2887,7 @@ async def list_portal_track_event_counts(
     empty tracks without fetching the whole event list to count on the
     client (which also capped at the page limit).
     """
+    ensure_api_key_popup(token_payload, popup_id)
     counts = crud.events_crud.count_published_events_by_track(db, popup_id=popup_id)
     return [
         TrackEventCount(track_id=track_id, event_count=count)
@@ -2873,6 +2899,7 @@ async def list_portal_track_event_counts(
 async def list_portal_venue_event_counts(
     db: HumanTenantSession,
     _: CurrentHuman,
+    token_payload: CallerToken,
     popup_id: uuid.UUID,
 ) -> list[VenueEventCount]:
     """Distinct published-event count per venue for a popup.
@@ -2881,6 +2908,7 @@ async def list_portal_venue_event_counts(
     no events without fetching the whole event list to count on the client
     (which also capped at the page limit).
     """
+    ensure_api_key_popup(token_payload, popup_id)
     rows = crud.events_crud.count_published_events_by_venue(db, popup_id=popup_id)
     return [
         VenueEventCount(venue_id=venue_id, venue_title=venue_title, event_count=count)
@@ -2892,6 +2920,7 @@ async def list_portal_venue_event_counts(
 async def portal_calendar_summary(
     db: HumanTenantSession,
     current_human: CurrentHuman,
+    token_payload: CallerToken,
     popup_id: uuid.UUID,
     start_after: datetime | None = None,
     start_before: datetime | None = None,
@@ -2912,6 +2941,7 @@ async def portal_calendar_summary(
     """
     from app.api.event_venue.router import _resolve_popup_timezone
 
+    ensure_api_key_popup(token_payload, popup_id)
     events = crud.events_crud.find_in_range_expanded(
         db,
         popup_id=popup_id,
@@ -2979,6 +3009,7 @@ async def get_portal_event(
     event_id: uuid.UUID,
     db: HumanTenantSession,
     current_human: CurrentHuman,
+    token_payload: CallerToken,
     occurrence_start: datetime | None = None,
 ) -> EventPublic:
     """Fetch a single event for the portal.
@@ -2996,6 +3027,7 @@ async def get_portal_event(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Event not found"
         )
+    ensure_api_key_popup(token_payload, event.popup_id)
 
     if event.visibility == EventVisibility.PRIVATE:
         invited = db.exec(
@@ -3065,6 +3097,7 @@ async def get_portal_event_admin_notes(
     event_id: uuid.UUID,
     db: HumanTenantSession,
     _: CurrentPortalStaff,
+    token_payload: CallerToken,
 ) -> EventAdminNotes:
     """Read an event's staff-only notes from the portal (staff humans only)."""
     event = crud.events_crud.get(db, event_id)
@@ -3072,6 +3105,7 @@ async def get_portal_event_admin_notes(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Event not found"
         )
+    ensure_api_key_popup(token_payload, event.popup_id)
     return EventAdminNotes(notes=event.admin_notes)
 
 
@@ -3100,6 +3134,7 @@ async def hide_portal_event(
     event_id: uuid.UUID,
     db: HumanTenantSession,
     current_human: CurrentHuman,
+    token_payload: CallerToken,
 ) -> None:
     """Hide an event from the current human's portal.
 
@@ -3113,6 +3148,7 @@ async def hide_portal_event(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Event not found"
         )
+    ensure_api_key_popup(token_payload, event.popup_id)
 
     target_id = event.recurrence_master_id or event.id
     crud.hidden_by_human_crud.hide(
@@ -3135,9 +3171,12 @@ async def unhide_portal_event(
     event_id: uuid.UUID,
     db: HumanTenantSession,
     current_human: CurrentHuman,
+    token_payload: CallerToken,
 ) -> None:
     """Undo a prior hide."""
     event = crud.events_crud.get(db, event_id)
+    # Fail closed for popup-scoped keys when the event can't be resolved.
+    ensure_api_key_popup(token_payload, event.popup_id if event else None)
     target_id = event.recurrence_master_id or event.id if event else event_id
     crud.hidden_by_human_crud.unhide(
         db,
@@ -3161,9 +3200,12 @@ async def create_portal_event(
     event_in: EventCreate,
     db: HumanTenantSession,
     current_human: CurrentHuman,
+    token_payload: CallerToken,
 ) -> EventPublic:
     from app.api.event.models import Events
     from app.api.event_settings.crud import event_settings_crud
+
+    ensure_api_key_popup(token_payload, event_in.popup_id)
 
     settings = event_settings_crud.get_by_popup_id(db, event_in.popup_id)
     if settings and not settings.event_enabled:
@@ -3301,12 +3343,14 @@ async def update_portal_event(
     event_in: EventUpdate,
     db: HumanTenantSession,
     current_human: CurrentHuman,
+    token_payload: CallerToken,
 ) -> EventPublic:
     event = crud.events_crud.get(db, event_id)
     if not event:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Event not found"
         )
+    ensure_api_key_popup(token_payload, event.popup_id)
     if not _human_manages_event(event, current_human):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -3461,12 +3505,14 @@ async def cancel_portal_event(
     event_id: uuid.UUID,
     db: HumanTenantSession,
     current_human: CurrentHuman,
+    token_payload: CallerToken,
 ) -> EventPublic:
     event = crud.events_crud.get(db, event_id)
     if not event:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Event not found"
         )
+    ensure_api_key_popup(token_payload, event.popup_id)
     if not _human_manages_event(event, current_human):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -3504,10 +3550,12 @@ async def export_portal_event_ics(
     event_id: uuid.UUID,
     db: HumanTenantSession,
     current_human: CurrentHuman,
+    token_payload: CallerToken,
 ) -> Response:
     event = crud.events_crud.get(db, event_id)
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
+    ensure_api_key_popup(token_payload, event.popup_id)
     # Re-use the same visibility gate as the detail endpoint.
     if event.visibility == EventVisibility.PRIVATE and not _human_manages_event(
         event, current_human

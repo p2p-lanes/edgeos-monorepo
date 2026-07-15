@@ -1,6 +1,7 @@
 import uuid
+from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Header, HTTPException, status
 
 from app.api.shared.enums import UserRole
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
@@ -9,6 +10,12 @@ from app.api.ticketing_step.schemas import (
     TicketingStepCreate,
     TicketingStepPublic,
     TicketingStepUpdate,
+)
+from app.api.translation.service import (
+    apply_ticketing_step_overlay,
+    delete_translations_for_entity,
+    get_translations_bulk,
+    parse_accept_language,
 )
 from app.core.dependencies.users import (
     AdminOrApiKey_TicketingStepsRead,
@@ -28,11 +35,23 @@ async def list_portal_ticketing_steps(
     db: HumanTenantSession,
     _: CurrentHuman,
     popup_id: uuid.UUID,
+    accept_language: Annotated[str | None, Header(alias="Accept-Language")] = None,
 ) -> ListModel[TicketingStepPublic]:
     """List enabled ticketing steps for a popup (portal-facing)."""
     steps = crud.ticketing_steps_crud.find_portal_by_popup(db, popup_id=popup_id)
+    lang = parse_accept_language(accept_language)
+    translations_map = (
+        get_translations_bulk(db, "ticketing_step", [s.id for s in steps], lang)
+        if lang
+        else {}
+    )
+    results = []
+    for s in steps:
+        data = TicketingStepPublic.model_validate(s).model_dump()
+        data = apply_ticketing_step_overlay(data, translations_map.get(s.id))
+        results.append(TicketingStepPublic.model_validate(data))
     return ListModel[TicketingStepPublic](
-        results=[TicketingStepPublic.model_validate(s) for s in steps],
+        results=results,
         paging=Paging(offset=0, limit=len(steps), total=len(steps)),
     )
 
@@ -244,4 +263,5 @@ async def delete_ticketing_step(
             detail="Cannot delete a protected step",
         )
 
+    delete_translations_for_entity(db, "ticketing_step", step.id)
     crud.ticketing_steps_crud.delete(db, step)

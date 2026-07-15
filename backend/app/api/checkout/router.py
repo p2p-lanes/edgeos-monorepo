@@ -7,11 +7,13 @@ Endpoints:
 """
 
 import uuid
+from typing import Annotated
 
 from fastapi import (
     APIRouter,
     BackgroundTasks,
     Depends,
+    Header,
     HTTPException,
     Query,
     Request,
@@ -39,6 +41,7 @@ from app.api.payment.router import (
     _send_payment_confirmed_email,
 )
 from app.api.payment.schemas import PaymentStatus, PendingReleaseResponse
+from app.api.translation.service import parse_accept_language
 from app.core.dependencies.tenants import PublicTenant
 from app.core.dependencies.users import SessionDep
 from app.core.rate_limit import RateLimit
@@ -109,13 +112,14 @@ async def get_runtime(
     slug: str,
     db: SessionDep,
     tenant: PublicTenant,
+    accept_language: Annotated[str | None, Header(alias="Accept-Language")] = None,
 ) -> CheckoutRuntimeResponse:
     """Return popup metadata, products, buyer form, and ticketing steps for anonymous checkout.
 
     Fully public endpoint (no JWT). Only serves sale_type=direct active popups.
     Rate-limited 120/min/IP.
     """
-    return runtime_for_slug(db, slug, tenant.id)
+    return runtime_for_slug(db, slug, tenant.id, parse_accept_language(accept_language))
 
 
 @router.get(

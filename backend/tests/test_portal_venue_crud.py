@@ -94,6 +94,7 @@ def _make_pat(
     db: Session,
     tenant: Tenants,
     human: Humans,
+    popup: Popups,
     *,
     scopes: list[str] | None = None,
     expires_at: datetime | None = None,
@@ -102,11 +103,33 @@ def _make_pat(
         db,
         tenant_id=tenant.id,
         human_id=human.id,
+        popup_id=popup.id,
         name=f"venue test pat {uuid.uuid4().hex[:4]}",
         expires_at=expires_at,
         scopes=scopes or ["events:read"],
     )
     return raw
+
+
+def _accept_application(
+    db: Session, tenant: Tenants, popup: Popups, human: Humans
+) -> None:
+    """Seed an accepted application so the human is a member of the popup.
+
+    API key creation requires popup membership.
+    """
+    from app.api.application.models import Applications
+    from app.api.application.schemas import ApplicationStatus
+
+    db.add(
+        Applications(
+            tenant_id=tenant.id,
+            popup_id=popup.id,
+            human_id=human.id,
+            status=ApplicationStatus.ACCEPTED.value,
+        )
+    )
+    db.commit()
 
 
 def _make_venue(
@@ -213,7 +236,7 @@ class TestPortalVenueCrudPat:
         popup = _make_popup(db, tenant_a)
         owner = _make_human(db, tenant_a)
         venue = _make_venue(db, tenant_a, popup, owner)
-        raw_key = _make_pat(db, tenant_a, owner, scopes=["events:read"])
+        raw_key = _make_pat(db, tenant_a, owner, popup, scopes=["events:read"])
 
         resp = client.delete(
             f"/api/v1/event-venues/portal/venues/{venue.id}",
@@ -238,6 +261,7 @@ class TestPortalVenueCrudPat:
             db,
             tenant_a,
             other,
+            popup,
             scopes=["events:read", "venues:write"],
             expires_at=datetime.now(UTC) + timedelta(days=7),
         )
@@ -264,6 +288,7 @@ class TestPortalVenueCrudPat:
             db,
             tenant_a,
             owner,
+            popup,
             scopes=["events:read", "venues:write"],
             expires_at=datetime.now(UTC) + timedelta(days=7),
         )
@@ -360,6 +385,7 @@ class TestPortalVenueCrudPat:
             db,
             tenant_a,
             owner,
+            popup,
             scopes=["events:read", "venues:write"],
             expires_at=datetime.now(UTC) + timedelta(days=7),
         )
@@ -415,6 +441,7 @@ class TestPortalVenueCrudPat:
             db,
             tenant_a,
             human,
+            popup,
             scopes=["events:read", "venues:write"],
             expires_at=datetime.now(UTC) + timedelta(days=7),
         )
@@ -439,7 +466,7 @@ class TestPortalVenueCrudPat:
         popup = _make_popup(db, tenant_a)
         _set_event_settings(db, tenant_a, popup)
         human = _make_human(db, tenant_a)
-        raw_key = _make_pat(db, tenant_a, human, scopes=["events:read"])
+        raw_key = _make_pat(db, tenant_a, human, popup, scopes=["events:read"])
 
         resp = client.post(
             "/api/v1/event-venues/portal/venues",
@@ -463,6 +490,7 @@ class TestPortalVenueCrudPat:
             db,
             tenant_a,
             owner,
+            popup,
             scopes=["events:read", "venues:write"],
             expires_at=datetime.now(UTC) + timedelta(days=7),
         )
@@ -491,6 +519,7 @@ class TestPortalVenueCrudPat:
             db,
             tenant_a,
             other,
+            popup,
             scopes=["events:read", "venues:write"],
             expires_at=datetime.now(UTC) + timedelta(days=7),
         )
@@ -513,13 +542,19 @@ class TestPortalVenueCrudPat:
         from app.api.api_key.schemas import MAX_WRITE_SCOPE_LIFETIME_DAYS
         from app.core.security import create_access_token
 
+        popup = _make_popup(db, tenant_a)
         human = _make_human(db, tenant_a)
+        _accept_application(db, tenant_a, popup, human)
         token = create_access_token(subject=human.id, token_type="human")
 
         resp = client.post(
             "/api/v1/api-keys",
             headers={"Authorization": f"Bearer {token}"},
-            json={"name": "venue writer", "scopes": ["venues:write"]},
+            json={
+                "name": "venue writer",
+                "scopes": ["venues:write"],
+                "popup_id": str(popup.id),
+            },
         )
 
         assert resp.status_code == 201, resp.text
@@ -537,7 +572,9 @@ class TestPortalVenueCrudPat:
     ) -> None:
         from app.core.security import create_access_token
 
+        popup = _make_popup(db, tenant_a)
         human = _make_human(db, tenant_a)
+        _accept_application(db, tenant_a, popup, human)
         token = create_access_token(subject=human.id, token_type="human")
 
         resp = client.post(
@@ -547,6 +584,7 @@ class TestPortalVenueCrudPat:
                 "name": "venue writer",
                 "scopes": ["events:read", "venues:write"],
                 "expires_at": _future_expiry(),
+                "popup_id": str(popup.id),
             },
         )
 

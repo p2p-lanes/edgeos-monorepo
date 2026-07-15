@@ -16,6 +16,11 @@ from app.api.form_section.models import FormSections
 from app.api.payment.crud import payments_crud
 from app.api.payment.schemas import PaymentStatus
 from app.api.popup import crud
+from app.api.popup.guards import (
+    CallerToken,
+    ensure_api_key_popup,
+    is_popup_scoped_api_key,
+)
 from app.api.popup.models import Popups
 from app.api.popup.schemas import (
     PopupAdmin,
@@ -33,6 +38,7 @@ from app.api.translation.service import (
     delete_translations_for_entity,
     get_translations_bulk,
     get_translations_for_entity,
+    parse_accept_language,
 )
 from app.core.dependencies.users import (
     CurrentCheckInOperator,
@@ -399,6 +405,7 @@ async def delete_popup(
 async def list_portal_popups(
     db: HumanTenantSession,
     current_human: CurrentHuman,
+    token_payload: CallerToken,
     accept_language: Annotated[str | None, Header(alias="Accept-Language")] = None,
 ) -> list[PopupPublic]:
     """List popups visible to the current human in the Portal.
@@ -418,10 +425,14 @@ async def list_portal_popups(
     ]
     popups = list(active_popups) + participated_ended
 
-    if not accept_language or accept_language == "en":
+    # Popup-scoped API keys only ever see their own popup.
+    if is_popup_scoped_api_key(token_payload):
+        popups = [p for p in popups if p.id == token_payload.popup_id]
+
+    lang = parse_accept_language(accept_language)
+    if lang is None:
         return [PopupPublic.model_validate(p) for p in popups]
 
-    lang = accept_language.split(",")[0].split("-")[0].strip()
     popup_ids = [p.id for p in popups]
     translations_map = get_translations_bulk(db, "popup", popup_ids, lang)
 
@@ -440,6 +451,7 @@ async def get_portal_popup(
     slug: str,
     db: HumanTenantSession,
     current_human: CurrentHuman,
+    token_payload: CallerToken,
     accept_language: Annotated[str | None, Header(alias="Accept-Language")] = None,
 ) -> PopupPublic:
     """Get a popup by slug (Portal). Ended popups are served only to participants."""
@@ -452,6 +464,7 @@ async def get_portal_popup(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Event not found",
         )
+    ensure_api_key_popup(token_payload, popup.id)
 
     if popup.status == PopupStatus.ended:
         access = applications_crud.resolve_popup_access(db, current_human.id, popup.id)
@@ -461,10 +474,10 @@ async def get_portal_popup(
                 detail="Event not found",
             )
 
-    if not accept_language or accept_language == "en":
+    lang = parse_accept_language(accept_language)
+    if lang is None:
         return PopupPublic.model_validate(popup)
 
-    lang = accept_language.split(",")[0].split("-")[0].strip()
     translation = get_translations_for_entity(db, "popup", popup.id, lang)
     data = PopupPublic.model_validate(popup).model_dump()
     data = apply_translation_overlay(data, translation, TRANSLATABLE_FIELDS["popup"])

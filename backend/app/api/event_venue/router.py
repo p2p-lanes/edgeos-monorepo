@@ -35,7 +35,11 @@ from app.api.event_venue.schemas import (
     VenueStatus,
     VenueWeeklyHoursUpdate,
 )
-from app.api.popup.guards import ensure_popup_writable
+from app.api.popup.guards import (
+    CallerToken,
+    ensure_api_key_popup,
+    ensure_popup_writable,
+)
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
 from app.core.dependencies.users import (
     AdminOrApiKey_EventsRead,
@@ -805,6 +809,7 @@ async def get_portal_availability(
     venue_id: uuid.UUID,
     db: HumanTenantSession,
     current_human: CurrentHuman,
+    token_payload: CallerToken,
     start: datetime = Query(...),
     end: datetime = Query(...),
     exclude_event_id: uuid.UUID | None = Query(default=None),
@@ -816,6 +821,7 @@ async def get_portal_availability(
     visible as occupied without leaking what it is.
     """
     venue = _get_venue_or_404(db, venue_id)
+    ensure_api_key_popup(token_payload, venue.popup_id)
     return _compute_availability(
         db,
         venue,
@@ -831,11 +837,13 @@ async def get_portal_availability(
 async def list_portal_venues(
     db: HumanTenantSession,
     _: CurrentHuman,
+    token_payload: CallerToken,
     popup_id: uuid.UUID,
     search: str | None = None,
     skip: PaginationSkip = 0,
     limit: PaginationLimit = 100,
 ) -> ListModel[EventVenuePublic]:
+    ensure_api_key_popup(token_payload, popup_id)
     # Hide pending venues from portal listings. Filtering in the query (not in
     # Python) keeps the paging total correct.
     venues, total = crud.event_venues_crud.find_by_popup(
@@ -858,12 +866,14 @@ async def update_portal_venue(
     venue_in: EventVenueUpdate,
     db: HumanTenantSession,
     current_human: CurrentHuman,
+    token_payload: CallerToken,
 ) -> EventVenuePublic:
     """Let a human edit a venue they created from the portal. Admin-only
     fields (``status``) are ignored on this endpoint — re-approval lives in
     the backoffice.
     """
     venue = _get_venue_or_404(db, venue_id)
+    ensure_api_key_popup(token_payload, venue.popup_id)
     if venue.owner_id != current_human.id:
         raise HTTPException(
             status_code=403,
@@ -894,6 +904,7 @@ async def delete_portal_venue(
     venue_id: uuid.UUID,
     db: HumanTenantSession,
     current_human: CurrentHuman,
+    token_payload: CallerToken,
 ) -> None:
     """Let a human delete a venue they created. Blocked if the venue still
     has linked events — those must be removed/reassigned first."""
@@ -901,6 +912,7 @@ async def delete_portal_venue(
     from app.api.event.schemas import EventStatus
 
     venue = _get_venue_or_404(db, venue_id)
+    ensure_api_key_popup(token_payload, venue.popup_id)
     if venue.owner_id != current_human.id:
         raise HTTPException(
             status_code=403,
@@ -934,11 +946,13 @@ async def create_portal_venue(
     venue_in: EventVenueCreate,
     db: HumanTenantSession,
     current_human: CurrentHuman,
+    token_payload: CallerToken,
 ) -> EventVenuePublic:
     """Create a venue as a human (portal). Respects popup event settings."""
     from app.api.event_settings.crud import event_settings_crud
     from app.api.popup.crud import popups_crud
 
+    ensure_api_key_popup(token_payload, venue_in.popup_id)
     ensure_popup_writable(popups_crud.get(db, venue_in.popup_id))
 
     settings = event_settings_crud.get_by_popup_id(db, venue_in.popup_id)

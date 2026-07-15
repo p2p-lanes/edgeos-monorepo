@@ -7,6 +7,7 @@ import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 import type { CheckoutMode } from "@/checkout/popupCheckoutPolicy"
 import { ApiError, CheckoutService, PaymentsService } from "@/client"
+import { withCheckoutLocale } from "@/helpers/checkout"
 import { getAttribution } from "@/lib/attribution"
 import { trackGAPurchase } from "@/lib/google-analytics"
 import { getMetaAttribution, trackMetaPurchase } from "@/lib/meta-pixel"
@@ -262,7 +263,10 @@ export function usePaymentSubmit({
       }
 
       if (data.status === "pending" && data.checkout_url) {
-        window.location.href = data.checkout_url
+        window.location.href = withCheckoutLocale(
+          data.checkout_url,
+          i18n.language,
+        )
         return { success: true }
       }
 
