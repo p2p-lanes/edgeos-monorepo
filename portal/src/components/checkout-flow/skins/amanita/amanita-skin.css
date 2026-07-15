@@ -73,6 +73,7 @@
 /* Dark (navy) section: inverts the semantic tokens. The checkout's
    root wrapper is .section-dark with a transparent background (the
    fixed background layer paints the forest photo + gradient). */
+.checkout-amanita.section-dark,
 .checkout-amanita .section-dark {
   --color-bg: var(--color-deep);
   --color-surface: rgba(241, 235, 227, 0.06);

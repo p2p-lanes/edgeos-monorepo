@@ -381,8 +381,17 @@ export default function StepperCheckoutFlow({
       {isAmanita && <AmanitaBackground />}
 
       {/* pills nav */}
+      {/* `pr-14` below `lg` insets the <nav>'s scroll viewport so the pinned
+          switcher gets a gutter of its own — padding *inside* the scroller
+          would only hold the pills back at the end of their travel, letting
+          them slide under it mid-scroll. The gutter must clear the switcher's
+          own width plus its `right-2` offset, so it is wider than it looks.
+          Above `lg` the centred rail can no longer reach the switcher, so the
+          gutter is dropped and the pills centre against the true viewport. The
+          bar's background is painted behind this padding, so it stays
+          full-bleed either way. */}
       <header
-        className={NAV_OUTER[skin].className}
+        className={`${NAV_OUTER[skin].className} pr-14 lg:pr-0`}
         style={NAV_OUTER[skin].style}
       >
         <nav
@@ -454,8 +463,17 @@ export default function StepperCheckoutFlow({
               </button>
             </>
           )}
-          {navExtraContent}
         </nav>
+        {/* Pinned to the bar's right edge instead of trailing the pills: the
+            pills are a centred rail, and the switcher is a page-level control
+            that shouldn't read as one more step. The bar is already
+            fixed/sticky, so it is the containing block — adding `relative`
+            here would re-declare `position` and drop the bar out of flow. */}
+        {navExtraContent && (
+          <div className="absolute inset-y-0 right-2 flex items-center">
+            {navExtraContent}
+          </div>
+        )}
       </header>
 
       {isAmanita && (
