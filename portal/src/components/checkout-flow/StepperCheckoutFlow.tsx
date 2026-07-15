@@ -193,7 +193,7 @@ export default function StepperCheckoutFlow({
     submitPayment,
     isInitialLoading,
     markStepVisited,
-    cart,
+    hasAnyCartItems,
     summary,
     isSubmitting,
     termsAccepted,
@@ -273,13 +273,15 @@ export default function StepperCheckoutFlow({
   const current = sections[active]
   const isLast = active === last
   const nextSection = !isLast ? sections[active + 1] : undefined
-  const itemCount =
-    cart.passes.length +
-    (cart.housing ? 1 : 0) +
-    cart.merch.length +
-    (cart.patron ? 1 : 0)
+  // Both of these read the cart through the provider rather than re-deriving
+  // it from `cart.*`: an open checkout routes ticket picks to
+  // `cart.dynamicItems`, never `cart.passes` (useTicketsStep.ts:284,336), so
+  // any hand-rolled `passes`-based count is empty exactly when the shopper has
+  // a full cart. `summary.itemCount` and `hasAnyCartItems` already span every
+  // cart bucket — CartFooter reads the same two.
+  const itemCount = summary.itemCount
   const requiresTerms = !!popup?.terms_and_conditions_url && !termsAccepted
-  const canPay = cart.passes.length > 0 && !requiresTerms && !isSubmitting
+  const canPay = hasAnyCartItems && !requiresTerms && !isSubmitting
 
   // The first section is an "intro" when it's a content-only template (a hero
   // or similar): nothing has been priced yet, so the bar drops Back and Total

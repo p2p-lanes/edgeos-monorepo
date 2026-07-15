@@ -7,6 +7,7 @@ const submitPayment = vi.fn().mockResolvedValue({ success: true })
 let cityOverride: Record<string, unknown> | null = null
 let availableStepsOverride: string[] | null = null
 let stepConfigsOverride: Record<string, unknown>[] | null = null
+let hasAnyCartItemsOverride: boolean | null = null
 
 vi.mock("next/navigation", () => ({
   useParams: () => ({ popupSlug: "popup-a" }),
@@ -30,8 +31,13 @@ vi.mock("@/providers/checkoutProvider", () => ({
     submitPayment,
     isInitialLoading: false,
     markStepVisited: vi.fn(),
-    cart: { passes: [{}], housing: null, merch: [], patron: null },
-    summary: { grandTotal: 100 },
+    // Open checkout (`/checkout/[popupSlug]`) routes ticket picks to
+    // cart.dynamicItems, never cart.passes — see useTicketsStep.ts:284,336.
+    // The mock mirrors that, so gating the pay button on `passes` fails here
+    // the way it fails in a real open checkout.
+    cart: { passes: [], housing: null, merch: [], patron: null },
+    hasAnyCartItems: hasAnyCartItemsOverride ?? true,
+    summary: { grandTotal: 100, itemCount: 1 },
     isSubmitting: false,
     termsAccepted: true,
   }),
@@ -79,6 +85,24 @@ describe("StepperCheckoutFlow", () => {
     cityOverride = null
     availableStepsOverride = null
     stepConfigsOverride = null
+    hasAnyCartItemsOverride = null
+  })
+
+  it("enables pay when the cart holds only dynamic items", () => {
+    render(<StepperCheckoutFlow />)
+    fireEvent.click(screen.getByTestId("stepper-next")) // → confirm (last)
+
+    const pay = screen.getByTestId("stepper-next") as HTMLButtonElement
+    expect(pay.disabled).toBe(false)
+  })
+
+  it("disables pay when the cart is empty", () => {
+    hasAnyCartItemsOverride = false
+    render(<StepperCheckoutFlow />)
+    fireEvent.click(screen.getByTestId("stepper-next")) // → confirm (last)
+
+    const pay = screen.getByTestId("stepper-next") as HTMLButtonElement
+    expect(pay.disabled).toBe(true)
   })
 
   it("renders only the first section initially", () => {
