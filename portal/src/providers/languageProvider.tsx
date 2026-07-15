@@ -12,11 +12,12 @@ import {
 } from "react"
 import { useTranslation } from "react-i18next"
 import { SUPPORTED_LANGUAGES } from "@/i18n/config"
+import { LANGUAGE_STORAGE_KEY } from "@/lib/language-storage"
 import { CityContext } from "./cityProvider"
 
 // Bumped from "portal_language": prior versions auto-wrote on every render,
 // leaving stale "en" values that override the popup default_language.
-const STORAGE_KEY = "portal_language_v2"
+const STORAGE_KEY = LANGUAGE_STORAGE_KEY
 const PORTAL_LANGUAGES = Object.keys(SUPPORTED_LANGUAGES)
 const DEFAULT_LANGUAGE = "en"
 

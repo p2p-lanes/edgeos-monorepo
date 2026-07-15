@@ -22,6 +22,7 @@ import {
   TEMPLATE_DEFINITIONS,
 } from "@/components/ticketing-step-builder/constants"
 import { TEMPLATE_CONFIG_REGISTRY } from "@/components/ticketing-step-builder/template-configs"
+import { TranslationManager } from "@/components/translations/TranslationManager"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import {
@@ -155,11 +156,12 @@ function StepConfigContent({ stepId }: { stepId: string }) {
     step.emoji,
   ])
 
-  // Popup data (needed for insurance_enabled gate on confirm step)
+  // Popup data: needed for the insurance_enabled gate on the confirm step and
+  // for the supported/default languages that drive the translations editor.
   const { data: popup } = useQuery({
     queryKey: ["popups", "detail", step.popup_id],
     queryFn: () => PopupsService.getPopup({ popupId: step.popup_id }),
-    enabled: step.step_type === "confirm",
+    enabled: !!step.popup_id,
   })
 
   // Product categories for select
@@ -625,6 +627,25 @@ function StepConfigContent({ stepId }: { stepId: string }) {
               </CardContent>
             </Card>
           )}
+        </>
+      )}
+
+      {(popup?.supported_languages?.length ?? 0) > 1 && (
+        <>
+          <Separator />
+          <TranslationManager
+            entityType="ticketing_step"
+            entityId={step.id}
+            translatableFields={["title", "description"]}
+            sourceData={{
+              title: step.title,
+              description: step.description,
+            }}
+            nestedField="template_config"
+            nestedSource={step.template_config}
+            supportedLanguages={popup!.supported_languages!}
+            defaultLanguage={popup!.default_language!}
+          />
         </>
       )}
 

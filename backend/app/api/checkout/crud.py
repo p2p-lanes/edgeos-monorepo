@@ -23,6 +23,13 @@ from app.api.product.models import Products
 from app.api.shared.enums import SaleType
 from app.api.ticketing_step.models import TicketingSteps
 from app.api.ticketing_step.schemas import TicketingStepPublic
+from app.api.translation.service import (
+    TRANSLATABLE_FIELDS,
+    apply_ticketing_step_overlay,
+    apply_translation_overlay,
+    get_translations_bulk,
+    get_translations_for_entity,
+)
 
 
 def resolve_active_direct_popup_slug(db: Session, tenant_id: uuid.UUID) -> str | None:
@@ -88,9 +95,15 @@ def get_open_ticketing_popup(
 
 
 def runtime_for_slug(
-    session: Session, slug: str, tenant_id: uuid.UUID
+    session: Session, slug: str, tenant_id: uuid.UUID, lang: str | None = None
 ) -> CheckoutRuntimeResponse:
-    """Load the public runtime data for an open-ticketing checkout page."""
+    """Load the public runtime data for an open-ticketing checkout page.
+
+    When ``lang`` is provided, popup, product, and ticketing-step text is
+    overlaid with the matching translations. The overlay is default-agnostic:
+    if the requested language equals the popup default (no rows exist), the
+    untranslated source is returned unchanged.
+    """
     popup = get_open_ticketing_popup(session, slug, tenant_id)
 
     # Load active products
@@ -127,14 +140,39 @@ def runtime_for_slug(
 
     attendee_categories = attendee_categories_crud.list_by_popup(session, popup.id)
 
+    # Translation overlays. Every branch is a no-op when lang is None or when no
+    # rows match the requested language, so the untranslated source is returned.
+    popup_data = PopupPublic.model_validate(popup).model_dump()
+    product_translations: dict[uuid.UUID, dict] = {}
+    step_translations: dict[uuid.UUID, dict] = {}
+    if lang:
+        popup_data = apply_translation_overlay(
+            popup_data,
+            get_translations_for_entity(session, "popup", popup.id, lang),
+            TRANSLATABLE_FIELDS["popup"],
+        )
+        product_translations = get_translations_bulk(
+            session, "product", [p.id for p in products], lang
+        )
+        step_translations = get_translations_bulk(
+            session, "ticketing_step", [s.id for s in ticketing_steps], lang
+        )
+
+    def _product(p: Products) -> CheckoutRuntimeProduct:
+        data = {**p.model_dump(), "currency": popup.currency}
+        data = apply_translation_overlay(
+            data, product_translations.get(p.id), TRANSLATABLE_FIELDS["product"]
+        )
+        return CheckoutRuntimeProduct.model_validate(data)
+
+    def _step(step: TicketingSteps) -> TicketingStepPublic:
+        data = TicketingStepPublic.model_validate(step).model_dump()
+        data = apply_ticketing_step_overlay(data, step_translations.get(step.id))
+        return TicketingStepPublic.model_validate(data)
+
     return CheckoutRuntimeResponse(
-        popup=PopupPublic.model_validate(popup),
-        products=[
-            CheckoutRuntimeProduct.model_validate(
-                {**p.model_dump(), "currency": popup.currency}
-            )
-            for p in products
-        ],
+        popup=PopupPublic.model_validate(popup_data),
+        products=[_product(p) for p in products],
         buyer_form=[
             CheckoutBuyerSection(
                 id=sec.id,
@@ -149,9 +187,7 @@ def runtime_for_slug(
             )
             for sec in sections
         ],
-        ticketing_steps=[
-            TicketingStepPublic.model_validate(step) for step in ticketing_steps
-        ],
+        ticketing_steps=[_step(step) for step in ticketing_steps],
         attendee_categories=[
             AttendeeCategoryPublic.model_validate(c) for c in attendee_categories
         ],

@@ -20,6 +20,7 @@ from app.api.translation.service import (
     apply_translation_overlay,
     delete_translations_for_entity,
     get_translations_bulk,
+    parse_accept_language,
 )
 from app.core.dependencies.users import (
     AdminOrApiKey_ProductsRead,
@@ -416,9 +417,7 @@ async def list_portal_products(
             category=category,
         )
 
-    lang = None
-    if accept_language and accept_language != "en":
-        lang = accept_language.split(",")[0].split("-")[0].strip()
+    lang = parse_accept_language(accept_language)
 
     translations_map: dict[uuid.UUID, Any] = {}
     if lang:
