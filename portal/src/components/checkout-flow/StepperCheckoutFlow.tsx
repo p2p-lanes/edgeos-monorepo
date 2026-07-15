@@ -622,9 +622,7 @@ export default function StepperCheckoutFlow({
             hint and a CTA, no centre slot — and keeps flex. */}
         <div
           className={`${BOTTOM_INNER[skin].className} ${
-            isIntro
-              ? "flex justify-between"
-              : "grid grid-cols-[1fr_auto_1fr]"
+            isIntro ? "flex justify-between" : "grid grid-cols-[1fr_auto_1fr]"
           }`}
           style={BOTTOM_INNER[skin].style}
         >

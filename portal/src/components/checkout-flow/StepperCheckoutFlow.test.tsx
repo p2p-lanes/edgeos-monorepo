@@ -541,9 +541,7 @@ describe("StepperCheckoutFlow", () => {
     it("falls back to the next section label when no cta_label is set", () => {
       cityOverride = AMANITA_CITY
       availableStepsOverride = ["hero", "passes"]
-      stepConfigsOverride = [
-        { ...HERO_STEP_CONFIG, template_config: {} },
-      ]
+      stepConfigsOverride = [{ ...HERO_STEP_CONFIG, template_config: {} }]
 
       render(<StepperCheckoutFlow />)
 

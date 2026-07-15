@@ -186,11 +186,7 @@ export default function AmanitaBuyerStep() {
 
   // Hooks must always run (never short-circuited by `??`), so compute the
   // local fallback unconditionally first, then let a real provider error win.
-  const localEmailError = useLocalFieldError(
-    "email",
-    email,
-    isTouched("email"),
-  )
+  const localEmailError = useLocalFieldError("email", email, isTouched("email"))
   const localFirstNameError = useLocalFieldError(
     "first_name",
     firstName,
@@ -201,11 +197,7 @@ export default function AmanitaBuyerStep() {
     lastName,
     isTouched("last_name"),
   )
-  const localPhoneError = useLocalFieldError(
-    "phone",
-    phone,
-    isTouched("phone"),
-  )
+  const localPhoneError = useLocalFieldError("phone", phone, isTouched("phone"))
 
   const emailError = buyerErrors.email ?? localEmailError
   const firstNameError = buyerErrors.first_name ?? localFirstNameError
