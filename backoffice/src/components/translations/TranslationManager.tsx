@@ -15,6 +15,7 @@ import {
   type ConfigLeaf,
   extractTranslatableLeaves,
   flattenConfigValues,
+  groupLeaves,
 } from "./templateConfigLeaves"
 
 const LANGUAGE_NAMES: Record<string, string> = {
@@ -231,18 +232,23 @@ function LanguageTab({
           <p className="text-sm font-medium text-muted-foreground">
             Step content
           </p>
-          {leaves.map((leaf) => (
-            <TranslationFieldEditor
-              key={leaf.path}
-              fieldName={leaf.path}
-              label={leaf.label}
-              originalValue={leaf.value}
-              translatedValue={nestedDraft[leaf.path] ?? ""}
-              onChange={(value) =>
-                setNestedDraft((prev) => ({ ...prev, [leaf.path]: value }))
-              }
-              multiline={leaf.multiline}
-            />
+          {groupLeaves(leaves).map((group) => (
+            <div key={group.key} className="space-y-3 rounded-lg border p-4">
+              <p className="text-sm font-semibold">{group.label}</p>
+              {group.leaves.map((leaf) => (
+                <TranslationFieldEditor
+                  key={leaf.path}
+                  fieldName={leaf.path}
+                  label={leaf.label}
+                  originalValue={leaf.value}
+                  translatedValue={nestedDraft[leaf.path] ?? ""}
+                  onChange={(value) =>
+                    setNestedDraft((prev) => ({ ...prev, [leaf.path]: value }))
+                  }
+                  multiline={leaf.multiline}
+                />
+              ))}
+            </div>
           ))}
         </div>
       )}
