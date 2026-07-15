@@ -14,6 +14,7 @@ import CheckoutToast from "./CheckoutToast"
 import DynamicProductStep from "./DynamicProductStep"
 import { deriveCheckoutSections } from "./deriveCheckoutSections"
 import { shouldUseDynamicStep } from "./registries/stepRegistry"
+import { CONTENT_ONLY_TEMPLATES } from "./registries/variantRegistry"
 import type { ScrollyCheckoutFlowProps } from "./ScrollyCheckoutFlow"
 import SectionHeader from "./SectionHeader"
 import { AmanitaBackground } from "./skins/amanita/AmanitaBackground"
@@ -144,6 +145,20 @@ const TOTAL_VALUE_CLASSES: Record<CheckoutSkin, string> = {
   amanita: "font-condensed text-lg leading-tight text-cream md:text-xl",
 }
 
+/* Intro bottom bar's hint text, shown where the Total sits on other steps.
+ * amanita is ported verbatim from the mockup's hero bar
+ * (checkout-amanita/codigo/checkout/CheckoutExperience.tsx:350-355). */
+const HINT_CLASSES: Record<
+  CheckoutSkin,
+  { className: string; style?: CSSProperties }
+> = {
+  default: { className: "min-w-0 text-sm text-muted-foreground" },
+  amanita: {
+    className: "min-w-0 text-sm leading-snug md:text-base",
+    style: { color: "rgba(241,235,227,0.85)" },
+  },
+}
+
 const CTA_BUTTON_CLASSES: Record<CheckoutSkin, string> = {
   default:
     "shrink-0 rounded-xl bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50",
@@ -266,6 +281,22 @@ export default function StepperCheckoutFlow({
   const requiresTerms = !!popup?.terms_and_conditions_url && !termsAccepted
   const canPay = cart.passes.length > 0 && !requiresTerms && !isSubmitting
 
+  // The first section is an "intro" when it's a content-only template (a hero
+  // or similar): nothing has been priced yet, so the bar drops Back and Total
+  // and invites the user forward instead. Gated on the template — not on
+  // `active === 0` — so popups that open straight into a product step keep
+  // their standard bar.
+  const currentTemplate = current?.config?.template
+  const isIntro =
+    !isLast &&
+    active === 0 &&
+    !!currentTemplate &&
+    CONTENT_ONLY_TEMPLATES.has(currentTemplate)
+  const introConfig = (current?.config?.template_config ?? {}) as {
+    cta_label?: string
+    cta_hint?: string
+  }
+
   const renderStepContent = (section: (typeof sections)[number]) => {
     const { stepType, config } = section
     const isFirstSection = active === 0
@@ -279,13 +310,12 @@ export default function StepperCheckoutFlow({
       )
     // Amanita: route product steps (passes/tickets, or any other
     // config-carrying step) to the pixel-perfect catalog card layout.
-    // Excludes `hero`/`faqs`-template steps: `hero` is a content-only,
-    // skin-agnostic template (Task 9, no products to catalog) that keeps
-    // rendering via DynamicProductStep below for both skins; `faqs` steps
-    // never reach here for Amanita since they're already filtered out of
-    // `sections` above (Task 10) and surfaced via the FAQs drawer instead.
+    // Content-only templates are excluded: they have no products to
+    // catalog and keep rendering via DynamicProductStep below for both
+    // skins. (`faqs` steps never reach here for Amanita anyway — they're
+    // filtered out of `sections` above and surfaced via the FAQs drawer.)
     const isContentOnlyTemplate =
-      config?.template === "hero" || config?.template === "faqs"
+      !!config?.template && CONTENT_ONLY_TEMPLATES.has(config.template)
     const isProductStep =
       (stepType === "passes" || stepType === "tickets" || !!config) &&
       !isContentOnlyTemplate
@@ -435,42 +465,63 @@ export default function StepperCheckoutFlow({
           className={BOTTOM_INNER[skin].className}
           style={BOTTOM_INNER[skin].style}
         >
-          <button
-            type="button"
-            onClick={() => goTo(active - 1)}
-            disabled={active === 0}
-            className={BACK_BUTTON[skin].className}
-            style={BACK_BUTTON[skin].style}
-          >
-            {t("common.back")}
-          </button>
-          <div className="flex min-w-0 flex-col items-center">
-            <span className={TOTAL_LABEL_CLASSES[skin]}>Total</span>
-            <span className={TOTAL_VALUE_CLASSES[skin]}>
-              {formatCurrency(summary.grandTotal)}
-            </span>
-          </div>
-          {isLast ? (
-            <button
-              type="button"
-              data-testid="stepper-next"
-              onClick={handlePayment}
-              disabled={!canPay}
-              className={CTA_BUTTON_CLASSES[skin]}
-            >
-              {summary.grandTotal === 0
-                ? t("checkout.actions.claim_pass")
-                : t("checkout.actions.pay")}
-            </button>
+          {isIntro ? (
+            <>
+              <p
+                className={HINT_CLASSES[skin].className}
+                style={HINT_CLASSES[skin].style}
+              >
+                {introConfig.cta_hint ?? ""}
+              </p>
+              <button
+                type="button"
+                data-testid="stepper-next"
+                onClick={() => goTo(active + 1)}
+                className={CTA_BUTTON_CLASSES[skin]}
+              >
+                {introConfig.cta_label ?? nextSection?.label}
+              </button>
+            </>
           ) : (
-            <button
-              type="button"
-              data-testid="stepper-next"
-              onClick={() => goTo(active + 1)}
-              className={CTA_BUTTON_CLASSES[skin]}
-            >
-              {nextSection?.label}
-            </button>
+            <>
+              <button
+                type="button"
+                onClick={() => goTo(active - 1)}
+                disabled={active === 0}
+                className={BACK_BUTTON[skin].className}
+                style={BACK_BUTTON[skin].style}
+              >
+                {t("common.back")}
+              </button>
+              <div className="flex min-w-0 flex-col items-center">
+                <span className={TOTAL_LABEL_CLASSES[skin]}>Total</span>
+                <span className={TOTAL_VALUE_CLASSES[skin]}>
+                  {formatCurrency(summary.grandTotal)}
+                </span>
+              </div>
+              {isLast ? (
+                <button
+                  type="button"
+                  data-testid="stepper-next"
+                  onClick={handlePayment}
+                  disabled={!canPay}
+                  className={CTA_BUTTON_CLASSES[skin]}
+                >
+                  {summary.grandTotal === 0
+                    ? t("checkout.actions.claim_pass")
+                    : t("checkout.actions.pay")}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  data-testid="stepper-next"
+                  onClick={() => goTo(active + 1)}
+                  className={CTA_BUTTON_CLASSES[skin]}
+                >
+                  {nextSection?.label}
+                </button>
+              )}
+            </>
           )}
           {itemCount > 0 && (
             <span className="sr-only">{itemCount} items in cart</span>

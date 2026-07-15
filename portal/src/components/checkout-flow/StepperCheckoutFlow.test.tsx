@@ -87,6 +87,13 @@ describe("StepperCheckoutFlow", () => {
     expect(screen.queryByText("confirm-step")).toBeNull()
   })
 
+  it("keeps Back and Total on a non-content-only first step", () => {
+    render(<StepperCheckoutFlow />)
+
+    expect(screen.getByText("common.back")).toBeTruthy()
+    expect(screen.getByText("$100")).toBeTruthy()
+  })
+
   it("advances to the next section via the contextual CTA", () => {
     render(<StepperCheckoutFlow />)
     fireEvent.click(screen.getByTestId("stepper-next"))
@@ -315,6 +322,78 @@ describe("StepperCheckoutFlow", () => {
       )
       expect(confirmPill).toBeTruthy()
       expect(confirmPill?.textContent).toContain("1")
+    })
+
+    const HERO_STEP_CONFIG = {
+      id: "hero-config-1",
+      step_type: "hero",
+      title: "Hero",
+      template: "hero",
+      show_in_navbar: true,
+      template_config: {
+        cta_label: "Ver Entradas →",
+        cta_hint: "Elegí tu entrada para comenzar",
+      },
+    }
+
+    it("renders the intro bottom bar on a content-only first step", () => {
+      cityOverride = AMANITA_CITY
+      availableStepsOverride = ["hero", "passes"]
+      stepConfigsOverride = [HERO_STEP_CONFIG]
+
+      render(<StepperCheckoutFlow />)
+
+      expect(screen.getByText("Elegí tu entrada para comenzar")).toBeTruthy()
+      expect(screen.getByTestId("stepper-next").textContent).toBe(
+        "Ver Entradas →",
+      )
+      expect(screen.queryByText("common.back")).toBeNull()
+      expect(screen.queryByText("$100")).toBeNull()
+    })
+
+    it("intro CTA advances, and the standard bar returns", () => {
+      cityOverride = AMANITA_CITY
+      availableStepsOverride = ["hero", "passes"]
+      stepConfigsOverride = [HERO_STEP_CONFIG]
+
+      render(<StepperCheckoutFlow />)
+      fireEvent.click(screen.getByTestId("stepper-next"))
+
+      expect(screen.getByText("pass-step")).toBeTruthy()
+      expect(screen.getByText("common.back")).toBeTruthy()
+      expect(screen.getByText("$100")).toBeTruthy()
+    })
+
+    it("falls back to the next section label when no cta_label is set", () => {
+      cityOverride = AMANITA_CITY
+      availableStepsOverride = ["hero", "passes"]
+      stepConfigsOverride = [
+        { ...HERO_STEP_CONFIG, template_config: {} },
+      ]
+
+      render(<StepperCheckoutFlow />)
+
+      expect(screen.getByTestId("stepper-next").textContent).not.toBe("")
+      expect(screen.queryByText("common.back")).toBeNull()
+    })
+
+    it("routes rich-text steps to DynamicProductStep, not the catalog", () => {
+      cityOverride = AMANITA_CITY
+      availableStepsOverride = ["housing", "confirm"]
+      stepConfigsOverride = [
+        {
+          id: "rich-text-config-1",
+          step_type: "housing",
+          title: "Info",
+          template: "rich-text",
+          template_config: null,
+        },
+      ]
+
+      render(<StepperCheckoutFlow />)
+
+      expect(screen.getByText("dynamic-step")).toBeTruthy()
+      expect(screen.queryByText("amanita-catalog")).toBeNull()
     })
   })
 })
