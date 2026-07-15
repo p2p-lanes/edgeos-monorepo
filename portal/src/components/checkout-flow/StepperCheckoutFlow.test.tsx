@@ -200,6 +200,20 @@ describe("StepperCheckoutFlow", () => {
       expect(nav?.className).not.toContain("max-w-")
     })
 
+    it("renders the amanita CTA as a flat gold fill, not the gem frame", () => {
+      cityOverride = AMANITA_CITY
+      stepConfigsOverride = [PASSES_STEP_CONFIG]
+      render(<StepperCheckoutFlow />)
+
+      const cta = screen.getByTestId("stepper-next")
+      expect(cta.classList.contains("btn-gold-fill")).toBe(true)
+      expect(cta.classList.contains("ck-gold")).toBe(true)
+      expect(cta.classList.contains("btn-ornate-2")).toBe(true)
+      // The gem-frame primary must be gone — classList matches whole tokens,
+      // so this does not trip on the `btn-ornate-2` above.
+      expect(cta.classList.contains("btn-ornate")).toBe(false)
+    })
+
     it("routes the buyer step to AmanitaBuyerStep when the skin is amanita", () => {
       cityOverride = {
         terms_and_conditions_url: null,

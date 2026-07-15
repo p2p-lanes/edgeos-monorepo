@@ -116,9 +116,10 @@
    100%/100% over its own rounded navy background — gems that
    overhang the radius sit over the section's background. The
    `!important`s override shadcn Button variant backgrounds without
-   touching its markup. `.btn-ornate` = primary CTA (bottom bar,
-   Confirmar compra); `.btn-ornate-2` = secondary ("Ver tickets" in
-   the empty state). Assets rewritten to /checkout-skins/amanita/... */
+   touching its markup. `.btn-ornate-2` = the bottom-bar CTA (with
+   `.btn-gold-fill`) and the empty state's "Ver tickets". `.btn-ornate`
+   is currently unused — the live reference moved the CTA off it.
+   Assets rewritten to /checkout-skins/amanita/... */
 .checkout-amanita .btn-ornate,
 .checkout-amanita .btn-ornate-2 {
   background-color: rgba(7, 19, 34, 0.92) !important;
@@ -132,6 +133,40 @@
 }
 .checkout-amanita .btn-ornate-2 {
   background-image: url("/checkout-skins/amanita/btn-secondary-1.webp") !important;
+}
+
+/* `.btn-gold-fill` turns an ornate button into a flat gold plate (the frame
+   art stays as background-image but is overpainted by the fill). `.ck-gold`
+   drops the diffuse glow and keeps a crisp 1px ring — both ported from the
+   live reference, which iterated past the `codigo/` snapshot this skin was
+   built from. The live comment for ck-gold reads: "Ronda 3b (Agus): sin el
+   glow difuso del btn-gold-fill de la home -- queda solo el ring nitido de
+   1px (el blur exterior lo hacia ver borroso sobre la barra oscura)."
+   The `!important`s match the rules they override above. */
+.checkout-amanita .btn-ornate.btn-gold-fill,
+.checkout-amanita .btn-ornate-2.btn-gold-fill {
+  background-color: #bfa67f !important;
+  color: #0a1a24 !important;
+  text-shadow: none !important;
+}
+.checkout-amanita .btn-ornate.btn-gold-fill:hover,
+.checkout-amanita .btn-ornate-2.btn-gold-fill:hover {
+  background-color: #cdb48c !important;
+}
+
+/* Also the focus ring: the reference does this with `focus-visible:ring-*`
+   utilities that can't resolve in this repo's Tailwind theme, so it's
+   expressed here instead. */
+.checkout-amanita .ck-gold,
+.checkout-amanita .ck-gold:hover {
+  box-shadow: 0 0 0 1px rgba(84, 62, 26, 0.22) !important;
+}
+.checkout-amanita .ck-gold:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 1px rgba(84, 62, 26, 0.22),
+    0 0 0 2px var(--color-deep),
+    0 0 0 4px var(--color-accent) !important;
 }
 
 /* ── 6 · Twinkling stars animation ──────────────────────────────── */

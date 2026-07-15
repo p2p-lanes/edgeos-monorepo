@@ -173,11 +173,21 @@ const HINT_CLASSES: Record<
   },
 }
 
+/* amanita is the live reference's recipe
+ * (https://amanita-web.vercel.app/checkout-design) — a flat gold fill over
+ * the lighter `btn-ornate-2` frame, not the gem-framed `btn-ornate` of the
+ * frozen `codigo/` snapshot this skin was originally ported from. The live
+ * markup's `focus-visible:ring-accent`/`ring-offset-deep` utilities are
+ * dropped: `accent`/`deep` are not Tailwind theme colors in this repo, so
+ * those classes would generate nothing (same reason fd4e8945 had to
+ * hand-author the `hover:` variants). The ring lives in the skin CSS
+ * instead. `disabled:` has no counterpart in the reference — the pay button
+ * needs it. */
 const CTA_BUTTON_CLASSES: Record<CheckoutSkin, string> = {
   default:
     "shrink-0 rounded-xl bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50",
   amanita:
-    "btn-ornate flex shrink-0 items-center justify-center whitespace-nowrap !px-4 py-2.5 font-condensed text-xs font-medium uppercase tracking-[0.1em] md:!px-6 md:text-sm disabled:cursor-not-allowed disabled:opacity-50",
+    "btn-ornate-2 btn-gold-fill ck-gold flex shrink-0 items-center justify-center whitespace-nowrap !px-4 py-2.5 font-condensed text-xs font-medium uppercase tracking-[0.12em] transition-all duration-200 hover:-translate-y-0.5 md:!px-6 md:text-sm disabled:cursor-not-allowed disabled:opacity-50",
 }
 
 /** `faqs`-template step's `template_config.items` — same `{question,
