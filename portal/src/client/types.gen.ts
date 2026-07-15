@@ -8,7 +8,8 @@ export type AbandonedCartPublic = {
     items: CartState;
     created_at?: (string | null);
     updated_at?: (string | null);
-    human: CartHumanInfo;
+    email?: (string | null);
+    human?: (CartHumanInfo | null);
     popup: CartPopupInfo;
     payments?: Array<CartPaymentInfo>;
 };
@@ -4858,6 +4859,7 @@ export type CheckInListCheckInsData = {
 export type CheckInListCheckInsResponse = (ListModel_CheckInListItem_);
 
 export type CheckoutGetRuntimeData = {
+    acceptLanguage?: (string | null);
     slug: string;
     xTenantId?: (string | null);
 };
@@ -6640,6 +6642,7 @@ export type ThirdPartyDiscoveryGetThirdPartyOpenapiResponse = ({
 });
 
 export type TicketingStepsListPortalTicketingStepsData = {
+    acceptLanguage?: (string | null);
     popupId: string;
 };
 

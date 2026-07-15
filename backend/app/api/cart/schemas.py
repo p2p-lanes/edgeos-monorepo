@@ -169,7 +169,11 @@ class AbandonedCartPublic(BaseModel):
     items: CartState
     created_at: datetime | None = None
     updated_at: datetime | None = None
-    human: CartHumanInfo
+    # Buyer email. Taken from the human for authenticated carts, or from the
+    # cart row for anonymous open-checkout carts (which have no human).
+    email: str | None = None
+    # Null for anonymous open-checkout carts (no logged-in human).
+    human: CartHumanInfo | None = None
     popup: CartPopupInfo
     payments: list[CartPaymentInfo] = []
 

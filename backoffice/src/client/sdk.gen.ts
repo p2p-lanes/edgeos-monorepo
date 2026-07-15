@@ -2035,6 +2035,7 @@ export class CheckoutService {
      * Rate-limited 120/min/IP.
      * @param data The data for the request.
      * @param data.slug
+     * @param data.acceptLanguage
      * @param data.xTenantId
      * @returns CheckoutRuntimeResponse Successful Response
      * @throws ApiError
@@ -2047,6 +2048,7 @@ export class CheckoutService {
                 slug: data.slug
             },
             headers: {
+                'Accept-Language': data.acceptLanguage,
                 'X-Tenant-Id': data.xTenantId
             },
             errors: {
@@ -7988,6 +7990,7 @@ export class TicketingStepsService {
      * List enabled ticketing steps for a popup (portal-facing).
      * @param data The data for the request.
      * @param data.popupId
+     * @param data.acceptLanguage
      * @returns ListModel_TicketingStepPublic_ Successful Response
      * @throws ApiError
      */
@@ -7995,6 +7998,9 @@ export class TicketingStepsService {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/api/v1/ticketing-steps/portal',
+            headers: {
+                'Accept-Language': data.acceptLanguage
+            },
             query: {
                 popup_id: data.popupId
             },
