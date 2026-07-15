@@ -305,6 +305,11 @@ export const ApiKeyCreateSchema = {
             minLength: 1,
             title: 'Name'
         },
+        popup_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Popup Id'
+        },
         expires_at: {
             anyOf: [
                 {
@@ -327,7 +332,7 @@ export const ApiKeyCreateSchema = {
         }
     },
     type: 'object',
-    required: ['name'],
+    required: ['name', 'popup_id'],
     title: 'ApiKeyCreate',
     description: 'Request body for creating a new API key.'
 } as const;
@@ -346,6 +351,18 @@ export const ApiKeyCreatedSchema = {
         prefix: {
             type: 'string',
             title: 'Prefix'
+        },
+        popup_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Popup Id'
         },
         scopes: {
             items: {
@@ -422,6 +439,18 @@ export const ApiKeyPublicSchema = {
         prefix: {
             type: 'string',
             title: 'Prefix'
+        },
+        popup_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Popup Id'
         },
         scopes: {
             items: {
@@ -13276,6 +13305,10 @@ export const PopupAdminSchema = {
             ],
             title: 'Simplefi Api Key'
         },
+        simplefi_success_behavior: {
+            '$ref': '#/components/schemas/SimpleFiSuccessBehavior',
+            default: 'manual'
+        },
         terms_and_conditions_url: {
             anyOf: [
                 {
@@ -13753,6 +13786,10 @@ export const PopupCreateSchema = {
                 }
             ],
             title: 'Simplefi Api Key'
+        },
+        simplefi_success_behavior: {
+            '$ref': '#/components/schemas/SimpleFiSuccessBehavior',
+            default: 'manual'
         },
         terms_and_conditions_url: {
             anyOf: [
@@ -14728,6 +14765,16 @@ export const PopupUpdateSchema = {
                 }
             ],
             title: 'Simplefi Api Key'
+        },
+        simplefi_success_behavior: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/SimpleFiSuccessBehavior'
+                },
+                {
+                    type: 'null'
+                }
+            ]
         },
         terms_and_conditions_url: {
             anyOf: [
@@ -17026,6 +17073,18 @@ export const SendTestRequestSchema = {
     type: 'object',
     required: ['html_content', 'template_type', 'to_email'],
     title: 'SendTestRequest'
+} as const;
+
+export const SimpleFiSuccessBehaviorSchema = {
+    type: 'string',
+    enum: ['manual', 'automatic'],
+    title: 'SimpleFiSuccessBehavior',
+    description: `How SimpleFi redirects the buyer to the success URL after payment.
+
+Mirrors SimpleFi's \`\`redirect_urls.success_behavior\`\`:
+- manual: the buyer clicks a button on SimpleFi's checkout to continue
+  (SimpleFi's default, and ours).
+- automatic: SimpleFi redirects the buyer immediately after approval.`
 } as const;
 
 export const TaskAppSchema = {

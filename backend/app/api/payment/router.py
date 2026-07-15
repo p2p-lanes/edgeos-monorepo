@@ -540,7 +540,10 @@ async def create_my_application_fee(
             detail="Application not found",
         )
 
+    from app.api.popup.guards import ensure_popup_writable
+
     popup = application.popup
+    ensure_popup_writable(popup)
     payment = payments_crud.create_fee_payment(db, application, popup)
     return PaymentPublic.model_validate(payment)
 
@@ -850,6 +853,10 @@ async def create_my_payment(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Application not found",
         )
+
+    from app.api.popup.guards import ensure_popup_writable
+
+    ensure_popup_writable(application.popup)
 
     payment, _preview = payments_crud.create_payment(
         db,

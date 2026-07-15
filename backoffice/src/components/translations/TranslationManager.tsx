@@ -10,6 +10,12 @@ import {
 } from "@/hooks/useTranslations"
 import { AITranslateButton } from "./AITranslateButton"
 import { TranslationFieldEditor } from "./TranslationFieldEditor"
+import {
+  buildPartialConfig,
+  type ConfigLeaf,
+  extractTranslatableLeaves,
+  flattenConfigValues,
+} from "./templateConfigLeaves"
 
 const LANGUAGE_NAMES: Record<string, string> = {
   en: "English",
@@ -31,6 +37,11 @@ interface TranslationManagerProps {
   sourceData: Record<string, string | null | undefined>
   supportedLanguages: string[]
   defaultLanguage?: string
+  // Optional nested-config translation (e.g. a ticketing step's
+  // template_config): text leaves are auto-extracted and saved as a partial
+  // mirror under `nestedField` in the same translation row.
+  nestedField?: string
+  nestedSource?: unknown
 }
 
 export function TranslationManager({
@@ -40,6 +51,8 @@ export function TranslationManager({
   sourceData,
   supportedLanguages,
   defaultLanguage = "en",
+  nestedField,
+  nestedSource,
 }: TranslationManagerProps) {
   const nonDefaultLanguages = supportedLanguages.filter(
     (l) => l !== defaultLanguage,
@@ -67,6 +80,8 @@ export function TranslationManager({
                 language={lang}
                 translatableFields={translatableFields}
                 sourceData={sourceData}
+                nestedField={nestedField}
+                nestedSource={nestedSource}
               />
             </TabsContent>
           ))}
@@ -82,12 +97,16 @@ function LanguageTab({
   language,
   translatableFields,
   sourceData,
+  nestedField,
+  nestedSource,
 }: {
   entityType: string
   entityId: string
   language: string
   translatableFields: string[]
   sourceData: Record<string, string | null | undefined>
+  nestedField?: string
+  nestedSource?: unknown
 }) {
   const { data: translations = [] } = useTranslationsQuery(entityType, entityId)
   const upsertMutation = useUpsertTranslation()
@@ -95,30 +114,46 @@ function LanguageTab({
 
   const existingTranslation = translations.find((t) => t.language === language)
 
+  const leaves: ConfigLeaf[] = nestedField
+    ? extractTranslatableLeaves(nestedSource)
+    : []
+
   const [draft, setDraft] = useState<Record<string, string>>(() => {
     const initial: Record<string, string> = {}
     for (const field of translatableFields) {
-      initial[field] = existingTranslation?.data[field] ?? ""
+      initial[field] = (existingTranslation?.data[field] as string) ?? ""
     }
     return initial
   })
 
-  // Sync draft when data loads
-  const translationData = existingTranslation?.data
+  const [nestedDraft, setNestedDraft] = useState<Record<string, string>>(() =>
+    nestedField
+      ? flattenConfigValues(existingTranslation?.data[nestedField])
+      : {},
+  )
+
+  // Sync drafts when the persisted translation loads or changes identity.
   const [syncedId, setSyncedId] = useState<string | null>(null)
   if (existingTranslation && existingTranslation.id !== syncedId) {
     const updated: Record<string, string> = {}
     for (const field of translatableFields) {
-      updated[field] = translationData?.[field] ?? ""
+      updated[field] = (existingTranslation.data[field] as string) ?? ""
     }
     setDraft(updated)
+    if (nestedField) {
+      setNestedDraft(flattenConfigValues(existingTranslation.data[nestedField]))
+    }
     setSyncedId(existingTranslation.id)
   }
 
   const handleSave = () => {
-    const data: Record<string, string> = {}
+    const data: Record<string, unknown> = {}
     for (const [key, value] of Object.entries(draft)) {
       if (value.trim()) data[key] = value
+    }
+    if (nestedField) {
+      const partial = buildPartialConfig(nestedDraft)
+      if (partial) data[nestedField] = partial
     }
 
     upsertMutation.mutate(
@@ -139,7 +174,37 @@ function LanguageTab({
   }
 
   const handleAITranslated = (data: Record<string, string>) => {
-    setDraft((prev) => ({ ...prev, ...data }))
+    // The AI response mixes flat fields (title, description) with nested config
+    // leaf paths (sections.0.label). Route each key to its own draft, and only
+    // fill blanks: a value the user already typed is never overwritten, so AI
+    // Translate completes what is missing instead of replacing manual work.
+    const leafPaths = new Set(leaves.map((l) => l.path))
+    const flat: Record<string, string> = {}
+    const nested: Record<string, string> = {}
+    for (const [key, value] of Object.entries(data)) {
+      if (leafPaths.has(key)) {
+        nested[key] = value
+      } else {
+        flat[key] = value
+      }
+    }
+
+    const fillBlanks =
+      (incoming: Record<string, string>) =>
+      (prev: Record<string, string>): Record<string, string> => {
+        const next = { ...prev }
+        for (const [key, value] of Object.entries(incoming)) {
+          if (!next[key]?.trim()) {
+            next[key] = value
+          }
+        }
+        return next
+      }
+
+    setDraft(fillBlanks(flat))
+    if (Object.keys(nested).length > 0) {
+      setNestedDraft(fillBlanks(nested))
+    }
   }
 
   const formatFieldLabel = (field: string) =>
@@ -160,6 +225,27 @@ function LanguageTab({
           multiline={MULTILINE_FIELDS.has(field)}
         />
       ))}
+
+      {leaves.length > 0 && (
+        <div className="space-y-4 border-t pt-4">
+          <p className="text-sm font-medium text-muted-foreground">
+            Step content
+          </p>
+          {leaves.map((leaf) => (
+            <TranslationFieldEditor
+              key={leaf.path}
+              fieldName={leaf.path}
+              label={leaf.label}
+              originalValue={leaf.value}
+              translatedValue={nestedDraft[leaf.path] ?? ""}
+              onChange={(value) =>
+                setNestedDraft((prev) => ({ ...prev, [leaf.path]: value }))
+              }
+              multiline={leaf.multiline}
+            />
+          ))}
+        </div>
+      )}
 
       <div className="flex items-center gap-2 pt-2">
         <Button

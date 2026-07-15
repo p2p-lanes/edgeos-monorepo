@@ -7,6 +7,7 @@ import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 import type { CheckoutMode } from "@/checkout/popupCheckoutPolicy"
 import { ApiError, CheckoutService, PaymentsService } from "@/client"
+import { withCheckoutLocale } from "@/helpers/checkout"
 import { getAttribution } from "@/lib/attribution"
 import { trackGAPurchase } from "@/lib/google-analytics"
 import { getMetaAttribution, trackMetaPurchase } from "@/lib/meta-pixel"
@@ -22,7 +23,11 @@ import type {
   SelectedPatronItem,
 } from "@/types/checkout"
 import { buildPaymentProducts } from "./buildPaymentProducts"
-import { dispatchPaymentError, extractCartMeta } from "./errorDispatch"
+import {
+  dispatchPaymentError,
+  extractCartMeta,
+  POPUP_ENDED_READ_ONLY_DETAIL,
+} from "./errorDispatch"
 
 interface UsePaymentSubmitParams {
   applicationId: string | undefined
@@ -264,7 +269,10 @@ export function usePaymentSubmit({
       }
 
       if (data.status === "pending" && data.checkout_url) {
-        window.location.href = data.checkout_url
+        window.location.href = withCheckoutLocale(
+          data.checkout_url,
+          i18n.language,
+        )
         return { success: true }
       }
 
@@ -393,6 +401,13 @@ export function usePaymentSubmit({
         apiBody !== null && typeof apiBody?.detail === "string"
           ? (apiBody.detail as string)
           : null
+      if (apiDetailStr === POPUP_ENDED_READ_ONLY_DETAIL) {
+        const errorMsg = t("checkout.popup_ended_error")
+        setPromoError(errorMsg)
+        toast.error(errorMsg)
+        setIsSubmitting(false)
+        return { success: false, error: errorMsg }
+      }
       const isCouponError = apiDetailStr?.startsWith("Coupon code")
       if (isCouponError) {
         clearPromoCode()

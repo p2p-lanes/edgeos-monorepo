@@ -468,6 +468,7 @@
     "revoke_failed": "撤销 API 密钥失败",
     "scopes_label": "权限",
     "scopes_description": "新密钥默认仅有只读权限。仅在确有需要时才开启更多权限。",
+    "ended_read_only_note": "此 pop-up 已结束，因此新的 API 密钥仅能拥有只读权限。",
     "scope": {
       "events_read": {
         "label": "读取活动",
@@ -480,6 +481,10 @@
       "rsvp_write": {
         "label": "报名活动",
         "description": "为活动报名或取消报名。"
+      },
+      "venues_write": {
+        "label": "管理自己的场地",
+        "description": "创建、编辑和删除你拥有的场地。"
       }
     }
   },

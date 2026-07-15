@@ -116,6 +116,19 @@ class InstallmentInterval(StrEnum):
     year = "year"
 
 
+class SimpleFiSuccessBehavior(StrEnum):
+    """How SimpleFi redirects the buyer to the success URL after payment.
+
+    Mirrors SimpleFi's ``redirect_urls.success_behavior``:
+    - manual: the buyer clicks a button on SimpleFi's checkout to continue
+      (SimpleFi's default, and ours).
+    - automatic: SimpleFi redirects the buyer immediately after approval.
+    """
+
+    manual = "manual"
+    automatic = "automatic"
+
+
 def derive_checkout_mode(sale_type: SaleType) -> CheckoutMode:
     if sale_type == SaleType.direct:
         return CheckoutMode.simple_quantity

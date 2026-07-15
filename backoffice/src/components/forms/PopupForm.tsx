@@ -35,6 +35,7 @@ import {
   PopupsService,
   type PopupUpdate,
   type SaleType,
+  type SimpleFiSuccessBehavior,
 } from "@/client"
 import { AttendeeCategoriesEditor } from "@/components/attendee-categories/AttendeeCategoriesEditor"
 import { DangerZone } from "@/components/Common/DangerZone"
@@ -82,6 +83,7 @@ interface PopupFormProps {
 const POPUP_STATUSES = [
   { value: "draft", label: "Draft" },
   { value: "active", label: "Active" },
+  { value: "ended", label: "Ended" },
 ] as const
 
 const AVAILABLE_LANGUAGES = [
@@ -220,6 +222,8 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
       open_checkout_signing_secret:
         defaultValues?.open_checkout_signing_secret ?? "",
       simplefi_api_key: defaultValues?.simplefi_api_key ?? "",
+      simplefi_success_behavior: (defaultValues?.simplefi_success_behavior ??
+        "manual") as SimpleFiSuccessBehavior,
       invoice_company_name: defaultValues?.invoice_company_name ?? "",
       invoice_company_address: defaultValues?.invoice_company_address ?? "",
       invoice_company_email: defaultValues?.invoice_company_email ?? "",
@@ -283,6 +287,7 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
         open_checkout_signing_secret:
           value.open_checkout_signing_secret || null,
         simplefi_api_key: value.simplefi_api_key || null,
+        simplefi_success_behavior: value.simplefi_success_behavior,
         invoice_company_name: value.invoice_company_name || null,
         invoice_company_address: value.invoice_company_address || null,
         invoice_company_email: value.invoice_company_email || null,
@@ -1031,6 +1036,34 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
                   disabled={readOnly}
                   className="max-w-xs text-sm"
                 />
+              </InlineRow>
+            )}
+          </form.Field>
+          <form.Field name="simplefi_success_behavior">
+            {(field) => (
+              <InlineRow
+                icon={<LinkIcon className="h-4 w-4 text-muted-foreground" />}
+                label="SimpleFi success redirect"
+                description="How the buyer reaches the success URL after paying. Manual keeps them on SimpleFi's checkout until they click through; automatic redirects them immediately."
+              >
+                <Select
+                  value={field.state.value}
+                  onValueChange={(v) =>
+                    field.handleChange(v as SimpleFiSuccessBehavior)
+                  }
+                  disabled={readOnly}
+                >
+                  <SelectTrigger
+                    id="simplefi_success_behavior"
+                    className="w-[140px]"
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="manual">Manual</SelectItem>
+                    <SelectItem value="automatic">Automatic</SelectItem>
+                  </SelectContent>
+                </Select>
               </InlineRow>
             )}
           </form.Field>

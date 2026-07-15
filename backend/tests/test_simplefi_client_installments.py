@@ -54,6 +54,8 @@ def test_create_payment_one_shot_hits_payment_requests(monkeypatch) -> None:
     assert "max_installments" not in captured["body"]
     assert "interval" not in captured["body"]
     assert captured["body"]["amount"] == 100.0
+    # Manual is SimpleFi's default and must be sent explicitly unless overridden.
+    assert captured["body"]["redirect_urls"]["success_behavior"] == "manual"
     assert isinstance(result, SimpleFIPaymentResponse)
     assert result.is_installment_plan is False
     assert result.id == "pr-1"
@@ -139,6 +141,7 @@ def test_create_payment_installment_branch_hits_installment_plans(
     assert body["reference"] == {"application_id": "abc"}
     assert "notification_url" in body
     assert "redirect_urls" in body
+    assert body["redirect_urls"]["success_behavior"] == "manual"
 
     assert isinstance(result, SimpleFIPaymentResponse)
     assert result.is_installment_plan is True
@@ -212,3 +215,47 @@ def test_create_payment_passes_through_custom_interval(monkeypatch) -> None:
     body = captured["body"]
     assert body["interval"] == "week"
     assert body["interval_count"] == 2
+
+
+def test_create_payment_passes_through_automatic_success_behavior(
+    monkeypatch,
+) -> None:
+    captured = _install_capture(
+        monkeypatch,
+        {"id": "pr-4", "status": "pending", "checkout_v2_url": "https://pay/x"},
+    )
+    client = SimpleFIClient("fake-key")
+
+    client.create_payment(
+        amount=Decimal("100.00"),
+        popup_slug="popup",
+        tenant_slug="tenant",
+        success_behavior="automatic",
+    )
+
+    assert captured["body"]["redirect_urls"]["success_behavior"] == "automatic"
+
+
+def test_create_payment_installment_branch_passes_success_behavior(
+    monkeypatch,
+) -> None:
+    captured = _install_capture(
+        monkeypatch,
+        {
+            "id": "plan-4",
+            "status": "pending",
+            "checkout_url": "https://pay/plan/plan-4",
+        },
+    )
+    client = SimpleFIClient("fake-key")
+
+    client.create_payment(
+        amount=Decimal("600.00"),
+        popup_slug="popup",
+        tenant_slug="tenant",
+        max_installments=3,
+        user_email="buyer@example.com",
+        success_behavior="automatic",
+    )
+
+    assert captured["body"]["redirect_urls"]["success_behavior"] == "automatic"

@@ -5,6 +5,22 @@ import { OPTIMIZED_IMAGE_HOSTS } from "./src/lib/image-optimization"
 const nextConfig: NextConfig = {
   output: "standalone",
   outputFileTracingRoot: path.resolve(__dirname, ".."),
+  // CDN for /_next/static chunks (e.g. https://static.edgeos.world). One
+  // static domain serves every tenant custom domain, so immutable assets get
+  // edge caching without per-tenant certificates or DNS. Unset = same-origin.
+  assetPrefix: process.env.ASSET_PREFIX || undefined,
+  // Fonts fetched through the assetPrefix CDN are cross-origin and require
+  // CORS. Baking the header into the origin response means the CDN caches it
+  // inside the object, instead of depending on per-request edge policy
+  // evaluation.
+  async headers() {
+    return [
+      {
+        source: "/_next/static/:path*",
+        headers: [{ key: "Access-Control-Allow-Origin", value: "*" }],
+      },
+    ]
+  },
   transpilePackages: ["@edgeos/shared-form-ui", "@edgeos/shared-events"],
   env: {
     NEXT_PUBLIC_API_URL:

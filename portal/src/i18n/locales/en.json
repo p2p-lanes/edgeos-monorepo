@@ -279,6 +279,7 @@
     },
     "coupon_no_longer_valid": "This coupon is no longer available. Your total has been updated. Please review and try again.",
     "payment_error": "Something went wrong with your payment. Please try again.",
+    "popup_ended_error": "This popup has ended. Purchases are no longer available.",
     "no_products": "No products available for this step.",
     "no_images": "No images available for this step.",
     "no_video": "No video available for this step.",
@@ -538,6 +539,7 @@
     "revoke_failed": "Failed to revoke API key",
     "scopes_label": "Permissions",
     "scopes_description": "New keys start with read-only access. Only enable broader permissions when you really need them.",
+    "ended_read_only_note": "This popup has ended, so new API keys can only have read access.",
     "scope": {
       "events_read": {
         "label": "Read events",
@@ -550,6 +552,10 @@
       "rsvp_write": {
         "label": "RSVP to events",
         "description": "Register or cancel attendance for events."
+      },
+      "venues_write": {
+        "label": "Manage own venues",
+        "description": "Create, edit, and delete venues you own."
       }
     }
   },
@@ -870,6 +876,8 @@
       "required_start": "Pick a start time",
       "creation_restricted_heading": "Event creation is restricted",
       "creation_restricted_message": "Only admins can create events for this pop-up.",
+      "popup_ended_heading": "This pop-up has ended",
+      "popup_ended_message": "It is now read-only, so creating or editing content is no longer available.",
       "no_popup_error": "No popup",
       "no_timezone_error": "No timezone configured for this popup",
       "no_venue_option": "Virtual meeting",

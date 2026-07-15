@@ -142,6 +142,7 @@ class SimpleFIClient:
         installment_interval_count: int = 1,
         user_email: str | None = None,
         plan_name: str | None = None,
+        success_behavior: str = "manual",
     ) -> SimpleFIPaymentResponse:
         """
         Create a payment request OR an installment plan in SimpleFI.
@@ -180,6 +181,9 @@ class SimpleFIClient:
             user_email: Required when creating an installment plan.
             plan_name: Optional display name for the installment plan
                 (shown to the buyer in SimpleFi's UI).
+            success_behavior: "manual" (SimpleFi's default — the buyer clicks
+                through to the success URL) or "automatic" (SimpleFi redirects
+                immediately after approval).
 
         Returns:
             SimpleFIPaymentResponse with id, status, checkout_url, and
@@ -195,7 +199,11 @@ class SimpleFIClient:
             or f"{portal_base}/portal/{popup_slug}/passes/buy?checkout=success"
         )
         cancel_url = cancel_path or f"{portal_base}/portal/{popup_slug}/passes/buy"
-        redirect_urls = {"success_url": success_url, "cancel_url": cancel_url}
+        redirect_urls = {
+            "success_url": success_url,
+            "cancel_url": cancel_url,
+            "success_behavior": success_behavior,
+        }
 
         if max_installments is not None and max_installments >= 2:
             if not user_email:

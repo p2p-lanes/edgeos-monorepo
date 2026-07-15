@@ -1,4 +1,5 @@
 import { OpenAPI } from "@/client"
+import { LANGUAGE_STORAGE_KEY } from "@/lib/language-storage"
 
 if (!process.env.NEXT_PUBLIC_API_URL) {
   throw new Error("NEXT_PUBLIC_API_URL is not configured")
@@ -24,8 +25,12 @@ OpenAPI.interceptors.request.use((config) => {
   if (tenantId) {
     config.headers = { ...config.headers, "X-Tenant-Id": tenantId }
   }
-  const language = localStorage.getItem("portal_language")
-  if (language && language !== "en") {
+  // Send the selected language whenever one is stored, regardless of which
+  // language it is. The backend overlay is default-agnostic: if the requested
+  // language matches the popup default it simply finds no translation rows and
+  // returns the source. Special-casing "en" here broke Spanish-default popups.
+  const language = localStorage.getItem(LANGUAGE_STORAGE_KEY)
+  if (language) {
     config.headers = { ...config.headers, "Accept-Language": language }
   }
   return config

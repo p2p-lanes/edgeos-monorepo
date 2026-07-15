@@ -169,6 +169,11 @@ class TokenPayload(BaseModel):
     # get_admin_or_api_key_tenant_session resolve tenant without going through
     # CurrentUser. NOT serialised into any JWT.
     api_key_tenant_id: uuid.UUID | None = None
+    # Internal — set only by _resolve_api_key for human-owned keys. The popup
+    # the key is bound to; popup-scoped route guards compare it against the
+    # popup targeted by each request. None for JWT and admin-key paths.
+    # NOT serialised into any JWT.
+    popup_id: uuid.UUID | None = None
     # Identifies which ThirdPartyApps row minted this JWT. Drives per-app scope
     # enforcement at api-key minting and self-discovery.
     # None for portal JWTs and for legacy v1 third-party JWTs in flight at
@@ -413,6 +418,9 @@ def _resolve_api_key(token: str) -> TokenPayload:
                 api_key_id=str(row.id),
                 scopes=row.scopes,  # type: ignore[arg-type]
                 via_api_key=True,
+                # Popup binding — enforced per-route by ensure_api_key_popup.
+                # Legacy rows without one fail closed there.
+                popup_id=row.popup_id,
             )
 
         # Admin-owned key (user_id is set).

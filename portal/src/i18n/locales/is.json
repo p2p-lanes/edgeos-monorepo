@@ -458,6 +458,7 @@
     "revoke_failed": "Mistókst að afturkalla API lykil",
     "scopes_label": "Heimildir",
     "scopes_description": "Nýir lyklar byrja með lesaðgangi eingöngu. Aðeins veita víðtækari heimildir þegar þú þarft þess.",
+    "ended_read_only_note": "Þessum popup viðburði er lokið og því geta nýir API lyklar aðeins haft lesaðgang.",
     "scope": {
       "events_read": {
         "label": "Lesa viðburði",
@@ -470,6 +471,10 @@
       "rsvp_write": {
         "label": "RSVP á viðburði",
         "description": "Skrá eða afturkalla mætingu á viðburði."
+      },
+      "venues_write": {
+        "label": "Sýsla með eigin staði",
+        "description": "Búa til, breyta og eyða stöðum sem þú átt."
       }
     }
   },

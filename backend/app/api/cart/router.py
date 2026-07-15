@@ -134,6 +134,11 @@ async def update_my_cart(
     current_human: CurrentHuman,
 ) -> CartPublic:
     """Replace cart items for current human and popup (Portal)."""
+    from app.api.popup.crud import popups_crud
+    from app.api.popup.guards import ensure_popup_writable
+
+    ensure_popup_writable(popups_crud.get(db, popup_id))
+
     cart = carts_crud.get_or_create(
         db,
         human_id=current_human.id,
@@ -161,6 +166,11 @@ async def delete_my_cart(
     current_human: CurrentHuman,
 ) -> None:
     """Clear cart for current human and popup (Portal)."""
+    from app.api.popup.crud import popups_crud
+    from app.api.popup.guards import ensure_popup_writable
+
+    ensure_popup_writable(popups_crud.get(db, popup_id))
+
     carts_crud.delete_by_human_popup(
         db,
         human_id=current_human.id,

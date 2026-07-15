@@ -269,6 +269,7 @@ async def create_my_attendee_for_popup(
     popup is not an application popup.
     """
     from app.api.application.crud import applications_crud
+    from app.api.popup.guards import ensure_popup_writable
     from app.api.popup.models import Popups
     from app.api.shared.enums import SaleType
 
@@ -284,6 +285,8 @@ async def create_my_attendee_for_popup(
                 }
             ],
         )
+
+    ensure_popup_writable(popup)
 
     # Validate application exists for this human + popup
     application = applications_crud.get_by_human_popup(db, current_human.id, popup_id)
@@ -420,6 +423,11 @@ async def update_my_attendee_for_popup(
             status_code=status.HTTP_404_NOT_FOUND, detail="Attendee not found"
         )
 
+    from app.api.popup.crud import popups_crud
+    from app.api.popup.guards import ensure_popup_writable
+
+    ensure_popup_writable(popups_crud.get(db, popup_id))
+
     # Validate category change (blocked if attendee has products)
     update_dict = attendee_in.model_dump(exclude_unset=True)
     if "category" in update_dict and attendee.has_products():
@@ -485,6 +493,11 @@ async def update_my_meal_plan_ticket(
             status_code=status.HTTP_404_NOT_FOUND, detail="Attendee not found"
         )
 
+    from app.api.popup.crud import popups_crud
+    from app.api.popup.guards import ensure_popup_writable
+
+    ensure_popup_writable(popups_crud.get(db, popup_id))
+
     crud.attendees_crud.update_ticket_metadata(
         db,
         attendee_id=attendee_id,
@@ -531,6 +544,11 @@ async def delete_my_attendee_for_popup(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Attendee not found"
         )
+
+    from app.api.popup.crud import popups_crud
+    from app.api.popup.guards import ensure_popup_writable
+
+    ensure_popup_writable(popups_crud.get(db, popup_id))
 
     # delete_attendee raises 400 if attendee has products
     crud.attendees_crud.delete_attendee(db, attendee)
