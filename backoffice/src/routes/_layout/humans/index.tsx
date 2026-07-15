@@ -290,6 +290,22 @@ const columns: ColumnDef<HumanPublic>[] = [
     ),
   },
   {
+    id: "phone",
+    header: "Phone",
+    // phone_country is an ISO-2 code ("AR"), not a dial prefix — the ISO→dial
+    // map lives only in the portal's checkout, so show the code as-is rather
+    // than duplicate it here. It can be null on a row that still has a number.
+    accessorFn: (row) => `${row.phone_country ?? ""} ${row.phone ?? ""}`.trim(),
+    cell: ({ row }) => {
+      const { phone, phone_country } = row.original
+      return (
+        <span className="text-muted-foreground">
+          {phone ? `${phone_country ?? ""} ${phone}`.trim() : "—"}
+        </span>
+      )
+    },
+  },
+  {
     accessorKey: "rating",
     header: "Rating",
     cell: ({ row }) => (

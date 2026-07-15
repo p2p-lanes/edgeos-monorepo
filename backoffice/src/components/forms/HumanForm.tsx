@@ -665,6 +665,21 @@ export function HumanForm({ defaultValues, onSuccess }: HumanFormProps) {
                   </div>
                   <Separator />
                   <div>
+                    <p className="text-sm text-muted-foreground">Phone</p>
+                    {/* Two columns on the human: a bare number plus an ISO-2
+                        country ("AR"), which is what the open checkout collects.
+                        Shown as the ISO code rather than a dial prefix — the
+                        ISO→dial map lives only in the portal's checkout and
+                        isn't shared. The country can be null on a row that
+                        still has a number. */}
+                    <p className="font-medium">
+                      {defaultValues.phone
+                        ? `${defaultValues.phone_country ?? ""} ${defaultValues.phone}`.trim()
+                        : "—"}
+                    </p>
+                  </div>
+                  <Separator />
+                  <div>
                     <p className="text-sm text-muted-foreground">Human ID</p>
                     <p className="font-mono text-xs text-muted-foreground">
                       {defaultValues.id}
