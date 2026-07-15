@@ -373,7 +373,31 @@ describe("StepperCheckoutFlow", () => {
 
       render(<StepperCheckoutFlow />)
 
-      expect(screen.getByTestId("stepper-next").textContent).not.toBe("")
+      // "passes" has no matching stepConfig here (only the "hero" step does),
+      // so deriveCheckoutSections falls back to DEFAULT_LABELS.passes.
+      expect(screen.getByTestId("stepper-next").textContent).toBe(
+        "Select Your Passes",
+      )
+      expect(screen.queryByText("common.back")).toBeNull()
+    })
+
+    it("falls back to the next section label when cta_label is cleared to an empty string", () => {
+      // Regression test (final-review fix): the backoffice's HeroConfig.tsx
+      // writes text fields verbatim, so an admin clearing the "Bottom bar
+      // CTA" input persists cta_label: "" — not undefined. `??` doesn't
+      // coalesce "", so the CTA rendered blank. Must fall back just like
+      // the absent-cta_label case above.
+      cityOverride = AMANITA_CITY
+      availableStepsOverride = ["hero", "passes"]
+      stepConfigsOverride = [
+        { ...HERO_STEP_CONFIG, template_config: { cta_label: "" } },
+      ]
+
+      render(<StepperCheckoutFlow />)
+
+      expect(screen.getByTestId("stepper-next").textContent).toBe(
+        "Select Your Passes",
+      )
       expect(screen.queryByText("common.back")).toBeNull()
     })
 

@@ -479,7 +479,7 @@ export default function StepperCheckoutFlow({
                 onClick={() => goTo(active + 1)}
                 className={CTA_BUTTON_CLASSES[skin]}
               >
-                {introConfig.cta_label ?? nextSection?.label}
+                {introConfig.cta_label || nextSection?.label}
               </button>
             </>
           ) : (
