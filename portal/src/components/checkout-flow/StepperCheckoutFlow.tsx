@@ -221,6 +221,12 @@ export default function StepperCheckoutFlow({
     summary,
     isSubmitting,
     termsAccepted,
+    isBuyerInfoComplete,
+    getBuyerInvalidFields,
+    findFirstIncompleteStep,
+    markBuyerFieldsTouched,
+    triggerCheckoutToast,
+    dismissCheckoutToast,
   } = useCheckout()
   const { getCity } = useCityProvider()
   const popup = getCity()
@@ -287,10 +293,88 @@ export default function StepperCheckoutFlow({
     goTo(idx >= 0 ? idx : 0)
   }, [sections, goTo])
 
+  // Send the user to a step by its type rather than its id: `sections` ids are
+  // disambiguated for repeats (`housing-2`), so an id lookup misses.
+  const goToStepType = useCallback(
+    (stepType: string) => {
+      const idx = sections.findIndex((s) => s.stepType === stepType)
+      if (idx >= 0) goTo(idx)
+      return idx >= 0
+    },
+    [sections, goTo],
+  )
+
+  // Reveal every unmet field on a gated step and put the caret in the first
+  // one. Fields are marked touched through the provider because the user
+  // never focused them — without that the inputs stay silently pristine and
+  // the bounce looks like the button is simply broken.
+  const revealBuyerErrors = useCallback(() => {
+    markBuyerFieldsTouched(getBuyerInvalidFields())
+    if (typeof document === "undefined") return
+    // Deferred so React has painted the errors and the inputs actually carry
+    // aria-invalid by the time we look. Searching the whole document is safe
+    // here in a way it wouldn't be in the scrolly funnel: the stepper mounts
+    // exactly one step, so the only invalid fields on the page are the
+    // buyer's.
+    window.setTimeout(() => {
+      document
+        .querySelector<HTMLElement>('[aria-invalid="true"]')
+        ?.focus({ preventScroll: true })
+    }, 250)
+  }, [markBuyerFieldsTouched, getBuyerInvalidFields])
+
   const handlePayment = useCallback(async () => {
+    // Enable-and-validate, mirroring CartFooter's Path A: the button stays
+    // pressable and explains the problem, rather than sitting dead with no
+    // hint of what is missing. The buyer step can be skipped outright via the
+    // nav pills, so this — not the Continue gate — is the load-bearing check.
+    const incomplete = findFirstIncompleteStep()
+    if (incomplete) {
+      if (incomplete === "buyer") revealBuyerErrors()
+      goToStepType(incomplete)
+      triggerCheckoutToast({
+        message: t("checkout.toast_buyer_incomplete_pay"),
+        chips: [{ label: t("checkout.step_short.buyer"), stepId: incomplete }],
+      })
+      return
+    }
+    dismissCheckoutToast()
     const result = await submitPayment()
     if (result.success) onPaymentComplete?.()
-  }, [submitPayment, onPaymentComplete])
+  }, [
+    submitPayment,
+    onPaymentComplete,
+    findFirstIncompleteStep,
+    revealBuyerErrors,
+    goToStepType,
+    triggerCheckoutToast,
+    dismissCheckoutToast,
+    t,
+  ])
+
+  // Continue from the buyer step: don't let the user walk forward leaving an
+  // invalid form behind them.
+  const handleAdvance = useCallback(
+    (nextIndex: number) => {
+      if (sections[active]?.stepType === "buyer" && !isBuyerInfoComplete) {
+        revealBuyerErrors()
+        triggerCheckoutToast({
+          message: t("checkout.toast_buyer_incomplete_continue"),
+        })
+        return
+      }
+      goTo(nextIndex)
+    },
+    [
+      sections,
+      active,
+      isBuyerInfoComplete,
+      revealBuyerErrors,
+      triggerCheckoutToast,
+      goTo,
+      t,
+    ],
+  )
 
   if (isInitialLoading) return <Loader />
 
@@ -334,7 +418,16 @@ export default function StepperCheckoutFlow({
       return isAmanita ? <AmanitaBuyerStep /> : <OpenCheckoutBuyerStep />
     if (stepType === "confirm")
       return isAmanita ? (
-        <AmanitaConfirmSection onGoToTickets={goToFirstProductSection} />
+        /* The card's CTA is a second trigger for the same payment as the
+           bottom bar's, so it is handed the bar's own handler and gate
+           rather than re-deriving them: `canPay` already folds in
+           `!isSubmitting`, which is what stops a double charge once one of
+           the two has been pressed. Two buttons, one source of truth. */
+        <AmanitaConfirmSection
+          onGoToTickets={goToFirstProductSection}
+          onPay={handlePayment}
+          payDisabled={!canPay}
+        />
       ) : (
         <ConfirmStep />
       )
@@ -533,7 +626,7 @@ export default function StepperCheckoutFlow({
               <button
                 type="button"
                 data-testid="stepper-next"
-                onClick={() => goTo(active + 1)}
+                onClick={() => handleAdvance(active + 1)}
                 className={CTA_BUTTON_CLASSES[skin]}
               >
                 {introConfig.cta_label || nextSection?.label}
@@ -572,7 +665,7 @@ export default function StepperCheckoutFlow({
                 <button
                   type="button"
                   data-testid="stepper-next"
-                  onClick={() => goTo(active + 1)}
+                  onClick={() => handleAdvance(active + 1)}
                   className={CTA_BUTTON_CLASSES[skin]}
                 >
                   {nextSection?.label}

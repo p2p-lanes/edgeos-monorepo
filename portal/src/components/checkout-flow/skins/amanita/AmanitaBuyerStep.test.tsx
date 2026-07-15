@@ -14,12 +14,15 @@ import AmanitaBuyerStep from "./AmanitaBuyerStep"
 const setBuyerField = vi.fn()
 let buyerValues: Record<string, unknown> = {}
 let buyerErrors: Record<string, string> = {}
+// Fields the funnel forced open after a bounce, unioned into local blur state.
+let forcedBuyerFieldsTouched: Set<string> = new Set()
 
 vi.mock("@/providers/checkoutProvider", () => ({
   useCheckout: () => ({
     buyerValues,
     buyerErrors,
     setBuyerField,
+    forcedBuyerFieldsTouched,
   }),
 }))
 
@@ -32,6 +35,23 @@ describe("AmanitaBuyerStep", () => {
     setBuyerField.mockClear()
     buyerValues = {}
     buyerErrors = {}
+    forcedBuyerFieldsTouched = new Set()
+  })
+
+  // The funnel bounces a shopper here for fields they never focused, so blur
+  // state alone would leave the step looking pristine on arrival.
+  it("shows errors for fields the funnel forced open, without any blur", () => {
+    forcedBuyerFieldsTouched = new Set(["email", "phone"])
+    render(<AmanitaBuyerStep />)
+
+    expect(screen.getByText("checkout.amanita.email_required")).toBeTruthy()
+    expect(screen.getByText("checkout.amanita.phone_required")).toBeTruthy()
+  })
+
+  it("stays pristine when nothing has been touched or forced", () => {
+    render(<AmanitaBuyerStep />)
+
+    expect(screen.queryByText("checkout.amanita.email_required")).toBeNull()
   })
 
   it("calls setBuyerField('phone', …) when typing the WhatsApp number", () => {

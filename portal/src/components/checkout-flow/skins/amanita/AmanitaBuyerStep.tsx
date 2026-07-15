@@ -151,10 +151,18 @@ function useLocalFieldError(
 
 export default function AmanitaBuyerStep() {
   const { t } = useTranslation()
-  const { buyerValues, buyerErrors, setBuyerField } = useCheckout()
-  const [touched, setTouched] = useState<Set<string>>(() => new Set())
+  const { buyerValues, buyerErrors, setBuyerField, forcedBuyerFieldsTouched } =
+    useCheckout()
+  const [localTouched, setLocalTouched] = useState<Set<string>>(() => new Set())
   const markTouched = (name: string) =>
-    setTouched((prev) => (prev.has(name) ? prev : new Set(prev).add(name)))
+    setLocalTouched((prev) => (prev.has(name) ? prev : new Set(prev).add(name)))
+  // Union the provider's forced set in at read time, matching
+  // OpenTicketingBuyerForm. Blur alone isn't enough: the funnel bounces a
+  // shopper here for fields they never focused — precisely the ones left
+  // empty — so on a purely local `touched` the step would open looking
+  // pristine and the bounce would read as a dead button.
+  const isTouched = (name: string) =>
+    localTouched.has(name) || forcedBuyerFieldsTouched.has(name)
 
   const email = fieldValue(buyerValues, "email")
   const firstName = fieldValue(buyerValues, "first_name")
@@ -181,22 +189,22 @@ export default function AmanitaBuyerStep() {
   const localEmailError = useLocalFieldError(
     "email",
     email,
-    touched.has("email"),
+    isTouched("email"),
   )
   const localFirstNameError = useLocalFieldError(
     "first_name",
     firstName,
-    touched.has("first_name"),
+    isTouched("first_name"),
   )
   const localLastNameError = useLocalFieldError(
     "last_name",
     lastName,
-    touched.has("last_name"),
+    isTouched("last_name"),
   )
   const localPhoneError = useLocalFieldError(
     "phone",
     phone,
-    touched.has("phone"),
+    isTouched("phone"),
   )
 
   const emailError = buyerErrors.email ?? localEmailError

@@ -346,7 +346,8 @@
       "catalog_show_less": "Show less",
       "catalog_add_aria": "Add {{product}}",
       "catalog_add_one_aria": "Add one more {{product}}",
-      "catalog_remove_one_aria": "Remove one {{product}}"
+      "catalog_remove_one_aria": "Remove one {{product}}",
+      "confirm_cta": "Confirm purchase"
     }
   },
   "openCheckout": {

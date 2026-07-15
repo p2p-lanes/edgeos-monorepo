@@ -8,6 +8,11 @@ let cityOverride: Record<string, unknown> | null = null
 let availableStepsOverride: string[] | null = null
 let stepConfigsOverride: Record<string, unknown>[] | null = null
 let hasAnyCartItemsOverride: boolean | null = null
+let buyerCompleteOverride: boolean | null = null
+
+const markBuyerFieldsTouched = vi.fn()
+const triggerCheckoutToast = vi.fn()
+const dismissCheckoutToast = vi.fn()
 
 vi.mock("next/navigation", () => ({
   useParams: () => ({ popupSlug: "popup-a" }),
@@ -40,6 +45,16 @@ vi.mock("@/providers/checkoutProvider", () => ({
     summary: { grandTotal: 100, itemCount: 1 },
     isSubmitting: false,
     termsAccepted: true,
+    // Buyer gating. The provider already owns this contract — CartFooter
+    // (the scrolly funnel's bar) drives the same four.
+    isBuyerInfoComplete: buyerCompleteOverride ?? true,
+    getBuyerInvalidFields: () =>
+      (buyerCompleteOverride ?? true) ? [] : ["email", "phone"],
+    findFirstIncompleteStep: () =>
+      (buyerCompleteOverride ?? true) ? null : "buyer",
+    markBuyerFieldsTouched,
+    triggerCheckoutToast,
+    dismissCheckoutToast,
   }),
 }))
 
@@ -86,6 +101,58 @@ describe("StepperCheckoutFlow", () => {
     availableStepsOverride = null
     stepConfigsOverride = null
     hasAnyCartItemsOverride = null
+    buyerCompleteOverride = null
+    markBuyerFieldsTouched.mockClear()
+    triggerCheckoutToast.mockClear()
+    dismissCheckoutToast.mockClear()
+  })
+
+  // The buyer form is the only step with formal field validation, and the
+  // stepper lets you leave it behind or skip it via the nav pills. Without a
+  // gate at these two exits, the first sign of a missed field is a rejected
+  // purchase.
+  describe("buyer-form gating", () => {
+    const WITH_BUYER = ["passes", "buyer", "confirm"]
+
+    it("blocks Continue on the buyer step while the form is incomplete", () => {
+      availableStepsOverride = WITH_BUYER
+      buyerCompleteOverride = false
+      render(<StepperCheckoutFlow />)
+      fireEvent.click(screen.getByTestId("stepper-next")) // passes → buyer
+      expect(screen.getByText("buyer-step")).toBeTruthy()
+
+      fireEvent.click(screen.getByTestId("stepper-next")) // attempt → confirm
+
+      expect(screen.getByText("buyer-step")).toBeTruthy()
+      expect(screen.queryByText("confirm-step")).toBeNull()
+      expect(markBuyerFieldsTouched).toHaveBeenCalledWith(["email", "phone"])
+    })
+
+    it("lets Continue through once the buyer form is complete", () => {
+      availableStepsOverride = WITH_BUYER
+      buyerCompleteOverride = true
+      render(<StepperCheckoutFlow />)
+      fireEvent.click(screen.getByTestId("stepper-next")) // passes → buyer
+      fireEvent.click(screen.getByTestId("stepper-next")) // buyer → confirm
+
+      expect(screen.getByText("confirm-step")).toBeTruthy()
+      expect(markBuyerFieldsTouched).not.toHaveBeenCalled()
+    })
+
+    it("bounces pay back to the buyer step instead of submitting", async () => {
+      availableStepsOverride = WITH_BUYER
+      buyerCompleteOverride = false
+      render(<StepperCheckoutFlow />)
+      // Reach confirm via the nav pills, the way a shopper skips the form.
+      fireEvent.click(screen.getByText("Review & Confirm"))
+      expect(screen.getByText("confirm-step")).toBeTruthy()
+
+      fireEvent.click(screen.getByTestId("stepper-next")) // → pay
+
+      await waitFor(() => expect(screen.getByText("buyer-step")).toBeTruthy())
+      expect(submitPayment).not.toHaveBeenCalled()
+      expect(markBuyerFieldsTouched).toHaveBeenCalledWith(["email", "phone"])
+    })
   })
 
   it("enables pay when the cart holds only dynamic items", () => {

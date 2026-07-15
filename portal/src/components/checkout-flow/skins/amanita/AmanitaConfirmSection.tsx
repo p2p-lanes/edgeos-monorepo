@@ -20,9 +20,14 @@
  * insurance is already toggled on elsewhere, its charge still shows as a
  * summary line so the total stays correct.
  *
- * IMPORTANT: payment is triggered by the stepper's fixed bottom-bar CTA
- * (Plan 2/5), not by this section — the mockup's "Confirmar compra" button
- * is intentionally OMITTED here so there is no second payment trigger.
+ * Payment triggers: the mockup's in-card "Confirmar compra" button was
+ * originally omitted here, leaving the stepper's fixed bottom bar as the sole
+ * trigger. It is now rendered alongside the bar's, matching the mockup, so the
+ * same payment has two buttons. They are deliberately NOT independent: `onPay`
+ * and `payDisabled` are the bar's own handler and gate, passed down. Deriving
+ * a second `canPay` here from `useCheckout()` would let the two disagree — the
+ * card could still look armed while the bar is mid-submit, which is exactly
+ * how a double charge gets in.
  */
 import {
   AlertCircle,
@@ -76,8 +81,14 @@ function SectionLabel({
 
 export default function AmanitaConfirmSection({
   onGoToTickets,
+  onPay,
+  payDisabled,
 }: {
   onGoToTickets?: () => void
+  /** The stepper's own payment handler — see the header note on why this is
+   *  passed in rather than pulled from `useCheckout()` here. */
+  onPay?: () => void
+  payDisabled?: boolean
 }) {
   const { t } = useTranslation()
   const {
@@ -728,6 +739,18 @@ export default function AmanitaConfirmSection({
               <p className="mt-2 text-center text-sm text-primary">
                 {t("checkout.amanita.confirm_free_note")}
               </p>
+            )}
+            {onPay && (
+              <button
+                type="button"
+                onClick={onPay}
+                disabled={payDisabled}
+                className="btn-ornate-2 btn-gold-fill ck-gold mt-5 flex w-full items-center justify-center whitespace-nowrap py-3 font-condensed text-sm font-medium uppercase tracking-[0.12em] transition-all duration-200 hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {summary.grandTotal === 0
+                  ? t("checkout.actions.claim_pass")
+                  : t("checkout.amanita.confirm_cta")}
+              </button>
             )}
           </div>
         </div>
