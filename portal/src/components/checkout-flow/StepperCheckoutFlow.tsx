@@ -113,17 +113,21 @@ const BOTTOM_OUTER: Record<
   },
 }
 
+/* Surface only — the bar's layout is applied per-branch at the JSX below,
+ * because the two branches lay out differently and `display` can't be
+ * overridden by a later class in the attribute (the cascade decides, not the
+ * order written here). */
 const BOTTOM_INNER: Record<
   CheckoutSkin,
   { className: string; style?: CSSProperties }
 > = {
   default: {
     className:
-      "mx-auto flex max-w-2xl items-center justify-between gap-3 rounded-2xl border bg-background/95 px-4 py-3 shadow-lg backdrop-blur",
+      "mx-auto max-w-2xl items-center gap-3 rounded-2xl border bg-background/95 px-4 py-3 shadow-lg backdrop-blur",
   },
   amanita: {
     className:
-      "pointer-events-auto mx-auto flex max-w-[760px] items-center justify-between gap-3 rounded-2xl border border-white/10 px-4 py-3 md:px-6",
+      "pointer-events-auto mx-auto max-w-[760px] items-center gap-3 rounded-2xl border border-white/10 px-4 py-3 md:px-6",
     style: {
       backgroundColor: "rgba(3,22,33,0.93)",
       boxShadow: "0 18px 48px rgba(1,15,22,0.65)",
@@ -611,8 +615,17 @@ export default function StepperCheckoutFlow({
         className={BOTTOM_OUTER[skin].className}
         style={BOTTOM_OUTER[skin].style}
       >
+        {/* Three equal-weight slots, so Total sits on the bar's true centre.
+            `justify-between` can't: it centres Total in the space LEFT OVER
+            between Back and the CTA, so the wider CTA drags it off-centre by
+            half the width difference. The intro bar is a different shape — a
+            hint and a CTA, no centre slot — and keeps flex. */}
         <div
-          className={BOTTOM_INNER[skin].className}
+          className={`${BOTTOM_INNER[skin].className} ${
+            isIntro
+              ? "flex justify-between"
+              : "grid grid-cols-[1fr_auto_1fr]"
+          }`}
           style={BOTTOM_INNER[skin].style}
         >
           {isIntro ? (
@@ -638,7 +651,7 @@ export default function StepperCheckoutFlow({
                 type="button"
                 onClick={() => goTo(active - 1)}
                 disabled={active === 0}
-                className={BACK_BUTTON[skin].className}
+                className={`${BACK_BUTTON[skin].className} justify-self-start`}
                 style={BACK_BUTTON[skin].style}
               >
                 {t("common.back")}
@@ -655,7 +668,7 @@ export default function StepperCheckoutFlow({
                   data-testid="stepper-next"
                   onClick={handlePayment}
                   disabled={!canPay}
-                  className={CTA_BUTTON_CLASSES[skin]}
+                  className={`${CTA_BUTTON_CLASSES[skin]} justify-self-end`}
                 >
                   {summary.grandTotal === 0
                     ? t("checkout.actions.claim_pass")
@@ -666,7 +679,7 @@ export default function StepperCheckoutFlow({
                   type="button"
                   data-testid="stepper-next"
                   onClick={() => handleAdvance(active + 1)}
-                  className={CTA_BUTTON_CLASSES[skin]}
+                  className={`${CTA_BUTTON_CLASSES[skin]} justify-self-end`}
                 >
                   {nextSection?.label}
                 </button>
