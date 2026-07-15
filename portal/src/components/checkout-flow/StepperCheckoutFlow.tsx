@@ -39,21 +39,35 @@ const ROOT_CLASSES: Record<CheckoutSkin, string> = {
   amanita: `checkout-amanita ${amanitaFontVars} section-dark relative min-h-dvh`,
 }
 
-const NAV: Record<CheckoutSkin, { className: string; style?: CSSProperties }> =
-  {
-    default: {
-      className:
-        "sticky top-0 z-40 flex gap-2 overflow-x-auto bg-background/90 px-4 py-3 backdrop-blur",
+/* The nav is two elements, mirroring BOTTOM_OUTER/BOTTOM_INNER below: a
+ * full-bleed bar that paints the background, wrapping a constrained inner
+ * <nav> that holds the pills. Putting `max-w-*` on the bar itself would clip
+ * its background to that width — the mockup's <header>/<nav> pair
+ * (checkout-amanita/codigo/checkout/CheckoutExperience.tsx:194-204) exists
+ * for exactly this reason. */
+const NAV_OUTER: Record<
+  CheckoutSkin,
+  { className: string; style?: CSSProperties }
+> = {
+  default: {
+    className: "sticky top-0 z-40 bg-background/90 backdrop-blur",
+  },
+  amanita: {
+    className: "fixed inset-x-0 top-0 z-40",
+    style: {
+      background:
+        "linear-gradient(180deg, rgba(1,15,22,0.92) 0%, rgba(1,15,22,0.72) 72%, rgba(1,15,22,0) 100%)",
     },
-    amanita: {
-      className:
-        "no-scrollbar fixed inset-x-0 top-0 z-40 mx-auto flex max-w-[980px] items-center gap-1.5 overflow-x-auto px-3 py-3 md:justify-center",
-      style: {
-        background:
-          "linear-gradient(180deg, rgba(1,15,22,0.92) 0%, rgba(1,15,22,0.72) 72%, rgba(1,15,22,0) 100%)",
-      },
-    },
-  }
+  },
+}
+
+const NAV_INNER: Record<CheckoutSkin, { className: string }> = {
+  default: { className: "flex gap-2 overflow-x-auto px-4 py-3" },
+  amanita: {
+    className:
+      "no-scrollbar mx-auto flex max-w-[980px] items-center gap-1.5 overflow-x-auto px-3 py-3 md:justify-center",
+  },
+}
 
 const PILL: Record<
   CheckoutSkin,
@@ -353,75 +367,82 @@ export default function StepperCheckoutFlow({
       {isAmanita && <AmanitaBackground />}
 
       {/* pills nav */}
-      <nav
-        aria-label="Checkout sections"
-        className={NAV[skin].className}
-        style={NAV[skin].style}
+      <header
+        className={NAV_OUTER[skin].className}
+        style={NAV_OUTER[skin].style}
       >
-        {navSections.map((section, navIdx) => {
-          const idx = sections.findIndex((s) => s.id === section.id)
-          const isActive = idx === active
-          const pill = PILL[skin]
-          // Amanita mockup detail (Task 5 review, folded in here): the first
-          // pill shows the brand mark instead of a text label, and the
-          // Confirm pill carries a cart-count badge once items are added.
-          const isFirstPill = isAmanita && navIdx === 0
-          const showCartBadge =
-            isAmanita && section.stepType === "confirm" && itemCount > 0
-          return (
-            <button
-              key={section.id}
-              type="button"
-              onClick={() => goTo(idx)}
-              aria-current={isActive ? "step" : undefined}
-              className={`${pill.base} ${isActive ? pill.active : pill.inactive}`}
-              style={isActive ? pill.activeStyle : pill.inactiveStyle}
-            >
-              {isFirstPill ? (
-                <>
-                  <Image
-                    src="/checkout-skins/amanita/logo-hongo.webp"
-                    alt=""
-                    aria-hidden
-                    width={647}
-                    height={360}
-                    className="h-4 w-auto"
-                  />
-                  <span className="sr-only">
-                    {t("checkout.amanita.nav_home_sr")}
+        <nav
+          aria-label="Checkout sections"
+          className={NAV_INNER[skin].className}
+        >
+          {navSections.map((section, navIdx) => {
+            const idx = sections.findIndex((s) => s.id === section.id)
+            const isActive = idx === active
+            const pill = PILL[skin]
+            // Amanita mockup detail (Task 5 review, folded in here): the first
+            // pill shows the brand mark instead of a text label, and the
+            // Confirm pill carries a cart-count badge once items are added.
+            const isFirstPill = isAmanita && navIdx === 0
+            const showCartBadge =
+              isAmanita && section.stepType === "confirm" && itemCount > 0
+            return (
+              <button
+                key={section.id}
+                type="button"
+                onClick={() => goTo(idx)}
+                aria-current={isActive ? "step" : undefined}
+                className={`${pill.base} ${isActive ? pill.active : pill.inactive}`}
+                style={isActive ? pill.activeStyle : pill.inactiveStyle}
+              >
+                {isFirstPill ? (
+                  <>
+                    <Image
+                      src="/checkout-skins/amanita/logo-hongo.webp"
+                      alt=""
+                      aria-hidden
+                      width={647}
+                      height={360}
+                      className="h-4 w-auto"
+                    />
+                    <span className="sr-only">
+                      {t("checkout.amanita.nav_home_sr")}
+                    </span>
+                  </>
+                ) : (
+                  section.label
+                )}
+                {showCartBadge && (
+                  <span className="ml-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-sand px-1 font-condensed text-[0.6rem] font-semibold text-deep">
+                    {itemCount}
                   </span>
-                </>
-              ) : (
-                section.label
-              )}
-              {showCartBadge && (
-                <span className="ml-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-sand px-1 font-condensed text-[0.6rem] font-semibold text-deep">
-                  {itemCount}
-                </span>
-              )}
-            </button>
-          )
-        })}
-        {isAmanita && faqSections.length > 0 && (
-          <>
-            <span aria-hidden className="mx-1 h-4 w-px shrink-0 bg-white/25" />
-            <button
-              type="button"
-              onClick={() => setFaqsOpen(true)}
-              aria-haspopup="dialog"
-              aria-expanded={faqsOpen}
-              className="shrink-0 whitespace-nowrap rounded-full border border-dashed bg-transparent px-3.5 py-1.5 font-condensed text-xs font-medium uppercase tracking-[0.08em] transition-colors hover:border-mint hover:text-mint"
-              style={{
-                borderColor: "rgba(241,235,227,0.4)",
-                color: "rgba(241,235,227,0.85)",
-              }}
-            >
-              {t("checkout.amanita.faqs_pill_label")}
-            </button>
-          </>
-        )}
-        {navExtraContent}
-      </nav>
+                )}
+              </button>
+            )
+          })}
+          {isAmanita && faqSections.length > 0 && (
+            <>
+              <span
+                aria-hidden
+                className="mx-1 h-4 w-px shrink-0 bg-white/25"
+              />
+              <button
+                type="button"
+                onClick={() => setFaqsOpen(true)}
+                aria-haspopup="dialog"
+                aria-expanded={faqsOpen}
+                className="shrink-0 whitespace-nowrap rounded-full border border-dashed bg-transparent px-3.5 py-1.5 font-condensed text-xs font-medium uppercase tracking-[0.08em] transition-colors hover:border-mint hover:text-mint"
+                style={{
+                  borderColor: "rgba(241,235,227,0.4)",
+                  color: "rgba(241,235,227,0.85)",
+                }}
+              >
+                {t("checkout.amanita.faqs_pill_label")}
+              </button>
+            </>
+          )}
+          {navExtraContent}
+        </nav>
+      </header>
 
       {isAmanita && (
         <FaqsDrawer open={faqsOpen} items={faqItems} onClose={closeFaqs} />

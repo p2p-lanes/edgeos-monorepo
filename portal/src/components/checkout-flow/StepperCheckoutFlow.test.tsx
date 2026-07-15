@@ -171,6 +171,35 @@ describe("StepperCheckoutFlow", () => {
       expect(container.querySelector(".checkout-amanita")).toBeNull()
     })
 
+    it("paints the amanita nav gradient full-bleed, with only the pills constrained", () => {
+      cityOverride = AMANITA_CITY
+      stepConfigsOverride = [PASSES_STEP_CONFIG]
+      const { container } = render(<StepperCheckoutFlow />)
+
+      // The <nav> holds the pills and is the constrained element…
+      const nav = container.querySelector('nav[aria-label="Checkout sections"]')
+      expect(nav).toBeTruthy()
+      expect(nav?.className).toContain("max-w-[980px]")
+      expect(nav?.classList.contains("fixed")).toBe(false)
+
+      // …while its parent is the full-bleed bar that paints the gradient.
+      const bar = nav?.parentElement as HTMLElement
+      expect(bar.classList.contains("fixed")).toBe(true)
+      expect(bar.className).not.toContain("max-w-")
+      expect(bar.style.background).toContain("linear-gradient")
+    })
+
+    it("keeps the default skin's nav bar full-width with its own background", () => {
+      stepConfigsOverride = [PASSES_STEP_CONFIG]
+      const { container } = render(<StepperCheckoutFlow />)
+
+      const nav = container.querySelector('nav[aria-label="Checkout sections"]')
+      const bar = nav?.parentElement as HTMLElement
+      expect(bar.classList.contains("sticky")).toBe(true)
+      expect(bar.className).toContain("bg-background/90")
+      expect(nav?.className).not.toContain("max-w-")
+    })
+
     it("routes the buyer step to AmanitaBuyerStep when the skin is amanita", () => {
       cityOverride = {
         terms_and_conditions_url: null,
