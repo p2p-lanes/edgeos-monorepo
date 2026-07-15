@@ -3788,28 +3788,6 @@ export const BuyerInfoSchema = {
             type: 'string',
             title: 'Last Name'
         },
-        phone: {
-            anyOf: [
-                {
-                    type: 'string'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Phone'
-        },
-        phone_country: {
-            anyOf: [
-                {
-                    type: 'string'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Phone Country'
-        },
         form_data: {
             additionalProperties: true,
             type: 'object',
@@ -10333,28 +10311,6 @@ export const HumanCreateSchema = {
             ],
             title: 'Telegram'
         },
-        phone: {
-            anyOf: [
-                {
-                    type: 'string'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Phone'
-        },
-        phone_country: {
-            anyOf: [
-                {
-                    type: 'string'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Phone Country'
-        },
         gender: {
             anyOf: [
                 {
@@ -10705,28 +10661,6 @@ export const HumanProfileUpdateSchema = {
             ],
             title: 'Telegram'
         },
-        phone: {
-            anyOf: [
-                {
-                    type: 'string'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Phone'
-        },
-        phone_country: {
-            anyOf: [
-                {
-                    type: 'string'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Phone Country'
-        },
         gender: {
             anyOf: [
                 {
@@ -10825,28 +10759,6 @@ export const HumanPublicSchema = {
                 }
             ],
             title: 'Telegram'
-        },
-        phone: {
-            anyOf: [
-                {
-                    type: 'string'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Phone'
-        },
-        phone_country: {
-            anyOf: [
-                {
-                    type: 'string'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Phone Country'
         },
         gender: {
             anyOf: [
@@ -10965,28 +10877,6 @@ export const HumanUpdateSchema = {
                 }
             ],
             title: 'Telegram'
-        },
-        phone: {
-            anyOf: [
-                {
-                    type: 'string'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Phone'
-        },
-        phone_country: {
-            anyOf: [
-                {
-                    type: 'string'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Phone Country'
         },
         gender: {
             anyOf: [

@@ -57,10 +57,6 @@ interface UsePaymentSubmitParams {
     email: string
     firstName: string
     lastName: string
-    /** WhatsApp phone, sent top-level on BuyerInfo (not nested in form_data)
-     *  so the backend's phone-persistence path (Plan 1) fires. */
-    phone?: string
-    phone_country?: string
     formData: Record<string, unknown>
   } | null
   editPassesEnabled: boolean
@@ -228,8 +224,6 @@ export function usePaymentSubmit({
                   email: buyerData!.email,
                   first_name: buyerData!.firstName,
                   last_name: buyerData!.lastName,
-                  phone: buyerData!.phone,
-                  phone_country: buyerData!.phone_country,
                   // form_data carries only custom field values; strip the form's "custom_" prefix to send raw field names.
                   form_data: Object.fromEntries(
                     Object.entries(buyerData!.formData).flatMap(

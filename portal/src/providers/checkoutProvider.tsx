@@ -1360,14 +1360,6 @@ export function CheckoutProvider({
               typeof buyerValues.last_name === "string"
                 ? buyerValues.last_name
                 : "",
-            phone:
-              typeof buyerValues.phone === "string"
-                ? buyerValues.phone
-                : undefined,
-            phone_country:
-              typeof buyerValues.phone_country === "string"
-                ? buyerValues.phone_country
-                : undefined,
             formData: buyerValues,
           }
         : null,

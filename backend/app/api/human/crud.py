@@ -44,8 +44,6 @@ class HumansCRUD(BaseCRUD[Humans, HumanCreate, HumanUpdate]):
         *,
         default_first_name: str | None = None,
         default_last_name: str | None = None,
-        default_phone: str | None = None,
-        default_phone_country: str | None = None,
     ) -> Humans:
         """Return the existing Human for (email, tenant_id) or create one.
 
@@ -72,8 +70,6 @@ class HumansCRUD(BaseCRUD[Humans, HumanCreate, HumanUpdate]):
             tenant_id=tenant_id,
             first_name=default_first_name,
             last_name=default_last_name,
-            phone=default_phone,
-            phone_country=default_phone_country,
         )
         try:
             session.add(new_human)
@@ -109,8 +105,6 @@ class HumansCRUD(BaseCRUD[Humans, HumanCreate, HumanUpdate]):
         *,
         default_first_name: str | None = None,
         default_last_name: str | None = None,
-        default_phone: str | None = None,
-        default_phone_country: str | None = None,
     ) -> Humans:
         """Flush-only variant of `find_or_create` for atomic admin batch flows.
 
@@ -133,8 +127,6 @@ class HumansCRUD(BaseCRUD[Humans, HumanCreate, HumanUpdate]):
             tenant_id=tenant_id,
             first_name=default_first_name,
             last_name=default_last_name,
-            phone=default_phone,
-            phone_country=default_phone_country,
         )
         # SAVEPOINT so a concurrent unique-constraint race can be recovered
         # from without poisoning the outer transaction (which holds prior

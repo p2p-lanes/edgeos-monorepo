@@ -1,24 +1,26 @@
 "use client"
 
 /**
- * Amanita skin — "Tus Datos" buyer step (ex "Tu información").
+ * Amanita skin — "Tus Datos" buyer step.
  *
- * Ported from checkout-amanita/codigo/checkout/sections.tsx (`InfoSection` +
- * `Field` + `WA_COUNTRIES`). Unlike the mockup (which owns local `BuyerInfo`
- * state), this component is fed by the REAL buyer form state from
- * `useCheckout()` — `buyerValues`/`buyerErrors`/`setBuyerField` — so typing
- * writes straight into the checkout provider that `submitPayment` reads
- * from. OTP email verification is intentionally NOT part of this step: it's
- * not part of open-ticketing today.
+ * Renders the popup's buyer form as declared in the form builder — the same
+ * `buyerFormSchema` the default checkout reads — wearing Amanita's chrome.
  *
- * The WhatsApp field is the one genuinely new field vs. the base
- * OpenCheckoutBuyerStep: it writes `phone` (number) + `phone_country` (ISO
- * code) via `setBuyerField`, same as any other buyer field. Task 6 wired
- * `phone_country` to persist top-level alongside `phone`.
+ * It used to hardcode email/first_name/last_name plus a bespoke WhatsApp
+ * field and ignore the schema completely. That silently dropped any field an
+ * organizer configured, and a REQUIRED one was worse than invisible: the
+ * backend still validated it (payment/crud.py `_validate_open_ticketing_form_data`)
+ * so the purchase died on a 422 with no input on screen to fix. Reading the
+ * schema is what makes the skin a skin rather than a fork of the form.
+ *
+ * A skin owns presentation, not the field list: this file decides how a
+ * `phone` looks in Amanita, never whether a phone is collected.
  */
-import { type CSSProperties, useEffect, useState } from "react"
+import { type CSSProperties, useState } from "react"
 import { useTranslation } from "react-i18next"
+import { getCheckoutSchemaSections } from "@/app/checkout/types"
 import { useCheckout } from "@/providers/checkoutProvider"
+import type { FormFieldSchema } from "@/types/form-schema"
 import { SectionShell } from "./SectionShell"
 
 /** Curated WhatsApp country list. Rendered as TEXT ("AR +54") — no flag
@@ -44,11 +46,7 @@ export const WA_COUNTRIES = [
   { code: "NL", dial: "31" },
 ] as const
 
-const WA_COUNTRY_CODES = new Set<string>(WA_COUNTRIES.map((c) => c.code))
 const DEFAULT_WA_COUNTRY = "AR"
-
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-const PHONE_RE = /^\d{6,15}$/
 
 const CREAM_CARD_STYLE: CSSProperties = {
   border: "1px solid rgba(193,170,136,0.4)",
@@ -60,99 +58,213 @@ const FIELD_INPUT_STYLE = (hasError: boolean): CSSProperties => ({
   borderColor: hasError ? "#b3271e" : "rgba(4,34,49,0.18)",
 })
 
-function fieldValue(values: Record<string, unknown>, name: string): string {
-  const value = values[name]
+const LABEL_CLASS =
+  "font-condensed text-xs font-medium uppercase tracking-[0.16em] text-primary"
+const CONTROL_CLASS =
+  "mt-1.5 w-full rounded-xl border px-4 py-3 text-deep outline-none transition-shadow focus:ring-2 focus:ring-accent"
+
+function asString(value: unknown): string {
   return typeof value === "string" ? value : ""
 }
 
-function Field({
-  id,
-  label,
-  type = "text",
-  autoComplete,
-  placeholder,
+/** Split an E.164 number into a supported country + national digits.
+ *  Longest-dial-first so "+598…" reads as UY, not US ("+1") by prefix luck. */
+function splitE164(value: string): { country: string; national: string } {
+  if (value.startsWith("+")) {
+    const digits = value.slice(1)
+    const match = [...WA_COUNTRIES]
+      .sort((a, b) => b.dial.length - a.dial.length)
+      .find((c) => digits.startsWith(c.dial))
+    if (match) {
+      return { country: match.code, national: digits.slice(match.dial.length) }
+    }
+  }
+  return { country: DEFAULT_WA_COUNTRY, national: value.replace(/^\+/, "") }
+}
+
+function dialFor(code: string): string {
+  return WA_COUNTRIES.find((c) => c.code === code)?.dial ?? "54"
+}
+
+function FieldError({ message }: { message: string }) {
+  return (
+    <p className="mt-1.5 text-xs font-semibold" style={{ color: "#b3271e" }}>
+      {message}
+    </p>
+  )
+}
+
+/** One schema field in Amanita chrome. Presentation only — which fields
+ *  exist, their labels and whether they're required all come from config. */
+function AmanitaField({
+  name,
+  field,
   value,
-  onChange,
   error,
+  onChange,
 }: {
-  id: string
-  label: string
-  type?: string
-  autoComplete?: string
-  placeholder?: string
-  value: string
-  onChange: (value: string) => void
+  name: string
+  field: FormFieldSchema
+  value: unknown
   error?: string
+  onChange: (name: string, value: unknown) => void
 }) {
+  const { t } = useTranslation()
+  const id = `ck-${name}`
+  const label = field.label
+  const hasError = !!error
+
+  if (field.type === "phone") {
+    const { country, national } = splitE164(asString(value))
+    return (
+      <div>
+        <label htmlFor={id} className={LABEL_CLASS}>
+          {label}
+        </label>
+        <div className="mt-1.5 flex gap-2">
+          <select
+            aria-label={t("checkout.amanita.whatsapp_country_aria")}
+            autoComplete="tel-country-code"
+            value={country}
+            onChange={(e) =>
+              onChange(name, `+${dialFor(e.target.value)}${national}`)
+            }
+            className="shrink-0 rounded-xl border px-3 py-3 text-sm font-medium text-deep outline-none transition-shadow focus:ring-2 focus:ring-accent"
+            style={{
+              backgroundColor: "#faf6ef",
+              borderColor: "rgba(4,34,49,0.18)",
+            }}
+          >
+            {WA_COUNTRIES.map((c) => (
+              <option key={c.code} value={c.code}>
+                {c.code} +{c.dial}
+              </option>
+            ))}
+          </select>
+          <input
+            id={id}
+            type="tel"
+            inputMode="numeric"
+            autoComplete="tel-national"
+            placeholder={field.placeholder ?? undefined}
+            value={national}
+            onChange={(e) =>
+              onChange(name, `+${dialFor(country)}${e.target.value}`)
+            }
+            aria-invalid={hasError || undefined}
+            className="w-full min-w-0 rounded-xl border px-4 py-3 text-deep outline-none transition-shadow focus:ring-2 focus:ring-accent"
+            style={FIELD_INPUT_STYLE(hasError)}
+          />
+        </div>
+        {error && <FieldError message={error} />}
+      </div>
+    )
+  }
+
+  if (field.type === "select") {
+    return (
+      <div>
+        <label htmlFor={id} className={LABEL_CLASS}>
+          {label}
+        </label>
+        <select
+          id={id}
+          value={asString(value)}
+          onChange={(e) => onChange(name, e.target.value)}
+          aria-invalid={hasError || undefined}
+          className={CONTROL_CLASS}
+          style={FIELD_INPUT_STYLE(hasError)}
+        >
+          <option value="">—</option>
+          {(field.options ?? []).map((option) => (
+            <option key={option} value={option}>
+              {option}
+            </option>
+          ))}
+        </select>
+        {error && <FieldError message={error} />}
+      </div>
+    )
+  }
+
+  if (field.type === "textarea") {
+    return (
+      <div>
+        <label htmlFor={id} className={LABEL_CLASS}>
+          {label}
+        </label>
+        <textarea
+          id={id}
+          rows={3}
+          value={asString(value)}
+          onChange={(e) => onChange(name, e.target.value)}
+          aria-invalid={hasError || undefined}
+          className={CONTROL_CLASS}
+          style={FIELD_INPUT_STYLE(hasError)}
+        />
+        {error && <FieldError message={error} />}
+      </div>
+    )
+  }
+
+  if (field.type === "boolean") {
+    return (
+      <div>
+        <label htmlFor={id} className="flex items-center gap-2.5 text-sm">
+          <input
+            id={id}
+            type="checkbox"
+            checked={value === true}
+            onChange={(e) => onChange(name, e.target.checked)}
+            className="h-4 w-4 rounded border-primary/40"
+          />
+          <span className="text-deep">{label}</span>
+        </label>
+        {error && <FieldError message={error} />}
+      </div>
+    )
+  }
+
   return (
     <div>
-      <label
-        htmlFor={id}
-        className="font-condensed text-xs font-medium uppercase tracking-[0.16em] text-primary"
-      >
+      <label htmlFor={id} className={LABEL_CLASS}>
         {label}
       </label>
       <input
         id={id}
-        type={type}
-        autoComplete={autoComplete}
-        placeholder={placeholder}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        aria-invalid={error ? true : undefined}
-        className="mt-1.5 w-full rounded-xl border px-4 py-3 text-deep outline-none transition-shadow focus:ring-2 focus:ring-accent"
-        style={FIELD_INPUT_STYLE(!!error)}
+        type={field.type === "email" ? "email" : "text"}
+        autoComplete={
+          name === "email"
+            ? "email"
+            : name === "first_name"
+              ? "given-name"
+              : name === "last_name"
+                ? "family-name"
+                : undefined
+        }
+        placeholder={field.placeholder ?? undefined}
+        value={asString(value)}
+        onChange={(e) => onChange(name, e.target.value)}
+        aria-invalid={hasError || undefined}
+        className={CONTROL_CLASS}
+        style={FIELD_INPUT_STYLE(hasError)}
       />
-      {error && (
-        <p
-          className="mt-1.5 text-xs font-semibold"
-          style={{ color: "#b3271e" }}
-        >
-          {error}
-        </p>
-      )}
+      {error && <FieldError message={error} />}
     </div>
   )
 }
 
-// Blank/format checks adapted from the mockup's `getInfoErrors`, translated
-// via the real checkout.amanita.* validation-message keys. These are only a
-// fallback: a `buyerErrors[name]` value from the provider always wins, and
-// this local check only surfaces once the field has been touched (blurred)
-// so the form doesn't open already covered in red ink.
-function useLocalFieldError(
-  name: "email" | "first_name" | "last_name" | "phone",
-  value: string,
-  touched: boolean,
-): string | undefined {
-  const { t } = useTranslation()
-  if (!touched) return undefined
-  switch (name) {
-    case "email":
-      if (!value.trim()) return t("checkout.amanita.email_required")
-      if (!EMAIL_RE.test(value.trim()))
-        return t("checkout.amanita.email_invalid")
-      return undefined
-    case "first_name":
-      if (!value.trim()) return t("checkout.amanita.first_name_required")
-      return undefined
-    case "last_name":
-      if (!value.trim()) return t("checkout.amanita.last_name_required")
-      return undefined
-    case "phone":
-      if (!value.trim()) return t("checkout.amanita.phone_required")
-      if (!PHONE_RE.test(value.replace(/[\s.-]/g, "")))
-        return t("checkout.amanita.phone_invalid")
-      return undefined
-    default:
-      return undefined
-  }
-}
-
 export default function AmanitaBuyerStep() {
   const { t } = useTranslation()
-  const { buyerValues, buyerErrors, setBuyerField, forcedBuyerFieldsTouched } =
-    useCheckout()
+  const {
+    buyerValues,
+    buyerErrors,
+    setBuyerField,
+    forcedBuyerFieldsTouched,
+    buyerFormSchema,
+    getBuyerInvalidFields,
+  } = useCheckout()
+
   const [localTouched, setLocalTouched] = useState<Set<string>>(() => new Set())
   const markTouched = (name: string) =>
     setLocalTouched((prev) => (prev.has(name) ? prev : new Set(prev).add(name)))
@@ -164,45 +276,12 @@ export default function AmanitaBuyerStep() {
   const isTouched = (name: string) =>
     localTouched.has(name) || forcedBuyerFieldsTouched.has(name)
 
-  const email = fieldValue(buyerValues, "email")
-  const firstName = fieldValue(buyerValues, "first_name")
-  const lastName = fieldValue(buyerValues, "last_name")
-  const phone = fieldValue(buyerValues, "phone")
-  const phoneCountryRaw = fieldValue(buyerValues, "phone_country")
-  const phoneCountry = phoneCountryRaw || DEFAULT_WA_COUNTRY
-
-  // Country preselect: reads navigator.language's region (e.g. "es-AR" →
-  // "AR") ONLY inside the effect (never during render, to avoid hydration
-  // mismatches) and ONLY when phone_country is currently unset AND the
-  // region is one of our supported WhatsApp countries.
-  useEffect(() => {
-    if (phoneCountryRaw) return
-    if (typeof navigator === "undefined" || !navigator.language) return
-    const region = navigator.language.split("-")[1]?.toUpperCase()
-    if (region && WA_COUNTRY_CODES.has(region)) {
-      setBuyerField("phone_country", region)
-    }
-  }, [phoneCountryRaw, setBuyerField])
-
-  // Hooks must always run (never short-circuited by `??`), so compute the
-  // local fallback unconditionally first, then let a real provider error win.
-  const localEmailError = useLocalFieldError("email", email, isTouched("email"))
-  const localFirstNameError = useLocalFieldError(
-    "first_name",
-    firstName,
-    isTouched("first_name"),
-  )
-  const localLastNameError = useLocalFieldError(
-    "last_name",
-    lastName,
-    isTouched("last_name"),
-  )
-  const localPhoneError = useLocalFieldError("phone", phone, isTouched("phone"))
-
-  const emailError = buyerErrors.email ?? localEmailError
-  const firstNameError = buyerErrors.first_name ?? localFirstNameError
-  const lastNameError = buyerErrors.last_name ?? localLastNameError
-  const phoneError = buyerErrors.phone ?? localPhoneError
+  const sections = buyerFormSchema
+    ? getCheckoutSchemaSections(buyerFormSchema)
+    : []
+  // Same Zod-derived set the funnel gates on, so what the step paints red and
+  // what blocks Pay can never disagree.
+  const invalidFields = new Set(getBuyerInvalidFields())
 
   return (
     <SectionShell
@@ -234,95 +313,35 @@ export default function AmanitaBuyerStep() {
           </p>
         </div>
 
-        <div className="mt-6 flex flex-col gap-5">
-          <div onBlurCapture={() => markTouched("email")}>
-            <Field
-              id="ck-email"
-              label={t("form.email")}
-              type="email"
-              autoComplete="email"
-              placeholder="tu@email.com"
-              value={email}
-              onChange={(v) => setBuyerField("email", v)}
-              error={emailError}
-            />
+        {sections.map((section) => (
+          <div key={section.id} className="mt-6 flex flex-col gap-5">
+            {sections.length > 1 && section.title ? (
+              <h3 className="font-condensed text-sm font-medium uppercase tracking-[0.14em] text-primary">
+                {section.title}
+              </h3>
+            ) : null}
+            {section.fields.map(({ name, field }) => {
+              const error =
+                buyerErrors[name] ??
+                (isTouched(name) && invalidFields.has(name) && field.required
+                  ? t("checkout.field_required", {
+                      defaultValue: "Este campo es obligatorio",
+                    })
+                  : undefined)
+              return (
+                <div key={name} onBlurCapture={() => markTouched(name)}>
+                  <AmanitaField
+                    name={name}
+                    field={field}
+                    value={buyerValues[name]}
+                    error={error}
+                    onChange={setBuyerField}
+                  />
+                </div>
+              )
+            })}
           </div>
-          <div className="grid gap-5 md:grid-cols-2">
-            <div onBlurCapture={() => markTouched("first_name")}>
-              <Field
-                id="ck-first-name"
-                label={t("form.first_name")}
-                autoComplete="given-name"
-                placeholder={t("form.first_name_placeholder")}
-                value={firstName}
-                onChange={(v) => setBuyerField("first_name", v)}
-                error={firstNameError}
-              />
-            </div>
-            <div onBlurCapture={() => markTouched("last_name")}>
-              <Field
-                id="ck-last-name"
-                label={t("form.last_name")}
-                autoComplete="family-name"
-                placeholder={t("form.last_name_placeholder")}
-                value={lastName}
-                onChange={(v) => setBuyerField("last_name", v)}
-                error={lastNameError}
-              />
-            </div>
-          </div>
-
-          {/* WhatsApp: country select as TEXT ("AR +54", no flag emojis) +
-              number. Country arrives preselected (navigator.language here,
-              geo IP in production EdgeOS). */}
-          <div onBlurCapture={() => markTouched("phone")}>
-            <label
-              htmlFor="ck-whatsapp"
-              className="font-condensed text-xs font-medium uppercase tracking-[0.16em] text-primary"
-            >
-              {t("checkout.amanita.whatsapp_label")}
-            </label>
-            <div className="mt-1.5 flex gap-2">
-              <select
-                aria-label={t("checkout.amanita.whatsapp_country_aria")}
-                autoComplete="tel-country-code"
-                value={phoneCountry}
-                onChange={(e) => setBuyerField("phone_country", e.target.value)}
-                className="shrink-0 rounded-xl border px-3 py-3 text-sm font-medium text-deep outline-none transition-shadow focus:ring-2 focus:ring-accent"
-                style={{
-                  backgroundColor: "#faf6ef",
-                  borderColor: "rgba(4,34,49,0.18)",
-                }}
-              >
-                {WA_COUNTRIES.map((c) => (
-                  <option key={c.code} value={c.code}>
-                    {c.code} +{c.dial}
-                  </option>
-                ))}
-              </select>
-              <input
-                id="ck-whatsapp"
-                type="tel"
-                inputMode="numeric"
-                autoComplete="tel-national"
-                placeholder={t("checkout.amanita.whatsapp_placeholder")}
-                value={phone}
-                onChange={(e) => setBuyerField("phone", e.target.value)}
-                aria-invalid={phoneError ? true : undefined}
-                className="w-full min-w-0 rounded-xl border px-4 py-3 text-deep outline-none transition-shadow focus:ring-2 focus:ring-accent"
-                style={FIELD_INPUT_STYLE(!!phoneError)}
-              />
-            </div>
-            {phoneError && (
-              <p
-                className="mt-1.5 text-xs font-semibold"
-                style={{ color: "#b3271e" }}
-              >
-                {phoneError}
-              </p>
-            )}
-          </div>
-        </div>
+        ))}
       </div>
     </SectionShell>
   )
