@@ -36,6 +36,7 @@
  */
 import Image from "next/image"
 import { Fragment, useState } from "react"
+import { useTranslation } from "react-i18next"
 import type { TicketingStepPublic } from "@/client"
 import {
   type TicketRowVM,
@@ -124,6 +125,7 @@ function VariantRow({
   onDec: () => void
   onAdd: () => void
 }) {
+  const { t } = useTranslation()
   const { product, quantity, disabled, usesStepper, maxQuantity, selected } =
     row
   const incDisabled = disabled || quantity >= maxQuantity
@@ -146,7 +148,9 @@ function VariantRow({
         quantity === 0 ? (
           <button
             type="button"
-            aria-label={`Agregar ${product.name}`}
+            aria-label={t("checkout.amanita.catalog_add_aria", {
+              product: product.name,
+            })}
             onClick={onInc}
             disabled={incDisabled}
             className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary text-xl leading-none text-cream transition-colors hover:bg-deep disabled:cursor-not-allowed disabled:opacity-40"
@@ -163,7 +167,9 @@ function VariantRow({
           >
             <button
               type="button"
-              aria-label={`Quitar uno de ${product.name}`}
+              aria-label={t("checkout.amanita.catalog_remove_one_aria", {
+                product: product.name,
+              })}
               onClick={onDec}
               disabled={disabled}
               className="flex h-8 w-8 items-center justify-center rounded-full text-lg leading-none text-primary transition-colors hover:bg-primary hover:text-cream disabled:cursor-not-allowed disabled:opacity-40"
@@ -175,7 +181,9 @@ function VariantRow({
             </span>
             <button
               type="button"
-              aria-label={`Agregar uno más de ${product.name}`}
+              aria-label={t("checkout.amanita.catalog_add_one_aria", {
+                product: product.name,
+              })}
               onClick={onInc}
               disabled={incDisabled}
               className="flex h-8 w-8 items-center justify-center rounded-full text-lg leading-none text-primary transition-colors hover:bg-primary hover:text-cream disabled:cursor-not-allowed disabled:opacity-40"
@@ -205,7 +213,9 @@ function VariantRow({
               : undefined
           }
         >
-          {selected ? "Agregado" : "Agregar"}
+          {selected
+            ? t("checkout.amanita.catalog_added")
+            : t("checkout.amanita.catalog_add")}
         </button>
       )}
     </div>
@@ -227,6 +237,7 @@ function ProductCard({
   onDecRow: (row: TicketRowVM) => void
   onAddRow: (row: TicketRowVM) => void
 }) {
+  const { t } = useTranslation()
   const [expanded, setExpanded] = useState(false)
   const primaryProduct = section.rows[0]?.product
   const image = section.image_url ?? primaryProduct?.image_url ?? null
@@ -274,7 +285,9 @@ function ProductCard({
               aria-expanded={expanded}
               className="mt-2 font-condensed text-xs font-medium uppercase tracking-[0.14em] text-primary underline underline-offset-4 transition-colors hover:text-accent"
             >
-              {expanded ? "Ver menos" : "Ver más"}
+              {expanded
+                ? t("checkout.amanita.catalog_show_less")
+                : t("checkout.amanita.catalog_show_more")}
             </button>
           </>
         )}

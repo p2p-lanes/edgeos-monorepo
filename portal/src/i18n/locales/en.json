@@ -339,7 +339,14 @@
       "faqs_kicker": "Frequently asked questions",
       "faqs_title": "FAQs",
       "faqs_intro": "What people ask most before getting their pass. Close and pick up right where you left off.",
-      "faqs_close_aria": "Close frequently asked questions"
+      "faqs_close_aria": "Close frequently asked questions",
+      "catalog_add": "Add",
+      "catalog_added": "Added",
+      "catalog_show_more": "Show more",
+      "catalog_show_less": "Show less",
+      "catalog_add_aria": "Add {{product}}",
+      "catalog_add_one_aria": "Add one more {{product}}",
+      "catalog_remove_one_aria": "Remove one {{product}}"
     }
   },
   "openCheckout": {

@@ -339,7 +339,14 @@
       "faqs_kicker": "Dudas frecuentes",
       "faqs_title": "FAQs",
       "faqs_intro": "Lo que más nos preguntan antes de sacar la entrada. Cerrá y seguís justo donde estabas.",
-      "faqs_close_aria": "Cerrar las preguntas frecuentes"
+      "faqs_close_aria": "Cerrar las preguntas frecuentes",
+      "catalog_add": "Agregar",
+      "catalog_added": "Agregado",
+      "catalog_show_more": "Ver más",
+      "catalog_show_less": "Ver menos",
+      "catalog_add_aria": "Agregar {{product}}",
+      "catalog_add_one_aria": "Agregar uno más de {{product}}",
+      "catalog_remove_one_aria": "Quitar uno de {{product}}"
     }
   },
   "openCheckout": {

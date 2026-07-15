@@ -35,6 +35,16 @@ vi.mock("@/providers/checkoutProvider", () => ({
   useCheckout: () => ({ getProductsForStep }),
 }))
 
+// Key-as-text, per the other skin tests — but the row controls are told apart
+// only by the product name interpolated into their label, so unlike those
+// tests this stub has to keep the interpolated values.
+vi.mock("react-i18next", () => ({
+  useTranslation: () => ({
+    t: (key: string, vars?: Record<string, unknown>) =>
+      vars ? `${key}:${Object.values(vars).join(",")}` : key,
+  }),
+}))
+
 vi.mock("@/hooks/checkout/useTicketsStep", async () => {
   const actual = await vi.importActual<
     typeof import("@/hooks/checkout/useTicketsStep")
@@ -134,7 +144,9 @@ describe("AmanitaCatalogSection", () => {
 
   it('clicking "+" on a row calls setRowQuantity with quantity + 1', () => {
     render(<AmanitaCatalogSection stepConfig={stepConfig} />)
-    const plusButton = screen.getByLabelText("Agregar Full Pass")
+    const plusButton = screen.getByLabelText(
+      "checkout.amanita.catalog_add_aria:Full Pass",
+    )
     fireEvent.click(plusButton)
     expect(setRowQuantity).toHaveBeenCalledWith("", product1, 1)
   })
@@ -142,7 +154,7 @@ describe("AmanitaCatalogSection", () => {
   it('disables the "+" control on a disabled row', () => {
     render(<AmanitaCatalogSection stepConfig={stepConfig} />)
     const plusButton = screen.getByLabelText(
-      "Agregar Day Pass",
+      "checkout.amanita.catalog_add_aria:Day Pass",
     ) as HTMLButtonElement
     expect(plusButton.disabled).toBe(true)
     fireEvent.click(plusButton)
