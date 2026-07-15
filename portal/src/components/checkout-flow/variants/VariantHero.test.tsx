@@ -126,5 +126,8 @@ describe("VariantHero", () => {
     )
     const source = await readFile(filePath, "utf8")
     expect(source).not.toContain("skins/")
+    expect(source).not.toMatch(/#c1aa88|#f1ebe3/i)
+    expect(source).not.toMatch(/rgba\(\s*193[,\s]/)
+    expect(source).not.toMatch(/rgba\(\s*241[,\s]/)
   })
 })

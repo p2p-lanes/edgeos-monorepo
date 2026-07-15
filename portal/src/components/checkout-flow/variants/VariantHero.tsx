@@ -195,8 +195,8 @@ export default function VariantHero({
         <span
           className="rounded-full border px-4 py-1.5 font-condensed text-xs font-medium uppercase tracking-[0.16em] text-sand md:text-sm"
           style={{
-            borderColor: "rgba(193,170,136,0.55)",
-            backgroundColor: "rgba(193,170,136,0.12)",
+            borderColor: "var(--hero-badge-border-color, currentColor)",
+            backgroundColor: "var(--hero-badge-bg-color, transparent)",
           }}
         >
           {config.date_badge}
@@ -209,7 +209,7 @@ export default function VariantHero({
             <li
               key={bullet}
               className="flex items-center gap-2.5 text-sm md:text-base"
-              style={{ color: "rgba(241,235,227,0.85)" }}
+              style={{ color: "var(--hero-text-color, inherit)" }}
             >
               {config.bullet_icon_url && (
                 <HeroBullet src={config.bullet_icon_url} />

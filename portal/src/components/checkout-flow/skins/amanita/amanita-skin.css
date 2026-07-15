@@ -34,6 +34,9 @@
 
   /* ornament tints consumed by generic templates (VariantHero's bullet) */
   --hero-bullet-color: var(--color-sand);
+  --hero-badge-border-color: rgba(193, 170, 136, 0.55);
+  --hero-badge-bg-color: rgba(193, 170, 136, 0.12);
+  --hero-text-color: rgba(241, 235, 227, 0.85);
 
   /* semantic tokens (light theme base) */
   --color-bg: var(--color-cream);
