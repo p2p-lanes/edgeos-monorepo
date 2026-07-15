@@ -754,6 +754,29 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             default_phone=obj.buyer.phone,
             default_phone_country=obj.buyer.phone_country,
         )
+        # `find_or_create`'s `default_*` args only apply when it INSERTS — it
+        # never touches an existing row. An email already in `humans` (an
+        # earlier purchase, an admin import, or simply a past login) is the
+        # common case here, so everything the buyer typed was being dropped;
+        # only `email` survived, because it is the lookup key rather than
+        # something the form ever wrote.
+        #
+        # Backfill blanks only — never overwrite. A populated field was set by
+        # someone who knows better than a checkout form (an admin, an import),
+        # and `test_create_open_ticketing_payment_does_not_overwrite_existing_human`
+        # pins that: a returning buyer's typed name must not clobber the human's
+        # curated one. That purchase-time name still reaches the Attendee row,
+        # which is where a per-purchase name belongs.
+        if not buyer.first_name and obj.buyer.first_name:
+            buyer.first_name = obj.buyer.first_name
+        if not buyer.last_name and obj.buyer.last_name:
+            buyer.last_name = obj.buyer.last_name
+        if not buyer.phone and obj.buyer.phone:
+            # Country travels with the number — pairing a fresh number with a
+            # stale country would be worse than storing neither.
+            buyer.phone = obj.buyer.phone
+            buyer.phone_country = obj.buyer.phone_country
+        session.add(buyer)
 
         self._validate_open_ticketing_form_data(popup, obj.buyer.form_data)
 
