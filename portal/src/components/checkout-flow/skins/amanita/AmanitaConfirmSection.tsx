@@ -42,6 +42,7 @@ import {
   Utensils,
   X,
 } from "lucide-react"
+import Image from "next/image"
 import { useState } from "react"
 import { useTranslation } from "react-i18next"
 import type { TicketingStepPublic } from "@/client"
@@ -222,7 +223,19 @@ export default function AmanitaConfirmSection({
          in its own words. */
       <SectionShell gem="bold" kicker={copy.kicker} title={copy.title}>
         <div className="flex flex-col items-center gap-4 py-10 text-center">
-          <ShoppingBag className="w-12 h-12 text-cream/60" aria-hidden="true" />
+          {/* The brand mark, not a shopping bag: this is the one spot on the
+              skin where a generic e-commerce glyph stood in for it. Same asset
+              and intrinsic size as the nav's "home" pill. `opacity-60` keeps
+              the muting the icon it replaces had, so the title stays the loud
+              thing here. */}
+          <Image
+            src="/checkout-skins/amanita/logo-hongo.webp"
+            alt=""
+            aria-hidden
+            width={647}
+            height={360}
+            className="h-12 w-auto opacity-60"
+          />
           <p className="font-display text-xl uppercase tracking-wide text-cream">
             {t("checkout.amanita.confirm_empty_title")}
           </p>
