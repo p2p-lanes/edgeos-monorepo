@@ -29,10 +29,12 @@
  *   read directly from the raw `template_config.sections[].category`
  *   (an optional field the typed `TemplateSection` shape doesn't declare)
  *   and correlated back to each section VM by `.key`.
- * - `TicketSectionVM.image_url`/`.description` are typed but never
- *   populated by the hook today, so the card image/description fall back
- *   to the first row's `product.image_url`/`product.description` — the
- *   field the brief explicitly named ("next/image for `product.image_url`").
+ * - The card's image/description are the SECTION's, never a product's. The
+ *   brief named `product.image_url`, but that mirrored a gap rather than the
+ *   design: the mockup's `ProductGroup` owns `image`/`description` and its
+ *   `Variant`s carry only label+price. `useTicketsStep` now passes both
+ *   fields through from `template_config.sections[]`, so a card with no
+ *   authored artwork simply renders without it.
  */
 import Image from "next/image"
 import { Fragment, useState } from "react"
@@ -239,9 +241,13 @@ function ProductCard({
 }) {
   const { t } = useTranslation()
   const [expanded, setExpanded] = useState(false)
-  const primaryProduct = section.rows[0]?.product
-  const image = section.image_url ?? primaryProduct?.image_url ?? null
-  const description = section.description ?? primaryProduct?.description ?? null
+  // Section-level only, with no product fallback: a card is one authored group
+  // (the mockup's `ProductGroup`), and the products it holds are just priced
+  // rows. A product's own image/description is deliberately ignored here —
+  // letting one leak through would caption the whole card with whichever
+  // product happened to sort first.
+  const image = section.image_url ?? null
+  const description = section.description ?? null
 
   return (
     <article

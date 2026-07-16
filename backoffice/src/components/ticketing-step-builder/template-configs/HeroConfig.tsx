@@ -37,12 +37,9 @@ import type { TemplateConfigProps } from "./types"
 // Every field is optional: the hero renders whatever is present.
 // ---------------------------------------------------------------------------
 
+// The bullet ornament is not editable here: it's part of the skin's brand
+// furniture, not step content (see portal amanita-skin.css `.ck-hero-bullet`).
 const IMAGE_FIELDS = [
-  {
-    key: "logo_url",
-    label: "Brand mark",
-    description: "Small logo above the wordmark. Optional.",
-  },
   {
     key: "date_logo_url",
     label: "Wordmark / date banner",
@@ -57,12 +54,6 @@ const IMAGE_FIELDS = [
     key: "divider_url",
     label: "Divider ornament",
     description: "Sits above the subtitle.",
-  },
-  {
-    key: "bullet_icon_url",
-    label: "Bullet ornament",
-    description:
-      "Recolored via CSS mask — use a single-color SVG. Tinted by the skin.",
   },
 ] as const
 

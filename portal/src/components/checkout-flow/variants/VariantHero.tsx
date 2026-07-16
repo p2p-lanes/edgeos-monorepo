@@ -18,16 +18,18 @@ import type { VariantProps } from "../registries/variantRegistry"
 // Schema (`template_config`), all fields optional — render only what's
 // present, never throw on an empty/undefined config:
 //   {
-//     "logo_url": "https://…",        // brand mark (top)
 //     "date_logo_url": "https://…",   // wordmark + date banner image
 //     "edition_url": "https://…",     // edition banner image (e.g. "3rd ed.")
 //     "headline": "string",           // main H1
 //     "subtitle": "string",           // italic tagline under the headline
 //     "date_badge": "string",         // pill text (e.g. extended dates)
 //     "bullets": ["string", …],       // bullet list
-//     "bullet_icon_url": "https://…", // bullet ornament (CSS mask, see below)
 //     "divider_url": "https://…"      // ornament above the subtitle
 //   }
+//
+// The bullet ornament is deliberately NOT in this schema: it's brand
+// furniture, not content, so the skin owns it via `.ck-hero-bullet` (see
+// amanita-skin.css) and the admin never has to re-upload the same star.
 //
 // `cta_label` / `cta_hint` also live in this template_config but are read by
 // StepperCheckoutFlow's intro bottom bar, not by this component.
@@ -37,14 +39,12 @@ import type { VariantProps } from "../registries/variantRegistry"
 // ---------------------------------------------------------------------------
 
 interface HeroConfig {
-  logo_url?: string
   date_logo_url?: string
   edition_url?: string
   headline?: string
   subtitle?: string
   date_badge?: string
   bullets?: string[]
-  bullet_icon_url?: string
   divider_url?: string
 }
 
@@ -94,29 +94,12 @@ function HeroDivider({ src, eager }: { src: string; eager: boolean }) {
   )
 }
 
-/** Bullet ornament. Stays a CSS-masked <span> rather than an <img> because
- *  ornament artwork is typically a single-color SVG that must be recolored to
- *  the skin's palette (the mockup's star.svg is petrol on a navy page). The
- *  tint comes from the skin via `--hero-bullet-color`; skins that don't set it
- *  fall back to the surrounding text color. */
-function HeroBullet({ src }: { src: string }) {
-  return (
-    <span
-      aria-hidden
-      className="inline-block h-3.5 w-3.5 shrink-0"
-      style={{
-        backgroundColor: "var(--hero-bullet-color, currentColor)",
-        WebkitMaskImage: `url(${src})`,
-        maskImage: `url(${src})`,
-        WebkitMaskRepeat: "no-repeat",
-        maskRepeat: "no-repeat",
-        WebkitMaskSize: "contain",
-        maskSize: "contain",
-        WebkitMaskPosition: "center",
-        maskPosition: "center",
-      }}
-    />
-  )
+/** Bullet ornament hook. Carries no artwork or size of its own: the skin
+ *  paints it through `.ck-hero-bullet` (Amanita masks its gold star.svg over
+ *  it). A skin that styles nothing leaves a 0×0 span, so the bullets simply
+ *  render unadorned instead of showing a stray box. */
+function HeroBullet() {
+  return <span aria-hidden className="ck-hero-bullet shrink-0" />
 }
 
 export default function VariantHero({
@@ -132,7 +115,6 @@ export default function VariantHero({
     : []
 
   const hasAnyContent =
-    config.logo_url ||
     config.date_logo_url ||
     config.edition_url ||
     config.headline ||
@@ -146,14 +128,6 @@ export default function VariantHero({
 
   return (
     <section className="ck-section flex min-h-[calc(100dvh-230px)] flex-col items-center justify-center gap-5 py-6 text-center">
-      {config.logo_url && (
-        <HeroImage
-          src={config.logo_url}
-          alt=""
-          className="w-[min(240px,60%)]"
-          eager={isFirstSection}
-        />
-      )}
       {config.date_logo_url && (
         <HeroImage
           src={config.date_logo_url}
@@ -211,9 +185,7 @@ export default function VariantHero({
               className="flex items-center gap-2.5 text-sm md:text-base"
               style={{ color: "var(--hero-text-color, inherit)" }}
             >
-              {config.bullet_icon_url && (
-                <HeroBullet src={config.bullet_icon_url} />
-              )}
+              <HeroBullet />
               {bullet}
             </li>
           ))}

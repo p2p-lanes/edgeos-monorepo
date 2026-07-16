@@ -581,7 +581,10 @@ export default function StepperCheckoutFlow({
 
       {/* one section at a time */}
       <main className={MAIN_CLASSES[skin]}>
-        {brandLogoUrl && (
+        {/* Amanita already carries its brand mark in the nav's "home" pill, and
+            its hero opens on the wordmark artwork — a second copy of the logo
+            above every step is not part of that skin. */}
+        {brandLogoUrl && !isAmanita && (
           <Image
             src={brandLogoUrl}
             alt={brandLabel ?? ""}

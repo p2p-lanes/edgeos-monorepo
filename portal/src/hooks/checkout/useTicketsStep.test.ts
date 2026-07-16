@@ -473,6 +473,64 @@ describe("S3-A: simple_quantity open-checkout VM (Slice 3)", () => {
     expect(sec?.rows[0].product.id).toBe("p-week")
   })
 
+  it("carries each section's authored image and description onto the VM", () => {
+    const pWeek = makeProduct("p-week", { duration_type: "week" })
+    const config = {
+      sections: [
+        {
+          key: "passes",
+          label: "Passes",
+          order: 1,
+          product_ids: ["p-week"],
+          attendee_categories: null,
+          image_url: "https://cdn.example.com/passes.png",
+          image_aspect: "16/9",
+          description: "Acceso a los 4 días",
+        },
+      ],
+    }
+
+    const { result } = renderHook(() =>
+      useTicketsStep({
+        stepType: "passes",
+        templateConfig: config,
+        products: [pWeek],
+      }),
+    )
+
+    const sec = result.current.sections.find((s) => s.key === "passes")
+    expect(sec?.image_url).toBe("https://cdn.example.com/passes.png")
+    expect(sec?.image_aspect).toBe("16/9")
+    expect(sec?.description).toBe("Acceso a los 4 días")
+  })
+
+  it("leaves image and description undefined when a section authors none", () => {
+    const pWeek = makeProduct("p-week", { duration_type: "week" })
+    const config = {
+      sections: [
+        {
+          key: "passes",
+          label: "Passes",
+          order: 1,
+          product_ids: ["p-week"],
+          attendee_categories: null,
+        },
+      ],
+    }
+
+    const { result } = renderHook(() =>
+      useTicketsStep({
+        stepType: "passes",
+        templateConfig: config,
+        products: [pWeek],
+      }),
+    )
+
+    const sec = result.current.sections.find((s) => s.key === "passes")
+    expect(sec?.image_url).toBeUndefined()
+    expect(sec?.description).toBeUndefined()
+  })
+
   it("view.attendees[0].id === '' (synthetic bucket)", () => {
     const pWeek = makeProduct("p-week", { duration_type: "week" })
     const config = {

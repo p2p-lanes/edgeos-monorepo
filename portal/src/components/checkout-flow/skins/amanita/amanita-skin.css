@@ -32,8 +32,7 @@
   --color-forest: #153b34;
   --color-violet: #736b93;
 
-  /* ornament tints consumed by generic templates (VariantHero's bullet) */
-  --hero-bullet-color: var(--color-sand);
+  /* tints consumed by generic templates (VariantHero) */
   --hero-badge-border-color: rgba(193, 170, 136, 0.55);
   --hero-badge-bg-color: rgba(193, 170, 136, 0.12);
   --hero-text-color: rgba(241, 235, 227, 0.85);
@@ -346,4 +345,18 @@
 .checkout-amanita .ck-gem-flourish {
   aspect-ratio: 1400 / 123;
   mask-image: url(/checkout-skins/amanita/sep-gem-flourish.webp);
+}
+
+/* Hero bullet ornament: same gold star as <GoldStar>, but reached from the
+   generic VariantHero, which can't import skin code. star.svg is petrol, so
+   it's masked and repainted sand rather than used as an <img>. */
+.checkout-amanita .ck-hero-bullet {
+  display: inline-block;
+  width: 0.875rem;
+  height: 0.875rem;
+  background-color: var(--color-sand);
+  mask-image: url(/checkout-skins/amanita/ornaments/star.svg);
+  mask-repeat: no-repeat;
+  mask-position: center;
+  mask-size: contain;
 }
