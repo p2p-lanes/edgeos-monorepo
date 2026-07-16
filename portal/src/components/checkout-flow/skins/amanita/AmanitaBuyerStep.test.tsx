@@ -71,6 +71,100 @@ describe("AmanitaBuyerStep — schema-driven rendering", () => {
     expect(screen.getByLabelText("Email")).toBeTruthy()
   })
 
+  describe("section heading", () => {
+    // The structural email/first_name/last_name carry no section_id, so
+    // getCheckoutSchemaSections parks them in a synthetic "_unsectioned_base"
+    // group titled with a hardcoded "Personal information". Rendering that
+    // alongside the organizer's own section printed the heading twice.
+    function twoSectionSchema() {
+      return {
+        base_fields: {
+          email: EMAIL_FIELD,
+          first_name: {
+            type: "text",
+            label: "Nombre",
+            required: true,
+            target: "human",
+            position: 1,
+          },
+          last_name: {
+            type: "text",
+            label: "Apellido",
+            required: true,
+            target: "human",
+            position: 2,
+          },
+        },
+        custom_fields: {
+          dietary: {
+            type: "text",
+            label: "Dietary",
+            required: false,
+            section_id: "sec-1",
+            position: 0,
+          },
+        },
+        sections: [{ id: "sec-1", label: "Personal Information", order: 0 }],
+      } as unknown as ApplicationFormSchema
+    }
+
+    it("prints the organizer's heading exactly once", () => {
+      buyerFormSchema = twoSectionSchema()
+      render(<AmanitaBuyerStep />)
+      expect(screen.getAllByText("Personal Information")).toHaveLength(1)
+    })
+
+    it("never prints the synthetic 'Personal information' group title", () => {
+      buyerFormSchema = twoSectionSchema()
+      render(<AmanitaBuyerStep />)
+      expect(screen.queryByText("Personal information")).toBeNull()
+    })
+
+    // "arriba de todo los campos" — the heading leads, every field follows it.
+    it("puts the heading above every field", () => {
+      buyerFormSchema = twoSectionSchema()
+      const { container } = render(<AmanitaBuyerStep />)
+      const heading = screen.getByText("Personal Information")
+      const email = screen.getByLabelText("Email")
+      expect(
+        heading.compareDocumentPosition(email) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy()
+      expect(container.querySelectorAll("h3")).toHaveLength(1)
+    })
+  })
+
+  it("lays first_name and last_name out on one row", () => {
+    buyerFormSchema = {
+      base_fields: {
+        email: EMAIL_FIELD,
+        first_name: {
+          type: "text",
+          label: "Nombre",
+          required: true,
+          target: "human",
+          position: 1,
+        },
+        last_name: {
+          type: "text",
+          label: "Apellido",
+          required: true,
+          target: "human",
+          position: 2,
+        },
+      },
+      custom_fields: {},
+      sections: [],
+    } as unknown as ApplicationFormSchema
+    render(<AmanitaBuyerStep />)
+
+    const row = screen.getByTestId("ck-name-row")
+    expect(row.contains(screen.getByLabelText("Nombre"))).toBe(true)
+    expect(row.contains(screen.getByLabelText("Apellido"))).toBe(true)
+    // Email keeps its own full-width row.
+    expect(row.contains(screen.getByLabelText("Email"))).toBe(false)
+  })
+
   // The whole point of the rewrite: an organizer adds a field in the form
   // builder and it shows up on the skin. Before, it never rendered — and if
   // required, the backend rejected the purchase with a 422 nobody could clear.

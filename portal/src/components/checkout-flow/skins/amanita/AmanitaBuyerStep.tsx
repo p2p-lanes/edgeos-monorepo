@@ -86,6 +86,32 @@ function dialFor(code: string): string {
   return WA_COUNTRIES.find((c) => c.code === code)?.dial ?? "54"
 }
 
+/** getCheckoutSchemaSections parks fields that carry no section_id — the
+ *  structural email/first_name/last_name — in this synthetic group and titles
+ *  it with a hardcoded "Personal information". That title is a portal
+ *  artifact, not the organizer's, and printing it next to their own section
+ *  showed the heading twice. Only real sections get to name themselves. */
+const SYNTHETIC_SECTION_ID = "_unsectioned_base"
+
+type FieldEntry = { name: string; field: FormFieldSchema }
+
+/** Group a section's fields into rows. first_name + last_name share one, the
+ *  way the mockup pairs them; everything else takes a full row. */
+function toRows(fields: FieldEntry[]): FieldEntry[][] {
+  const rows: FieldEntry[][] = []
+  for (let i = 0; i < fields.length; i++) {
+    const current = fields[i]
+    const next = fields[i + 1]
+    if (current.name === "first_name" && next?.name === "last_name") {
+      rows.push([current, next])
+      i++
+      continue
+    }
+    rows.push([current])
+  }
+  return rows
+}
+
 function FieldError({ message }: { message: string }) {
   return (
     <p className="mt-1.5 text-xs font-semibold" style={{ color: "#b3271e" }}>
@@ -294,6 +320,15 @@ export default function AmanitaBuyerStep() {
   // what blocks Pay can never disagree.
   const invalidFields = new Set(getBuyerInvalidFields())
 
+  // With a single organizer section — the normal open-ticketing shape — its
+  // heading leads the whole card, so the structural fields sitting in the
+  // synthetic group read as part of it instead of as an untitled orphan
+  // block. Several sections keep their headings in place, where they still
+  // tell the shopper what changed.
+  const realSections = sections.filter((s) => s.id !== SYNTHETIC_SECTION_ID)
+  const hoistedTitle =
+    realSections.length === 1 ? realSections[0].title : undefined
+
   return (
     <SectionShell
       gem="flourish"
@@ -324,32 +359,55 @@ export default function AmanitaBuyerStep() {
           </p>
         </div>
 
+        {hoistedTitle ? (
+          <h3 className="mt-6 font-condensed text-sm font-medium uppercase tracking-[0.14em] text-primary">
+            {hoistedTitle}
+          </h3>
+        ) : null}
+
         {sections.map((section) => (
           <div key={section.id} className="mt-6 flex flex-col gap-5">
-            {sections.length > 1 && section.title ? (
+            {!hoistedTitle &&
+            section.id !== SYNTHETIC_SECTION_ID &&
+            section.title ? (
               <h3 className="font-condensed text-sm font-medium uppercase tracking-[0.14em] text-primary">
                 {section.title}
               </h3>
             ) : null}
-            {section.fields.map(({ name, field }) => {
-              const error =
-                buyerErrors[name] ??
-                (isTouched(name) && invalidFields.has(name) && field.required
-                  ? t("checkout.field_required", {
-                      defaultValue: "Este campo es obligatorio",
-                    })
-                  : undefined)
-              return (
-                <div key={name} onBlurCapture={() => markTouched(name)}>
-                  <AmanitaField
-                    name={name}
-                    field={field}
-                    value={buyerValues[name]}
-                    error={error}
-                    onChange={setBuyerField}
-                  />
-                </div>
-              )
+            {toRows(section.fields).map((row) => {
+              const renderField = ({ name, field }: FieldEntry) => {
+                const error =
+                  buyerErrors[name] ??
+                  (isTouched(name) && invalidFields.has(name) && field.required
+                    ? t("checkout.field_required", {
+                        defaultValue: "Este campo es obligatorio",
+                      })
+                    : undefined)
+                return (
+                  <div key={name} onBlurCapture={() => markTouched(name)}>
+                    <AmanitaField
+                      name={name}
+                      field={field}
+                      value={buyerValues[name]}
+                      error={error}
+                      onChange={setBuyerField}
+                    />
+                  </div>
+                )
+              }
+
+              if (row.length === 2) {
+                return (
+                  <div
+                    key={row[0].name}
+                    data-testid="ck-name-row"
+                    className="grid gap-5 md:grid-cols-2"
+                  >
+                    {row.map(renderField)}
+                  </div>
+                )
+              }
+              return renderField(row[0])
             })}
           </div>
         ))}
