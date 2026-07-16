@@ -94,6 +94,31 @@ describe("AmanitaBuyerStep — schema-driven rendering", () => {
     expect(setBuyerField).toHaveBeenCalledWith("custom_dietary", "vegan")
   })
 
+  // A `number` field rendered as `type="text"` looks fine and is wrong: no
+  // numeric keypad on mobile, no browser validation.
+  it.each([
+    ["number", "number"],
+    ["date", "date"],
+    ["url", "url"],
+    ["text", "text"],
+  ])("renders a %s field as input[type=%s]", (schemaType, domType) => {
+    buyerFormSchema = schema(
+      { email: EMAIL_FIELD },
+      {
+        thing: {
+          type: schemaType,
+          label: "Thing",
+          required: false,
+          position: 0,
+        },
+      },
+    )
+    render(<AmanitaBuyerStep />)
+    expect((screen.getByLabelText("Thing") as HTMLInputElement).type).toBe(
+      domType,
+    )
+  })
+
   it("renders a select field's options from the schema", () => {
     buyerFormSchema = schema(
       { email: EMAIL_FIELD },

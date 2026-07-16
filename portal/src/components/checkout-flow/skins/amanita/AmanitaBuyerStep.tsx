@@ -232,7 +232,18 @@ function AmanitaField({
       </label>
       <input
         id={id}
-        type={field.type === "email" ? "email" : "text"}
+        type={
+          field.type === "email"
+            ? "email"
+            : field.type === "number"
+              ? "number"
+              : field.type === "date"
+                ? "date"
+                : field.type === "url"
+                  ? "url"
+                  : "text"
+        }
+        inputMode={field.type === "number" ? "numeric" : undefined}
         autoComplete={
           name === "email"
             ? "email"
@@ -277,7 +288,7 @@ export default function AmanitaBuyerStep() {
     localTouched.has(name) || forcedBuyerFieldsTouched.has(name)
 
   const sections = buyerFormSchema
-    ? getCheckoutSchemaSections(buyerFormSchema)
+    ? getCheckoutSchemaSections(buyerFormSchema, { includeAllSections: true })
     : []
   // Same Zod-derived set the funnel gates on, so what the step paints red and
   // what blocks Pay can never disagree.
