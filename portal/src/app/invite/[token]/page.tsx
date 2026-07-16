@@ -1,7 +1,7 @@
 "use client"
 
 import { useQuery } from "@tanstack/react-query"
-import { useParams } from "next/navigation"
+import { useParams, useRouter } from "next/navigation"
 import { useEffect } from "react"
 import { useTranslation } from "react-i18next"
 import { PopupCheckoutContent } from "@/app/checkout/components/PopupCheckoutContent"
@@ -32,6 +32,7 @@ const LoadingFallback = () => (
  */
 export default function InviteCheckoutPage() {
   const { t } = useTranslation()
+  const router = useRouter()
   const { token } = useParams<{ token: string }>()
   const { getPopups, popupsLoaded, setCityPreselected } = useCityProvider()
   const { setDiscount, discountApplied } = useDiscount()
@@ -88,7 +89,17 @@ export default function InviteCheckoutPage() {
     setDiscount,
   ])
 
-  if (isLoading || !popupsLoaded) {
+  // A redeemer who re-opens the link is recognized by the auth-aware preview:
+  // send them to their portal checkout instead of the now-consumed invite page.
+  useEffect(() => {
+    if (!preview?.already_redeemed) return
+    const redeemedPopup = getPopups().find((p) => p.id === preview.popup_id)
+    if (redeemedPopup?.slug) {
+      router.replace(`/portal/${redeemedPopup.slug}`)
+    }
+  }, [preview?.already_redeemed, preview?.popup_id, getPopups, router])
+
+  if (isLoading || !popupsLoaded || preview?.already_redeemed) {
     return <LoadingFallback />
   }
 

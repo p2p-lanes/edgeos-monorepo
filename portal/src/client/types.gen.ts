@@ -2467,6 +2467,7 @@ export type InvitePublicPreview = {
     max_uses?: (number | null);
     current_uses: number;
     expires_at?: (string | null);
+    already_redeemed?: boolean;
 };
 
 /**

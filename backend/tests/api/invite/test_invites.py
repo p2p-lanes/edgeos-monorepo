@@ -500,6 +500,50 @@ class TestInvitePreview:
         resp = client.get(f"/api/v1/invites/redeem/{tok}")
         assert resp.status_code == 410, resp.json()
 
+    def test_preview_redeemer_gets_already_redeemed_not_410(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+        admin_user_tenant_a: Users,
+    ) -> None:
+        """A human who already redeemed re-opens the exhausted link.
+
+        The exhausted guard (410) is skipped for the redeemer; they get
+        already_redeemed=True so the portal redirects them to their checkout.
+        A different human and an anonymous caller still get 410.
+        """
+        popup = _make_popup(db, tenant_a)
+        tok = f"reenter-{uuid.uuid4().hex[:12]}"
+        _make_invite(db, popup, admin_user_tenant_a, token=tok, max_uses=1)
+        redeemer = _make_human(db, tenant_a)
+
+        # Redeem once → application created, invite now exhausted (max_uses=1).
+        redeem = client.post(
+            f"/api/v1/invites/redeem/{tok}",
+            json={"popup_id": str(popup.id)},
+            headers=_auth(_human_token(redeemer)),
+        )
+        assert redeem.status_code in (200, 201), redeem.json()
+
+        # Redeemer re-opens the link → recognized, redirected (no 410).
+        as_redeemer = client.get(
+            f"/api/v1/invites/redeem/{tok}", headers=_auth(_human_token(redeemer))
+        )
+        assert as_redeemer.status_code == 200, as_redeemer.json()
+        assert as_redeemer.json()["already_redeemed"] is True
+
+        # Anonymous caller on the exhausted link → still 410.
+        anon = client.get(f"/api/v1/invites/redeem/{tok}")
+        assert anon.status_code == 410, anon.json()
+
+        # A different human without an application → still 410.
+        other = _make_human(db, tenant_a)
+        as_other = client.get(
+            f"/api/v1/invites/redeem/{tok}", headers=_auth(_human_token(other))
+        )
+        assert as_other.status_code == 410, as_other.json()
+
 
 # ---------------------------------------------------------------------------
 # Portal redemption — POST /invites/redeem/{token}

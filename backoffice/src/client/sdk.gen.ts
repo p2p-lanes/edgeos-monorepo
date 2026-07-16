@@ -6081,10 +6081,13 @@ export class HumansService {
 export class InvitesService {
     /**
      * Preview invite (unauthenticated)
-     * Unauthenticated preview — returns inviter_name and is_email_restricted.
+     * Preview an invite. Open to anonymous callers, but auth-aware.
      *
      * Spec: REQ-GR-005.
-     * Guard order checked here for preview: expired → 410, exhausted → 410.
+     * Guard order for a fresh caller: ended popup → 410, expired → 410,
+     * exhausted → 410. A caller who already has an application for this popup
+     * skips those guards and gets ``already_redeemed=True`` so the portal
+     * redirects them to their checkout instead of re-redeeming the link.
      * recipient_email is NEVER returned.
      * @param data The data for the request.
      * @param data.token

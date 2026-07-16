@@ -11506,6 +11506,11 @@ export const InvitePublicPreviewSchema = {
                 }
             ],
             title: 'Expires At'
+        },
+        already_redeemed: {
+            type: 'boolean',
+            title: 'Already Redeemed',
+            default: false
         }
     },
     type: 'object',

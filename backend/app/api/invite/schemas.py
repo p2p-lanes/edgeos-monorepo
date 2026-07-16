@@ -122,6 +122,9 @@ class InvitePublicPreview(BaseModel):
     max_uses: int | None = None
     current_uses: int
     expires_at: datetime | None = None
+    # True when the requesting human already has an application for this popup:
+    # the portal redirects them to their checkout instead of re-redeeming.
+    already_redeemed: bool = False
 
     model_config = ConfigDict(from_attributes=True)
 

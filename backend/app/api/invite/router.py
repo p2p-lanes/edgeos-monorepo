@@ -25,6 +25,7 @@ from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, 
 from app.core.dependencies.users import (
     CurrentAdmin,
     CurrentHuman,
+    OptionalHuman,
     SessionDep,
 )
 
@@ -42,12 +43,18 @@ router = APIRouter(prefix="/invites", tags=["invites"])
     summary="Preview invite (unauthenticated)",
 )
 async def preview_invite(
-    token: str, db: SessionDep, response: Response
+    token: str,
+    db: SessionDep,
+    response: Response,
+    current_human: OptionalHuman,
 ) -> InvitePublicPreview:
-    """Unauthenticated preview — returns inviter_name and is_email_restricted.
+    """Preview an invite. Open to anonymous callers, but auth-aware.
 
     Spec: REQ-GR-005.
-    Guard order checked here for preview: expired → 410, exhausted → 410.
+    Guard order for a fresh caller: ended popup → 410, expired → 410,
+    exhausted → 410. A caller who already has an application for this popup
+    skips those guards and gets ``already_redeemed=True`` so the portal
+    redirects them to their checkout instead of re-redeeming the link.
     recipient_email is NEVER returned.
     """
     # Never cache the preview — it reflects mutable invite state (max_uses,
@@ -62,12 +69,27 @@ async def preview_invite(
             headers={"Cache-Control": "no-store"},
         )
 
-    # Ended popup → link no longer valid (410), then expired/exhausted → 410
-    from app.api.popup.crud import popups_crud
-    from app.api.popup.guards import ensure_popup_link_active
+    # A caller who already has an application for this popup has already entered
+    # (uq_application_human_popup makes it one per popup): redirect them to the
+    # portal instead of failing the link guards below.
+    already_redeemed = False
+    if current_human is not None:
+        from app.api.application.crud import applications_crud
 
-    ensure_popup_link_active(popups_crud.get(db, invite.popup_id))
-    invites_crud.validate_for_redemption(invite)
+        already_redeemed = (
+            applications_crud.get_by_human_popup(
+                db, current_human.id, invite.popup_id
+            )
+            is not None
+        )
+
+    if not already_redeemed:
+        # Ended popup → link no longer valid (410), then expired/exhausted → 410
+        from app.api.popup.crud import popups_crud
+        from app.api.popup.guards import ensure_popup_link_active
+
+        ensure_popup_link_active(popups_crud.get(db, invite.popup_id))
+        invites_crud.validate_for_redemption(invite)
 
     # Resolve inviter_name from the created_by user (explicit fetch — avoid lazy load)
     from sqlmodel import select as _select
@@ -89,6 +111,7 @@ async def preview_invite(
         max_uses=invite.max_uses,
         current_uses=invite.current_uses,
         expires_at=invite.expires_at,
+        already_redeemed=already_redeemed,
     )
 
 
