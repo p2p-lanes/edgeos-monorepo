@@ -12,6 +12,7 @@
  */
 import { fireEvent, render, screen } from "@testing-library/react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
+import type { TicketingStepPublic } from "@/client"
 import type { ApplicationFormSchema } from "@/types/form-schema"
 import AmanitaBuyerStep from "./AmanitaBuyerStep"
 
@@ -380,6 +381,62 @@ describe("AmanitaBuyerStep — schema-driven rendering", () => {
       invalidFields = ["email"]
       render(<AmanitaBuyerStep />)
       expect(screen.queryByText("checkout.field_required")).toBeNull()
+    })
+  })
+
+  // The stepper hides its generic SectionHeader on this skin, so the step
+  // config's copy reaches the shopper through this section's shell or not at
+  // all. It used to hardcode the skin's strings: an organizer renamed the step
+  // in the backoffice and nothing on screen moved.
+  describe("step heading", () => {
+    const CONFIG = {
+      id: "s1",
+      step_type: "buyer",
+      title: "Tus Datos",
+      description: "Necesitamos saber a quién le emitimos las entradas.",
+      watermark: "Paso 2",
+      template_config: null,
+    } as unknown as TicketingStepPublic
+
+    it("takes title, description and watermark from the step config", () => {
+      render(<AmanitaBuyerStep stepConfig={CONFIG} />)
+      expect(screen.getByText("Tus Datos")).toBeTruthy()
+      expect(
+        screen.getByText(
+          "Necesitamos saber a quién le emitimos las entradas.",
+        ),
+      ).toBeTruthy()
+      expect(screen.getByText("Paso 2")).toBeTruthy()
+    })
+
+    it("prefers a template_config kicker over the watermark", () => {
+      render(
+        <AmanitaBuyerStep
+          stepConfig={
+            { ...CONFIG, template_config: { kicker: "Casi listo" } } as never
+          }
+        />,
+      )
+      expect(screen.getByText("Casi listo")).toBeTruthy()
+      expect(screen.queryByText("Paso 2")).toBeNull()
+    })
+
+    // An organizer who cleared the description wants no intro — not the
+    // skin's opinion of one.
+    it("shows no intro when the configured step has no description", () => {
+      render(
+        <AmanitaBuyerStep
+          stepConfig={{ ...CONFIG, description: null } as never}
+        />,
+      )
+      expect(screen.queryByText("checkout.amanita.buyer_intro")).toBeNull()
+    })
+
+    it("falls back to the skin's copy when no step is configured", () => {
+      render(<AmanitaBuyerStep />)
+      expect(screen.getByText("checkout.amanita.buyer_title")).toBeTruthy()
+      expect(screen.getByText("checkout.amanita.buyer_kicker")).toBeTruthy()
+      expect(screen.getByText("checkout.amanita.buyer_intro")).toBeTruthy()
     })
   })
 

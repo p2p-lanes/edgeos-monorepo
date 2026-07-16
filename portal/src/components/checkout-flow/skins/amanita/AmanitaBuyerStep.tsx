@@ -19,9 +19,10 @@
 import { type CSSProperties, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { getCheckoutSchemaSections } from "@/app/checkout/types"
+import type { TicketingStepPublic } from "@/client"
 import { useCheckout } from "@/providers/checkoutProvider"
 import type { FormFieldSchema } from "@/types/form-schema"
-import { SectionShell } from "./SectionShell"
+import { SectionShell, shellCopy } from "./SectionShell"
 
 /** Curated WhatsApp country list. Rendered as TEXT ("AR +54") — no flag
  *  emojis (they don't render on Chrome/Windows, a known repo gotcha). */
@@ -303,7 +304,14 @@ function AmanitaField({
   )
 }
 
-export default function AmanitaBuyerStep() {
+export default function AmanitaBuyerStep({
+  stepConfig,
+}: {
+  /** The organizer's buyer step, when one is configured — it names this
+   *  section. Optional: a popup with no buyer step row still collects the
+   *  schema's fields, so the skin's own copy stands in. */
+  stepConfig?: TicketingStepPublic | null
+}) {
   const { t } = useTranslation()
   const {
     buyerValues,
@@ -341,12 +349,18 @@ export default function AmanitaBuyerStep() {
   const hoistedTitle =
     realSections.length === 1 ? realSections[0].title : undefined
 
+  const copy = shellCopy(stepConfig, {
+    kicker: t("checkout.amanita.buyer_kicker"),
+    title: t("checkout.amanita.buyer_title"),
+    intro: t("checkout.amanita.buyer_intro"),
+  })
+
   return (
     <SectionShell
       gem="flourish"
-      kicker={t("checkout.amanita.buyer_kicker")}
-      title={t("checkout.amanita.buyer_title")}
-      intro={t("checkout.amanita.buyer_intro")}
+      kicker={copy.kicker}
+      title={copy.title}
+      intro={copy.intro}
     >
       <div
         className="rounded-2xl bg-cream p-6 text-left md:p-8"

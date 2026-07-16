@@ -419,7 +419,14 @@ export default function StepperCheckoutFlow({
     const { stepType, config } = section
     const isFirstSection = active === 0
     if (stepType === "buyer")
-      return isAmanita ? <AmanitaBuyerStep /> : <OpenCheckoutBuyerStep />
+      return isAmanita ? (
+        /* `contentOwnsHeader` suppresses the generic SectionHeader on this
+           skin, so the step's configured title/description/watermark only
+           reach the screen if its own shell is given the config. */
+        <AmanitaBuyerStep stepConfig={config} />
+      ) : (
+        <OpenCheckoutBuyerStep />
+      )
     if (stepType === "confirm")
       return isAmanita ? (
         /* The card's CTA is a second trigger for the same payment as the
@@ -428,6 +435,7 @@ export default function StepperCheckoutFlow({
            `!isSubmitting`, which is what stops a double charge once one of
            the two has been pressed. Two buttons, one source of truth. */
         <AmanitaConfirmSection
+          stepConfig={config}
           onGoToTickets={goToFirstProductSection}
           onPay={handlePayment}
           payDisabled={!canPay}
