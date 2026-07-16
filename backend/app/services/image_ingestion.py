@@ -527,6 +527,7 @@ class ImageIngestionService:
           ``image-gallery``            → ``config["images"]`` via ``ingest_urls``
           ``rich-text``                → ``config["html"]`` via ``ingest_html``
           ``ticket-select``/``ticket-card`` → each ``section["image_url"]``
+          ``hero``                     → flat ``*_url`` artwork/ornament fields
           other / unknown              → config returned unchanged (safe no-op)
 
         Returns ``None`` when *config* is ``None``.
@@ -554,6 +555,23 @@ class ImageIngestionService:
                 new_img_url = await self.ingest_url(img_url, tenant_id)
                 new_sections.append({**section, "image_url": new_img_url})
             return {**config, "sections": new_sections}
+
+        # Hero (checkout "home" step) — brand artwork and ornaments, each a
+        # flat top-level URL field (see portal VariantHero / backoffice
+        # HeroConfig). Missing/empty fields are left alone.
+        if template == "hero":
+            new_config = {**config}
+            for key in (
+                "logo_url",
+                "date_logo_url",
+                "edition_url",
+                "bullet_icon_url",
+                "divider_url",
+            ):
+                url = config.get(key)
+                if url:
+                    new_config[key] = await self.ingest_url(url, tenant_id)
+            return new_config
 
         # Unknown template type — return unchanged (fail-safe).
         return config

@@ -1232,3 +1232,71 @@ def test_purchase_one_shot_when_installments_deadline_too_close(
     assert payment is not None
     assert payment.is_installment_plan is False
     assert payment.installments_paid is None
+
+
+def test_purchase_backfills_blank_fields_on_a_preexisting_human(
+    client: TestClient,
+    db: Session,
+    tenant_a: Tenants,
+) -> None:
+    """A buyer whose Human row already exists gets their blanks filled in.
+
+    The row can predate the purchase for many reasons — an earlier checkout, an
+    admin import, or simply having logged in once. `humans_crud.find_or_create`
+    returns such a row untouched, which silently discarded everything the buyer
+    typed. Only `email` survived, because it is the lookup key rather than
+    something the form ever wrote.
+
+    Backfill only — populated fields are left alone. See
+    `test_create_open_ticketing_payment_does_not_overwrite_existing_human`,
+    which pins the other half: a curated name must survive a returning buyer.
+    """
+    from app.api.human.models import Humans
+
+    popup = _make_popup(db, tenant_a, slug_prefix="returning-buyer")
+    product = _make_product(db, popup, price="100.00")
+    # `db` and `tenant_a` are session-scoped (tests/conftest.py:59,128) — every
+    # test shares one tenant and nothing rolls back, so a hardcoded address
+    # collides with any other test using it under uq_human_email_tenant_id.
+    # Randomize, the way _make_popup/_make_product randomize their slugs.
+    email = f"returning-{uuid.uuid4().hex[:8]}@test.com"
+    # Mirrors the real dev-DB row this was found on: seeded/logged-in human,
+    # email only, every profile field still blank.
+    existing = Humans(
+        id=uuid.uuid4(),
+        email=email,
+        tenant_id=tenant_a.id,
+    )
+    db.add(existing)
+    db.commit()
+    existing_id = existing.id
+
+    with patch("app.services.simplefi.get_simplefi_client") as mock_get_client:
+        mock_get_client.return_value.create_payment.return_value = SimpleNamespace(
+            id="sf_returning_2",
+            status="pending",
+            checkout_url="https://simplefi.test/checkout/returning-buyer",
+            is_installment_plan=False,
+        )
+        response = client.post(
+            f"/api/v1/checkout/{popup.slug}/purchase",
+            json={
+                "products": [{"product_id": str(product.id), "quantity": 1}],
+                "buyer": {
+                    "email": email,
+                    "first_name": "Ana",
+                    "last_name": "Diaz",
+                    "form_data": {},
+                },
+            },
+            headers={"X-Tenant-Id": str(tenant_a.id)},
+        )
+
+    assert response.status_code == 200, response.text
+    db.expire_all()
+    human = db.get(Humans, existing_id)
+    assert human is not None
+    # No second row: the purchase must reuse the existing human, not fork one.
+    assert len(db.exec(select(Humans).where(Humans.email == email)).all()) == 1
+    assert human.first_name == "Ana"
+    assert human.last_name == "Diaz"

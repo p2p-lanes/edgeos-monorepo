@@ -100,9 +100,45 @@ class TestExtractTranslatableLeaves:
             "items.0.answer": "Escribinos",
         }
 
+    def test_hero_copy_is_fully_extracted(self):
+        # Every text leaf a hero step renders, mirroring a real home config.
+        # The CTA pair and the headline are the step's loudest copy, so
+        # missing one leaves an organizer staring at source-language text on
+        # an otherwise translated checkout with no field to fix it in.
+        config = {
+            "headline": "4 días de música, arte, yoga y talleres",
+            "subtitle": "Una celebración de amor, apertura y conexión",
+            "date_badge": "Experiencia Extendida — 17, 18 y 19 de noviembre",
+            "cta_label": "Ver Entradas →",
+            "cta_hint": "Elegí tu entrada para comenzar",
+            "bullets": ["+200 artistas y facilitadores", "+10 escenarios"],
+            "logo_url": "https://cdn.example/logo.webp",
+            "variant": "presentation",
+        }
+        assert extract_translatable_leaves(config) == {
+            "headline": "4 días de música, arte, yoga y talleres",
+            "subtitle": "Una celebración de amor, apertura y conexión",
+            "date_badge": "Experiencia Extendida — 17, 18 y 19 de noviembre",
+            "cta_label": "Ver Entradas →",
+            "cta_hint": "Elegí tu entrada para comenzar",
+            "bullets.0": "+200 artistas y facilitadores",
+            "bullets.1": "+10 escenarios",
+        }
+
     def test_ignores_non_text_and_blank_values(self):
         config = {"presets": [10, 20], "label": "  ", "minimum": 5}
         assert extract_translatable_leaves(config) == {}
+
+    def test_machine_keys_are_never_extracted(self):
+        # `key` and `id` pair a translated leaf back to its source row, and
+        # `variant`/`*_url` drive rendering. Translating any of them would
+        # corrupt the config rather than localize it.
+        config = {
+            "variant": "presentation",
+            "logo_url": "https://cdn.example/a.webp",
+            "items": [{"id": "174d6487", "key": "passes", "question": "¿Vale?"}],
+        }
+        assert extract_translatable_leaves(config) == {"items.0.question": "¿Vale?"}
 
     def test_non_dict_input_is_safe(self):
         assert extract_translatable_leaves(None) == {}

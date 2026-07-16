@@ -1,0 +1,349 @@
+/*
+ * AMANITA SKIN — scoped design tokens + utilities
+ * ─────────────────────────────────────────────────────────────────
+ * Mechanical port of the Amanita mockup's design tokens
+ * (checkout-amanita/codigo/estilos/design-tokens.css) and the
+ * `.ck-*` rules inline in CheckoutExperience.tsx's <style> block.
+ *
+ * HARD RULE: every selector in this file MUST live under
+ * `.checkout-amanita` — never touch `:root`, `html`, `body`, or the
+ * global `@theme` in globals.css. This is the Amanita skin's private
+ * namespace; other skins/tenants must be unaffected.
+ *
+ * All `/brand/...` asset paths from the mockup are rewritten to
+ * `/checkout-skins/amanita/...` (see portal/public/checkout-skins/amanita).
+ */
+
+/* ── 1 · Brand tokens + base (was :root + body in the mockup) ─────── */
+/* Scoped to the wrapper itself: palette vars, semantic tokens (the
+   ones `.section-dark` inverts) and the base body-ish styling, all
+   contained to the `.checkout-amanita` subtree. */
+.checkout-amanita {
+  /* brand palette */
+  --color-cream: #f1ebe3;
+  --color-primary: #004a5a;
+  --color-deep: #042231;
+  --color-deep-2: #0d3042;
+  --color-night: #010f16;
+  --color-accent: #0a9b9b;
+  --color-accent-2: #3295a4;
+  --color-mint: #b0d5ce;
+  --color-sand: #c1aa88;
+  --color-forest: #153b34;
+  --color-violet: #736b93;
+
+  /* ornament tints consumed by generic templates (VariantHero's bullet) */
+  --hero-bullet-color: var(--color-sand);
+  --hero-badge-border-color: rgba(193, 170, 136, 0.55);
+  --hero-badge-bg-color: rgba(193, 170, 136, 0.12);
+  --hero-text-color: rgba(241, 235, 227, 0.85);
+
+  /* semantic tokens (light theme base) */
+  --color-bg: var(--color-cream);
+  --color-surface: #faf6ef;
+  --color-surface-2: #e7dfd2;
+  --color-text: var(--color-deep);
+  --color-text-muted: #4a6670;
+  --color-line: rgba(4, 34, 49, 0.16);
+
+  --radius-lg: 0.75rem;
+  --radius-xl: 1.25rem;
+  --radius-2xl: 2rem;
+
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  font-family: var(--font-amanita-sans), system-ui, sans-serif;
+}
+
+/* Amarante has a single weight (400): display headings don't get a
+   synthetic bold — emphasis comes from size/uppercase instead. */
+.checkout-amanita h1,
+.checkout-amanita h2 {
+  font-weight: 400;
+}
+
+.checkout-amanita ::selection {
+  background: var(--color-accent);
+  color: var(--color-cream);
+}
+
+/* ── 2 · .section-dark ──────────────────────────────────────────── */
+/* Dark (navy) section: inverts the semantic tokens. The checkout's
+   root wrapper is .section-dark with a transparent background (the
+   fixed background layer paints the forest photo + gradient). */
+.checkout-amanita.section-dark,
+.checkout-amanita .section-dark {
+  --color-bg: var(--color-deep);
+  --color-surface: rgba(241, 235, 227, 0.06);
+  --color-surface-2: rgba(241, 235, 227, 0.12);
+  --color-text: var(--color-cream);
+  --color-text-muted: #a8bfc4;
+  --color-line: rgba(241, 235, 227, 0.18);
+  background-color: var(--color-deep);
+  color: var(--color-cream);
+}
+
+/* ── 3 · .dark-stars ────────────────────────────────────────────── */
+/* Brand star texture over dark backgrounds (pseudo-element to avoid
+   blocking LCP). Asset rewritten to /checkout-skins/amanita/... */
+.checkout-amanita .dark-stars {
+  position: relative;
+}
+.checkout-amanita .dark-stars::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: url("/checkout-skins/amanita/ornaments/bg-stars.webp") repeat;
+  background-size: 480px;
+  opacity: 0.1;
+  pointer-events: none;
+}
+
+/* ── 4 · .no-scrollbar ──────────────────────────────────────────── */
+/* Hides the native scrollbar — used by the scrollable pills nav on
+   mobile. */
+.checkout-amanita .no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.checkout-amanita .no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* ── 5 · Ornamental buttons ─────────────────────────────────────── */
+/* The frame art (webp with a transparent interior) is stretched
+   100%/100% over its own rounded navy background — gems that
+   overhang the radius sit over the section's background. The
+   `!important`s override shadcn Button variant backgrounds without
+   touching its markup. `.btn-ornate-2` = the bottom-bar CTA (with
+   `.btn-gold-fill`) and the empty state's "Ver tickets". `.btn-ornate`
+   is currently unused — the live reference moved the CTA off it.
+   Assets rewritten to /checkout-skins/amanita/... */
+.checkout-amanita .btn-ornate,
+.checkout-amanita .btn-ornate-2 {
+  background-color: rgba(7, 19, 34, 0.92) !important;
+  background-size: 100% 100% !important;
+  background-repeat: no-repeat !important;
+  border-radius: 12px !important;
+  color: #f1ebe3 !important;
+}
+.checkout-amanita .btn-ornate {
+  background-image: url("/checkout-skins/amanita/btn-primary.webp") !important;
+}
+.checkout-amanita .btn-ornate-2 {
+  background-image: url("/checkout-skins/amanita/btn-secondary-1.webp") !important;
+}
+
+/* `.btn-gold-fill` turns an ornate button into a flat gold plate (the frame
+   art stays as background-image but is overpainted by the fill). `.ck-gold`
+   drops the diffuse glow and keeps a crisp 1px ring — both ported from the
+   live reference, which iterated past the `codigo/` snapshot this skin was
+   built from. The live comment for ck-gold reads: "Ronda 3b (Agus): sin el
+   glow difuso del btn-gold-fill de la home -- queda solo el ring nitido de
+   1px (el blur exterior lo hacia ver borroso sobre la barra oscura)."
+   The `!important`s match the rules they override above. */
+.checkout-amanita .btn-ornate.btn-gold-fill,
+.checkout-amanita .btn-ornate-2.btn-gold-fill {
+  background-color: #bfa67f !important;
+  color: #0a1a24 !important;
+  text-shadow: none !important;
+}
+.checkout-amanita .btn-ornate.btn-gold-fill:hover,
+.checkout-amanita .btn-ornate-2.btn-gold-fill:hover {
+  background-color: #cdb48c !important;
+}
+
+/* Also the focus ring: the reference does this with `focus-visible:ring-*`
+   utilities that can't resolve in this repo's Tailwind theme, so it's
+   expressed here instead. */
+.checkout-amanita .ck-gold,
+.checkout-amanita .ck-gold:hover {
+  box-shadow: 0 0 0 1px rgba(84, 62, 26, 0.22) !important;
+}
+.checkout-amanita .ck-gold:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 1px rgba(84, 62, 26, 0.22),
+    0 0 0 2px var(--color-deep),
+    0 0 0 4px var(--color-accent) !important;
+}
+
+/* ── 6 · Twinkling stars animation ──────────────────────────────── */
+/* Used by the shared Stars component via inline `animation`.
+   Keyframe name is prefixed (amanita-) so it can't collide with/leak
+   into other skins' global keyframe namespace — @keyframes names are
+   always registered globally in CSS, nesting them under a selector
+   does not scope them, so a unique name is the only real guard here. */
+@keyframes amanita-amTwinkle {
+  0%,
+  100% {
+    opacity: 0.25;
+  }
+  50% {
+    opacity: 0.9;
+  }
+}
+
+/* ── 7 · prefers-reduced-motion ─────────────────────────────────── */
+/* Amanita design-system rule: all motion is frozen (amanita-amTwinkle
+   and the .ck-* inline animations below). Scoped to descendants of
+   .checkout-amanita only — not a global `*` selector — to avoid
+   affecting motion elsewhere in the app. */
+@media (prefers-reduced-motion: reduce) {
+  .checkout-amanita *,
+  .checkout-amanita *::before,
+  .checkout-amanita *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ── 8 · Tailwind color utilities ───────────────────────────────── */
+/* The mockup markup (sections.tsx / CheckoutExperience.tsx) uses
+   Tailwind utility color names (text-sand, bg-cream, ...) that map to
+   the brand tokens via `theme.extend` in the mockup's own
+   tailwind.config. This repo is Tailwind v4 and doesn't define those
+   names, so they're defined here as plain scoped CSS utilities
+   instead — exact set actually used across the mockup source. */
+.checkout-amanita .bg-cream {
+  background-color: var(--color-cream);
+}
+.checkout-amanita .bg-deep {
+  background-color: var(--color-deep);
+}
+.checkout-amanita .bg-primary {
+  background-color: var(--color-primary);
+}
+.checkout-amanita .bg-sand {
+  background-color: var(--color-sand);
+}
+.checkout-amanita .border-mint {
+  border-color: var(--color-mint);
+}
+.checkout-amanita .text-accent {
+  color: var(--color-accent);
+}
+.checkout-amanita .text-cream {
+  color: var(--color-cream);
+}
+.checkout-amanita .text-deep {
+  color: var(--color-deep);
+}
+.checkout-amanita .text-mint {
+  color: var(--color-mint);
+}
+.checkout-amanita .text-primary {
+  color: var(--color-primary);
+}
+.checkout-amanita .text-sand {
+  color: var(--color-sand);
+}
+
+/* `hover:` variants of the above — Tailwind never generates these
+   because mint/cream/sand aren't real Tailwind theme colors in this
+   repo (see the bare utilities above), so the escaped-colon selector
+   form has to be hand-authored too. Only the combinations actually
+   used in StepperCheckoutFlow.tsx's Amanita branches (inactive pills,
+   Back button) are defined here. */
+.checkout-amanita .hover\:border-mint:hover {
+  border-color: var(--color-mint);
+}
+.checkout-amanita .hover\:text-mint:hover {
+  color: var(--color-mint);
+}
+.checkout-amanita .hover\:text-cream:hover {
+  color: var(--color-cream);
+}
+
+/* ── 9 · Font-family utilities (bound to fonts.ts CSS vars) ────────── */
+.checkout-amanita .font-display {
+  font-family: var(--font-amanita-display), serif;
+}
+.checkout-amanita .font-condensed {
+  font-family:
+    var(--font-amanita-condensed), var(--font-amanita-sans), sans-serif;
+}
+.checkout-amanita .font-sans {
+  font-family: var(--font-amanita-sans), system-ui, sans-serif;
+}
+
+/* ── 10 · `.ck-*` rules (ported from CheckoutExperience.tsx's inline
+   <style> block) ────────────────────────────────────────────────── */
+/* Soft entrance for each section (prefers-reduced-motion freezes it
+   via rule 7 above) + gem separators via CSS mask: the
+   sep-gem-*.webp files are RGB with a black background, the mask
+   runs in LUMINANCE mode (black -> transparent guaranteed, the gem
+   is painted with the div's cream background — a "png effect"). If
+   the browser doesn't support mask-mode, no gem beats a solid plate. */
+@keyframes amanita-ckSectionIn {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.checkout-amanita .ck-section {
+  animation: amanita-ckSectionIn 0.45s ease both;
+}
+
+@keyframes amanita-ckFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.checkout-amanita .ck-drawer-backdrop {
+  animation: amanita-ckFadeIn 0.25s ease both;
+}
+
+@keyframes amanita-ckDrawerIn {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.checkout-amanita .ck-drawer-panel {
+  animation: amanita-ckDrawerIn 0.32s ease both;
+}
+
+.checkout-amanita .ck-gem {
+  display: none;
+}
+@supports (mask-mode: luminance) {
+  .checkout-amanita .ck-gem {
+    display: block;
+    mask-repeat: no-repeat;
+    mask-position: center;
+    mask-size: contain;
+    mask-mode: luminance;
+  }
+}
+.checkout-amanita .ck-gem-bold {
+  aspect-ratio: 1400 / 169;
+  mask-image: url(/checkout-skins/amanita/sep-gem-bold.webp);
+}
+.checkout-amanita .ck-gem-mid {
+  aspect-ratio: 1400 / 122;
+  mask-image: url(/checkout-skins/amanita/sep-gem-mid.webp);
+}
+.checkout-amanita .ck-gem-thin {
+  aspect-ratio: 1400 / 169;
+  mask-image: url(/checkout-skins/amanita/sep-gem-thin.webp);
+}
+.checkout-amanita .ck-gem-flourish {
+  aspect-ratio: 1400 / 123;
+  mask-image: url(/checkout-skins/amanita/sep-gem-flourish.webp);
+}
