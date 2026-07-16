@@ -232,9 +232,9 @@ export default function AmanitaConfirmSection({
             src="/checkout-skins/amanita/logo-hongo.webp"
             alt=""
             aria-hidden
-            width={647}
-            height={360}
-            className="h-12 w-auto opacity-60"
+            width={115}
+            height={30}
+            className="opacity-60"
           />
           <p className="font-display text-xl uppercase tracking-wide text-cream">
             {t("checkout.amanita.confirm_empty_title")}
