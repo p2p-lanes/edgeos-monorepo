@@ -1,5 +1,6 @@
 // ──────────────────────────────────────────────────────────────────────────
-// TrialOnboarding — replaces the dashboard for free-trial tenants.
+// TrialOnboarding — the Onboarding section (default landing for free-trial
+// tenants; the dashboard stays available as its own section).
 //
 // A guided checklist of everything a new organizer should set up, in order.
 // Each step's completion is detected from real data (cheap `limit: 1` list
@@ -41,6 +42,14 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
 import useAuth from "@/hooks/useAuth"
 import { cn } from "@/lib/utils"
+
+/**
+ * localStorage key marking the onboarding as skipped for this browser.
+ * Per-tenant so a superadmin hopping between workspaces doesn't dismiss it
+ * globally. Shared by the `/` redirect and the `/onboarding` route.
+ */
+export const onboardingDismissedKey = (tenantId: string) =>
+  `trial_onboarding_dismissed_${tenantId}`
 
 interface OnboardingStep {
   key: string

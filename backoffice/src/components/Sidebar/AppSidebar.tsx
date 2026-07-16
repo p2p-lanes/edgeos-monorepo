@@ -17,6 +17,7 @@ import {
   MapPin,
   Package,
   Palette,
+  Rocket,
   Settings,
   ShoppingCart,
   Sparkles,
@@ -42,6 +43,7 @@ import {
 } from "@/components/ui/sidebar"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
 import useAuth from "@/hooks/useAuth"
+import { useCurrentTenant } from "@/hooks/useCurrentTenant"
 import { type Item, Main } from "./Main"
 import { User as UserComponent } from "./User"
 import { WorkspaceSelector } from "./WorkspaceSelector"
@@ -59,8 +61,14 @@ function getAdminItems(tenantId: string | null | undefined): Item[] {
   return items
 }
 
-// Core navigation items for all users
+// Core navigation items for all users. Trial tenants also get the Onboarding
+// section (their default landing — see the redirect in routes/_layout/index).
 const coreItems: Item[] = [{ icon: Home, title: "Dashboard", path: "/" }]
+const onboardingItem: Item = {
+  icon: Rocket,
+  title: "Onboarding",
+  path: "/onboarding",
+}
 
 const popupItems: Item[] = [
   { icon: Calendar, title: "Gatherings", path: "/popups" },
@@ -110,6 +118,7 @@ export function AppSidebar() {
     isSuperadmin,
   } = useAuth()
   const { isContextReady, selectedPopupId } = useWorkspace()
+  const { data: tenant } = useCurrentTenant()
 
   const { data: pendingReviews } = useQuery({
     queryKey: ["pending-reviews-count", selectedPopupId],
@@ -191,7 +200,9 @@ export function AppSidebar() {
         <Separator className="mx-2 group-data-[collapsible=icon]:hidden" />
 
         {/* Core navigation */}
-        <Main items={coreItems} />
+        <Main
+          items={tenant?.is_trial ? [onboardingItem, ...coreItems] : coreItems}
+        />
 
         {/* Popup management section */}
         <SidebarGroup>

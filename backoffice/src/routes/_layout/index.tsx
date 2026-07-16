@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query"
-import { createFileRoute, Link } from "@tanstack/react-router"
+import { createFileRoute, Link, Navigate } from "@tanstack/react-router"
 import { AlertTriangle, ArrowRight, Clock, ListChecks } from "lucide-react"
-import { useCallback, useEffect, useState } from "react"
+import { useEffect, useState } from "react"
 
 import {
   type ApplicationPublic,
@@ -19,7 +19,7 @@ import {
   KeyMetricsCards,
   RevenueBreakdownCharts,
 } from "@/components/Dashboard"
-import { TrialOnboarding } from "@/components/Dashboard/TrialOnboarding"
+import { onboardingDismissedKey } from "@/components/Dashboard/TrialOnboarding"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
@@ -33,27 +33,12 @@ export const Route = createFileRoute("/_layout/")({
   }),
 })
 
-// Free-trial tenants land on the onboarding checklist instead of the
-// dashboard (which is empty until they configure their gathering anyway).
-// "Skip for now" hides it for this browser; the flag is per-tenant so a
-// superadmin hopping between workspaces doesn't dismiss it globally.
+// Free-trial tenants land on the Onboarding section instead of the dashboard
+// (which is empty until they configure their gathering anyway). "Skip for
+// now" over there marks it dismissed for this browser, after which `/` is the
+// dashboard again — Onboarding stays reachable from the sidebar.
 function HomePage() {
   const { data: tenant, isLoading: tenantLoading } = useCurrentTenant()
-
-  // Synchronous localStorage read (cheap) so a previously-dismissed
-  // onboarding never flashes before an effect can hide it.
-  const [justSkipped, setJustSkipped] = useState(false)
-  const dismissed =
-    justSkipped ||
-    (!!tenant?.id &&
-      localStorage.getItem(`trial_onboarding_dismissed_${tenant.id}`) === "1")
-
-  const handleSkip = useCallback(() => {
-    if (tenant?.id) {
-      localStorage.setItem(`trial_onboarding_dismissed_${tenant.id}`, "1")
-    }
-    setJustSkipped(true)
-  }, [tenant?.id])
 
   // Avoid flashing the dashboard while we don't know the trial status yet.
   if (tenantLoading) {
@@ -65,8 +50,12 @@ function HomePage() {
     )
   }
 
+  const dismissed =
+    !!tenant?.id &&
+    localStorage.getItem(onboardingDismissedKey(tenant.id)) === "1"
+
   if (tenant?.is_trial && !dismissed) {
-    return <TrialOnboarding tenant={tenant} onSkip={handleSkip} />
+    return <Navigate to="/onboarding" replace />
   }
 
   return <Dashboard />
