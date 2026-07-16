@@ -15,6 +15,7 @@
  */
 import { act, fireEvent, render, screen } from "@testing-library/react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
+import type { TicketingStepPublic } from "@/client"
 import { createInitialCartState } from "@/types/checkout"
 import AmanitaConfirmSection from "./AmanitaConfirmSection"
 
@@ -242,6 +243,39 @@ describe("AmanitaConfirmSection", () => {
   it("keeps the service fee out of the item list when the popup charges none", () => {
     render(<AmanitaConfirmSection />)
     expect(screen.queryByText("checkout.contribution.fallbackLabel")).toBeNull()
+  })
+
+  // Same contract as the buyer step: with the stepper's generic
+  // SectionHeader suppressed on this skin, ignoring the config is what makes
+  // an organizer's rename invisible.
+  describe("step heading", () => {
+    const CONFIG = {
+      id: "s2",
+      step_type: "confirm",
+      title: "Revisá tu compra",
+      description: "Un último vistazo antes de pagar.",
+      watermark: "Paso 3",
+      template_config: null,
+    } as unknown as TicketingStepPublic
+
+    it("takes title, description and watermark from the step config", () => {
+      render(<AmanitaConfirmSection stepConfig={CONFIG} />)
+      expect(screen.getByText("Revisá tu compra")).toBeTruthy()
+      expect(screen.getByText("Un último vistazo antes de pagar.")).toBeTruthy()
+      expect(screen.getByText("Paso 3")).toBeTruthy()
+    })
+
+    it("keeps the configured title on the empty-cart state", () => {
+      cart = createInitialCartState()
+      render(<AmanitaConfirmSection stepConfig={CONFIG} />)
+      expect(screen.getByText("Revisá tu compra")).toBeTruthy()
+    })
+
+    it("falls back to the skin's copy when no step is configured", () => {
+      render(<AmanitaConfirmSection />)
+      expect(screen.getByText("checkout.amanita.confirm_title")).toBeTruthy()
+      expect(screen.getByText("checkout.amanita.confirm_kicker")).toBeTruthy()
+    })
   })
 
   it("does NOT render a second pay/confirm button — the bottom bar owns payment", () => {

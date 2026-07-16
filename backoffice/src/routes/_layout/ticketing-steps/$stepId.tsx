@@ -370,7 +370,8 @@ function StepConfigContent({ stepId }: { stepId: string }) {
               </div>
 
               {!CONTENT_ONLY_TEMPLATES.has(template) &&
-                step.step_type !== "confirm" && (
+                step.step_type !== "confirm" &&
+                step.step_type !== "buyer" && (
                   <div className="flex flex-col gap-1.5">
                     <Label htmlFor="step-product-category">
                       Product Category
@@ -578,8 +579,11 @@ function StepConfigContent({ stepId }: { stepId: string }) {
               </Alert>
             ))}
 
-          {/* Template Selection & Configuration (hidden for confirm step) */}
-          {step.step_type !== "confirm" && (
+          {/* Template Selection & Configuration (hidden for the steps whose
+              template is not a choice: confirm, and buyer — the checkout
+              renders both by step_type, so swapping their template would only
+              produce a step that no longer draws itself.) */}
+          {step.step_type !== "confirm" && step.step_type !== "buyer" && (
             <>
               <Card>
                 <CardHeader>

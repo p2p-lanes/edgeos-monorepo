@@ -283,56 +283,12 @@ export function CheckoutProvider({
       }),
     enabled: !configuredStepsOverride && !!cityId && isAuthenticated,
   })
+  // The funnel is exactly what the organizer configured. The buyer step used
+  // to be synthesized here when a popup carried no `buyer` row, which made it
+  // impossible to leave out: it reappeared in checkout no matter what the step
+  // config said. It is a real step now, added from the backoffice like any
+  // other — a popup without one collects no buyer info.
   const configuredSteps = configuredStepsOverride ?? stepsData?.results ?? []
-  const effectiveConfiguredSteps = useMemo(() => {
-    if (!buyerFormSchema || submitMode !== "open-ticketing") {
-      return configuredSteps
-    }
-
-    // Post-migration, every direct-sale popup carries a real `buyer` row whose
-    // position the admin controls from the backoffice — use it as-is.
-    if (configuredSteps.some((step) => step.step_type === "buyer")) {
-      return configuredSteps
-    }
-
-    // Legacy fallback: popup hasn't been migrated yet. Synthesize a buyer
-    // step and slot it just before confirm so checkout still works.
-    const confirmStep = configuredSteps.find(
-      (step) => step.step_type === "confirm",
-    )
-
-    const buyerStep: TicketingStepPublic = {
-      id: "buyer-step",
-      tenant_id: cityId ?? "",
-      popup_id: cityId ?? "",
-      step_type: "buyer",
-      title: t("checkout.buyer_step_title"),
-      description: t("checkout.buyer_step_description"),
-      order: 9998,
-      is_enabled: true,
-      protected: true,
-      product_category: null,
-      template: null,
-      template_config: null,
-      watermark: null,
-      show_title: confirmStep?.show_title ?? true,
-      show_watermark: confirmStep?.show_watermark ?? true,
-    }
-
-    const confirmIndex = configuredSteps.findIndex(
-      (step) => step.step_type === "confirm",
-    )
-
-    if (confirmIndex === -1) {
-      return [...configuredSteps, buyerStep]
-    }
-
-    return [
-      ...configuredSteps.slice(0, confirmIndex),
-      buyerStep,
-      ...configuredSteps.slice(confirmIndex),
-    ]
-  }, [buyerFormSchema, cityId, configuredSteps, submitMode, t])
 
   const isBuyerInfoComplete =
     !buyerFormSchema ||
@@ -368,7 +324,7 @@ export function CheckoutProvider({
   // Each step's product list is derived from step.product_category at runtime,
   // not from a hardcoded "merch"/"housing"/"patreon" filter on the full list.
   const { productsByStepId, getProductsForStep } = useStepProductResolver(
-    effectiveConfiguredSteps,
+    configuredSteps,
     products,
   )
 
@@ -778,7 +734,7 @@ export function CheckoutProvider({
     isStepComplete: isStepCompleteFn,
   } = useCheckoutSteps({
     initialStep,
-    configuredSteps: effectiveConfiguredSteps,
+    configuredSteps: configuredSteps,
     productsByStepId,
     selectedPassesCount: selectedPasses.length,
     dynamicItemsCount: Object.values(dynamicItems).flat().length,
@@ -1113,7 +1069,7 @@ export function CheckoutProvider({
         ) {
           return false
         }
-        const config = effectiveConfiguredSteps.find(
+        const config = configuredSteps.find(
           (c) =>
             c.step_type === stepName ||
             (c.step_type === "tickets" && stepName === "passes"),
@@ -1131,7 +1087,7 @@ export function CheckoutProvider({
       }
       return productSteps[0]
     },
-    [availableSteps, effectiveConfiguredSteps],
+    [availableSteps, configuredSteps],
   )
 
   // hasAnyCartItems: mirrors CartFooter's old `canContinue` cart check,
@@ -1368,7 +1324,7 @@ export function CheckoutProvider({
   const value: CheckoutContextValue = {
     currentStep,
     availableSteps,
-    stepConfigs: effectiveConfiguredSteps,
+    stepConfigs: configuredSteps,
     cart,
     summary,
     allProducts: products,

@@ -42,12 +42,13 @@ import {
 } from "lucide-react"
 import { useState } from "react"
 import { useTranslation } from "react-i18next"
+import type { TicketingStepPublic } from "@/client"
 import { useApplication } from "@/providers/applicationProvider"
 import { useCheckout } from "@/providers/checkoutProvider"
 import { useCityProvider } from "@/providers/cityProvider"
 import { formatCheckoutDate, formatCurrency } from "@/types/checkout"
 import { CornerFrame } from "./Ornaments"
-import { SectionShell } from "./SectionShell"
+import { SectionShell, shellCopy } from "./SectionShell"
 
 const CREAM_CARD_STYLE = {
   border: "1px solid rgba(193,170,136,0.4)",
@@ -82,12 +83,17 @@ export default function AmanitaConfirmSection({
   onGoToTickets,
   onPay,
   payDisabled,
+  stepConfig,
 }: {
   onGoToTickets?: () => void
   /** The stepper's own payment handler — see the header note on why this is
    *  passed in rather than pulled from `useCheckout()` here. */
   onPay?: () => void
   payDisabled?: boolean
+  /** The organizer's confirm step, when one is configured — it names this
+   *  section. Optional: the funnel shows a confirm step whether or not a row
+   *  exists for it, and then the skin's own copy stands in. */
+  stepConfig?: TicketingStepPublic | null
 }) {
   const { t } = useTranslation()
   const {
@@ -186,13 +192,18 @@ export default function AmanitaConfirmSection({
   const showEligibleQualifier = summary.discount > 0 && nonDiscountableTotal > 0
   const notEligibleCaption = t("checkout.discount.not_eligible_caption")
 
+  const copy = shellCopy(stepConfig, {
+    kicker: t("checkout.amanita.confirm_kicker"),
+    title: t("checkout.amanita.confirm_title"),
+    intro: t("checkout.amanita.confirm_intro"),
+  })
+
   if (!hasCartItems) {
     return (
-      <SectionShell
-        gem="bold"
-        kicker={t("checkout.amanita.confirm_kicker")}
-        title={t("checkout.amanita.confirm_title")}
-      >
+      /* No intro here even when one is configured: it describes reviewing an
+         order, and there is nothing to review yet — the empty state says so
+         in its own words. */
+      <SectionShell gem="bold" kicker={copy.kicker} title={copy.title}>
         <div className="flex flex-col items-center gap-4 py-10 text-center">
           <ShoppingBag className="w-12 h-12 text-cream/60" aria-hidden="true" />
           <p className="font-display text-xl uppercase tracking-wide text-cream">
@@ -219,9 +230,9 @@ export default function AmanitaConfirmSection({
   return (
     <SectionShell
       gem="bold"
-      kicker={t("checkout.amanita.confirm_kicker")}
-      title={t("checkout.amanita.confirm_title")}
-      intro={t("checkout.amanita.confirm_intro")}
+      kicker={copy.kicker}
+      title={copy.title}
+      intro={copy.intro}
     >
       {buyerGeneralError ? (
         <div
