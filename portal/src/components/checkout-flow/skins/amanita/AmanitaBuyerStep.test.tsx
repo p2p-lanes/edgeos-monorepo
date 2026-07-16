@@ -71,6 +71,71 @@ describe("AmanitaBuyerStep — schema-driven rendering", () => {
     expect(screen.getByLabelText("Email")).toBeTruthy()
   })
 
+  describe("structural field placeholders", () => {
+    const NAME_FIELDS = {
+      first_name: {
+        type: "text",
+        label: "Nombre",
+        required: true,
+        target: "human",
+        position: 1,
+      },
+      last_name: {
+        type: "text",
+        label: "Apellido",
+        required: true,
+        target: "human",
+        position: 2,
+      },
+    }
+
+    it("suggests example text in email, first name and last name", () => {
+      buyerFormSchema = schema({ email: EMAIL_FIELD, ...NAME_FIELDS })
+      render(<AmanitaBuyerStep />)
+
+      expect(
+        (screen.getByLabelText("Email") as HTMLInputElement).placeholder,
+      ).toBe("checkout.amanita.buyer_placeholder_email")
+      expect(
+        (screen.getByLabelText("Nombre") as HTMLInputElement).placeholder,
+      ).toBe("checkout.amanita.buyer_placeholder_first_name")
+      expect(
+        (screen.getByLabelText("Apellido") as HTMLInputElement).placeholder,
+      ).toBe("checkout.amanita.buyer_placeholder_last_name")
+    })
+
+    it("never overrides a placeholder the organizer authored", () => {
+      buyerFormSchema = schema({
+        email: { ...EMAIL_FIELD, placeholder: "socio@club.com" },
+      })
+      render(<AmanitaBuyerStep />)
+
+      expect(
+        (screen.getByLabelText("Email") as HTMLInputElement).placeholder,
+      ).toBe("socio@club.com")
+    })
+
+    it("leaves a field the skin knows nothing about without one", () => {
+      buyerFormSchema = schema(
+        {},
+        {
+          instagram: {
+            type: "text",
+            label: "Instagram",
+            required: false,
+            target: "human",
+            position: 0,
+          },
+        },
+      )
+      render(<AmanitaBuyerStep />)
+
+      expect(
+        (screen.getByLabelText("Instagram") as HTMLInputElement).placeholder,
+      ).toBe("")
+    })
+  })
+
   describe("section heading", () => {
     // The structural email/first_name/last_name carry no section_id, so
     // getCheckoutSchemaSections parks them in a synthetic "_unsectioned_base"

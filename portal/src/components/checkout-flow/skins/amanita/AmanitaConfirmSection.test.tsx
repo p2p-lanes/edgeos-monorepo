@@ -185,6 +185,61 @@ describe("AmanitaConfirmSection", () => {
     expect(onGoToTickets).toHaveBeenCalled()
   })
 
+  it("always shows Subtotal, even with nothing discounted", () => {
+    render(<AmanitaConfirmSection />)
+    expect(screen.getByText("checkout.amanita.confirm_subtotal_label")).toBeTruthy()
+    expect(screen.getByText("checkout.amanita.confirm_total_label")).toBeTruthy()
+  })
+
+  it("lays the summary out as items → coupon → subtotal → fee → total", () => {
+    popup = { ...popup, contribution_label: "Service fee" }
+    summary = { ...summary, contributionSubtotal: 10, grandTotal: 110 }
+
+    const { container } = render(<AmanitaConfirmSection />)
+    const text = container.textContent ?? ""
+
+    const order = [
+      "General Pass",
+      "checkout.amanita.confirm_coupon_label",
+      "checkout.amanita.confirm_subtotal_label",
+      "Service fee",
+      "checkout.amanita.confirm_total_label",
+    ].map((needle) => text.indexOf(needle))
+
+    for (const index of order) expect(index).toBeGreaterThan(-1)
+    const sorted = [...order].sort((a, b) => a - b)
+    expect(order).toEqual(sorted)
+  })
+
+  it("runs the order lines flat — no group heading over the tickets", () => {
+    cart = {
+      ...cart,
+      passes: [],
+      dynamicItems: {
+        tickets: [
+          {
+            productId: "d1",
+            product: { id: "d1", name: "Full Pass", discountable: true },
+            quantity: 1,
+            price: 100,
+            stepType: "tickets",
+          },
+        ],
+      },
+    }
+    const { container } = render(<AmanitaConfirmSection />)
+
+    expect(screen.getByText("Full Pass")).toBeTruthy()
+    expect(screen.queryByText("checkout.step_short.passes")).toBeNull()
+    // The order card carries its own title and nothing else above the lines.
+    expect(container.querySelectorAll("svg").length).toBe(0)
+  })
+
+  it("keeps the service fee out of the item list when the popup charges none", () => {
+    render(<AmanitaConfirmSection />)
+    expect(screen.queryByText("checkout.contribution.fallbackLabel")).toBeNull()
+  })
+
   it("does NOT render a second pay/confirm button — the bottom bar owns payment", () => {
     render(<AmanitaConfirmSection />)
     const buttons = screen.getAllByRole("button").map((b) => b.textContent)

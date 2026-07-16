@@ -67,6 +67,15 @@ function asString(value: unknown): string {
   return typeof value === "string" ? value : ""
 }
 
+/** Example text the mockup shows in the three structural fields. A skin may
+ *  suggest how to fill a field it knows by name, but never overrides copy the
+ *  organizer authored — a configured `placeholder` always wins. */
+const PLACEHOLDER_KEY_BY_FIELD: Record<string, string> = {
+  email: "checkout.amanita.buyer_placeholder_email",
+  first_name: "checkout.amanita.buyer_placeholder_first_name",
+  last_name: "checkout.amanita.buyer_placeholder_last_name",
+}
+
 /** Split an E.164 number into a supported country + national digits.
  *  Longest-dial-first so "+598…" reads as UY, not US ("+1") by prefix luck. */
 function splitE164(value: string): { country: string; national: string } {
@@ -139,6 +148,9 @@ function AmanitaField({
   const id = `ck-${name}`
   const label = field.label
   const hasError = !!error
+  const placeholderKey = PLACEHOLDER_KEY_BY_FIELD[name]
+  const placeholder =
+    field.placeholder ?? (placeholderKey ? t(placeholderKey) : undefined)
 
   if (field.type === "phone") {
     const { country, national } = splitE164(asString(value))
@@ -172,7 +184,7 @@ function AmanitaField({
             type="tel"
             inputMode="numeric"
             autoComplete="tel-national"
-            placeholder={field.placeholder ?? undefined}
+            placeholder={placeholder}
             value={national}
             onChange={(e) =>
               onChange(name, `+${dialFor(country)}${e.target.value}`)
@@ -279,7 +291,7 @@ function AmanitaField({
                 ? "family-name"
                 : undefined
         }
-        placeholder={field.placeholder ?? undefined}
+        placeholder={placeholder}
         value={asString(value)}
         onChange={(e) => onChange(name, e.target.value)}
         aria-invalid={hasError || undefined}
