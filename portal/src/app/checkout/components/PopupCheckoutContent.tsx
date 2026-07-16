@@ -215,14 +215,22 @@ export const PopupCheckoutContent = ({
       return
     }
 
-    // Existing applicant clicking a group invite link whose application isn't
-    // accepted yet: persist the group membership so the backend auto-accepts it
-    // before checkout, otherwise the payment step 403s ("Application must be
-    // accepted before purchasing products"). Only attempt it for statuses the
-    // backend allows updating (draft/pending_fee/in review); rejected/withdrawn
-    // fall through unchanged and stay gated at payment.
-    const joinableStatuses = ["draft", "pending_fee", "in review"]
-    if (groupId && joinableStatuses.includes(existingApplication.status)) {
+    // Existing applicant clicking a group link: persist the group membership on
+    // their current application. This both auto-accepts an in-progress
+    // application (otherwise payment 403s "Application must be accepted before
+    // purchasing products") AND links the group so its discount is applied
+    // server-side — without the link the group discount only ever shows
+    // client-side and the payment is charged the full amount.
+    // Include "accepted" so an application auto-accepted by a prior invite still
+    // picks up the group discount. Limited to statuses the backend allows
+    // updating (draft/pending_fee/in review/accepted); rejected/withdrawn fall
+    // through and stay gated at payment. Skip when already on this group.
+    const joinableStatuses = ["draft", "pending_fee", "in review", "accepted"]
+    if (
+      groupId &&
+      existingApplication.group_id !== groupId &&
+      joinableStatuses.includes(existingApplication.status)
+    ) {
       joinGroupAsApplicant()
       return
     }
