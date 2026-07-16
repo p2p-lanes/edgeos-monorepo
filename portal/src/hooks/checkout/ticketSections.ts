@@ -25,6 +25,12 @@ export interface TemplateSection {
   product_ids: string[]
   attendee_categories?: string[] | null
   visible_if?: SectionVisibilityCondition | null
+  /** Presentation authored per section in the backoffice (see backoffice
+   *  SortableSectionCard's `ProductSection`). These describe the section as a
+   *  whole — the products it groups only supply name and price. */
+  image_url?: string
+  image_aspect?: string
+  description?: string
 }
 
 // ---------------------------------------------------------------------------
