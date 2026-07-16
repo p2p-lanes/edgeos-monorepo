@@ -62,6 +62,14 @@ export function AddStepDialog({
     enabled: !!popupId && open,
   })
 
+  // A template may pin the step_type (see TemplateDefinition.stepType). The
+  // title-derived type still tracks the input underneath, so clearing the
+  // template hands the step back to the normal naming rule.
+  const pinnedStepType = TEMPLATE_DEFINITIONS.find(
+    (def) => def.key === template,
+  )?.stepType
+  const effectiveStepType = pinnedStepType ?? stepType
+
   const handleTitleChange = (value: string) => {
     setTitle(value)
     setStepType(
@@ -83,11 +91,16 @@ export function AddStepDialog({
       await TicketingStepsService.createTicketingStep({
         requestBody: {
           popup_id: popupId,
-          step_type: stepType,
+          step_type: effectiveStepType,
           title,
           order: insertOrder,
           is_enabled: true,
-          product_category: productCategory || null,
+          // Send a category only when the picker is on screen: a template
+          // that shows no products hides it, and a category chosen before
+          // that template was picked would otherwise ride along invisibly.
+          product_category: CONTENT_ONLY_TEMPLATES.has(template)
+            ? null
+            : productCategory || null,
           template: template || null,
         },
       })
@@ -108,7 +121,8 @@ export function AddStepDialog({
     onError: createErrorHandler(showErrorToast),
   })
 
-  const canSubmit = title.trim().length > 0 && stepType.trim().length > 0
+  const canSubmit =
+    title.trim().length > 0 && effectiveStepType.trim().length > 0
 
   return (
     <Dialog
