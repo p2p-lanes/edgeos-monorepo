@@ -11,7 +11,9 @@ import {
   type LucideIcon,
   Shield,
   ShoppingBag,
+  Sparkles,
   Ticket,
+  User,
   Utensils,
   Video,
 } from "lucide-react"
@@ -27,9 +29,21 @@ export interface TemplateDefinition {
   label: string
   description: string
   icon: LucideIcon
+  /** Pins the step's `step_type` instead of deriving it from the title.
+   *  For templates the checkout routes by step_type rather than by template
+   *  (the buyer form is rendered by `step_type === "buyer"`, not by its
+   *  template), a title-derived type like "your-information" would leave the
+   *  step configured and invisible. */
+  stepType?: string
 }
 
 export const TEMPLATE_DEFINITIONS: TemplateDefinition[] = [
+  {
+    key: "hero",
+    label: "Hero / Home",
+    description: "Opening screen: artwork, headline and bullets",
+    icon: Sparkles,
+  },
   {
     key: "ticket-select",
     label: "Ticket Select",
@@ -90,14 +104,24 @@ export const TEMPLATE_DEFINITIONS: TemplateDefinition[] = [
     description: "Weekly meal plans with per-day dish picker",
     icon: Utensils,
   },
+  {
+    key: "buyer-form",
+    label: "Buyer Form",
+    description:
+      "Collects the buyer's details before payment. The fields come from the form builder — only the heading is configured here",
+    icon: User,
+    stepType: "buyer",
+  },
 ]
 
 /** Templates that don't display products and therefore don't need a product category. */
 export const CONTENT_ONLY_TEMPLATES = new Set([
+  "hero",
   "youtube-video",
   "image-gallery",
   "faqs",
   "rich-text",
+  "buyer-form",
 ])
 
 export const STEP_TYPE_DEFINITIONS: StepTypeDefinition[] = [
@@ -106,6 +130,7 @@ export const STEP_TYPE_DEFINITIONS: StepTypeDefinition[] = [
   { step_type: "merch", defaultTitle: "Merchandise", icon: ShoppingBag },
   { step_type: "patron", defaultTitle: "Patron", icon: Heart },
   { step_type: "meal_plan", defaultTitle: "Meal Plan", icon: Utensils },
+  { step_type: "buyer", defaultTitle: "Your information", icon: User },
   { step_type: "insurance_checkout", defaultTitle: "Insurance", icon: Shield },
   { step_type: "confirm", defaultTitle: "Review & Confirm", icon: CheckCircle },
 ]

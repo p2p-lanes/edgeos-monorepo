@@ -53,6 +53,8 @@ interface ThemeConfig {
   border_radius?: string
   checkout_background_contexts?: CheckoutBackgroundContext[]
   thank_you?: ThankYouConfig
+  checkout_shell?: "scrolly" | "stepper"
+  checkout_skin?: "default" | "amanita"
 }
 
 /** Serialize the thank-you editor state into the persisted theme_config shape. */
@@ -163,6 +165,12 @@ export function ThemeConfigForm({
     () => new Set(),
   )
   const [previewTab, setPreviewTab] = useState<PreviewTab>("home")
+  const [checkoutShell, setCheckoutShell] = useState<"scrolly" | "stepper">(
+    themeConfig?.checkout_shell ?? "scrolly",
+  )
+  const [checkoutSkin, setCheckoutSkin] = useState<"default" | "amanita">(
+    themeConfig?.checkout_skin ?? "default",
+  )
 
   const updateMutation = useMutation({
     mutationFn: (data: PopupUpdate) =>
@@ -218,6 +226,8 @@ export function ThemeConfigForm({
     setBackgroundContexts([])
     setThankYouEnabled(false)
     setThankYou({})
+    setCheckoutShell("scrolly")
+    setCheckoutSkin("default")
   }
 
   const handleSave = () => {
@@ -226,6 +236,8 @@ export function ThemeConfigForm({
     const hasRadius = !!radius
     const hasBorderRadius = !!borderRadius
     const hasBackgroundContexts = backgroundContexts.length > 0
+    const hasCheckoutLayout =
+      checkoutShell !== "scrolly" || checkoutSkin !== "default"
 
     const config: Record<string, unknown> | null =
       hasColors ||
@@ -233,7 +245,8 @@ export function ThemeConfigForm({
       hasRadius ||
       hasBorderRadius ||
       hasBackgroundContexts ||
-      thankYouEnabled
+      thankYouEnabled ||
+      hasCheckoutLayout
         ? {
             ...(hasColors && { colors }),
             ...(hasTypography && {
@@ -252,6 +265,10 @@ export function ThemeConfigForm({
             ...(thankYouEnabled && {
               thank_you: buildThankYouConfig(thankYou),
             }),
+            ...(checkoutShell !== "scrolly" && {
+              checkout_shell: checkoutShell,
+            }),
+            ...(checkoutSkin !== "default" && { checkout_skin: checkoutSkin }),
           }
         : null
 
@@ -274,7 +291,9 @@ export function ThemeConfigForm({
     thankYouEnabled !== (themeConfig?.thank_you !== undefined) ||
     (thankYouEnabled &&
       JSON.stringify(buildThankYouConfig(thankYou)) !==
-        JSON.stringify(themeConfig?.thank_you ?? {}))
+        JSON.stringify(themeConfig?.thank_you ?? {})) ||
+    checkoutShell !== (themeConfig?.checkout_shell ?? "scrolly") ||
+    checkoutSkin !== (themeConfig?.checkout_skin ?? "default")
 
   // Effective values = user override OR default.
   const effectiveColors = useMemo(() => {
@@ -503,6 +522,15 @@ export function ThemeConfigForm({
             disabled={readOnly}
           />
 
+          {/* Checkout shell + skin */}
+          <CheckoutLayoutSection
+            shell={checkoutShell}
+            skin={checkoutSkin}
+            onShellChange={setCheckoutShell}
+            onSkinChange={setCheckoutSkin}
+            disabled={readOnly}
+          />
+
           {/* Checkout background visibility */}
           <BackgroundContextsSection
             value={backgroundContexts}
@@ -568,6 +596,107 @@ export function ThemeConfigForm({
         </div>
       </div>
     </InlineSection>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CheckoutLayoutSection — Shell (scrolly/stepper) + Skin (default/amanita)
+// segmented toggles. Stored under theme_config.checkout_shell /
+// theme_config.checkout_skin and read by the portal's
+// resolveCheckoutShell/resolveCheckoutSkin.
+// ─────────────────────────────────────────────────────────────────────────────
+
+function CheckoutLayoutSection({
+  shell,
+  skin,
+  onShellChange,
+  onSkinChange,
+  disabled,
+}: {
+  shell: "scrolly" | "stepper"
+  skin: "default" | "amanita"
+  onShellChange: (v: "scrolly" | "stepper") => void
+  onSkinChange: (v: "default" | "amanita") => void
+  disabled?: boolean
+}) {
+  return (
+    <div className="rounded-lg border bg-background">
+      <div className="flex flex-col px-3 py-2.5">
+        <span className="text-sm font-medium">Checkout layout</span>
+        <span className="text-[11px] text-muted-foreground">
+          Navigation shell and visual skin for this popup's checkout. Existing
+          popups default to Scrolly + Default.
+        </span>
+      </div>
+      <div className="space-y-2 border-t px-3 pb-3 pt-3">
+        <SegmentedRow
+          label="Shell"
+          hint="Scrolly = continuous scroll. Stepper = one section at a time."
+          value={shell}
+          options={[
+            { value: "scrolly", label: "Scrolly" },
+            { value: "stepper", label: "Stepper" },
+          ]}
+          onChange={onShellChange}
+          disabled={disabled}
+        />
+        <SegmentedRow
+          label="Skin"
+          hint="Default = platform theming. Amanita = Amanita brand skin."
+          value={skin}
+          options={[
+            { value: "default", label: "Default" },
+            { value: "amanita", label: "Amanita" },
+          ]}
+          onChange={onSkinChange}
+          disabled={disabled}
+        />
+      </div>
+    </div>
+  )
+}
+
+function SegmentedRow<T extends string>({
+  label,
+  hint,
+  value,
+  options,
+  onChange,
+  disabled,
+}: {
+  label: string
+  hint: string
+  value: T
+  options: { value: T; label: string }[]
+  onChange: (v: T) => void
+  disabled?: boolean
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <div className="flex flex-col">
+        <Label className="text-xs font-medium">{label}</Label>
+        <span className="text-[11px] text-muted-foreground">{hint}</span>
+      </div>
+      <div className="flex items-center gap-1 rounded-md border p-0.5">
+        {options.map((o) => (
+          <button
+            key={o.value}
+            type="button"
+            aria-pressed={value === o.value}
+            onClick={() => onChange(o.value)}
+            disabled={disabled}
+            className={cn(
+              "rounded px-3 py-1 text-xs font-medium transition-colors",
+              value === o.value
+                ? "bg-primary text-primary-foreground"
+                : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            {o.label}
+          </button>
+        ))}
+      </div>
+    </div>
   )
 }
 

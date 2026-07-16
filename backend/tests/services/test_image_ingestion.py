@@ -778,6 +778,66 @@ def test_ingest_template_config_ticket_card_replaces_section_image_url() -> None
     assert result["sections"][0]["label"] == "GA"
 
 
+def test_ingest_template_config_hero_replaces_image_urls() -> None:
+    """hero carries flat top-level image URLs (see portal VariantHero)."""
+    cdn_url = "https://cdn.example.com/hero.webp"
+
+    async def _run() -> dict:
+        svc = ImageIngestionService()
+
+        async def fake_ingest(_url: str, _tenant_id: uuid.UUID) -> str:
+            return cdn_url
+
+        with patch.object(svc, "ingest_url", new=AsyncMock(side_effect=fake_ingest)):
+            return await svc.ingest_template_config(
+                "hero",
+                {
+                    "date_logo_url": "https://ext.com/logo-fecha.webp",
+                    "edition_url": "https://ext.com/tercera-edicion.webp",
+                    "divider_url": "https://ext.com/divider-1-dark.webp",
+                    "bullet_icon_url": "https://ext.com/star.svg",
+                    "headline": "4 días de música, arte, yoga y talleres",
+                    "bullets": ["+10 escenarios"],
+                },
+                TENANT_ID,
+            )
+
+    result = asyncio.run(_run())
+    assert result is not None
+    assert result["date_logo_url"] == cdn_url
+    assert result["edition_url"] == cdn_url
+    assert result["divider_url"] == cdn_url
+    # The bullet ornament now belongs to the skin, so a leftover URL from an
+    # older config is passed through untouched rather than ingested.
+    assert result["bullet_icon_url"] == "https://ext.com/star.svg"
+    # Absent optional image field is not invented.
+    assert "logo_url" not in result
+    # Non-image fields are preserved verbatim.
+    assert result["headline"] == "4 días de música, arte, yoga y talleres"
+    assert result["bullets"] == ["+10 escenarios"]
+
+
+def test_ingest_template_config_hero_without_images_is_noop() -> None:
+    """A hero with copy but no artwork must not call ingest_url at all."""
+
+    async def _run() -> tuple[dict, AsyncMock]:
+        svc = ImageIngestionService()
+        mock = AsyncMock(return_value="https://cdn.example.com/x.webp")
+        with patch.object(svc, "ingest_url", new=mock):
+            config = await svc.ingest_template_config(
+                "hero",
+                {"headline": "Solo texto", "date_logo_url": ""},
+                TENANT_ID,
+            )
+        return config, mock
+
+    result, mock = asyncio.run(_run())
+    assert result is not None
+    assert result["headline"] == "Solo texto"
+    assert result["date_logo_url"] == ""
+    mock.assert_not_awaited()
+
+
 def test_ingest_template_config_per_item_fail_isolation() -> None:
     """One URL that fails open keeps original; rest succeed."""
 

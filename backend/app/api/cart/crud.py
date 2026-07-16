@@ -2,7 +2,7 @@ import uuid
 from datetime import UTC, datetime
 
 from sqlalchemy.orm import selectinload
-from sqlmodel import Session, col, func, select
+from sqlmodel import Session, func, select
 
 from app.api.cart.models import Carts
 from app.api.cart.schemas import CartState
@@ -113,60 +113,33 @@ class CartsCRUD:
             session.flush()
 
     # ------------------------------------------------------------------
-    # Anonymous open-checkout carts (keyed by email, no human, human_id NULL)
+    # Open-checkout carts. Keyed by human (resolved from the buyer email) just
+    # like authenticated portal carts, so a buyer has a single cart per popup
+    # across both flows.
     # ------------------------------------------------------------------
 
-    def find_anonymous_by_email_popup(
-        self,
-        session: Session,
-        email: str,
-        popup_id: uuid.UUID,
-    ) -> Carts | None:
-        """Find an anonymous cart by email and popup (read-only).
-
-        Email match is case-insensitive so the payment-approval cleanup finds
-        the cart regardless of how the buyer typed the address here versus at
-        checkout — the rest of the open-checkout flow normalizes to lowercase.
-        """
-        statement = select(Carts).where(
-            func.lower(Carts.email) == email.lower(),
-            Carts.popup_id == popup_id,
-            col(Carts.human_id).is_(None),
-        )
-        return session.exec(statement).first()
-
-    def find_anonymous_by_id_popup(
-        self,
-        session: Session,
-        cart_id: uuid.UUID,
-        popup_id: uuid.UUID,
-    ) -> Carts | None:
-        """Find an anonymous cart by id, scoped to a popup (read-only)."""
-        statement = select(Carts).where(
-            Carts.id == cart_id,
-            Carts.popup_id == popup_id,
-            col(Carts.human_id).is_(None),
-        )
-        return session.exec(statement).first()
-
-    def upsert_anonymous(
+    def upsert_open_cart(
         self,
         session: Session,
         *,
         tenant_id: uuid.UUID,
         popup_id: uuid.UUID,
+        human_id: uuid.UUID,
         email: str,
         items: CartState,
     ) -> Carts:
-        """Create or update the anonymous cart for (popup, email)."""
-        cart = self.find_anonymous_by_email_popup(session, email, popup_id)
+        """Create or update the open-checkout cart for (human, popup).
+
+        Shares the uq_cart_human_popup key with the authenticated portal cart,
+        so the two flows converge on one row. Email is stored for display and
+        restore-link continuity only, not as a key.
+        """
+        cart = self.find_by_human_popup(session, human_id, popup_id)
         if cart is None:
             cart = Carts(
                 tenant_id=tenant_id,
-                human_id=None,
+                human_id=human_id,
                 popup_id=popup_id,
-                # Store normalized so the unique (tenant, popup, email) index and
-                # later case-insensitive lookups stay consistent.
                 email=email.lower(),
                 items=items.model_dump(),
             )
@@ -176,23 +149,28 @@ class CartsCRUD:
             return cart
 
         cart.items = items.model_dump()
+        cart.email = email.lower()
         cart.updated_at = datetime.now(UTC)
         session.add(cart)
         session.commit()
         session.refresh(cart)
         return cart
 
-    def delete_anonymous_by_email_popup(
+    def find_by_id_popup(
         self,
         session: Session,
-        email: str,
+        cart_id: uuid.UUID,
         popup_id: uuid.UUID,
-    ) -> None:
-        """Delete the anonymous cart for (popup, email) — e.g. after payment."""
-        cart = self.find_anonymous_by_email_popup(session, email, popup_id)
-        if cart:
-            session.delete(cart)
-            session.flush()
+    ) -> Carts | None:
+        """Find a cart by id, scoped to a popup (read-only).
+
+        Backs the open-checkout restore link and cart-continuity proof.
+        """
+        statement = select(Carts).where(
+            Carts.id == cart_id,
+            Carts.popup_id == popup_id,
+        )
+        return session.exec(statement).first()
 
 
 carts_crud = CartsCRUD()

@@ -119,8 +119,25 @@ function getCheckoutVisibleSectionIds(
   return sectionIds
 }
 
+export interface CheckoutSchemaOptions {
+  /** Skip the mini-form reduction of custom fields.
+   *
+   *  The reduction keeps only custom fields whose section also holds a
+   *  human-target base field. That is right for the APPLICATION checkout —
+   *  the application form is long and the checkout shows a cut-down view —
+   *  but wrong for open ticketing, where the popup's buyer form IS the form
+   *  and there is nothing to cut down.
+   *
+   *  It also fails outright there: an open-ticketing popup can have zero
+   *  BaseFieldConfigs, so `base_fields` arrives empty, no section is ever
+   *  "visible", and EVERY organizer-configured field is dropped. Required
+   *  ones then 422 the purchase for inputs the shopper was never shown. */
+  includeAllSections?: boolean
+}
+
 export function getCheckoutMiniFormSchema(
   schema: ApplicationFormSchema,
+  options: CheckoutSchemaOptions = {},
 ): ApplicationFormSchema {
   const visibleSectionIds = getCheckoutVisibleSectionIds(schema.base_fields)
 
@@ -131,11 +148,13 @@ export function getCheckoutMiniFormSchema(
         isCheckoutBaseField(name, field),
       ),
     ),
-    custom_fields: Object.fromEntries(
-      Object.entries(schema.custom_fields).filter(([, field]) =>
-        visibleSectionIds.has(field.section_id || "_unsectioned_base"),
-      ),
-    ),
+    custom_fields: options.includeAllSections
+      ? schema.custom_fields
+      : Object.fromEntries(
+          Object.entries(schema.custom_fields).filter(([, field]) =>
+            visibleSectionIds.has(field.section_id || "_unsectioned_base"),
+          ),
+        ),
   }
 }
 
@@ -161,8 +180,9 @@ export function filterCheckoutApplicationValues(
 
 export function getCheckoutSchemaSections(
   schema: ApplicationFormSchema,
+  options: CheckoutSchemaOptions = {},
 ): CheckoutSchemaSection[] {
-  const miniFormSchema = getCheckoutMiniFormSchema(schema)
+  const miniFormSchema = getCheckoutMiniFormSchema(schema, options)
   const groupedFields: Record<string, CheckoutSchemaSectionField[]> = {}
 
   for (const [name, field] of Object.entries(miniFormSchema.base_fields)) {

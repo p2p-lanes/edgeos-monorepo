@@ -759,6 +759,24 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             default_first_name=obj.buyer.first_name,
             default_last_name=obj.buyer.last_name,
         )
+        # `find_or_create`'s `default_*` args only apply when it INSERTS — it
+        # never touches an existing row. An email already in `humans` (an
+        # earlier purchase, an admin import, or simply a past login) is the
+        # common case here, so everything the buyer typed was being dropped;
+        # only `email` survived, because it is the lookup key rather than
+        # something the form ever wrote.
+        #
+        # Backfill blanks only — never overwrite. A populated field was set by
+        # someone who knows better than a checkout form (an admin, an import),
+        # and `test_create_open_ticketing_payment_does_not_overwrite_existing_human`
+        # pins that: a returning buyer's typed name must not clobber the human's
+        # curated one. That purchase-time name still reaches the Attendee row,
+        # which is where a per-purchase name belongs.
+        if not buyer.first_name and obj.buyer.first_name:
+            buyer.first_name = obj.buyer.first_name
+        if not buyer.last_name and obj.buyer.last_name:
+            buyer.last_name = obj.buyer.last_name
+        session.add(buyer)
 
         self._validate_open_ticketing_form_data(popup, obj.buyer.form_data)
 
@@ -2596,20 +2614,21 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
 
         return payment, preview
 
-    def _direct_buyer_email(self, session: Session, payment: Payments) -> str | None:
-        """Resolve the buyer email for a direct-sale payment via its attendee.
+    def _direct_buyer_human_id(
+        self, session: Session, payment: Payments
+    ) -> uuid.UUID | None:
+        """Resolve the buyer's human_id for a direct-sale payment via its attendee.
 
-        Direct-sale payments have no application; the buyer is the human behind
-        the (single) attendee on the payment's product snapshot. Used to clear
-        the anonymous open-checkout cart keyed by that email.
+        Used to clear the open-checkout cart, which is now keyed by (human, popup)
+        like the authenticated portal cart.
         """
         snapshot = payment.products_snapshot
         if not snapshot:
             return None
         attendee = session.get(Attendees, snapshot[0].attendee_id)
-        if attendee is None or attendee.human is None:
+        if attendee is None:
             return None
-        return attendee.human.email
+        return attendee.human_id
 
     def approve_payment(
         self,
@@ -2674,9 +2693,9 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             if payment.application_id is not None:
                 self._create_ambassador_group(session, payment)
 
-            # Clear cart after successful payment. Application flow clears by
-            # human; direct-sale (open checkout) clears the anonymous cart by the
-            # buyer email so a returning buyer never restores an already-paid cart.
+            # Clear cart after successful payment so a returning buyer never
+            # restores an already-paid cart. Both the application flow and open
+            # checkout key the cart by (human, popup), so delete by human.
             from app.api.cart.crud import carts_crud
 
             if payment.application:
@@ -2686,10 +2705,12 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                     popup_id=payment.application.popup_id,
                 )
             elif payment.popup_id:
-                buyer_email = self._direct_buyer_email(session, payment)
-                if buyer_email:
-                    carts_crud.delete_anonymous_by_email_popup(
-                        session, buyer_email, payment.popup_id
+                buyer_human_id = self._direct_buyer_human_id(session, payment)
+                if buyer_human_id:
+                    carts_crud.delete_by_human_popup(
+                        session,
+                        human_id=buyer_human_id,
+                        popup_id=payment.popup_id,
                     )
 
             # Single atomic commit for the entire operation
@@ -3016,7 +3037,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         2. The popup has an open_checkout_signing_secret.
         3. HMAC signature is valid for the given cid and secret.
         4. The referenced cart belongs to this popup (popup_id match built into
-           carts_crud.find_anonymous_by_id_popup).
+           carts_crud.find_by_id_popup).
         5. The cart's email matches the buyer email (case-insensitive).
 
         A valid token for a different email or a different popup is always invalid.
@@ -3030,7 +3051,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             return False
         from app.api.cart.crud import carts_crud as _carts_crud  # noqa: PLC0415
 
-        cart = _carts_crud.find_anonymous_by_id_popup(session, cid, popup.id)
+        cart = _carts_crud.find_by_id_popup(session, cid, popup.id)
         if cart is None:
             return False
         cart_email: str = getattr(cart, "email", None) or ""

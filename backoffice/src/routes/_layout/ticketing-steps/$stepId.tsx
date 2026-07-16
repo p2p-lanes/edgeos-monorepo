@@ -370,7 +370,8 @@ function StepConfigContent({ stepId }: { stepId: string }) {
               </div>
 
               {!CONTENT_ONLY_TEMPLATES.has(template) &&
-                step.step_type !== "confirm" && (
+                step.step_type !== "confirm" &&
+                step.step_type !== "buyer" && (
                   <div className="flex flex-col gap-1.5">
                     <Label htmlFor="step-product-category">
                       Product Category
@@ -426,6 +427,40 @@ function StepConfigContent({ stepId }: { stepId: string }) {
               </div>
             </CardContent>
           </Card>
+
+          {/* Pay button label (only for confirm step) */}
+          {step.step_type === "confirm" && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Pay Button</CardTitle>
+                <CardDescription>
+                  The button that completes the purchase
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="confirm-cta-label">Button Label</Label>
+                  <Input
+                    id="confirm-cta-label"
+                    value={(templateConfig?.cta_label as string) ?? ""}
+                    onChange={(e) =>
+                      setTemplateConfig({
+                        ...templateConfig,
+                        cta_label: e.target.value || undefined,
+                      })
+                    }
+                    placeholder="Pagar"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Shown on both the bottom bar's button and the one inside the
+                    confirm card — they always read the same. Leave empty to use
+                    the checkout's own wording, translated per shopper. Once
+                    set, translate it in this step's Translations tab.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Insurance Card Content (only for confirm step) */}
           {step.step_type === "confirm" &&
@@ -578,8 +613,11 @@ function StepConfigContent({ stepId }: { stepId: string }) {
               </Alert>
             ))}
 
-          {/* Template Selection & Configuration (hidden for confirm step) */}
-          {step.step_type !== "confirm" && (
+          {/* Template Selection & Configuration (hidden for the steps whose
+              template is not a choice: confirm, and buyer — the checkout
+              renders both by step_type, so swapping their template would only
+              produce a step that no longer draws itself.) */}
+          {step.step_type !== "confirm" && step.step_type !== "buyer" && (
             <>
               <Card>
                 <CardHeader>

@@ -150,7 +150,12 @@ export function OpenTicketingBuyerForm({
 }: OpenTicketingBuyerFormProps) {
   const { t } = useTranslation()
   const { getBuyerInvalidFields, forcedBuyerFieldsTouched } = useCheckout()
-  const sections = getCheckoutSchemaSections(schema)
+  // Open ticketing: the popup's buyer form is the whole form, so opt out
+  // of the application-flow mini-form reduction. Without this a popup with
+  // no BaseFieldConfigs renders none of the organizer's fields at all.
+  const sections = getCheckoutSchemaSections(schema, {
+    includeAllSections: true,
+  })
   const genderField = schema.base_fields.gender
   const displayGender = getDisplayGender(values, schema)
   const genderSpecifyValue = getGenderSpecifyValue(values)

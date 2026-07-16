@@ -12,8 +12,10 @@ import {
 } from "@/client"
 import FaviconOverride from "@/components/checkout-flow/FaviconOverride"
 import ScrollyCheckoutFlow from "@/components/checkout-flow/ScrollyCheckoutFlow"
+import StepperCheckoutFlow from "@/components/checkout-flow/StepperCheckoutFlow"
 import { LanguageSwitcher } from "@/components/common/LanguageSwitcher"
 import { captureAttribution } from "@/lib/attribution"
+import { resolveCheckoutShell } from "@/lib/checkout-shell"
 import { trackGAViewItem } from "@/lib/google-analytics"
 import { trackMetaViewContent } from "@/lib/meta-pixel"
 import { queryKeys } from "@/lib/query-keys"
@@ -196,6 +198,11 @@ export function OpenCheckoutRuntime({
     trackedViewContentRef.current = popup.id
   }, [popup, runtime.products])
 
+  const Flow =
+    resolveCheckoutShell(popup) === "stepper"
+      ? StepperCheckoutFlow
+      : ScrollyCheckoutFlow
+
   return (
     <CityContext.Provider
       value={{
@@ -269,7 +276,7 @@ export function OpenCheckoutRuntime({
                       null
                     }
                   />
-                  <ScrollyCheckoutFlow
+                  <Flow
                     navExtraContent={<LanguageSwitcher compact />}
                     brandLogoUrl={
                       (popup as { icon_url?: string | null }).icon_url ?? null
