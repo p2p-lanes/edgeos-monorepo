@@ -23,6 +23,7 @@ from sqlmodel import Session
 from app.api.human.models import Humans
 from app.api.invite.models import Invites
 from app.api.popup.models import Popups
+from app.api.popup.schemas import PopupStatus
 from app.api.tenant.models import Tenants
 from app.api.user.models import Users
 from app.core.security import create_access_token
@@ -49,12 +50,14 @@ def _make_popup(
     tenant: Tenants,
     *,
     invites_enabled: bool = True,
+    status: PopupStatus = PopupStatus.active,
 ) -> Popups:
     popup = Popups(
         name=f"InviteTest {uuid.uuid4().hex[:6]}",
         slug=f"invitetest-{uuid.uuid4().hex[:8]}",
         tenant_id=tenant.id,
         invites_enabled=invites_enabled,
+        status=status,
     )
     db.add(popup)
     db.commit()
@@ -482,6 +485,21 @@ class TestInvitePreview:
         resp = client.get(f"/api/v1/invites/redeem/{tok}")
         assert resp.status_code == 410, resp.json()
 
+    def test_preview_ended_popup_returns_410(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+        admin_user_tenant_a: Users,
+    ) -> None:
+        """Invite on an ended popup → 410 Gone (link no longer available)."""
+        popup = _make_popup(db, tenant_a, status=PopupStatus.ended)
+        tok = f"ended-{uuid.uuid4().hex[:12]}"
+        _make_invite(db, popup, admin_user_tenant_a, token=tok)
+
+        resp = client.get(f"/api/v1/invites/redeem/{tok}")
+        assert resp.status_code == 410, resp.json()
+
 
 # ---------------------------------------------------------------------------
 # Portal redemption — POST /invites/redeem/{token}
@@ -535,6 +553,27 @@ class TestInviteRedemption:
         _make_invite(
             db, popup, admin_user_tenant_a, token=tok, expires_at=past, max_uses=100
         )
+        human = _make_human(db, tenant_a)
+        human_tok = _human_token(human)
+
+        resp = client.post(
+            f"/api/v1/invites/redeem/{tok}",
+            json={"popup_id": str(popup.id)},
+            headers=_auth(human_tok),
+        )
+        assert resp.status_code == 410, resp.json()
+
+    def test_ended_popup_rejected_with_410(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+        admin_user_tenant_a: Users,
+    ) -> None:
+        """Redeeming an invite on an ended popup → 410 Gone."""
+        popup = _make_popup(db, tenant_a, status=PopupStatus.ended)
+        tok = f"ended-redeem-{uuid.uuid4().hex[:12]}"
+        _make_invite(db, popup, admin_user_tenant_a, token=tok, max_uses=100)
         human = _make_human(db, tenant_a)
         human_tok = _human_token(human)
 

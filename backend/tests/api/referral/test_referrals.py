@@ -25,6 +25,7 @@ from sqlmodel import Session
 from app.api.attendee.models import AttendeeProducts, Attendees
 from app.api.human.models import Humans
 from app.api.popup.models import Popups
+from app.api.popup.schemas import PopupStatus
 from app.api.product.models import Products
 from app.api.referral.models import Referrals
 from app.api.tenant.models import Tenants
@@ -53,12 +54,14 @@ def _make_popup(
     tenant: Tenants,
     *,
     referrals_enabled: bool = True,
+    status: PopupStatus = PopupStatus.active,
 ) -> Popups:
     popup = Popups(
         name=f"ReferralTest {uuid.uuid4().hex[:6]}",
         slug=f"reftest-{uuid.uuid4().hex[:8]}",
         tenant_id=tenant.id,
         referrals_enabled=referrals_enabled,
+        status=status,
     )
     db.add(popup)
     db.commit()
@@ -440,6 +443,21 @@ class TestReferralPublicLookup:
         """Unknown code → 404."""
         resp = client.get("/api/v1/referrals/r/does-not-exist-xyz")
         assert resp.status_code == 404, resp.json()
+
+    def test_ended_popup_returns_410(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+    ) -> None:
+        """Referral on an ended popup → 410 Gone (link no longer available)."""
+        popup = _make_popup(db, tenant_a, status=PopupStatus.ended)
+        human = _make_human(db, tenant_a)
+        code = f"ended-{uuid.uuid4().hex[:12]}"
+        _make_referral(db, popup, human, code=code)
+
+        resp = client.get(f"/api/v1/referrals/r/{code}")
+        assert resp.status_code == 410, resp.json()
 
 
 # ---------------------------------------------------------------------------

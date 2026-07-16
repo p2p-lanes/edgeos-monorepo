@@ -889,6 +889,12 @@ async def get_group_public(
             detail="Group not found",
         )
 
+    # Ended popup → group share link no longer valid (410)
+    from app.api.popup.crud import popups_crud
+    from app.api.popup.guards import ensure_popup_link_active
+
+    ensure_popup_link_active(popups_crud.get(db, group.popup_id))
+
     return GroupPublic.model_validate(group)
 
 

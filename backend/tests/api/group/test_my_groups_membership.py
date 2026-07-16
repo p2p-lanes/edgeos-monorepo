@@ -18,6 +18,7 @@ from sqlmodel import Session
 from app.api.group.models import GroupLeaders, GroupMembers, Groups
 from app.api.human.models import Humans
 from app.api.popup.models import Popups
+from app.api.popup.schemas import PopupStatus
 from app.api.tenant.models import Tenants
 from app.core.security import create_access_token
 
@@ -285,3 +286,34 @@ class TestMutationEndpointsLeaderGated:
             headers=_auth(token),
         )
         assert resp.status_code == 403, resp.json()
+
+
+# ---------------------------------------------------------------------------
+# Public group link — GET /groups/public/{group_slug}
+# ---------------------------------------------------------------------------
+
+
+class TestPublicGroupLink:
+    """Public group share link is invalidated when the popup has ended."""
+
+    def test_public_group_active_popup_returns_200(
+        self, client: TestClient, db: Session, tenant_a: Tenants
+    ) -> None:
+        popup = _make_popup(db, tenant_a)
+        group = _make_group(db, tenant_a, popup)
+
+        resp = client.get(f"/api/v1/groups/public/{group.slug}")
+        assert resp.status_code == 200, resp.json()
+        assert resp.json()["slug"] == group.slug
+
+    def test_public_group_ended_popup_returns_410(
+        self, client: TestClient, db: Session, tenant_a: Tenants
+    ) -> None:
+        popup = _make_popup(db, tenant_a)
+        popup.status = PopupStatus.ended
+        db.add(popup)
+        db.commit()
+        group = _make_group(db, tenant_a, popup)
+
+        resp = client.get(f"/api/v1/groups/public/{group.slug}")
+        assert resp.status_code == 410, resp.json()

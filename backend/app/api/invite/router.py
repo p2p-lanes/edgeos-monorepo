@@ -62,7 +62,11 @@ async def preview_invite(
             headers={"Cache-Control": "no-store"},
         )
 
-    # Apply guard chain for preview as well (expired/exhausted → 410)
+    # Ended popup → link no longer valid (410), then expired/exhausted → 410
+    from app.api.popup.crud import popups_crud
+    from app.api.popup.guards import ensure_popup_link_active
+
+    ensure_popup_link_active(popups_crud.get(db, invite.popup_id))
     invites_crud.validate_for_redemption(invite)
 
     # Resolve inviter_name from the created_by user (explicit fetch — avoid lazy load)
@@ -127,6 +131,17 @@ async def redeem_invite(
             status_code=status.HTTP_404_NOT_FOUND, detail="Invite not found"
         )
 
+    popup = popups_crud.get(db, invite.popup_id)
+    if not popup:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Popup not found"
+        )
+
+    # Guard chain step 0: ended popup → link no longer valid
+    from app.api.popup.guards import ensure_popup_link_active
+
+    ensure_popup_link_active(popup)
+
     # Guard chain steps 1 and 2
     invites_crud.validate_for_redemption(invite)
 
@@ -146,11 +161,6 @@ async def redeem_invite(
         )
 
     # Check popup.invites_enabled guard (REQ-GR-026)
-    popup = popups_crud.get(db, invite.popup_id)
-    if not popup:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Popup not found"
-        )
     if not popup.invites_enabled:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

@@ -31,6 +31,22 @@ def ensure_popup_writable(popup: Popups | None) -> None:
         )
 
 
+def ensure_popup_link_active(popup: Popups | None) -> None:
+    """Invalidate group/invite/referral share links on ended popups (410 Gone).
+
+    Distinct from ``ensure_popup_writable`` (403): a shared link that lands on
+    an ended popup is treated as no longer valid rather than merely read-only,
+    so its preview and redemption both fail. ``no-store`` keeps a browser from
+    caching the 410 if the popup is later reactivated.
+    """
+    if popup is not None and popup.status == PopupStatus.ended:
+        raise HTTPException(
+            status_code=status.HTTP_410_GONE,
+            detail="This popup has ended and this link is no longer available.",
+            headers={"Cache-Control": "no-store"},
+        )
+
+
 def is_popup_scoped_api_key(token_payload: TokenPayload) -> bool:
     """True when the caller authenticated with a human-owned (portal) API key.
 

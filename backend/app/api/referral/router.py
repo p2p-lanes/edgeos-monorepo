@@ -212,6 +212,13 @@ async def get_referral_preview(
             headers={"Cache-Control": "no-store"},
         )
 
+    # Ended popup → link no longer valid (410). Expiry/use limits stay soft below
+    # so the portal can present them; the application-create path enforces them.
+    from app.api.popup.crud import popups_crud
+    from app.api.popup.guards import ensure_popup_link_active
+
+    ensure_popup_link_active(popups_crud.get(db, referral.popup_id))
+
     # Surface guard state but do NOT raise — let the portal decide how to present
     # (the apply endpoint enforces hard errors; preview is informational only).
     # id is included so the portal can pass referral_id on application create
