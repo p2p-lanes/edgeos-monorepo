@@ -18,11 +18,13 @@ import { shouldUseDynamicStep } from "./registries/stepRegistry"
 import { CONTENT_ONLY_TEMPLATES } from "./registries/variantRegistry"
 import type { ScrollyCheckoutFlowProps } from "./ScrollyCheckoutFlow"
 import SectionHeader from "./SectionHeader"
+import StepFootnotes from "./StepFootnotes"
 import { AmanitaBackground } from "./skins/amanita/AmanitaBackground"
 import AmanitaBuyerStep from "./skins/amanita/AmanitaBuyerStep"
 import AmanitaCatalogSection from "./skins/amanita/AmanitaCatalogSection"
 import AmanitaConfirmSection from "./skins/amanita/AmanitaConfirmSection"
 import "./skins/amanita/amanita-skin.css"
+import AmanitaStepFaqs from "./skins/amanita/AmanitaStepFaqs"
 import FaqsDrawer, { type FaqDrawerItem } from "./skins/amanita/FaqsDrawer"
 import { amanitaFontVars } from "./skins/amanita/fonts"
 import ConfirmStep from "./steps/ConfirmStep"
@@ -451,6 +453,11 @@ export default function StepperCheckoutFlow({
     cta_label?: string
     cta_hint?: string
   }
+  // The active step's raw config, for the trailing FAQs/footnotes blocks.
+  const currentTemplateConfig = current?.config?.template_config as
+    | Record<string, unknown>
+    | null
+    | undefined
 
   const renderStepContent = (section: (typeof sections)[number]) => {
     const { stepType, config } = section
@@ -659,6 +666,17 @@ export default function StepperCheckoutFlow({
               </div>
             )}
             {renderStepContent(current)}
+            {/* A step's own FAQs, below its content (the mockup's "Preguntas
+                sobre el acampe" under the Alojamiento cards). Rendered here
+                rather than inside AmanitaCatalogSection because the backoffice
+                offers the field on every step — buyer and confirm included —
+                and the catalog only covers the product ones. */}
+            {isAmanita && (
+              <AmanitaStepFaqs templateConfig={currentTemplateConfig} />
+            )}
+            {/* Last on the step, under the FAQs — the mockup's centred
+                clarifications below the Extras cards. */}
+            <StepFootnotes skin={skin} templateConfig={currentTemplateConfig} />
           </>
         )}
       </main>
