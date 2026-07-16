@@ -63,7 +63,7 @@ function getAdminItems(tenantId: string | null | undefined): Item[] {
 const coreItems: Item[] = [{ icon: Home, title: "Dashboard", path: "/" }]
 
 const popupItems: Item[] = [
-  { icon: Calendar, title: "Pop-ups", path: "/popups" },
+  { icon: Calendar, title: "Gatherings", path: "/popups" },
   { icon: Package, title: "Products", path: "/products" },
   { icon: Tag, title: "Coupons", path: "/coupons" },
   { icon: UsersRound, title: "Groups", path: "/groups" },
@@ -195,7 +195,7 @@ export function AppSidebar() {
 
         {/* Popup management section */}
         <SidebarGroup>
-          <SidebarGroupLabel>Pop-up Management</SidebarGroupLabel>
+          <SidebarGroupLabel>Gathering Management</SidebarGroupLabel>
           <Main items={popupItems} />
         </SidebarGroup>
 

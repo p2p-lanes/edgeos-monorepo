@@ -634,7 +634,7 @@ function DetailedMinMaxInputs({
         </div>
       </div>
       {minGreaterThanMax && (
-        <p className="text-xs text-red-500">
+        <p className="text-xs text-destructive">
           Min selections must be ≤ max selections.
         </p>
       )}

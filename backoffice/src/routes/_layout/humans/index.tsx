@@ -406,7 +406,7 @@ function HumansTableContent() {
           <EmptyState
             icon={Users}
             title="No humans yet"
-            description="Humans will appear here once end-users register through your popups."
+            description="Humans will appear here once end-users register through your gatherings."
           />
         ) : undefined
       }
@@ -454,7 +454,7 @@ function Humans() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Humans</h1>
           <p className="text-muted-foreground">
-            End-users who interact with your popups
+            End-users who interact with your gatherings
           </p>
         </div>
         {isSuperadmin && isContextReady && <AddHumanButton />}

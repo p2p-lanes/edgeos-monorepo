@@ -46,7 +46,7 @@ function ReviewQueuePage() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Review Queue</h1>
           <p className="text-muted-foreground">
-            Select a popup and sign in as admin to review applications
+            Select a gathering and sign in as admin to review applications
           </p>
         </div>
       </div>

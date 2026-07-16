@@ -192,7 +192,7 @@ const columns: ColumnDef<ProductPublic>[] = [
           title={row.original.is_active ? "Active" : "Inactive"}
           className={cn(
             "size-2 shrink-0 rounded-full",
-            row.original.is_active ? "bg-green-500" : "bg-red-500",
+            row.original.is_active ? "bg-success" : "bg-destructive",
           )}
         />
         <span className="font-medium">{row.original.name}</span>
@@ -472,7 +472,7 @@ function Products() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Products</h1>
           <p className="text-muted-foreground">
-            Manage tickets and products for your popups
+            Manage tickets and products for your gatherings
           </p>
         </div>
         <div className="flex items-center gap-2">

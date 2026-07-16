@@ -51,7 +51,7 @@ const TICKET_CARD_SURFACES = [
   {
     value: "theme",
     label: "Theme",
-    description: "Inherit popup theme colours",
+    description: "Inherit gathering theme colours",
   },
   {
     value: "light",
@@ -205,7 +205,7 @@ export function TicketCardConfig({
           <Label className="text-sm font-medium">Card surface</Label>
           <p className="text-xs text-muted-foreground">
             Override the card background for this step only. Theme inherits from
-            the popup; light/dark pin a fixed surface.
+            the gathering; light/dark pin a fixed surface.
           </p>
         </div>
         <div className="grid grid-cols-3 gap-2">

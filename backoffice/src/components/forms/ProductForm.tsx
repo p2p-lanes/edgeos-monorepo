@@ -270,7 +270,7 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
         })
       } else {
         if (!selectedPopupId) {
-          showErrorToast("Please select a popup first")
+          showErrorToast("Please select a gathering first")
           return
         }
         createMutation.mutate({
@@ -401,7 +401,7 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
                               disabled={isDisabled}
                               title={
                                 isDisabled
-                                  ? "This popup already has a Patron product"
+                                  ? "This gathering already has a Patron product"
                                   : undefined
                               }
                             >
@@ -685,7 +685,7 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
                       <ShieldCheck className="h-4 w-4 text-muted-foreground" />
                     }
                     label="Insurance Eligible"
-                    description="Include this product in the insurance calculation when popup insurance is enabled"
+                    description="Include this product in the insurance calculation when gathering insurance is enabled"
                   >
                     <div className="flex items-center gap-2">
                       <Checkbox
@@ -849,7 +849,7 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
             </form.Subscribe>
 
             {/* Sale Window — applies to every product category. Times are entered
-            in the popup's timezone and stored as precise instants, so a cutoff
+            in the gathering's timezone and stored as precise instants, so a cutoff
             like a meal-plan "Friday 11:59 PM" deadline is enforced exactly. */}
             <Separator />
             <InlineSection title="Sale Window">

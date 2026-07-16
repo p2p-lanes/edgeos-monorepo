@@ -125,41 +125,41 @@ export function KeyMetricsCards({ data, isLoading }: KeyMetricsCardsProps) {
         title="People"
         value={(data.people ?? 0).toLocaleString()}
         icon={Users}
-        accentClass="text-blue-500"
+        accentClass="text-chart-1"
       />
       <MetricCard
         title="Total Revenue"
         value={formatCompact(data.total_revenue, currency)}
         icon={DollarSign}
         description={currency}
-        accentClass="text-green-500"
+        accentClass="text-chart-2"
       />
       <MetricCard
         title="Avg Order Value"
         value={formatCurrency(data.avg_ticket_price, currency)}
         icon={Receipt}
         description="per payment"
-        accentClass="text-amber-500"
+        accentClass="text-warning"
       />
       <MetricCard
         title="Revenue / Person"
         value={formatCurrency(data.avg_revenue_per_person, currency)}
         icon={TrendingUp}
         description={`${(data.paying_people ?? 0).toLocaleString()} paying`}
-        accentClass="text-violet-500"
+        accentClass="text-chart-3"
       />
       <MetricCard
         title="Conversion Rate"
         value={`${data.conversion_rate ?? 0}%`}
         icon={Percent}
         description="accepted vs rejected"
-        accentClass="text-emerald-500"
+        accentClass="text-chart-2"
       />
       <MetricCard
         title="% w/ Accommodation"
         value={`${data.accommodation_percentage ?? 0}%`}
         icon={BedDouble}
-        accentClass="text-sky-500"
+        accentClass="text-chart-3"
       />
     </div>
   )

@@ -318,7 +318,7 @@ function getColumns(hasInvoice: boolean): ColumnDef<PaymentPublic>[] {
             </span>
             {showReason && adj ? (
               <span
-                className={`text-xs ${adj.isDiscount ? "text-green-600" : "text-amber-600"}`}
+                className={`text-xs ${adj.isDiscount ? "text-success" : "text-warning"}`}
               >
                 adjustment {adj.isDiscount ? "−" : "+"}
                 {adj.pct}%
@@ -580,7 +580,7 @@ function PaymentSubRow({ row }: { row: Row<PaymentPublic> }) {
               >
                 {discountLabel}
               </td>
-              <td className="py-0.5 pl-4 text-right font-mono tabular-nums text-green-600">
+              <td className="py-0.5 pl-4 text-right font-mono tabular-nums text-success">
                 -${discountAmount.toFixed(2)}
               </td>
             </tr>
@@ -630,7 +630,7 @@ function PaymentSubRow({ row }: { row: Row<PaymentPublic> }) {
                   {railAdj.pct}%)
                 </td>
                 <td
-                  className={`py-0.5 pl-4 text-right font-mono tabular-nums ${railAdj.isDiscount ? "text-green-600" : "text-amber-600"}`}
+                  className={`py-0.5 pl-4 text-right font-mono tabular-nums ${railAdj.isDiscount ? "text-success" : "text-warning"}`}
                 >
                   {railAdj.isDiscount ? "−" : "+"}$
                   {Math.abs(railAdj.delta).toFixed(2)}
