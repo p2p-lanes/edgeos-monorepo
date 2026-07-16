@@ -23,6 +23,7 @@ import AmanitaBuyerStep from "./skins/amanita/AmanitaBuyerStep"
 import AmanitaCatalogSection from "./skins/amanita/AmanitaCatalogSection"
 import AmanitaConfirmSection from "./skins/amanita/AmanitaConfirmSection"
 import "./skins/amanita/amanita-skin.css"
+import AmanitaStepFaqs from "./skins/amanita/AmanitaStepFaqs"
 import FaqsDrawer, { type FaqDrawerItem } from "./skins/amanita/FaqsDrawer"
 import { amanitaFontVars } from "./skins/amanita/fonts"
 import ConfirmStep from "./steps/ConfirmStep"
@@ -659,6 +660,21 @@ export default function StepperCheckoutFlow({
               </div>
             )}
             {renderStepContent(current)}
+            {/* A step's own FAQs, below its content (the mockup's "Preguntas
+                sobre el acampe" under the Alojamiento cards). Rendered here
+                rather than inside AmanitaCatalogSection because the backoffice
+                offers the field on every step — buyer and confirm included —
+                and the catalog only covers the product ones. */}
+            {isAmanita && (
+              <AmanitaStepFaqs
+                templateConfig={
+                  current.config?.template_config as
+                    | Record<string, unknown>
+                    | null
+                    | undefined
+                }
+              />
+            )}
           </>
         )}
       </main>

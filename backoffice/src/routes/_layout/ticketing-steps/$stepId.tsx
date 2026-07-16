@@ -22,6 +22,12 @@ import {
   TEMPLATE_DEFINITIONS,
 } from "@/components/ticketing-step-builder/constants"
 import { TEMPLATE_CONFIG_REGISTRY } from "@/components/ticketing-step-builder/template-configs"
+import {
+  buildFaqsValue,
+  type FaqItem,
+  FaqItemsEditor,
+  parseFaqItems,
+} from "@/components/ticketing-step-builder/template-configs/FaqItemsEditor"
 import { TranslationManager } from "@/components/translations/TranslationManager"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
@@ -239,6 +245,23 @@ function StepConfigContent({ stepId }: { stepId: string }) {
     ? TEMPLATE_CONFIG_REGISTRY[template]
     : undefined
 
+  // This step's own FAQs, stored under `template_config.faqs` — nested rather
+  // than at the top level so they can't collide with the `faqs` template's own
+  // `items`, which feed the global drawer.
+  const stepFaqs = (templateConfig?.faqs ?? null) as Record<
+    string,
+    unknown
+  > | null
+  const stepFaqsTitle = (stepFaqs?.title as string) ?? ""
+  const stepFaqItems = parseFaqItems(stepFaqs?.items)
+
+  const setStepFaqs = (title: string, items: FaqItem[]) => {
+    setTemplateConfig({
+      ...templateConfig,
+      faqs: buildFaqsValue(title, items),
+    })
+  }
+
   const hasTranslations = (popup?.supported_languages?.length ?? 0) > 1
 
   return (
@@ -427,6 +450,30 @@ function StepConfigContent({ stepId }: { stepId: string }) {
               </div>
             </CardContent>
           </Card>
+
+          {/* This step's own FAQs, shown below its content. Hidden on the
+              `faqs` template, whose whole purpose is already a question list —
+              a step there would carry two. */}
+          {template !== "faqs" && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">FAQs</CardTitle>
+                <CardDescription>
+                  Questions shown below this step's content. Rendered only on
+                  the Amanita checkout skin.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <FaqItemsEditor
+                  title={stepFaqsTitle}
+                  items={stepFaqItems}
+                  titleDescription="Heading shown above the questions. Leave empty for none."
+                  onChangeTitle={(next) => setStepFaqs(next, stepFaqItems)}
+                  onChangeItems={(next) => setStepFaqs(stepFaqsTitle, next)}
+                />
+              </CardContent>
+            </Card>
+          )}
 
           {/* Pay button label (only for confirm step) */}
           {step.step_type === "confirm" && (
