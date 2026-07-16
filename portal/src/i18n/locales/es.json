@@ -339,8 +339,7 @@
       "catalog_show_less": "Ver menos",
       "catalog_add_aria": "Agregar {{product}}",
       "catalog_add_one_aria": "Agregar uno más de {{product}}",
-      "catalog_remove_one_aria": "Quitar uno de {{product}}",
-      "confirm_cta": "Confirmar compra"
+      "catalog_remove_one_aria": "Quitar uno de {{product}}"
     }
   },
   "openCheckout": {

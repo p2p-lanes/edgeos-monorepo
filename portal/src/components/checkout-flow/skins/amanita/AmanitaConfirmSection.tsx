@@ -23,11 +23,13 @@
  * Payment triggers: the mockup's in-card "Confirmar compra" button was
  * originally omitted here, leaving the stepper's fixed bottom bar as the sole
  * trigger. It is now rendered alongside the bar's, matching the mockup, so the
- * same payment has two buttons. They are deliberately NOT independent: `onPay`
- * and `payDisabled` are the bar's own handler and gate, passed down. Deriving
- * a second `canPay` here from `useCheckout()` would let the two disagree — the
- * card could still look armed while the bar is mid-submit, which is exactly
- * how a double charge gets in.
+ * same payment has two buttons. They are deliberately NOT independent: `onPay`,
+ * `payDisabled` and `payLabel` are the bar's own handler, gate and label,
+ * passed down. Deriving a second `canPay` here from `useCheckout()` would let
+ * the two disagree — the card could still look armed while the bar is
+ * mid-submit, which is exactly how a double charge gets in. The label is
+ * threaded for the milder version of the same failure: this card used to print
+ * its own "Confirmar compra" next to a bar that said "Pagar".
  */
 import type { LucideIcon } from "lucide-react"
 import {
@@ -83,6 +85,7 @@ export default function AmanitaConfirmSection({
   onGoToTickets,
   onPay,
   payDisabled,
+  payLabel,
   stepConfig,
 }: {
   onGoToTickets?: () => void
@@ -90,6 +93,11 @@ export default function AmanitaConfirmSection({
    *  passed in rather than pulled from `useCheckout()` here. */
   onPay?: () => void
   payDisabled?: boolean
+  /** The bottom bar's own CTA label, so both triggers for this payment read
+   *  the same. Passed in for the same reason `onPay` is — there is
+   *  deliberately no local fallback, since re-deriving it here is exactly how
+   *  the two came to disagree. */
+  payLabel?: string
   /** The organizer's confirm step, when one is configured — it names this
    *  section. Optional: the funnel shows a confirm step whether or not a row
    *  exists for it, and then the skin's own copy stands in. */
@@ -191,6 +199,15 @@ export default function AmanitaConfirmSection({
     summary.contributionSubtotal
   const showEligibleQualifier = summary.discount > 0 && nonDiscountableTotal > 0
   const notEligibleCaption = t("checkout.discount.not_eligible_caption")
+
+  // `summary.subtotal` already contains the service fee (useCartSummary.ts:
+  // `originalSubtotal`), but the ladder below prints that fee as its own line
+  // on the way to the Total — so showing it raw counted the fee twice on
+  // screen and, with nothing discounted, made Subtotal and Total identical.
+  // Taking it out is what makes the column add up: subtotal − adjustments +
+  // fee = total. Insurance stays in, deliberately: it has no line of its own
+  // down here, so pulling it out would leave the arithmetic short instead.
+  const subtotalBeforeFee = summary.subtotal - summary.contributionSubtotal
 
   const copy = shellCopy(stepConfig, {
     kicker: t("checkout.amanita.confirm_kicker"),
@@ -625,11 +642,12 @@ export default function AmanitaConfirmSection({
           )}
 
           {/* Terms and conditions */}
-          {/* Totals — the mockup's reading order: Subtotal, then every
-              adjustment, then the service fee the total already includes, then
-              the Total itself. Subtotal always shows: it is the top of that
-              ladder, and hiding it whenever nothing was discounted left the
-              fee looking like it was subtracted from thin air. */}
+          {/* Totals — the mockup's reading order: Subtotal (of the items, fee
+              excluded), then every adjustment, then the service fee that gets
+              added on, then the Total itself. Read top to bottom the column
+              now arrives at the Total. Subtotal always shows: it is the top of
+              that ladder, and hiding it whenever nothing was discounted left
+              the fee looking like it was added to thin air. */}
           <div
             className="border-t px-5 py-4 md:px-8"
             style={{ borderColor: ROW_BORDER }}
@@ -640,7 +658,7 @@ export default function AmanitaConfirmSection({
             >
               <p>{t("checkout.amanita.confirm_subtotal_label")}</p>
               <p className="font-condensed text-base">
-                {formatCurrency(summary.subtotal)}
+                {formatCurrency(subtotalBeforeFee)}
               </p>
             </div>
             {summary.discount > 0 && (
@@ -755,9 +773,7 @@ export default function AmanitaConfirmSection({
                 disabled={payDisabled}
                 className="btn-ornate-2 btn-gold-fill ck-gold flex w-full items-center justify-center whitespace-nowrap py-3 font-condensed text-sm font-medium uppercase tracking-[0.12em] transition-all duration-200 hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {summary.grandTotal === 0
-                  ? t("checkout.actions.claim_pass")
-                  : t("checkout.amanita.confirm_cta")}
+                {payLabel}
               </button>
             </div>
           )}

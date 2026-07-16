@@ -7,8 +7,9 @@
  * - Applying a coupon calls the real `applyPromoCode` mutation.
  * - The empty-cart state shows when the cart has no items, with a
  *   "Ver tickets" CTA that calls the `onGoToTickets` callback.
- * - There is NO second pay/confirm button in this section — payment is only
- *   triggered by the stepper's fixed bottom-bar CTA.
+ * - The in-card pay CTA appears only when the stepper hands this section a
+ *   payment handler, and then takes its label and disabled state from the
+ *   bottom bar rather than re-deriving either.
  *
  * No jest-dom in this project — assertions use
  * `getByText`/`getByRole`/`toBeTruthy()`.
@@ -216,6 +217,29 @@ describe("AmanitaConfirmSection", () => {
     expect(order).toEqual(sorted)
   })
 
+  /* `useCartSummary` folds the service fee into `summary.subtotal`, so the
+     realistic shape of a $100 order with a $10 fee is subtotal 110 / total
+     110. Printed raw, the fee showed up twice and Subtotal read the same as
+     Total — the column never added up. */
+  it("shows Subtotal without the service fee the Total adds back", () => {
+    popup = { ...popup, contribution_label: "Service fee" }
+    summary = {
+      ...summary,
+      subtotal: 110,
+      contributionSubtotal: 10,
+      grandTotal: 110,
+    }
+
+    render(<AmanitaConfirmSection />)
+
+    // Subtotal 100 + fee 10 = total 110, which is what the ladder claims.
+    const row = (label: string) =>
+      screen.getByText(label).parentElement?.textContent ?? ""
+    expect(row("checkout.amanita.confirm_subtotal_label")).toContain("$100")
+    expect(row("checkout.amanita.confirm_subtotal_label")).not.toContain("$110")
+    expect(row("checkout.amanita.confirm_total_label")).toContain("$110")
+  })
+
   it("runs the order lines flat — no group heading over the tickets", () => {
     cart = {
       ...cart,
@@ -286,5 +310,51 @@ describe("AmanitaConfirmSection", () => {
         /pay|confirmar compra|checkout\.actions\.pay/,
       )
     }
+  })
+
+  describe("in-card pay CTA", () => {
+    it("prints the label the bar passes down rather than one of its own", () => {
+      render(
+        <AmanitaConfirmSection
+          onPay={vi.fn()}
+          payLabel="checkout.actions.pay"
+        />,
+      )
+      expect(
+        screen.getByRole("button", { name: "checkout.actions.pay" }),
+      ).toBeTruthy()
+    })
+
+    /* The bug this guards: the card used to re-derive its label from
+       `summary.grandTotal`, printing "Confirmar compra" beside a bar that said
+       "Pagar". The label is the bar's to decide, so a free order's CTA has to
+       follow `payLabel` and nothing else. */
+    it("follows payLabel on a free order instead of re-deriving from the total", () => {
+      summary = { ...summary, grandTotal: 0 }
+      render(
+        <AmanitaConfirmSection
+          onPay={vi.fn()}
+          payLabel="checkout.actions.claim_pass"
+        />,
+      )
+      expect(
+        screen.getByRole("button", { name: "checkout.actions.claim_pass" }),
+      ).toBeTruthy()
+      expect(screen.queryByText("checkout.amanita.confirm_cta")).toBeNull()
+    })
+
+    it("disables the card CTA from the bar's gate", () => {
+      render(
+        <AmanitaConfirmSection
+          onPay={vi.fn()}
+          payLabel="checkout.actions.pay"
+          payDisabled
+        />,
+      )
+      const button = screen.getByRole("button", {
+        name: "checkout.actions.pay",
+      }) as HTMLButtonElement
+      expect(button.disabled).toBe(true)
+    })
   })
 })
