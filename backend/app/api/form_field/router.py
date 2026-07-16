@@ -334,10 +334,23 @@ async def update_form_field(
     field = crud.form_fields_crud.get(db, field_id)
 
     if field:
-        # NOTE: field.name is a stable internal key generated once at creation.
-        # It MUST NOT change when the label is edited — existing application
-        # custom_fields reference this key and renaming it would silently break
-        # the link to all previously submitted data.
+        # NOTE: field.name regenerates on label edits only while the key is
+        # still unused (no submitted answers, no ticketing step references).
+        # After first use it is frozen forever — application custom_fields and
+        # step visibility conditions are keyed by it.
+        new_label = field_in.label
+        if (
+            "label" in field_in.model_fields_set
+            and new_label
+            and new_label != field.label
+            and crud._slugify(new_label) != field.name
+            and not crud.form_fields_crud.is_field_name_in_use(
+                db, field.name, field.popup_id
+            )
+        ):
+            field.name = crud.form_fields_crud.generate_field_name(
+                db, new_label, field.popup_id, exclude_id=field.id
+            )
         updated = crud.form_fields_crud.update(db, field, field_in)
         return _to_public(updated)
 
