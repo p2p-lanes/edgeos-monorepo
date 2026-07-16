@@ -562,10 +562,8 @@ class ImageIngestionService:
         if template == "hero":
             new_config = {**config}
             for key in (
-                "logo_url",
                 "date_logo_url",
                 "edition_url",
-                "bullet_icon_url",
                 "divider_url",
             ):
                 url = config.get(key)
