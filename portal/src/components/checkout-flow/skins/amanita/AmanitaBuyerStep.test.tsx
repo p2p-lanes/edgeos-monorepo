@@ -402,9 +402,7 @@ describe("AmanitaBuyerStep — schema-driven rendering", () => {
       render(<AmanitaBuyerStep stepConfig={CONFIG} />)
       expect(screen.getByText("Tus Datos")).toBeTruthy()
       expect(
-        screen.getByText(
-          "Necesitamos saber a quién le emitimos las entradas.",
-        ),
+        screen.getByText("Necesitamos saber a quién le emitimos las entradas."),
       ).toBeTruthy()
       expect(screen.getByText("Paso 2")).toBeTruthy()
     })
