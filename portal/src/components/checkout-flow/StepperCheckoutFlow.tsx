@@ -1,5 +1,6 @@
 "use client"
 
+import { ArrowLeft, ArrowRight } from "lucide-react"
 import Image from "next/image"
 import type { CSSProperties } from "react"
 import { useCallback, useMemo, useState } from "react"
@@ -53,7 +54,7 @@ const NAV_OUTER: Record<
     className: "sticky top-0 z-40 bg-background/90 backdrop-blur",
   },
   amanita: {
-    className: "fixed inset-x-0 top-0 z-40",
+    className: "pointer-events-none fixed inset-x-0 top-0 z-40",
     style: {
       background:
         "linear-gradient(180deg, rgba(1,15,22,0.92) 0%, rgba(1,15,22,0.72) 72%, rgba(1,15,22,0) 100%)",
@@ -61,11 +62,18 @@ const NAV_OUTER: Record<
   },
 }
 
+/* amanita's `pointer-events-none`/`-auto` pair mirrors BOTTOM_OUTER/INNER's,
+ * and for the same reason as AmanitaBackground's: this bar is `fixed`, so it
+ * scroll-chains to the (unscrollable) viewport rather than to the page's
+ * `overflow-y-auto` scroller, and its full-bleed gradient would otherwise eat
+ * the wheel across the whole top strip. `-auto` is put back on the inner
+ * element so the pills stay clickable. The default skin's nav is `sticky` — it
+ * scrolls with its container, so it never had the problem. */
 const NAV_INNER: Record<CheckoutSkin, { className: string }> = {
   default: { className: "flex gap-2 overflow-x-auto px-4 py-3" },
   amanita: {
     className:
-      "no-scrollbar mx-auto flex max-w-[980px] items-center gap-1.5 overflow-x-auto px-3 py-3 md:justify-center",
+      "no-scrollbar pointer-events-auto mx-auto flex max-w-[980px] items-center gap-1.5 overflow-x-auto px-3 py-3 md:justify-center",
   },
 }
 
@@ -143,11 +151,11 @@ const BACK_BUTTON: Record<
 > = {
   default: {
     className:
-      "shrink-0 text-xs font-medium text-muted-foreground hover:text-foreground disabled:opacity-40",
+      "inline-flex shrink-0 items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground disabled:opacity-40",
   },
   amanita: {
     className:
-      "shrink-0 font-condensed text-xs font-medium uppercase tracking-[0.12em] transition-colors hover:text-cream disabled:opacity-40",
+      "inline-flex shrink-0 items-center gap-1.5 font-condensed text-xs font-medium uppercase tracking-[0.12em] transition-colors hover:text-cream disabled:opacity-40",
     style: { color: "rgba(241,235,227,0.7)" },
   },
 }
@@ -189,10 +197,16 @@ const HINT_CLASSES: Record<
  * needs it. */
 const CTA_BUTTON_CLASSES: Record<CheckoutSkin, string> = {
   default:
-    "shrink-0 rounded-xl bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50",
+    "inline-flex shrink-0 items-center justify-center gap-1.5 rounded-xl bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50",
   amanita:
-    "btn-ornate-2 btn-gold-fill ck-gold flex shrink-0 items-center justify-center whitespace-nowrap !px-4 py-2.5 font-condensed text-xs font-medium uppercase tracking-[0.12em] transition-all duration-200 hover:-translate-y-0.5 md:!px-6 md:text-sm disabled:cursor-not-allowed disabled:opacity-50",
+    "btn-ornate-2 btn-gold-fill ck-gold flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap !px-4 py-2.5 font-condensed text-xs font-medium uppercase tracking-[0.12em] transition-all duration-200 hover:-translate-y-0.5 md:!px-6 md:text-sm disabled:cursor-not-allowed disabled:opacity-50",
 }
+
+/* Bottom-bar direction arrows. `aria-hidden` because the button's own label
+ * already names the destination — the arrow is orientation, not information,
+ * and announcing it would only add noise to the accessible name the tests and
+ * screen readers read. */
+const ARROW_CLASSES = "h-3.5 w-3.5 shrink-0"
 
 /** `faqs`-template step's `template_config.items` — same `{question,
  * answer}[]` shape VariantFaqs.tsx parses for the default skin's inline
@@ -394,6 +408,29 @@ export default function StepperCheckoutFlow({
   const itemCount = summary.itemCount
   const requiresTerms = !!popup?.terms_and_conditions_url && !termsAccepted
   const canPay = hasAnyCartItems && !requiresTerms && !isSubmitting
+  // Derived once and handed to Amanita's in-card CTA below, for the same
+  // reason `handlePayment`/`canPay` are: the two buttons pay for the same
+  // order, so they must say the same thing. Re-deriving this next to the card
+  // is what let it read "Confirmar compra" while the bar read "Pagar".
+  //
+  // The organizer can name this button on the confirm step, and what they wrote
+  // wins — including on a free order, since `cta_label` is authored for this
+  // button specifically and second-guessing it would just make the field lie.
+  // It's read from the *confirm* step's config rather than `current`'s: the bar
+  // renders the pay CTA on the last step, which is where this label belongs,
+  // and the in-card CTA needs the same string regardless of which step is
+  // active. Reuses the hero's `cta_label` key, which the translation overlay
+  // already treats as copy (backend service.py `_TEXT_LEAF_KEYS`), so the
+  // string arrives here already in the shopper's language.
+  const confirmTemplateConfig = (sections.find(
+    (section) => section.stepType === "confirm",
+  )?.config?.template_config ?? {}) as { cta_label?: string }
+  const authoredPayLabel = confirmTemplateConfig.cta_label?.trim()
+  const payLabel =
+    authoredPayLabel ||
+    (summary.grandTotal === 0
+      ? t("checkout.actions.claim_pass")
+      : t("checkout.actions.pay"))
 
   // The first section is an "intro" when it's a content-only template (a hero
   // or similar): nothing has been priced yet, so the bar drops Back and Total
@@ -430,8 +467,8 @@ export default function StepperCheckoutFlow({
     if (stepType === "confirm")
       return isAmanita ? (
         /* The card's CTA is a second trigger for the same payment as the
-           bottom bar's, so it is handed the bar's own handler and gate
-           rather than re-deriving them: `canPay` already folds in
+           bottom bar's, so it is handed the bar's own handler, gate and
+           label rather than re-deriving them: `canPay` already folds in
            `!isSubmitting`, which is what stops a double charge once one of
            the two has been pressed. Two buttons, one source of truth. */
         <AmanitaConfirmSection
@@ -439,6 +476,7 @@ export default function StepperCheckoutFlow({
           onGoToTickets={goToFirstProductSection}
           onPay={handlePayment}
           payDisabled={!canPay}
+          payLabel={payLabel}
         />
       ) : (
         <ConfirmStep />
@@ -574,8 +612,12 @@ export default function StepperCheckoutFlow({
             that shouldn't read as one more step. The bar is already
             fixed/sticky, so it is the containing block — adding `relative`
             here would re-declare `position` and drop the bar out of flow. */}
+        {/* `pointer-events-auto` for the same reason the <nav> above has it:
+            amanita's bar is `pointer-events-none` so the wheel reaches the
+            page scroller through it, and this control sits outside the <nav>,
+            so it has to opt back in on its own or it can't be clicked. */}
         {navExtraContent && (
-          <div className="absolute inset-y-0 right-2 flex items-center">
+          <div className="pointer-events-auto absolute inset-y-0 right-2 flex items-center">
             {navExtraContent}
           </div>
         )}
@@ -652,6 +694,7 @@ export default function StepperCheckoutFlow({
                 className={CTA_BUTTON_CLASSES[skin]}
               >
                 {introConfig.cta_label || nextSection?.label}
+                <ArrowRight aria-hidden className={ARROW_CLASSES} />
               </button>
             </>
           ) : (
@@ -663,6 +706,7 @@ export default function StepperCheckoutFlow({
                 className={`${BACK_BUTTON[skin].className} justify-self-start`}
                 style={BACK_BUTTON[skin].style}
               >
+                <ArrowLeft aria-hidden className={ARROW_CLASSES} />
                 {t("common.back")}
               </button>
               <div className="flex min-w-0 flex-col items-center">
@@ -679,9 +723,8 @@ export default function StepperCheckoutFlow({
                   disabled={!canPay}
                   className={`${CTA_BUTTON_CLASSES[skin]} justify-self-end`}
                 >
-                  {summary.grandTotal === 0
-                    ? t("checkout.actions.claim_pass")
-                    : t("checkout.actions.pay")}
+                  {payLabel}
+                  <ArrowRight aria-hidden className={ARROW_CLASSES} />
                 </button>
               ) : (
                 <button
@@ -691,6 +734,7 @@ export default function StepperCheckoutFlow({
                   className={`${CTA_BUTTON_CLASSES[skin]} justify-self-end`}
                 >
                   {nextSection?.label}
+                  <ArrowRight aria-hidden className={ARROW_CLASSES} />
                 </button>
               )}
             </>
