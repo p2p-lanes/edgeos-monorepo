@@ -187,8 +187,12 @@ describe("AmanitaConfirmSection", () => {
 
   it("always shows Subtotal, even with nothing discounted", () => {
     render(<AmanitaConfirmSection />)
-    expect(screen.getByText("checkout.amanita.confirm_subtotal_label")).toBeTruthy()
-    expect(screen.getByText("checkout.amanita.confirm_total_label")).toBeTruthy()
+    expect(
+      screen.getByText("checkout.amanita.confirm_subtotal_label"),
+    ).toBeTruthy()
+    expect(
+      screen.getByText("checkout.amanita.confirm_total_label"),
+    ).toBeTruthy()
   })
 
   it("lays the summary out as items → coupon → subtotal → fee → total", () => {
