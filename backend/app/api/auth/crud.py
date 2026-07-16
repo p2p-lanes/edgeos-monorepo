@@ -31,6 +31,27 @@ from app.services.email import (
 MAX_AUTH_ATTEMPTS = 5
 CODE_EXPIRATION_MINUTES = 15
 
+# Machine-readable detail returned when a user's tenant is suspended
+# (expired self-serve trial). The frontend shows a "talk to us" screen.
+TRIAL_ENDED_DETAIL = "trial_ended"
+
+
+def check_tenant_not_suspended(session: Session, tenant_id: uuid.UUID | None) -> None:
+    """Raise 403 trial_ended when the user's tenant is suspended.
+
+    Suspension is reversible (expired trial): data and credentials are kept,
+    but backoffice logins are blocked until the tenant is reactivated.
+    Users without a tenant (superadmins) are never blocked.
+    """
+    if tenant_id is None:
+        return
+    tenant = session.get(Tenants, tenant_id)
+    if tenant is not None and tenant.suspended_at is not None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=TRIAL_ENDED_DETAIL,
+        )
+
 
 def check_rate_limit(identifier: str) -> None:
     """Check rate limit and raise exception if exceeded."""
@@ -74,6 +95,10 @@ async def login_user(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found",
         )
+
+    # Suspended tenant (expired trial): block PRE-OTP so the user never
+    # receives a code they could not redeem.
+    check_tenant_not_suspended(session, user.tenant_id)
 
     auth_code = generate_auth_code()
 
@@ -151,6 +176,10 @@ async def authenticate_user(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found",
         )
+
+    # Suspended tenant (expired trial): reject before consuming the OTP so a
+    # code issued pre-suspension cannot mint a session.
+    check_tenant_not_suspended(session, user.tenant_id)
 
     # Try Redis first, fall back to database
     if is_redis_available():

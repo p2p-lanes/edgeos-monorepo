@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query"
 import { createFileRoute, Link } from "@tanstack/react-router"
 import { AlertTriangle, ArrowRight, Clock, ListChecks } from "lucide-react"
+import { useEffect, useState } from "react"
 
 import {
   type ApplicationPublic,
@@ -34,6 +35,19 @@ function Dashboard() {
   const { user: currentUser, isOperatorOrAbove, isSuperadmin } = useAuth()
   const { selectedPopupId, selectedTenantId, isContextReady } = useWorkspace()
 
+  // "Welcome back" is wrong on a user's very first visit (e.g. straight from
+  // the trial signup). Per-user, per-browser marker until a real onboarding
+  // flow replaces it.
+  const [isFirstVisit, setIsFirstVisit] = useState(false)
+  useEffect(() => {
+    if (!currentUser?.id) return
+    const key = `dashboard_seen_${currentUser.id}`
+    if (!localStorage.getItem(key)) {
+      localStorage.setItem(key, "1")
+      setIsFirstVisit(true)
+    }
+  }, [currentUser?.id])
+
   const {
     data: enriched,
     isLoading,
@@ -63,7 +77,8 @@ function Dashboard() {
       <div className="flex flex-col gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">
-            Welcome back, {currentUser?.full_name || currentUser?.email}
+            {isFirstVisit ? "Welcome" : "Welcome back"},{" "}
+            {currentUser?.full_name || currentUser?.email}
           </h1>
           <p className="text-muted-foreground text-sm">
             Event performance overview

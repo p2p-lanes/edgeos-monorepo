@@ -311,10 +311,48 @@ class CheckInPassContext(BaseModel):
     portal_url: str | None = None
 
 
+class TrialWelcomeContext(BaseModel):
+    """Context for auth/trial_welcome.html template.
+
+    Sent right after a self-serve trial is provisioned, with the onboarding
+    checklist.
+    """
+
+    gathering_name: str
+    backoffice_url: str
+    trial_days: int = 7
+
+
+class TrialReminderContext(BaseModel):
+    """Context for auth/trial_reminder.html template.
+
+    Sent once when a trial has 2 days or less remaining.
+    """
+
+    gathering_name: str
+    backoffice_url: str
+    expires_on: str  # human-readable date, e.g. "July 22, 2026"
+
+
+class TrialEndedContext(BaseModel):
+    """Context for auth/trial_ended.html template.
+
+    Sent once when a trial expires and the tenant is suspended.
+    Data is retained — the copy invites the organizer to talk to us.
+    """
+
+    gathering_name: str
+
+
 class EmailTemplates:
     # Auth
     LOGIN_CODE_USER = "auth/login_code_user.html"
     LOGIN_CODE_HUMAN = "auth/login_code_human.html"
+
+    # Self-serve trials
+    TRIAL_WELCOME = "auth/trial_welcome.html"
+    TRIAL_REMINDER = "auth/trial_reminder.html"
+    TRIAL_ENDED = "auth/trial_ended.html"
 
     # Application
     APPLICATION_RECEIVED = "application/received.html"
