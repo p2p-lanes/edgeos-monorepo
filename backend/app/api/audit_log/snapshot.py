@@ -19,13 +19,23 @@ from pydantic import BaseModel
 
 
 def jsonable(value: Any) -> Any:
-    """Coerce a value to something JSON/JSONB-serializable and diff-stable."""
+    """Coerce a value to something JSON/JSONB-serializable and diff-stable.
+
+    Recurses into lists/tuples and dicts so collections of UUIDs/datetimes/enums
+    are coerced element-wise — e.g. ``collaborator_ids`` (a ``list[UUID]``) would
+    otherwise reach the JSONB column as raw UUID objects and raise
+    "Object of type UUID is not JSON serializable" on flush.
+    """
     if isinstance(value, Enum):
         return value.value
     if isinstance(value, (datetime, date)):
         return value.isoformat()
     if isinstance(value, uuid.UUID):
         return str(value)
+    if isinstance(value, (list, tuple)):
+        return [jsonable(v) for v in value]
+    if isinstance(value, dict):
+        return {key: jsonable(val) for key, val in value.items()}
     return value
 
 

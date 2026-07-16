@@ -5,12 +5,13 @@ Scenarios covered:
   - SCN-02: contribution disabled → preview has contribution_amount=0
   - SCN-04: enabled + null percentage → contribution_amount=0
   - SCN-07: insurance + contribution both enabled → parallel fees, no compounding
-  - SCN-08: direct-sale (sale_type=direct) → contribution NOT applied
+  - SCN-08: Payments.contribution_amount column defaults to 0 when not set
 
-SCN-08 note: The direct-sale flow uses create_open_ticketing_payment, which does
-NOT call _apply_discounts — it builds Payments directly with amount=0 and no
-contribution. Contribution is naturally excluded from the direct-sale path
-because it runs through a completely separate code path.
+SCN-08 note: The direct-sale / open-checkout flow uses create_open_ticketing_payment,
+a separate code path from _apply_discounts. It DOES apply contribution — covered by
+test_create_open_ticketing_payment.py::test_create_open_ticketing_payment_applies_contribution.
+The test here only guards the column server_default (0, not NULL) for payments built
+without an explicit contribution_amount.
 """
 
 import uuid
@@ -322,12 +323,13 @@ class TestContributionInApplyDiscounts:
         )
 
 
-class TestDirectSaleExclusion:
-    """SCN-08: Direct-sale flow excludes contribution (different code path).
+class TestContributionColumnDefault:
+    """SCN-08: Payments.contribution_amount defaults to 0 when not explicitly set.
 
-    The create_open_ticketing_payment path does not call _apply_discounts,
-    so contribution is naturally excluded. We verify the Payments model
-    has contribution_amount=0 default when no calculation runs.
+    Guards the column server_default so any flow that skips the contribution
+    calculation (e.g. a contribution-disabled popup) yields 0 on the row rather
+    than NULL. The open-checkout flow DOES apply contribution — see
+    test_create_open_ticketing_payment.py.
     """
 
     def test_payments_model_has_zero_contribution_amount_by_default(
@@ -337,8 +339,8 @@ class TestDirectSaleExclusion:
     ) -> None:
         """SCN-08: Payments created without contribution_amount → defaults to 0.
 
-        This validates the column default and that the direct-sale path
-        (which never calls calculate_contribution_amount) yields 0 on the row.
+        Validates the column server_default for payments built without an
+        explicit contribution_amount.
         """
         from app.api.payment.models import Payments
         from app.api.payment.schemas import PaymentStatus
@@ -351,8 +353,8 @@ class TestDirectSaleExclusion:
             sale_type=SaleType.direct,
         )
 
-        # Simulate what create_open_ticketing_payment does: build Payments
-        # WITHOUT passing contribution_amount — the server_default kicks in.
+        # Build Payments WITHOUT passing contribution_amount — the
+        # server_default kicks in and the row lands at 0, not NULL.
         payment = Payments(
             tenant_id=tenant_a.id,
             popup_id=popup.id,

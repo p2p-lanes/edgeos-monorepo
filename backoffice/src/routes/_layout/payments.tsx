@@ -46,6 +46,7 @@ import { exportToCsv, fetchAllPages } from "@/lib/export"
 import {
   buildPaymentsQueryConfig,
   buildPaymentsTableState,
+  getRailAdjustment,
   resolveLineUnitPrice,
 } from "./payments.helpers"
 
@@ -288,6 +289,46 @@ function getColumns(hasInvoice: boolean): ColumnDef<PaymentPublic>[] {
       ),
     },
     {
+      accessorKey: "amount_charged",
+      header: ({ column }) => (
+        <SortableHeader label="Charged" column={column} />
+      ),
+      cell: ({ row }) => {
+        // Settled total from SimpleFi — differs from Amount when the merchant
+        // applies a per-rail (card/crypto) discount or surcharge. NULL until
+        // settlement and for non-SimpleFi payments.
+        const val = row.original.amount_charged
+        if (val == null) {
+          return <span className="text-muted-foreground">—</span>
+        }
+        // In-flight installment plans accumulate per settlement, so this is
+        // what's been collected so far, not the final adjusted total.
+        const adj = getRailAdjustment(row.original)
+        const showReason = adj?.final && Math.abs(adj.delta) > 0.01
+        return (
+          <div className="flex flex-col">
+            <span className="font-mono">
+              ${val} {row.original.currency}
+              {adj && !adj.final ? (
+                <span className="font-sans text-xs text-muted-foreground">
+                  {" "}
+                  so far
+                </span>
+              ) : null}
+            </span>
+            {showReason && adj ? (
+              <span
+                className={`text-xs ${adj.isDiscount ? "text-green-600" : "text-amber-600"}`}
+              >
+                adjustment {adj.isDiscount ? "−" : "+"}
+                {adj.pct}%
+              </span>
+            ) : null}
+          </div>
+        )
+      },
+    },
+    {
       accessorKey: "status",
       header: ({ column }) => <SortableHeader label="Status" column={column} />,
       cell: ({ row }) => <StatusBadge status={row.original.status ?? ""} />,
@@ -300,6 +341,28 @@ function getColumns(hasInvoice: boolean): ColumnDef<PaymentPublic>[] {
           {row.original.source || "N/A"}
         </span>
       ),
+    },
+    {
+      id: "installments",
+      header: "Installments",
+      cell: ({ row }) => {
+        // Render the badge only once SimpleFi's installment_plan_activated
+        // webhook has filled in installments_total. While the plan is still
+        // PENDING (buyer hasn't picked a cycle count), we show em-dash to
+        // match the other "no value yet" columns. A single-installment plan
+        // is effectively pay-in-full, so we also show em-dash there — the
+        // badge is reserved for genuine multi-cycle plans (total >= 2).
+        const total = row.original.installments_total
+        if (!row.original.is_installment_plan || total == null || total < 2) {
+          return <span className="text-muted-foreground">—</span>
+        }
+        const paid = row.original.installments_paid ?? 0
+        return (
+          <Badge variant="secondary" className="font-mono">
+            {paid}/{total}
+          </Badge>
+        )
+      },
     },
     {
       accessorKey: "insurance_amount",
@@ -435,6 +498,8 @@ function PaymentSubRow({ row }: { row: Row<PaymentPublic> }) {
   const hasContribution = contributionAmount > 0.01
   const hasBreakdown = hasDiscount || hasInsurance || hasContribution
 
+  const railAdj = getRailAdjustment(payment)
+
   let discountLabel = "Discount"
   if (payment.coupon_code) {
     discountLabel = `Discount (coupon: ${payment.coupon_code})`
@@ -554,6 +619,48 @@ function PaymentSubRow({ row }: { row: Row<PaymentPublic> }) {
               ${total.toFixed(2)} {payment.currency}
             </td>
           </tr>
+          {railAdj?.final && Math.abs(railAdj.delta) > 0.01 ? (
+            <>
+              <tr>
+                <td
+                  colSpan={5}
+                  className="py-0.5 text-right text-muted-foreground"
+                >
+                  Adjustment ({railAdj.isDiscount ? "−" : "+"}
+                  {railAdj.pct}%)
+                </td>
+                <td
+                  className={`py-0.5 pl-4 text-right font-mono tabular-nums ${railAdj.isDiscount ? "text-green-600" : "text-amber-600"}`}
+                >
+                  {railAdj.isDiscount ? "−" : "+"}$
+                  {Math.abs(railAdj.delta).toFixed(2)}
+                </td>
+              </tr>
+              <tr>
+                <td colSpan={5} className="pt-0.5 text-right font-semibold">
+                  Charged
+                </td>
+                <td className="pt-0.5 pl-4 text-right font-mono font-semibold tabular-nums">
+                  ${Number(payment.amount_charged).toFixed(2)}{" "}
+                  {payment.currency}
+                </td>
+              </tr>
+            </>
+          ) : null}
+          {railAdj && !railAdj.final ? (
+            <tr>
+              <td
+                colSpan={5}
+                className="py-0.5 text-right text-muted-foreground"
+              >
+                Collected so far ({payment.installments_paid ?? 0}/
+                {payment.installments_total} installments)
+              </td>
+              <td className="py-0.5 pl-4 text-right font-mono tabular-nums text-muted-foreground">
+                ${Number(payment.amount_charged).toFixed(2)} {payment.currency}
+              </td>
+            </tr>
+          ) : null}
         </tfoot>
       </table>
     </div>
@@ -607,6 +714,8 @@ function PaymentsTableContent() {
       searchPlaceholder="Search by external ID, attendee email, or attendee name..."
       hiddenOnMobile={[
         "source",
+        "amount_charged",
+        "installments",
         "insurance_amount",
         "contribution_amount",
         "coupon_code",
@@ -671,6 +780,9 @@ function Payments() {
         { key: "currency", label: "Currency" },
         { key: "status", label: "Status" },
         { key: "source", label: "Source" },
+        { key: "is_installment_plan", label: "Installment Plan" },
+        { key: "installments_paid", label: "Installments Paid" },
+        { key: "installments_total", label: "Installments Total" },
         { key: "insurance_amount", label: "Insurance" },
         { key: "contribution_amount", label: "Contribution" },
         { key: "coupon_code", label: "Coupon" },

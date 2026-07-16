@@ -21,12 +21,18 @@ export function deriveProductState(
     | "sale_ends_at"
     | "total_stock_remaining"
     | "total_stock_cap"
+    | "sold_out_override"
   >,
   now: Date = new Date(),
 ): ProductSaleState {
+  // Sold-out wins over time-based states, matching backend precedence:
+  // the manual override flag or depleted tracked stock short-circuits here.
   const cap = product.total_stock_cap ?? null
   const remaining = product.total_stock_remaining ?? null
-  if (cap !== null && remaining !== null && remaining <= 0) {
+  if (
+    product.sold_out_override === true ||
+    (cap !== null && remaining !== null && remaining <= 0)
+  ) {
     return "sold_out"
   }
 

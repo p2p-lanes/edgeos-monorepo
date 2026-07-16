@@ -1,5 +1,7 @@
 "use client"
 
+import { utcToLocalTzNaive } from "@edgeos/shared-events"
+import { MarkdownEditor } from "@edgeos/shared-form-ui"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useRouter } from "next/navigation"
 import { useMemo } from "react"
@@ -18,10 +20,10 @@ import {
 } from "@/client"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
 import { CollaboratorsField } from "../../components/CollaboratorsField"
 import { EventScheduleFields } from "../../components/EventScheduleFields"
 import { HostDisplayField } from "../../components/HostDisplayField"
+import { VenueDayScheduleDialog } from "../../components/VenueDayScheduleDialog"
 import { VisibilityHint } from "../../components/VisibilityHint"
 import {
   formatDateKeyInTz,
@@ -85,11 +87,10 @@ export function EditEventForm({
 
   const { data: settings } = usePortalEventSettings(popupId)
 
-  const { isDateOutsidePopupWindow, popupStartKey, popupWindowLabel } =
-    usePopupWindow({
-      startDate: cityStartDate,
-      endDate: cityEndDate,
-    })
+  const { isDateOutsidePopupWindow, popupWindowLabel } = usePopupWindow({
+    startDate: cityStartDate,
+    endDate: cityEndDate,
+  })
 
   const { data: tracksData } = useQuery({
     queryKey: ["portal-tracks", popupId],
@@ -150,6 +151,12 @@ export function EditEventForm({
     initialDurationMinutes: initialSchedule.initialDurationMinutes,
   })
 
+  const isCustomLocation = form.venueId === "__custom__"
+  const isMeeting = form.venueId === "__meeting__"
+  // The id of an actual venue — empty for the sentinel options (meeting /
+  // custom location).
+  const realVenueId = isCustomLocation || isMeeting ? "" : form.venueId
+
   const {
     venues,
     selectedVenue,
@@ -163,17 +170,17 @@ export function EditEventForm({
     effectiveBookingMode,
   } = useVenueAvailability({
     popupId,
-    venueId: form.venueId,
+    venueId: realVenueId,
     dateStr,
     displayTz,
     startIso,
     endIso,
     durationMinutes,
     excludeEventId: event.id,
-    isDateOutsidePopupWindow,
-    popupStartKey,
-    setDateStr,
-    setTimeStr,
+    // Changing the venue keeps the user's saved schedule. Availability is
+    // still re-checked against the new venue (conflict check,
+    // withinOpenHours, selectedDateIsClosed all key off venueId) and
+    // surfaced as warnings.
   })
 
   const updateMutation = useMutation({
@@ -199,18 +206,26 @@ export function EditEventForm({
 
   const venueMaxCapacity = selectedVenue?.capacity ?? null
   const venueDisabled = selectedVenue?.booking_mode === "unbookable"
-  const isCustomLocation = form.venueId === "__custom__"
-  const isMeeting = !form.venueId && !isCustomLocation
   const customLocationMissing =
     isCustomLocation &&
     (!form.customLocationName.trim() || !form.customLocationUrl.trim())
   const meetingUrlMissing = isMeeting && !form.meetingUrl.trim()
 
+  // Show the day-schedule preview only when a real venue (not the custom-
+  // location / meeting sentinels) and a day are selected.
+  const showSchedule = !!realVenueId && !!dateStr
+
+  // Clicking a free slot in the preview sets the start time. Convert the UTC
+  // instant to the display-tz "HH:mm" wall-clock the time field expects.
+  const handlePickScheduleTime = (isoUtc: string) => {
+    setTimeStr(utcToLocalTzNaive(isoUtc, displayTz).slice(11, 16))
+  }
+
   const canSubmit =
     !!form.title.trim() &&
     !!startIso &&
     !!endIso &&
-    (!form.venueId || isCustomLocation || withinOpenHours) &&
+    (!realVenueId || withinOpenHours) &&
     !customLocationMissing &&
     !meetingUrlMissing &&
     availability !== "conflict" &&
@@ -248,6 +263,9 @@ export function EditEventForm({
           customLocationUrl={form.customLocationUrl}
           onCustomLocationUrlChange={form.setCustomLocationUrl}
           effectiveBookingMode={effectiveBookingMode}
+          // Venue is mandatory for events; the meeting option survives only
+          // while editing an event that is already a meeting (legacy data).
+          allowMeeting={!event.venue_id && !event.custom_location_name}
         />
         {customLocationMissing && (
           <p className="text-xs text-destructive">
@@ -281,7 +299,7 @@ export function EditEventForm({
             setDurationValue(next.value)
             setDurationUnit(next.unit)
           }}
-          venueId={form.venueId}
+          venueId={realVenueId}
           withinOpenHours={withinOpenHours}
           availability={availability}
           availabilityLoaded={!!availabilityData}
@@ -290,6 +308,17 @@ export function EditEventForm({
           onSuggestionPick={setTimeStr}
           disabled={venueDisabled}
         />
+
+        {showSchedule && (
+          <VenueDayScheduleDialog
+            availability={availabilityData}
+            timezone={displayTz}
+            dayKey={dateStr}
+            proposedStartIso={startIso || null}
+            proposedEndIso={endIso || null}
+            onPickTime={handlePickScheduleTime}
+          />
+        )}
 
         <VisibilityField
           value={form.visibility}
@@ -317,11 +346,10 @@ export function EditEventForm({
 
         <div className="space-y-2">
           <Label htmlFor="desc">{t("events.form.description_label")}</Label>
-          <Textarea
+          <MarkdownEditor
             id="desc"
-            rows={4}
             value={form.content}
-            onChange={(e) => form.setContent(e.target.value)}
+            onChange={form.setContent}
           />
         </div>
 

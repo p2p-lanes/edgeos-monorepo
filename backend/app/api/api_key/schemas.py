@@ -20,6 +20,9 @@ class ApiKeyCreate(BaseModel):
     """Request body for creating a new API key."""
 
     name: str = Field(min_length=1, max_length=100)
+    # Popup the key is bound to. Human-owned keys are attendee keys: the key
+    # only works against this popup's portal routes.
+    popup_id: uuid.UUID
     expires_at: datetime | None = None
     scopes: list[ApiKeyScope] = Field(
         default_factory=lambda: list(DEFAULT_API_KEY_SCOPES)
@@ -74,6 +77,8 @@ class ApiKeyPublic(BaseModel):
     id: uuid.UUID
     name: str
     prefix: str
+    # None only for legacy rows created before popup scoping (all revoked).
+    popup_id: uuid.UUID | None = None
     scopes: list[ApiKeyScope]
     created_at: datetime
     last_used_at: datetime | None = None

@@ -8,6 +8,7 @@ import {
   getPriceStrategy,
   type PriceStrategy,
 } from "@/strategies/PriceStrategy"
+import { isPassQuantityBased } from "@/strategies/passQuantityHelper"
 import type { AttendeePassState } from "@/types/Attendee"
 import type { DiscountProps } from "@/types/discounts"
 import type { ProductsPass } from "@/types/Products"
@@ -72,7 +73,7 @@ class MonthProductStrategy implements ProductStrategy {
     attendeeId: string,
     product: ProductsPass,
   ): AttendeePassState[] {
-    const isMultiUnit = supportsQuantitySelector(product.max_per_order)
+    const isMultiUnit = isPassQuantityBased(product)
     // For multi-unit products, the caller passes the NEW desired quantity in
     // `product.quantity`. The selection is active when quantity > 0.
     const willSelectMonth = isMultiUnit
@@ -190,7 +191,7 @@ class WeekProductStrategy implements ProductStrategy {
     exclusivityScopeIds?: string[],
     attendeeVisibleProductIds?: string[],
   ): AttendeePassState[] {
-    const isMultiUnit = supportsQuantitySelector(product.max_per_order)
+    const isMultiUnit = isPassQuantityBased(product)
 
     // Promotion scope: prefer the WIDE scope (all attendee-visible products
     // across sections) so a week-in-section-A can promote a month-in-section-B
@@ -281,7 +282,7 @@ class FullProductStrategy implements ProductStrategy {
     attendeeId: string,
     product: ProductsPass,
   ): AttendeePassState[] {
-    const isMultiUnit = supportsQuantitySelector(product.max_per_order)
+    const isMultiUnit = isPassQuantityBased(product)
 
     return attendees.map((attendee) => {
       if (attendee.id !== attendeeId) return attendee
@@ -338,19 +339,14 @@ class ExclusivityGuard implements ProductStrategy {
   private isActive(product: ProductsPass): boolean {
     if (product.purchased) return true
     if (product.selected) return true
-    if (
-      product.duration_type === "day" ||
-      supportsQuantitySelector(product.max_per_order)
-    ) {
+    if (isPassQuantityBased(product)) {
       return (product.quantity ?? 0) > 0
     }
     return false
   }
 
   private clearSelection(product: ProductsPass): ProductsPass {
-    const usesQuantity =
-      product.duration_type === "day" ||
-      supportsQuantitySelector(product.max_per_order)
+    const usesQuantity = isPassQuantityBased(product)
 
     return {
       ...product,
@@ -414,28 +410,167 @@ class ExclusivityGuard implements ProductStrategy {
 }
 
 class EditProductStrategy implements ProductStrategy {
+  private inScope(p: ProductsPass, scopeIds: string[] | undefined): boolean {
+    if (!scopeIds || scopeIds.length === 0) return true
+    return scopeIds.includes(p.id)
+  }
+
+  // The auto-promotion target when the full week set is completed. Only a
+  // Month qualifies — a Full pass is a distinct product (full-event access,
+  // not "4 weeks"), so it never auto-upgrades from weeks. It can still be
+  // chosen explicitly via a direct click (handled in handleSelection). This
+  // mirrors WeekProductStrategy in normal checkout, which also targets Month.
+  private resolveMonthTarget(
+    products: ProductsPass[],
+    scopeIds: string[] | undefined,
+  ): ProductsPass | undefined {
+    return products.find(
+      (p) =>
+        p.duration_type === "month" &&
+        !p.purchased &&
+        this.inScope(p, scopeIds),
+    )
+  }
+
+  // A week counts toward the month when it stays in the order: an owned week
+  // that is kept (not given up for credit) OR a newly added selected week.
+  private activeWeekCount(
+    products: ProductsPass[],
+    scopeIds: string[] | undefined,
+  ): number {
+    return products.filter(
+      (p) =>
+        p.duration_type === "week" &&
+        this.inScope(p, scopeIds) &&
+        ((p.purchased && !p.edit) || (!p.purchased && p.selected)),
+    ).length
+  }
+
+  // Threshold: with scope, all weeks in that scope; without, legacy "4 weeks".
+  private weeksThreshold(
+    products: ProductsPass[],
+    scopeIds: string[] | undefined,
+  ): number {
+    if (scopeIds && scopeIds.length > 0) {
+      return products.filter(
+        (p) => p.duration_type === "week" && scopeIds.includes(p.id),
+      ).length
+    }
+    return 4
+  }
+
+  // Collapse the weekly/day passes into the month: select the month, give up
+  // owned weeks/days for credit, and drop newly added ones, so the price
+  // becomes (month - credit). Shared by the direct month click and the
+  // week-completion auto-promotion. The month target also gets a quantity so
+  // quantity-based month/full tiles (max_per_order null/>1) render as selected.
+  private upgradeToMonth(
+    products: ProductsPass[],
+    monthId: string,
+    scopeIds: string[] | undefined,
+  ): ProductsPass[] {
+    return products.map((p) => {
+      if (p.id === monthId) {
+        const quantity = isPassQuantityBased(p)
+          ? Math.max(1, p.quantity ?? 0)
+          : p.quantity
+        return { ...p, selected: true, quantity }
+      }
+      if (p.duration_type !== "week" && p.duration_type !== "day") return p
+      if (!this.inScope(p, scopeIds)) return p
+      if (p.purchased) return { ...p, edit: true, selected: false }
+      return { ...p, selected: false, quantity: 0 }
+    })
+  }
+
   handleSelection(
     attendees: AttendeePassState[],
     attendeeId: string,
     product: ProductsPass,
+    _discount?: DiscountProps,
+    exclusivityScopeIds?: string[],
+    attendeeVisibleProductIds?: string[],
   ): AttendeePassState[] {
+    const scope =
+      attendeeVisibleProductIds && attendeeVisibleProductIds.length > 0
+        ? attendeeVisibleProductIds
+        : exclusivityScopeIds
+
+    const isMonthLike =
+      product.duration_type === "month" || product.duration_type === "full"
+    // Day passes and genuinely multi-unit products are driven by quantity, not a
+    // plain selected toggle. Full and month passes are single-select in
+    // pass_system regardless of max_per_order — use isPassQuantityBased so a
+    // purchased full/month pass with max_per_order=null is toggled for credit
+    // instead of hitting the quantity branch and no-op'ing.
+    const usesQuantity = isPassQuantityBased(product)
+
     return attendees.map((attendee) => {
       if (attendee.id !== attendeeId) return attendee
+      const products = attendee.products
 
-      return {
-        ...attendee,
-        products: attendee.products.map((p) => {
-          if (p.id !== product.id) return p
-
-          if (p.purchased) {
-            // Toggle edit flag: give up for credit
-            return { ...p, edit: !p.edit, selected: !p.edit }
+      // Direct month/full click while editing: select → upgrade, deselect →
+      // revert owned weeks/days back to kept (the newly added ones stay off).
+      if (isMonthLike && !product.purchased) {
+        const willSelect = usesQuantity
+          ? (product.quantity ?? 0) > 0
+          : !product.selected
+        if (willSelect) {
+          return {
+            ...attendee,
+            products: this.upgradeToMonth(products, product.id, scope),
           }
-
-          // Non-purchased: toggle selection
-          return { ...p, selected: !p.selected }
-        }),
+        }
+        return {
+          ...attendee,
+          products: products.map((p) => {
+            if (p.id === product.id)
+              return {
+                ...p,
+                selected: false,
+                quantity: usesQuantity ? 0 : p.quantity,
+              }
+            if (p.duration_type !== "week" && p.duration_type !== "day")
+              return p
+            if (!this.inScope(p, scope)) return p
+            if (p.purchased) return { ...p, edit: false, selected: true }
+            return p
+          }),
+        }
       }
+
+      // Toggle the clicked product with edit semantics. Quantity-based products
+      // (day passes, multi-unit) follow the new quantity the caller sent.
+      const toggled = products.map((p) => {
+        if (p.id !== product.id) return p
+        if (usesQuantity) {
+          const nextQuantity = Math.max(0, product.quantity ?? 0)
+          return { ...p, quantity: nextQuantity, selected: nextQuantity > 0 }
+        }
+        if (p.purchased) {
+          // Toggle edit flag: give up for credit
+          return { ...p, edit: !p.edit, selected: !p.edit }
+        }
+        // Non-purchased: toggle selection
+        return { ...p, selected: !p.selected }
+      })
+
+      // Auto-promote to month once the full week set is active again — mirrors
+      // WeekProductStrategy in normal checkout, which is bypassed while editing.
+      const monthTarget = this.resolveMonthTarget(toggled, scope)
+      const threshold = this.weeksThreshold(toggled, scope)
+      if (
+        monthTarget &&
+        threshold > 0 &&
+        this.activeWeekCount(toggled, scope) >= threshold
+      ) {
+        return {
+          ...attendee,
+          products: this.upgradeToMonth(toggled, monthTarget.id, scope),
+        }
+      }
+
+      return { ...attendee, products: toggled }
     })
   }
 }

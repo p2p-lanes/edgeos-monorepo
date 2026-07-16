@@ -1,10 +1,14 @@
+import json
+import re
 import uuid
 from decimal import Decimal
-from typing import TYPE_CHECKING, Annotated, Literal
+from ipaddress import ip_address
+from typing import TYPE_CHECKING, Annotated, Any, Literal
 
 from fastapi import APIRouter, HTTPException, Query, Request, Response, status
 from sqlmodel import Session
 
+from app.api.audit_log.actor import actor_from_human
 from app.api.payment.crud import payments_crud
 from app.api.payment.models import Payments
 from app.api.payment.schemas import (
@@ -13,11 +17,16 @@ from app.api.payment.schemas import (
     PaymentFilter,
     PaymentPreview,
     PaymentPublic,
+    PaymentSource,
     PaymentStatus,
     PaymentStatusCheck,
     PaymentUpdate,
+    PendingReleaseAuthRequest,
+    PendingReleaseResponse,
+    SimpleFIInstallmentPlan,
     SimpleFIInstallmentPlanPayload,
     SimpleFIPaymentInfo,
+    SimpleFIPaymentRequest,
     SimpleFIWebhookPayload,
 )
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
@@ -32,21 +41,28 @@ from app.core.dependencies.users import (
     needs,
 )
 from app.core.redis import WebhookCache
-from app.services.email import (
-    EmailAttachment,
-    PaymentAttendeeItem,
-    PaymentConfirmedContext,
-    PaymentProductItem,
-    compute_order_summary,
-    get_email_service,
-)
 from app.services.email_helpers import send_application_status_email
+
+# Email notification helpers live in app.services.payment_notifications to
+# allow import by background jobs without creating a circular dependency with
+# the web layer.  The names are re-exported here under their original private
+# identifiers so existing call sites and test monkey-patches keep working.
+from app.services.payment_notifications import (  # noqa: F401
+    _build_payment_confirmed_context,
+    _send_payment_confirmed_email,
+)
+from app.services.payment_notifications import (
+    send_payment_confirmed_email_best_effort as _send_payment_confirmed_email_best_effort,
+)
 
 if TYPE_CHECKING:
     from app.api.human.models import Humans
     from app.api.popup.models import Popups
 
 router = APIRouter(prefix="/payments", tags=["payments"])
+
+_META_BROWSER_ID_PATTERN = re.compile(r"^fb\.1\.\d{10,13}\.[A-Za-z0-9._-]{1,256}$")
+_MAX_USER_AGENT_LENGTH = 512
 
 
 def _normalize_payment_source(provider: str | None) -> str:
@@ -60,6 +76,116 @@ def _normalize_payment_source(provider: str | None) -> str:
     if normalized in {"mercadopago", "mercado pago", "mercado_pago"}:
         return "MercadoPago"
     return provider.strip()
+
+
+def _first_non_empty(*values: str | None) -> str | None:
+    for value in values:
+        if value:
+            stripped = value.strip()
+            if stripped:
+                return stripped
+    return None
+
+
+def _sanitize_meta_browser_id(value: str | None) -> str | None:
+    candidate = _first_non_empty(value)
+    if candidate is None or len(candidate) > 512:
+        return None
+    if not _META_BROWSER_ID_PATTERN.fullmatch(candidate):
+        return None
+    return candidate
+
+
+def _sanitize_client_ip(value: str | None) -> str | None:
+    candidate = _first_non_empty(value)
+    if candidate is None or len(candidate) > 128:
+        return None
+    try:
+        return str(ip_address(candidate))
+    except ValueError:
+        return None
+
+
+def _extract_client_ip(request: Request) -> str | None:
+    direct_ip = _sanitize_client_ip(request.client.host if request.client else None)
+    if direct_ip:
+        return direct_ip
+
+    forwarded_for = request.headers.get("X-Forwarded-For")
+    if not forwarded_for or len(forwarded_for) > 512:
+        return None
+    return _sanitize_client_ip(forwarded_for.split(",", maxsplit=1)[0])
+
+
+def _extract_meta_attribution(
+    request: Request,
+    *,
+    fbc: str | None = None,
+    fbp: str | None = None,
+) -> dict[str, str | None]:
+    user_agent = _first_non_empty(request.headers.get("User-Agent"))
+    return {
+        "fbc": _sanitize_meta_browser_id(
+            _first_non_empty(request.cookies.get("_fbc"), fbc)
+        ),
+        "fbp": _sanitize_meta_browser_id(
+            _first_non_empty(request.cookies.get("_fbp"), fbp)
+        ),
+        "client_ip": _extract_client_ip(request),
+        "client_user_agent": user_agent[:_MAX_USER_AGENT_LENGTH]
+        if user_agent
+        else None,
+    }
+
+
+def _webhook_payment_external_id(raw_body: dict[str, Any]) -> str | None:
+    event_type = raw_body.get("event_type")
+    data = raw_body.get("data") if isinstance(raw_body.get("data"), dict) else {}
+
+    if event_type in {
+        "installment_plan_activated",
+        "installment_plan_cancelled",
+        "installment_plan_completed",
+    }:
+        entity_id = raw_body.get("entity_id")
+        return entity_id if isinstance(entity_id, str) else None
+
+    payment_request = data.get("payment_request")
+    if not isinstance(payment_request, dict):
+        return None
+
+    installment_plan_id = payment_request.get("installment_plan_id")
+    if isinstance(installment_plan_id, str) and installment_plan_id:
+        return installment_plan_id
+
+    payment_request_id = payment_request.get("id")
+    return payment_request_id if isinstance(payment_request_id, str) else None
+
+
+def _verify_simplefi_webhook_or_raise(
+    raw_body: dict[str, Any],
+    db: Session,
+) -> None:
+    from loguru import logger
+
+    external_id = _webhook_payment_external_id(raw_body)
+    if external_id is None:
+        logger.warning("SimpleFI webhook missing verifiable payment identifier")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid webhook payload",
+        )
+
+    payment = payments_crud.get_by_external_id(db, external_id)
+    if payment is None:
+        logger.warning(
+            "SimpleFI webhook rejected: payment not found for external_id={}",
+            external_id,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Payment not found",
+        )
 
 
 def _extract_settlement_details(
@@ -89,186 +215,70 @@ def _extract_settlement_details(
     return settlement_currency, settlement_rate, source
 
 
-def _build_payment_email_products(payment: Payments) -> list[PaymentProductItem]:
-    return [
-        PaymentProductItem(
-            name=pp.product_name,
-            price=float(pp.product_price),
-            quantity=pp.quantity,
-        )
-        for pp in payment.products_snapshot
-    ]
+def _extract_charged_amount(payment_request: SimpleFIPaymentRequest) -> Decimal:
+    """Total the buyer was actually charged, in the request's fiat currency.
 
-
-def _build_payment_email_attendees(
-    payment: Payments,
-) -> list[PaymentAttendeeItem] | None:
-    if not payment.products_snapshot:
-        return None
-
-    attendees_by_id: dict[uuid.UUID, PaymentAttendeeItem] = {}
-
-    for product_snapshot in payment.products_snapshot:
-        attendee = product_snapshot.attendee
-        attendee_id = product_snapshot.attendee_id
-
-        if attendee_id not in attendees_by_id:
-            attendees_by_id[attendee_id] = PaymentAttendeeItem(
-                name=(attendee.name if attendee else None)
-                or product_snapshot.attendee_name
-                or "Attendee",
-                category=(attendee.category if attendee else None) or "attendee",
-                products=[],
-            )
-
-        attendees_by_id[attendee_id].products = [
-            *(attendees_by_id[attendee_id].products or []),
-            PaymentProductItem(
-                name=product_snapshot.product_name,
-                price=float(product_snapshot.product_price),
-                quantity=product_snapshot.quantity,
-            ),
-        ]
-
-    return list(attendees_by_id.values())
-
-
-def _build_payment_confirmed_context(
-    payment: Payments,
-    popup_name: str,
-    first_name: str,
-    portal_url: str | None,
-) -> PaymentConfirmedContext:
-    products = _build_payment_email_products(payment)
-    attendees = _build_payment_email_attendees(payment)
-
-    original_amount = None
-    if payment.discount_value and payment.discount_value > 0:
-        original_amount = sum(
-            float(pp.product_price) * pp.quantity for pp in payment.products_snapshot
-        )
-
-    return PaymentConfirmedContext(
-        first_name=first_name,
-        popup_name=popup_name,
-        payment_id=str(payment.id),
-        amount=float(payment.amount),
-        currency=payment.currency,
-        products=products if products else None,
-        discount_value=int(payment.discount_value) if payment.discount_value else None,
-        original_amount=original_amount,
-        attendees=attendees,
-        order_summary=compute_order_summary(payment)
-        if payment.products_snapshot
-        else None,
-        portal_url=portal_url,
-    )
-
-
-async def _send_payment_confirmed_email(payment, db_session=None) -> None:
-    """Send payment confirmation email.
-
-    If the popup has invoice details configured (company name, address, email),
-    an invoice PDF is generated and attached to the email.
-
-    Branches on payment.application_id:
-    - application-based: resolve human via payment.application.human.
-    - direct-sale: resolve human via the attendee in the first product snapshot,
-      and popup via payment.popup.
+    SimpleFi merchants can configure signed per-rail price adjustments, so this
+    can differ from the quoted Payment.amount. Card payments carry the adjusted
+    fiat total in card_payment.price_details.final_amount; the request's legacy
+    `amount` scalar mirrors the crypto-rail adjusted total. `amount_paid` is NOT
+    usable for card checkouts — SimpleFi normalizes the discount back out of it.
     """
+    card_payment = payment_request.card_payment
+    if card_payment is not None and card_payment.price_details is not None:
+        return Decimal(str(card_payment.price_details.final_amount))
+    return Decimal(str(payment_request.amount))
+
+
+def _plan_payment_source(plan: SimpleFIInstallmentPlan) -> str | None:
+    """Settlement provider for an installment plan, from the activation payload.
+
+    Subscription-charged installments never carry a card_payment object on
+    their settlement webhooks, so activation is the only point where the
+    rail/provider is visible. SimpleFi locks the payment method after the
+    first charge, so the value stays accurate for the plan's lifetime.
+    Returns None when the payload doesn't identify the rail (leave source
+    untouched rather than guessing).
+    """
+    method = (plan.payment_method or "").upper()
+    if method == "CRYPTO":
+        return PaymentSource.CRYPTO.value
+    if method == "CARD":
+        if plan.stripe_subscription_id:
+            return PaymentSource.STRIPE.value
+        if plan.mercadopago_preapproval_id:
+            return PaymentSource.MERCADOPAGO.value
+    return None
+
+
+def _schedule_meta_capi_purchase(payment: Payments) -> None:
     from loguru import logger
 
-    payment_model: Payments = payment
+    from app.services.meta_capi import fire_and_forget_purchase_event
 
-    if payment_model.application_id is not None:
-        # Application-based payment (existing flow)
-        application = payment_model.application
-        human = application.human if application else None
-        popup = application.popup if application else None
-    else:
-        # Direct-sale payment: no application. Human comes from the attendee
-        # linked to the first product snapshot (direct-sale only ever has one
-        # attendee per payment — the buyer).
-        popup = payment_model.popup
-        human = None
-        if payment_model.products_snapshot:
-            attendee = payment_model.products_snapshot[0].attendee
-            if attendee is not None:
-                human = attendee.human
-
-    if popup is None:
-        logger.warning(
-            f"Cannot send payment confirmed email: popup missing for payment {payment.id}"
+    try:
+        fire_and_forget_purchase_event(
+            tenant=payment.tenant,
+            payment=payment,
+            popup=payment.popup,
         )
-        return
-    tenant = popup.tenant
-
-    if not human or not human.email:
-        logger.warning(
-            f"Cannot send payment confirmed email: no human email for payment {payment.id}"
+    except Exception:
+        logger.exception(
+            "Failed to queue Meta CAPI Purchase event payment_id={}", payment.id
         )
-        return
 
-    # Generate invoice PDF attachment if popup has invoice details configured
-    attachments: list[EmailAttachment] | None = None
-    popup_has_invoice = (
-        popup.invoice_company_name
-        and popup.invoice_company_address
-        and popup.invoice_company_email
-    )
-    if popup_has_invoice:
-        try:
-            from app.core.invoice import generate_invoice_pdf
 
-            client_name = f"{human.first_name or ''} {human.last_name or ''}".strip()
+def _installment_charged_amount(payment_request: SimpleFIPaymentRequest) -> Decimal:
+    """Charged amount for a single installment's payment request.
 
-            pdf_bytes = generate_invoice_pdf(
-                payment=payment_model,
-                client_name=client_name or "N/A",
-                invoice_company_name=popup.invoice_company_name,
-                invoice_company_address=popup.invoice_company_address,
-                invoice_company_email=popup.invoice_company_email,
-                header_image_url=popup.image_url,
-            )
-            attachments = [
-                EmailAttachment(
-                    filename=f"invoice-{payment_model.id}.pdf",
-                    content=pdf_bytes,
-                    mime_type="application/pdf",
-                )
-            ]
-            logger.info(f"Invoice PDF generated for payment {payment_model.id}")
-        except Exception as e:
-            logger.error(
-                f"Failed to generate invoice PDF for payment {payment_model.id}: {e}"
-            )
-            # Continue sending email without attachment
-
-    email_service = get_email_service()
-
-    from app.api.tenant.utils import get_portal_url
-
-    portal_url = get_portal_url(tenant)
-    context = _build_payment_confirmed_context(
-        payment_model,
-        popup_name=popup.name,
-        first_name=human.first_name or "",
-        portal_url=portal_url,
-    )
-
-    await email_service.send_payment_confirmed(
-        to=human.email,
-        subject=f"Payment Confirmed for {popup.name}",
-        context=context,
-        from_address=tenant.sender_email,
-        from_name=tenant.sender_name,
-        popup_id=popup.id,
-        db_session=db_session,
-        attachments=attachments,
-    )
-    logger.info(
-        f"Payment confirmed email sent to {human.email} for payment {payment.id}"
-    )
+    Card checkout installments carry the adjusted total in card_payment.price_details;
+    subscription installments (Stripe / Mercado Pago) and crypto installments report
+    the actually-debited amount directly in `amount_paid`.
+    """
+    card_payment = payment_request.card_payment
+    if card_payment is not None and card_payment.price_details is not None:
+        return Decimal(str(card_payment.price_details.final_amount))
+    return Decimal(str(payment_request.amount_paid))
 
 
 def _get_portal_owned_payment_or_404(
@@ -477,6 +487,19 @@ async def update_payment(
     # If status is being updated, use the special method
     old_status = payment.status
     if payment_in.status:
+        # Manual backoffice approval of an application-fee payment: route through
+        # the shared handler so the application transitions out of PENDING_FEE and
+        # credit is granted — identical to the SimpleFi webhook path.
+        if (
+            payment_in.status == PaymentStatus.APPROVED
+            and old_status != PaymentStatus.APPROVED.value
+        ):
+            from app.api.payment.schemas import PaymentType
+
+            if payment.payment_type == PaymentType.APPLICATION_FEE.value:
+                await _handle_fee_payment_approved(db, payment, source="manual")
+                return PaymentPublic.model_validate(payment)
+
         payment = payments_crud.update_status(db, payment_id, payment_in.status)
     else:
         payment = payments_crud.update(db, payment, payment_in)
@@ -517,9 +540,62 @@ async def create_my_application_fee(
             detail="Application not found",
         )
 
+    from app.api.popup.guards import ensure_popup_writable
+
     popup = application.popup
+    ensure_popup_writable(popup)
     payment = payments_crud.create_fee_payment(db, application, popup)
     return PaymentPublic.model_validate(payment)
+
+
+@router.post(
+    "/my/pending/release",
+    response_model=PendingReleaseResponse,
+    dependencies=[needs("portal:applications:write")],
+    responses={
+        409: {
+            "description": (
+                "Payment conflict. detail.code='previous_payment_completed' means the prior "
+                "PENDING payment was concurrently approved — includes a redirect_url "
+                "pointing to the buyer's passes page."
+            ),
+        },
+        502: {
+            "description": (
+                "Payment provider error. detail.code='payment_cancel_failed' means the prior "
+                "pending payment could not be cancelled. Checkout should proceed — "
+                "creation-time supersede remains as a backstop."
+            ),
+        },
+    },
+)
+async def release_my_pending_payment(
+    request_in: PendingReleaseAuthRequest,
+    db: HumanTenantSession,
+    current_human: CurrentHuman,
+) -> PendingReleaseResponse:
+    """Opportunistically release a buyer's own prior PENDING payment on checkout return (authenticated).
+
+    Called by the portal on checkout mount for authenticated buyers (portal flow and
+    popup-mode direct sale) before coupon validation or stock display.
+    This frees any coupon/stock/credit holds so the buyer can re-apply their own
+    single-use coupon without a false-invalid error (the circularity fix).
+
+    Proof: application_id ownership, verified against current_human.id.
+
+    Response contract:
+    - HTTP 200 {released: false}: no PENDING for this application, or flag disabled.
+    - HTTP 200 {released: true}: PENDING payment cancelled, holds freed.
+    - HTTP 404: application not found or not owned by current_human (enumeration-safe).
+    - HTTP 409 previous_payment_completed: race lost — prior payment already approved.
+    - HTTP 502 payment_cancel_failed: SimpleFi unreachable; creation-time backstop remains.
+    """
+    result = payments_crud.release_pending_authenticated(
+        db,
+        application_id=request_in.application_id,
+        human_id=current_human.id,
+    )
+    return PendingReleaseResponse(released=result.released)
 
 
 @router.get(
@@ -733,9 +809,27 @@ async def preview_my_payment(
     response_model=PaymentPublic,
     status_code=status.HTTP_201_CREATED,
     dependencies=[needs("portal:applications:write")],
+    responses={
+        409: {
+            "description": (
+                "Concurrent payment conflict. "
+                "detail.code is one of: "
+                "'concurrent_payment_in_progress' (another PENDING payment exists and could not be superseded) or "
+                "'previous_payment_completed' (prior payment was completed — redirect_url points to the buyer's passes page)."
+            ),
+        },
+        502: {
+            "description": (
+                "Payment provider error. "
+                "detail.code='payment_cancel_failed' means the prior pending payment could not be cancelled. "
+                "Retry the request."
+            ),
+        },
+    },
 )
 async def create_my_payment(
     payment_in: PaymentCreate,
+    request: Request,
     db: HumanTenantSession,
     current_human: CurrentHuman,
 ) -> PaymentPublic:
@@ -760,10 +854,19 @@ async def create_my_payment(
             detail="Application not found",
         )
 
-    payment, _preview = payments_crud.create_payment(db, payment_in)
+    from app.api.popup.guards import ensure_popup_writable
+
+    ensure_popup_writable(application.popup)
+
+    payment, _preview = payments_crud.create_payment(
+        db,
+        payment_in,
+        attribution=_extract_meta_attribution(request),
+        actor=actor_from_human(current_human),
+    )
 
     if payment.status == PaymentStatus.APPROVED.value:
-        await _send_payment_confirmed_email(payment, db_session=db)
+        await _send_payment_confirmed_email_best_effort(payment, db_session=db)
 
     return PaymentPublic.model_validate(payment)
 
@@ -797,7 +900,22 @@ async def simplefi_webhook(
 
     from app.core.redis import webhook_cache
 
-    raw_body = await request.json()
+    raw_payload = await request.body()
+    try:
+        raw_body = json.loads(raw_payload)
+    except json.JSONDecodeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid webhook payload",
+        ) from exc
+    if not isinstance(raw_body, dict):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid webhook payload",
+        )
+
+    _verify_simplefi_webhook_or_raise(raw_body, db)
+
     event_type = raw_body.get("event_type")
     logger.info(
         "SimpleFI webhook received: event_type={} entity_type={} entity_id={}",
@@ -889,6 +1007,9 @@ async def _handle_regular_payment(
     if payment_request_status == "approved":
         from app.api.payment.schemas import PaymentType
 
+        # Recorded before approval so it lands in the same commit.
+        payment.amount_charged = _extract_charged_amount(payload.data.payment_request)
+
         if payment.payment_type == PaymentType.APPLICATION_FEE.value:
             await _handle_fee_payment_approved(
                 db,
@@ -905,7 +1026,8 @@ async def _handle_regular_payment(
                 rate=settlement_rate,
                 source=source,
             )
-            await _send_payment_confirmed_email(payment, db_session=db)
+            _schedule_meta_capi_purchase(payment)
+            await _send_payment_confirmed_email_best_effort(payment, db_session=db)
         logger.info("Payment {} approved via SimpleFI webhook", payment.id)
     else:
         payments_crud.update_status(db, payment.id, PaymentStatus.EXPIRED)
@@ -1014,7 +1136,8 @@ async def _handle_fee_payment_approved(
 
     # Approve the payment record first
     payment.status = PaymentStatus.APPROVED.value
-    payment.settlement_currency = settlement_currency
+    if settlement_currency is not None:
+        payment.settlement_currency = settlement_currency
     if rate is not None:
         payment.rate = rate
     payment.source = source
@@ -1109,8 +1232,36 @@ async def _handle_installment_payment(
             detail="Payment not found",
         )
 
+    # Defence-in-depth dedupe: the redis-backed fingerprint above stops the
+    # common case (same webhook re-delivered), but it doesn't survive cache
+    # eviction or a deploy that clears state. If we already inserted an
+    # installment row for this payment_request_id, skip — don't double-count.
+    existing = next(
+        (
+            i
+            for i in payment.installments
+            if i.external_payment_id == payment_request_id
+        ),
+        None,
+    )
+    if existing is not None:
+        logger.info(
+            "Installment payment_request_id={} already recorded as installment #{} for payment {}; skipping",
+            payment_request_id,
+            existing.installment_number,
+            payment.id,
+        )
+        return {"message": "Installment payment already recorded"}
+
     # Extract payment details
     settlement_currency, settlement_rate, source = _extract_settlement_details(payload)
+
+    # Subscription-charged installments carry no card_payment object, so the
+    # extracted source falls back to the residual "SimpleFI". If activation
+    # already recorded the plan's provider (Stripe/MercadoPago/Crypto), keep
+    # it — never downgrade to the residual. Webhook ordering isn't guaranteed.
+    if payment.source and payment.source != PaymentSource.SIMPLEFI.value:
+        source = payment.source
 
     if isinstance(new_payment, SimpleFIPaymentInfo):
         amount = Decimal(str(new_payment.amount))
@@ -1134,6 +1285,13 @@ async def _handle_installment_payment(
     )
     db.add(installment)
 
+    # Accumulate the fiat total actually charged across installments. Uses the
+    # payment request's charged amount, not the raw installment row amount —
+    # the row may be denominated in the paying coin rather than fiat.
+    payment.amount_charged = (
+        payment.amount_charged or Decimal("0")
+    ) + _installment_charged_amount(payment_request)
+
     # First installment: approve payment to assign products
     is_first_installment = (payment.installments_paid or 0) == 0
     if is_first_installment and payment.status != "approved":
@@ -1144,6 +1302,7 @@ async def _handle_installment_payment(
             rate=settlement_rate,
             source=source,
         )
+        _schedule_meta_capi_purchase(payment)
         logger.info("First installment received - payment {} approved", payment.id)
 
     # Increment installments_paid
@@ -1204,7 +1363,7 @@ async def _handle_installment_plan_completed(
         )
         payment.installments_paid = installment_plan.paid_installments_count
         db.commit()
-        await _send_payment_confirmed_email(payment, db_session=db)
+        await _send_payment_confirmed_email_best_effort(payment, db_session=db)
         return {"message": "Installment plan completed - count synced"}
 
     # Edge case: plan completed but payment not approved
@@ -1213,7 +1372,8 @@ async def _handle_installment_plan_completed(
     )
     payment.installments_paid = installment_plan.paid_installments_count
     payment = payments_crud.approve_payment(db, payment.id)
-    await _send_payment_confirmed_email(payment, db_session=db)
+    _schedule_meta_capi_purchase(payment)
+    await _send_payment_confirmed_email_best_effort(payment, db_session=db)
 
     return {"message": "Installment plan payment approved successfully"}
 
@@ -1246,7 +1406,62 @@ async def _handle_installment_plan_activated(
         )
 
     installment_plan = payload.data.installment_plan
-    payment.installments_total = installment_plan.number_of_installments
+    new_total = installment_plan.number_of_installments
+    new_paid = installment_plan.paid_installments_count
+    plan_source = _plan_payment_source(installment_plan)
+
+    # Idempotent. The fingerprint above catches the redis-cached case, but if
+    # SimpleFi re-delivers after a cache eviction we should still no-op
+    # cleanly. A *changed* number_of_installments would mean the buyer somehow
+    # re-picked after activation — surface that as a warning rather than
+    # silently overwriting, since downstream installment-counting depends on it.
+    if payment.installments_total is not None:
+        if payment.installments_total == new_total:
+            changed = False
+            if getattr(payment, "installments_paid", new_paid) != new_paid:
+                payment.installments_paid = new_paid
+                changed = True
+            if (
+                plan_source is not None
+                and getattr(payment, "source", None) != plan_source
+            ):
+                payment.source = plan_source
+                changed = True
+            if changed:
+                db.commit()
+                return {"message": "Installment plan activation synced"}
+            logger.info(
+                "Payment {}: installments_total already set to {}; skipping",
+                payment.id,
+                new_total,
+            )
+            return {"message": "Installment plan already activated"}
+        logger.warning(
+            "Payment {}: installments_total changing {} -> {} on re-activation",
+            payment.id,
+            payment.installments_total,
+            new_total,
+        )
+
+    payment.installments_total = new_total
+    payment.installments_paid = new_paid
+
+    # SimpleFi creates a "plan" even when the buyer picks pay-in-full
+    # (number_of_installments = 1). Normalize the flag so data consumers
+    # don't need a single-installment special case.
+    if new_total == 1 and payment.is_installment_plan:
+        payment.is_installment_plan = False
+        logger.info(
+            "Payment {}: single-installment plan — is_installment_plan normalized to False",
+            payment.id,
+        )
+
+    # Activation is the only webhook that exposes the plan's rail/provider,
+    # so record it here. Settlement must not downgrade it later (see
+    # _handle_installment_payment).
+    if plan_source is not None:
+        payment.source = plan_source
+
     db.commit()
 
     logger.info(
@@ -1285,18 +1500,33 @@ async def _handle_installment_plan_cancelled(
             detail="Payment not found",
         )
 
-    # Idempotent: skip if already cancelled
-    if payment.status == "cancelled":
+    old_status = payment.status
+
+    # Idempotent: skip if already cancelled. The early return also keeps us
+    # from double-restoring stock (the LEAST clamp is a backstop, not the
+    # primary defence).
+    if old_status == "cancelled":
         logger.info("Payment {} already cancelled. Skipping...", payment.id)
         return {"message": "Payment already cancelled"}
 
-    # If payment was approved, revoke products
-    if payment.status == "approved":
+    # If the first installment had already approved the payment, attendee
+    # products were assigned — revoke them before flipping status.
+    if old_status == "approved":
         logger.info("Revoking products for cancelled payment {}", payment.id)
         payments_crud._remove_products_from_attendees(db, payment)
+
+    # Restore stock for any in-progress plan (PENDING or APPROVED-partial).
+    # The buyer abandoned mid-plan; we free inventory so other buyers can take
+    # those tickets. This intentionally diverges from the documented
+    # ``_restore_payment_stock`` contract (which limits APPROVED restores) —
+    # installment plans never represent a fully-paid purchase when cancelled
+    # by SimpleFi, so the refund-flow caveat doesn't apply. Duplicate webhook
+    # delivery is already short-circuited by the already-cancelled check
+    # above; the per-product LEAST clamp is the structural safety net.
+    payments_crud._restore_payment_stock(db, payment)
 
     payment.status = "cancelled"
     db.commit()
 
-    logger.info("Payment {} cancelled", payment.id)
+    logger.info("Payment {} cancelled (stock restored)", payment.id)
     return {"message": "Installment plan cancelled successfully"}

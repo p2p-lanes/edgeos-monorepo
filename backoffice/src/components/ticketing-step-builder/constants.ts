@@ -11,6 +11,7 @@ import {
   type LucideIcon,
   Shield,
   ShoppingBag,
+  Sparkles,
   Ticket,
   Utensils,
   Video,
@@ -30,6 +31,12 @@ export interface TemplateDefinition {
 }
 
 export const TEMPLATE_DEFINITIONS: TemplateDefinition[] = [
+  {
+    key: "hero",
+    label: "Hero / Home",
+    description: "Opening screen: artwork, headline and bullets",
+    icon: Sparkles,
+  },
   {
     key: "ticket-select",
     label: "Ticket Select",
@@ -94,6 +101,7 @@ export const TEMPLATE_DEFINITIONS: TemplateDefinition[] = [
 
 /** Templates that don't display products and therefore don't need a product category. */
 export const CONTENT_ONLY_TEMPLATES = new Set([
+  "hero",
   "youtube-video",
   "image-gallery",
   "faqs",

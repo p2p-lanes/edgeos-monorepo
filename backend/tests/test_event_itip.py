@@ -320,6 +320,31 @@ class TestBuildEventIcs:
         assert "RECURRENCE-ID:" not in invite
         assert "RECURRENCE-ID:" not in update
 
+    def test_recurring_master_invite_carries_rrule(self) -> None:
+        """A series-master REQUEST must carry RRULE so the recipient's calendar
+        expands every occurrence and later updates reconcile the whole series.
+        A single-occurrence message (keyed by RECURRENCE-ID) must NOT, so it
+        patches just that instance."""
+        start = datetime(2026, 5, 5, 14, 0, tzinfo=UTC)
+        event = self._minimal_event(start=start, end=start + timedelta(hours=1))
+        event.rrule = "FREQ=WEEKLY;BYDAY=MO"
+
+        master = build_event_ics(
+            event, recipient_email="alice@example.com", method="REQUEST", sequence=1
+        )
+        assert "RRULE:FREQ=WEEKLY;BYDAY=MO" in master
+        assert "RECURRENCE-ID:" not in master
+
+        occ = build_event_ics(
+            event,
+            recipient_email="alice@example.com",
+            method="REQUEST",
+            sequence=1,
+            occurrence_start=start + timedelta(days=7),
+        )
+        assert "RRULE:" not in occ
+        assert "RECURRENCE-ID:" in occ
+
     def test_add_to_calendar_export_uid_matches_itip_uid(self) -> None:
         """The "Add to calendar" .ics download and the emailed invite/cancel
         must share the SAME UID. Calendars key entries on UID, so a mismatch
@@ -657,6 +682,8 @@ class TestPatchBumpsSequenceAndDispatches:
         tenant_a: Tenants,
         admin_token_tenant_a: str,
     ) -> None:
+        """A field that doesn't change the calendar entry (e.g. `highlighted`)
+        must not bump SEQUENCE or re-send iTIP."""
         popup = _make_popup(db, tenant_a)
         event = _make_event(db, tenant_a, popup)
         _invite(db, event, _make_human(db, tenant_a))
@@ -667,15 +694,46 @@ class TestPatchBumpsSequenceAndDispatches:
             resp = client.patch(
                 f"/api/v1/events/{event.id}",
                 headers=_auth(admin_token_tenant_a),
-                json={"content": "Completely new description"},
+                json={"highlighted": True},
             )
 
         assert resp.status_code == 200, resp.text
         db.expire_all()
         refreshed = db.get(Events, event.id)
         assert refreshed.ical_sequence == before_sequence
-        assert refreshed.content == "Completely new description"
         assert send_mock.await_count == 0
+
+    def test_description_and_meeting_url_changes_bump_and_dispatch(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+        admin_token_tenant_a: str,
+    ) -> None:
+        """Editing the description or the online join link is material — it must
+        bump SEQUENCE and re-send REQUEST so attendees' calendars update."""
+        popup = _make_popup(db, tenant_a)
+        event = _make_event(db, tenant_a, popup)
+        _invite(db, event, _make_human(db, tenant_a))
+
+        for field, value in (
+            ("content", "Brand new description"),
+            ("meeting_url", "https://meet.example.com/new-link"),
+        ):
+            before_sequence = db.get(Events, event.id).ical_sequence
+            send_mock = AsyncMock(return_value=None)
+            with _patch_send_everywhere(send_mock):
+                resp = client.patch(
+                    f"/api/v1/events/{event.id}",
+                    headers=_auth(admin_token_tenant_a),
+                    json={field: value},
+                )
+            assert resp.status_code == 200, resp.text
+            db.expire_all()
+            refreshed = db.get(Events, event.id)
+            assert refreshed.ical_sequence == before_sequence + 1, field
+            assert send_mock.await_count == 1, field
+            assert send_mock.await_args.kwargs["method"] == "REQUEST"
 
     def test_patch_with_two_recipients_fans_out_once(
         self,

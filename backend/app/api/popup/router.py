@@ -16,6 +16,11 @@ from app.api.form_section.models import FormSections
 from app.api.payment.crud import payments_crud
 from app.api.payment.schemas import PaymentStatus
 from app.api.popup import crud
+from app.api.popup.guards import (
+    CallerToken,
+    ensure_api_key_popup,
+    is_popup_scoped_api_key,
+)
 from app.api.popup.models import Popups
 from app.api.popup.schemas import (
     PopupAdmin,
@@ -33,6 +38,7 @@ from app.api.translation.service import (
     delete_translations_for_entity,
     get_translations_bulk,
     get_translations_for_entity,
+    parse_accept_language,
 )
 from app.core.dependencies.users import (
     CurrentCheckInOperator,
@@ -42,6 +48,7 @@ from app.core.dependencies.users import (
     SessionDep,
     TenantSession,
 )
+from app.services.image_ingestion import ImageIngestionService
 
 router = APIRouter(prefix="/popups", tags=["popups"])
 
@@ -188,6 +195,21 @@ async def create_popup(
             detail="A popup with this slug already exists in this tenant",
         )
 
+    # CDN image ingestion: rewrite external image URLs to CDN before commit.
+    # Pattern B (async hook). Fail-open: any per-URL failure keeps the original URL.
+    _svc = ImageIngestionService()
+    tenant_id = popup_in.tenant_id  # already resolved above
+    if popup_in.image_url is not None:
+        popup_in.image_url = await _svc.ingest_url(popup_in.image_url, tenant_id)
+    if popup_in.icon_url is not None:
+        popup_in.icon_url = await _svc.ingest_url(popup_in.icon_url, tenant_id)
+    if popup_in.favicon_url is not None:
+        popup_in.favicon_url = await _svc.ingest_url(popup_in.favicon_url, tenant_id)
+    if popup_in.express_checkout_background is not None:
+        popup_in.express_checkout_background = await _svc.ingest_url(
+            popup_in.express_checkout_background, tenant_id
+        )
+
     try:
         popup = crud.create(db, popup_in)
     except IntegrityError as exc:
@@ -256,6 +278,22 @@ async def update_popup(
     scholarship_enabling = (
         popup_in.allows_scholarship is True and not popup.allows_scholarship
     )
+
+    # CDN image ingestion: rewrite external image URLs to CDN before commit.
+    # Pattern B (async hook). Fail-open: any per-URL failure keeps the original URL.
+    _svc = ImageIngestionService()
+    if popup_in.image_url is not None:
+        popup_in.image_url = await _svc.ingest_url(popup_in.image_url, popup.tenant_id)
+    if popup_in.icon_url is not None:
+        popup_in.icon_url = await _svc.ingest_url(popup_in.icon_url, popup.tenant_id)
+    if popup_in.favicon_url is not None:
+        popup_in.favicon_url = await _svc.ingest_url(
+            popup_in.favicon_url, popup.tenant_id
+        )
+    if popup_in.express_checkout_background is not None:
+        popup_in.express_checkout_background = await _svc.ingest_url(
+            popup_in.express_checkout_background, popup.tenant_id
+        )
 
     try:
         updated = crud.update(db, popup, popup_in)
@@ -366,16 +404,35 @@ async def delete_popup(
 @router.get("/portal/list", response_model=list[PopupPublic])
 async def list_portal_popups(
     db: HumanTenantSession,
-    _current_human: CurrentHuman,
+    current_human: CurrentHuman,
+    token_payload: CallerToken,
     accept_language: Annotated[str | None, Header(alias="Accept-Language")] = None,
 ) -> list[PopupPublic]:
-    """List active popups for the current human's tenant (Portal)."""
-    popups, _total = crud.find(db, status=PopupStatus.active, limit=100)
+    """List popups visible to the current human in the Portal.
 
-    if not accept_language or accept_language == "en":
+    Active popups are visible to everyone in the tenant. Ended popups (recap
+    mode) are visible only to humans who participated, resolved via the same
+    access ladder used by the passes/events gates.
+    """
+    from app.api.application.crud import applications_crud  # noqa: PLC0415
+
+    active_popups, _ = crud.find(db, status=PopupStatus.active, limit=100)
+    ended_popups, _ = crud.find(db, status=PopupStatus.ended, limit=100)
+    participated_ended = [
+        p
+        for p in ended_popups
+        if applications_crud.resolve_popup_access(db, current_human.id, p.id).allowed
+    ]
+    popups = list(active_popups) + participated_ended
+
+    # Popup-scoped API keys only ever see their own popup.
+    if is_popup_scoped_api_key(token_payload):
+        popups = [p for p in popups if p.id == token_payload.popup_id]
+
+    lang = parse_accept_language(accept_language)
+    if lang is None:
         return [PopupPublic.model_validate(p) for p in popups]
 
-    lang = accept_language.split(",")[0].split("-")[0].strip()
     popup_ids = [p.id for p in popups]
     translations_map = get_translations_bulk(db, "popup", popup_ids, lang)
 
@@ -393,22 +450,34 @@ async def list_portal_popups(
 async def get_portal_popup(
     slug: str,
     db: HumanTenantSession,
-    _: CurrentHuman,
+    current_human: CurrentHuman,
+    token_payload: CallerToken,
     accept_language: Annotated[str | None, Header(alias="Accept-Language")] = None,
 ) -> PopupPublic:
-    """Get a popup by slug (Portal)."""
+    """Get a popup by slug (Portal). Ended popups are served only to participants."""
+    from app.api.application.crud import applications_crud  # noqa: PLC0415
+
     popup = crud.get_by_slug(db, slug)
 
-    if not popup or popup.status != PopupStatus.active:
+    if not popup or popup.status not in (PopupStatus.active, PopupStatus.ended):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Event not found",
         )
+    ensure_api_key_popup(token_payload, popup.id)
 
-    if not accept_language or accept_language == "en":
+    if popup.status == PopupStatus.ended:
+        access = applications_crud.resolve_popup_access(db, current_human.id, popup.id)
+        if not access.allowed:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Event not found",
+            )
+
+    lang = parse_accept_language(accept_language)
+    if lang is None:
         return PopupPublic.model_validate(popup)
 
-    lang = accept_language.split(",")[0].split("-")[0].strip()
     translation = get_translations_for_entity(db, "popup", popup.id, lang)
     data = PopupPublic.model_validate(popup).model_dump()
     data = apply_translation_overlay(data, translation, TRANSLATABLE_FIELDS["popup"])

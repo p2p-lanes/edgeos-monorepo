@@ -128,7 +128,7 @@
     "pay_and_submit": "Greiða og senda ({{amount}})",
     "fee": {
       "required_title": "Umsóknargjald krafist",
-      "required_description": "Óafturkræft gjald upp á ${{amount}} USD er krafist til að senda umsóknina. Þér verður vísað á örugga greiðslusíðu.",
+      "required_description": "Endurgreiðanlegt gjald upp á ${{amount}} USD er krafist til að senda umsóknina. Þér verður vísað á örugga greiðslusíðu.",
       "processing_title": "Vinn úr greiðslu...",
       "processing_description": "Við erum að staðfesta greiðsluna þína. Þetta getur tekið nokkur augnablik.",
       "confirmed_title": "Greiðsla staðfest!",
@@ -166,6 +166,9 @@
   "checkout": {
     "title": "Greiðsla",
     "express_title": "Hraðgreiðsla",
+    "sold_out": "Uppselt",
+    "sale_upcoming": "Væntanlegt",
+    "sale_ended": "Lokið",
     "buyer_step_title": "Upplýsingar þínar",
     "buyer_step_description": "Fylltu út upplýsingar þínar áður en þú greiðir.",
     "loading_info": "Hleður upplýsingum þínum",
@@ -202,6 +205,9 @@
     },
     "to_pay": "Til greiðslu",
     "credit_label": "Inneign: {{amount}}",
+    "credit_applied_label": "Inneign notuð",
+    "edit_mode_title": "Breytingarhamur",
+    "edit_mode_description": "Veldu keyptan passa til að fá inneign og veldu svo nýjan.",
     "cart": {
       "close_aria": "Loka körfu",
       "empty_title": "Karfan þín er tóm",
@@ -228,7 +234,8 @@
       "play_aria": "Spila bakgrunnsmyndband",
       "pause_aria": "Stöðva bakgrunnsmyndband",
       "mute_aria": "Slökkva á hljóði bakgrunnsmyndbands",
-      "unmute_aria": "Kveikja á hljóði bakgrunnsmyndbands"
+      "unmute_aria": "Kveikja á hljóði bakgrunnsmyndbands",
+      "play_youtube_aria": "Spila myndband"
     },
     "housing": {
       "carousel": {
@@ -244,7 +251,21 @@
     "discount": {
       "not_eligible_caption": "Ekki gjaldgengt fyrir afslátt",
       "promo_discount_eligible_label": "Afsláttur (gjaldgengar vörur)"
-    }
+    },
+    "coupon_no_longer_valid": "This coupon is no longer available. Your total has been updated. Please review and try again.",
+    "payment_error": "Something went wrong with your payment. Please try again.",
+    "no_products": "Engar vörur í boði fyrir þetta skref.",
+    "no_images": "Engar myndir í boði fyrir þetta skref.",
+    "no_video": "Ekkert myndband í boði fyrir þetta skref.",
+    "no_passes": "Engir passar í boði.",
+    "no_passes_for_category": "Engir passar í boði fyrir þennan gestaflokk.",
+    "no_meal_plans": "Engir matarpakkar í boði.",
+    "no_contributions": "Engir framlagsmöguleikar í boði.",
+    "step_config_error": "Villa í uppsetningu skrefs.",
+    "step_config_error_detail": "Ekkert sniðmát er tengt þessu skrefi. Hafðu samband við stjórnanda.",
+    "previous_payment_completed": "Fyrri greiðsla þín var lokið.",
+    "pending_payment_wait": "Þú ert með greiðslu í bið. Bíddu í nokkrar mínútur.",
+    "payment_cancel_failed": "Okkur tókst ekki að afgreiða greiðsluna. Reyndu aftur."
   },
   "openCheckout": {
     "loading": "Hleður greiðslu...",
@@ -267,7 +288,12 @@
     "summary_pay": "Greiða",
     "thank_you_title": "Greiðslu lokið",
     "thank_you_description": "Takk fyrir kaupin. Við sendum staðfestingu og miðaupplýsingar með tölvupósti.",
-    "thank_you_cta": "Fara í vefgátt"
+    "thank_you_cta": "Fara í vefgátt",
+    "thank_you_order_summary": "Yfirlit pöntunar",
+    "thank_you_total": "Samtals",
+    "previous_payment_completed": "Fyrri greiðsla þín var lokið.",
+    "payment_cancel_failed": "Okkur tókst ekki að afgreiða greiðsluna. Reyndu aftur.",
+    "pending_payment_wait": "Þú ert með greiðslu í bið. Bíddu í nokkrar mínútur."
   },
   "passes": {
     "your_passes": "Passarnir þínir",
@@ -343,7 +369,9 @@
     "description": "Hafðu samband við vini þína til að skipuleggja stefnumót, finna sameiginlegt húsnæði eða skipuleggja athafnir saman. *Þessi skrá inniheldur aðeins upplýsingar þeirra sem hafa sjálfviljugir samþykkt að deila upplýsingum sínum.",
     "search_placeholder": "Leita eftir nafni, netfangi, stofnun...",
     "export_csv": "Flytja þátttakendur út sem CSV",
-    "no_attendees": "Engir þátttakendur fundust"
+    "no_attendees": "Engir þátttakendur fundust",
+    "per_page_label": "Á síðu",
+    "showing_range": "Sýni {{from}}–{{to}} af {{total}}"
   },
   "checkin": {
     "title": "Innritun á netinu fyrir {{eventName}}",
@@ -431,6 +459,7 @@
     "revoke_failed": "Mistókst að afturkalla API lykil",
     "scopes_label": "Heimildir",
     "scopes_description": "Nýir lyklar byrja með lesaðgangi eingöngu. Aðeins veita víðtækari heimildir þegar þú þarft þess.",
+    "ended_read_only_note": "Þessum popup viðburði er lokið og því geta nýir API lyklar aðeins haft lesaðgang.",
     "scope": {
       "events_read": {
         "label": "Lesa viðburði",
@@ -443,6 +472,10 @@
       "rsvp_write": {
         "label": "RSVP á viðburði",
         "description": "Skrá eða afturkalla mætingu á viðburði."
+      },
+      "venues_write": {
+        "label": "Sýsla með eigin staði",
+        "description": "Búa til, breyta og eyða stöðum sem þú átt."
       }
     }
   },
@@ -606,6 +639,9 @@
       "filter_by_tracks": "Sía eftir brautum",
       "tracks_label": "Brautir",
       "filter_by_track_label": "Sía eftir braut",
+      "filter_by_venues": "Sía eftir stöðum",
+      "venues_label": "Staðir",
+      "filter_by_venue_label": "Sía eftir stað",
       "clear_filters": "Hreinsa",
       "list_view_label": "Listasýn",
       "calendar_view_label": "Dagatalssýn",
@@ -660,7 +696,9 @@
       "check_in_opens_at_start": "Innritun opnar á upphafstíma",
       "registered": "Skráður",
       "checked_in": "Innritaður",
-      "action_error": "Ekki tókst að uppfæra RSVP. Vinsamlegast reyndu aftur."
+      "action_error": "Ekki tókst að uppfæra RSVP. Vinsamlegast reyndu aftur.",
+      "requires_ticket": "Þú þarft miða fyrir þennan viðburð til að skrá þig.",
+      "application_rejected": "Umsókn þín var ekki samþykkt, svo þú getur ekki skráð þig."
     },
     "login_required": {
       "title": "Skráðu þig inn til að sjá þennan viðburð",
@@ -696,6 +734,7 @@
       "participants_heading": "Þátttakendur",
       "no_participants_yet": "Engir þátttakendur enn",
       "participants_more": "+{{count}} fleiri",
+      "participants_show_less": "Sýna minna",
       "unnamed_participant": "Ónafngreindur",
       "bulk_invite_success": "Boðið {{invited}} · Sleppt {{skipped}} · Ekki fundið {{notFound}}",
       "bulk_invite_error": "Mistókst að bjóða",
@@ -714,6 +753,9 @@
       "pending_approval_banner_title": "Bíður samþykkis",
       "pending_approval_banner_message": "Viðburðurinn þinn bíður samþykkis og er ekki enn sýnilegur öðrum.",
       "open_in_maps": "Opna í Google kortum",
+      "view_on_geobrowser": "Skoða á Geobrowser",
+      "join_on_geo": "Taka þátt á Geo",
+      "join_on_geo_tooltip": "Samantekt, kannanir og efni",
       "share_button": "Deila viðburði",
       "share_link_copied": "Hlekkur afritaður",
       "share_link_error": "Mistókst að afrita hlekk"
@@ -754,6 +796,14 @@
       "start_time_outside_venue_hours": "Upphafstími fellur utan opnunartíma staðarins.",
       "start_time_conflict": "Það er þegar viðburður á þessum tíma.",
       "try_nearby_slots": "Prófaðu einn af þessum tímum nálægt:",
+      "private_event": "Lokaður viðburður",
+      "schedule_preview_title": "Dagskrá staðar",
+      "view_venue_schedule": "Skoða dagskrá staðar",
+      "free_slot_hint": "Smelltu á lausan tíma til að stilla upphafstíma",
+      "setup_teardown": "Uppsetning / frágangur",
+      "schedule_legend_booked": "Bókað",
+      "schedule_legend_your_slot": "Þinn tími",
+      "schedule_legend_closed": "Lokað",
       "visibility_label": "Sýnileiki",
       "visibility_public": "Opinber",
       "visibility_private": "Einkamál (aðeins boðnum)",
@@ -795,6 +845,9 @@
       "visibility_helper": "Public is visible to everyone. Private is limited to people you invite, or to members of a group you pick below. Unlisted is only reachable with the direct link.",
       "no_eligible_groups": "You are not in a group with private events enabled, so there is no group to scope this to. The event stays invitation-only.",
       "event_created_pending_approval_success": "Viðburður sendur og bíður samþykkis. Hann er ekki sýnilegur öðrum enn.",
+      "pending_success_heading": "Sent!",
+      "pending_success_message": "Stjórnandi mun yfirfara viðburðinn þinn. Þar til hann er samþykktur finnur þú hann undir Mínir viðburðir.",
+      "pending_success_view_event": "Skoða viðburðinn minn",
       "event_updated_success": "Viðburður uppfærður",
       "image_uploaded_success": "Mynd hlaðin upp",
       "required_title": "Titill er nauðsynlegur",
@@ -805,7 +858,8 @@
       "creation_restricted_message": "Aðeins stjórnendur geta búið til viðburði fyrir þennan popup.",
       "no_popup_error": "Enginn popup",
       "no_timezone_error": "Engin tímabelti stillt fyrir þennan popup",
-      "no_venue_option": "Fundur",
+      "no_venue_option": "Fjarfundur",
+      "venue_where_placeholder": "Hvar verður viðburðurinn?",
       "custom_location_option": "Sérsniðin staðsetning",
       "venues_group_label": "Staðir",
       "custom_location_name_label": "Nafn staðar",

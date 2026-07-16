@@ -56,6 +56,17 @@ def actor_from_user(current_user: UserPublic) -> AuditActor:
     )
 
 
+def actor_from_system() -> AuditActor:
+    """Build an actor for background/system operations (no request user)."""
+    return AuditActor(
+        type=AuditActorType.SYSTEM,
+        source=AuditSource.SYSTEM,
+        id=None,
+        email=None,
+        name="system",
+    )
+
+
 def actor_from_human(current_human: HumanPublic) -> AuditActor:
     """Build an actor for a portal (community) human."""
     first = getattr(current_human, "first_name", None) or ""

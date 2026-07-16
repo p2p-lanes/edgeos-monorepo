@@ -6,6 +6,7 @@ import {
   freeIntervalsForDay,
   localTzNaiveToUtc,
   monthBoundsInTz,
+  slotOptionsForDay,
   tzOffsetMinutes,
   utcToLocalTzNaive,
 } from "./venue-slots"
@@ -77,7 +78,10 @@ describe("monthBoundsInTz", () => {
 describe("localTzNaiveToUtc", () => {
   it("'2026-06-04T13:00' in LA → 20:00Z (DST UTC-7)", () => {
     expect(
-      localTzNaiveToUtc("2026-06-04T13:00", "America/Los_Angeles").toISOString(),
+      localTzNaiveToUtc(
+        "2026-06-04T13:00",
+        "America/Los_Angeles",
+      ).toISOString(),
     ).toBe("2026-06-04T20:00:00.000Z")
   })
 
@@ -220,5 +224,50 @@ describe("durationFits", () => {
   it("does not fit when the end exceeds the free interval", () => {
     const start = localTzNaiveToUtc("2026-06-04T16:30", tz).getTime()
     expect(durationFits(free, start, 60)).toBe(false)
+  })
+})
+
+describe("slotOptionsForDay", () => {
+  const tz = "America/Los_Angeles"
+  const { start: dayStart, end: dayEnd } = dayBoundsInTz("2026-06-04", tz)
+
+  function openLA(startHHMM: string, endHHMM: string) {
+    return {
+      start: localTzNaiveToUtc(`2026-06-04T${startHHMM}`, tz).toISOString(),
+      end: localTzNaiveToUtc(`2026-06-04T${endHHMM}`, tz).toISOString(),
+    }
+  }
+
+  it("lists every in-hours slot, flagging occupied ones as not free", () => {
+    const open = [openLA("09:00", "12:00")]
+    const busy = { ...openLA("10:00", "11:00"), source: "event", label: "X" }
+    const free = freeIntervalsForDay(open, [busy], dayStart, dayEnd)
+    const options = slotOptionsForDay(open, free, dayStart, dayEnd, 60, 30, tz)
+
+    // Slots are NOT hidden by the busy block — only flagged.
+    expect(options.map((o) => o.label)).toEqual([
+      "09:00",
+      "09:30",
+      "10:00",
+      "10:30",
+      "11:00",
+      "11:30",
+    ])
+    const byLabel = Object.fromEntries(options.map((o) => [o.label, o.free]))
+    expect(byLabel["09:00"]).toBe(true) // 09:00-10:00 fits before busy
+    expect(byLabel["09:30"]).toBe(false) // would overlap 10:00-11:00
+    expect(byLabel["10:00"]).toBe(false) // occupied
+    expect(byLabel["10:30"]).toBe(false) // occupied
+    expect(byLabel["11:00"]).toBe(true) // 11:00-12:00 fits after busy
+    expect(byLabel["11:30"]).toBe(false) // 60min overruns the 12:00 close
+  })
+
+  it("returns nothing outside the venue's open hours", () => {
+    const open = [openLA("09:00", "11:00")]
+    const free = freeIntervalsForDay(open, [], dayStart, dayEnd)
+    const options = slotOptionsForDay(open, free, dayStart, dayEnd, 30, 30, tz)
+    expect(options[0]?.label).toBe("09:00")
+    expect(options.at(-1)?.label).toBe("10:30")
+    expect(options).toHaveLength(4)
   })
 })

@@ -93,6 +93,7 @@
     "last_name": "Apellido",
     "last_name_placeholder": "Ingresá tu apellido",
     "last_name_required": "El apellido es obligatorio",
+    "phone": "WhatsApp",
     "telegram": "Telegram",
     "telegram_placeholder": "usuario",
     "organization": "Organización",
@@ -142,7 +143,7 @@
     "pay_and_submit": "Pagar y enviar ({{amount}})",
     "fee": {
       "required_title": "Se requiere tarifa de aplicación",
-      "required_description": "Se requiere una tarifa no reembolsable de ${{amount}} USD para enviar tu aplicación. Serás redirigido a una página de pago segura.",
+      "required_description": "Se requiere una tarifa reembolsable de ${{amount}} USD para enviar tu aplicación. Serás redirigido a una página de pago segura.",
       "processing_title": "Procesando pago...",
       "processing_description": "Estamos confirmando tu pago. Esto puede tardar unos momentos.",
       "confirmed_title": "¡Pago confirmado!",
@@ -180,6 +181,9 @@
   "checkout": {
     "title": "Checkout",
     "express_title": "Checkout Express",
+    "sold_out": "Agotado",
+    "sale_upcoming": "Próximamente",
+    "sale_ended": "Finalizado",
     "buyer_step_title": "Tu información",
     "buyer_step_description": "Completá tus datos antes del pago.",
     "buyer_hero_title": "¡Estás a un paso!",
@@ -225,6 +229,9 @@
     },
     "to_pay": "A pagar",
     "credit_label": "Crédito: {{amount}}",
+    "credit_applied_label": "Crédito aplicado",
+    "edit_mode_title": "Modo edición",
+    "edit_mode_description": "Seleccioná un pase comprado para obtener crédito y luego elegí uno nuevo.",
     "cart": {
       "close_aria": "Cerrar carrito",
       "empty_title": "Tu carrito está vacío",
@@ -252,7 +259,8 @@
       "play_aria": "Reproducir video de fondo",
       "pause_aria": "Pausar video de fondo",
       "mute_aria": "Silenciar video de fondo",
-      "unmute_aria": "Activar sonido del video de fondo"
+      "unmute_aria": "Activar sonido del video de fondo",
+      "play_youtube_aria": "Reproducir video"
     },
     "housing": {
       "carousel": {
@@ -268,6 +276,70 @@
     "discount": {
       "not_eligible_caption": "No aplica descuento",
       "promo_discount_eligible_label": "Descuento (items elegibles)"
+    },
+    "coupon_no_longer_valid": "This coupon is no longer available. Your total has been updated. Please review and try again.",
+    "payment_error": "Something went wrong with your payment. Please try again.",
+    "popup_ended_error": "Este popup ha finalizado. Las compras ya no están disponibles.",
+    "no_products": "No hay productos disponibles para este paso.",
+    "no_images": "No hay imágenes disponibles para este paso.",
+    "no_video": "No hay video disponible para este paso.",
+    "no_passes": "No hay pases disponibles.",
+    "no_passes_for_category": "No hay pases disponibles para esta categoría de asistente.",
+    "no_meal_plans": "No hay planes de comidas disponibles.",
+    "no_contributions": "No hay opciones de contribución disponibles.",
+    "step_config_error": "Error de configuración del paso.",
+    "step_config_error_detail": "No se asignó una plantilla a este paso. Contactá a tu administrador.",
+    "previous_payment_completed": "Tu pago anterior fue completado.",
+    "pending_payment_wait": "Tenés un pago pendiente. Por favor, esperá unos minutos.",
+    "payment_cancel_failed": "No pudimos procesar tu pago. Por favor, intentá de nuevo.",
+    "amanita": {
+      "buyer_kicker": "Tus datos",
+      "buyer_title": "¡Estás a un paso!",
+      "buyer_intro": "Un par de datos para emitir tus entradas — después, solo queda confirmar.",
+      "buyer_privacy": "Tus datos viajan seguros: los usamos solo para emitir tus entradas y contactarte por tu compra.",
+      "whatsapp_country_aria": "Código de país del WhatsApp",
+      "confirm_kicker": "Último paso",
+      "confirm_title": "Confirmar",
+      "confirm_intro": "Revisá tu compra antes de pasar al pago.",
+      "confirm_order_title": "Tu compra",
+      "confirm_empty_title": "Todavía no elegiste tus pases",
+      "confirm_empty_body": "Volvé a la sección de tickets y elegí cómo querés vivir el evento.",
+      "confirm_go_tickets": "Ver tickets",
+      "confirm_patron_label": "Contribución a la comunidad",
+      "confirm_meal_plans_label": "Planes de comida",
+      "confirm_insurance_label": "Seguro",
+      "confirm_insurance_subtitle": "Cobertura por cambio de planes",
+      "confirm_coupon_label": "¿Tenés un cupón?",
+      "confirm_coupon_placeholder": "Tu código",
+      "confirm_coupon_apply": "Aplicar",
+      "confirm_coupon_remove": "Quitar código promocional",
+      "confirm_coupon_applied": "¡Código aplicado!",
+      "confirm_coupon_missing": "Ingresá un código promocional",
+      "confirm_coupon_invalid": "Código promocional inválido",
+      "confirm_coupon_error": "No pudimos validar ese código",
+      "confirm_terms_prefix": "Acepto los",
+      "confirm_terms_link": "Términos y Condiciones",
+      "confirm_subtotal_label": "Subtotal",
+      "confirm_discount_label": "Descuento promocional",
+      "confirm_edit_credit_label": "Crédito por edición",
+      "confirm_credit_label": "Crédito",
+      "confirm_account_credit_label": "Crédito de cuenta",
+      "confirm_total_label": "Total",
+      "confirm_free_note": "No necesitás pagar, tu pedido ya está cubierto",
+      "nav_home_sr": "Inicio",
+      "faqs_pill_label": "FAQs",
+      "faqs_kicker": "Dudas frecuentes",
+      "faqs_title": "FAQs",
+      "faqs_intro": "Lo que más nos preguntan antes de sacar la entrada. Cerrá y seguís justo donde estabas.",
+      "faqs_close_aria": "Cerrar las preguntas frecuentes",
+      "catalog_add": "Agregar",
+      "catalog_added": "Agregado",
+      "catalog_show_more": "Ver más",
+      "catalog_show_less": "Ver menos",
+      "catalog_add_aria": "Agregar {{product}}",
+      "catalog_add_one_aria": "Agregar uno más de {{product}}",
+      "catalog_remove_one_aria": "Quitar uno de {{product}}",
+      "confirm_cta": "Confirmar compra"
     }
   },
   "openCheckout": {
@@ -291,7 +363,12 @@
     "summary_pay": "Pagar",
     "thank_you_title": "Pago completado",
     "thank_you_description": "Gracias por tu compra. Te enviamos la confirmación y los detalles de tus tickets por email.",
-    "thank_you_cta": "Ir al portal"
+    "thank_you_cta": "Ir al portal",
+    "thank_you_order_summary": "Resumen de la orden",
+    "thank_you_total": "Total",
+    "previous_payment_completed": "Tu pago anterior fue completado.",
+    "payment_cancel_failed": "No pudimos procesar tu pago. Por favor, intentá de nuevo.",
+    "pending_payment_wait": "Tenés un pago pendiente. Por favor, esperá unos minutos."
   },
   "passes": {
     "your_passes": "Tus Pases",
@@ -367,7 +444,9 @@
     "description": "Contactá a tus amigos para planificar fechas, encontrar alojamiento compartido u organizar actividades juntos. *Este directorio incluye solo la información de quienes voluntariamente optaron por compartir sus datos.",
     "search_placeholder": "Buscar por nombre, email, organización...",
     "export_csv": "Exportar asistentes como CSV",
-    "no_attendees": "No se encontraron asistentes"
+    "no_attendees": "No se encontraron asistentes",
+    "per_page_label": "Por página",
+    "showing_range": "Mostrando {{from}}–{{to}} de {{total}}"
   },
   "checkin": {
     "title": "Check-in online para {{eventName}}",
@@ -424,7 +503,11 @@
     "venues": "Lugares",
     "api_keys": "API Keys",
     "api_docs": "API Docs",
-    "referrals": "Referidos"
+    "referrals": "Referidos",
+    "locked_ended": "Finalizado — no disponible"
+  },
+  "recap": {
+    "status_badge": "Finalizado"
   },
   "api_keys": {
     "title": "API Keys",
@@ -455,6 +538,7 @@
     "revoke_failed": "Error al revocar la API key",
     "scopes_label": "Permisos",
     "scopes_description": "Las keys nuevas arrancan solo con acceso de lectura. Activá permisos más amplios solo cuando realmente los necesites.",
+    "ended_read_only_note": "Este popup ha finalizado, por lo que las nuevas API keys solo pueden tener acceso de lectura.",
     "scope": {
       "events_read": {
         "label": "Leer eventos",
@@ -467,6 +551,10 @@
       "rsvp_write": {
         "label": "Registrarse a eventos",
         "description": "Registrar o cancelar la asistencia a eventos."
+      },
+      "venues_write": {
+        "label": "Gestionar tus venues",
+        "description": "Crear, editar y eliminar los venues que te pertenecen."
       }
     }
   },
@@ -630,6 +718,9 @@
       "filter_by_tracks": "Filtrar por tracks",
       "tracks_label": "Tracks",
       "filter_by_track_label": "Filtrar por track",
+      "filter_by_venues": "Filtrar por venues",
+      "venues_label": "Venues",
+      "filter_by_venue_label": "Filtrar por venue",
       "clear_filters": "Limpiar",
       "list_view_label": "Vista de lista",
       "calendar_view_label": "Vista de calendario",
@@ -684,7 +775,9 @@
       "check_in_opens_at_start": "El check-in se habilita al comenzar el evento",
       "registered": "Anotado",
       "checked_in": "Check-in realizado",
-      "action_error": "No pudimos actualizar tu RSVP. Por favor intentá de nuevo."
+      "action_error": "No pudimos actualizar tu RSVP. Por favor intentá de nuevo.",
+      "requires_ticket": "Necesitás un ticket de este evento para registrarte.",
+      "application_rejected": "Tu aplicación no fue aceptada, no podés registrarte."
     },
     "recurrence": {
       "daily_one": "Se repite diariamente",
@@ -740,7 +833,12 @@
       "participants_heading": "Participantes",
       "no_participants_yet": "Aún no hay participantes",
       "participants_more": "+{{count}} más",
+      "participants_show_less": "Mostrar menos",
       "unnamed_participant": "Sin nombre",
+      "copy_attendee_emails": "Copiar emails de asistentes",
+      "copy_attendee_emails_done": "Se copiaron {{count}} emails de asistentes",
+      "copy_attendee_emails_empty": "Aún no hay emails de asistentes para copiar",
+      "copy_attendee_emails_error": "No se pudieron copiar los emails",
       "bulk_invite_success": "Invitados {{invited}} · Omitidos {{skipped}} · No encontrados {{notFound}}",
       "bulk_invite_error": "Falló la invitación",
       "remove_invitation_error": "No se pudo quitar",
@@ -758,6 +856,9 @@
       "pending_approval_banner_title": "Pendiente de aprobación",
       "pending_approval_banner_message": "Tu evento está pendiente de aprobación y aún no es visible para otros.",
       "open_in_maps": "Abrir en Google Maps",
+      "view_on_geobrowser": "Ver en Geobrowser",
+      "join_on_geo": "Unirse en Geo",
+      "join_on_geo_tooltip": "Resumen, encuestas y recursos",
       "share_button": "Compartir evento",
       "share_link_copied": "Link copiado",
       "share_link_error": "No se pudo copiar el link",
@@ -805,6 +906,14 @@
       "start_time_outside_venue_hours": "La hora de inicio queda fuera del horario del lugar.",
       "start_time_conflict": "Ya hay un evento en ese horario.",
       "try_nearby_slots": "Probá uno de estos horarios cercanos:",
+      "private_event": "Evento privado",
+      "schedule_preview_title": "Agenda del lugar",
+      "view_venue_schedule": "Ver agenda del lugar",
+      "free_slot_hint": "Hacé clic en un horario libre para fijar la hora de inicio",
+      "setup_teardown": "Montaje / desmontaje",
+      "schedule_legend_booked": "Reservado",
+      "schedule_legend_your_slot": "Tu horario",
+      "schedule_legend_closed": "Cerrado",
       "visibility_label": "Visibilidad",
       "visibility_public": "Público",
       "visibility_private": "Privado (solo invitados)",
@@ -846,6 +955,9 @@
       "visibility_helper": "Público es visible para todos. Privado se limita a las personas que invites o a los miembros de un grupo que elijas abajo. No listado solo es accesible con el enlace directo.",
       "no_eligible_groups": "No formás parte de un grupo con eventos privados habilitados, así que no hay grupo al cual limitarlo. El evento queda solo por invitación.",
       "event_created_pending_approval_success": "Evento enviado y pendiente de aprobación. Aún no es visible para otros.",
+      "pending_success_heading": "¡Enviado!",
+      "pending_success_message": "Un administrador revisará tu evento. Hasta que sea aprobado, lo encontrarás en Mis eventos.",
+      "pending_success_view_event": "Ver mi evento",
       "event_updated_success": "Evento actualizado",
       "image_uploaded_success": "Imagen subida",
       "required_title": "El título es obligatorio",
@@ -854,9 +966,12 @@
       "required_start": "Elegí una hora de inicio",
       "creation_restricted_heading": "La creación de eventos está restringida",
       "creation_restricted_message": "Solo los admins pueden crear eventos para este pop-up.",
+      "popup_ended_heading": "Este pop-up finalizó",
+      "popup_ended_message": "Ahora es de solo lectura, por lo que ya no es posible crear ni editar contenido.",
       "no_popup_error": "Sin popup",
       "no_timezone_error": "El popup no tiene zona horaria configurada",
-      "no_venue_option": "Reunión",
+      "no_venue_option": "Reunión virtual",
+      "venue_where_placeholder": "¿Dónde va a ser?",
       "custom_location_option": "Ubicación personalizada",
       "venues_group_label": "Venues",
       "custom_location_name_label": "Nombre del lugar",

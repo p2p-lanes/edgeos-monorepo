@@ -106,10 +106,43 @@ async def create_api_key(
                 detail=f"These scopes are not permitted for third-party sessions: {sorted(invalid)}",
             )
 
+    # Popup binding: keys are attendee keys (human + popup). The popup must
+    # exist within the caller's tenant (RLS hides foreign popups → 404).
+    from app.api.application.crud import applications_crud
+    from app.api.popup.crud import popups_crud
+    from app.api.popup.schemas import PopupStatus
+
+    popup = popups_crud.get(db, payload.popup_id)
+    if popup is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Popup not found",
+        )
+
+    # Membership gate: same access ladder as the portal passes/events gates
+    # (accepted application, attendee ticket, payment, or companion access).
+    access = applications_crud.resolve_popup_access(db, current_human.id, popup.id)
+    if not access.allowed:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You need to be an accepted participant of this popup to create an API key for it.",
+        )
+
+    # Ended popups are recap/read-only: keys may still be minted for queries,
+    # but never with write capability.
+    if popup.status == PopupStatus.ended and any(
+        scope.endswith(":write") for scope in payload.scopes
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="This popup has ended; API keys can only be created with read-only access.",
+        )
+
     row, raw = crud.create_for_human(
         db,
         tenant_id=current_human.tenant_id,
         human_id=current_human.id,
+        popup_id=popup.id,
         name=payload.name.strip(),
         expires_at=payload.expires_at,
         scopes=payload.scopes,

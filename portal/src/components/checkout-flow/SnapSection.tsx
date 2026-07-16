@@ -6,27 +6,40 @@ import { useEffect, useRef, useState } from "react"
 export default function SnapSection({
   id,
   children,
-  bottomPadding = "50vh",
+  bottomPadding = "8rem",
+  // Most steps read as a centred column; card-grid steps pass a wider class so
+  // their cards have room to sit side by side. Both literals live here and at
+  // the call site so Tailwind keeps them.
+  widthClass = "max-w-2xl",
 }: {
   id: string
   children: React.ReactNode
   bottomPadding?: string
+  widthClass?: string
 }) {
   const ref = useRef<HTMLElement>(null)
-  const [visible, setVisible] = useState(false)
+  // null until the IntersectionObserver reports for the first time. The
+  // distinction matters: a section that is ALREADY on screen at that first
+  // report (the above-the-fold one) must keep its server-rendered, fully
+  // visible state — hiding it to replay the entrance animation makes the
+  // title flash: paint → hide → animate back in. Entrance animations are
+  // only for sections the user scrolls INTO.
+  const [visible, setVisible] = useState<boolean | null>(null)
+  const hasBeenHiddenRef = useRef(false)
 
   useEffect(() => {
     const el = ref.current
     if (!el) return
     const observer = new IntersectionObserver(
       ([entry]) => setVisible(entry.isIntersecting),
-      { threshold: 0.3 },
+      { rootMargin: "-35% 0px -55% 0px", threshold: 0 },
     )
     observer.observe(el)
     return () => observer.disconnect()
   }, [])
 
   useEffect(() => {
+    if (visible === null) return
     const el = ref.current
     if (!el) return
 
@@ -36,7 +49,7 @@ export default function SnapSection({
     const titleEl = el.querySelector<HTMLElement>("[data-section-title]")
     const subtitleEl = el.querySelector<HTMLElement>("[data-section-subtitle]")
 
-    if (visible) {
+    if (visible && hasBeenHiddenRef.current) {
       if (watermarkChars.length > 0) {
         gsap.fromTo(
           watermarkChars,
@@ -65,7 +78,8 @@ export default function SnapSection({
           { opacity: 1, y: 0, duration: 0.45, ease: "power1.out", delay: 0.3 },
         )
       }
-    } else {
+    } else if (!visible) {
+      hasBeenHiddenRef.current = true
       if (watermarkChars.length > 0) {
         gsap.set(watermarkChars, { opacity: 0, y: 60, filter: "blur(8px)" })
       }
@@ -84,14 +98,22 @@ export default function SnapSection({
     }
   }, [visible])
 
+  // Single-axis scroll model. Every section is at least one viewport tall
+  // (`--snap-section-h` = the scroll container's clientHeight) and content
+  // taller than that simply extends the section — it scrolls on the MAIN
+  // axis like any web page. Combined with `scroll-snap-type: y mandatory`
+  // on the container this gives crisp per-section snapping for short
+  // sections while tall ones stay freely scrollable (a snap area larger
+  // than the snapport is a valid rest position anywhere it covers it, per
+  // the scroll-snap spec). No nested scrollers, no snap juggling.
   return (
     <section
       id={id}
       ref={ref}
-      className="flex flex-col justify-start px-4 max-w-2xl mx-auto"
+      className={`flex flex-col justify-start px-4 ${widthClass} mx-auto`}
       style={{
         minHeight: "var(--snap-section-h, 100vh)",
-        paddingTop: "calc(var(--snap-nav-h, 48px) + 1.5rem)",
+        paddingTop: "calc(var(--snap-nav-h, 48px) + 4rem)",
         paddingBottom: bottomPadding,
       }}
     >

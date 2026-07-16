@@ -20,7 +20,7 @@ from loguru import logger
 
 from app.api.tenant.crud import tenants_crud
 from app.api.tenant.models import Tenants
-from app.api.tenant.schemas import TenantPublic
+from app.api.tenant.schemas import TenantAnonymousPublic
 from app.core.config import settings
 from app.core.dependencies.users import SessionDep
 from app.core.redis import domain_cache
@@ -49,7 +49,7 @@ def _resolve_host_with_cache(
 ) -> Tenants | None:
     """DomainCache-first tenant lookup.
 
-    Cache stores serialized TenantPublic JSON or the sentinel string "null".
+    Cache stores serialized TenantAnonymousPublic JSON or the sentinel string "null".
 
     On cache hit with valid JSON: re-fetches the live ORM Tenants instance by
     id (required because downstream callers need the real SQLAlchemy object).
@@ -62,7 +62,7 @@ def _resolve_host_with_cache(
         return None
     if cached is not None:
         try:
-            tp = TenantPublic.model_validate_json(cached)
+            tp = TenantAnonymousPublic.model_validate_json(cached)
         except (ValueError, TypeError):
             tp = None
         if tp is not None:
@@ -75,7 +75,9 @@ def _resolve_host_with_cache(
     if tenant is None:
         domain_cache.set(host, "null")
         return None
-    domain_cache.set(host, TenantPublic.model_validate(tenant).model_dump_json())
+    domain_cache.set(
+        host, TenantAnonymousPublic.model_validate(tenant).model_dump_json()
+    )
     return tenant
 
 

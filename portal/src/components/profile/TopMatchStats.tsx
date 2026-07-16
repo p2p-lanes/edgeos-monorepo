@@ -2,6 +2,7 @@ import { Users } from "lucide-react"
 import Image from "next/image"
 import { useCallback, useEffect, useState } from "react"
 import type { HumanPublic } from "@/client"
+import { imageOptimization } from "@/lib/image-optimization"
 import type { EventParticipant } from "@/types/StatsSocialLayer"
 import { Avatar } from "../ui/avatar"
 import { Card } from "../ui/card"
@@ -130,6 +131,7 @@ const TopMatchStats = ({
                           width={32}
                           height={32}
                           className="w-full h-full object-cover rounded-full"
+                          {...imageOptimization(match.image_url)}
                         />
                       ) : (
                         <div className="w-full h-full bg-gradient-to-br from-blue-400 to-purple-500 rounded-full flex items-center justify-center text-primary-foreground text-xs font-semibold">

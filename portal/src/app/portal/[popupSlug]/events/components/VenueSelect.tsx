@@ -25,9 +25,17 @@ interface VenueSelectProps {
    * this we fall back to `events.venues.list.untitled_venue`.
    */
   selectedVenueLabel?: string
+  /**
+   * Offer the virtual-meeting option. Venue selection is mandatory for new
+   * events, so this is only enabled when editing an event that is already a
+   * meeting (legacy data keeps working; nothing new can become one).
+   */
+  allowMeeting?: boolean
 }
 
-const NONE_VALUE = "__none__"
+// Virtual meeting is an explicit choice, not the default: an empty
+// `venueId` means "nothing picked yet" and renders the placeholder.
+const MEETING_VALUE = "__meeting__"
 const CUSTOM_VALUE = "__custom__"
 
 function VenueSelectImpl({
@@ -35,6 +43,7 @@ function VenueSelectImpl({
   onVenueChange,
   venues,
   selectedVenueLabel,
+  allowMeeting = false,
 }: VenueSelectProps) {
   const { t } = useTranslation()
 
@@ -46,7 +55,7 @@ function VenueSelectImpl({
   // the list query is still resolving.
   const venueItems = useMemo(() => {
     const out: { value: string; label: string }[] = []
-    const seen = new Set<string>([NONE_VALUE, CUSTOM_VALUE])
+    const seen = new Set<string>([MEETING_VALUE, CUSTOM_VALUE])
 
     const formatVenueLabel = (v: EventVenuePublic) => {
       const title = v.title || t("events.venues.list.untitled_venue")
@@ -60,6 +69,7 @@ function VenueSelectImpl({
     if (
       venueId &&
       venueId !== CUSTOM_VALUE &&
+      venueId !== MEETING_VALUE &&
       !venues.some((v) => v.id === venueId)
     ) {
       out.push({
@@ -89,32 +99,40 @@ function VenueSelectImpl({
   const triggerLabel =
     venueId === CUSTOM_VALUE
       ? t("events.form.custom_location_option")
-      : !venueId
+      : venueId === MEETING_VALUE
         ? t("events.form.no_venue_option")
-        : (venueItems.find((i) => i.value === venueId)?.label ??
-          t("events.form.venue_placeholder"))
+        : !venueId
+          ? t("events.form.venue_where_placeholder")
+          : (venueItems.find((i) => i.value === venueId)?.label ??
+            t("events.form.venue_placeholder"))
 
   return (
-    <Select
-      value={venueId || NONE_VALUE}
-      onValueChange={(v) => onVenueChange(v === NONE_VALUE ? "" : v)}
-    >
+    <Select value={venueId} onValueChange={onVenueChange}>
       <SelectTrigger className="w-full">
-        <span className="truncate text-left">{triggerLabel}</span>
-      </SelectTrigger>
-      <SelectContent className="max-h-[min(20rem,60svh)]">
-        <SelectItem
-          value={NONE_VALUE}
+        <span
           className={cn(
-            "data-[highlighted]:bg-muted",
-            "bg-muted/40 text-foreground",
+            "truncate text-left",
+            !venueId && "text-muted-foreground",
           )}
         >
-          <span className="inline-flex items-center gap-2">
-            <Video className="h-3.5 w-3.5 text-muted-foreground" />
-            {t("events.form.no_venue_option")}
-          </span>
-        </SelectItem>
+          {triggerLabel}
+        </span>
+      </SelectTrigger>
+      <SelectContent className="max-h-[min(20rem,60svh)]">
+        {allowMeeting && (
+          <SelectItem
+            value={MEETING_VALUE}
+            className={cn(
+              "data-[highlighted]:bg-muted",
+              "bg-muted/40 text-foreground",
+            )}
+          >
+            <span className="inline-flex items-center gap-2">
+              <Video className="h-3.5 w-3.5 text-muted-foreground" />
+              {t("events.form.no_venue_option")}
+            </span>
+          </SelectItem>
+        )}
         <SelectItem
           value={CUSTOM_VALUE}
           className={cn(

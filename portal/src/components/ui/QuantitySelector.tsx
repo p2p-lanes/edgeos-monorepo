@@ -32,6 +32,36 @@ export const resolveMaxQuantity = (product: {
   return cap
 }
 
+/**
+ * Resolves the effective stepper props for a row whose product may be
+ * blocked (sold out, upcoming, ended, exclusivity).
+ *
+ * Constraint: blocked rows stay removable. Quantity already in the cart must
+ * remain decrementable, so a blocked row with quantity > 0 keeps the stepper
+ * enabled with `max` capped at the current quantity (increment self-disables
+ * at max, decrement keeps working). Locked rows (e.g. already purchased) and
+ * blocked rows with nothing in the cart stay fully disabled.
+ */
+export const resolveBlockedStepperProps = ({
+  blocked,
+  locked = false,
+  quantity,
+  max,
+}: {
+  blocked: boolean
+  locked?: boolean
+  quantity: number
+  max: number
+}): { max: number; disabled: boolean } => {
+  if (locked) return { max, disabled: true }
+  if (blocked) {
+    return quantity > 0
+      ? { max: quantity, disabled: false }
+      : { max, disabled: true }
+  }
+  return { max, disabled: false }
+}
+
 interface QuantitySelectorProps {
   value: number
   max: number
@@ -130,9 +160,12 @@ const QuantitySelector = ({
     const addClasses = cn(
       "transition-all duration-200 ease-out transform hover:scale-110 active:scale-95 flex items-center justify-center rounded-full shadow-sm",
       isAccent
-        ? // Solid PRIMARY tile + ACCENT icon. Falls back to foreground/background
-          // if the popup didn't set a primary/accent so the button still renders.
-          "bg-[color:var(--primary,theme(colors.foreground))] text-[color:var(--accent,theme(colors.background))] hover:brightness-110"
+        ? // Solid PRIMARY tile + PRIMARY-FOREGROUND icon — the theme's
+          // guaranteed on-primary colour (same pairing as the Continue
+          // button), so the "+" stays legible even when the accent is a
+          // dark earthy tone that barely contrasts with primary. Falls back
+          // to foreground/background if the popup set no theme.
+          "bg-[color:var(--primary,theme(colors.foreground))] text-[color:var(--primary-foreground,theme(colors.background))] hover:brightness-110"
         : "hover:bg-primary/30 bg-primary/20 text-primary",
       ADD_BUTTON_SIZES[size],
     )

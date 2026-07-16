@@ -10,6 +10,7 @@ from app.api.product.schemas import (
     ProductBatchResult,
     ProductCreate,
     ProductPublic,
+    ProductSoldOutUpdate,
     ProductUpdate,
 )
 from app.api.shared.enums import UserRole
@@ -19,6 +20,7 @@ from app.api.translation.service import (
     apply_translation_overlay,
     delete_translations_for_entity,
     get_translations_bulk,
+    parse_accept_language,
 )
 from app.core.dependencies.users import (
     AdminOrApiKey_ProductsRead,
@@ -31,6 +33,7 @@ from app.core.dependencies.users import (
     SessionDep,
     TenantSession,
 )
+from app.services.image_ingestion import ImageIngestionService
 from app.utils.utils import slugify
 
 router = APIRouter(prefix="/products", tags=["products"])
@@ -129,6 +132,7 @@ async def create_products_batch(
         )
     tenant_id = popup.tenant_id
 
+    _svc = ImageIngestionService()
     results: list[ProductBatchResult] = []
     for idx, item in enumerate(batch.products):
         try:
@@ -142,6 +146,16 @@ async def create_products_batch(
                 product_data["tenant_id"] = tenant_id
                 product_data["popup_id"] = batch.popup_id
                 product_data["slug"] = slug
+
+                # CDN image ingestion: rewrite external URLs to CDN before commit.
+                # Fail-open: any per-URL failure keeps the original URL.
+                product_data["image_url"] = await _svc.ingest_url(
+                    product_data.get("image_url"), tenant_id
+                )
+                product_data["images"] = await _svc.ingest_urls(
+                    product_data.get("images") or [], tenant_id
+                )
+
                 product = Products(**product_data)
 
                 db.add(product)
@@ -232,6 +246,17 @@ async def create_product(
     product_data = product_in.model_dump()
     product_data["tenant_id"] = tenant_id
     product_data["slug"] = slug
+
+    # CDN image ingestion: rewrite external image URLs to CDN before commit.
+    # Pattern B (async hook). Fail-open: any per-URL failure keeps the original URL.
+    _svc = ImageIngestionService()
+    product_data["image_url"] = await _svc.ingest_url(
+        product_data.get("image_url"), tenant_id
+    )
+    product_data["images"] = await _svc.ingest_urls(
+        product_data.get("images") or [], tenant_id
+    )
+
     product = Products(**product_data)
 
     db.add(product)
@@ -269,7 +294,43 @@ async def update_product(
             db, product_in.slug, product.popup_id
         )
 
+    # CDN image ingestion: rewrite external image URLs to CDN before commit.
+    # Pattern B (async hook). Fail-open: any per-URL failure keeps the original URL.
+    _svc = ImageIngestionService()
+    if product_in.image_url is not None:
+        product_in.image_url = await _svc.ingest_url(
+            product_in.image_url, product.tenant_id
+        )
+    if product_in.images is not None:
+        product_in.images = await _svc.ingest_urls(product_in.images, product.tenant_id)
+
     updated = crud.products_crud.update(db, product, product_in)
+    return ProductPublic.model_validate(updated)
+
+
+@router.post("/{product_id}/sold-out", response_model=ProductPublic)
+async def set_product_sold_out(
+    product_id: uuid.UUID,
+    payload: ProductSoldOutUpdate,
+    db: AdminOrApiKeySession_ProductsWrite,
+    _current_user: AdminOrApiKey_ProductsWrite,
+) -> ProductPublic:
+    """Mark a product as sold out, or put it back on sale.
+
+    Sets the manual `sold_out_override` flag only. The stock counter is
+    never modified, so inventory accounting stays truthful. While the flag
+    is on, the product reports state `sold_out` and checkout rejects new
+    purchases regardless of remaining stock.
+    """
+    product = crud.products_crud.get(db, product_id)
+
+    if not product:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Product not found",
+        )
+
+    updated = crud.products_crud.set_sold_out(db, product, payload.sold_out)
     return ProductPublic.model_validate(updated)
 
 
@@ -334,6 +395,9 @@ async def list_portal_products(
 ) -> ListModel[ProductPublic]:
     """List products visible to the current human (Portal)."""
     if popup_id:
+        # Ended popups keep their products visible here: the portal recap
+        # views still need them, and purchasing is blocked at the payment,
+        # cart, and application layers.
         products, total = crud.products_crud.find_by_popup(
             db,
             popup_id=popup_id,
@@ -343,15 +407,17 @@ async def list_portal_products(
             category=category,
         )
     else:
-        products, total = crud.products_crud.find(
+        # Same read-only contract without popup_id: ended-popup products are
+        # excluded so they cannot be enumerated through the unscoped listing.
+        products, total = crud.products_crud.find_excluding_ended_popups(
             db,
             skip=skip,
             limit=limit,
+            is_active=is_active,
+            category=category,
         )
 
-    lang = None
-    if accept_language and accept_language != "en":
-        lang = accept_language.split(",")[0].split("-")[0].strip()
+    lang = parse_accept_language(accept_language)
 
     translations_map: dict[uuid.UUID, Any] = {}
     if lang:

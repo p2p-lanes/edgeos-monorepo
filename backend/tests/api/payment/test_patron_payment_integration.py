@@ -277,6 +277,7 @@ class TestPatronPaymentCreation:
                 id="sf_patron_test",
                 status="pending",
                 checkout_url="https://sf.test/patron",
+                is_installment_plan=False,
             )
             with patch("app.services.simplefi.get_simplefi_client") as mock_client:
                 mock_client.return_value.create_payment.return_value = sf_resp

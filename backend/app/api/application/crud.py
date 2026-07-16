@@ -1,5 +1,6 @@
 import uuid
 from datetime import UTC, datetime
+from decimal import Decimal
 from typing import TYPE_CHECKING
 
 from fastapi import HTTPException, status
@@ -33,6 +34,21 @@ if TYPE_CHECKING:
 # other non-adult categories) are intentionally excluded — only the main
 # applicant and their spouse appear.
 DIRECTORY_VISIBLE_CATEGORY_KEYS = ("main", "spouse")
+
+# Default ``info_not_shared`` for applications materialized by an admin grant
+# (comped/gifted tickets): every field the directory can mask. The recipient
+# never filled the form, so nothing is shared until they opt in themselves.
+GRANTED_DEFAULT_INFO_NOT_SHARED = (
+    "first_name",
+    "last_name",
+    "email",
+    "telegram",
+    "role",
+    "organization",
+    "residence",
+    "age",
+    "gender",
+)
 
 
 def _is_draft_status(status_value: object) -> bool:
@@ -177,6 +193,55 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
 
         if popup_id:
             base_statement = base_statement.where(Applications.popup_id == popup_id)
+
+        count_statement = select(func.count()).select_from(base_statement.subquery())
+        total = session.exec(count_statement).one()
+
+        statement = (
+            base_statement.options(
+                selectinload(Applications.attendees)  # type: ignore[arg-type]
+                .selectinload(Attendees.attendee_products)  # type: ignore[arg-type]
+                .selectinload(AttendeeProducts.product),  # type: ignore[arg-type]
+                selectinload(Applications.attendees).selectinload(  # type: ignore[arg-type]
+                    Attendees.category_ref  # type: ignore[arg-type]
+                ),
+                selectinload(Applications.human),  # type: ignore[arg-type]
+            )
+            .order_by(desc(Applications.created_at))  # type: ignore[arg-type]
+            .offset(skip)
+            .limit(limit)
+        )
+        results = list(session.exec(statement).all())
+
+        return results, total
+
+    def find_pending_review(
+        self,
+        session: Session,
+        reviewer_id: uuid.UUID,
+        popup_ids: list[uuid.UUID] | None = None,
+        skip: int = 0,
+        limit: int = 100,
+    ) -> tuple[list[Applications], int]:
+        """Find IN_REVIEW applications the reviewer has not reviewed yet.
+
+        The reviewed-by-me exclusion and pagination run in SQL so the count is
+        exact and no oversized candidate list is loaded into Python.
+        """
+        already_reviewed = (
+            exists()
+            .where(ApplicationReviews.application_id == Applications.id)
+            .where(ApplicationReviews.reviewer_id == reviewer_id)
+        )
+        base_statement = select(Applications).where(
+            Applications.status == ApplicationStatus.IN_REVIEW.value,
+            ~already_reviewed,
+        )
+
+        if popup_ids is not None:
+            base_statement = base_statement.where(
+                col(Applications.popup_id).in_(popup_ids)
+            )
 
         count_statement = select(func.count()).select_from(base_statement.subquery())
         total = session.exec(count_statement).one()
@@ -974,6 +1039,7 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
             application.status = ApplicationStatus.ACCEPTED.value
             application.accepted_at = datetime.now(UTC)
             self.create_snapshot(session, application, "auto_accepted")
+            _maybe_grant_fee_credit(session, application)
         else:
             self.create_snapshot(session, application, "submitted")
 
@@ -1080,6 +1146,7 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         application.accepted_at = datetime.now(UTC)
         session.add(application)
         self.create_snapshot(session, application, "admin_grant_accepted")
+        _maybe_grant_fee_credit(session, application)
         return application
 
     def create_for_admin_grant(
@@ -1115,6 +1182,12 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
             custom_fields_schema=form_fields_crud.build_schema_for_popup(
                 session, popup_id
             ),
+            # Granted (comped/gifted) people never filled the application
+            # form, so they never consented to sharing anything: default the
+            # attendee-directory privacy to fully hidden. They can opt in
+            # later by editing their privacy preferences. Grants to people
+            # with an EXISTING application keep whatever they chose.
+            info_not_shared=list(GRANTED_DEFAULT_INFO_NOT_SHARED),
         )
         session.add(application)
         session.flush()
@@ -1136,6 +1209,7 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         session.add(attendee)
         self.create_snapshot(session, application, "admin_grant_created")
         session.flush()
+        _maybe_grant_fee_credit(session, application)
         return application
 
     def accept(
@@ -1161,6 +1235,7 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
 
         # Create snapshot — uses flush internally, caller owns the commit
         self.create_snapshot(session, application, "accepted")
+        _maybe_grant_fee_credit(session, application)
         return application
 
     def create_attendee(
@@ -1291,6 +1366,10 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         # If status doesn't change (e.g. application is already ACCEPTED, or strategy
         # keeps it IN_REVIEW), it returns without committing — the flush above is dangling.
         application = approval_calculator.recalculate_status(session, application)
+
+        # Grant fee credit if the calculator reached ACCEPTED (flush-only;
+        # the unconditional commit below persists it together with scholarship fields).
+        _maybe_grant_fee_credit(session, application)
 
         # 8. Commit unconditionally: guarantees scholarship fields are persisted
         # regardless of whether recalculate_status committed or not.
@@ -1455,6 +1534,60 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
             allowed=False,
             reason="no_access",
         )
+
+
+def _maybe_grant_fee_credit(
+    session: Session,
+    application: "Applications",
+) -> None:
+    """Grant the application fee as portal credit on the first acceptance.
+
+    Implements the fee → credit conversion (Spec R-BE-08, R-BE-09).
+    No-op when:
+    - Popup does not require an application fee.
+    - The grant has already been issued (fee_credit_granted=True, idempotency guard).
+    - The application's latest fee payment is not APPROVED.
+
+    Flush-only — caller owns the commit boundary, keeping this atomic with
+    the status transition that triggered it.
+    """
+    from app.api.audit_log.actor import actor_from_system
+    from app.api.audit_log.constants import AuditAction
+    from app.api.payment.crud import adjust_application_credit, payments_crud
+    from app.api.payment.schemas import PaymentStatus
+
+    if application.status != ApplicationStatus.ACCEPTED.value:
+        return
+
+    if application.fee_credit_granted:
+        return
+
+    # Load popup explicitly to avoid stale lazy-load after an internal commit
+    # (e.g. recalculate_status commits and refreshes the application row).
+    from app.api.popup.models import Popups
+
+    popup = session.get(Popups, application.popup_id)
+    if popup is None or not popup.requires_application_fee:
+        return
+
+    fee_payment = payments_crud.get_latest_fee_payment(session, application.id)
+    if fee_payment is None or fee_payment.status != PaymentStatus.APPROVED.value:
+        return
+
+    amount = Decimal(str(fee_payment.amount_charged or fee_payment.amount))
+
+    adjust_application_credit(
+        session,
+        application,
+        amount,
+        kind=AuditAction.CREDIT_GRANTED,
+        source="application_fee",
+        actor=actor_from_system(),
+        payment=fee_payment,
+    )
+
+    application.fee_credit_granted = True
+    session.add(application)
 
 
 applications_crud = ApplicationsCRUD()

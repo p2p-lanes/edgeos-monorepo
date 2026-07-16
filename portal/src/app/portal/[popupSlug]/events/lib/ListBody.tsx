@@ -55,6 +55,30 @@ function groupByDate(
   return Object.entries(groups).sort(([a], [b]) => a.localeCompare(b))
 }
 
+/**
+ * Pick the day-header to scroll to after the user collapses `collapsedDate`:
+ * the first still-open day after it (in render order), or — when no open day
+ * follows — the collapsed day itself, so its own header pins to the top
+ * instead of leaving the viewport stranded in the gap the events left behind.
+ * Returns null only when `collapsedDate` isn't in `orderedDays` (defensive;
+ * the caller then skips scrolling).
+ *
+ * `collapsedDays` is the set BEFORE `collapsedDate` is added; days after it are
+ * unaffected by this toggle, so their membership reflects their open state.
+ */
+export function nextOpenDayTarget(
+  collapsedDate: string,
+  orderedDays: string[],
+  collapsedDays: Set<string>,
+): string | null {
+  const startIdx = orderedDays.indexOf(collapsedDate)
+  if (startIdx === -1) return null
+  return (
+    orderedDays.slice(startIdx + 1).find((d) => !collapsedDays.has(d)) ??
+    collapsedDate
+  )
+}
+
 interface ListBodyProps {
   events: EventPublic[]
   slug: string | undefined
@@ -86,6 +110,19 @@ interface ListBodyProps {
    * spinner and is disabled until the request settles.
    */
   pendingRsvpKey?: string | null
+  /**
+   * When false, the RSVP (register) button is disabled — the human lacks a
+   * ticket for this popup or has a rejected application. The "Going"/cancel
+   * button is never gated. Defaults to true.
+   */
+  canRsvp?: boolean
+  /** Tooltip text shown on the disabled RSVP button explaining why. */
+  rsvpDisabledReason?: string
+  /**
+   * When false, the RSVP and "Going"/cancel buttons are hidden entirely —
+   * used for ended (read-only) popups. Defaults to true.
+   */
+  showRsvp?: boolean
   onHide?: (eventId: string) => void
   onUnhide?: (eventId: string) => void
   /** Popup-scoped fallback image when an event has no cover/venue image. */
@@ -97,6 +134,12 @@ interface ListBodyProps {
    * specific card after returning from event detail.
    */
   autoScrollToUpcoming?: boolean
+  /**
+   * Px offset from the top of the scroll container at which each day header
+   * freezes. Should match the sticky filter toolbar's height so the headers
+   * stack right below it instead of behind it. Defaults to 0.
+   */
+  stickyTop?: number
 }
 
 /**
@@ -120,14 +163,21 @@ export function ListBody({
   onRsvp,
   onCancelRsvp,
   pendingRsvpKey,
+  canRsvp = true,
+  rsvpDisabledReason,
+  showRsvp = true,
   onHide,
   onUnhide,
   placeholderUrl,
   autoScrollToUpcoming = false,
+  stickyTop = 0,
 }: ListBodyProps) {
   const { t } = useTranslation()
   const isAuthed = mode === "authed"
   const [collapsedDays, setCollapsedDays] = useState<Set<string>>(new Set())
+  // Day-header elements keyed by day key, so collapsing a day can scroll the
+  // next still-open day's header to the top of the viewport.
+  const dayHeaderRefs = useRef<Map<string, HTMLElement>>(new Map())
 
   // "Now" reference for the today divider + auto-scroll. Ticks once a
   // minute so the divider creeps down as events start, without re-rendering
@@ -192,6 +242,31 @@ export function ListBody({
     })
   }
 
+  // Collapsing a day strands the viewport in the gap its removed events left
+  // behind. Toggle as usual, but on collapse snap to the top of the next
+  // still-open day (or this day's own header when nothing open follows) so the
+  // next day reads from the start. `orderedDays` is the rendered day order;
+  // `willBeOpen` is Radix's next open state (false ⇒ we're collapsing). The
+  // collapse is instant (no height animation), so one rAF after the commit is
+  // enough for layout to settle before we scroll.
+  const handleDayToggle = (
+    date: string,
+    willBeOpen: boolean,
+    orderedDays: string[],
+  ) => {
+    toggleDay(date)
+    if (willBeOpen) return
+    const startIdx = orderedDays.indexOf(date)
+    if (startIdx === -1) return
+    const targetDate =
+      orderedDays.slice(startIdx + 1).find((d) => !collapsedDays.has(d)) ?? date
+    requestAnimationFrame(() => {
+      dayHeaderRefs.current
+        .get(targetDate)
+        ?.scrollIntoView({ block: "start", behavior: "auto" })
+    })
+  }
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -210,6 +285,7 @@ export function ListBody({
   }
 
   const grouped = groupByDate(events, formatDayKey)
+  const orderedDays = grouped.map(([day]) => day)
 
   return (
     <div className="space-y-6">
@@ -237,7 +313,7 @@ export function ListBody({
           <Collapsible
             key={date}
             open={isOpen}
-            onOpenChange={() => toggleDay(date)}
+            onOpenChange={(open) => handleDayToggle(date, open, orderedDays)}
           >
             <CollapsibleTrigger asChild>
               <button
@@ -248,7 +324,18 @@ export function ListBody({
                     : "events.list.expand_day_aria",
                   { date: dayLabel },
                 )}
-                className="w-full flex items-center gap-3 mb-3 group cursor-pointer"
+                // Sticky per-day header. Each Collapsible is its own
+                // containing block, so a header only stays frozen while its
+                // own day is in view — the next day's header pushes it up as
+                // it arrives (and pulls it back when scrolling up). `top`
+                // matches the sticky toolbar height; z-10 keeps it under the
+                // toolbar (z-20) so the outgoing header slides beneath it.
+                ref={(el) => {
+                  if (el) dayHeaderRefs.current.set(date, el)
+                  else dayHeaderRefs.current.delete(date)
+                }}
+                style={{ top: stickyTop, scrollMarginTop: stickyTop }}
+                className="sticky z-10 w-full flex items-center gap-3 mb-3 py-1.5 bg-background group cursor-pointer"
               >
                 <div className="h-2 w-2 rounded-full bg-primary" />
                 <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -318,7 +405,10 @@ export function ListBody({
                     placeholderUrl ||
                     null
                   return (
-                    <Fragment key={event.id}>
+                    // Key by occurrence (id + start_time), not just id: a
+                    // recurring series shares one id across instances, so a
+                    // plain id key would collide between sibling occurrences.
+                    <Fragment key={domId}>
                       {idx === dividerAt && nowDivider(dividerIsAnchor)}
                       <div
                         id={domId}
@@ -343,6 +433,7 @@ export function ListBody({
                                 src={thumbUrl}
                                 alt={event.title}
                                 className="w-full h-full object-cover"
+                                sizes="64px"
                                 fallback={
                                   <CalendarDays className="h-5 w-5 text-muted-foreground/40" />
                                 }
@@ -423,7 +514,8 @@ export function ListBody({
                         </Link>
                         {isAuthed && (
                           <div className="absolute bottom-2 right-2 flex items-center gap-1.5">
-                            {event.status === "published" &&
+                            {showRsvp &&
+                              event.status === "published" &&
                               (() => {
                                 const rsvpKey = `${event.id}:${event.start_time}`
                                 const isRsvpPending = pendingRsvpKey === rsvpKey
@@ -451,7 +543,10 @@ export function ListBody({
                                 ) : (
                                   <button
                                     type="button"
-                                    disabled={isRsvpPending}
+                                    disabled={isRsvpPending || !canRsvp}
+                                    title={
+                                      !canRsvp ? rsvpDisabledReason : undefined
+                                    }
                                     onClick={(e) => {
                                       e.preventDefault()
                                       e.stopPropagation()

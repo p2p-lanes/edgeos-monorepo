@@ -8,6 +8,7 @@ import type { PopupPublic } from "@/client"
 import { ButtonAnimated } from "@/components/ui/button"
 import { CardAnimation, CardContent } from "@/components/ui/card"
 import { formatDate } from "@/helpers/dates"
+import { imageOptimization } from "@/lib/image-optimization"
 import { EventProgressBar, type EventStatus } from "./EventProgressBar"
 
 const CTA_KEYS: Record<EventStatus, string> = {
@@ -68,7 +69,9 @@ function Image() {
           src={popup.image_url}
           alt={popup.name}
           fill
+          sizes="(max-width: 1024px) 100vw, 33vw"
           className="object-cover w-full h-full"
+          {...imageOptimization(popup.image_url)}
         />
       ) : (
         <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-neutral-200 to-neutral-300">

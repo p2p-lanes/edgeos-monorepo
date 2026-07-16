@@ -1,3 +1,4 @@
+import { Lock } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { cn } from "@/lib/utils"
 import type { Resource } from "@/types/resources"
@@ -68,6 +69,9 @@ const ResourceMenuItem = ({
         <span className="ml-auto rounded-md bg-muted px-1.5 py-0.5 text-xs text-muted-foreground group-data-[collapsible=icon]:hidden">
           {t("sidebar.soon_badge")}
         </span>
+      )}
+      {status === "disabled" && (
+        <Lock className="ml-auto size-3.5 text-muted-foreground group-data-[collapsible=icon]:hidden" />
       )}
       {resource.value && (
         <span className={cn("ml-auto rounded-full px-2 py-1 text-xs", color)}>

@@ -18,6 +18,11 @@ interface UsePromoCodeParams {
   savedCart: CartState | null | undefined
   hasRestoredCheckoutRef: MutableRefObject<boolean>
   validatePromoCodeOverride?: (code: string) => Promise<number | null>
+  /** When true, allows re-validation of a restored promo code to proceed.
+   *  Used to gate open-cart promo re-validation until the release-on-mount
+   *  call settles so the coupon field never flashes "Invalid" before the
+   *  pending hold is freed. Defaults to true (no gate) for non-open-cart flows. */
+  releaseSettled?: boolean
 }
 
 export function usePromoCode({
@@ -28,6 +33,7 @@ export function usePromoCode({
   savedCart,
   hasRestoredCheckoutRef,
   validatePromoCodeOverride,
+  releaseSettled = true,
 }: UsePromoCodeParams) {
   const [promoCode, setPromoCode] = useState("")
   const [promoCodeValid, setPromoCodeValid] = useState(false)
@@ -96,11 +102,16 @@ export function usePromoCode({
     resetDiscount()
   }, [resetDiscount])
 
-  // Re-validate promo code from saved cart
+  // Re-validate promo code from saved cart.
+  // Gated on releaseSettled to prevent a "Invalid promo code" flash when the
+  // backend coupon hold is not yet freed (the circularity fix).
   const hasRevalidatedPromoRef = useRef(false)
   useEffect(() => {
     if (hasRevalidatedPromoRef.current || !hasRestoredCheckoutRef.current)
       return
+    // Gate: wait for the pending-release call to settle before re-validating.
+    // releaseSettled defaults to true for non-open-cart flows (no gate needed).
+    if (!releaseSettled) return
     // If the user already applied a promo this session, skip re-validation —
     // applyPromoCode is authoritative. Without this guard, a saved-cart write
     // triggered by applyPromoCode itself can race back here and clobber
@@ -109,7 +120,54 @@ export function usePromoCode({
       hasRevalidatedPromoRef.current = true
       return
     }
-    if (!savedCart?.promo_code || !cityId || validatePromoCodeOverride) return
+
+    // Open-cart path: savedCart is null (cartPersistenceEnabled=false) but
+    // hydrateFromSnapshot has already called setPromoCode with the restored code.
+    // Re-validate via the override (uses public slug-based endpoint, no cityId needed).
+    if (validatePromoCodeOverride && promoCode) {
+      hasRevalidatedPromoRef.current = true
+      // Note: hasRevalidatedPromoRef is set before the async call so that a
+      // concurrent savedCart write cannot trigger a second re-validation attempt.
+      // Single-shot semantics are intentional: if the network call fails, the
+      // promo field is cleared and the user can re-enter the code manually.
+      // A retry loop would risk double-applying a single-use coupon hold.
+      validatePromoCodeOverride(promoCode)
+        .then((discountValue) => {
+          const value = discountValue ?? 0
+          if (value <= 0) {
+            // P3 fix: clear silently AND reset all promo state so the UI
+            // never shows a visible code without a discount applied to it.
+            setPromoCode("")
+            setPromoCodeValid(false)
+            setPromoCodeDiscount(0)
+            resetDiscount()
+            return
+          }
+          setPromoCodeValid(true)
+          setPromoCodeDiscount(value)
+          setDiscount({
+            discount_value: value,
+            discount_type: "percentage",
+            discount_code: promoCode,
+            city_id: cityId ? String(cityId) : null,
+          })
+        })
+        .catch(() => {
+          // P3 fix: on transport error, clear all promo state (same as expired
+          // path) so the UI stays consistent — no dangling visible code without
+          // a discount applied to it. hasRevalidatedPromoRef stays true:
+          // single-shot semantics prevent a retry loop from double-applying a
+          // single-use coupon hold if the network recovers.
+          setPromoCode("")
+          setPromoCodeValid(false)
+          setPromoCodeDiscount(0)
+          resetDiscount()
+        })
+      return
+    }
+
+    // Portal/application path: savedCart is populated via useCartPersistence.
+    if (!savedCart?.promo_code || !cityId) return
 
     hasRevalidatedPromoRef.current = true
 
@@ -141,10 +199,13 @@ export function usePromoCode({
   }, [
     savedCart,
     cityId,
+    promoCode,
     setDiscount,
     hasRestoredCheckoutRef.current,
     validatePromoCodeOverride,
     promoCodeValid,
+    releaseSettled,
+    resetDiscount,
   ])
 
   return {

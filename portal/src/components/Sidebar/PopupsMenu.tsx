@@ -9,7 +9,10 @@ import { ChevronsUpDown } from "lucide-react"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { useCallback } from "react"
+import { useTranslation } from "react-i18next"
 import type { PopupPublic } from "@/client"
+import { Badge } from "@/components/ui/badge"
+import { imageOptimization } from "@/lib/image-optimization"
 import { cn } from "@/lib/utils"
 import { useCityProvider } from "@/providers/cityProvider"
 import { DropdownMenuContent, DropdownMenuItem } from "./DropdownMenu"
@@ -25,6 +28,7 @@ const PopupsMenu = () => {
   const { getCity, getPopups } = useCityProvider()
   const { state } = useSidebar()
   const router = useRouter()
+  const { t } = useTranslation()
   const isCollapsed = state === "collapsed"
   const city = getCity()
   const popups = getPopups()
@@ -81,7 +85,9 @@ const PopupsMenu = () => {
                           src={city.icon_url}
                           alt={city.name ?? "Popup icon"}
                           fill
+                          sizes="48px"
                           className="rounded-lg object-cover"
+                          {...imageOptimization(city.icon_url)}
                         />
                       ) : (
                         <div
@@ -128,7 +134,14 @@ const PopupsMenu = () => {
                   className="cursor-pointer"
                   onClick={() => handleClickCity(popup)}
                 >
-                  <span>{popup.name}</span>
+                  <span className="flex w-full items-center justify-between gap-2">
+                    <span className="truncate">{popup.name}</span>
+                    {popup.status === "ended" && (
+                      <Badge variant="secondary" className="shrink-0">
+                        {t("recap.status_badge")}
+                      </Badge>
+                    )}
+                  </span>
                 </DropdownMenuItem>
               ))}
             </DropdownMenuContent>

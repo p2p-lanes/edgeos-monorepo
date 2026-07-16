@@ -23,13 +23,24 @@ from app.api.form_section.models import FormSections
 from app.api.human.models import Humans
 from app.api.payment.crud import payments_crud
 from app.api.payment.models import PaymentProducts, Payments
+from app.api.payment.schemas import PaymentStatus
 from app.api.popup.models import Popups
 from app.api.product.models import Products
 from app.api.shared.enums import SaleType
 from app.api.tenant.models import Tenants
+from app.services.simplefi.client import CancelOutcome
 
 
-def _make_popup(db: Session, tenant: Tenants, *, slug_prefix: str = "ot") -> Popups:
+def _make_popup(
+    db: Session,
+    tenant: Tenants,
+    *,
+    slug_prefix: str = "ot",
+    contribution_enabled: bool = False,
+    contribution_percentage: str | None = None,
+    insurance_enabled: bool = False,
+    insurance_percentage: str | None = None,
+) -> Popups:
     popup = Popups(
         id=uuid.uuid4(),
         tenant_id=tenant.id,
@@ -39,6 +50,14 @@ def _make_popup(db: Session, tenant: Tenants, *, slug_prefix: str = "ot") -> Pop
         status="active",
         simplefi_api_key="simplefi_test_key",
         currency="USD",
+        contribution_enabled=contribution_enabled,
+        contribution_percentage=Decimal(contribution_percentage)
+        if contribution_percentage
+        else None,
+        insurance_enabled=insurance_enabled,
+        insurance_percentage=Decimal(insurance_percentage)
+        if insurance_percentage
+        else None,
     )
     db.add(popup)
     db.flush()
@@ -52,6 +71,7 @@ def _make_product(
     name: str,
     price: str,
     attendee_category_id: uuid.UUID | None = None,
+    insurance_eligible: bool = False,
 ) -> Products:
     product = Products(
         id=uuid.uuid4(),
@@ -63,6 +83,7 @@ def _make_product(
         category="ticket",
         attendee_category_id=attendee_category_id,
         is_active=True,
+        insurance_eligible=insurance_eligible,
     )
     db.add(product)
     db.flush()
@@ -140,6 +161,7 @@ def _purchase_create(
     products: list[tuple[Products, int]],
     form_data: dict[str, object],
     coupon_code: str | None = None,
+    insurance: bool = False,
 ) -> OpenTicketingPurchaseCreate:
     return OpenTicketingPurchaseCreate(
         products=[
@@ -153,6 +175,7 @@ def _purchase_create(
             form_data=form_data,
         ),
         coupon_code=coupon_code,
+        insurance=insurance,
     )
 
 
@@ -193,22 +216,33 @@ def test_create_open_ticketing_payment_one_attendee_n_tickets(
         id="sf_open_ticketing_1",
         status="pending",
         checkout_url="https://simplefi.test/checkout/1",
+        is_installment_plan=False,
     )
 
     with patch("app.services.simplefi.get_simplefi_client") as mock_get_client:
         mock_get_client.return_value.create_payment.return_value = simplefi_response
 
-        payment, checkout_url = payments_crud.create_open_ticketing_payment(
+        payment, checkout_url, _ = payments_crud.create_open_ticketing_payment(
             db,
             obj=obj,
             popup=popup,
             tenant=tenant_a,
+            attribution={
+                "fbc": "fb.1.1710000000.click",
+                "fbp": "fb.1.1710000000.browser",
+                "client_ip": "203.0.113.10",
+                "client_user_agent": "Mozilla/5.0 Test",
+            },
         )
 
     assert checkout_url == "https://simplefi.test/checkout/1"
     assert payment.status == "pending"
     assert payment.amount == Decimal("360.00")
     assert payment.external_id == "sf_open_ticketing_1"
+    assert payment.meta_fbc == "fb.1.1710000000.click"
+    assert payment.meta_fbp == "fb.1.1710000000.browser"
+    assert payment.meta_client_ip == "203.0.113.10"
+    assert payment.meta_client_user_agent == "Mozilla/5.0 Test"
 
     # New design: 1 attendee for 3 tickets (not 3 attendees)
     attendees = list(
@@ -247,8 +281,21 @@ def test_create_open_ticketing_payment_second_purchase_reuses_attendee(
     db: Session,
     tenant_a: Tenants,
 ) -> None:
-    """Second purchase by same (human, popup) reuses the existing attendee.  Design §2.1 / Spec C2."""
+    """Second purchase by same (human, popup) reuses the existing attendee.  Design §2.1 / Spec C2.
+
+    Proof gate: the second call must supply a valid cart continuity proof (cid+sig)
+    so the supersede step is allowed to cancel the first PENDING payment.  Without
+    proof the gate returns 409 pending_payment_exists (correct security behavior).
+    """
+    from app.api.cart.models import Carts
+    from app.utils.checkout_signing import build_cart_restore_token
+
+    signing_secret = "reuse-test-signing-secret"
     popup = _make_popup(db, tenant_a, slug_prefix="reuse")
+    # Give the popup a signing secret so the proof gate can validate cid+sig.
+    popup.open_checkout_signing_secret = signing_secret
+    db.add(popup)
+
     product = _make_product(db, popup, name="GA", price="50.00")
     section = _make_section(db, popup, label="Buyer Info")
     name_field = _make_field(
@@ -256,37 +303,82 @@ def test_create_open_ticketing_payment_second_purchase_reuses_attendee(
     )
     db.commit()
 
+    buyer_email = "repeat@test.com"
+
     obj1 = _purchase_create(
-        email="repeat@test.com",
+        email=buyer_email,
         first_name="Repeat",
         last_name="Buyer",
         products=[(product, 1)],
         form_data={name_field.name: "Repeat"},
     )
-    obj2 = _purchase_create(
-        email="repeat@test.com",
-        first_name="Repeat",
-        last_name="Buyer",
-        products=[(product, 2)],
-        form_data={name_field.name: "Repeat"},
-    )
 
     sf_resp1 = SimpleNamespace(
-        id="sf_reuse_1", status="pending", checkout_url="https://sf.test/1"
+        id="sf_reuse_1",
+        status="pending",
+        checkout_url="https://sf.test/1",
+        is_installment_plan=False,
     )
     sf_resp2 = SimpleNamespace(
-        id="sf_reuse_2", status="pending", checkout_url="https://sf.test/2"
+        id="sf_reuse_2",
+        status="pending",
+        checkout_url="https://sf.test/2",
+        is_installment_plan=False,
     )
 
-    with patch("app.services.simplefi.get_simplefi_client") as mock_get_client:
-        mock_get_client.return_value.create_payment.side_effect = [sf_resp1, sf_resp2]
+    from unittest.mock import MagicMock
 
-        payments_crud.create_open_ticketing_payment(
+    with patch("app.services.simplefi.get_simplefi_client") as mock_get_client:
+        mock_client = MagicMock()
+        mock_client.create_payment.side_effect = [sf_resp1, sf_resp2]
+        mock_client.cancel_payment_request.return_value = CancelOutcome.CANCELED
+        mock_get_client.return_value = mock_client
+
+        p1, _, _ = payments_crud.create_open_ticketing_payment(
             db, obj=obj1, popup=popup, tenant=tenant_a
         )
-        payments_crud.create_open_ticketing_payment(
+
+        # Create an anonymous cart for the buyer to supply as continuity proof on
+        # the second purchase (mirrors the abandoned-cart restore flow).
+        buyer_cart = Carts(
+            tenant_id=tenant_a.id,
+            human_id=None,
+            popup_id=popup.id,
+            email=buyer_email,
+            items={},
+        )
+        db.add(buyer_cart)
+        db.commit()
+        db.refresh(buyer_cart)
+
+        valid_sig = build_cart_restore_token(str(buyer_cart.id), signing_secret)
+
+        obj2 = OpenTicketingPurchaseCreate(
+            products=[ProductLine(product_id=product.id, quantity=2)],
+            buyer=BuyerInfo(
+                email=buyer_email,
+                first_name="Repeat",
+                last_name="Buyer",
+                form_data={name_field.name: "Repeat"},
+            ),
+            cid=buyer_cart.id,
+            sig=valid_sig,
+        )
+
+        p2, _, _ = payments_crud.create_open_ticketing_payment(
             db, obj=obj2, popup=popup, tenant=tenant_a
         )
+
+    # Second purchase superseded the first: P1 is CANCELLED, P2 is PENDING
+    db.expire_all()
+    fresh_p1 = db.get(Payments, p1.id)
+    assert fresh_p1 is not None
+    assert fresh_p1.status == PaymentStatus.CANCELLED.value, (
+        "First payment should be CANCELLED after supersede"
+    )
+    fresh_p2 = db.get(Payments, p2.id)
+    assert fresh_p2 is not None
+    assert fresh_p2.status == PaymentStatus.PENDING.value
 
     # Still exactly 1 attendee after two purchases
     attendees = list(
@@ -339,6 +431,7 @@ def test_create_open_ticketing_payment_does_not_overwrite_existing_human(
             id="sf_open_ticketing_3",
             status="pending",
             checkout_url="https://simplefi.test/checkout/3",
+            is_installment_plan=False,
         )
 
         payments_crud.create_open_ticketing_payment(
@@ -414,6 +507,43 @@ def test_create_open_ticketing_payment_rolls_back_payment_artifacts_on_provider_
     assert attendee_products == []
 
 
+def test_create_open_ticketing_payment_does_not_consume_coupon_on_provider_failure(
+    db: Session,
+    tenant_a: Tenants,
+) -> None:
+    """A coupon is consumed only after SimpleFI accepts the payment. A provider
+    failure must NOT burn a single-use code. Regression: the open-checkout path
+    used to consume the coupon before the SimpleFI call, creating false uses."""
+    popup = _make_popup(db, tenant_a, slug_prefix="coupon-rollback")
+    product = _make_product(db, popup, name="GA", price="100.00")
+    coupon = _make_coupon(db, popup, code="SAFE10", discount_value=10)
+    db.commit()
+
+    obj = _purchase_create(
+        email="buyer@test.com",
+        first_name="Matias",
+        last_name="Walter",
+        products=[(product, 2)],
+        form_data={},
+        coupon_code="SAFE10",
+    )
+
+    with patch("app.services.simplefi.get_simplefi_client") as mock_get_client:
+        mock_get_client.return_value.create_payment.side_effect = RuntimeError("boom")
+
+        with pytest.raises(HTTPException):
+            payments_crud.create_open_ticketing_payment(
+                db,
+                obj=obj,
+                popup=popup,
+                tenant=tenant_a,
+            )
+
+    db.expire(coupon)
+    db.refresh(coupon)
+    assert coupon.current_uses == 0
+
+
 def test_create_open_ticketing_payment_applies_coupon_discount(
     db: Session,
     tenant_a: Tenants,
@@ -437,9 +567,10 @@ def test_create_open_ticketing_payment_applies_coupon_discount(
             id="sf_open_ticketing_coupon",
             status="pending",
             checkout_url="https://simplefi.test/checkout/coupon",
+            is_installment_plan=False,
         )
 
-        payment, _ = payments_crud.create_open_ticketing_payment(
+        payment, _, _ = payments_crud.create_open_ticketing_payment(
             db,
             obj=obj,
             popup=popup,
@@ -455,6 +586,218 @@ def test_create_open_ticketing_payment_applies_coupon_discount(
     db.expire(coupon)
     db.refresh(coupon)
     assert coupon.current_uses == 1
+
+
+def test_create_open_ticketing_payment_applies_contribution(
+    db: Session,
+    tenant_a: Tenants,
+) -> None:
+    """Popup-level contribution fee is added to the open-checkout total, persisted
+    on the payment, and sent to SimpleFI. Regression: the festival popup showed the
+    contribution in checkout but never charged it (separate code path from
+    _apply_discounts)."""
+    popup = _make_popup(
+        db,
+        tenant_a,
+        slug_prefix="contribution",
+        contribution_enabled=True,
+        contribution_percentage="10.00",
+    )
+    product = _make_product(db, popup, name="GA", price="100.00")
+    db.commit()
+
+    obj = _purchase_create(
+        email="buyer@test.com",
+        first_name="Matias",
+        last_name="Walter",
+        products=[(product, 2)],
+        form_data={},
+    )
+
+    with patch("app.services.simplefi.get_simplefi_client") as mock_get_client:
+        mock_get_client.return_value.create_payment.return_value = SimpleNamespace(
+            id="sf_open_ticketing_contribution",
+            status="pending",
+            checkout_url="https://simplefi.test/checkout/contribution",
+            is_installment_plan=False,
+        )
+
+        payment, _, _ = payments_crud.create_open_ticketing_payment(
+            db,
+            obj=obj,
+            popup=popup,
+            tenant=tenant_a,
+        )
+
+        sent_amount = mock_get_client.return_value.create_payment.call_args.kwargs[
+            "amount"
+        ]
+
+    # 2 × $100 = $200 base, + 10% contribution = $20 → $220 grand total
+    assert payment.contribution_amount == Decimal("20.00")
+    assert payment.amount == Decimal("220.00")
+    assert sent_amount == Decimal("220.00")
+
+
+def test_create_open_ticketing_payment_applies_insurance_opt_in(
+    db: Session,
+    tenant_a: Tenants,
+) -> None:
+    """Buyer opt-in insurance is computed on the eligible-product subtotal,
+    persisted on the payment, and charged via SimpleFI. Only products flagged
+    insurance_eligible feed the eligible subtotal."""
+    popup = _make_popup(
+        db,
+        tenant_a,
+        slug_prefix="insurance",
+        insurance_enabled=True,
+        insurance_percentage="5.00",
+    )
+    eligible = _make_product(
+        db, popup, name="GA", price="100.00", insurance_eligible=True
+    )
+    not_eligible = _make_product(
+        db, popup, name="Donation", price="50.00", insurance_eligible=False
+    )
+    db.commit()
+
+    obj = _purchase_create(
+        email="buyer@test.com",
+        first_name="Matias",
+        last_name="Walter",
+        products=[(eligible, 2), (not_eligible, 1)],
+        form_data={},
+        insurance=True,
+    )
+
+    with patch("app.services.simplefi.get_simplefi_client") as mock_get_client:
+        mock_get_client.return_value.create_payment.return_value = SimpleNamespace(
+            id="sf_open_ticketing_insurance",
+            status="pending",
+            checkout_url="https://simplefi.test/checkout/insurance",
+            is_installment_plan=False,
+        )
+
+        payment, _, _ = payments_crud.create_open_ticketing_payment(
+            db,
+            obj=obj,
+            popup=popup,
+            tenant=tenant_a,
+        )
+
+        sent_amount = mock_get_client.return_value.create_payment.call_args.kwargs[
+            "amount"
+        ]
+
+    # Eligible subtotal = 2 × $100 = $200 (the $50 donation is excluded).
+    # 5% insurance = $10. Grand total = $200 + $50 + $10 = $260.
+    assert payment.insurance_amount == Decimal("10.00")
+    assert payment.amount == Decimal("260.00")
+    assert sent_amount == Decimal("260.00")
+
+
+def test_create_open_ticketing_payment_insurance_skipped_without_opt_in(
+    db: Session,
+    tenant_a: Tenants,
+) -> None:
+    """Insurance is opt-in: an eligible product on an insurance-enabled popup is
+    NOT charged insurance when the buyer did not opt in (default)."""
+    popup = _make_popup(
+        db,
+        tenant_a,
+        slug_prefix="insurance-off",
+        insurance_enabled=True,
+        insurance_percentage="5.00",
+    )
+    product = _make_product(
+        db, popup, name="GA", price="100.00", insurance_eligible=True
+    )
+    db.commit()
+
+    obj = _purchase_create(
+        email="buyer@test.com",
+        first_name="Matias",
+        last_name="Walter",
+        products=[(product, 1)],
+        form_data={},
+    )
+
+    with patch("app.services.simplefi.get_simplefi_client") as mock_get_client:
+        mock_get_client.return_value.create_payment.return_value = SimpleNamespace(
+            id="sf_open_ticketing_no_insurance",
+            status="pending",
+            checkout_url="https://simplefi.test/checkout/no-insurance",
+            is_installment_plan=False,
+        )
+
+        payment, _, _ = payments_crud.create_open_ticketing_payment(
+            db,
+            obj=obj,
+            popup=popup,
+            tenant=tenant_a,
+        )
+
+    assert payment.insurance_amount == Decimal("0")
+    assert payment.amount == Decimal("100.00")
+
+
+def test_create_open_ticketing_payment_insurance_and_contribution_dont_compound(
+    db: Session,
+    tenant_a: Tenants,
+) -> None:
+    """Insurance and contribution both read the post-discount subtotal as their
+    base — neither compounds on the other (ADR-2 invariant, matching the
+    authenticated flow)."""
+    popup = _make_popup(
+        db,
+        tenant_a,
+        slug_prefix="both-fees",
+        contribution_enabled=True,
+        contribution_percentage="10.00",
+        insurance_enabled=True,
+        insurance_percentage="5.00",
+    )
+    product = _make_product(
+        db, popup, name="GA", price="100.00", insurance_eligible=True
+    )
+    db.commit()
+
+    obj = _purchase_create(
+        email="buyer@test.com",
+        first_name="Matias",
+        last_name="Walter",
+        products=[(product, 1)],
+        form_data={},
+        insurance=True,
+    )
+
+    with patch("app.services.simplefi.get_simplefi_client") as mock_get_client:
+        mock_get_client.return_value.create_payment.return_value = SimpleNamespace(
+            id="sf_open_ticketing_both_fees",
+            status="pending",
+            checkout_url="https://simplefi.test/checkout/both-fees",
+            is_installment_plan=False,
+        )
+
+        payment, _, _ = payments_crud.create_open_ticketing_payment(
+            db,
+            obj=obj,
+            popup=popup,
+            tenant=tenant_a,
+        )
+
+        sent_amount = mock_get_client.return_value.create_payment.call_args.kwargs[
+            "amount"
+        ]
+
+    # Post-discount base = $100. Both fees read THAT base, not each other:
+    #   insurance     = 5%  of $100 = $5
+    #   contribution  = 10% of $100 = $10  (NOT 10% of $105)
+    #   grand total   = $100 + $5 + $10 = $115
+    assert payment.insurance_amount == Decimal("5.00")
+    assert payment.contribution_amount == Decimal("10.00")
+    assert payment.amount == Decimal("115.00")
+    assert sent_amount == Decimal("115.00")
 
 
 def test_create_open_ticketing_payment_100_percent_coupon_auto_approves(
@@ -478,7 +821,7 @@ def test_create_open_ticketing_payment_100_percent_coupon_auto_approves(
     )
 
     with patch("app.services.simplefi.get_simplefi_client") as mock_get_client:
-        payment, checkout_url = payments_crud.create_open_ticketing_payment(
+        payment, checkout_url, _ = payments_crud.create_open_ticketing_payment(
             db,
             obj=obj,
             popup=popup,

@@ -453,6 +453,7 @@ class TestOpenTicketingPaymentEnforcement:
             id=f"sf-{uuid.uuid4().hex[:8]}",
             status="pending",
             checkout_url="https://simplefi.test/checkout/enf",
+            is_installment_plan=False,
         )
 
         with patch("app.services.simplefi.get_simplefi_client") as mock_get_client:
@@ -489,11 +490,12 @@ class TestOpenTicketingPaymentEnforcement:
             id=f"sf-{uuid.uuid4().hex[:8]}",
             status="pending",
             checkout_url="https://simplefi.test/checkout/unlimited",
+            is_installment_plan=False,
         )
 
         with patch("app.services.simplefi.get_simplefi_client") as mock_get_client:
             mock_get_client.return_value.create_payment.return_value = simplefi_response
-            payment, _ = payments_crud.create_open_ticketing_payment(
+            payment, _, _ = payments_crud.create_open_ticketing_payment(
                 db, obj=obj, popup=popup, tenant=tenant_a
             )
 
@@ -533,7 +535,13 @@ class TestOpenTicketingPaymentEnforcement:
         tenant_a: Tenants,
         test_engine,
     ) -> None:
-        """Concurrent calls on remaining=1: exactly one succeeds, one 409."""
+        """Concurrent calls on remaining=1: exactly one succeeds, one loses.
+
+        The loser's status depends on thread timing: 409 when both threads pass
+        the on-sale pre-check and race the atomic decrement, or 422 when it reads
+        the already sold-out state after the winner committed. Both are valid
+        "lost the race" outcomes, so accept either to keep the test deterministic.
+        """
         from types import SimpleNamespace
         from unittest.mock import patch
 
@@ -548,7 +556,7 @@ class TestOpenTicketingPaymentEnforcement:
         )
 
         successes: list[bool] = []
-        conflicts: list[bool] = []
+        losses: list[int] = []
         lock = threading.Lock()
 
         def one_purchase() -> None:
@@ -557,6 +565,7 @@ class TestOpenTicketingPaymentEnforcement:
                 id=f"sf-{uuid.uuid4().hex[:8]}",
                 status="pending",
                 checkout_url="https://simplefi.test/checkout/conc",
+                is_installment_plan=False,
             )
             with SyncSession(test_engine) as session:
                 with patch(
@@ -572,9 +581,9 @@ class TestOpenTicketingPaymentEnforcement:
                         with lock:
                             successes.append(True)
                     except HTTPException as exc:
-                        if exc.status_code == 409:
+                        if exc.status_code in (409, 422):
                             with lock:
-                                conflicts.append(True)
+                                losses.append(exc.status_code)
                         else:
                             raise
 
@@ -586,7 +595,7 @@ class TestOpenTicketingPaymentEnforcement:
         t2.join()
 
         assert len(successes) == 1, f"Expected 1 success, got {successes}"
-        assert len(conflicts) == 1, f"Expected 1 conflict, got {conflicts}"
+        assert len(losses) == 1, f"Expected 1 lost-race (409/422), got {losses}"
 
         db.expire_all()
         refreshed = db.get(Products, product.id)

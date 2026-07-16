@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 
 import pytest
 from fastapi.testclient import TestClient
@@ -9,12 +10,15 @@ from sqlmodel import Session, select
 
 from app.api.api_key import crud as api_key_crud
 from app.api.api_key.models import ApiKeys
+from app.api.attendee.models import AttendeeProducts, Attendees
 from app.api.event.models import EventInvitations, Events
 from app.api.event.schemas import EventStatus, EventVisibility
 from app.api.event_settings.models import EventSettings
 from app.api.event_settings.schemas import PublishPermission
 from app.api.human.models import Humans
 from app.api.popup.models import Popups
+from app.api.product.models import Products
+from app.api.shared.enums import HumanRating
 from app.api.tenant.models import Tenants
 
 # POST /api/v1/events/portal/events is temporarily disabled for API keys
@@ -39,6 +43,48 @@ def _make_popup(db: Session, tenant: Tenants) -> Popups:
     db.commit()
     db.refresh(popup)
     return popup
+
+
+def _give_ticket(
+    db: Session, tenant: Tenants, popup: Popups, human: Humans
+) -> Attendees:
+    """Seed a purchased ticket for ``human`` in ``popup``.
+
+    Portal RSVP registration requires the human to hold a ticket for the
+    event's popup, so the success-path register test must seed one.
+    """
+    product = Products(
+        tenant_id=tenant.id,
+        popup_id=popup.id,
+        name=f"Ticket {uuid.uuid4().hex[:6]}",
+        slug=f"ticket-{uuid.uuid4().hex[:10]}",
+        price=Decimal("100.00"),
+    )
+    db.add(product)
+    db.commit()
+    db.refresh(product)
+
+    attendee = Attendees(
+        tenant_id=tenant.id,
+        popup_id=popup.id,
+        human_id=human.id,
+        name="PAT Ticket Holder",
+        email=human.email,
+    )
+    db.add(attendee)
+    db.commit()
+    db.refresh(attendee)
+
+    db.add(
+        AttendeeProducts(
+            tenant_id=tenant.id,
+            attendee_id=attendee.id,
+            product_id=product.id,
+            check_in_code=uuid.uuid4().hex[:10],
+        )
+    )
+    db.commit()
+    return attendee
 
 
 def _set_event_settings(
@@ -87,6 +133,7 @@ def _make_pat(
     db: Session,
     tenant: Tenants,
     human: Humans,
+    popup: Popups,
     *,
     scopes: list[str] | None = None,
 ) -> str:
@@ -94,11 +141,34 @@ def _make_pat(
         db,
         tenant_id=tenant.id,
         human_id=human.id,
+        popup_id=popup.id,
         name="test pat",
         expires_at=None,
         scopes=scopes or ["events:read"],
     )
     return raw
+
+
+def _accept_application(
+    db: Session, tenant: Tenants, popup: Popups, human: Humans
+) -> None:
+    """Seed an accepted application so the human is a member of the popup.
+
+    API key creation requires popup membership (accepted application,
+    attendee ticket, payment, or companion access).
+    """
+    from app.api.application.models import Applications
+    from app.api.application.schemas import ApplicationStatus
+
+    db.add(
+        Applications(
+            tenant_id=tenant.id,
+            popup_id=popup.id,
+            human_id=human.id,
+            status=ApplicationStatus.ACCEPTED.value,
+        )
+    )
+    db.commit()
 
 
 def _event_payload(popup: Popups) -> dict[str, str]:
@@ -122,8 +192,9 @@ class TestApiKeyPolicy:
         db: Session,
         tenant_a: Tenants,
     ) -> None:
+        popup = _make_popup(db, tenant_a)
         human = _make_human(db, tenant_a)
-        raw_key = _make_pat(db, tenant_a, human, scopes=["events:read"])
+        raw_key = _make_pat(db, tenant_a, human, popup, scopes=["events:read"])
 
         resp = client.get(
             "/api/v1/events/portal/events",
@@ -138,8 +209,9 @@ class TestApiKeyPolicy:
         db: Session,
         tenant_a: Tenants,
     ) -> None:
+        popup = _make_popup(db, tenant_a)
         human = _make_human(db, tenant_a)
-        raw_key = _make_pat(db, tenant_a, human, scopes=["events:read"])
+        raw_key = _make_pat(db, tenant_a, human, popup, scopes=["events:read"])
 
         resp = client.get(
             "/api/v1/applications/my/applications",
@@ -163,6 +235,7 @@ class TestApiKeyPolicy:
             db,
             tenant_a,
             human,
+            popup,
             scopes=["events:read", "events:write"],
         )
 
@@ -197,6 +270,7 @@ class TestApiKeyPolicy:
             db,
             tenant_a,
             human,
+            popup,
             scopes=["events:read", "events:write"],
         )
 
@@ -227,7 +301,7 @@ class TestApiKeyPolicy:
         popup = _make_popup(db, tenant_a)
         _set_event_settings(db, tenant_a, popup)
         human = _make_human(db, tenant_a)
-        raw_key = _make_pat(db, tenant_a, human, scopes=["events:read"])
+        raw_key = _make_pat(db, tenant_a, human, popup, scopes=["events:read"])
 
         resp = client.post(
             "/api/v1/events/portal/events",
@@ -261,7 +335,8 @@ class TestApiKeyPolicy:
         db.refresh(event)
 
         human = _make_human(db, tenant_a)
-        raw_key = _make_pat(db, tenant_a, human, scopes=["rsvp:write"])
+        _give_ticket(db, tenant_a, popup, human)
+        raw_key = _make_pat(db, tenant_a, human, popup, scopes=["rsvp:write"])
 
         resp = client.post(
             f"/api/v1/event-participants/portal/register/{event.id}",
@@ -279,7 +354,7 @@ class TestApiKeyPolicy:
         from app.core.security import create_access_token
 
         human = _make_human(db, tenant_a)
-        human.red_flag = True
+        human.rating = HumanRating.RED_FLAG
         db.add(human)
         db.commit()
         db.refresh(human)
@@ -288,7 +363,12 @@ class TestApiKeyPolicy:
         resp = client.post(
             "/api/v1/api-keys",
             headers={"Authorization": f"Bearer {token}"},
-            json={"name": "blocked", "scopes": ["events:read"]},
+            json={
+                "name": "blocked",
+                "scopes": ["events:read"],
+                # The red-flag guard fires before the popup is resolved.
+                "popup_id": str(uuid.uuid4()),
+            },
         )
 
         assert resp.status_code == 403, resp.text
@@ -305,13 +385,19 @@ class TestApiKeyPolicy:
         from app.api.api_key.schemas import MAX_WRITE_SCOPE_LIFETIME_DAYS
         from app.core.security import create_access_token
 
+        popup = _make_popup(db, tenant_a)
         human = _make_human(db, tenant_a)
+        _accept_application(db, tenant_a, popup, human)
         token = create_access_token(subject=human.id, token_type="human")
 
         resp = client.post(
             "/api/v1/api-keys",
             headers={"Authorization": f"Bearer {token}"},
-            json={"name": "writer", "scopes": ["events:read", "events:write"]},
+            json={
+                "name": "writer",
+                "scopes": ["events:read", "events:write"],
+                "popup_id": str(popup.id),
+            },
         )
 
         assert resp.status_code == 201, resp.text
@@ -347,6 +433,8 @@ class TestApiKeyPolicy:
                 "name": "writer",
                 "scopes": ["events:read", "events:write"],
                 "expires_at": expires_at,
+                # Validation fails before the popup is resolved.
+                "popup_id": str(uuid.uuid4()),
             },
         )
 
@@ -359,8 +447,9 @@ class TestApiKeyPolicy:
         tenant_a: Tenants,
         admin_token_tenant_a: str,
     ) -> None:
+        popup = _make_popup(db, tenant_a)
         human = _make_human(db, tenant_a)
-        raw_key = _make_pat(db, tenant_a, human, scopes=["events:read"])
+        raw_key = _make_pat(db, tenant_a, human, popup, scopes=["events:read"])
 
         resp = client.post(
             f"/api/v1/humans/{human.id}/api-keys/revoke",
@@ -387,12 +476,14 @@ class TestApiKeyPolicy:
         tenant_a: Tenants,
         admin_token_tenant_a: str,
     ) -> None:
+        popup = _make_popup(db, tenant_a)
         human = _make_human(db, tenant_a)
-        _make_pat(db, tenant_a, human, scopes=["events:read"])
+        _make_pat(db, tenant_a, human, popup, scopes=["events:read"])
         _make_pat(
             db,
             tenant_a,
             human,
+            popup,
             scopes=["events:read", "rsvp:write"],
         )
 
@@ -434,6 +525,7 @@ class TestApiKeyPolicy:
             db,
             tenant_a,
             human,
+            popup,
             scopes=["events:read", "events:write"],
         )
 
@@ -479,6 +571,7 @@ class TestApiKeyPolicy:
             db,
             tenant_a,
             attacker,
+            popup,
             scopes=["events:read", "events:write"],
         )
 
@@ -514,7 +607,7 @@ class TestApiKeyPolicy:
         db.commit()
         db.refresh(event)
 
-        raw_key = _make_pat(db, tenant_a, human, scopes=["events:read"])
+        raw_key = _make_pat(db, tenant_a, human, popup, scopes=["events:read"])
 
         resp = client.patch(
             f"/api/v1/events/portal/events/{event.id}",
@@ -552,6 +645,7 @@ class TestApiKeyPolicy:
             db,
             tenant_a,
             human,
+            popup,
             scopes=["events:read", "events:write"],
         )
 
@@ -596,6 +690,7 @@ class TestApiKeyPolicy:
             db,
             tenant_a,
             owner,
+            popup,
             scopes=["events:read", "events:write"],
         )
 
@@ -642,7 +737,7 @@ class TestApiKeyPolicy:
         db.commit()
         db.refresh(event)
 
-        raw_key = _make_pat(db, tenant_a, owner, scopes=["events:read"])
+        raw_key = _make_pat(db, tenant_a, owner, popup, scopes=["events:read"])
 
         resp = client.get(
             f"/api/v1/events/portal/events/{event.id}/invitations",
@@ -692,6 +787,7 @@ class TestApiKeyPolicy:
             db,
             tenant_a,
             owner,
+            popup,
             scopes=["events:read", "events:write"],
         )
 
@@ -748,6 +844,7 @@ class TestApiKeyPolicy:
             db,
             tenant_a,
             attacker,
+            popup,
             scopes=["events:read", "events:write"],
         )
 
@@ -779,13 +876,14 @@ class TestApiKeyPolicy:
         tenant_a: Tenants,
         admin_token_tenant_a: str,
     ) -> None:
+        popup = _make_popup(db, tenant_a)
         human = _make_human(db, tenant_a)
-        raw_key = _make_pat(db, tenant_a, human, scopes=["events:read"])
+        raw_key = _make_pat(db, tenant_a, human, popup, scopes=["events:read"])
 
         resp = client.patch(
             f"/api/v1/humans/{human.id}",
             headers={"Authorization": f"Bearer {admin_token_tenant_a}"},
-            json={"red_flag": True},
+            json={"rating": "red_flag"},
         )
 
         assert resp.status_code == 200, resp.text

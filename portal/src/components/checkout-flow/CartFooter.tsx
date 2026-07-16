@@ -58,7 +58,6 @@ export default function CartFooter({
     goToPreviousStep,
     isSubmitting,
     isEditing,
-    editCredit,
     termsAccepted,
     isBuyerInfoComplete,
     cartUiEnabled,
@@ -286,10 +285,10 @@ export default function CartFooter({
                 <span className="text-lg lg:text-2xl font-bold text-checkout-bottom-bar-text truncate max-w-full">
                   {formatCurrency(summary.grandTotal)}
                 </span>
-                {isEditing && editCredit > 0 && (
+                {summary.creditApplied > 0 && (
                   <span className="text-[10px] lg:text-xs text-orange-400 font-medium">
                     {t("checkout.credit_label", {
-                      amount: formatCurrency(editCredit),
+                      amount: formatCurrency(summary.creditApplied),
                     })}
                   </span>
                 )}

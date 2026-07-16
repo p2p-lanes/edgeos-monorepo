@@ -135,9 +135,10 @@ export function KeyMetricsCards({ data, isLoading }: KeyMetricsCardsProps) {
         accentClass="text-green-500"
       />
       <MetricCard
-        title="Avg Ticket Price"
+        title="Avg Order Value"
         value={formatCurrency(data.avg_ticket_price, currency)}
         icon={Receipt}
+        description="per payment"
         accentClass="text-amber-500"
       />
       <MetricCard

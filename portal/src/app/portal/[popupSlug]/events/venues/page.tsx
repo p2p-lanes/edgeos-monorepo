@@ -24,7 +24,9 @@ export default function PortalVenuesPage() {
     enabled: !!city?.id,
   })
   const { data: settings } = usePortalEventSettings(city?.id)
-  const canCreateVenue = settings?.humans_can_create_venues === true
+  // Ended popups are read-only: venue creation is hidden in recap mode.
+  const canCreateVenue =
+    settings?.humans_can_create_venues === true && city?.status !== "ended"
 
   const venues: EventVenuePublic[] = data?.results ?? []
 
@@ -83,6 +85,7 @@ export default function PortalVenuesPage() {
                 src={venue.image_url}
                 alt={venue.title}
                 className="aspect-[16/9] w-full object-cover"
+                sizes="(max-width: 640px) 100vw, 440px"
                 fallback={
                   <MapPin className="h-8 w-8 text-muted-foreground/40" />
                 }

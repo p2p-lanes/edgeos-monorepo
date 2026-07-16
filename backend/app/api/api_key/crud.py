@@ -83,15 +83,17 @@ def create_for_human(
     *,
     tenant_id: uuid.UUID,
     human_id: uuid.UUID,
+    popup_id: uuid.UUID,
     name: str,
     expires_at: datetime | None,
     scopes: list[str],
 ) -> tuple[ApiKeys, str]:
-    """Mint and persist a new key. Returns (row, raw_token)."""
+    """Mint and persist a new key bound to one popup. Returns (row, raw_token)."""
     raw = generate_raw_key()
     row = ApiKeys(
         tenant_id=tenant_id,
         human_id=human_id,
+        popup_id=popup_id,
         name=name,
         key_hash=hash_key(raw),
         prefix=display_prefix(raw),

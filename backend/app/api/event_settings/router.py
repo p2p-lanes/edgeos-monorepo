@@ -8,8 +8,10 @@ from app.api.event_settings.schemas import (
     EventSettingsPublic,
     EventSettingsUpdate,
 )
+from app.api.popup.guards import CallerToken, ensure_api_key_popup
 from app.core.dependencies.users import (
     CurrentHuman,
+    CurrentUser,
     CurrentWriter,
     HumanTenantSession,
     TenantSession,
@@ -22,7 +24,7 @@ router = APIRouter(prefix="/event-settings", tags=["event-settings"])
 async def get_event_settings(
     popup_id: uuid.UUID,
     db: TenantSession,
-    _: CurrentWriter,
+    _: CurrentUser,
 ) -> EventSettingsPublic:
     """Get event settings for a popup (backoffice)."""
     settings = crud.event_settings_crud.get_by_popup_id(db, popup_id)
@@ -105,8 +107,10 @@ async def get_portal_event_settings(
     popup_id: uuid.UUID,
     db: HumanTenantSession,
     _: CurrentHuman,
+    token_payload: CallerToken,
 ) -> EventSettingsPublic | None:
     """Get event settings for a popup (portal). Returns null if not configured."""
+    ensure_api_key_popup(token_payload, popup_id)
     settings = crud.event_settings_crud.get_by_popup_id(db, popup_id)
     if not settings:
         return None

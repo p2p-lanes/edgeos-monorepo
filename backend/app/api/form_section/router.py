@@ -42,14 +42,16 @@ async def list_form_sections(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Popup not found",
             )
-        sections, total = crud.form_sections_crud.find_by_popup(
-            db, popup_id=popup_id, skip=skip, limit=limit
+        # Fetch all sections for the popup (small set) so the flag filter
+        # runs before pagination — otherwise totals and pages are wrong.
+        all_sections, _ = crud.form_sections_crud.find_by_popup(
+            db, popup_id=popup_id, limit=None
         )
         # Gate special-kind sections by current popup flags so the backoffice
         # renders consistently with the portal after a flag is toggled off.
-        filtered = [s for s in sections if _section_allowed_by_flags(s, popup)]
-        sections = filtered
+        filtered = [s for s in all_sections if _section_allowed_by_flags(s, popup)]
         total = len(filtered)
+        sections = filtered[skip : skip + limit]
     else:
         sections, total = crud.form_sections_crud.find(db, skip=skip, limit=limit)
 

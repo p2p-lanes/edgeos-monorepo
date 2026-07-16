@@ -1,3 +1,5 @@
+import secrets
+from datetime import datetime
 from typing import Any
 
 from sqlalchemy import case
@@ -21,6 +23,14 @@ class PopupsCRUD(BaseCRUD[Popups, PopupCreate, PopupUpdate]):
         from app.api.attendee_category.crud import attendee_categories_crud
 
         popup = self.model(**obj_in.model_dump())
+
+        # Auto-provision the open_checkout_signing_secret when not explicitly set.
+        # This CRUD hook (not a model default) ensures every new popup is immediately
+        # capable of signing cart restore tokens and return-release proofs.
+        # Uses secrets.token_urlsafe(32) for 256-bit URL-safe randomness.
+        if popup.open_checkout_signing_secret is None:
+            popup.open_checkout_signing_secret = secrets.token_urlsafe(32)
+
         session.add(popup)
         session.flush()  # Get the popup id without committing
 
@@ -66,6 +76,22 @@ class PopupsCRUD(BaseCRUD[Popups, PopupCreate, PopupUpdate]):
                 Popups.start_date.is_not(None),  # type: ignore[union-attr]
             )
             .options(selectinload(Popups.tenant))  # type: ignore[arg-type]
+        )
+        return list(session.exec(statement).all())
+
+    def list_active_past_end_date(
+        self, session: Session, now: datetime
+    ) -> list[Popups]:
+        """Active popups whose end_date is in the past — due to transition to ended.
+
+        ``end_date`` is stored timezone-naive (treated as UTC); the aware ``now``
+        is stripped to naive for the comparison.
+        """
+        naive_now = now.replace(tzinfo=None) if now.tzinfo else now
+        statement = select(Popups).where(
+            Popups.status == PopupStatus.active,
+            Popups.end_date.is_not(None),  # type: ignore[union-attr]
+            Popups.end_date < naive_now,  # type: ignore[operator]
         )
         return list(session.exec(statement).all())
 

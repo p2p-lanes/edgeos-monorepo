@@ -65,10 +65,12 @@ export default function Home() {
                 popup={city}
               />
             )}
-            <EventCard.ApplyButton
-              onClick={onClickApply}
-              labelKey={isDirectSale ? "cta.buy_tickets" : undefined}
-            />
+            {city.status !== "ended" && (
+              <EventCard.ApplyButton
+                onClick={onClickApply}
+                labelKey={isDirectSale ? "cta.buy_tickets" : undefined}
+              />
+            )}
           </EventCard.Content>
         </EventCard>
       </div>

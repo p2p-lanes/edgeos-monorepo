@@ -6,6 +6,7 @@ import {
   type ApiKeyPublic,
   type HumanCreate,
   type HumanPublic,
+  type HumanRating,
   HumansService,
   type HumanUpdate,
 } from "@/client"
@@ -30,7 +31,6 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Separator } from "@/components/ui/separator"
-import { Switch } from "@/components/ui/switch"
 import useAuth from "@/hooks/useAuth"
 import useCustomToast from "@/hooks/useCustomToast"
 import {
@@ -46,6 +46,50 @@ const GENDER_OPTIONS = [
   { value: "non_binary", label: "Non Binary" },
   { value: "prefer_not_to_say", label: "Prefer not to say" },
 ]
+
+type BadgeVariant = "default" | "secondary" | "destructive" | "outline"
+
+const RATING_OPTIONS: {
+  value: HumanRating
+  label: string
+  description: string
+  badge: BadgeVariant
+}[] = [
+  {
+    value: "unrated",
+    label: "No rating",
+    description: "No assessment yet",
+    badge: "secondary",
+  },
+  {
+    value: "red_flag",
+    label: "🔴 Red Flag",
+    description: "Should not be admitted to gatherings (blocks the user)",
+    badge: "destructive",
+  },
+  {
+    value: "orange_flag",
+    label: "🟠 Orange Flag",
+    description: "Reasons against, still open to discussion",
+    badge: "outline",
+  },
+  {
+    value: "green_flag",
+    label: "🟢 Green Flag",
+    description: "A great attendee who adds value",
+    badge: "default",
+  },
+  {
+    value: "star",
+    label: "⭐ Star",
+    description: "Excellent — their presence enriches everyone's experience",
+    badge: "default",
+  },
+]
+
+function ratingMeta(rating: HumanRating | string | null | undefined) {
+  return RATING_OPTIONS.find((o) => o.value === rating) ?? RATING_OPTIONS[0]
+}
 
 const AGE_OPTIONS = [
   { value: "under_18", label: "Under 18" },
@@ -138,7 +182,7 @@ export function HumanForm({ defaultValues, onSuccess }: HumanFormProps) {
       age: defaultValues?.age ?? "",
       residence: defaultValues?.residence ?? "",
       picture_url: defaultValues?.picture_url ?? "",
-      red_flag: defaultValues?.red_flag ?? false,
+      rating: defaultValues?.rating ?? "unrated",
     },
     onSubmit: ({ value }) => {
       if (isEdit) {
@@ -150,7 +194,7 @@ export function HumanForm({ defaultValues, onSuccess }: HumanFormProps) {
           age: value.age || null,
           residence: value.residence || null,
           picture_url: value.picture_url || null,
-          red_flag: value.red_flag,
+          rating: value.rating,
         })
       } else {
         createMutation.mutate({
@@ -376,31 +420,43 @@ export function HumanForm({ defaultValues, onSuccess }: HumanFormProps) {
               </CardContent>
             </Card>
 
-            {/* Status (only for edit mode) */}
+            {/* Rating (only for edit mode) */}
             {isEdit && (
               <Card>
                 <CardHeader>
-                  <CardTitle>Status</CardTitle>
-                  <CardDescription>User flags and status</CardDescription>
+                  <CardTitle>Rating</CardTitle>
+                  <CardDescription>
+                    Admin assessment for gathering admission. Only Red Flag
+                    blocks the user (revokes API keys and rejects in-review
+                    applications).
+                  </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <form.Field name="red_flag">
+                  <form.Field name="rating">
                     {(field) => (
-                      <div className="flex items-center justify-between">
-                        <div className="space-y-0.5">
-                          <Label htmlFor={field.name}>Red Flag</Label>
-                          <p className="text-sm text-muted-foreground">
-                            Mark this user as flagged for review
-                          </p>
-                        </div>
-                        <Switch
-                          id={field.name}
-                          checked={field.state.value}
-                          onCheckedChange={(checked) =>
-                            field.handleChange(checked)
+                      <div className="space-y-1.5">
+                        <Label htmlFor={field.name}>Rating</Label>
+                        <Select
+                          value={field.state.value}
+                          onValueChange={(value) =>
+                            field.handleChange(value as HumanRating)
                           }
                           disabled={readOnly}
-                        />
+                        >
+                          <SelectTrigger id={field.name}>
+                            <SelectValue placeholder="Select a rating" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {RATING_OPTIONS.map((opt) => (
+                              <SelectItem key={opt.value} value={opt.value}>
+                                {opt.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <p className="text-sm text-muted-foreground">
+                          {ratingMeta(field.state.value).description}
+                        </p>
                       </div>
                     )}
                   </form.Field>
@@ -434,7 +490,7 @@ export function HumanForm({ defaultValues, onSuccess }: HumanFormProps) {
                 last_name: state.values.last_name,
                 residence: state.values.residence,
                 picture_url: state.values.picture_url,
-                red_flag: state.values.red_flag,
+                rating: state.values.rating,
               })}
             >
               {(values) => (
@@ -465,7 +521,7 @@ export function HumanForm({ defaultValues, onSuccess }: HumanFormProps) {
                               .filter(Boolean)
                               .join(" ") || "Name"}
                           </p>
-                          {values.red_flag && (
+                          {values.rating === "red_flag" && (
                             <AlertTriangle className="h-3.5 w-3.5 text-destructive" />
                           )}
                         </div>
@@ -493,12 +549,10 @@ export function HumanForm({ defaultValues, onSuccess }: HumanFormProps) {
 
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-muted-foreground">
-                        Status
+                        Rating
                       </span>
-                      <Badge
-                        variant={values.red_flag ? "destructive" : "default"}
-                      >
-                        {values.red_flag ? "Flagged" : "Normal"}
+                      <Badge variant={ratingMeta(values.rating).badge}>
+                        {ratingMeta(values.rating).label}
                       </Badge>
                     </div>
 

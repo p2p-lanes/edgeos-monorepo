@@ -157,7 +157,15 @@ export interface CheckoutCartSummary {
   dynamicSubtotal: number
   subtotal: number
   discount: number
+  /** Total credit available to spend (account balance + edit give-up). */
   credit: number
+  /**
+   * Credit that actually reduced the total this order. Equals `credit`
+   * unless the balance exceeds the discounted subtotal, in which case only
+   * the portion that brought the total to zero is applied (the rest carries
+   * over). Use this for display so the shown reduction matches the total.
+   */
+  creditApplied: number
   grandTotal: number
   itemCount: number
 }
@@ -222,10 +230,17 @@ export function formatPrice(
 }
 
 export function formatCheckoutDate(date: string | Date): string {
+  // Date-only strings ("YYYY-MM-DD") parse as UTC midnight, so they must be
+  // formatted in UTC too — formatting them in the viewer's zone shifts the
+  // calendar date back a day anywhere west of UTC and makes SSR (UTC) and
+  // client render different text.
+  const isDateOnly =
+    typeof date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(date)
   const d = typeof date === "string" ? new Date(date) : date
   return d.toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
+    ...(isDateOnly ? { timeZone: "UTC" } : {}),
   })
 }
 
@@ -284,6 +299,7 @@ export function createInitialSummary(): CheckoutCartSummary {
     subtotal: 0,
     discount: 0,
     credit: 0,
+    creditApplied: 0,
     grandTotal: 0,
     itemCount: 0,
   }

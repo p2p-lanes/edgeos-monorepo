@@ -143,6 +143,8 @@ export function AttendeeModal({
         id: editingAttendee?.id ?? "",
         // Pass email from dynamic fields if present
         ...(formData.email ? { email: formData.email } : {}),
+        // Persist declarative required_fields answers (e.g. age_group)
+        additional_data: additionalData,
       } as AttendeePassState & { category_id?: string })
     } finally {
       setLoading(false)

@@ -7,13 +7,14 @@ import ExpandableDescription from "@/components/ui/ExpandableDescription"
 import QuantitySelector, {
   supportsQuantitySelector,
 } from "@/components/ui/QuantitySelector"
-import SoldOutBadge from "@/components/ui/SoldOutBadge"
+import { imageOptimization } from "@/lib/image-optimization"
 import { getProductAvailability } from "@/lib/product-availability"
 import { cn } from "@/lib/utils"
 import { useCheckout } from "@/providers/checkoutProvider"
 import { formatCurrency } from "@/types/checkout"
 import type { ProductsPass } from "@/types/Products"
 import type { VariantProps } from "../registries/variantRegistry"
+import { SaleStateBadge } from "./saleStateBadge"
 
 /* ── Shared components ────────────────────────────────────── */
 
@@ -41,7 +42,7 @@ function MerchQtyControl({
   } = getProductAvailability(product)
 
   if (!canSelect) {
-    return state === "sold_out" ? <SoldOutBadge /> : null
+    return state === "sold_out" ? <SaleStateBadge state="sold_out" /> : null
   }
 
   if (showStepper) {
@@ -130,7 +131,9 @@ function MerchDefaultItem({
               src={product.image_url}
               alt={product.name}
               fill
+              sizes="56px"
               className="object-cover"
+              {...imageOptimization(product.image_url)}
             />
           ) : (
             <ShoppingBag className="w-6 h-6 text-muted-foreground" />
@@ -196,7 +199,9 @@ function MerchDefaultItem({
                 src={product.image_url}
                 alt={product.name}
                 fill
+                sizes="64px"
                 className="object-cover"
+                {...imageOptimization(product.image_url)}
               />
             ) : (
               <ShoppingBag className="w-7 h-7 text-muted-foreground" />
@@ -304,7 +309,9 @@ function MerchGrid({ products, getQuantity, onQuantityChange }: CardListProps) {
                     src={product.image_url}
                     alt={product.name}
                     fill
+                    sizes="(max-width: 640px) 50vw, 336px"
                     className="object-cover"
+                    {...imageOptimization(product.image_url)}
                   />
                 ) : (
                   <ShoppingBag className="w-10 h-10 text-muted-foreground" />
@@ -401,7 +408,9 @@ function MerchCompact({
                     src={product.image_url}
                     alt={product.name}
                     fill
+                    sizes="44px"
                     className="object-cover"
+                    {...imageOptimization(product.image_url)}
                   />
                 ) : (
                   <ShoppingBag className="w-4 h-4 text-muted-foreground" />

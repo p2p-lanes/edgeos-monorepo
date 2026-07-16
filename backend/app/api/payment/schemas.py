@@ -18,11 +18,18 @@ class PaymentType(str, Enum):
 
 
 class PaymentSource(str, Enum):
-    """Settlement rail/provider shown to users."""
+    """Settlement rail/provider shown to users.
+
+    SIMPLEFI is the residual value: settlement webhooks that don't expose a
+    card provider. CRYPTO is written at installment-plan activation, where
+    the rail is explicit — so a plan with SIMPLEFI source predates that
+    logic and its rail is unknown.
+    """
 
     SIMPLEFI = "SimpleFI"
     STRIPE = "Stripe"
     MERCADOPAGO = "MercadoPago"
+    CRYPTO = "Crypto"
 
 
 class PaymentStatus(str, Enum):
@@ -91,6 +98,13 @@ class PaymentBase(SQLModel):
     amount: Decimal = Field(
         default=Decimal("0"), sa_column=Column(Numeric(10, 2), nullable=False)
     )
+    # Total actually charged to the buyer, in the payment's fiat currency.
+    # SimpleFi merchants can configure per-rail (card/crypto) price adjustments,
+    # so this can differ from `amount` (the quoted total). NULL until settlement
+    # and for non-SimpleFi payments — reporting reads COALESCE(amount_charged, amount).
+    amount_charged: Decimal | None = Field(
+        default=None, sa_column=Column(Numeric(10, 2), nullable=True)
+    )
     insurance_amount: Decimal = Field(
         default=Decimal("0"),
         sa_column=Column(Numeric(10, 2), nullable=False, server_default="0"),
@@ -113,7 +127,6 @@ class PaymentBase(SQLModel):
         default=None,
         sa_column=Column(JSONB, nullable=True),
     )
-
     # Discount tracking
     coupon_id: uuid.UUID | None = Field(
         default=None, foreign_key="coupons.id", nullable=True, index=True
@@ -146,6 +159,14 @@ class PaymentBase(SQLModel):
     # free payments (100% coupon, credit, etc.) which leave this NULL.
     granted_by_user_id: uuid.UUID | None = Field(
         default=None, foreign_key="users.id", nullable=True, index=True
+    )
+
+    # Credit deducted from application.credit at payment creation.
+    # 0 when no credit was consumed; restored to the application balance
+    # when the payment expires or is cancelled (PENDING-only path).
+    credit_applied: Decimal = Field(
+        default=Decimal("0"),
+        sa_column=Column(Numeric(10, 2), nullable=False, server_default="0"),
     )
 
 
@@ -239,6 +260,9 @@ class PaymentPreview(BaseModel):
     group_id: uuid.UUID | None = None
     scholarship_discount: bool = False
 
+    # Credit consumed from the application balance for this payment.
+    credit_applied: Decimal = Decimal("0")
+
     # Payment provider response (populated on creation)
     status: str | None = None
     external_id: str | None = None
@@ -292,20 +316,23 @@ class ApplicationFeeCreate(BaseModel):
     application_id: uuid.UUID
 
 
-class SimpleFICardPayment(BaseModel):
-    """Card payment info from SimpleFI."""
-
-    provider: str
-    status: str
-    coin: str = "USD"
-
-
 class SimpleFIPriceDetails(BaseModel):
     """Price details for a SimpleFI transaction."""
 
     currency: str
     final_amount: float
     rate: float
+
+
+class SimpleFICardPayment(BaseModel):
+    """Card payment info from SimpleFI."""
+
+    provider: str
+    status: str
+    coin: str = "USD"
+    # final_amount here is the card-rail adjusted fiat total — the amount the
+    # buyer is actually charged when the merchant has card pricing configured.
+    price_details: SimpleFIPriceDetails | None = None
 
 
 class SimpleFITransaction(BaseModel):
@@ -367,12 +394,18 @@ class SimpleFIWebhookPayload(BaseModel):
 class SimpleFIInstallmentPlan(BaseModel):
     """Installment plan details from SimpleFI."""
 
-    id: str
+    id: str | None = None
     status: str
     paid_installments_count: int
     number_of_installments: int
     user_email: str
+    # CARD | CRYPTO. Locked once the first payment is made — SimpleFi does
+    # not allow switching afterwards, so the value seen at activation holds
+    # for the plan's lifetime.
     payment_method: str | None = None
+    # Exactly one is set for CARD plans; identifies the charging provider.
+    stripe_subscription_id: str | None = None
+    mercadopago_preapproval_id: str | None = None
     reference: dict | None = None
 
     model_config = ConfigDict(extra="allow")
@@ -393,3 +426,29 @@ class SimpleFIInstallmentPlanPayload(BaseModel):
     entity_id: str
     merchant_id: str | None = None
     data: SimpleFIInstallmentPlanData
+
+
+# ---------------------------------------------------------------------------
+# Release-on-return schemas (POST /payments/my/pending/release)
+# ---------------------------------------------------------------------------
+
+
+class PendingReleaseAuthRequest(BaseModel):
+    """Request body for POST /payments/my/pending/release (authenticated surface).
+
+    application_id identifies which PENDING payment to release.
+    Ownership is verified server-side against current_human.id.
+    """
+
+    application_id: uuid.UUID
+
+
+class PendingReleaseResponse(BaseModel):
+    """Response body for both release-on-return endpoints.
+
+    released=True only when a cancel+hold-release actually committed.
+    released=False covers: invalid proof, no PENDING exists, flag disabled.
+    Enumeration-safe: the body shape is identical across all False outcomes.
+    """
+
+    released: bool

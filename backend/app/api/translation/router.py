@@ -7,7 +7,10 @@ from pydantic import BaseModel
 from app.api.shared.enums import UserRole
 from app.api.translation.crud import translations_crud
 from app.api.translation.schemas import TranslationCreate, TranslationPublic
-from app.api.translation.service import TRANSLATABLE_FIELDS
+from app.api.translation.service import (
+    TRANSLATABLE_FIELDS,
+    extract_translatable_leaves,
+)
 from app.core.dependencies.users import (
     AdminOrApiKey_TranslationsRead,
     AdminOrApiKey_TranslationsWrite,
@@ -91,6 +94,14 @@ async def ai_translate(
         if value and isinstance(value, str):
             source_fields[field] = value
 
+    # Ticketing steps also carry nested template_config copy (section labels,
+    # meal-plan options, insurance card text). Extract those leaves keyed by
+    # path so the AI translates them alongside the flat fields.
+    if request.entity_type == "ticketing_step":
+        source_fields.update(
+            extract_translatable_leaves(getattr(entity, "template_config", None))
+        )
+
     if not source_fields:
         return {}
 
@@ -113,7 +124,8 @@ async def ai_translate(
             detail=f"AI translation failed: {e}",
         )
 
-    return {k: v for k, v in translated.items() if k in translatable}
+    # Return only keys we asked to translate (flat fields + nested leaf paths).
+    return {k: v for k, v in translated.items() if k in source_fields}
 
 
 @router.delete("/{translation_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -142,6 +154,7 @@ def _fetch_entity(db, entity_type: str, entity_id: uuid.UUID):
     from app.api.group.crud import groups_crud
     from app.api.popup.crud import popups_crud
     from app.api.product.crud import products_crud
+    from app.api.ticketing_step.crud import ticketing_steps_crud
 
     cruds = {
         "popup": popups_crud,
@@ -149,6 +162,7 @@ def _fetch_entity(db, entity_type: str, entity_id: uuid.UUID):
         "group": groups_crud,
         "form_field": form_fields_crud,
         "form_section": form_sections_crud,
+        "ticketing_step": ticketing_steps_crud,
     }
     crud = cruds.get(entity_type)
     if not crud:

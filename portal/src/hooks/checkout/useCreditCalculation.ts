@@ -4,16 +4,16 @@ import type { AttendeePassState } from "@/types/Attendee"
 interface UseCreditCalculationParams {
   attendeePasses: AttendeePassState[]
   isEditing: boolean
-  creditsEnabled: boolean
+  editPassesEnabled: boolean
 }
 
 export function useCreditCalculation({
   attendeePasses,
   isEditing,
-  creditsEnabled,
+  editPassesEnabled,
 }: UseCreditCalculationParams) {
   const editCredit = useMemo(() => {
-    if (!creditsEnabled) return 0
+    if (!editPassesEnabled) return 0
     if (!isEditing) return 0
     return attendeePasses.reduce((total, attendee) => {
       return (
@@ -23,10 +23,10 @@ export function useCreditCalculation({
           .reduce((sum, p) => sum + p.price * (p.quantity ?? 1), 0)
       )
     }, 0)
-  }, [attendeePasses, isEditing, creditsEnabled])
+  }, [attendeePasses, isEditing, editPassesEnabled])
 
   const monthUpgradeCredit = useMemo(() => {
-    if (!creditsEnabled) return 0
+    if (!editPassesEnabled) return 0
     if (isEditing) return 0
 
     const hasPatreonSelected = attendeePasses.some((a) =>
@@ -61,7 +61,7 @@ export function useCreditCalculation({
 
       return total + purchasedCredit
     }, 0)
-  }, [attendeePasses, isEditing, creditsEnabled])
+  }, [attendeePasses, isEditing, editPassesEnabled])
 
   return { editCredit, monthUpgradeCredit }
 }

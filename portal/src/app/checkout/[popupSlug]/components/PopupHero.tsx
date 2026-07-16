@@ -1,4 +1,6 @@
+import Image from "next/image"
 import type { PopupPublic } from "@/client"
+import { imageOptimization } from "@/lib/image-optimization"
 
 interface PopupHeroProps {
   popup: PopupPublic
@@ -8,10 +10,16 @@ export function PopupHero({ popup }: PopupHeroProps) {
   return (
     <section className="overflow-hidden rounded-2xl border bg-card text-card-foreground shadow-sm">
       {popup.image_url ? (
-        <div
-          className="h-56 w-full bg-cover bg-center"
-          style={{ backgroundImage: `url(${popup.image_url})` }}
-        />
+        <div className="relative h-56 w-full">
+          <Image
+            src={popup.image_url}
+            alt={popup.name}
+            fill
+            sizes="100vw"
+            className="object-cover"
+            {...imageOptimization(popup.image_url)}
+          />
+        </div>
       ) : null}
       <div className="space-y-3 p-6">
         <div>

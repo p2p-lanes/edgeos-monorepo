@@ -1,6 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Pencil, Trash2 } from "lucide-react"
 import { useState } from "react"
+import ReactMarkdown from "react-markdown"
+import remarkGfm from "remark-gfm"
 
 import { type TaskCommentPublic, TasksService } from "@/client"
 import { Button } from "@/components/ui/button"
@@ -26,12 +28,16 @@ function CommentRow({
   comment: TaskCommentPublic
 }) {
   const queryClient = useQueryClient()
-  const { user } = useAuth()
+  const { user, isSuperadmin } = useAuth()
   const { showSuccessToast, showErrorToast } = useCustomToast()
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(comment.body)
 
   const isOwn = !!user && comment.author_user_id === user.id
+  // Editing stays author-only (the backend rejects editing others' comments),
+  // but superadmins can delete any comment for moderation — mirrors the
+  // backend's delete-comment policy (author OR superadmin).
+  const canDelete = isOwn || isSuperadmin
 
   const invalidate = () =>
     queryClient.invalidateQueries({ queryKey: commentsQueryKey(taskId) })
@@ -101,29 +107,55 @@ function CommentRow({
           </div>
         </div>
       ) : (
-        <p className="whitespace-pre-wrap text-sm text-foreground/90">
-          {comment.body}
-        </p>
+        <div
+          className={
+            "text-sm text-foreground/90 " +
+            "[&>p]:my-0 [&>p]:whitespace-pre-wrap [&>p+p]:mt-2 " +
+            "[&>ul]:my-1 [&>ul]:list-disc [&>ul]:pl-5 " +
+            "[&>ol]:my-1 [&>ol]:list-decimal [&>ol]:pl-5 " +
+            "[&_li]:my-0.5 " +
+            "[&_h1]:text-base [&_h1]:font-semibold [&_h1]:mt-2 [&_h1]:mb-1 " +
+            "[&_h2]:text-sm [&_h2]:font-semibold [&_h2]:mt-2 [&_h2]:mb-1 " +
+            "[&_h3]:text-sm [&_h3]:font-semibold [&_h3]:mt-2 [&_h3]:mb-1 " +
+            "[&_strong]:font-semibold [&_em]:italic " +
+            "[&_code]:rounded [&_code]:bg-muted [&_code]:px-1 [&_code]:py-0.5 [&_code]:text-xs " +
+            "[&_a]:text-primary [&_a]:underline"
+          }
+        >
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+            {comment.body}
+          </ReactMarkdown>
+        </div>
       )}
 
-      {isOwn && !editing && (
+      {canDelete && !editing && (
         <div className="mt-2 flex gap-1">
-          <Button
-            size="sm"
-            variant="ghost"
-            className="h-7 px-2 text-muted-foreground"
-            onClick={() => setEditing(true)}
-          >
-            <Pencil className="mr-1 h-3 w-3" /> Edit
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            className="h-7 px-2 text-muted-foreground"
-            onClick={() => deleteMutation.mutate()}
-          >
-            <Trash2 className="mr-1 h-3 w-3" /> Delete
-          </Button>
+          {isOwn && (
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-7 px-2 text-muted-foreground"
+              onClick={() => setEditing(true)}
+            >
+              <Pencil className="mr-1 h-3 w-3" /> Edit
+            </Button>
+          )}
+          {canDelete && (
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-7 px-2 text-muted-foreground"
+              onClick={() => {
+                // A superadmin deleting someone else's comment is a moderation
+                // action — confirm so it isn't a stray click. Deleting your own
+                // stays one-click, matching the prior behavior.
+                if (!isOwn && !window.confirm("Delete this comment?")) return
+                deleteMutation.mutate()
+              }}
+            >
+              <Trash2 className="mr-1 h-3 w-3" /> Delete
+            </Button>
+          )}
         </div>
       )}
     </div>

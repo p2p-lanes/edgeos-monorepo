@@ -35,6 +35,11 @@ from app.api.event_venue.schemas import (
     VenueStatus,
     VenueWeeklyHoursUpdate,
 )
+from app.api.popup.guards import (
+    CallerToken,
+    ensure_api_key_popup,
+    ensure_popup_writable,
+)
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
 from app.core.dependencies.users import (
     AdminOrApiKey_EventsRead,
@@ -544,6 +549,8 @@ def _compute_availability(
     start: datetime,
     end: datetime,
     exclude_event_id: uuid.UUID | None = None,
+    redact_private: bool = False,
+    viewer_human_id: uuid.UUID | None = None,
 ) -> VenueAvailability:
     """Return open ranges (derived from weekly_hours + open exceptions) and
     busy slots (existing events with setup/teardown + closed exceptions).
@@ -553,9 +560,16 @@ def _compute_availability(
 
     ``exclude_event_id`` drops one event from the busy list — used by edit
     forms so the event being edited doesn't appear to overlap itself.
+
+    ``redact_private`` hides the title of non-public events that the viewer
+    doesn't manage (portal privacy): the slot stays visible as occupied but
+    ``label`` is blanked. ``viewer_human_id`` is the human whose own private
+    events keep their title even when ``redact_private`` is set.
     """
+    from app.api.event.crud import _strip_tz
     from app.api.event.models import Events
-    from app.api.event.schemas import EventStatus
+    from app.api.event.recurrence import expand, parse_rrule
+    from app.api.event.schemas import EventStatus, EventVisibility
 
     if end <= start:
         raise HTTPException(status_code=400, detail="end must be after start")
@@ -567,20 +581,31 @@ def _compute_availability(
     # Drafts, cancelled and rejected events no longer hold their slot; treat
     # them as freed availability so calendars don't show ghost blocks and
     # draft proposals don't lock the venue against other bookings.
+    # Recurring masters are handled separately: their start/end only describe
+    # the first occurrence, so the window filter below would miss (or
+    # misplace) every later instance.
+    freed_statuses = [EventStatus.DRAFT, EventStatus.CANCELLED, EventStatus.REJECTED]
     events_query = (
         select(Events)
         .where(Events.venue_id == venue.id)
-        .where(
-            Events.status.notin_(
-                [EventStatus.DRAFT, EventStatus.CANCELLED, EventStatus.REJECTED]
-            )
-        )
+        .where(Events.status.notin_(freed_statuses))
+        .where(Events.rrule.is_(None))
         .where(Events.start_time < end)
         .where(Events.end_time > start)
     )
     if exclude_event_id is not None:
         events_query = events_query.where(Events.id != exclude_event_id)
     events = list(db.exec(events_query).all())
+
+    recurring_query = (
+        select(Events)
+        .where(Events.venue_id == venue.id)
+        .where(Events.status.notin_(freed_statuses))
+        .where(Events.rrule.is_not(None))
+    )
+    if exclude_event_id is not None:
+        recurring_query = recurring_query.where(Events.id != exclude_event_id)
+    recurring_masters = list(db.exec(recurring_query).all())
 
     closed_exceptions = list(
         db.exec(
@@ -602,21 +627,81 @@ def _compute_availability(
     )
 
     busy: list[VenueBusySlot] = []
-    for e in events:
-        busy_start = e.start_time - timedelta(minutes=venue.setup_time_minutes)
-        busy_end = e.end_time + timedelta(minutes=venue.teardown_time_minutes)
+
+    def _append_event_busy(e: Events, ev_start: datetime, ev_end: datetime) -> None:
+        busy_start = ev_start - timedelta(minutes=venue.setup_time_minutes)
+        busy_end = ev_end + timedelta(minutes=venue.teardown_time_minutes)
+        # Mirror ``_human_id_manages_event`` (event/router.py) inline to avoid a
+        # cross-module import: owner, host, or any collaborator may see titles.
+        is_manager = viewer_human_id is not None and (
+            viewer_human_id in (e.owner_id, e.host_id)
+            or viewer_human_id in (e.collaborator_ids or [])
+        )
+        redacted = (
+            redact_private and e.visibility != EventVisibility.PUBLIC and not is_manager
+        )
         busy.append(
             VenueBusySlot(
                 start=busy_start,
                 end=busy_end,
                 source="event",
-                label=e.title,
+                label=None if redacted else e.title,
+                visibility=e.visibility.value,
                 event_id=e.id,
-                event_start=e.start_time,
-                event_end=e.end_time,
+                event_start=ev_start,
+                event_end=ev_end,
                 highlighted=bool(e.highlighted),
             )
         )
+
+    for e in events:
+        _append_event_busy(e, e.start_time, e.end_time)
+
+    # Expand recurring masters into per-occurrence busy slots. Materialized
+    # override children (rows with recurrence_master_id) are plain rows and
+    # already came through ``events``; suppress the generated occurrence at
+    # the same start so the instance isn't double-counted — mirrors
+    # ``_expand_rows_in_window`` (event/crud.py).
+    if recurring_masters:
+        override_keys: set[tuple[uuid.UUID, datetime]] = set()
+        for child in db.exec(
+            select(Events).where(
+                Events.recurrence_master_id.in_([m.id for m in recurring_masters])
+            )
+        ).all():
+            if child.recurrence_master_id is not None:
+                override_keys.add(
+                    (child.recurrence_master_id, _strip_tz(child.start_time))
+                )
+        for master in recurring_masters:
+            try:
+                rule = parse_rrule(master.rrule)
+            except ValueError:
+                rule = None
+            if rule is None:
+                # Unparseable/absent rule: fall back to the master's own slot
+                # so the event at least blocks its first occurrence.
+                if master.start_time < end and master.end_time > start:
+                    _append_event_busy(master, master.start_time, master.end_time)
+                continue
+            duration = master.end_time - master.start_time
+            occurrences = expand(
+                dtstart=master.start_time,
+                rule=rule,
+                # Pad left so occurrences that start before the window but
+                # still overlap it are kept (same trick as _series_overlaps).
+                window_start=start - duration,
+                window_end=end,
+                exdates=list(master.recurrence_exdates or []),
+                timezone=master.timezone,
+            )
+            for occ_start in occurrences:
+                occ_end = occ_start + duration
+                if not (occ_start < end and occ_end > start):
+                    continue
+                if (master.id, _strip_tz(occ_start)) in override_keys:
+                    continue
+                _append_event_busy(master, occ_start, occ_end)
     for exc in closed_exceptions:
         busy.append(
             VenueBusySlot(
@@ -724,6 +809,7 @@ async def get_portal_availability(
     venue_id: uuid.UUID,
     db: HumanTenantSession,
     current_human: CurrentHuman,
+    token_payload: CallerToken,
     start: datetime = Query(...),
     end: datetime = Query(...),
     exclude_event_id: uuid.UUID | None = Query(default=None),
@@ -731,9 +817,11 @@ async def get_portal_availability(
     """Portal-side availability query — same shape as the backoffice one,
     used by the event-creation form to show open/busy slots per day.
 
-    PRIVATE event busy slots are opacity-filtered: non-members see the slot
-    timing (start/end/event_start/event_end) but the label (event title) is
-    masked to None. Members and the event owner see the full label.
+    PRIVATE event busy slots are opacity-filtered through the chokepoint: the
+    slot timing (start/end/event_start/event_end) stays visible as occupied but
+    the label (event title) is masked to None for viewers who cannot see it.
+    Members, invitees, the owner, and managers (host/collaborators) see the
+    full label.
     """
     from sqlmodel import select as _select
 
@@ -744,6 +832,7 @@ async def get_portal_availability(
     from app.services.event_visibility import project_event_for
 
     venue = _get_venue_or_404(db, venue_id)
+    ensure_api_key_popup(token_payload, venue.popup_id)
     availability = _compute_availability(db, venue, start, end, exclude_event_id)
 
     # Fast path: if there are no event-sourced busy slots, nothing to filter.
@@ -804,6 +893,16 @@ async def get_portal_availability(
             filtered_busy.append(slot)
             continue
 
+        # Managers (owner/host/collaborators) always see the label — mirrors
+        # `_human_id_manages_event` (event/router.py). Taking the chokepoint
+        # alone would regress the host/collaborator visibility added on dev.
+        is_manager = current_human.id in (ev.owner_id, ev.host_id) or (
+            current_human.id in (ev.collaborator_ids or [])
+        )
+        if is_manager:
+            filtered_busy.append(slot)
+            continue
+
         # Apply the chokepoint for this PRIVATE event.
         result = project_event_for(
             viewer=viewer,
@@ -822,6 +921,7 @@ async def get_portal_availability(
                     end=slot.end,
                     source=slot.source,
                     label=None,
+                    visibility=ev.visibility.value,
                     event_id=slot.event_id,
                     event_start=slot.event_start,
                     event_end=slot.event_end,
@@ -844,11 +944,13 @@ async def get_portal_availability(
 async def list_portal_venues(
     db: HumanTenantSession,
     _: CurrentHuman,
+    token_payload: CallerToken,
     popup_id: uuid.UUID,
     search: str | None = None,
     skip: PaginationSkip = 0,
     limit: PaginationLimit = 100,
 ) -> ListModel[EventVenuePublic]:
+    ensure_api_key_popup(token_payload, popup_id)
     # Hide pending venues from portal listings. Filtering in the query (not in
     # Python) keeps the paging total correct.
     venues, total = crud.event_venues_crud.find_by_popup(
@@ -871,17 +973,22 @@ async def update_portal_venue(
     venue_in: EventVenueUpdate,
     db: HumanTenantSession,
     current_human: CurrentHuman,
+    token_payload: CallerToken,
 ) -> EventVenuePublic:
     """Let a human edit a venue they created from the portal. Admin-only
     fields (``status``) are ignored on this endpoint — re-approval lives in
     the backoffice.
     """
     venue = _get_venue_or_404(db, venue_id)
+    ensure_api_key_popup(token_payload, venue.popup_id)
     if venue.owner_id != current_human.id:
         raise HTTPException(
             status_code=403,
             detail="Only the venue's owner can edit it from the portal",
         )
+    from app.api.popup.crud import popups_crud
+
+    ensure_popup_writable(popups_crud.get(db, venue.popup_id))
 
     update_data = venue_in.model_dump(
         exclude_unset=True, exclude={"property_type_ids", "status"}
@@ -904,6 +1011,7 @@ async def delete_portal_venue(
     venue_id: uuid.UUID,
     db: HumanTenantSession,
     current_human: CurrentHuman,
+    token_payload: CallerToken,
 ) -> None:
     """Let a human delete a venue they created. Blocked if the venue still
     has linked events — those must be removed/reassigned first."""
@@ -911,11 +1019,15 @@ async def delete_portal_venue(
     from app.api.event.schemas import EventStatus
 
     venue = _get_venue_or_404(db, venue_id)
+    ensure_api_key_popup(token_payload, venue.popup_id)
     if venue.owner_id != current_human.id:
         raise HTTPException(
             status_code=403,
             detail="Only the venue's owner can delete it from the portal",
         )
+    from app.api.popup.crud import popups_crud
+
+    ensure_popup_writable(popups_crud.get(db, venue.popup_id))
 
     active_event = db.exec(
         select(Events)
@@ -941,9 +1053,14 @@ async def create_portal_venue(
     venue_in: EventVenueCreate,
     db: HumanTenantSession,
     current_human: CurrentHuman,
+    token_payload: CallerToken,
 ) -> EventVenuePublic:
     """Create a venue as a human (portal). Respects popup event settings."""
     from app.api.event_settings.crud import event_settings_crud
+    from app.api.popup.crud import popups_crud
+
+    ensure_api_key_popup(token_payload, venue_in.popup_id)
+    ensure_popup_writable(popups_crud.get(db, venue_in.popup_id))
 
     settings = event_settings_crud.get_by_popup_id(db, venue_in.popup_id)
     if not settings or not settings.humans_can_create_venues:
@@ -965,11 +1082,10 @@ async def create_portal_venue(
     db.refresh(venue)
 
     if pending:
-        from app.api.popup.crud import popups_crud
         from app.services.approval_notify import notify_venue_pending_approval
 
         popup = popups_crud.get(db, venue.popup_id)
-        await notify_venue_pending_approval(venue, popup, settings)
+        await notify_venue_pending_approval(venue, popup, settings, db_session=db)
 
     return EventVenuePublic.model_validate(venue)
 

@@ -48,6 +48,26 @@ export default function EditPortalEventPage() {
     )
   }
 
+  // Ended popups are read-only: events can no longer be edited.
+  if (city.status === "ended") {
+    return (
+      <div className="max-w-2xl mx-auto p-4 sm:p-6 text-center py-20">
+        <h1 className="text-xl font-semibold">
+          {t("events.form.popup_ended_heading")}
+        </h1>
+        <p className="text-sm text-muted-foreground mt-2">
+          {t("events.form.popup_ended_message")}
+        </p>
+        <Link
+          href={`/portal/${city.slug}/events/${params.eventId}`}
+          className="mt-4 inline-block text-sm underline"
+        >
+          {t("events.form.back_to_event")}
+        </Link>
+      </div>
+    )
+  }
+
   const canManage = canManageEvent(event, currentHuman?.id)
   if (!canManage) {
     return (

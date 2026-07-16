@@ -101,6 +101,33 @@ class EventParticipantsCRUD(
             )
         return session.exec(statement).one()
 
+    def count_active_for_events(
+        self,
+        session: Session,
+        event_ids: list[uuid.UUID],
+    ) -> dict[uuid.UUID, int]:
+        """Active (non-cancelled) RSVP counts for many events in one query.
+
+        Returns a ``{event_id: count}`` map; event_ids with no active
+        participants are omitted (callers should default missing keys to 0).
+        Used by the backoffice event list so operators can see RSVP counts
+        without opening each event, avoiding an N+1 of ``count_active_for_event``.
+        """
+        if not event_ids:
+            return {}
+        statement = (
+            select(
+                EventParticipants.event_id,
+                func.count().label("count"),
+            )
+            .where(
+                EventParticipants.event_id.in_(event_ids),  # type: ignore[attr-defined]
+                EventParticipants.status != ParticipantStatus.CANCELLED,
+            )
+            .group_by(EventParticipants.event_id)
+        )
+        return {row[0]: int(row[1]) for row in session.exec(statement).all()}
+
     def cancel_all_for_event(
         self,
         session: Session,
@@ -138,6 +165,38 @@ class EventParticipantsCRUD(
             session.add(row)
         if rows:
             session.commit()
+        return len(rows)
+
+    def repoint_occurrence_to_event(
+        self,
+        session: Session,
+        src_event_id: uuid.UUID,
+        occurrence_start: datetime,
+        dst_event_id: uuid.UUID,
+    ) -> int:
+        """Move RSVPs of one occurrence onto a standalone event.
+
+        Re-points every participant row matching ``(src_event_id,
+        occurrence_start)`` to ``(dst_event_id, occurrence_start=NULL)``. Used
+        when a recurring occurrence is detached into its own row so the RSVPs
+        that targeted that occurrence follow the new event instead of being
+        orphaned on the master. All statuses are moved (cancelled rows
+        included) to preserve history.
+
+        Safe against the partial unique indexes: ``dst_event_id`` is a freshly
+        created child, so ``(dst_event_id, profile_id)`` with a NULL
+        ``occurrence_start`` cannot collide with an existing one-off row.
+        Returns the number of rows moved. Does not commit.
+        """
+        statement = select(EventParticipants).where(
+            EventParticipants.event_id == src_event_id,
+            EventParticipants.occurrence_start == occurrence_start,
+        )
+        rows = list(session.exec(statement).all())
+        for row in rows:
+            row.event_id = dst_event_id
+            row.occurrence_start = None
+            session.add(row)
         return len(rows)
 
     def find_by_profile(

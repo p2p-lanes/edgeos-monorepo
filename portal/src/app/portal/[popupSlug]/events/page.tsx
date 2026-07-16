@@ -27,16 +27,20 @@ import {
   type EventsViewSnapshot,
   saveEventsViewState,
 } from "./lib/eventsViewState"
+import { fetchAllPortalEvents } from "./lib/fetchAllPortalEvents"
 import { ListBody } from "./lib/ListBody"
 import { eventListWindowForPopup } from "./lib/listWindow"
 import { SubscribeCalendarButton } from "./lib/SubscribeCalendarButton"
+import { useCanRsvp } from "./lib/useCanRsvp"
 import { useEventRsvp } from "./lib/useEventRsvp"
 import {
   useEventTimezone,
   usePortalEventSettings,
 } from "./lib/useEventTimezone"
+import { useMeasuredHeight } from "./lib/useMeasuredHeight"
 import { usePopupTags } from "./lib/usePopupTags"
 import { usePopupTracks } from "./lib/usePopupTracks"
+import { usePopupVenues } from "./lib/usePopupVenues"
 
 // useLayoutEffect on the client, useEffect on the server. Lets us restore
 // scroll synchronously before the browser paints (no flash of "first event"
@@ -151,6 +155,18 @@ export default function EventsPage() {
     if (raw != null) return raw.split(",").filter(Boolean)
     return restoredFilters?.selectedTrackIds ?? []
   })
+  // The venue filter mirrors the track filter: persisted in the URL
+  // (`?venues=id1,id2`) so a venue-filtered list/calendar is shareable, seeded
+  // first from the URL (with a window.location fallback for the router lag) and
+  // then from the restored sessionStorage snapshot.
+  const [selectedVenueIds, setSelectedVenueIds] = useState<string[]>(() => {
+    let raw = searchParams.get("venues")
+    if (raw == null && typeof window !== "undefined") {
+      raw = new URLSearchParams(window.location.search).get("venues")
+    }
+    if (raw != null) return raw.split(",").filter(Boolean)
+    return restoredFilters?.selectedVenueIds ?? []
+  })
   const queryClient = useQueryClient()
 
   // Keep `?tracks=` in lockstep with the filter state. Runs when the user
@@ -170,6 +186,21 @@ export default function EventsPage() {
     const qs = params.toString()
     router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false })
   }, [selectedTrackIds, searchParams, router, pathname])
+
+  // Keep `?venues=` in lockstep with the venue filter state, mirroring the
+  // track-sync effect above (publish to URL on toggle → shareable; re-publish
+  // after a sessionStorage restore that only round-trips view/date).
+  useEffect(() => {
+    const current = searchParams.get("venues")
+    const desired = selectedVenueIds.length ? selectedVenueIds.join(",") : null
+    if ((current ?? null) === desired) return
+    if (typeof window === "undefined") return
+    const params = new URLSearchParams(window.location.search)
+    if (desired) params.set("venues", desired)
+    else params.delete("venues")
+    const qs = params.toString()
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false })
+  }, [selectedVenueIds, searchParams, router, pathname])
 
   // The view tab and the day-view/calendar-view selected day are both
   // persisted in the URL. `view` and `selectedDate` are derived from
@@ -244,6 +275,11 @@ export default function EventsPage() {
   useEffect(() => {
     if (view !== "day" && isDayFullscreen) setIsDayFullscreen(false)
   }, [view, isDayFullscreen])
+
+  // Measure the sticky toolbar so the list's per-day headers can freeze
+  // right below it. The toolbar's height changes when its filter chips wrap,
+  // so a fixed offset would drift; 112px is a close first-paint estimate.
+  const [toolbarRef, toolbarHeight] = useMeasuredHeight<HTMLDivElement>(112)
   // Lock body scroll while fullscreen so the overlay's inner scroll
   // owns vertical movement; restore prior value on cleanup.
   useEffect(() => {
@@ -293,10 +329,19 @@ export default function EventsPage() {
           showHidden,
           selectedTags,
           selectedTrackIds,
+          selectedVenueIds,
         },
       })
     },
-    [search, rsvpedOnly, mineOnly, showHidden, selectedTags, selectedTrackIds],
+    [
+      search,
+      rsvpedOnly,
+      mineOnly,
+      showHidden,
+      selectedTags,
+      selectedTrackIds,
+      selectedVenueIds,
+    ],
   )
 
   const { data: currentHuman } = useQuery({
@@ -319,11 +364,20 @@ export default function EventsPage() {
   // event_settings.event_enabled gates creation only; existing events
   // stay browsable so users can review what's already published.
   const creationEnabled = eventSettings?.event_enabled ?? true
+  // Ended popups are read-only in the portal: creation and RSVP affordances
+  // are hidden while the list stays browsable (recap mode). Mirrors the
+  // backend ensure_popup_writable guard.
+  const isEnded = city?.status === "ended"
 
   // Only surface tracks that actually have events in the window — the
   // curated track list often contains tracks no published event uses yet,
   // and those would resolve to an empty calendar if shown in the filter.
   const { tracksWithEvents: allowedTracks } = usePopupTracks(city?.id)
+
+  // Only surface venues that actually host events — the venue-counts endpoint
+  // already returns only venues with at least one published event, so an empty
+  // venue never shows up in the filter.
+  const { venuesWithEvents: allowedVenues } = usePopupVenues(city?.id)
 
   // Expansion window for recurring events. Passing start_after triggers the
   // backend to expand RRULEs into concrete occurrences; without it, recurring
@@ -369,21 +423,24 @@ export default function EventsPage() {
       showHidden,
       selectedTags,
       selectedTrackIds,
+      selectedVenueIds,
       listWindow.startAfter,
       listWindow.startBefore,
     ],
-    queryFn: () =>
-      EventsService.listPortalEvents({
+    // fetchAllPortalEvents returns the full window in one request.
+    queryFn: async () => ({
+      results: await fetchAllPortalEvents({
         popupId: city!.id,
         search: search || undefined,
         eventStatus: "published",
         includeHidden: showHidden || undefined,
         tags: selectedTags.length ? selectedTags : undefined,
         trackIds: selectedTrackIds.length ? selectedTrackIds : undefined,
+        venueIds: selectedVenueIds.length ? selectedVenueIds : undefined,
         startAfter: listWindow.startAfter,
         startBefore: listWindow.startBefore,
-        limit: 200,
       }),
+    }),
     enabled: !!city?.id && moduleEnabled && view === "list" && useAllChannel,
   })
 
@@ -396,11 +453,12 @@ export default function EventsPage() {
       showHidden,
       selectedTags,
       selectedTrackIds,
+      selectedVenueIds,
       listWindow.startAfter,
       listWindow.startBefore,
     ],
-    queryFn: () =>
-      EventsService.listPortalEvents({
+    queryFn: async () => ({
+      results: await fetchAllPortalEvents({
         popupId: city!.id,
         search: search || undefined,
         // No status filter: include my drafts / pending / rejected.
@@ -412,10 +470,11 @@ export default function EventsPage() {
         includeHidden: showHidden || undefined,
         tags: selectedTags.length ? selectedTags : undefined,
         trackIds: selectedTrackIds.length ? selectedTrackIds : undefined,
+        venueIds: selectedVenueIds.length ? selectedVenueIds : undefined,
         startAfter: listWindow.startAfter,
         startBefore: listWindow.startBefore,
-        limit: 200,
       }),
+    }),
     enabled: !!city?.id && moduleEnabled && view === "list" && useMineChannel,
   })
 
@@ -428,11 +487,12 @@ export default function EventsPage() {
       showHidden,
       selectedTags,
       selectedTrackIds,
+      selectedVenueIds,
       listWindow.startAfter,
       listWindow.startBefore,
     ],
-    queryFn: () =>
-      EventsService.listPortalEvents({
+    queryFn: async () => ({
+      results: await fetchAllPortalEvents({
         popupId: city!.id,
         search: search || undefined,
         eventStatus: "published",
@@ -440,10 +500,11 @@ export default function EventsPage() {
         includeHidden: showHidden || undefined,
         tags: selectedTags.length ? selectedTags : undefined,
         trackIds: selectedTrackIds.length ? selectedTrackIds : undefined,
+        venueIds: selectedVenueIds.length ? selectedVenueIds : undefined,
         startAfter: listWindow.startAfter,
         startBefore: listWindow.startBefore,
-        limit: 200,
       }),
+    }),
     enabled: !!city?.id && moduleEnabled && view === "list" && useRsvpedChannel,
   })
 
@@ -462,6 +523,17 @@ export default function EventsPage() {
   const { rsvpMutation, cancelRsvpMutation, pendingRsvpKey } = useEventRsvp([
     "portal-events",
   ])
+
+  // Gate the RSVP (register) action: a human can only RSVP if they hold a
+  // ticket for this popup and their application isn't rejected. Shared across
+  // all three views; the button renders disabled with an explanatory tooltip.
+  const { canRsvp, reason: rsvpBlockReason } = useCanRsvp()
+  const rsvpDisabledReason =
+    rsvpBlockReason === "rejected"
+      ? (t("events.rsvp.application_rejected") as string)
+      : rsvpBlockReason === "no_tickets"
+        ? (t("events.rsvp.requires_ticket") as string)
+        : undefined
 
   const hideMutation = useMutation({
     mutationFn: (eventId: string) => EventsService.hidePortalEvent({ eventId }),
@@ -657,7 +729,8 @@ export default function EventsPage() {
           </h1>
           <div className="flex shrink-0 items-center gap-2">
             {city?.id && <SubscribeCalendarButton popupId={city.id} />}
-            {creationEnabled &&
+            {!isEnded &&
+              creationEnabled &&
               (eventSettings?.can_publish_event ?? "everyone") ===
                 "everyone" && (
                 <Button asChild size="sm" className="shrink-0 px-2 sm:px-3">
@@ -687,6 +760,7 @@ export default function EventsPage() {
 
       {!isDayFullscreen && (
         <div
+          ref={toolbarRef}
           className={cn(
             "mb-4",
             // Freeze the filters for the list & calendar views (the page
@@ -714,6 +788,9 @@ export default function EventsPage() {
             allowedTracks={allowedTracks}
             selectedTrackIds={selectedTrackIds}
             onSelectedTrackIdsChange={setSelectedTrackIds}
+            allowedVenues={allowedVenues}
+            selectedVenueIds={selectedVenueIds}
+            onSelectedVenueIdsChange={setSelectedVenueIds}
           />
         </div>
       )}
@@ -725,11 +802,16 @@ export default function EventsPage() {
             slug={city?.slug}
             search={search}
             rsvpedOnly={rsvpedOnly}
+            mineOnly={mineOnly}
             tags={selectedTags}
             trackIds={selectedTrackIds}
+            venueIds={selectedVenueIds}
             defaultDate={selectedDate}
             onEventLinkClick={handleEventLinkClick}
             placeholderUrl={eventSettings?.placeholder_url}
+            canRsvp={canRsvp}
+            rsvpDisabledReason={rsvpDisabledReason}
+            showRsvp={!isEnded}
           />
         ) : view === "day" ? (
           isDayFullscreen ? null : (
@@ -738,14 +820,19 @@ export default function EventsPage() {
               slug={city?.slug}
               search={search}
               rsvpedOnly={rsvpedOnly}
+              mineOnly={mineOnly}
               tags={selectedTags}
               trackIds={selectedTrackIds}
+              venueIds={selectedVenueIds}
               selectedDate={selectedDate}
               onSelectedDateChange={setSelectedDate}
               restoredScroll={restoredScroll}
               onEventLinkClick={handleEventLinkClick}
               isFullscreen={false}
               onToggleFullscreen={toggleDayFullscreen}
+              canRsvp={canRsvp}
+              rsvpDisabledReason={rsvpDisabledReason}
+              showRsvp={!isEnded}
             />
           )
         ) : (
@@ -762,12 +849,16 @@ export default function EventsPage() {
             onRsvp={(e) => rsvpMutation.mutate(e)}
             onCancelRsvp={(e) => cancelRsvpMutation.mutate(e)}
             pendingRsvpKey={pendingRsvpKey}
+            canRsvp={canRsvp}
+            rsvpDisabledReason={rsvpDisabledReason}
+            showRsvp={!isEnded}
             onHide={(id) => hideMutation.mutate(id)}
             onUnhide={(id) => unhideMutation.mutate(id)}
             placeholderUrl={eventSettings?.placeholder_url}
             autoScrollToUpcoming={
               !restoredScroll?.outer && !focusEventRef.current?.id
             }
+            stickyTop={toolbarHeight}
           />
         )}
       </div>
@@ -799,20 +890,28 @@ export default function EventsPage() {
               allowedTracks={allowedTracks}
               selectedTrackIds={selectedTrackIds}
               onSelectedTrackIdsChange={setSelectedTrackIds}
+              allowedVenues={allowedVenues}
+              selectedVenueIds={selectedVenueIds}
+              onSelectedVenueIdsChange={setSelectedVenueIds}
             />
             <DayBody
               popupId={city?.id}
               slug={city?.slug}
               search={search}
               rsvpedOnly={rsvpedOnly}
+              mineOnly={mineOnly}
               tags={selectedTags}
               trackIds={selectedTrackIds}
+              venueIds={selectedVenueIds}
               selectedDate={selectedDate}
               onSelectedDateChange={setSelectedDate}
               restoredScroll={restoredScroll}
               onEventLinkClick={handleEventLinkClick}
               isFullscreen={true}
               onToggleFullscreen={toggleDayFullscreen}
+              canRsvp={canRsvp}
+              rsvpDisabledReason={rsvpDisabledReason}
+              showRsvp={!isEnded}
             />
           </div>,
           document.body,

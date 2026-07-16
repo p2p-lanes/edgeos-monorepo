@@ -5,6 +5,7 @@ import {
   isCheckoutInsuranceAvailable,
 } from "@/checkout/insuranceUi"
 import type {
+  SelectedDynamicItem,
   SelectedHousingItem,
   SelectedMerchItem,
   SelectedPassItem,
@@ -48,6 +49,26 @@ function makeMerch(
     quantity: 1,
     unitPrice: totalPrice,
     totalPrice,
+  }
+}
+
+function makeDynamic(
+  id: string,
+  price: number,
+  insuranceEligible: boolean,
+): SelectedDynamicItem {
+  return {
+    productId: id,
+    product: {
+      id,
+      name: `Dynamic ${id}`,
+      insurance_eligible: insuranceEligible,
+    } as SelectedDynamicItem["product"],
+    quantity: 1,
+    // `price` is the line total (unit price * quantity), mirroring the
+    // checkoutProvider discount subtotal.
+    price,
+    stepType: "tickets",
   }
 }
 
@@ -235,6 +256,29 @@ describe("buildCheckoutInsuranceSummary", () => {
     // 10% × 200 = 20
     expect(summary.amount).toBe(20)
     expect(summary.eligibleProductIds).toContain("h1")
+  })
+
+  it("includes eligible dynamicItems in subtotal (open-checkout flow)", () => {
+    // Open checkout selects every product via DynamicProductStep, so its
+    // tickets land only in dynamicItems. Without this, the eligible subtotal
+    // was 0 and the InsuranceCard never rendered.
+    const popup = { insurance_enabled: true, insurance_percentage: "5.00" }
+    const dynamicItems: Record<string, SelectedDynamicItem[]> = {
+      "step-1": [makeDynamic("d1", 100, true), makeDynamic("d2", 200, true)],
+      "step-2": [makeDynamic("d3", 50, false)],
+    }
+
+    const summary = buildCheckoutInsuranceSummary(popup, {
+      passes: [],
+      housing: null,
+      merch: [],
+      dynamicItems,
+    })
+
+    // 5% × (100 + 200) = 15; the non-eligible d3 is excluded.
+    expect(summary.amount).toBe(15)
+    expect(summary.eligibleProductIds).toEqual(["d1", "d2"])
+    expect(summary.eligibleProductIds).not.toContain("d3")
   })
 
   it("returns empty summary for null popup", () => {

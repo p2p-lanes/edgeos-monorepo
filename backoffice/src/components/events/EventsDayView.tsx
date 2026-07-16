@@ -16,12 +16,7 @@ import {
 } from "lucide-react"
 import { Fragment, useEffect, useMemo, useRef, useState } from "react"
 
-import {
-  type EventPublic,
-  type EventStatus,
-  EventsService,
-  EventVenuesService,
-} from "@/client"
+import { type EventPublic, EventsService, EventVenuesService } from "@/client"
 import { Button } from "@/components/ui/button"
 import { Calendar } from "@/components/ui/calendar"
 import {
@@ -29,13 +24,18 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover"
+import {
+  type EventStatusFilter,
+  resolveStatusFilter,
+} from "@/lib/events/statusFilter"
 import { summarizeRrule } from "@/lib/events/summarizeRrule"
 import { useEventTimezone } from "@/lib/events/useEventTimezone"
 import { cn } from "@/lib/utils"
+import { EventVisibilityIcon } from "./EventBadges"
 
 interface EventsDayViewProps {
   popupId: string
-  status: EventStatus | undefined
+  status: EventStatusFilter | undefined
   venueId: string | undefined
   search: string
   selectedDate: Date | null
@@ -168,7 +168,7 @@ export function EventsDayView({
     queryFn: () =>
       EventsService.listEvents({
         popupId,
-        eventStatus: status,
+        ...resolveStatusFilter(status),
         venueId:
           venueId && venueId !== "custom" && venueId !== "meeting"
             ? venueId
@@ -538,6 +538,10 @@ export function EventsDayView({
                                     aria-hidden="true"
                                   />
                                 )}
+                              <EventVisibilityIcon
+                                visibility={event.visibility}
+                                className="h-3 w-3"
+                              />
                               <span
                                 className={cn(
                                   isShort ? "truncate" : "line-clamp-2",
@@ -708,6 +712,10 @@ export function EventsDayView({
                                     aria-hidden="true"
                                   />
                                 )}
+                              <EventVisibilityIcon
+                                visibility={event.visibility}
+                                className="h-2.5 w-2.5"
+                              />
                               <span className="truncate">{event.title}</span>
                             </div>
                             <div className="flex items-center gap-1 text-[9px] text-muted-foreground mt-0.5">

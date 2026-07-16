@@ -26,7 +26,7 @@ from app.api.group.models import GroupLeaders, GroupMembers, Groups
 from app.api.human.models import Humans
 from app.api.popup.models import Popups
 from app.api.popup_reviewer.models import PopupReviewers
-from app.api.shared.enums import UserRole
+from app.api.shared.enums import HumanRating, UserRole
 from app.api.tenant.models import Tenants
 from app.api.user.models import Users
 from app.core.security import create_access_token
@@ -61,7 +61,7 @@ def _make_human(
         email=email,
         first_name="Test",
         last_name="Human",
-        red_flag=red_flag,
+        rating=HumanRating.RED_FLAG if red_flag else HumanRating.UNRATED,
     )
     db.add(human)
     db.commit()

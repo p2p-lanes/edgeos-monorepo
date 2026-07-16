@@ -93,6 +93,7 @@
     "last_name": "Last Name",
     "last_name_placeholder": "Enter your last name",
     "last_name_required": "Last name is required",
+    "phone": "WhatsApp",
     "telegram": "Telegram",
     "telegram_placeholder": "username",
     "organization": "Organization",
@@ -142,7 +143,7 @@
     "pay_and_submit": "Pay & Submit ({{amount}})",
     "fee": {
       "required_title": "Application fee required",
-      "required_description": "A non-refundable fee of ${{amount}} USD is required to submit your application. You will be redirected to a secure payment page.",
+      "required_description": "A refundable fee of ${{amount}} USD is required to submit your application. You will be redirected to a secure payment page.",
       "processing_title": "Processing payment...",
       "processing_description": "We are confirming your payment. This may take a few moments.",
       "confirmed_title": "Payment confirmed!",
@@ -180,6 +181,9 @@
   "checkout": {
     "title": "Checkout",
     "express_title": "Express Checkout",
+    "sold_out": "Sold out",
+    "sale_upcoming": "Upcoming",
+    "sale_ended": "Ended",
     "buyer_step_title": "Your information",
     "buyer_step_description": "Complete your information before payment.",
     "buyer_hero_title": "You're one step away!",
@@ -225,6 +229,9 @@
     },
     "to_pay": "To Pay",
     "credit_label": "Credit: {{amount}}",
+    "credit_applied_label": "Credit applied",
+    "edit_mode_title": "Edit Mode",
+    "edit_mode_description": "Select a purchased pass to get credit, then choose a new one.",
     "cart": {
       "close_aria": "Close cart",
       "empty_title": "Your cart is empty",
@@ -252,7 +259,8 @@
       "play_aria": "Play background video",
       "pause_aria": "Pause background video",
       "mute_aria": "Mute background video",
-      "unmute_aria": "Unmute background video"
+      "unmute_aria": "Unmute background video",
+      "play_youtube_aria": "Play video"
     },
     "housing": {
       "carousel": {
@@ -268,6 +276,70 @@
     "discount": {
       "not_eligible_caption": "Not eligible for discount",
       "promo_discount_eligible_label": "Promo Discount (eligible items)"
+    },
+    "coupon_no_longer_valid": "This coupon is no longer available. Your total has been updated. Please review and try again.",
+    "payment_error": "Something went wrong with your payment. Please try again.",
+    "popup_ended_error": "This popup has ended. Purchases are no longer available.",
+    "no_products": "No products available for this step.",
+    "no_images": "No images available for this step.",
+    "no_video": "No video available for this step.",
+    "no_passes": "No passes available.",
+    "no_passes_for_category": "No passes available for this attendee category.",
+    "no_meal_plans": "No meal plans available.",
+    "no_contributions": "No contribution options available.",
+    "step_config_error": "Step configuration error.",
+    "step_config_error_detail": "No template assigned to this step. Please contact your administrator.",
+    "previous_payment_completed": "Your previous payment was completed.",
+    "pending_payment_wait": "You have a pending payment. Please wait a few minutes.",
+    "payment_cancel_failed": "We could not process your payment. Please try again.",
+    "amanita": {
+      "buyer_kicker": "Your details",
+      "buyer_title": "You're one step away!",
+      "buyer_intro": "Just a few details to issue your tickets — then all that's left is to confirm.",
+      "buyer_privacy": "Your data travels safely: we only use it to issue your tickets and contact you about your purchase.",
+      "whatsapp_country_aria": "WhatsApp country code",
+      "confirm_kicker": "Last step",
+      "confirm_title": "Confirm",
+      "confirm_intro": "Review your order before moving on to payment.",
+      "confirm_order_title": "Your order",
+      "confirm_empty_title": "You haven't picked your passes yet",
+      "confirm_empty_body": "Head back to the tickets section and choose how you want to experience the event.",
+      "confirm_go_tickets": "See tickets",
+      "confirm_patron_label": "Community contribution",
+      "confirm_meal_plans_label": "Meal Plans",
+      "confirm_insurance_label": "Insurance",
+      "confirm_insurance_subtitle": "Change of plans coverage",
+      "confirm_coupon_label": "Have a coupon?",
+      "confirm_coupon_placeholder": "Your code",
+      "confirm_coupon_apply": "Apply",
+      "confirm_coupon_remove": "Remove promo code",
+      "confirm_coupon_applied": "Code applied!",
+      "confirm_coupon_missing": "Enter a promo code",
+      "confirm_coupon_invalid": "Invalid promo code",
+      "confirm_coupon_error": "We couldn't validate that code",
+      "confirm_terms_prefix": "I agree to the",
+      "confirm_terms_link": "Terms and Conditions",
+      "confirm_subtotal_label": "Subtotal",
+      "confirm_discount_label": "Promo Discount",
+      "confirm_edit_credit_label": "Edit Credit",
+      "confirm_credit_label": "Credit",
+      "confirm_account_credit_label": "Account Credit",
+      "confirm_total_label": "Total",
+      "confirm_free_note": "You don't need to pay, your order is covered",
+      "nav_home_sr": "Home",
+      "faqs_pill_label": "FAQs",
+      "faqs_kicker": "Frequently asked questions",
+      "faqs_title": "FAQs",
+      "faqs_intro": "What people ask most before getting their pass. Close and pick up right where you left off.",
+      "faqs_close_aria": "Close frequently asked questions",
+      "catalog_add": "Add",
+      "catalog_added": "Added",
+      "catalog_show_more": "Show more",
+      "catalog_show_less": "Show less",
+      "catalog_add_aria": "Add {{product}}",
+      "catalog_add_one_aria": "Add one more {{product}}",
+      "catalog_remove_one_aria": "Remove one {{product}}",
+      "confirm_cta": "Confirm purchase"
     }
   },
   "openCheckout": {
@@ -291,7 +363,12 @@
     "summary_pay": "Pay",
     "thank_you_title": "Payment completed",
     "thank_you_description": "Thank you for your purchase. We sent your confirmation and ticket details by email.",
-    "thank_you_cta": "Go to portal"
+    "thank_you_cta": "Go to portal",
+    "thank_you_order_summary": "Order summary",
+    "thank_you_total": "Total",
+    "previous_payment_completed": "Your previous payment was completed.",
+    "payment_cancel_failed": "We could not process your payment. Please try again.",
+    "pending_payment_wait": "You have a pending payment. Please wait a few minutes."
   },
   "passes": {
     "your_passes": "Your Passes",
@@ -368,7 +445,9 @@
     "description": "Reach out to your friends to plan dates, find shared housing, or organize activities together. *This directory includes only the information of those who have voluntarily opted in to share their details.",
     "search_placeholder": "Search by name, email, organization...",
     "export_csv": "Export attendees as CSV",
-    "no_attendees": "No attendees found"
+    "no_attendees": "No attendees found",
+    "per_page_label": "Per page",
+    "showing_range": "Showing {{from}}–{{to}} of {{total}}"
   },
   "checkin": {
     "title": "Online Check-in for {{eventName}}",
@@ -426,7 +505,11 @@
     "venues": "Venues",
     "api_keys": "API Keys",
     "api_docs": "API Docs",
-    "referrals": "Referrals"
+    "referrals": "Referrals",
+    "locked_ended": "Ended — not available"
+  },
+  "recap": {
+    "status_badge": "Ended"
   },
   "api_keys": {
     "title": "API Keys",
@@ -457,6 +540,7 @@
     "revoke_failed": "Failed to revoke API key",
     "scopes_label": "Permissions",
     "scopes_description": "New keys start with read-only access. Only enable broader permissions when you really need them.",
+    "ended_read_only_note": "This popup has ended, so new API keys can only have read access.",
     "scope": {
       "events_read": {
         "label": "Read events",
@@ -469,6 +553,10 @@
       "rsvp_write": {
         "label": "RSVP to events",
         "description": "Register or cancel attendance for events."
+      },
+      "venues_write": {
+        "label": "Manage own venues",
+        "description": "Create, edit, and delete venues you own."
       }
     }
   },
@@ -633,6 +721,9 @@
       "filter_by_tracks": "Filter by tracks",
       "tracks_label": "Tracks",
       "filter_by_track_label": "Filter by track",
+      "filter_by_venues": "Filter by venues",
+      "venues_label": "Venues",
+      "filter_by_venue_label": "Filter by venue",
       "clear_filters": "Clear",
       "list_view_label": "List view",
       "calendar_view_label": "Calendar view",
@@ -687,7 +778,9 @@
       "check_in_opens_at_start": "Check-in opens at start time",
       "registered": "Registered",
       "checked_in": "Checked in",
-      "action_error": "Couldn't update your RSVP. Please try again."
+      "action_error": "Couldn't update your RSVP. Please try again.",
+      "requires_ticket": "You need a ticket for this popup to RSVP.",
+      "application_rejected": "Your application wasn't accepted, so you can't RSVP."
     },
     "recurrence": {
       "daily_one": "Repeats daily",
@@ -743,7 +836,12 @@
       "participants_heading": "Participants",
       "no_participants_yet": "No participants yet",
       "participants_more": "+{{count}} more",
+      "participants_show_less": "Show less",
       "unnamed_participant": "Unnamed",
+      "copy_attendee_emails": "Copy attendee emails",
+      "copy_attendee_emails_done": "Copied {{count}} attendee emails",
+      "copy_attendee_emails_empty": "No attendee emails to copy yet",
+      "copy_attendee_emails_error": "Couldn't copy attendee emails",
       "bulk_invite_success": "Invited {{invited}} · Skipped {{skipped}} · Not found {{notFound}}",
       "bulk_invite_error": "Failed to invite",
       "remove_invitation_error": "Failed to remove",
@@ -761,6 +859,9 @@
       "pending_approval_banner_title": "Pending approval",
       "pending_approval_banner_message": "Your event is pending approval and not yet visible to others.",
       "open_in_maps": "Open in Google Maps",
+      "view_on_geobrowser": "View on Geobrowser",
+      "join_on_geo": "Join on Geo",
+      "join_on_geo_tooltip": "Recap, polls and resources",
       "share_button": "Share event",
       "share_link_copied": "Link copied",
       "share_link_error": "Couldn't copy link",
@@ -808,6 +909,14 @@
       "start_time_outside_venue_hours": "Start time falls outside the venue's open hours.",
       "start_time_conflict": "There is already an event at this time.",
       "try_nearby_slots": "Try one of these nearby times:",
+      "private_event": "Private event",
+      "schedule_preview_title": "Venue schedule",
+      "view_venue_schedule": "View venue schedule",
+      "free_slot_hint": "Click a free slot to set the start time",
+      "setup_teardown": "Setup / teardown",
+      "schedule_legend_booked": "Booked",
+      "schedule_legend_your_slot": "Your slot",
+      "schedule_legend_closed": "Closed",
       "visibility_label": "Visibility",
       "visibility_public": "Public",
       "visibility_private": "Private (invitees only)",
@@ -857,6 +966,9 @@
       "visibility_helper": "Public is visible to everyone. Private is limited to people you invite, or to members of a group you pick below. Unlisted is only reachable with the direct link.",
       "no_eligible_groups": "You are not in a group with private events enabled, so there is no group to scope this to. The event stays invitation-only.",
       "event_created_pending_approval_success": "Event submitted and pending approval. It's not visible to others yet.",
+      "pending_success_heading": "Submitted!",
+      "pending_success_message": "An admin will review your event. Until it's approved, you'll find it under My events.",
+      "pending_success_view_event": "View my event",
       "event_updated_success": "Event updated",
       "image_uploaded_success": "Image uploaded",
       "required_title": "Title is required",
@@ -865,9 +977,12 @@
       "required_start": "Pick a start time",
       "creation_restricted_heading": "Event creation is restricted",
       "creation_restricted_message": "Only admins can create events for this pop-up.",
+      "popup_ended_heading": "This pop-up has ended",
+      "popup_ended_message": "It is now read-only, so creating or editing content is no longer available.",
       "no_popup_error": "No popup",
       "no_timezone_error": "No timezone configured for this popup",
-      "no_venue_option": "Meeting",
+      "no_venue_option": "Virtual meeting",
+      "venue_where_placeholder": "Where will it happen?",
       "custom_location_option": "Custom location",
       "venues_group_label": "Venues",
       "custom_location_name_label": "Place name",

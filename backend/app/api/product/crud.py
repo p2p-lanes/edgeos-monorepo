@@ -112,6 +112,58 @@ class ProductsCRUD(BaseCRUD[Products, ProductCreate, ProductUpdate]):
         results = list(session.exec(statement).all())
         return results, total
 
+    def find_excluding_ended_popups(
+        self,
+        session: Session,
+        skip: int = 0,
+        limit: int = 100,
+        search: str | None = None,
+        search_fields: list[str] | None = None,
+        sort_by: str | None = None,
+        sort_order: str = "desc",
+        **filters: object,
+    ) -> tuple[list[Products], int]:
+        """Find live products, excluding those of ended (read-only) popups.
+
+        Mirrors :meth:`find` (filters, search, sorting) with an extra join
+        that hides products belonging to ended popups.
+        """
+        from sqlalchemy import or_
+        from sqlmodel import func
+
+        from app.api.popup.models import Popups
+        from app.api.popup.schemas import PopupStatus
+
+        statement = (
+            select(Products)
+            .join(Popups, Products.popup_id == Popups.id)  # type: ignore[arg-type]
+            .where(
+                col(Products.deleted_at).is_(None),
+                Popups.status != PopupStatus.ended,
+            )
+        )
+        for field, value in filters.items():
+            if value is not None:
+                statement = statement.where(getattr(Products, field) == value)
+
+        if search and search_fields:
+            search_term = f"%{search}%"
+            search_conditions = [
+                getattr(Products, field).ilike(search_term)
+                for field in search_fields
+                if hasattr(Products, field)
+            ]
+            if search_conditions:
+                statement = statement.where(or_(*search_conditions))
+
+        count_statement = select(func.count()).select_from(statement.subquery())
+        total = session.exec(count_statement).one()
+
+        statement = self._apply_sorting(statement, sort_by, sort_order)
+        statement = statement.offset(skip).limit(limit)
+        results = list(session.exec(statement).all())
+        return results, total
+
     def get_by_slug(
         self, session: Session, slug: str, popup_id: uuid.UUID
     ) -> Products | None:
@@ -277,6 +329,26 @@ class ProductsCRUD(BaseCRUD[Products, ProductCreate, ProductUpdate]):
         session.refresh(db_obj)
         return db_obj
 
+    def set_sold_out(
+        self,
+        session: Session,
+        db_obj: Products,
+        sold_out: bool,
+    ) -> Products:
+        """Set the manual sold-out override flag.
+
+        Only flips `sold_out_override`; `total_stock_remaining` is never
+        touched, so the counter stays truthful and the decrement / restore /
+        cap-recompute flows are unaffected by design. While the flag is on,
+        `derive_product_state` reports sold_out and `decrement_total_stock`
+        rejects new purchases.
+        """
+        db_obj.sold_out_override = sold_out
+        session.add(db_obj)
+        session.commit()
+        session.refresh(db_obj)
+        return db_obj
+
     def decrement_total_stock(
         self,
         session: Session,
@@ -292,6 +364,7 @@ class ProductsCRUD(BaseCRUD[Products, ProductCreate, ProductUpdate]):
 
         Behavior matrix:
           - Product not found              → HTTP 404
+          - sold_out_override IS TRUE      → HTTP 409 "Sold out" (admin override)
           - total_stock_remaining IS NULL  → no-op, returns product unchanged (unlimited)
           - remaining < quantity           → HTTP 409 "Sold out"
           - success                        → returns refreshed product
@@ -308,6 +381,14 @@ class ProductsCRUD(BaseCRUD[Products, ProductCreate, ProductUpdate]):
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Product not found",
+            )
+        if product.sold_out_override:
+            # Admin override blocks purchases even when the counter still has
+            # stock or the product is unlimited. Must run before the NULL
+            # fast path or unlimited products would bypass the override.
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"'{product.name}' is sold out",
             )
         if product.total_stock_remaining is None:
             return product  # unlimited — no counter to move
@@ -336,7 +417,7 @@ class ProductsCRUD(BaseCRUD[Products, ProductCreate, ProductUpdate]):
                 return product
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail=f"Sold out — '{product.name}' has insufficient stock",
+                detail=f"'{product.name}' does not have enough stock available",
             )
 
         session.flush()

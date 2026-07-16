@@ -162,4 +162,54 @@ describe("checkout application schema helpers", () => {
       ],
     })
   })
+
+  // The mini-form reduction only makes sense for the APPLICATION checkout,
+  // where the full form is large and the checkout shows a cut-down view keyed
+  // off the sections that hold human-target base fields. In open ticketing the
+  // popup's buyer form IS the whole form: there is nothing to reduce, and a
+  // popup with no BaseFieldConfigs has no base fields to key off, so the
+  // reduction silently deleted every field the organizer had configured.
+  describe("includeAllSections (open ticketing)", () => {
+    // Pins the application-flow default so the opt-in can't quietly become
+    // the norm: `tshirt_size` sits in `preferences`, a section with no base
+    // field, so the reduction drops it.
+    it("drops custom fields outside base-field sections by default", () => {
+      const sections = getCheckoutSchemaSections(createSchema())
+      const names = sections.flatMap((s) => s.fields.map((f) => f.name))
+      expect(names).not.toContain("custom_tshirt_size")
+    })
+
+    it("keeps them when the caller opts out of the reduction", () => {
+      const sections = getCheckoutSchemaSections(createSchema(), {
+        includeAllSections: true,
+      })
+      const names = sections.flatMap((s) => s.fields.map((f) => f.name))
+      expect(names).toContain("custom_tshirt_size")
+    })
+
+    // The exact shape that broke the live Amanita popup: zero
+    // BaseFieldConfigs, so `base_fields` arrives empty and every organizer
+    // field hangs off a section the reduction considered invisible. All three
+    // were `required`, so the backend rejected the purchase with a 422 for
+    // fields the shopper was never shown.
+    it("renders an organizer's fields when the popup has no base fields at all", () => {
+      const sections = getCheckoutSchemaSections(
+        createSchema({
+          base_fields: {},
+          custom_fields: {
+            new_phone_field: {
+              type: "phone",
+              label: "phone",
+              required: true,
+              section_id: "personal",
+              position: 0,
+            },
+          },
+        }),
+        { includeAllSections: true },
+      )
+      const names = sections.flatMap((s) => s.fields.map((f) => f.name))
+      expect(names).toEqual(["custom_new_phone_field"])
+    })
+  })
 })

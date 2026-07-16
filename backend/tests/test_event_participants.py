@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
 
 import pytest
@@ -29,12 +30,14 @@ from sqlmodel import Session, select
 
 from app.api.application.models import Applications
 from app.api.application.schemas import ApplicationStatus
+from app.api.attendee.models import AttendeeProducts, Attendees
 from app.api.event.models import Events
 from app.api.event.schemas import EventStatus, EventVisibility
 from app.api.event_participant.models import EventParticipants
 from app.api.event_participant.schemas import ParticipantRole, ParticipantStatus
 from app.api.human.models import Humans
 from app.api.popup.models import Popups
+from app.api.product.models import Products
 from app.api.tenant.models import Tenants
 from app.core.security import create_access_token
 
@@ -94,6 +97,54 @@ def _make_human(db: Session, tenant: Tenants, *, email: str | None = None) -> Hu
     db.commit()
     db.refresh(human)
     return human
+
+
+def _give_ticket(
+    db: Session,
+    tenant: Tenants,
+    popup: Popups,
+    human: Humans,
+) -> Attendees:
+    """Give ``human`` a purchased ticket for ``popup``.
+
+    Portal RSVP registration requires the human to hold at least one ticket
+    (an attendee row with products) for the event's popup, so success-path
+    register/cancel/check-in tests must seed one. Mirrors the real shape:
+    a Product (ticket) + an Attendees row keyed by human_id/popup_id + one
+    AttendeeProducts (ticket) row linking them.
+    """
+    product = Products(
+        tenant_id=tenant.id,
+        popup_id=popup.id,
+        name=f"Ticket {uuid.uuid4().hex[:6]}",
+        slug=f"ticket-{uuid.uuid4().hex[:10]}",
+        price=Decimal("100.00"),
+    )
+    db.add(product)
+    db.commit()
+    db.refresh(product)
+
+    attendee = Attendees(
+        tenant_id=tenant.id,
+        popup_id=popup.id,
+        human_id=human.id,
+        name=f"{human.first_name} {human.last_name}".strip(),
+        email=human.email,
+    )
+    db.add(attendee)
+    db.commit()
+    db.refresh(attendee)
+
+    db.add(
+        AttendeeProducts(
+            tenant_id=tenant.id,
+            attendee_id=attendee.id,
+            product_id=product.id,
+            check_in_code=uuid.uuid4().hex[:10],
+        )
+    )
+    db.commit()
+    return attendee
 
 
 def _human_headers(human: Humans) -> dict[str, str]:
@@ -191,6 +242,107 @@ class TestPortalAttendeeCount:
 
 
 # ---------------------------------------------------------------------------
+# Portal: copy attendee emails (managers only)
+# ---------------------------------------------------------------------------
+
+
+class TestPortalAttendeeEmails:
+    """GET /event-participants/portal/attendee-emails.
+
+    Managers (owner/host/collaborator) copy every active RSVPer's email,
+    including registrants who hid their name from the directory (unlike the
+    participant list, which drops them). Non-managers are refused.
+    """
+
+    def _seed(
+        self, db: Session, tenant: Tenants
+    ) -> tuple[Events, Humans, dict[str, str]]:
+        popup = _make_popup(db, tenant)
+        event = _make_event(db, tenant, popup)
+        # Unique emails per call — the test DB is shared across tests in this
+        # module, so fixed addresses would collide on the email/tenant unique key.
+        manager = _make_human(db, tenant)
+        event.owner_id = manager.id
+        db.add(event)
+
+        visible = _make_human(db, tenant)
+        hider = _make_human(db, tenant)
+        gone = _make_human(db, tenant)
+        db.add_all(
+            [
+                EventParticipants(
+                    tenant_id=tenant.id,
+                    event_id=event.id,
+                    profile_id=visible.id,
+                    status=ParticipantStatus.REGISTERED,
+                ),
+                EventParticipants(
+                    tenant_id=tenant.id,
+                    event_id=event.id,
+                    profile_id=hider.id,
+                    status=ParticipantStatus.CHECKED_IN,
+                ),
+                EventParticipants(
+                    tenant_id=tenant.id,
+                    event_id=event.id,
+                    profile_id=gone.id,
+                    status=ParticipantStatus.CANCELLED,
+                ),
+            ]
+        )
+        # The hider opted out of showing their name; emails must still include
+        # them since this is the organiser reaching their own attendees.
+        db.add(
+            Applications(
+                id=uuid.uuid4(),
+                tenant_id=tenant.id,
+                popup_id=popup.id,
+                human_id=hider.id,
+                status=ApplicationStatus.ACCEPTED.value,
+                info_not_shared=["first_name"],
+            )
+        )
+        db.commit()
+        emails = {
+            "visible": visible.email,
+            "hider": hider.email,
+            "cancelled": gone.email,
+        }
+        return event, manager, emails
+
+    def test_manager_gets_all_active_emails_including_name_hiders(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+    ) -> None:
+        event, manager, emails = self._seed(db, tenant_a)
+        resp = client.get(
+            f"/api/v1/event-participants/portal/attendee-emails?event_id={event.id}",
+            headers=_human_headers(manager),
+        )
+        assert resp.status_code == 200, resp.text
+        body = resp.json()
+        assert set(body["emails"]) == {emails["visible"], emails["hider"]}
+        assert body["count"] == 2
+        assert emails["cancelled"] not in body["emails"]
+
+    def test_non_manager_is_forbidden(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+    ) -> None:
+        event, _, _ = self._seed(db, tenant_a)
+        outsider = _make_human(db, tenant_a)
+        resp = client.get(
+            f"/api/v1/event-participants/portal/attendee-emails?event_id={event.id}",
+            headers=_human_headers(outsider),
+        )
+        assert resp.status_code == 403, resp.text
+
+
+# ---------------------------------------------------------------------------
 # Portal: register
 # ---------------------------------------------------------------------------
 
@@ -207,6 +359,7 @@ class TestPortalRegister:
         popup = _make_popup(db, tenant_a)
         event = _make_event(db, tenant_a, popup)
         human = _make_human(db, tenant_a)
+        _give_ticket(db, tenant_a, popup, human)
 
         with patch(_ITIP_TARGET, new=AsyncMock(return_value=None)) as itip_mock:
             resp = client.post(
@@ -280,6 +433,7 @@ class TestPortalRegister:
         popup = _make_popup(db, tenant_a)
         event = _make_event(db, tenant_a, popup)
         human = _make_human(db, tenant_a)
+        _give_ticket(db, tenant_a, popup, human)
 
         with patch(_ITIP_TARGET, new=AsyncMock(return_value=None)):
             first = client.post(
@@ -304,6 +458,10 @@ class TestPortalRegister:
         event = _make_event(db, tenant_a, popup, max_participant=1)
         first_human = _make_human(db, tenant_a)
         second_human = _make_human(db, tenant_a)
+        # Both hold tickets so the capacity guard — not the ticket gate — is
+        # what blocks the second registration.
+        _give_ticket(db, tenant_a, popup, first_human)
+        _give_ticket(db, tenant_a, popup, second_human)
 
         with patch(_ITIP_TARGET, new=AsyncMock(return_value=None)):
             first = client.post(
@@ -330,6 +488,7 @@ class TestPortalRegister:
         popup = _make_popup(db, tenant_a)
         event = _make_event(db, tenant_a, popup)
         human = _make_human(db, tenant_a)
+        _give_ticket(db, tenant_a, popup, human)
 
         with patch(_ITIP_TARGET, new=AsyncMock(return_value=None)):
             client.post(
@@ -364,6 +523,121 @@ class TestPortalRegister:
 
 
 # ---------------------------------------------------------------------------
+# Portal: register eligibility gate (ticket required, not rejected)
+# ---------------------------------------------------------------------------
+
+
+class TestPortalRegisterEligibility:
+    """A human may only RSVP if they hold a ticket for the popup and their
+    application (if any) isn't rejected. Mirrors the portal UI gate."""
+
+    def test_register_without_ticket_forbidden(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+    ) -> None:
+        popup = _make_popup(db, tenant_a)
+        event = _make_event(db, tenant_a, popup)
+        human = _make_human(db, tenant_a)  # no ticket for this popup
+
+        with patch(_ITIP_TARGET, new=AsyncMock(return_value=None)) as itip_mock:
+            resp = client.post(
+                f"/api/v1/event-participants/portal/register/{event.id}",
+                headers=_human_headers(human),
+            )
+
+        assert resp.status_code == 403, resp.text
+        assert "ticket" in resp.json()["detail"].lower()
+        assert itip_mock.await_count == 0
+        assert _fetch_participant(db, event.id, human.id) is None
+
+    def test_register_with_ticket_for_other_popup_forbidden(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+    ) -> None:
+        popup = _make_popup(db, tenant_a)
+        other_popup = _make_popup(db, tenant_a)
+        event = _make_event(db, tenant_a, popup)
+        human = _make_human(db, tenant_a)
+        # Ticket belongs to a different popup, so it doesn't grant access here.
+        _give_ticket(db, tenant_a, other_popup, human)
+
+        with patch(_ITIP_TARGET, new=AsyncMock(return_value=None)):
+            resp = client.post(
+                f"/api/v1/event-participants/portal/register/{event.id}",
+                headers=_human_headers(human),
+            )
+
+        assert resp.status_code == 403, resp.text
+        assert _fetch_participant(db, event.id, human.id) is None
+
+    def test_register_with_rejected_application_forbidden(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+    ) -> None:
+        popup = _make_popup(db, tenant_a)
+        event = _make_event(db, tenant_a, popup)
+        human = _make_human(db, tenant_a)
+        # Even with a ticket, a rejected application blocks RSVP.
+        _give_ticket(db, tenant_a, popup, human)
+        db.add(
+            Applications(
+                id=uuid.uuid4(),
+                tenant_id=tenant_a.id,
+                popup_id=popup.id,
+                human_id=human.id,
+                status=ApplicationStatus.REJECTED.value,
+            )
+        )
+        db.commit()
+
+        with patch(_ITIP_TARGET, new=AsyncMock(return_value=None)) as itip_mock:
+            resp = client.post(
+                f"/api/v1/event-participants/portal/register/{event.id}",
+                headers=_human_headers(human),
+            )
+
+        assert resp.status_code == 403, resp.text
+        assert itip_mock.await_count == 0
+        assert _fetch_participant(db, event.id, human.id) is None
+
+    def test_register_with_ticket_and_accepted_application_succeeds(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+    ) -> None:
+        popup = _make_popup(db, tenant_a)
+        event = _make_event(db, tenant_a, popup)
+        human = _make_human(db, tenant_a)
+        _give_ticket(db, tenant_a, popup, human)
+        db.add(
+            Applications(
+                id=uuid.uuid4(),
+                tenant_id=tenant_a.id,
+                popup_id=popup.id,
+                human_id=human.id,
+                status=ApplicationStatus.ACCEPTED.value,
+            )
+        )
+        db.commit()
+
+        with patch(_ITIP_TARGET, new=AsyncMock(return_value=None)):
+            resp = client.post(
+                f"/api/v1/event-participants/portal/register/{event.id}",
+                headers=_human_headers(human),
+            )
+
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["status"] == ParticipantStatus.REGISTERED.value
+
+
+# ---------------------------------------------------------------------------
 # Portal: cancel
 # ---------------------------------------------------------------------------
 
@@ -380,6 +654,7 @@ class TestPortalCancelRegistration:
         popup = _make_popup(db, tenant_a)
         event = _make_event(db, tenant_a, popup)
         human = _make_human(db, tenant_a)
+        _give_ticket(db, tenant_a, popup, human)
 
         with patch(_ITIP_TARGET, new=AsyncMock(return_value=None)):
             client.post(
@@ -427,6 +702,7 @@ class TestPortalCancelRegistration:
         popup = _make_popup(db, tenant_a)
         event = _make_event(db, tenant_a, popup)
         human = _make_human(db, tenant_a)
+        _give_ticket(db, tenant_a, popup, human)
 
         # Register with the iTIP send fully stubbed so only the cancel below
         # exercises the real template-routing path.
@@ -489,6 +765,7 @@ class TestPortalCancelRegistration:
         popup = _make_popup(db, tenant_a)
         event = _make_event(db, tenant_a, popup)
         human = _make_human(db, tenant_a)
+        _give_ticket(db, tenant_a, popup, human)
 
         with patch(_ITIP_TARGET, new=AsyncMock(return_value=None)):
             client.post(
@@ -526,6 +803,7 @@ class TestPortalCheckIn:
         popup = _make_popup(db, tenant_a)
         event = _make_event(db, tenant_a, popup)
         human = _make_human(db, tenant_a)
+        _give_ticket(db, tenant_a, popup, human)
 
         with patch(_ITIP_TARGET, new=AsyncMock(return_value=None)):
             client.post(
@@ -577,6 +855,7 @@ class TestPortalCheckIn:
         popup = _make_popup(db, tenant_a)
         event = _make_event(db, tenant_a, popup)
         human = _make_human(db, tenant_a)
+        _give_ticket(db, tenant_a, popup, human)
 
         with patch(_ITIP_TARGET, new=AsyncMock(return_value=None)):
             client.post(
@@ -604,6 +883,7 @@ class TestPortalCheckIn:
         popup = _make_popup(db, tenant_a)
         event = _make_event(db, tenant_a, popup)
         human = _make_human(db, tenant_a)
+        _give_ticket(db, tenant_a, popup, human)
 
         with patch(_ITIP_TARGET, new=AsyncMock(return_value=None)):
             client.post(

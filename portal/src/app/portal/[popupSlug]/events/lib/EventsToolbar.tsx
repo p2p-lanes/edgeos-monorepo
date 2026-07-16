@@ -8,6 +8,7 @@ import {
 import { SearchField } from "./toolbar/parts/SearchField"
 import { TagsPopover } from "./toolbar/parts/TagsPopover"
 import { TracksPopover } from "./toolbar/parts/TracksPopover"
+import { VenuesPopover } from "./toolbar/parts/VenuesPopover"
 import { ViewSwitcher } from "./toolbar/parts/ViewSwitcher"
 import type { EventsToolbarProps } from "./toolbar/types"
 
@@ -37,12 +38,17 @@ export function EventsToolbar(props: EventsToolbarProps) {
     allowedTracks,
     selectedTrackIds,
     onSelectedTrackIdsChange,
+    allowedVenues,
+    selectedVenueIds,
+    onSelectedVenueIdsChange,
   } = props
 
   const hasTags =
     allowedTags && allowedTags.length > 0 && !!onSelectedTagsChange
   const hasTracks =
     allowedTracks && allowedTracks.length > 0 && !!onSelectedTrackIdsChange
+  const hasVenues =
+    allowedVenues && allowedVenues.length > 0 && !!onSelectedVenueIdsChange
 
   return (
     <div className="flex flex-col gap-2">
@@ -90,6 +96,13 @@ export function EventsToolbar(props: EventsToolbarProps) {
             allowedTracks={allowedTracks!}
             selectedTrackIds={selectedTrackIds ?? []}
             onChange={onSelectedTrackIdsChange!}
+          />
+        )}
+        {hasVenues && (
+          <VenuesPopover
+            allowedVenues={allowedVenues!}
+            selectedVenueIds={selectedVenueIds ?? []}
+            onChange={onSelectedVenueIdsChange!}
           />
         )}
       </div>

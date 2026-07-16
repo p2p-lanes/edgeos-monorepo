@@ -24,6 +24,8 @@ from app.api.application.schemas import (
     CompanionParticipation,
     DetachCompanionRequest,
     DirectoryProduct,
+    GrantCreditRequest,
+    GrantCreditResponse,
     GrantedPaymentInfo,
     NoParticipation,
     ParticipationResponse,
@@ -45,6 +47,7 @@ from app.core.dependencies.users import (
     AdminOrApiKey_ApplicationsWrite,
     AdminOrApiKeySession_ApplicationsRead,
     AdminOrApiKeySession_ApplicationsWrite,
+    CurrentAdmin,
     CurrentHuman,
     HumanTenantSession,
     needs,
@@ -515,15 +518,19 @@ async def grant_tickets_admin(
     # Best-effort post-commit confirmation emails. A mail failure here does
     # NOT undo the grant — the rows are already persisted and the admin can
     # resend manually if a recipient reports a missing email.
+    # IN (...) does not preserve input order — re-sort the batch fetch so
+    # emails go out in grant order. Missing ids are silently skipped.
+    payments_by_id = {p.id: p for p in payments_crud.get_many(db, payment_ids)}
     for payment_id in payment_ids:
+        payment = payments_by_id.get(payment_id)
+        if payment is None:
+            continue
         try:
-            payment = payments_crud.get(db, payment_id)
-            if payment is not None:
-                await _send_payment_confirmed_email(payment, db_session=db)
+            await _send_payment_confirmed_email(payment, db_session=db)
         except Exception:
             logger.exception(
                 "Failed to send PAYMENT_CONFIRMED for granted payment {}",
-                payment_id,
+                payment.id,
             )
 
     return AdminGrantTicketsResponse(granted=granted)
@@ -561,6 +568,48 @@ async def get_application(
                 )
 
     return _build_application_public(application, referred_by_name=referred_by_name)
+
+
+@router.post(
+    "/{application_id}/credit",
+    response_model=GrantCreditResponse,
+    summary="Grant credit to an application",
+)
+async def grant_application_credit(
+    application_id: uuid.UUID,
+    payload: GrantCreditRequest,
+    db: AdminOrApiKeySession_ApplicationsWrite,
+    current_user: CurrentAdmin,
+) -> GrantCreditResponse:
+    """Grant credit to a specific application (BO admin only).
+
+    Calls the central adjust_application_credit helper — the only writer of
+    application.credit — with source=manual and the authenticated admin as actor.
+    Returns the updated credit balance.
+    """
+    from app.api.audit_log.actor import actor_from_user
+    from app.api.audit_log.constants import AuditAction
+    from app.api.payment.crud import adjust_application_credit
+
+    application = crud.applications_crud.get(db, application_id)
+    if not application:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Application not found",
+        )
+
+    new_balance = adjust_application_credit(
+        db,
+        application,
+        payload.amount,
+        kind=AuditAction.CREDIT_GRANTED,
+        source="manual",
+        actor=actor_from_user(current_user),
+        note=payload.note,
+    )
+    db.commit()
+
+    return GrantCreditResponse(application_id=application_id, credit=new_balance)
 
 
 @router.get(
@@ -818,6 +867,10 @@ async def detach_companion(
     (money decisions handled by support, not by a checkout button).
     """
     from app.api.attendee.crud import attendees_crud
+    from app.api.popup.crud import popups_crud
+    from app.api.popup.guards import ensure_popup_writable
+
+    ensure_popup_writable(popups_crud.get(db, body.popup_id))
 
     companion = attendees_crud.find_companion_for_popup(
         db, human_id=current_human.id, popup_id=body.popup_id
@@ -861,6 +914,11 @@ async def create_my_application(
     current_human: CurrentHuman,
 ) -> ApplicationPublic:
     """Create an application for the current human (Portal)."""
+    from app.api.popup.crud import popups_crud
+    from app.api.popup.guards import ensure_popup_writable
+
+    ensure_popup_writable(popups_crud.get(db, app_in.popup_id))
+
     # Check for existing application
     existing = crud.applications_crud.get_by_human_popup(
         db, human_id=current_human.id, popup_id=app_in.popup_id
@@ -885,8 +943,6 @@ async def create_my_application(
 
     # Validate scholarship request against popup settings
     if app_in.scholarship_request is True:
-        from app.api.popup.crud import popups_crud
-
         popup = popups_crud.get(db, app_in.popup_id)
         if not popup or not popup.allows_scholarship:
             raise HTTPException(
@@ -921,6 +977,11 @@ async def update_my_application(
     current_human: CurrentHuman,
 ) -> ApplicationPublic:
     """Update current human's application (Portal)."""
+    from app.api.popup.crud import popups_crud
+    from app.api.popup.guards import ensure_popup_writable
+
+    ensure_popup_writable(popups_crud.get(db, popup_id))
+
     application = crud.applications_crud.get_by_human_popup(
         db, human_id=current_human.id, popup_id=popup_id
     )
@@ -1042,6 +1103,9 @@ async def update_my_application(
                         human_id=current_human.id,
                     )
                 )
+            from app.api.application.crud import _maybe_grant_fee_credit
+
+            _maybe_grant_fee_credit(db, application)
     elif (
         app_update.get("status") == ApplicationStatus.IN_REVIEW.value
         and application.human
@@ -1289,6 +1353,11 @@ async def add_my_attendee(
             detail="Application not found",
         )
 
+    from app.api.popup.crud import popups_crud
+    from app.api.popup.guards import ensure_popup_writable
+
+    ensure_popup_writable(popups_crud.get(db, popup_id))
+
     crud.applications_crud.create_attendee(
         db,
         application=application,
@@ -1335,6 +1404,11 @@ async def update_my_attendee(
             detail="Attendee not found",
         )
 
+    from app.api.popup.crud import popups_crud
+    from app.api.popup.guards import ensure_popup_writable
+
+    ensure_popup_writable(popups_crud.get(db, popup_id))
+
     # Check for duplicate email
     if attendee_in.email:
         existing_emails = [
@@ -1374,6 +1448,11 @@ async def delete_my_attendee(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Application not found",
         )
+
+    from app.api.popup.crud import popups_crud
+    from app.api.popup.guards import ensure_popup_writable
+
+    ensure_popup_writable(popups_crud.get(db, popup_id))
 
     crud.applications_crud.delete_attendee(db, application, attendee_id)
 

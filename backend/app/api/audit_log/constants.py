@@ -14,6 +14,20 @@ class AuditAction:
     TICKET_REMOVE = "ticket.remove"
     TICKET_GRANT = "ticket.grant"
 
+    # Manual activity note added to a human from the backoffice timeline.
+    HUMAN_NOTE_ADDED = "human.note_added"
+
+    # A human's rating (red/orange/green flag, star, …) was changed by a user.
+    HUMAN_RATING_CHANGED = "human.rating_changed"
+
+    # Credit movements on an application (grant, debit, restore).
+    CREDIT_GRANTED = "credit.granted"
+    CREDIT_APPLIED = "credit.applied"
+    CREDIT_RESTORED = "credit.restored"
+
+    # Portal edit-passes settlement (edit-pass swap completed).
+    PASSES_EDITED = "passes.edited"
+
 
 class AuditEntityType:
     """Type of the primary entity an event is grouped under."""

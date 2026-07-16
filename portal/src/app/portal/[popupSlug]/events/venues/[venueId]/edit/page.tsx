@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { ArrowLeft, CircleAlert, Loader2, Upload, X } from "lucide-react"
+import Image from "next/image"
 import Link from "next/link"
 import { useParams, useRouter } from "next/navigation"
 import { useEffect, useRef, useState } from "react"
@@ -28,6 +29,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
+import { imageOptimization } from "@/lib/image-optimization"
 import { useCityProvider } from "@/providers/cityProvider"
 import { useFileUpload } from "../../../lib/useFileUpload"
 
@@ -188,6 +190,28 @@ export default function EditPortalVenuePage() {
     )
   }
 
+  // Ended popups are read-only: venues can no longer be edited.
+  if (city?.status === "ended") {
+    return (
+      <div className="max-w-xl mx-auto p-6 text-center">
+        <CircleAlert className="mx-auto h-10 w-10 text-muted-foreground/50 mb-3" />
+        <h1 className="text-lg font-semibold">
+          {t("events.form.popup_ended_heading")}
+        </h1>
+        <p className="text-sm text-muted-foreground mt-2">
+          {t("events.form.popup_ended_message")}
+        </p>
+        <Link
+          href={`/portal/${popupSlug}/events/venues/${venue.id}`}
+          className="inline-flex items-center gap-1 text-sm text-primary mt-6"
+        >
+          <ArrowLeft className="h-4 w-4" />{" "}
+          {t("events.venues.edit.back_to_venue")}
+        </Link>
+      </div>
+    )
+  }
+
   const isOwner = currentHuman != null && venue.owner_id === currentHuman.id
 
   if (!isOwner) {
@@ -265,12 +289,14 @@ export default function EditPortalVenuePage() {
             }}
           />
           {imageUrl ? (
-            <div className="relative w-full overflow-hidden rounded-lg border">
-              {/* biome-ignore lint/performance/noImgElement: user-uploaded S3 image */}
-              <img
+            <div className="relative aspect-[16/9] w-full overflow-hidden rounded-lg border">
+              <Image
                 src={imageUrl}
                 alt={t("events.venues.new.venue_cover_alt")}
-                className="aspect-[16/9] w-full object-cover"
+                fill
+                sizes="(max-width: 768px) 100vw, 672px"
+                className="object-cover"
+                {...imageOptimization(imageUrl)}
               />
               <div className="absolute top-2 right-2 flex gap-2">
                 <Button

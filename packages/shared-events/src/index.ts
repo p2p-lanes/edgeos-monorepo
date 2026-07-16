@@ -1,3 +1,9 @@
+export type {
+  BusySlot,
+  DaySlotOption,
+  OpenRange,
+  SlotOption,
+} from "./venue-slots"
 export {
   availableEndOptions,
   availableStartOptionsForDuration,
@@ -6,7 +12,7 @@ export {
   freeIntervalsForDay,
   localTzNaiveToUtc,
   monthBoundsInTz,
+  slotOptionsForDay,
   tzOffsetMinutes,
   utcToLocalTzNaive,
 } from "./venue-slots"
-export type { BusySlot, OpenRange, SlotOption } from "./venue-slots"

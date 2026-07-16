@@ -7,7 +7,7 @@ interface TranslationPublic {
   entity_type: string
   entity_id: string
   language: string
-  data: Record<string, string>
+  data: Record<string, unknown>
   created_at: string | null
   updated_at: string | null
 }
@@ -16,7 +16,7 @@ interface TranslationCreate {
   entity_type: string
   entity_id: string
   language: string
-  data: Record<string, string>
+  data: Record<string, unknown>
 }
 
 async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {

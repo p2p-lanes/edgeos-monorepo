@@ -28,6 +28,7 @@ import type {
   ApiKeyPublic,
   ApiKeyScope,
 } from "@/lib/apiKeysService"
+import { useCityProvider } from "@/providers/cityProvider"
 import { CopyAgentBrief } from "./CopyAgentBrief"
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? ""
@@ -116,6 +117,14 @@ export default function AgenticAccessPage() {
 
 function ApiKeysSection() {
   const { t } = useTranslation()
+  const { getCity } = useCityProvider()
+  const city = getCity()
+  // Keys are bound to the current popup. When it has ended (recap mode)
+  // the backend rejects write scopes, so the dialog only offers read access.
+  const isPopupEnded = city?.status === "ended"
+  const scopeOptions = isPopupEnded
+    ? SCOPE_OPTIONS.filter((scope) => !scope.value.endsWith(":write"))
+    : SCOPE_OPTIONS
   const {
     keys,
     isLoading,
@@ -148,14 +157,19 @@ function ApiKeysSection() {
 
   const onCreate = async () => {
     const name = newKeyName.trim()
-    if (!name) return
+    const popupId = city?.id
+    if (!name || !popupId) return
     try {
       // The backend owns the write-scope lifetime: send ``expires_at: null``
       // and let it fill in the policy default. The created key returned in
       // the response already carries the final ``expires_at`` for display.
       const created = await createKey({
         name,
-        scopes: selectedScopes,
+        // Keys are attendee keys: they only work for the current popup.
+        popup_id: popupId,
+        scopes: isPopupEnded
+          ? selectedScopes.filter((scope) => !scope.endsWith(":write"))
+          : selectedScopes,
         expires_at: null,
       })
       setCreatedKey(created)
@@ -360,12 +374,20 @@ function ApiKeysSection() {
                     "New keys start with read-only access. Only enable broader permissions when you really need them.",
                 })}
               </p>
+              {isPopupEnded && (
+                <p className="flex items-center gap-1.5 text-xs font-medium text-amber-700">
+                  <Info className="size-3.5 shrink-0" />
+                  {t("api_keys.ended_read_only_note", {
+                    defaultValue:
+                      "This popup has ended, so new API keys can only have read access.",
+                  })}
+                </p>
+              )}
             </div>
             <div className="space-y-3 rounded-md border p-3">
-              {SCOPE_OPTIONS.map((scope) => {
+              {scopeOptions.map((scope) => {
                 const checked = selectedScopes.includes(scope.value)
                 const checkboxId = `scope-${scope.value}`
-                const isComingSoon = scope.value === "events:write"
                 return (
                   <div key={scope.value} className="flex items-start gap-3">
                     <Checkbox
@@ -393,14 +415,6 @@ function ApiKeysSection() {
                           },
                         )}
                       </p>
-                      {isComingSoon && (
-                        <p className="flex items-center gap-1.5 text-xs font-medium text-green-900">
-                          <Info className="size-3.5 shrink-0" />
-                          {t("api_keys.scope.events_write.coming_soon", {
-                            defaultValue: "Coming to the village in week 2",
-                          })}
-                        </p>
-                      )}
                     </div>
                   </div>
                 )
@@ -414,7 +428,10 @@ function ApiKeysSection() {
             <Button
               onClick={onCreate}
               disabled={
-                !newKeyName.trim() || isCreating || selectedScopes.length === 0
+                !newKeyName.trim() ||
+                !city ||
+                isCreating ||
+                selectedScopes.length === 0
               }
             >
               {isCreating && <Loader2 className="size-4 animate-spin mr-1" />}

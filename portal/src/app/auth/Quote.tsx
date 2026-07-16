@@ -1,25 +1,25 @@
 "use client"
 
 import Image from "next/image"
+import { imageOptimization } from "@/lib/image-optimization"
 import { useTenant } from "@/providers/tenantProvider"
 
 export default function Quote() {
   const { tenant } = useTenant()
 
   return (
-    <div
-      className="hidden md:flex md:w-1/2 relative p-8 items-center justify-center bg-muted"
-      style={
-        tenant?.image_url
-          ? {
-              backgroundImage: `url(${tenant.image_url})`,
-              backgroundSize: "cover",
-              backgroundPosition: "center",
-              backgroundRepeat: "no-repeat",
-            }
-          : undefined
-      }
-    >
+    <div className="hidden md:flex md:w-1/2 relative p-8 items-center justify-center bg-muted overflow-hidden">
+      {tenant?.image_url && (
+        <Image
+          src={tenant.image_url}
+          alt=""
+          fill
+          priority
+          sizes="50vw"
+          className="object-cover"
+          {...imageOptimization(tenant.image_url)}
+        />
+      )}
       <div className="absolute top-8 left-8">
         {tenant?.icon_url ? (
           <Image
@@ -28,6 +28,7 @@ export default function Quote() {
             width={100}
             height={40}
             priority
+            {...imageOptimization(tenant.icon_url)}
           />
         ) : (
           <div className="w-[100px] h-[40px] rounded bg-muted/50 flex items-center justify-center">

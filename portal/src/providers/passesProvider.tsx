@@ -14,13 +14,13 @@ import {
   resolvePopupCheckoutPolicy,
 } from "@/checkout/popupCheckoutPolicy"
 import type { AttendeePurchases } from "@/client"
-import { supportsQuantitySelector } from "@/components/ui/QuantitySelector"
 import { useCart } from "@/hooks/useCartApi"
 import useGetPassesData from "@/hooks/useGetPassesData"
 import { usePurchasesQuery } from "@/hooks/useGetPurchases"
 import { getPriceStrategy } from "@/strategies/PriceStrategy"
 import { getProductStrategy } from "@/strategies/ProductStrategies"
 import { getPurchaseStrategy } from "@/strategies/PurchaseStrategy"
+import { isPassQuantityBased } from "@/strategies/passQuantityHelper"
 import type { AttendeePassState } from "@/types/Attendee"
 import type { ProductsPass } from "@/types/Products"
 import { useCityProvider } from "./cityProvider"
@@ -120,9 +120,14 @@ export function buildBaseAttendeePasses(
       products,
       purchased,
     ).map((product: ProductsPass) => {
+      // Use isPassQuantityBased so full/month passes are never treated as
+      // multi-unit, regardless of max_per_order. A full pass with
+      // max_per_order=null means "one per order, unlimited stock" — not
+      // "can add multiple units". Without this, supportsQuantitySelector(null)
+      // returns true for full/month, setting initialQuantity=0 and breaking
+      // editCredit (price * 0 = 0).
       const isMultiUnit =
-        product.duration_type !== "day" &&
-        supportsQuantitySelector(product.max_per_order)
+        product.duration_type !== "day" && isPassQuantityBased(product)
       const originalQuantity =
         product.duration_type === "day"
           ? (purchased.find((p) => p.id === product.id)?.quantity ?? 0)
@@ -192,8 +197,11 @@ function applyCartSelections(
         }
       }
       // Non-day: multi-unit products restore the persisted quantity;
-      // single-unit products stay at the legacy quantity of 1.
-      const isMultiUnit = supportsQuantitySelector(product.max_per_order)
+      // single-unit products stay at the legacy quantity of 1. Use
+      // isPassQuantityBased so full/month passes (single-select even when
+      // max_per_order is null) keep their quantity instead of adopting the
+      // saved cart quantity.
+      const isMultiUnit = isPassQuantityBased(product)
       return {
         ...product,
         selected: true,
@@ -454,8 +462,7 @@ const PassesProvider = ({
             return { ...p, selected: false, edit: false, disabled: false }
           }
           const isMultiUnit =
-            p.duration_type !== "day" &&
-            supportsQuantitySelector(p.max_per_order)
+            p.duration_type !== "day" && isPassQuantityBased(p)
           const initialQuantity =
             p.duration_type === "day"
               ? (p.original_quantity ?? 0)

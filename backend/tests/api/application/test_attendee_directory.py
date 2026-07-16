@@ -66,9 +66,7 @@ def _category(
     return cat
 
 
-def _human(
-    db: Session, tenant: Tenants, first: str, last: str, **extra
-) -> Humans:
+def _human(db: Session, tenant: Tenants, first: str, last: str, **extra) -> Humans:
     human = Humans(
         id=uuid.uuid4(),
         tenant_id=tenant.id,
@@ -193,17 +191,13 @@ def directory_world(db: Session, tenant_a: Tenants):
     scott_att = _attendee(
         db, popup, andrea_app, scott, spouse, tickets=1, product=product
     )
-    kiddo_att = _attendee(
-        db, popup, andrea_app, kiddo, kid, tickets=1, product=product
-    )
+    kiddo_att = _attendee(db, popup, andrea_app, kiddo, kid, tickets=1, product=product)
 
     bob = _human(db, tenant_a, "Bob", "Roberts")
     carol = _human(db, tenant_a, "Carol", "Roberts")
     bob_app = _application(db, popup, bob)
     bob_att = _attendee(db, popup, bob_app, bob, main, tickets=0)  # no ticket
-    carol_att = _attendee(
-        db, popup, bob_app, carol, spouse, tickets=1, product=product
-    )
+    carol_att = _attendee(db, popup, bob_app, carol, spouse, tickets=1, product=product)
 
     return {
         "popup": popup,
@@ -259,7 +253,8 @@ def test_companion_entry_uses_own_profile_no_masking(
 ) -> None:
     """Spouse row: own name, own email (unmasked), blank role/org, spouse category."""
     scott = next(
-        a for a in applications_crud.find_directory(
+        a
+        for a in applications_crud.find_directory(
             db, popup_id=directory_world["popup"].id
         )[0]
         if a.id == directory_world["scott"].id
@@ -276,12 +271,11 @@ def test_companion_entry_uses_own_profile_no_masking(
     assert len(entry.participation) == 1
 
 
-def test_main_entry_keeps_role_org_and_masking(
-    db: Session, directory_world
-) -> None:
+def test_main_entry_keeps_role_org_and_masking(db: Session, directory_world) -> None:
     """Main applicant row: role/org from custom_fields, info_not_shared masking."""
     andrea = next(
-        a for a in applications_crud.find_directory(
+        a
+        for a in applications_crud.find_directory(
             db, popup_id=directory_world["popup"].id
         )[0]
         if a.id == directory_world["andrea"].id
@@ -300,9 +294,7 @@ def test_directory_excludes_non_accepted_application(
     popup = _popup(db, tenant_a)
     main = _category(db, popup, "main", is_primary=True)
     human = _human(db, tenant_a, "Pending", "Person")
-    app = _application(
-        db, popup, human, status=ApplicationStatus.IN_REVIEW.value
-    )
+    app = _application(db, popup, human, status=ApplicationStatus.IN_REVIEW.value)
     _attendee(db, popup, app, human, main, tickets=1)
     results, total = applications_crud.find_directory(db, popup_id=popup.id)
     assert total == 0

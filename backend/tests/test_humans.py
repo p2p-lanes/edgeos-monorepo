@@ -119,3 +119,59 @@ def test_list_humans_requires_popup_for_incomplete_application_filter(
     assert response.json()["detail"] == (
         "popup_id is required when filtering incomplete applications"
     )
+
+
+def test_list_humans_filters_by_field_attributes(
+    client,
+    db: Session,
+    tenant_a: Tenants,
+    admin_token_tenant_a: str,
+):
+    suffix = uuid.uuid4().hex[:8]
+    alice = Humans(
+        tenant_id=tenant_a.id,
+        email=f"alice-{suffix}@example.com",
+        first_name="Alice",
+        telegram=f"alice_{suffix}",
+        gender="female",
+        age="30",
+        residence=f"Buenos Aires {suffix}",
+        rating="star",
+    )
+    bob = Humans(
+        tenant_id=tenant_a.id,
+        email=f"bob-{suffix}@test.org",
+        first_name="Bob",
+        telegram=f"bob_{suffix}",
+        gender="male",
+        age="40",
+        residence=f"Lisbon {suffix}",
+        rating="green_flag",
+    )
+    db.add_all([alice, bob])
+    db.commit()
+    db.refresh(alice)
+    db.refresh(bob)
+
+    headers = {"Authorization": f"Bearer {admin_token_tenant_a}"}
+
+    def ids(params: dict) -> set[str]:
+        resp = client.get("/api/v1/humans", params=params, headers=headers)
+        assert resp.status_code == 200, resp.text
+        return {r["id"] for r in resp.json()["results"]}
+
+    # Dedicated email substring filter isolates Alice.
+    assert ids({"email": f"alice-{suffix}"}) == {str(alice.id)}
+    # Telegram / residence match as substrings.
+    assert ids({"telegram": f"bob_{suffix}"}) == {str(bob.id)}
+    assert ids({"residence": f"Lisbon {suffix}"}) == {str(bob.id)}
+    # Gender matches the whole value: "male" must not also catch "female".
+    # Scope to this test's rows via the unique email suffix.
+    gender_male = ids({"gender": "male", "email": suffix})
+    assert str(bob.id) in gender_male
+    assert str(alice.id) not in gender_male
+    # Age matches the whole value too.
+    assert ids({"age": "30", "email": suffix}) == {str(alice.id)}
+    # Rating matches the whole value: "star" must not also catch "green_flag".
+    assert ids({"rating": "star", "email": suffix}) == {str(alice.id)}
+    assert ids({"rating": "green_flag", "email": suffix}) == {str(bob.id)}

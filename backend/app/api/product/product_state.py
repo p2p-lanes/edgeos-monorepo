@@ -47,8 +47,9 @@ def derive_product_state(
 
     Args:
         product: Any object exposing ``sale_starts_at``, ``sale_ends_at``
-                 (both ``datetime | None``) and ``total_stock_remaining``
-                 (``int | None``). Naive datetimes are treated as UTC.
+                 (both ``datetime | None``), ``total_stock_remaining``
+                 (``int | None``) and ``sold_out_override`` (``bool``).
+                 Naive datetimes are treated as UTC.
         now:     The reference instant. Defaults to ``datetime.now(UTC)``.
 
     Returns:
@@ -61,7 +62,8 @@ def derive_product_state(
         any             past          now > ends              → ended
         otherwise                                             → on_sale
 
-    Stock override (applied after time evaluation):
+    Sold-out rule (applied after time evaluation, wins over any time state):
+        sold_out_override is true                             → sold_out
         total_stock_remaining is NOT NULL AND <= 0            → sold_out
     """
     now = _as_utc(now) or datetime.now(UTC)
@@ -69,6 +71,7 @@ def derive_product_state(
     starts = _as_utc(getattr(product, "sale_starts_at", None))
     ends = _as_utc(getattr(product, "sale_ends_at", None))
     stock: int | None = getattr(product, "total_stock_remaining", None)
+    override: bool = bool(getattr(product, "sold_out_override", False))
 
     if ends is not None and now > ends:
         state = ProductSaleState.ended
@@ -77,7 +80,7 @@ def derive_product_state(
     else:
         state = ProductSaleState.on_sale
 
-    if stock is not None and stock <= 0:
+    if override or (stock is not None and stock <= 0):
         state = ProductSaleState.sold_out
 
     return state

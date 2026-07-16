@@ -2,10 +2,15 @@
 
 import { useQueryClient } from "@tanstack/react-query"
 import { useRouter } from "next/navigation"
-import { useCallback, useEffect, useState } from "react"
+import { type MutableRefObject, useCallback, useEffect, useState } from "react"
+import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 import type { CheckoutMode } from "@/checkout/popupCheckoutPolicy"
-import { CheckoutService, PaymentsService } from "@/client"
+import { ApiError, CheckoutService, PaymentsService } from "@/client"
+import { withCheckoutLocale } from "@/helpers/checkout"
+import { getAttribution } from "@/lib/attribution"
+import { trackGAPurchase } from "@/lib/google-analytics"
+import { getMetaAttribution, trackMetaPurchase } from "@/lib/meta-pixel"
 import { queryKeys } from "@/lib/query-keys"
 import type { AttendeePassState } from "@/types/Attendee"
 import type {
@@ -18,6 +23,11 @@ import type {
   SelectedPatronItem,
 } from "@/types/checkout"
 import { buildPaymentProducts } from "./buildPaymentProducts"
+import {
+  dispatchPaymentError,
+  extractCartMeta,
+  POPUP_ENDED_READ_ONLY_DETAIL,
+} from "./errorDispatch"
 
 interface UsePaymentSubmitParams {
   applicationId: string | undefined
@@ -40,6 +50,7 @@ interface UsePaymentSubmitParams {
   clearCart: () => void
   setCurrentStep: (step: CheckoutStep) => void
   setPromoError: (error: string | null) => void
+  clearPromoCode: () => void
   paymentCompleteRef: React.MutableRefObject<boolean>
   submitMode: "application" | "open-ticketing"
   buyerData: {
@@ -48,7 +59,19 @@ interface UsePaymentSubmitParams {
     lastName: string
     formData: Record<string, unknown>
   } | null
-  creditsEnabled: boolean
+  editPassesEnabled: boolean
+  popupName?: string | null
+  /** Ref from useOpenCartPersistence exposing cartId and restoreToken for the
+   *  continuity-proof gate. Must be provided for open-ticketing flows; ignored
+   *  in application mode. */
+  openCartMetaRef?: MutableRefObject<{
+    cartId: string | null
+    restoreToken: string | null
+  }> | null
+  /** Flush function from useOpenCartPersistence — called at the START of
+   *  submitPayment in open-ticketing mode to ensure cartMetaRef has fresh
+   *  cid/restore_token before the purchase body is built (ADR-R8). */
+  flushOpenCartSave?: (() => Promise<void>) | null
 }
 
 interface PaymentSubmitResult {
@@ -77,11 +100,16 @@ export function usePaymentSubmit({
   clearCart,
   setCurrentStep,
   setPromoError,
+  clearPromoCode,
   paymentCompleteRef,
   submitMode,
   buyerData,
-  creditsEnabled,
+  editPassesEnabled,
+  popupName,
+  openCartMetaRef = null,
+  flushOpenCartSave = null,
 }: UsePaymentSubmitParams) {
+  const { t, i18n } = useTranslation()
   const queryClient = useQueryClient()
   const router = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -142,6 +170,12 @@ export function usePaymentSubmit({
     setIsSubmitting(true)
     setPromoError(null)
 
+    // Flush any pending debounced save BEFORE building the purchase body so
+    // cartMetaRef has fresh cid/restore_token (ADR-R8).
+    if (submitMode === "open-ticketing" && flushOpenCartSave) {
+      await flushOpenCartSave()
+    }
+
     try {
       const { products: productsToSend, isMonthUpgrade } = buildPaymentProducts(
         {
@@ -155,7 +189,7 @@ export function usePaymentSubmit({
           isEditing,
           appCredit,
           checkoutMode,
-          creditsEnabled,
+          editPassesEnabled,
         },
       )
 
@@ -164,6 +198,11 @@ export function usePaymentSubmit({
           ? await CheckoutService.purchaseOpenTicketing({
               slug: popupSlug!,
               requestBody: {
+                ...getMetaAttribution(),
+                locale: i18n.language,
+                ...(Object.keys(getAttribution()).length
+                  ? { attribution: getAttribution() }
+                  : {}),
                 products: Object.values(
                   productsToSend.reduce<
                     Record<string, { product_id: string; quantity: number }>
@@ -196,6 +235,11 @@ export function usePaymentSubmit({
                   ),
                 },
                 coupon_code: promoCodeValid ? promoCode : undefined,
+                insurance: insurance || undefined,
+                // Cart continuity proof: allows the backend to supersede an
+                // existing PENDING payment for the same email+popup pair.
+                // The backend ignores these fields when no PENDING payment exists.
+                ...extractCartMeta(openCartMetaRef),
               },
             })
           : await PaymentsService.createMyPayment({
@@ -213,14 +257,41 @@ export function usePaymentSubmit({
         payment_id?: string
         status?: string
         checkout_url?: string | null
+        redirect_url?: string | null
+        amount?: string
+        currency?: string
       }
 
       if (data.status === "pending" && data.checkout_url) {
-        window.location.href = data.checkout_url
+        window.location.href = withCheckoutLocale(
+          data.checkout_url,
+          i18n.language,
+        )
         return { success: true }
       }
 
       if (data.status === "approved") {
+        const paymentId = data.id ?? data.payment_id
+        if (
+          submitMode === "open-ticketing" &&
+          popupId &&
+          popupSlug &&
+          paymentId
+        ) {
+          const purchasePayload = {
+            paymentId,
+            popup: {
+              id: popupId,
+              slug: popupSlug,
+              name: popupName,
+            },
+            amount: data.amount ?? 0,
+            currency: data.currency ?? "USD",
+            products: productsToSend,
+          }
+          trackMetaPurchase(purchasePayload)
+          trackGAPurchase(purchasePayload)
+        }
         toast.success(
           isEditing
             ? "Your passes have been updated successfully!"
@@ -262,8 +333,13 @@ export function usePaymentSubmit({
           // email was sent, matching the open-ticketing zero-amount path.
           if (isEditing) {
             router.replace(`/portal/${popupSlug}/passes`)
+          } else if (submitMode === "open-ticketing" && data.redirect_url) {
+            // Zero-amount open checkout where the popup configured a custom
+            // success URL: SimpleFI was bypassed, so we perform the redirect
+            // the provider would have done on a paid purchase. The backend
+            // returns the configured URL in redirect_url for this case.
+            window.location.href = data.redirect_url
           } else {
-            const paymentId = data.id ?? data.payment_id
             const qs = paymentId ? `?payment_id=${paymentId}` : ""
             router.replace(`/checkout/${popupSlug}/thank-you${qs}`)
           }
@@ -280,8 +356,62 @@ export function usePaymentSubmit({
       return { success: true }
     } catch (err: unknown) {
       console.error("Payment failed:", err)
-      const errorMsg =
-        "Something went wrong with your payment. Please try again."
+
+      const apiBody =
+        err instanceof ApiError
+          ? (err.body as Record<string, unknown> | null)
+          : null
+
+      // Machine-code branch: detail is an object carrying a .code field.
+      // Checked before the string-detail coupon branch so structured errors
+      // are never mis-classified by the startsWith("Coupon code") guard.
+      if (
+        apiBody !== null &&
+        typeof apiBody?.detail === "object" &&
+        apiBody.detail !== null
+      ) {
+        const detail = apiBody.detail as {
+          code?: string
+          redirect_url?: string
+        }
+        const dispatch = dispatchPaymentError(detail, submitMode, popupSlug)
+        if (dispatch !== null) {
+          const msg = t(dispatch.messageKey)
+          toast.error(msg)
+          if (dispatch.blockResubmit) paymentCompleteRef.current = true
+          if (dispatch.setPersistentError) setPromoError(msg)
+          if (dispatch.navigate?.type === "href") {
+            window.location.href = dispatch.navigate.url
+          } else if (dispatch.navigate?.type === "router-push") {
+            router.push(dispatch.navigate.path)
+          }
+          setIsSubmitting(false)
+          return { success: false, error: msg }
+        }
+      }
+
+      // String-detail branch: coupon error and generic fallback.
+      const apiDetailStr =
+        apiBody !== null && typeof apiBody?.detail === "string"
+          ? (apiBody.detail as string)
+          : null
+      if (apiDetailStr === POPUP_ENDED_READ_ONLY_DETAIL) {
+        const errorMsg = t("checkout.popup_ended_error")
+        setPromoError(errorMsg)
+        toast.error(errorMsg)
+        setIsSubmitting(false)
+        return { success: false, error: errorMsg }
+      }
+      const isCouponError = apiDetailStr?.startsWith("Coupon code")
+      if (isCouponError) {
+        clearPromoCode()
+        const errorMsg = t("checkout.coupon_no_longer_valid")
+        setPromoError(errorMsg)
+        toast.error(errorMsg)
+        setIsSubmitting(false)
+        return { success: false, error: errorMsg }
+      }
+      const errorMsg = t("checkout.payment_error")
       setPromoError(errorMsg)
       toast.error(errorMsg)
       setIsSubmitting(false)
@@ -302,6 +432,7 @@ export function usePaymentSubmit({
     promoCode,
     insurance,
     clearCart,
+    clearPromoCode,
     isEditing,
     attendeePasses,
     toggleEditing,
@@ -312,9 +443,14 @@ export function usePaymentSubmit({
     popupId,
     popupSlug,
     submitMode,
+    popupName,
     router,
-    creditsEnabled,
+    editPassesEnabled,
     isSubmitting,
+    t,
+    i18n.language,
+    openCartMetaRef,
+    flushOpenCartSave,
   ])
 
   return { submitPayment, isSubmitting }

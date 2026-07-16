@@ -3,6 +3,7 @@ import uuid
 from fastapi import APIRouter, HTTPException, status
 
 from app.api.event.schemas import EventPublic
+from app.api.popup.guards import CallerToken, ensure_api_key_popup
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
 from app.api.track import crud
 from app.api.track.schemas import TrackCreate, TrackPublic, TrackUpdate
@@ -170,11 +171,13 @@ async def list_track_events(
 async def list_portal_tracks(
     db: HumanTenantSession,
     _: CurrentHuman,
+    token_payload: CallerToken,
     popup_id: uuid.UUID,
     search: str | None = None,
     skip: PaginationSkip = 0,
     limit: PaginationLimit = 100,
 ) -> ListModel[TrackPublic]:
+    ensure_api_key_popup(token_payload, popup_id)
     tracks, total = crud.tracks_crud.find_by_popup(
         db,
         popup_id=popup_id,
@@ -193,12 +196,14 @@ async def get_portal_track(
     track_id: uuid.UUID,
     db: HumanTenantSession,
     _: CurrentHuman,
+    token_payload: CallerToken,
 ) -> TrackPublic:
     track = crud.tracks_crud.get(db, track_id)
     if not track:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Track not found"
         )
+    ensure_api_key_popup(token_payload, track.popup_id)
     return TrackPublic.model_validate(track)
 
 
@@ -210,6 +215,7 @@ async def list_portal_track_events(
     track_id: uuid.UUID,
     db: HumanTenantSession,
     _: CurrentHuman,
+    token_payload: CallerToken,
     skip: PaginationSkip = 0,
     limit: PaginationLimit = 100,
 ) -> ListModel[EventPublic]:
@@ -221,6 +227,7 @@ async def list_portal_track_events(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Track not found"
         )
+    ensure_api_key_popup(token_payload, track.popup_id)
 
     # Track views are public — hide private events only. Unlisted events are
     # visible in the track view because the track itself acts as a soft share.

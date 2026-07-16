@@ -6,6 +6,7 @@ import {
 } from "@/checkout/insuranceUi"
 import type {
   CheckoutInsuranceSummary,
+  SelectedDynamicItem,
   SelectedHousingItem,
   SelectedMerchItem,
   SelectedPassItem,
@@ -16,6 +17,7 @@ interface UseInsuranceCalculationParams {
   selectedPasses: SelectedPassItem[]
   housing: SelectedHousingItem | null
   merch: SelectedMerchItem[]
+  dynamicItems: Record<string, SelectedDynamicItem[]>
   insurance: boolean
 }
 
@@ -41,6 +43,7 @@ export function useInsuranceCalculation({
   selectedPasses,
   housing,
   merch,
+  dynamicItems,
   insurance,
 }: UseInsuranceCalculationParams): UseInsuranceCalculationResult {
   const isAvailable = useMemo(
@@ -61,8 +64,9 @@ export function useInsuranceCalculation({
       passes: selectedPasses,
       housing,
       merch,
+      dynamicItems,
     })
-  }, [isAvailable, popup, selectedPasses, housing, merch])
+  }, [isAvailable, popup, selectedPasses, housing, merch, dynamicItems])
 
   const insurancePotentialAmount = insuranceSummary.amount
 

@@ -70,6 +70,8 @@ def _event_payload(popup: Popups, *, start: str, end: str) -> dict:
         "start_time": start,
         "end_time": end,
         "timezone": "UTC",
+        "custom_location_name": "Test Spot",
+        "custom_location_url": "https://maps.google.com/?q=test",
     }
 
 

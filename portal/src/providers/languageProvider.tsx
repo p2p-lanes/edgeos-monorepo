@@ -1,7 +1,7 @@
 "use client"
 
 import { useQueryClient } from "@tanstack/react-query"
-import { useSearchParams } from "next/navigation"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import {
   createContext,
   type ReactNode,
@@ -12,11 +12,12 @@ import {
 } from "react"
 import { useTranslation } from "react-i18next"
 import { SUPPORTED_LANGUAGES } from "@/i18n/config"
+import { LANGUAGE_STORAGE_KEY } from "@/lib/language-storage"
 import { CityContext } from "./cityProvider"
 
 // Bumped from "portal_language": prior versions auto-wrote on every render,
 // leaving stale "en" values that override the popup default_language.
-const STORAGE_KEY = "portal_language_v2"
+const STORAGE_KEY = LANGUAGE_STORAGE_KEY
 const PORTAL_LANGUAGES = Object.keys(SUPPORTED_LANGUAGES)
 const DEFAULT_LANGUAGE = "en"
 
@@ -85,6 +86,8 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
   const { i18n } = useTranslation()
   const cityContext = useContext(CityContext)
   const searchParams = useSearchParams()
+  const router = useRouter()
+  const pathname = usePathname()
   const queryClient = useQueryClient()
   const prevLanguageRef = useRef<string | null>(null)
   const popup = cityContext?.getCity() ?? null
@@ -103,6 +106,13 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
       searchParams.get("lang"),
       supportedLanguages,
     )
+    // An explicit ?lang= is a user choice made on the referring site (same
+    // class as the manual selector), so persist it: the language must survive
+    // in-session navigations that drop the query param, e.g. returning from
+    // the payment provider after a cancel.
+    if (urlLanguage && typeof window !== "undefined") {
+      localStorage.setItem(STORAGE_KEY, urlLanguage)
+    }
     const storedLanguage =
       typeof window === "undefined"
         ? null
@@ -124,8 +134,9 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
     }
   }, [searchParams, supportedLanguages, defaultLanguage, currentLanguage])
 
-  // localStorage is written only by setLanguage (manual choice) — not here, to avoid
-  // clobbering the popup default during auto-resolve and bouncing back on next render.
+  // localStorage is written only on explicit signals — setLanguage (manual
+  // choice) and an incoming ?lang= param — never by auto-resolve, to avoid
+  // clobbering the popup default and bouncing back on next render.
   useEffect(() => {
     if (i18n.language !== currentLanguage) {
       i18n.changeLanguage(currentLanguage)
@@ -144,12 +155,17 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
 
   const setLanguage = (lang: string) => {
     const resolvedLanguage = resolveLanguageCandidate(lang, supportedLanguages)
-    if (resolvedLanguage) {
-      if (typeof window !== "undefined") {
-        localStorage.setItem(STORAGE_KEY, resolvedLanguage)
-      }
-      setCurrentLanguage(resolvedLanguage)
+    if (!resolvedLanguage) return
+    if (typeof window !== "undefined") {
+      localStorage.setItem(STORAGE_KEY, resolvedLanguage)
     }
+    // The URL is the single source of truth: write ?lang and let the resolver
+    // effect apply it. Setting state here too would let the effect briefly
+    // revert to the stale ?lang before the navigation lands. This also keeps
+    // the selected language forwardable in the URL.
+    const params = new URLSearchParams(searchParams.toString())
+    params.set("lang", resolvedLanguage)
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false })
   }
 
   return (

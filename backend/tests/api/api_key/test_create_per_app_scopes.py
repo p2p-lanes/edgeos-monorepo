@@ -16,6 +16,7 @@ from fastapi.testclient import TestClient
 from sqlmodel import Session
 
 from app.api.human.models import Humans
+from app.api.popup.models import Popups
 from app.api.tenant.models import Tenants
 
 CREATE_URL = "/api/v1/api-keys"
@@ -31,6 +32,34 @@ def _make_human(db: Session, *, tenant: Tenants, email: str) -> Humans:
     db.commit()
     db.refresh(h)
     return h
+
+
+def _member_popup(db: Session, *, tenant: Tenants, human: Humans) -> Popups:
+    """Popup with an accepted application for ``human``.
+
+    API keys are popup-bound and require popup membership at creation.
+    """
+    from app.api.application.models import Applications
+    from app.api.application.schemas import ApplicationStatus
+
+    popup = Popups(
+        name=f"AK Popup {uuid.uuid4().hex[:6]}",
+        slug=f"ak-{uuid.uuid4().hex[:10]}",
+        tenant_id=tenant.id,
+    )
+    db.add(popup)
+    db.commit()
+    db.refresh(popup)
+    db.add(
+        Applications(
+            tenant_id=tenant.id,
+            popup_id=popup.id,
+            human_id=human.id,
+            status=ApplicationStatus.ACCEPTED.value,
+        )
+    )
+    db.commit()
+    return popup
 
 
 def _expiry() -> str:
@@ -67,6 +96,7 @@ class TestPerAppScopeSubset:
 
         email = f"pa-api-ok-{uuid.uuid4().hex[:8]}@example.com"
         human = _make_human(db, tenant=tenant_a, email=email)
+        popup = _member_popup(db, tenant=tenant_a, human=human)
 
         token = create_access_token(
             subject=human.id,
@@ -78,7 +108,11 @@ class TestPerAppScopeSubset:
         resp = client.post(
             CREATE_URL,
             headers=_bearer(token),
-            json={"name": "my-events-key", "scopes": ["events:read"]},
+            json={
+                "name": "my-events-key",
+                "scopes": ["events:read"],
+                "popup_id": str(popup.id),
+            },
         )
         assert resp.status_code == 201, resp.text
 
@@ -127,6 +161,8 @@ class TestPerAppScopeSubset:
                 "name": "rsvp-key",
                 "scopes": ["rsvp:write"],
                 "expires_at": _expiry(),
+                # Scope check fires before the popup is resolved.
+                "popup_id": str(uuid.uuid4()),
             },
         )
         assert resp.status_code == 403, resp.text
@@ -181,7 +217,12 @@ class TestPerAppScopeSubset:
         resp = client.post(
             CREATE_URL,
             headers=_bearer(token),
-            json={"name": "post-revoke-key", "scopes": ["events:read"]},
+            json={
+                "name": "post-revoke-key",
+                "scopes": ["events:read"],
+                # App revocation check fires before the popup is resolved.
+                "popup_id": str(uuid.uuid4()),
+            },
         )
         assert resp.status_code == 401, resp.text
 
@@ -205,6 +246,7 @@ class TestLegacyJwtFallback:
         tenant, _app, _raw = third_party_enabled_tenant
         email = f"legacy-ok-{uuid.uuid4().hex[:8]}@example.com"
         human = _make_human(db, tenant=tenant, email=email)
+        popup = _member_popup(db, tenant=tenant, human=human)
 
         # Legacy token: issued_via=third_party but NO issued_by_app_id
         token = create_access_token(
@@ -216,7 +258,11 @@ class TestLegacyJwtFallback:
         resp = client.post(
             CREATE_URL,
             headers=_bearer(token),
-            json={"name": "legacy-events-key", "scopes": ["events:read"]},
+            json={
+                "name": "legacy-events-key",
+                "scopes": ["events:read"],
+                "popup_id": str(popup.id),
+            },
         )
         assert resp.status_code == 201, resp.text
 
@@ -232,6 +278,7 @@ class TestLegacyJwtFallback:
         tenant, _app, _raw = third_party_enabled_tenant
         email = f"legacy-rsvp-{uuid.uuid4().hex[:8]}@example.com"
         human = _make_human(db, tenant=tenant, email=email)
+        popup = _member_popup(db, tenant=tenant, human=human)
 
         token = create_access_token(
             subject=human.id,
@@ -246,6 +293,7 @@ class TestLegacyJwtFallback:
                 "name": "legacy-rsvp-key",
                 "scopes": ["rsvp:write"],
                 "expires_at": _expiry(),
+                "popup_id": str(popup.id),
             },
         )
         assert resp.status_code == 201, resp.text
@@ -276,6 +324,8 @@ class TestLegacyJwtFallback:
                 "name": "legacy-venues-key",
                 "scopes": ["venues:write"],
                 "expires_at": _expiry(),
+                # Scope check fires before the popup is resolved.
+                "popup_id": str(uuid.uuid4()),
             },
         )
         assert resp.status_code == 403, resp.text

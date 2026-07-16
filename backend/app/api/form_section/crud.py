@@ -16,8 +16,13 @@ class FormSectionsCRUD(BaseCRUD[FormSections, FormSectionCreate, FormSectionUpda
         session: Session,
         popup_id: uuid.UUID,
         skip: int = 0,
-        limit: int = 100,
+        limit: int | None = 100,
     ) -> tuple[list[FormSections], int]:
+        """Find sections for a popup ordered by position.
+
+        limit=None returns all sections (no offset/limit) — callers that
+        post-filter in Python need the full set to paginate correctly.
+        """
         statement = (
             select(FormSections)
             .where(FormSections.popup_id == popup_id)
@@ -27,7 +32,8 @@ class FormSectionsCRUD(BaseCRUD[FormSections, FormSectionCreate, FormSectionUpda
         count_statement = select(func.count()).select_from(statement.subquery())
         total = session.exec(count_statement).one()
 
-        statement = statement.offset(skip).limit(limit)
+        if limit is not None:
+            statement = statement.offset(skip).limit(limit)
         results = list(session.exec(statement).all())
 
         return results, total

@@ -92,6 +92,13 @@ class ProductBase(SQLModel):
         default=True,
         sa_column=Column(Boolean, nullable=False, server_default="true"),
     )
+    # Admin-forced sold out. Kept separate from total_stock_remaining so the
+    # counter stays truthful: restore-on-expiry and cap recomputes never
+    # silently un-mark the product, and sold derivation is never poisoned.
+    sold_out_override: bool = Field(
+        default=False,
+        sa_column=Column(Boolean, nullable=False, server_default="false"),
+    )
 
 
 class ProductPublic(ProductBase):
@@ -247,6 +254,12 @@ class ProductUpdate(BaseModel):
             if self.sale_starts_at > self.sale_ends_at:
                 raise ValueError("sale_starts_at must be before sale_ends_at")
         return self
+
+
+class ProductSoldOutUpdate(BaseModel):
+    """Schema for manually marking a product as sold out (or back on sale)."""
+
+    sold_out: bool
 
 
 class ProductBatchItem(BaseModel):

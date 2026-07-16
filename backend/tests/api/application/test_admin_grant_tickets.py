@@ -581,3 +581,103 @@ def test_grant_per_person_validates_each_has_products(
         headers=_auth(admin_token_tenant_a),
     )
     assert response.status_code == 422, response.text
+
+
+@pytest.mark.usefixtures("mock_payment_email")
+def test_grant_created_application_defaults_to_directory_private(
+    client: TestClient,
+    db: Session,
+    admin_token_tenant_a: str,
+    grant_popup: Popups,
+) -> None:
+    """Comped people never consented to sharing: full info_not_shared default."""
+    from app.api.application.crud import GRANTED_DEFAULT_INFO_NOT_SHARED
+
+    product = _make_product(db, grant_popup, name="GA", price="10.00")
+    email = f"private-{uuid.uuid4().hex[:6]}@test.com"
+
+    response = client.post(
+        "/api/v1/applications/admin/grant-tickets",
+        json={
+            "popup_id": str(grant_popup.id),
+            "people": [
+                {
+                    "email": email,
+                    "first_name": "Comped",
+                    "last_name": "Guest",
+                    "products": [{"product_id": str(product.id), "quantity": 1}],
+                }
+            ],
+        },
+        headers=_auth(admin_token_tenant_a),
+    )
+    assert response.status_code == 201, response.text
+    granted = response.json()["granted"][0]
+
+    app = db.get(Applications, uuid.UUID(granted["application_id"]))
+    assert app is not None
+    assert set(app.info_not_shared or []) == set(GRANTED_DEFAULT_INFO_NOT_SHARED)
+
+
+@pytest.mark.usefixtures("mock_payment_email")
+def test_grant_existing_application_keeps_privacy_choices(
+    client: TestClient,
+    db: Session,
+    admin_token_tenant_a: str,
+    tenant_a: Tenants,
+    grant_popup: Popups,
+) -> None:
+    """Grants to someone who already applied must not override their prefs."""
+    product = _make_product(db, grant_popup, name="GA", price="10.00")
+    human = Humans(
+        id=uuid.uuid4(),
+        tenant_id=tenant_a.id,
+        email=f"keepprefs-{uuid.uuid4().hex[:6]}@test.com",
+        first_name="Self",
+        last_name="Applied",
+    )
+    db.add(human)
+    db.commit()
+    db.refresh(human)
+
+    primary_cat = _ensure_primary_category(db, grant_popup)
+    application = Applications(
+        id=uuid.uuid4(),
+        tenant_id=tenant_a.id,
+        popup_id=grant_popup.id,
+        human_id=human.id,
+        status=ApplicationStatus.ACCEPTED.value,
+        info_not_shared=["email"],  # explicit choice: share all but email
+    )
+    db.add(application)
+    attendee = Attendees(
+        id=uuid.uuid4(),
+        tenant_id=tenant_a.id,
+        application_id=application.id,
+        popup_id=grant_popup.id,
+        name="Self Applied",
+        email=human.email,
+        human_id=human.id,
+        category_id=primary_cat.id,
+    )
+    db.add(attendee)
+    db.commit()
+
+    response = client.post(
+        "/api/v1/applications/admin/grant-tickets",
+        json={
+            "popup_id": str(grant_popup.id),
+            "people": [
+                {
+                    "email": human.email,
+                    "products": [{"product_id": str(product.id), "quantity": 1}],
+                }
+            ],
+        },
+        headers=_auth(admin_token_tenant_a),
+    )
+    assert response.status_code == 201, response.text
+
+    db.expire(application)
+    db.refresh(application)
+    assert application.info_not_shared == ["email"]

@@ -14,6 +14,12 @@ export interface ThemeColors {
   accent_color?: string
   checkout_navbar_bg?: string
   checkout_subtitle_color?: string
+  checkout_nav_text_color?: string
+  checkout_watermark_color?: string
+  checkout_bottom_bar_bg_color?: string
+  checkout_bottom_bar_text_color?: string
+  card_background_color?: string
+  card_foreground_color?: string
 }
 
 // Editable keys shown in the backoffice form. Anything else in
@@ -27,6 +33,12 @@ export const NEW_THEME_KEYS = [
   "accent_color",
   "checkout_navbar_bg",
   "checkout_subtitle_color",
+  "checkout_nav_text_color",
+  "checkout_watermark_color",
+  "checkout_bottom_bar_bg_color",
+  "checkout_bottom_bar_text_color",
+  "card_background_color",
+  "card_foreground_color",
 ] as const
 
 export type NewThemeKey = (typeof NEW_THEME_KEYS)[number]
@@ -39,6 +51,12 @@ export const NEW_KEY_DEFAULTS: Record<NewThemeKey, string> = {
   accent_color: "",
   checkout_navbar_bg: "",
   checkout_subtitle_color: "",
+  checkout_nav_text_color: "",
+  checkout_watermark_color: "",
+  checkout_bottom_bar_bg_color: "",
+  checkout_bottom_bar_text_color: "",
+  card_background_color: "",
+  card_foreground_color: "",
 }
 
 const LIGHT = {
@@ -121,15 +139,19 @@ export function computeThemeVars(
     "--checkout-title": palette.foreground,
     "--checkout-subtitle":
       colors.checkout_subtitle_color || palette.foregroundSecondary,
-    "--checkout-watermark": mix(palette.background, palette.foreground, 92),
+    "--checkout-watermark":
+      colors.checkout_watermark_color ||
+      mix(palette.background, palette.foreground, 92),
     "--checkout-navbar-bg":
       colors.checkout_navbar_bg || mix(palette.background, "transparent", 85),
     "--checkout-nav-bg":
       colors.checkout_navbar_bg || mix(palette.background, "transparent", 85),
     "--checkout-footer-bg": mix(palette.background, "transparent", 85),
     "--checkout-card-bg": palette.card,
-    "--checkout-bottom-bar-bg": palette.sidebar,
-    "--checkout-bottom-bar-text": palette.foreground,
+    "--checkout-bottom-bar-bg":
+      colors.checkout_bottom_bar_bg_color || palette.sidebar,
+    "--checkout-bottom-bar-text":
+      colors.checkout_bottom_bar_text_color || palette.foreground,
   }
 
   if (primary) {
@@ -154,6 +176,22 @@ export function computeThemeVars(
     vars["--checkout-nav-text"] = primaryFg
     vars["--checkout-button"] = primary
     vars["--checkout-button-title"] = primaryFg
+  }
+
+  // Explicit per-surface overrides win over anything derived above. Mirrors
+  // the portal runtime (themeProvider.tsx): the checkout nav text/icons and
+  // the step-card surface stay on the palette unless the admin sets them.
+  if (colors.checkout_nav_text_color) {
+    vars["--checkout-badge-title"] = colors.checkout_nav_text_color
+    vars["--checkout-nav-text"] = colors.checkout_nav_text_color
+    vars["--checkout-badge-title-disabled"] =
+      `color-mix(in srgb, ${colors.checkout_nav_text_color} 70%, transparent)`
+  }
+  if (colors.card_background_color) {
+    vars["--step-card-bg"] = colors.card_background_color
+  }
+  if (colors.card_foreground_color) {
+    vars["--step-card-fg"] = colors.card_foreground_color
   }
 
   return vars
@@ -208,15 +246,17 @@ export const LEGACY_HIGHLIGHT_FROM_NEW: Record<string, string[]> = {
   checkout_title: ["mode"],
   checkout_subtitle: ["checkout_subtitle_color", "mode"],
   checkout_subtitle_color: ["checkout_subtitle_color", "mode"],
-  checkout_watermark: ["mode"],
+  checkout_watermark: ["checkout_watermark_color", "mode"],
   checkout_navbar_bg: ["checkout_navbar_bg", "mode"],
   checkout_nav_bg: ["checkout_navbar_bg", "mode"],
-  checkout_nav_text: ["primary_foreground_color"],
+  checkout_nav_text: ["checkout_nav_text_color", "primary_foreground_color"],
   checkout_badge_bg: ["primary_color"],
-  checkout_badge_title: ["primary_foreground_color"],
-  checkout_card_bg: ["mode"],
-  checkout_bottom_bar_bg: ["mode"],
-  checkout_bottom_bar_text: ["mode"],
+  checkout_badge_title: ["checkout_nav_text_color", "primary_foreground_color"],
+  checkout_card_bg: ["card_background_color", "mode"],
+  step_card_bg: ["card_background_color", "mode"],
+  step_card_fg: ["card_foreground_color", "mode"],
+  checkout_bottom_bar_bg: ["checkout_bottom_bar_bg_color", "mode"],
+  checkout_bottom_bar_text: ["checkout_bottom_bar_text_color", "mode"],
   checkout_button: ["primary_color"],
   checkout_button_title: ["primary_foreground_color"],
 }

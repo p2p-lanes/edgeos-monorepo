@@ -636,6 +636,93 @@ function ScholarshipPanel({
 }
 
 // ========================
+// Grant Credit Panel
+// ========================
+
+function GrantCreditPanel({
+  application,
+  onSuccess,
+}: {
+  application: ApplicationPublic
+  onSuccess: () => void
+}) {
+  const { showSuccessToast, showErrorToast } = useCustomToast()
+  const queryClient = useQueryClient()
+  const [amount, setAmount] = useState("")
+  const [note, setNote] = useState("")
+
+  const mutation = useMutation({
+    mutationFn: () =>
+      ApplicationsService.grantApplicationCredit({
+        applicationId: application.id,
+        requestBody: { amount: Number(amount), note: note || undefined },
+      }),
+    onSuccess: (data) => {
+      showSuccessToast(
+        `Credit granted. New balance: $${Number(data.credit).toFixed(2)}`,
+      )
+      setAmount("")
+      setNote("")
+      queryClient.invalidateQueries({
+        queryKey: ["applications", application.id],
+      })
+      onSuccess()
+    },
+    onError: (err) => createErrorHandler(showErrorToast)(err as ApiError),
+  })
+
+  const handleSubmit = () => {
+    const parsed = Number(amount)
+    if (!amount || Number.isNaN(parsed) || parsed <= 0) {
+      showErrorToast("Amount must be greater than zero")
+      return
+    }
+    mutation.mutate()
+  }
+
+  // The current balance is already shown as "Account Credit" in the applicant
+  // details above; don't repeat it here.
+  return (
+    <>
+      <Separator />
+      <InlineSection title="Grant Credit">
+        <div className="space-y-3">
+          <div className="space-y-1">
+            <Label htmlFor="grant-credit-amount">Amount</Label>
+            <Input
+              id="grant-credit-amount"
+              type="number"
+              min="0.01"
+              step="0.01"
+              placeholder="0.00"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+            />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="grant-credit-note">Note (optional)</Label>
+            <Input
+              id="grant-credit-note"
+              type="text"
+              placeholder="Reason for grant"
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+            />
+          </div>
+          <LoadingButton
+            loading={mutation.isPending}
+            onClick={handleSubmit}
+            className="w-full"
+          >
+            Grant Credit
+          </LoadingButton>
+        </div>
+      </InlineSection>
+    </>
+  )
+}
+
+// ========================
 // Main Component
 // ========================
 
@@ -650,7 +737,7 @@ export function ApplicationDetail({
   onReviewSuccess,
   headerExtra,
 }: ApplicationDetailProps) {
-  const { isOperatorOrAbove } = useAuth()
+  const { isAdmin, isOperatorOrAbove } = useAuth()
 
   const { data: schema } = useQuery({
     queryKey: ["form-fields-schema", application.popup_id],
@@ -959,6 +1046,14 @@ export function ApplicationDetail({
         <ScholarshipPanel
           application={application}
           popup={popup}
+          onSuccess={onReviewSuccess}
+        />
+      )}
+
+      {/* Grant Credit Panel — admin only */}
+      {isAdmin && (
+        <GrantCreditPanel
+          application={application}
           onSuccess={onReviewSuccess}
         />
       )}

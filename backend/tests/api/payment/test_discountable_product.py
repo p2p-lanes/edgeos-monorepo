@@ -178,7 +178,7 @@ class TestCalculatePrice:
             group=None,
         )
 
-        result = _calculate_price(
+        result, _credit_applied = _calculate_price(
             standard_amount=Decimal("100"),
             non_discountable_amount=Decimal("50"),
             discount_value=Decimal("100"),
@@ -200,7 +200,7 @@ class TestCalculatePrice:
             group=None,
         )
 
-        result = _calculate_price(
+        result, _credit_applied = _calculate_price(
             standard_amount=Decimal("200"),
             non_discountable_amount=Decimal("50"),
             discount_value=Decimal("50"),

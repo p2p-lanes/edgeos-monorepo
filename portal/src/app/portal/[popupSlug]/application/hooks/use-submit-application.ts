@@ -7,6 +7,7 @@ import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 import type { ApplicationPublic, PopupPublic } from "@/client"
 import { ApplicationsService } from "@/client"
+import { withCheckoutLocale } from "@/helpers/checkout"
 import { useApplicationFee } from "@/hooks/useApplicationFee"
 import { splitForCreate, splitForUpdate } from "@/lib/form-data-splitter"
 import { queryKeys } from "@/lib/query-keys"
@@ -61,7 +62,7 @@ export function useSubmitApplication({
   validate,
   referralId,
 }: UseSubmitApplicationArgs) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const router = useRouter()
   const queryClient = useQueryClient()
   const { updateApplication } = useApplication()
@@ -137,7 +138,10 @@ export function useSubmitApplication({
           throw new Error(t("application.fee.missing_checkout_url"))
         }
 
-        window.location.href = feePayment.checkoutUrl
+        window.location.href = withCheckoutLocale(
+          feePayment.checkoutUrl,
+          i18n.language,
+        )
         return
       }
 

@@ -76,7 +76,7 @@ _EE26_POPUP_ID = "43746fd0-bce2-472b-93e4-a438177b2dff"
 _EE26_INVITE_PREFIX = "EE26 invite — %"
 
 revision: str = "bfaabd563367"
-down_revision: str | Sequence[str] | None = "d1f6b8a3c925"
+down_revision: str | Sequence[str] | None = "d4f7b2a9c1e6"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

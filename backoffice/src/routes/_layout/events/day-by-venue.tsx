@@ -1,3 +1,4 @@
+import { MarkdownContent } from "@edgeos/shared-form-ui"
 import {
   useMutation,
   useQuery,
@@ -234,9 +235,10 @@ function DayByVenueContent({ popupId }: { popupId: string }) {
                 </div>
               )}
               {activeEvent.content && (
-                <p className="whitespace-pre-wrap text-muted-foreground">
-                  {activeEvent.content}
-                </p>
+                <MarkdownContent
+                  source={activeEvent.content}
+                  className="text-muted-foreground"
+                />
               )}
             </div>
           )}

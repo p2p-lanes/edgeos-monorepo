@@ -15,6 +15,7 @@ from fastapi.testclient import TestClient
 from sqlmodel import Session
 
 from app.api.human.models import Humans
+from app.api.popup.models import Popups
 from app.api.tenant.models import Tenants
 
 CREATE_URL = "/api/v1/api-keys"
@@ -32,6 +33,34 @@ def _make_human(db: Session, *, tenant: Tenants, email: str) -> Humans:
     return h
 
 
+def _member_popup(db: Session, *, tenant: Tenants, human: Humans) -> Popups:
+    """Popup with an accepted application for ``human``.
+
+    API keys are popup-bound and require popup membership at creation.
+    """
+    from app.api.application.models import Applications
+    from app.api.application.schemas import ApplicationStatus
+
+    popup = Popups(
+        name=f"AK Popup {uuid.uuid4().hex[:6]}",
+        slug=f"ak-{uuid.uuid4().hex[:10]}",
+        tenant_id=tenant.id,
+    )
+    db.add(popup)
+    db.commit()
+    db.refresh(popup)
+    db.add(
+        Applications(
+            tenant_id=tenant.id,
+            popup_id=popup.id,
+            human_id=human.id,
+            status=ApplicationStatus.ACCEPTED.value,
+        )
+    )
+    db.commit()
+    return popup
+
+
 class TestThirdPartyJwtApiKeyMintingRestriction:
     """REQ-AK-04."""
 
@@ -46,12 +75,17 @@ class TestThirdPartyJwtApiKeyMintingRestriction:
         tenant, _app, _raw = third_party_enabled_tenant
         email = f"tp-mint-ok-{uuid.uuid4().hex[:8]}@example.com"
         human = _make_human(db, tenant=tenant, email=email)
+        popup = _member_popup(db, tenant=tenant, human=human)
         token = third_party_jwt_factory(human=human)
 
         resp = client.post(
             CREATE_URL,
             headers=_bearer(token),
-            json={"name": "tp-events", "scopes": ["events:read"]},
+            json={
+                "name": "tp-events",
+                "scopes": ["events:read"],
+                "popup_id": str(popup.id),
+            },
         )
         assert resp.status_code == 201, resp.text
 
@@ -82,6 +116,8 @@ class TestThirdPartyJwtApiKeyMintingRestriction:
                 "name": "tp-venues",
                 "scopes": ["venues:write"],
                 "expires_at": expiry,
+                # Scope check fires before the popup is resolved.
+                "popup_id": str(uuid.uuid4()),
             },
         )
         assert resp.status_code == 403, resp.text
@@ -113,6 +149,8 @@ class TestThirdPartyJwtApiKeyMintingRestriction:
                 "name": "tp-mixed",
                 "scopes": ["rsvp:write", "venues:write"],
                 "expires_at": expiry,
+                # Scope check fires before the popup is resolved.
+                "popup_id": str(uuid.uuid4()),
             },
         )
         assert resp.status_code == 403, resp.text
@@ -133,12 +171,17 @@ class TestPortalJwtApiKeyMintingUnchanged:
         tenant, _app, _raw = third_party_enabled_tenant
         email = f"portal-mint-ok-{uuid.uuid4().hex[:8]}@example.com"
         human = _make_human(db, tenant=tenant, email=email)
+        popup = _member_popup(db, tenant=tenant, human=human)
         # Mint a legacy-style portal JWT (no scopes, no issued_via)
         token = create_access_token(subject=human.id, token_type="human")
 
         resp = client.post(
             CREATE_URL,
             headers=_bearer(token),
-            json={"name": "portal-events", "scopes": ["events:read"]},
+            json={
+                "name": "portal-events",
+                "scopes": ["events:read"],
+                "popup_id": str(popup.id),
+            },
         )
         assert resp.status_code == 201, resp.text

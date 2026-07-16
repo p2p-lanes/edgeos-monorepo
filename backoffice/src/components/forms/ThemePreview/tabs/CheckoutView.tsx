@@ -5,12 +5,6 @@ import { PreviewCheckoutTopBar } from "../parts/PreviewCheckoutTopBar"
 import { useDisplayEvent, usePreview } from "../parts/PreviewContext"
 import { makeIsHl, ringIf } from "../parts/ring"
 
-// Gradient fallback cuando el popup no tiene express_checkout_background —
-// mantiene el cosmic look del checkout real aunque el usuario no haya subido
-// imagen todavía.
-const FALLBACK_BG =
-  "radial-gradient(ellipse at 30% 20%, #4c3a8a 0%, #1b1540 50%, #080618 100%)"
-
 // Replica del flujo de Pases del checkout real: background image fullscreen,
 // navbar sticky con pills de steps, una sola card con el header del tenant y
 // la sección "Experiencias" con un producto, y bottom bar flotante.
@@ -24,15 +18,23 @@ export function CheckoutView() {
   const backgroundImage =
     checkoutEnabled && event.express_checkout_background
       ? `url(${event.express_checkout_background})`
-      : FALLBACK_BG
+      : undefined
 
   return (
     <div
       className="relative flex h-full flex-col"
       style={{
-        backgroundImage,
-        backgroundSize: "cover",
-        backgroundPosition: "center",
+        // No image (or context off) → solid theme background, matching the real
+        // checkout, where getCheckoutBackground returns `bg-background` for the
+        // no-image case instead of an invented gradient.
+        backgroundColor: "var(--background)",
+        ...(backgroundImage
+          ? {
+              backgroundImage,
+              backgroundSize: "cover",
+              backgroundPosition: "center",
+            }
+          : {}),
       }}
     >
       <PreviewCheckoutTopBar />

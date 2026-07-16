@@ -4,9 +4,13 @@ import type { Metadata, Viewport } from "next"
 import { headers } from "next/headers"
 import "./globals.css"
 import { Toaster } from "sonner"
+import { MetaPixel } from "@/components/MetaPixel"
 import GoogleAnalytics from "@/components/utils/GoogleAnalytics"
-import { fetchTenantBySlug } from "@/lib/tenant"
-import { resolveHostname } from "@/lib/tenant-resolution"
+import { buildShareMetadata } from "@/lib/share-metadata"
+import {
+  getMetadataBase,
+  resolveTenantForMetadata,
+} from "@/lib/tenant-metadata"
 import QueryProvider from "@/providers/queryProvider"
 import { TenantProvider } from "@/providers/tenantProvider"
 
@@ -15,34 +19,8 @@ const FALLBACK_DESCRIPTION =
   "Welcome to the Edge Portal. Log in or sign up to access events."
 
 export async function generateMetadata(): Promise<Metadata> {
-  const headersList = await headers()
-  const host = headersList.get("host") ?? ""
-  const { slug, isCustomDomain } = resolveHostname(host)
-
-  // For custom domains, the middleware already resolved the tenant and set
-  // x-tenant-slug — read it directly instead of making a redundant API call.
-  const middlewareSlug = isCustomDomain
-    ? (headersList.get("x-tenant-slug") ?? null)
-    : null
-
-  let tenant = null
-
-  try {
-    tenant =
-      middlewareSlug != null
-        ? await fetchTenantBySlug(middlewareSlug)
-        : slug
-          ? await fetchTenantBySlug(slug)
-          : null
-  } catch (error) {
-    console.error("Failed to resolve tenant metadata", {
-      host,
-      slug,
-      middlewareSlug,
-      isCustomDomain,
-      error,
-    })
-  }
+  const tenant = await resolveTenantForMetadata()
+  const metadataBase = await getMetadataBase()
 
   const name = tenant?.name ? `${tenant.name} Portal` : FALLBACK_NAME
   const description = tenant?.name
@@ -50,24 +28,16 @@ export async function generateMetadata(): Promise<Metadata> {
     : FALLBACK_DESCRIPTION
 
   return {
-    title: name,
-    description,
-    icons: {
-      icon: tenant?.icon_url ?? "/icon.png",
-    },
-    openGraph: {
+    metadataBase,
+    ...buildShareMetadata({
       title: name,
       description,
-      ...(tenant?.image_url && {
-        images: [
-          {
-            url: tenant.image_url,
-            alt: name,
-            width: 1200,
-            height: 630,
-          },
-        ],
-      }),
+      imageUrl: tenant?.image_url,
+      imageAlt: name,
+    }),
+    icons: {
+      icon: tenant?.icon_url ?? "/icons/icon.png",
+      apple: tenant?.icon_url ?? "/icons/icon-192.png",
     },
   }
 }
@@ -77,11 +47,34 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
+  themeColor: "#ffffff",
+}
+
+/**
+ * Origin of the backend API, derived from the runtime env — never
+ * hardcoded. Returns null when the env var is missing or malformed so the
+ * preconnect hint is simply skipped instead of pointing somewhere wrong.
+ */
+function getApiOrigin(): string | null {
+  try {
+    return new URL(process.env.NEXT_PUBLIC_API_URL ?? "").origin
+  } catch {
+    return null
+  }
 }
 
 export default async function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
+  // The portal is client-rendered: every page pays DNS + TCP + TLS to the
+  // API after hydration, in the critical path (tenant + checkout runtime
+  // fetches). Preconnecting from the initial HTML moves those handshakes
+  // off the critical path. Rendered as a <link> element (hoisted to <head>
+  // by React) because react-dom's preconnect() is a no-op in Server
+  // Components. `crossOrigin` matches the CORS mode of the SDK fetches so
+  // the warmed connection is actually reused.
+  const apiOrigin = getApiOrigin()
+
   const headersList = await headers()
   const isCustomDomain = headersList.get("x-custom-domain") === "true"
   const middlewareTenantId = isCustomDomain
@@ -104,7 +97,9 @@ export default async function RootLayout({
         className={`${GeistSans.variable} ${GeistSans.className} ${GeistMono.variable} antialiased`}
         suppressHydrationWarning
       >
-        <GoogleAnalytics />
+        {apiOrigin && (
+          <link rel="preconnect" href={apiOrigin} crossOrigin="anonymous" />
+        )}
         <QueryProvider>
           <TenantProvider
             initialTenantId={middlewareTenantId}
@@ -112,6 +107,8 @@ export default async function RootLayout({
             initialLandingMode={middlewareLandingMode}
             initialActivePopupSlug={middlewareActivePopupSlug}
           >
+            <GoogleAnalytics />
+            <MetaPixel />
             <div className="w-full">{children}</div>
           </TenantProvider>
         </QueryProvider>

@@ -10,7 +10,10 @@ import {
 } from "lucide-react"
 import Image from "next/image"
 import { useCallback, useEffect, useRef, useState } from "react"
+import { createPortal } from "react-dom"
+import { useTranslation } from "react-i18next"
 import { Button } from "@/components/ui/button"
+import { imageOptimization } from "@/lib/image-optimization"
 import { cn } from "@/lib/utils"
 import type { VariantProps } from "../registries/variantRegistry"
 
@@ -80,7 +83,23 @@ export function LightboxOverlay({
   const current = images[index]
   if (!current) return null
 
-  return (
+  // Fetch the adjacent full-size images while the current one is on screen
+  // so prev/next swaps come from the browser cache. display:none images
+  // never load under native lazy loading, hence the explicit eager.
+  const neighbors =
+    images.length > 1
+      ? [
+          ...new Set([
+            (index + 1) % images.length,
+            (index - 1 + images.length) % images.length,
+          ]),
+        ].filter((i) => i !== index)
+      : []
+
+  // Portal to <body>: hosts like a sold-out product card carry opacity < 1,
+  // which creates a stacking context that would trap this fixed overlay and
+  // render it semi-transparent over the page.
+  return createPortal(
     <div
       className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center"
       onClick={(e) => {
@@ -122,12 +141,26 @@ export function LightboxOverlay({
       )}
 
       <div className="max-w-4xl max-h-[80vh] w-full mx-4 relative">
+        {neighbors.map((i) => (
+          <Image
+            key={images[i].id}
+            src={images[i].url}
+            alt=""
+            aria-hidden
+            width={1200}
+            height={800}
+            loading="eager"
+            className="hidden"
+            {...imageOptimization(images[i].url)}
+          />
+        ))}
         <Image
           src={current.url}
           alt={current.caption || ""}
           width={1200}
           height={800}
           className="w-full h-auto max-h-[80vh] object-contain rounded-lg"
+          {...imageOptimization(current.url)}
         />
         {current.caption && (
           <p className="text-white/80 text-sm text-center mt-3">
@@ -138,7 +171,8 @@ export function LightboxOverlay({
           {index + 1} / {images.length}
         </p>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }
 
@@ -182,7 +216,9 @@ function CarouselGallery({
                   src={img.url}
                   alt={img.caption || ""}
                   fill
+                  sizes="(max-width: 768px) 100vw, 672px"
                   className="object-cover"
+                  {...imageOptimization(img.url)}
                 />
               </div>
             </div>
@@ -254,12 +290,16 @@ function MasonryGallery({
             aria-label={img.caption || `View image ${i + 1}`}
           >
             <div className="rounded-xl overflow-hidden shadow-sm border border-border group">
-              {/* biome-ignore lint: masonry items use native img for natural height */}
-              <img
+              {/* Masonry items keep their natural height: width/height are
+                  zeroed and CSS (w-full h-auto) drives layout. */}
+              <Image
                 src={img.url}
                 alt={img.caption || ""}
+                width={0}
+                height={0}
+                sizes="(max-width: 640px) 50vw, 33vw"
                 className="w-full h-auto block transition-transform duration-200 group-hover:scale-[1.02]"
-                loading="lazy"
+                {...imageOptimization(img.url)}
               />
               {img.caption && (
                 <div className="px-3 py-2">
@@ -313,7 +353,9 @@ function LightboxGallery({
               src={img.url}
               alt={img.caption || ""}
               fill
+              sizes="(max-width: 640px) 50vw, 224px"
               className="object-cover transition-transform duration-200 group-hover:scale-105"
+              {...imageOptimization(img.url)}
             />
           </button>
         ))}
@@ -419,6 +461,7 @@ export default function VariantImageGallery({
   onSkip,
   templateConfig,
 }: VariantProps) {
+  const { t } = useTranslation()
   const images = parseImages(templateConfig)
   const variant = (templateConfig?.variant as string) || "carousel"
 
@@ -426,11 +469,9 @@ export default function VariantImageGallery({
     return (
       <div className="flex flex-col items-center justify-center py-12 text-center">
         <ImageIcon className="w-12 h-12 text-muted-foreground mb-4" />
-        <p className="text-muted-foreground mb-6">
-          No images available for this step.
-        </p>
+        <p className="text-muted-foreground mb-6">{t("checkout.no_images")}</p>
         <Button variant="outline" onClick={onSkip}>
-          Continue
+          {t("common.continue")}
         </Button>
       </div>
     )

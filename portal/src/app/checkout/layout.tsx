@@ -1,10 +1,6 @@
-"use client"
-
 import type { ReactNode } from "react"
-import Providers from "./components/providers/Providers"
+import CheckoutClientShell from "./components/providers/CheckoutClientShell"
 
-const layout = ({ children }: { children: ReactNode }) => {
-  return <Providers>{children}</Providers>
+export default function CheckoutLayout({ children }: { children: ReactNode }) {
+  return <CheckoutClientShell>{children}</CheckoutClientShell>
 }
-
-export default layout

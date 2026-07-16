@@ -2,7 +2,13 @@ import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { Bug } from "lucide-react"
 import { useState } from "react"
 
-import { type TaskAttachmentCreate, TasksService } from "@/client"
+import {
+  type TaskApp,
+  type TaskAttachmentCreate,
+  type TaskPriority,
+  TasksService,
+  type TaskType,
+} from "@/client"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -16,11 +22,29 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { LoadingButton } from "@/components/ui/loading-button"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import useCustomToast from "@/hooks/useCustomToast"
 import { createErrorHandler } from "@/utils"
 import { AttachmentField } from "./AttachmentField"
 import { AttachmentGrid } from "./AttachmentGrid"
+import {
+  APP_LABELS,
+  PRIORITY_LABELS,
+  TASK_APPS,
+  TASK_PRIORITIES,
+  TASK_TYPES,
+  TYPE_LABELS,
+} from "./taskMeta"
+
+/** Select sentinel for "no app specified" (empty string isn't a valid item). */
+const NONE = "none"
 
 const DETAIL_GUIDE = `Help us reproduce it:
 1. What you did (steps).
@@ -38,11 +62,17 @@ export function ReportBugButton() {
   const [open, setOpen] = useState(false)
   const [title, setTitle] = useState("")
   const [detail, setDetail] = useState("")
+  const [type, setType] = useState<TaskType>("bug")
+  const [priority, setPriority] = useState<TaskPriority>("medium")
+  const [app, setApp] = useState<TaskApp | "">("")
   const [attachments, setAttachments] = useState<TaskAttachmentCreate[]>([])
 
   const reset = () => {
     setTitle("")
     setDetail("")
+    setType("bug")
+    setPriority("medium")
+    setApp("")
     setAttachments([])
   }
 
@@ -52,6 +82,9 @@ export function ReportBugButton() {
         requestBody: {
           title: title.trim(),
           detail: detail.trim() || null,
+          type,
+          priority,
+          app: app || null,
           attachments,
         },
       }),
@@ -125,6 +158,66 @@ export function ReportBugButton() {
               and where it happened. Screenshots or a screen recording help a
               lot.
             </p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Type</Label>
+              <Select
+                value={type}
+                onValueChange={(v) => setType(v as TaskType)}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {TASK_TYPES.map((t) => (
+                    <SelectItem key={t} value={t}>
+                      {TYPE_LABELS[t]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Priority</Label>
+              <Select
+                value={priority}
+                onValueChange={(v) => setPriority(v as TaskPriority)}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {TASK_PRIORITIES.map((p) => (
+                    <SelectItem key={p} value={p}>
+                      {PRIORITY_LABELS[p]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="col-span-2 space-y-2">
+              <Label>App</Label>
+              <Select
+                value={app || NONE}
+                onValueChange={(v) => setApp(v === NONE ? "" : (v as TaskApp))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Unspecified" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NONE}>Unspecified</SelectItem>
+                  {TASK_APPS.map((a) => (
+                    <SelectItem key={a} value={a}>
+                      {APP_LABELS[a]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           <div className="space-y-2">

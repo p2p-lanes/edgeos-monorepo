@@ -128,7 +128,7 @@
     "pay_and_submit": "支付并提交 ({{amount}})",
     "fee": {
       "required_title": "需要申请费",
-      "required_description": "提交申请需支付 ${{amount}} USD 的不可退还费用。您将被重定向到安全支付页面。",
+      "required_description": "提交申请需支付 ${{amount}} USD 的可退还费用。您将被重定向到安全支付页面。",
       "processing_title": "正在处理付款...",
       "processing_description": "我们正在确认您的付款。这可能需要一些时间。",
       "confirmed_title": "付款已确认！",
@@ -166,6 +166,9 @@
   "checkout": {
     "title": "结账",
     "express_title": "快速结账",
+    "sold_out": "已售罄",
+    "sale_upcoming": "即将开售",
+    "sale_ended": "已结束",
     "buyer_step_title": "您的信息",
     "buyer_step_description": "请在付款前填写您的信息。",
     "buyer_hero_title": "就差一步！",
@@ -211,6 +214,9 @@
     },
     "to_pay": "应付",
     "credit_label": "抵扣：{{amount}}",
+    "credit_applied_label": "已使用抵扣",
+    "edit_mode_title": "编辑模式",
+    "edit_mode_description": "选择已购买的通行证以获得抵扣，然后选择一张新的。",
     "cart": {
       "close_aria": "关闭购物车",
       "empty_title": "您的购物车是空的",
@@ -238,7 +244,8 @@
       "play_aria": "播放背景视频",
       "pause_aria": "暂停背景视频",
       "mute_aria": "静音背景视频",
-      "unmute_aria": "取消静音背景视频"
+      "unmute_aria": "取消静音背景视频",
+      "play_youtube_aria": "播放视频"
     },
     "housing": {
       "carousel": {
@@ -254,7 +261,21 @@
     "discount": {
       "not_eligible_caption": "不符合折扣条件",
       "promo_discount_eligible_label": "促销折扣（符合条件的商品）"
-    }
+    },
+    "coupon_no_longer_valid": "This coupon is no longer available. Your total has been updated. Please review and try again.",
+    "payment_error": "Something went wrong with your payment. Please try again.",
+    "no_products": "此步骤暂无可用产品。",
+    "no_images": "此步骤暂无可用图片。",
+    "no_video": "此步骤暂无可用视频。",
+    "no_passes": "暂无可用通行证。",
+    "no_passes_for_category": "此参与者类别暂无可用通行证。",
+    "no_meal_plans": "暂无可用餐饮计划。",
+    "no_contributions": "暂无可用捐助选项。",
+    "step_config_error": "步骤配置错误。",
+    "step_config_error_detail": "此步骤未分配模板。请联系管理员。",
+    "previous_payment_completed": "您之前的付款已完成。",
+    "pending_payment_wait": "您有一笔待处理的付款，请等待几分钟。",
+    "payment_cancel_failed": "我们无法处理您的付款，请重试。"
   },
   "openCheckout": {
     "loading": "正在加载结账...",
@@ -277,7 +298,12 @@
     "summary_pay": "支付",
     "thank_you_title": "付款已完成",
     "thank_you_description": "感谢您的购买。我们已通过电子邮件发送您的确认信息和门票详情。",
-    "thank_you_cta": "前往门户"
+    "thank_you_cta": "前往门户",
+    "thank_you_order_summary": "订单摘要",
+    "thank_you_total": "总计",
+    "previous_payment_completed": "您之前的付款已完成。",
+    "payment_cancel_failed": "我们无法处理您的付款，请重试。",
+    "pending_payment_wait": "您有一笔待处理的付款，请等待几分钟。"
   },
   "passes": {
     "your_passes": "我的通行证",
@@ -353,7 +379,9 @@
     "description": "联系您的朋友以计划日程、寻找合住住所或一起组织活动。*此名录仅包含自愿选择分享其信息的人的资料。",
     "search_placeholder": "按姓名、邮箱、组织搜索...",
     "export_csv": "导出参与者CSV",
-    "no_attendees": "未找到参与者"
+    "no_attendees": "未找到参与者",
+    "per_page_label": "每页",
+    "showing_range": "显示 {{from}}–{{to}}，共 {{total}}"
   },
   "checkin": {
     "title": "{{eventName}} 在线签到",
@@ -441,6 +469,7 @@
     "revoke_failed": "撤销 API 密钥失败",
     "scopes_label": "权限",
     "scopes_description": "新密钥默认仅有只读权限。仅在确有需要时才开启更多权限。",
+    "ended_read_only_note": "此 pop-up 已结束，因此新的 API 密钥仅能拥有只读权限。",
     "scope": {
       "events_read": {
         "label": "读取活动",
@@ -453,6 +482,10 @@
       "rsvp_write": {
         "label": "报名活动",
         "description": "为活动报名或取消报名。"
+      },
+      "venues_write": {
+        "label": "管理自己的场地",
+        "description": "创建、编辑和删除你拥有的场地。"
       }
     }
   },
@@ -616,6 +649,9 @@
       "filter_by_tracks": "按赛道筛选",
       "tracks_label": "赛道",
       "filter_by_track_label": "按赛道筛选",
+      "filter_by_venues": "按场地筛选",
+      "venues_label": "场地",
+      "filter_by_venue_label": "按场地筛选",
       "clear_filters": "清除",
       "list_view_label": "列表视图",
       "calendar_view_label": "日历视图",
@@ -670,7 +706,9 @@
       "check_in_opens_at_start": "签到将在活动开始时开放",
       "registered": "已登记",
       "checked_in": "已签到",
-      "action_error": "无法更新你的报名，请稍后重试。"
+      "action_error": "无法更新你的报名，请稍后重试。",
+      "requires_ticket": "你需要持有该活动的票才能报名。",
+      "application_rejected": "你的申请未获通过，无法报名。"
     },
     "login_required": {
       "title": "登录以查看此活动",
@@ -706,6 +744,7 @@
       "participants_heading": "参与者",
       "no_participants_yet": "暂无参与者",
       "participants_more": "+ 另 {{count}} 人",
+      "participants_show_less": "收起",
       "unnamed_participant": "未命名",
       "bulk_invite_success": "已邀请 {{invited}} · 已跳过 {{skipped}} · 未找到 {{notFound}}",
       "bulk_invite_error": "邀请失败",
@@ -724,6 +763,9 @@
       "pending_approval_banner_title": "等待审批",
       "pending_approval_banner_message": "你的活动正在等待审批,其他人暂时无法查看。",
       "open_in_maps": "在 Google 地图中打开",
+      "view_on_geobrowser": "在 Geobrowser 中查看",
+      "join_on_geo": "加入 Geo",
+      "join_on_geo_tooltip": "回顾、投票和资源",
       "share_button": "分享活动",
       "share_link_copied": "链接已复制",
       "share_link_error": "无法复制链接"
@@ -764,6 +806,14 @@
       "start_time_outside_venue_hours": "开始时间不在场地营业时间内。",
       "start_time_conflict": "该时间已有其他活动。",
       "try_nearby_slots": "可尝试以下相近时间:",
+      "private_event": "私密活动",
+      "schedule_preview_title": "场地日程",
+      "view_venue_schedule": "查看场地日程",
+      "free_slot_hint": "点击空闲时段以设置开始时间",
+      "setup_teardown": "布置 / 撤场",
+      "schedule_legend_booked": "已预订",
+      "schedule_legend_your_slot": "你的时段",
+      "schedule_legend_closed": "已关闭",
       "visibility_label": "可见性",
       "visibility_public": "公开",
       "visibility_private": "私密(仅限受邀者)",
@@ -805,6 +855,9 @@
       "visibility_helper": "公开对所有人可见。私密仅限于你邀请的人，或你在下方选择的群组成员。不公开仅可通过直接链接访问。",
       "no_eligible_groups": "你不属于任何已开启私密活动的群组，因此无法将范围限定到某个群组。该活动将保持仅限受邀者参与。",
       "event_created_pending_approval_success": "活动已提交,等待审批。其他人暂时无法查看。",
+      "pending_success_heading": "已提交！",
+      "pending_success_message": "管理员将审核你的活动。在审核通过之前，你可以在“我的活动”中找到它。",
+      "pending_success_view_event": "查看我的活动",
       "event_updated_success": "活动已更新",
       "image_uploaded_success": "图片已上传",
       "required_title": "标题必填",
@@ -815,7 +868,8 @@
       "creation_restricted_message": "仅管理员可为此 pop-up 创建活动。",
       "no_popup_error": "无 popup",
       "no_timezone_error": "未为此 popup 配置时区",
-      "no_venue_option": "会议",
+      "no_venue_option": "线上会议",
+      "venue_where_placeholder": "活动在哪里举行？",
       "custom_location_option": "自定义地点",
       "venues_group_label": "场地",
       "custom_location_name_label": "地点名称",

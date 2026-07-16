@@ -39,11 +39,10 @@ interface DialogState {
   maxPerApplication: string
   // High-level form fields the admin toggles. We serialize/deserialize these
   // to/from the underlying `required_fields` JSONB so the dialog stays simple
-  // for the two cases we actually have: spouse (email+gender), kid (age+gender).
+  // for the cases we actually have: spouse (email+gender), kid (age group).
   requireEmail: boolean
   requireGender: boolean
-  askAge: boolean
-  maxAge: string
+  askAgeGroup: boolean
 }
 
 const EMPTY_DIALOG: DialogState = {
@@ -56,8 +55,7 @@ const EMPTY_DIALOG: DialogState = {
   maxPerApplication: "",
   requireEmail: true,
   requireGender: false,
-  askAge: false,
-  maxAge: "12",
+  askAgeGroup: false,
 }
 
 interface RequiredFieldOption {
@@ -74,24 +72,14 @@ interface RequiredFieldEntry {
   display_as_subtitle?: boolean
 }
 
-function buildAgeOptions(maxAge: number): RequiredFieldOption[] {
-  const options: RequiredFieldOption[] = [
-    { value: "lt1", label: "< 1 year old" },
-  ]
-  for (let i = 1; i <= maxAge; i++) {
-    options.push({
-      value: String(i),
-      label: i === 1 ? "1 year old" : `${i} years old`,
-    })
-  }
-  return options
-}
+const AGE_GROUP_OPTIONS: RequiredFieldOption[] = [
+  { value: "baby", label: "Baby" },
+  { value: "kid", label: "Kid" },
+  { value: "teen", label: "Teen" },
+]
 
 function serializeRequiredFields(
-  state: Pick<
-    DialogState,
-    "requireEmail" | "requireGender" | "askAge" | "maxAge"
-  >,
+  state: Pick<DialogState, "requireEmail" | "requireGender" | "askAgeGroup">,
 ): RequiredFieldEntry[] {
   const fields: RequiredFieldEntry[] = []
   if (state.requireEmail) {
@@ -116,16 +104,13 @@ function serializeRequiredFields(
       ],
     })
   }
-  if (state.askAge) {
-    const max = Number(state.maxAge)
-    const maxAge =
-      Number.isFinite(max) && max > 0 && Number.isInteger(max) ? max : 12
+  if (state.askAgeGroup) {
     fields.push({
-      name: "age",
-      label: "Age",
+      name: "age_group",
+      label: "Age group",
       type: "select",
       required: true,
-      options: buildAgeOptions(maxAge),
+      options: AGE_GROUP_OPTIONS,
       display_as_subtitle: true,
     })
   }
@@ -134,32 +119,21 @@ function serializeRequiredFields(
 
 function deserializeRequiredFields(
   raw: unknown,
-): Pick<DialogState, "requireEmail" | "requireGender" | "askAge" | "maxAge"> {
+): Pick<DialogState, "requireEmail" | "requireGender" | "askAgeGroup"> {
   const fields: RequiredFieldEntry[] = Array.isArray(raw)
     ? (raw as RequiredFieldEntry[])
     : []
   const hasEmail = fields.some((f) => f?.name === "email")
   const hasGender = fields.some((f) => f?.name === "gender")
-  const ageField = fields.find((f) => f?.name === "age")
-  let maxAge = "12"
-  if (ageField?.options && Array.isArray(ageField.options)) {
-    // Largest numeric value across {value,label} pairs or string options.
-    const numericValues = ageField.options
-      .map((opt) =>
-        typeof opt === "string"
-          ? Number(opt)
-          : Number(opt?.value ?? Number.NaN),
-      )
-      .filter((n) => Number.isFinite(n))
-    if (numericValues.length > 0) {
-      maxAge = String(Math.max(...numericValues))
-    }
-  }
+  // Recognize both age_group and the legacy numeric `age` field so existing
+  // "kid" categories show the toggle as on until re-saved.
+  const hasAgeGroup = fields.some(
+    (f) => f?.name === "age_group" || f?.name === "age",
+  )
   return {
     requireEmail: hasEmail,
     requireGender: hasGender,
-    askAge: !!ageField,
-    maxAge,
+    askAgeGroup: hasAgeGroup,
   }
 }
 
@@ -299,13 +273,6 @@ export function AttendeeCategoriesEditor({
         Number(state.maxPerApplication) < 1)
     ) {
       showErrorToast("Max per application must be a positive integer or empty")
-      return
-    }
-    if (
-      state.askAge &&
-      (!Number.isInteger(Number(state.maxAge)) || Number(state.maxAge) < 1)
-    ) {
-      showErrorToast("Max age must be a positive integer")
       return
     }
     if (state.editing) {
@@ -514,36 +481,20 @@ export function AttendeeCategoriesEditor({
               </div>
 
               <div className="flex items-center justify-between">
-                <Label htmlFor="cat-ask-age">Ask for age</Label>
+                <Label htmlFor="cat-ask-age-group">Ask for age group</Label>
                 <Switch
-                  id="cat-ask-age"
-                  checked={state.askAge}
+                  id="cat-ask-age-group"
+                  checked={state.askAgeGroup}
                   onCheckedChange={(checked) =>
-                    setState((prev) => ({ ...prev, askAge: checked }))
+                    setState((prev) => ({ ...prev, askAgeGroup: checked }))
                   }
                 />
               </div>
-
-              {state.askAge && (
-                <div className="space-y-1.5 pl-2">
-                  <Label htmlFor="cat-max-age">Max age</Label>
-                  <Input
-                    id="cat-max-age"
-                    type="number"
-                    min="1"
-                    value={state.maxAge}
-                    placeholder="12"
-                    onChange={(e) =>
-                      setState((prev) => ({
-                        ...prev,
-                        maxAge: e.target.value,
-                      }))
-                    }
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Dropdown shows "{`< 1 year old`}" up to this number.
-                  </p>
-                </div>
+              {state.askAgeGroup && (
+                <p className="pl-2 text-xs text-muted-foreground">
+                  Adds an age-group field (baby / kid / teen) shown when adding
+                  this attendee in the portal.
+                </p>
               )}
             </div>
           </div>

@@ -5,16 +5,19 @@ from enum import StrEnum
 from typing import Self
 
 from pydantic import ConfigDict, field_validator, model_validator
-from sqlalchemy import Boolean, Column, Numeric, Text
+from sqlalchemy import Boolean, Column, Integer, Numeric, Text
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlmodel import Field, SQLModel, String
 
 from app.api.shared.enums import (
     ApplicationLayout,
     CheckoutMode,
+    InstallmentInterval,
     SaleType,
+    SimpleFiSuccessBehavior,
     derive_checkout_mode,
 )
+from app.core.config import settings
 from app.utils.utils import slugify
 
 
@@ -52,6 +55,37 @@ def validate_popup_contribution_config(enabled: bool, pct: "Decimal | None") -> 
         )
 
 
+def validate_popup_installments_config(
+    enabled: bool,
+    max_installments: int | None,
+    deadline: "datetime | None",
+    interval_count: int,
+) -> None:
+    """Validate installment-plan configuration bounds.
+
+    - When enabled, installments_max and installments_deadline must be set.
+    - installments_max must be within [2, MAX_ALLOWED_INSTALLMENTS] (SimpleFi accepts [2, 12]).
+    - installments_interval_count must be >= 1.
+    """
+    if interval_count < 1:
+        raise ValueError("installments_interval_count must be >= 1")
+    if not enabled:
+        return
+    if max_installments is None:
+        raise ValueError(
+            "installments_max is required when installments_enabled is True"
+        )
+    if max_installments < 2 or max_installments > settings.MAX_ALLOWED_INSTALLMENTS:
+        raise ValueError(
+            "installments_max must be between 2 and "
+            f"{settings.MAX_ALLOWED_INSTALLMENTS} (SimpleFi limits)"
+        )
+    if deadline is None:
+        raise ValueError(
+            "installments_deadline is required when installments_enabled is True"
+        )
+
+
 ALLOWED_CURRENCIES = ("USD", "ARS", "EUR")
 
 
@@ -62,6 +96,23 @@ def validate_currency_value(value: str | None) -> str | None:
     if normalized not in ALLOWED_CURRENCIES:
         raise ValueError(f"currency must be one of {ALLOWED_CURRENCIES}")
     return normalized
+
+
+def validate_optional_url(value: str | None) -> str | None:
+    """Validate an optional absolute http(s) URL, normalizing blanks to None.
+
+    Used for the per-popup open-checkout redirect URLs that are forwarded to
+    SimpleFi. A malformed value would break payment creation, so reject
+    anything that is not an absolute http(s) URL.
+    """
+    if value is None:
+        return None
+    stripped = value.strip()
+    if not stripped:
+        return None
+    if not stripped.startswith(("http://", "https://")):
+        raise ValueError("URL must start with http:// or https://")
+    return stripped
 
 
 def resolve_checkout_mode(
@@ -113,7 +164,24 @@ class PopupBase(SQLModel):
     blog_url: str | None = None
     twitter_url: str | None = None
     simplefi_api_key: str | None = None
+    # Forwarded to SimpleFi as redirect_urls.success_behavior on every payment
+    # created for this popup. Manual (SimpleFi's default) keeps the buyer on
+    # SimpleFi's checkout until they click through to the success URL.
+    simplefi_success_behavior: SimpleFiSuccessBehavior = Field(
+        default=SimpleFiSuccessBehavior.manual,
+        sa_column=Column(String, nullable=False, server_default="manual"),
+    )
     terms_and_conditions_url: str | None = None
+    # Per-popup redirect URLs for the open-checkout flow. When set, they
+    # override the default portal thank-you / cancel pages forwarded to
+    # SimpleFi. Null falls back to the derived portal URLs.
+    open_checkout_success_url: str | None = None
+    open_checkout_cancel_url: str | None = None
+    # Shared secret used to HMAC-sign the order payload appended to the success
+    # URL, so an external thank-you page can verify it. Dedicated per popup —
+    # never the global SECRET_KEY. When null, the success redirect is sent
+    # without a signed payload.
+    open_checkout_signing_secret: str | None = None
     invoice_company_name: str | None = None
     invoice_company_address: str | None = None
     invoice_company_email: str | None = None
@@ -177,7 +245,7 @@ class PopupBase(SQLModel):
         default=False,
         sa_column=Column(Boolean, nullable=False, server_default="false"),
     )
-    credits_enabled: bool = Field(
+    edit_passes_enabled: bool = Field(
         default=False,
         sa_column=Column(Boolean, nullable=False, server_default="false"),
     )
@@ -197,6 +265,20 @@ class PopupBase(SQLModel):
     # Per-attendee referral limit: max_uses applied to each referral link.
     # null = unlimited. Default 10.
     max_referrals_per_attendee: int | None = Field(default=10, nullable=True)
+    installments_enabled: bool = Field(
+        default=False,
+        sa_column=Column(Boolean, nullable=False, server_default="false"),
+    )
+    installments_deadline: datetime | None = None
+    installments_max: int | None = Field(default=None, nullable=True)
+    installments_interval: InstallmentInterval = Field(
+        default=InstallmentInterval.month,
+        sa_column=Column(String, nullable=False, server_default="month"),
+    )
+    installments_interval_count: int = Field(
+        default=1,
+        sa_column=Column(Integer, nullable=False, server_default="1"),
+    )
 
     @field_validator("currency")
     @classmethod
@@ -225,7 +307,11 @@ class PopupCreate(SQLModel):
     blog_url: str | None = None
     twitter_url: str | None = None
     simplefi_api_key: str | None = None
+    simplefi_success_behavior: SimpleFiSuccessBehavior = SimpleFiSuccessBehavior.manual
     terms_and_conditions_url: str | None = None
+    open_checkout_success_url: str | None = None
+    open_checkout_cancel_url: str | None = None
+    open_checkout_signing_secret: str | None = None
     invoice_company_name: str | None = None
     invoice_company_address: str | None = None
     invoice_company_email: str | None = None
@@ -246,13 +332,23 @@ class PopupCreate(SQLModel):
     events_enabled: bool = True
     self_check_in_enabled: bool = False
     show_attendee_directory: bool = False
-    credits_enabled: bool = False
+    edit_passes_enabled: bool = False
+    installments_enabled: bool = False
+    installments_deadline: datetime | None = None
+    installments_max: int | None = None
+    installments_interval: InstallmentInterval = InstallmentInterval.month
+    installments_interval_count: int = 1
     checkin_pass_lead_days: int | None = None
 
     @field_validator("currency")
     @classmethod
     def validate_currency(cls, value: str) -> str:
         return validate_currency_value(value) or "USD"
+
+    @field_validator("open_checkout_success_url", "open_checkout_cancel_url")
+    @classmethod
+    def validate_open_checkout_urls(cls, value: str | None) -> str | None:
+        return validate_optional_url(value)
 
     @field_validator("checkin_pass_lead_days")
     @classmethod
@@ -276,6 +372,12 @@ class PopupCreate(SQLModel):
         )
         validate_popup_contribution_config(
             self.contribution_enabled, self.contribution_percentage
+        )
+        validate_popup_installments_config(
+            self.installments_enabled,
+            self.installments_max,
+            self.installments_deadline,
+            self.installments_interval_count,
         )
         return self
 
@@ -304,7 +406,11 @@ class PopupUpdate(SQLModel):
     blog_url: str | None = None
     twitter_url: str | None = None
     simplefi_api_key: str | None = None
+    simplefi_success_behavior: SimpleFiSuccessBehavior | None = None
     terms_and_conditions_url: str | None = None
+    open_checkout_success_url: str | None = None
+    open_checkout_cancel_url: str | None = None
+    open_checkout_signing_secret: str | None = None
     invoice_company_name: str | None = None
     invoice_company_address: str | None = None
     invoice_company_email: str | None = None
@@ -325,7 +431,12 @@ class PopupUpdate(SQLModel):
     events_enabled: bool | None = None
     self_check_in_enabled: bool | None = None
     show_attendee_directory: bool | None = None
-    credits_enabled: bool | None = None
+    edit_passes_enabled: bool | None = None
+    installments_enabled: bool | None = None
+    installments_deadline: datetime | None = None
+    installments_max: int | None = None
+    installments_interval: InstallmentInterval | None = None
+    installments_interval_count: int | None = None
     checkin_pass_lead_days: int | None = None
     # groups-rework popup feature flags
     invites_enabled: bool | None = None
@@ -337,6 +448,11 @@ class PopupUpdate(SQLModel):
     @classmethod
     def validate_currency(cls, value: str | None) -> str | None:
         return validate_currency_value(value)
+
+    @field_validator("open_checkout_success_url", "open_checkout_cancel_url")
+    @classmethod
+    def validate_open_checkout_urls(cls, value: str | None) -> str | None:
+        return validate_optional_url(value)
 
     @field_validator("checkin_pass_lead_days")
     @classmethod
@@ -377,6 +493,22 @@ class PopupUpdate(SQLModel):
         # Validate contribution only when contribution_enabled is explicitly set to True
         if self.contribution_enabled is True:
             validate_popup_contribution_config(True, self.contribution_percentage)
+        # Validate installments only when caller is explicitly enabling them. For
+        # partial updates that touch only sub-fields we can't cross-validate
+        # without loading the persisted row, so the router/CRUD layer is
+        # responsible for re-validating after merge.
+        if self.installments_enabled is True:
+            validate_popup_installments_config(
+                True,
+                self.installments_max,
+                self.installments_deadline,
+                self.installments_interval_count
+                if self.installments_interval_count is not None
+                else 1,
+            )
+        elif self.installments_interval_count is not None:
+            if self.installments_interval_count < 1:
+                raise ValueError("installments_interval_count must be >= 1")
         return self
 
 
@@ -419,12 +551,17 @@ class PopupPublic(SQLModel):
     application_layout: ApplicationLayout = ApplicationLayout.single_page
     events_enabled: bool = True
     show_attendee_directory: bool = False
-    credits_enabled: bool = False
+    edit_passes_enabled: bool = False
     # groups-rework feature flags (portal needs these to gate nav/UI)
     invites_enabled: bool = False
     referrals_enabled: bool = False
     group_private_events_enabled: bool = False
     max_referrals_per_attendee: int | None = 10
+    installments_enabled: bool = False
+    installments_deadline: datetime | None = None
+    installments_max: int | None = None
+    installments_interval: InstallmentInterval = InstallmentInterval.month
+    installments_interval_count: int = 1
 
 
 class PopupAdmin(PopupBase):

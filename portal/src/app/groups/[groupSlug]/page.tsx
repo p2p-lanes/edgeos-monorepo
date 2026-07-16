@@ -6,6 +6,7 @@ import { useEffect } from "react"
 import { useTranslation } from "react-i18next"
 import { PopupCheckoutContent } from "@/app/checkout/components/PopupCheckoutContent"
 import { ApiError, InvitesService, PortalService } from "@/client"
+import { CheckoutBackgroundImage } from "@/components/CheckoutBackgroundImage"
 import { CheckoutBackgroundVideo } from "@/components/CheckoutBackgroundVideo"
 import { Loader } from "@/components/ui/Loader"
 import useGetPublicGroup from "@/hooks/useGetPublicGroup"
@@ -152,13 +153,15 @@ const GroupCheckoutPage = () => {
   }
 
   const background = getCheckoutBackground(popup, "groups")
-  const contentBackground =
-    background.type === "image"
-      ? { className: "", style: background.style }
-      : { className: background.type === "none" ? "bg-background" : "" }
+  const contentBackground = {
+    className: background.type === "none" ? "bg-background" : "",
+  }
 
   return (
     <>
+      {background.type === "image" && (
+        <CheckoutBackgroundImage url={background.url} />
+      )}
       {background.type === "video" && (
         <CheckoutBackgroundVideo url={background.url} />
       )}

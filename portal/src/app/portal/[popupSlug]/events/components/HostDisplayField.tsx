@@ -2,6 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query"
 import { UserSearch } from "lucide-react"
+import Image from "next/image"
 import { useEffect, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { type HumanPortalPublic, HumansService } from "@/client"
@@ -13,6 +14,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover"
+import { imageOptimization } from "@/lib/image-optimization"
 
 interface HostDisplayFieldProps {
   value: string
@@ -159,11 +161,13 @@ export function HostDisplayField({
                       }}
                     >
                       {h.picture_url ? (
-                        // biome-ignore lint/performance/noImgElement: user-uploaded S3 avatar
-                        <img
+                        <Image
                           src={h.picture_url}
                           alt=""
+                          width={24}
+                          height={24}
                           className="h-6 w-6 rounded-full object-cover"
+                          {...imageOptimization(h.picture_url)}
                         />
                       ) : (
                         <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-muted text-[10px] font-medium text-muted-foreground">

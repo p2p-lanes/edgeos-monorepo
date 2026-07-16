@@ -26,6 +26,8 @@ from app.api.event.models import EventInvitations, Events
 from app.api.event.schemas import EventStatus, EventVisibility
 from app.api.event_settings.models import EventSettings
 from app.api.event_settings.schemas import PublishPermission
+from app.api.event_venue.models import EventVenues
+from app.api.event_venue.schemas import VenueBookingMode, VenueStatus
 from app.api.group.models import GroupMembers, Groups
 from app.api.human.models import Humans
 from app.api.popup.models import Popups
@@ -126,13 +128,30 @@ def _add_member(db: Session, group: Groups, human: Humans) -> None:
     db.commit()
 
 
+def _make_venue(db: Session, tenant: Tenants, popup: Popups) -> EventVenues:
+    """Portal event creation requires a venue or custom location."""
+    venue = EventVenues(
+        tenant_id=tenant.id,
+        popup_id=popup.id,
+        owner_id=uuid.uuid4(),
+        title=f"GE Venue {uuid.uuid4().hex[:6]}",
+        status=VenueStatus.ACTIVE,
+        booking_mode=VenueBookingMode.FREE,
+    )
+    db.add(venue)
+    db.commit()
+    db.refresh(venue)
+    return venue
+
+
 def _event_payload(
     popup_id: uuid.UUID,
     *,
     visibility: str = "private",
     group_id: uuid.UUID | None = None,
+    venue_id: uuid.UUID | None = None,
 ) -> dict:
-    return {
+    payload = {
         "popup_id": str(popup_id),
         "title": "Test Group Event",
         "start_time": "2031-01-15T14:00:00Z",
@@ -142,6 +161,9 @@ def _event_payload(
         "status": "published",
         "group_id": str(group_id) if group_id else None,
     }
+    if venue_id is not None:
+        payload["venue_id"] = str(venue_id)
+    return payload
 
 
 # ---------------------------------------------------------------------------
@@ -275,10 +297,13 @@ class TestCreatorMembershipValidator:
         """Portal human NOT in the group gets 403 when setting group_id."""
         popup = _make_popup(db, tenant_a)
         group = _make_group(db, tenant_a, popup, enable_private_events=True)
+        venue = _make_venue(db, tenant_a, popup)
         human = _make_human(db, tenant_a)
         # human is NOT added to group
 
-        payload = _event_payload(popup.id, visibility="private", group_id=group.id)
+        payload = _event_payload(
+            popup.id, visibility="private", group_id=group.id, venue_id=venue.id
+        )
         resp = client.post(
             PORTAL_EVENTS_URL,
             json=payload,
@@ -296,10 +321,13 @@ class TestCreatorMembershipValidator:
         """Portal human who IS a member can create a group-scoped PRIVATE event."""
         popup = _make_popup(db, tenant_a)
         group = _make_group(db, tenant_a, popup, enable_private_events=True)
+        venue = _make_venue(db, tenant_a, popup)
         human = _make_human(db, tenant_a)
         _add_member(db, group, human)
 
-        payload = _event_payload(popup.id, visibility="private", group_id=group.id)
+        payload = _event_payload(
+            popup.id, visibility="private", group_id=group.id, venue_id=venue.id
+        )
         resp = client.post(
             PORTAL_EVENTS_URL,
             json=payload,

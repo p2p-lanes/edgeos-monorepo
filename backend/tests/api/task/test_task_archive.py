@@ -64,9 +64,7 @@ def test_archive_published_only_touches_published(client, superadmin_token) -> N
     pub2 = _create(client, superadmin_token, title=f"p2-{tag}", status="published")
     todo = _create(client, superadmin_token, title=f"t-{tag}", status="to_do")
 
-    r = client.post(
-        "/api/v1/tasks/archive-published", headers=_auth(superadmin_token)
-    )
+    r = client.post("/api/v1/tasks/archive-published", headers=_auth(superadmin_token))
     assert r.status_code == 200
     assert r.json()["archived"] >= 2
 
@@ -85,7 +83,9 @@ def test_archive_endpoints_are_superadmin_only(
     task = _create(client, superadmin_token, title=f"perm-{uuid.uuid4().hex[:8]}")
     tid = task["id"]
     for resp in (
-        client.post(f"/api/v1/tasks/{tid}/archive", headers=_auth(admin_token_tenant_a)),
+        client.post(
+            f"/api/v1/tasks/{tid}/archive", headers=_auth(admin_token_tenant_a)
+        ),
         client.post(
             f"/api/v1/tasks/{tid}/unarchive", headers=_auth(admin_token_tenant_a)
         ),

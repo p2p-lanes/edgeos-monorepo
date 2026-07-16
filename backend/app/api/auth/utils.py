@@ -1,3 +1,4 @@
+import hmac
 import secrets
 from datetime import UTC, datetime, timedelta
 
@@ -62,8 +63,9 @@ def is_code_valid(
     if is_code_expired(expiration):
         return False, "Code has expired"
 
-    # Check if codes match
-    if stored_code != provided_code:
+    # Check if codes match. Constant-time compare so response latency does not
+    # leak how many leading digits of the code were correct.
+    if not hmac.compare_digest(stored_code, provided_code):
         return False, "Invalid code"
 
     return True, None

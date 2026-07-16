@@ -31,6 +31,30 @@ describe("getProductAvailability", () => {
     expect(av.maxAllowedQuantity).toBe(0)
   })
 
+  it("flags sold_out when the override is set even with stock available", () => {
+    const av = getProductAvailability({
+      ...baseProduct,
+      sold_out_override: true,
+      total_stock_cap: 10,
+      total_stock_remaining: 10,
+    })
+    expect(av.state).toBe("sold_out")
+    expect(av.canSelect).toBe(false)
+    expect(av.maxAllowedQuantity).toBe(0)
+  })
+
+  it("prefers sold_out over ended when the override is set", () => {
+    const av = getProductAvailability(
+      {
+        ...baseProduct,
+        sold_out_override: true,
+        sale_ends_at: "2026-01-01",
+      },
+      new Date("2026-02-01"),
+    )
+    expect(av.state).toBe("sold_out")
+  })
+
   it("blocks selection when the sale window has ended even if stock is available", () => {
     const av = getProductAvailability(
       {
@@ -89,6 +113,9 @@ describe("isProductSoldOut", () => {
         total_stock_remaining: 0,
       }),
     ).toBe(true)
+    expect(isProductSoldOut({ ...baseProduct, sold_out_override: true })).toBe(
+      true,
+    )
     expect(isProductSoldOut(baseProduct)).toBe(false)
     expect(
       isProductSoldOut({

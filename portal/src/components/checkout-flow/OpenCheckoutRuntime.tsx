@@ -1,6 +1,8 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useQueryClient } from "@tanstack/react-query"
+import { useSearchParams } from "next/navigation"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 import {
   type CheckoutRuntimeProduct,
@@ -10,7 +12,13 @@ import {
 } from "@/client"
 import FaviconOverride from "@/components/checkout-flow/FaviconOverride"
 import ScrollyCheckoutFlow from "@/components/checkout-flow/ScrollyCheckoutFlow"
+import StepperCheckoutFlow from "@/components/checkout-flow/StepperCheckoutFlow"
 import { LanguageSwitcher } from "@/components/common/LanguageSwitcher"
+import { captureAttribution } from "@/lib/attribution"
+import { resolveCheckoutShell } from "@/lib/checkout-shell"
+import { trackGAViewItem } from "@/lib/google-analytics"
+import { trackMetaViewContent } from "@/lib/meta-pixel"
+import { queryKeys } from "@/lib/query-keys"
 import { ApplicationContext } from "@/providers/applicationProvider"
 import { CheckoutProvider } from "@/providers/checkoutProvider"
 import { CityContext } from "@/providers/cityProvider"
@@ -133,6 +141,15 @@ export function OpenCheckoutRuntime({
   prefilledBuyer,
 }: OpenCheckoutRuntimeProps) {
   const { t } = useTranslation()
+  const searchParams = useSearchParams()
+  const cartCid = searchParams.get("cid")
+  const cartSig = searchParams.get("sig")
+
+  // Persist marketing attribution from the entry URL before it is lost across
+  // checkout steps; read back at purchase time and forwarded to the webhook.
+  useEffect(() => {
+    captureAttribution(searchParams)
+  }, [searchParams])
   const [discountApplied, setDiscountApplied] = useState<DiscountProps>({
     discount_value: 0,
     discount_type: "percentage",
@@ -141,6 +158,23 @@ export function OpenCheckoutRuntime({
   })
 
   const popup = runtime.popup
+
+  // Seed the attendee-categories cache from the public runtime so the shared
+  // checkout components read it from cache instead of calling the human-gated
+  // /portal/popups/{id}/attendee-categories endpoint, which 401s for anonymous
+  // buyers. Runs once, synchronously, before children mount, so the query
+  // resolves from fresh cache with no network request.
+  const queryClient = useQueryClient()
+  const categoriesSeededRef = useRef(false)
+  if (!categoriesSeededRef.current) {
+    queryClient.setQueryData(
+      queryKeys.attendeeCategories.byPopup(popup.id),
+      runtime.attendee_categories ?? [],
+    )
+    categoriesSeededRef.current = true
+  }
+
+  const trackedViewContentRef = useRef<string | null>(null)
   const products = useMemo(
     () => runtime.products.map(toProductsPass),
     [runtime.products],
@@ -155,6 +189,19 @@ export function OpenCheckoutRuntime({
   )
 
   setActiveCurrency(popup.currency ?? "USD")
+
+  useEffect(() => {
+    if (trackedViewContentRef.current === popup.id) return
+
+    trackMetaViewContent({ popup, products: runtime.products })
+    trackGAViewItem({ popup, products: runtime.products })
+    trackedViewContentRef.current = popup.id
+  }, [popup, runtime.products])
+
+  const Flow =
+    resolveCheckoutShell(popup) === "stepper"
+      ? StepperCheckoutFlow
+      : ScrollyCheckoutFlow
 
   return (
     <CityContext.Provider
@@ -208,6 +255,9 @@ export function OpenCheckoutRuntime({
                   }
                   cartPersistenceEnabled={false}
                   cartUiEnabled={true}
+                  openCartPopupSlug={popupSlug}
+                  openCartCid={cartCid}
+                  openCartSig={cartSig}
                   validatePromoCodeOverride={async (code) => {
                     const result = await CouponsService.validateCouponPublic({
                       requestBody: {
@@ -226,7 +276,7 @@ export function OpenCheckoutRuntime({
                       null
                     }
                   />
-                  <ScrollyCheckoutFlow
+                  <Flow
                     navExtraContent={<LanguageSwitcher compact />}
                     brandLogoUrl={
                       (popup as { icon_url?: string | null }).icon_url ?? null

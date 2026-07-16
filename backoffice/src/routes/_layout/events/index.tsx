@@ -32,6 +32,7 @@ import {
   EventsService,
   type EventVenuePublic,
   EventVenuesService,
+  type EventVisibility,
   HumansService,
   PopupsService,
 } from "@/client"
@@ -89,15 +90,12 @@ import {
   useTableSearchParams,
   validateTableSearch,
 } from "@/hooks/useTableSearchParams"
+import {
+  type EventStatusFilter,
+  resolveStatusFilter,
+  VALID_EVENT_STATUS_FILTERS,
+} from "@/lib/events/statusFilter"
 import { createErrorHandler } from "@/utils"
-
-const VALID_EVENT_STATUSES: Set<string> = new Set([
-  "draft",
-  "published",
-  "cancelled",
-  "pending_approval",
-  "rejected",
-])
 
 const EVENT_STATUS_OPTIONS: { value: EventStatus; label: string }[] = [
   { value: "draft", label: "Draft" },
@@ -105,6 +103,18 @@ const EVENT_STATUS_OPTIONS: { value: EventStatus; label: string }[] = [
   { value: "pending_approval", label: "Pending approval" },
   { value: "cancelled", label: "Cancelled" },
   { value: "rejected", label: "Rejected" },
+]
+
+const VALID_EVENT_VISIBILITIES: Set<string> = new Set([
+  "public",
+  "unlisted",
+  "private",
+])
+
+const EVENT_VISIBILITY_OPTIONS: { value: EventVisibility; label: string }[] = [
+  { value: "public", label: "Public" },
+  { value: "unlisted", label: "Unlisted" },
+  { value: "private", label: "Private" },
 ]
 
 const VALID_EVENT_VIEWS: Set<string> = new Set([
@@ -126,7 +136,8 @@ function readStoredEventsView(): EventsView | null {
 }
 
 type EventsSearchParams = TableSearchParams & {
-  status?: EventStatus
+  status?: EventStatusFilter
+  visibility?: EventVisibility
   venueId?: string
   creatorId?: string
   startDate?: string
@@ -139,8 +150,13 @@ export const Route = createFileRoute("/_layout/events/")({
   component: EventsPage,
   validateSearch: (raw: Record<string, unknown>): EventsSearchParams => ({
     ...validateTableSearch(raw),
-    ...(typeof raw.status === "string" && VALID_EVENT_STATUSES.has(raw.status)
-      ? { status: raw.status as EventStatus }
+    ...(typeof raw.status === "string" &&
+    VALID_EVENT_STATUS_FILTERS.has(raw.status)
+      ? { status: raw.status as EventStatusFilter }
+      : {}),
+    ...(typeof raw.visibility === "string" &&
+    VALID_EVENT_VISIBILITIES.has(raw.visibility)
+      ? { visibility: raw.visibility as EventVisibility }
       : {}),
     ...(typeof raw.venueId === "string" && raw.venueId
       ? { venueId: raw.venueId }
@@ -362,77 +378,6 @@ function EventApprovalActions({ event }: { event: EventPublic }) {
   )
 }
 
-function EditOccurrenceDialog({
-  event,
-  onClose,
-}: {
-  event: EventPublic | null
-  onClose: () => void
-}) {
-  const queryClient = useQueryClient()
-  const navigate = useNavigate()
-  const { showSuccessToast, showErrorToast } = useCustomToast()
-  const occurrenceRef = event ? parseOccurrenceId(event.occurrence_id) : null
-
-  const detachMutation = useMutation({
-    mutationFn: async () => {
-      if (!occurrenceRef) throw new Error("Not an occurrence")
-      return EventsService.detachOccurrence({
-        eventId: occurrenceRef.masterId,
-        requestBody: { occurrence_start: occurrenceRef.start },
-      })
-    },
-    onSuccess: (child) => {
-      showSuccessToast("Detached occurrence for editing")
-      onClose()
-      queryClient.invalidateQueries({ queryKey: ["events"] })
-      navigate({
-        to: "/events/$eventId/edit",
-        params: { eventId: child.id },
-      })
-    },
-    onError: createErrorHandler(showErrorToast),
-  })
-
-  return (
-    <Dialog open={!!event} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Edit recurring event</DialogTitle>
-          <DialogDescription>
-            This is one instance of a recurring series. Would you like to edit
-            only this event, or the entire series?
-          </DialogDescription>
-        </DialogHeader>
-        <DialogFooter>
-          <DialogClose asChild>
-            <Button variant="outline">Cancel</Button>
-          </DialogClose>
-          <Button
-            variant="outline"
-            onClick={() => {
-              if (!occurrenceRef) return
-              onClose()
-              navigate({
-                to: "/events/$eventId/edit",
-                params: { eventId: occurrenceRef.masterId },
-              })
-            }}
-          >
-            Edit series
-          </Button>
-          <LoadingButton
-            loading={detachMutation.isPending}
-            onClick={() => detachMutation.mutate()}
-          >
-            Edit only this event
-          </LoadingButton>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  )
-}
-
 function EventHostCell({ event }: { event: EventPublic }) {
   const ownerId = event.owner_id
   const { data: owner } = useQuery({
@@ -585,26 +530,54 @@ function buildEventColumns(
   ]
 }
 
-function EventStatusFilter({
+function EventStatusSelect({
   selected,
   onSelect,
 }: {
-  selected: EventStatus | undefined
-  onSelect: (value: EventStatus | undefined) => void
+  selected: EventStatusFilter | undefined
+  onSelect: (value: EventStatusFilter | undefined) => void
+}) {
+  return (
+    <Select
+      value={selected ?? "active"}
+      onValueChange={(v) => onSelect(v as EventStatusFilter)}
+    >
+      <SelectTrigger className="h-9 w-[150px]">
+        <SelectValue placeholder="Active Events" />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="active">Active Events</SelectItem>
+        <SelectItem value="all">All statuses</SelectItem>
+        {EVENT_STATUS_OPTIONS.map((opt) => (
+          <SelectItem key={opt.value} value={opt.value}>
+            {opt.label}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  )
+}
+
+function EventVisibilityFilter({
+  selected,
+  onSelect,
+}: {
+  selected: EventVisibility | undefined
+  onSelect: (value: EventVisibility | undefined) => void
 }) {
   return (
     <Select
       value={selected ?? "all"}
       onValueChange={(v) =>
-        onSelect(v === "all" ? undefined : (v as EventStatus))
+        onSelect(v === "all" ? undefined : (v as EventVisibility))
       }
     >
       <SelectTrigger className="h-9 w-[150px]">
-        <SelectValue placeholder="All statuses" />
+        <SelectValue placeholder="All visibilities" />
       </SelectTrigger>
       <SelectContent>
-        <SelectItem value="all">All statuses</SelectItem>
-        {EVENT_STATUS_OPTIONS.map((opt) => (
+        <SelectItem value="all">All visibilities</SelectItem>
+        {EVENT_VISIBILITY_OPTIONS.map((opt) => (
           <SelectItem key={opt.value} value={opt.value}>
             {opt.label}
           </SelectItem>
@@ -852,15 +825,32 @@ function EventsTableContent({
     searchParams,
     "/events",
   )
-  const { status, venueId, creatorId, startDate, endDate } = searchParams
+  const { status, visibility, venueId, creatorId, startDate, endDate } =
+    searchParams
 
   const setStatus = useCallback(
-    (value: EventStatus | undefined) => {
+    (value: EventStatusFilter | undefined) => {
       navigate({
         to: "/events",
         search: (prev: Record<string, unknown>) => ({
           ...prev,
-          status: value,
+          // "active" is the default preset, so keep it out of the URL.
+          status: value === "active" ? undefined : value,
+          page: 0,
+        }),
+        replace: true,
+      })
+    },
+    [navigate],
+  )
+
+  const setVisibility = useCallback(
+    (value: EventVisibility | undefined) => {
+      navigate({
+        to: "/events",
+        search: (prev: Record<string, unknown>) => ({
+          ...prev,
+          visibility: value,
           page: 0,
         }),
         replace: true,
@@ -935,6 +925,7 @@ function EventsTableContent({
       search: (prev: Record<string, unknown>) => ({
         ...prev,
         status: undefined,
+        visibility: undefined,
         venueId: undefined,
         creatorId: undefined,
         startDate: undefined,
@@ -945,7 +936,14 @@ function EventsTableContent({
     })
   }, [navigate])
 
-  const hasFilters = !!(status || venueId || creatorId || startDate || endDate)
+  const hasFilters = !!(
+    status ||
+    visibility ||
+    venueId ||
+    creatorId ||
+    startDate ||
+    endDate
+  )
 
   // Popup timezone drives display of every start_time in the table so the
   // "Events" list matches the calendar views. We render a skeleton until
@@ -992,6 +990,7 @@ function EventsTableContent({
         pageSize: pagination.pageSize,
         search,
         status,
+        visibility,
         venueId,
         creatorId,
         startDate,
@@ -999,13 +998,16 @@ function EventsTableContent({
         popupTz,
       },
     ],
-    queryFn: () =>
-      EventsService.listEvents({
+    queryFn: () => {
+      const { eventStatus, excludeStatuses } = resolveStatusFilter(status)
+      return EventsService.listEvents({
         popupId: selectedPopupId!,
         search: search || undefined,
         skip: pagination.pageIndex * pagination.pageSize,
         limit: pagination.pageSize,
-        eventStatus: status,
+        eventStatus,
+        excludeStatuses,
+        visibility,
         venueId:
           venueId && venueId !== "custom" && venueId !== "meeting"
             ? venueId
@@ -1015,7 +1017,8 @@ function EventsTableContent({
         ownerId: creatorId || undefined,
         startAfter: filterStartAfter,
         startBefore: filterStartBefore,
-      }),
+      })
+    },
     enabled: !!selectedPopupId && !popupSettingsLoading,
     placeholderData: keepPreviousData,
   })
@@ -1073,7 +1076,11 @@ function EventsTableContent({
         }}
         filterBar={
           <div className="flex flex-wrap items-center gap-2">
-            <EventStatusFilter selected={status} onSelect={setStatus} />
+            <EventStatusSelect selected={status} onSelect={setStatus} />
+            <EventVisibilityFilter
+              selected={visibility}
+              onSelect={setVisibility}
+            />
             <EventVenueFilter
               venues={venues?.results ?? []}
               selected={venueId}
@@ -1137,10 +1144,10 @@ function CalendarDayToolbar({
   setSearch,
 }: {
   popupId: string
-  status: EventStatus | undefined
+  status: EventStatusFilter | undefined
   venueId: string | undefined
   search: string
-  setStatus: (value: EventStatus | undefined) => void
+  setStatus: (value: EventStatusFilter | undefined) => void
   setVenueId: (value: string | undefined) => void
   setSearch: (value: string) => void
 }) {
@@ -1186,7 +1193,7 @@ function CalendarDayToolbar({
         )}
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        <EventStatusFilter selected={status} onSelect={setStatus} />
+        <EventStatusSelect selected={status} onSelect={setStatus} />
         <EventVenueFilter
           venues={venues?.results ?? []}
           selected={venueId}
@@ -1210,10 +1217,6 @@ function EventsPage() {
   const searchParams = Route.useSearch()
   const view: EventsView = searchParams.view ?? readStoredEventsView() ?? "list"
   const selectedDate = parseSelectedDate(searchParams.date)
-  // Picking an occurrence row pops a "series or this only" prompt; non-recurring
-  // rows skip the dialog and navigate straight to /events/:id/edit.
-  const [occurrenceEditTarget, setOccurrenceEditTarget] =
-    useState<EventPublic | null>(null)
 
   const { data: popup } = useQuery({
     queryKey: ["popup", selectedPopupId],
@@ -1262,13 +1265,14 @@ function EventsPage() {
 
   const handleRowClick = useCallback(
     (event: EventPublic) => {
-      if (parseOccurrenceId(event.occurrence_id)) {
-        setOccurrenceEditTarget(event)
-        return
-      }
+      // Open the read-only view page (which owns the edit/share actions and,
+      // for a recurring instance, the "series vs this occurrence" choice).
+      // Occurrences route to their master id with the instance start in `occ`.
+      const occ = parseOccurrenceId(event.occurrence_id)
       navigate({
-        to: "/events/$eventId/edit",
-        params: { eventId: event.id },
+        to: "/events/$eventId",
+        params: { eventId: occ ? occ.masterId : event.id },
+        search: occ ? { occ: occ.start } : {},
       })
     },
     [navigate],
@@ -1313,12 +1317,13 @@ function EventsPage() {
   )
 
   const setStatusGlobal = useCallback(
-    (value: EventStatus | undefined) => {
+    (value: EventStatusFilter | undefined) => {
       navigate({
         to: "/events",
         search: (prev: Record<string, unknown>) => ({
           ...prev,
-          status: value,
+          // "active" is the default preset, so keep it out of the URL.
+          status: value === "active" ? undefined : value,
           page: 0,
         }),
         replace: true,
@@ -1386,20 +1391,27 @@ function EventsPage() {
             )}
             {view === "list" && (
               <div className="space-y-3">
-                <CalendarDayToolbar
-                  popupId={selectedPopupId}
-                  status={searchParams.status}
-                  venueId={searchParams.venueId}
-                  search={searchParams.search ?? ""}
-                  setStatus={setStatusGlobal}
-                  setVenueId={setVenueIdGlobal}
-                  setSearch={setSearchGlobal}
-                />
+                {/* Keep the search + filters pinned under the app top bar
+                    (h-16) so they stay reachable while scrolling a long list.
+                    Frosted white background covers the cards passing beneath. */}
+                <div className="sticky top-16 z-10 -mx-6 border-b bg-background/95 px-6 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/80 md:-mx-8 md:px-8">
+                  <CalendarDayToolbar
+                    popupId={selectedPopupId}
+                    status={searchParams.status}
+                    venueId={searchParams.venueId}
+                    search={searchParams.search ?? ""}
+                    setStatus={setStatusGlobal}
+                    setVenueId={setVenueIdGlobal}
+                    setSearch={setSearchGlobal}
+                  />
+                </div>
                 <EventsListView
                   popupId={selectedPopupId}
                   status={searchParams.status}
                   venueId={searchParams.venueId}
                   search={searchParams.search ?? ""}
+                  popupStart={popupStart}
+                  popupEnd={popupEnd}
                   onEventClick={handleRowClick}
                 />
               </div>
@@ -1492,10 +1504,6 @@ function EventsPage() {
           </div>,
           document.body,
         )}
-      <EditOccurrenceDialog
-        event={occurrenceEditTarget}
-        onClose={() => setOccurrenceEditTarget(null)}
-      />
     </div>
   )
 }

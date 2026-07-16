@@ -11,6 +11,7 @@ import { getProductAvailability } from "@/lib/product-availability"
 import { queryKeys } from "@/lib/query-keys"
 import type {
   CheckoutStep,
+  SelectedDynamicItem,
   SelectedHousingItem,
   SelectedMealPlanItem,
   SelectedMerchItem,
@@ -25,18 +26,21 @@ export interface CartSelectionState {
   merch: SelectedMerchItem[]
   patron: SelectedPatronItem | null
   selectedMealPlans: SelectedMealPlanItem[]
+  dynamicItems: Record<string, SelectedDynamicItem[]>
   promoCode: string
   promoCodeValid: boolean
   insurance: boolean
   currentStep: CheckoutStep
 }
 
-interface RestorationSetters {
+export interface RestorationSetters {
   setHousing: (item: SelectedHousingItem | null) => void
   setMerch: (items: SelectedMerchItem[]) => void
   setPatron: (item: SelectedPatronItem | null) => void
   setMealPlans: (items: SelectedMealPlanItem[]) => void
   setInsurance: (value: boolean) => void
+  setDynamicItems: (items: Record<string, SelectedDynamicItem[]>) => void
+  setPromoCode?: (code: string) => void
 }
 
 interface UseCartPersistenceParams {

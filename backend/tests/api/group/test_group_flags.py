@@ -22,6 +22,7 @@ from app.api.application.schemas import ApplicationStatus
 from app.api.group.models import Groups, GroupWhitelistedEmails
 from app.api.human.models import Humans
 from app.api.popup.models import Popups
+from app.api.shared.enums import HumanRating
 from app.api.tenant.models import Tenants
 from app.core.security import create_access_token
 
@@ -188,8 +189,9 @@ class TestAutoApproveFlag:
         """
         popup = _make_popup(db, tenant_a)
         human = _make_human(db, tenant_a)
-        # Set red_flag
-        human.red_flag = True
+        # Red-flag the human via the rating enum (red_flag is now a derived,
+        # read-only property computed from rating).
+        human.rating = HumanRating.RED_FLAG
         db.add(human)
         db.commit()
         db.refresh(human)

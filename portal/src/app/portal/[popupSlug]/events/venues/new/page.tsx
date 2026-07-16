@@ -10,6 +10,7 @@ import {
   Upload,
   X,
 } from "lucide-react"
+import Image from "next/image"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useRef, useState } from "react"
@@ -34,6 +35,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
+import { imageOptimization } from "@/lib/image-optimization"
 import { useCityProvider } from "@/providers/cityProvider"
 import { usePortalEventSettings } from "../../lib/useEventTimezone"
 import { useFileUpload } from "../../lib/useFileUpload"
@@ -58,7 +60,9 @@ export default function NewPortalVenuePage() {
 
   const { data: settings, isLoading: settingsLoading } =
     usePortalEventSettings(popupId)
-  const canCreate = settings?.humans_can_create_venues === true
+  // Ended popups are read-only: venue creation is blocked in recap mode.
+  const isEnded = city?.status === "ended"
+  const canCreate = settings?.humans_can_create_venues === true && !isEnded
   const requiresApproval = settings?.venues_require_approval === true
 
   const { data: propertyTypes } = useQuery({
@@ -175,12 +179,16 @@ export default function NewPortalVenuePage() {
       <div className="max-w-xl mx-auto p-6 text-center">
         <CircleAlert className="mx-auto h-10 w-10 text-muted-foreground/50 mb-3" />
         <h1 className="text-lg font-semibold">
-          {t("events.venues.new.venue_not_available")}
+          {isEnded
+            ? t("events.form.popup_ended_heading")
+            : t("events.venues.new.venue_not_available")}
         </h1>
         <p className="text-sm text-muted-foreground mt-2">
-          {t("events.venues.new.venue_not_available_message", {
-            cityName: city?.name,
-          })}
+          {isEnded
+            ? t("events.form.popup_ended_message")
+            : t("events.venues.new.venue_not_available_message", {
+                cityName: city?.name,
+              })}
         </p>
         <Link
           href={`/portal/${popupSlug}/events/venues`}
@@ -264,12 +272,14 @@ export default function NewPortalVenuePage() {
             }}
           />
           {imageUrl ? (
-            <div className="relative w-full overflow-hidden rounded-lg border">
-              {/* biome-ignore lint/performance/noImgElement: user-uploaded S3 image */}
-              <img
+            <div className="relative aspect-[16/9] w-full overflow-hidden rounded-lg border">
+              <Image
                 src={imageUrl}
                 alt={t("events.venues.new.venue_cover_alt")}
-                className="aspect-[16/9] w-full object-cover"
+                fill
+                sizes="(max-width: 768px) 100vw, 672px"
+                className="object-cover"
+                {...imageOptimization(imageUrl)}
               />
               <div className="absolute top-2 right-2 flex gap-2">
                 <Button

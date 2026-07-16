@@ -6,9 +6,11 @@ from fastapi.responses import JSONResponse
 from fastapi.routing import APIRoute
 from loguru import logger
 from pydantic import ValidationError
+from sentry_sdk.integrations.loguru import LoggingLevels, LoguruIntegration
 from sqlalchemy.exc import IntegrityError, ProgrammingError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.cors import CORSMiddleware
+from starlette.middleware.gzip import GZipMiddleware
 
 import app.models  # noqa: F401 - Register all models with SQLAlchemy
 from app.api.router import api_router
@@ -23,8 +25,21 @@ def custom_generate_unique_id(route: APIRoute) -> str:
     return f"{route.tags[0]}-{route.name}"
 
 
-if settings.SENTRY_DSN and settings.ENVIRONMENT != Environment.DEV:
-    sentry_sdk.init(dsn=str(settings.SENTRY_DSN), enable_tracing=True)
+if settings.SENTRY_DSN and settings.ENVIRONMENT == Environment.PRODUCTION:
+    sentry_sdk.init(
+        dsn=str(settings.SENTRY_DSN),
+        environment=settings.ENVIRONMENT.value,
+        traces_sample_rate=settings.SENTRY_TRACES_SAMPLE_RATE,
+        enable_logs=True,
+        send_default_pii=False,
+        integrations=[
+            LoguruIntegration(
+                sentry_logs_level=LoggingLevels.INFO.value,
+                level=LoggingLevels.INFO.value,
+                event_level=LoggingLevels.ERROR.value,
+            ),
+        ],
+    )
 
 application = FastAPI(
     title=settings.PROJECT_NAME,
@@ -138,6 +153,25 @@ application.add_middleware(
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "X-Tenant-Id", "Accept-Language"],
+)
+
+# Compress responses for clients that advertise gzip support. Event/calendar
+# payloads are large and highly repetitive JSON/ICS — e.g. a popup's public
+# .ics feed measured ~310 KB uncompressed, ~100 KB gzipped (~68% smaller) — and
+# the API previously sent everything uncompressed, so transfer time dominated
+# page load on slower connections. ``minimum_size`` skips tiny responses
+# (health checks, CORS preflights, error bodies) where compression isn't worth
+# the overhead; ``compresslevel=6`` is the usual ratio/CPU sweet spot (vs
+# Starlette's default 9). Starlette adds ``Vary: Accept-Encoding``, rewrites
+# Content-Length, and skips responses that already carry ``Content-Encoding``
+# or are Server-Sent Events (``text/event-stream``). Note: it does not skip by
+# content type otherwise, so already-compressed binaries (e.g. the invoice PDF
+# download) get re-gzipped — wasteful but harmless, and those endpoints are
+# rare. Added before RequestContextMiddleware so that middleware stays outermost.
+application.add_middleware(
+    GZipMiddleware,  # type: ignore[arg-type]
+    minimum_size=1000,
+    compresslevel=6,
 )
 
 # Outermost middleware: assigns a request_id, binds it to all logs in the

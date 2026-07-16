@@ -2,6 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query"
 import { UserPlus, X } from "lucide-react"
+import Image from "next/image"
 import { useEffect, useMemo, useState } from "react"
 import { useTranslation } from "react-i18next"
 import {
@@ -17,6 +18,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover"
+import { imageOptimization } from "@/lib/image-optimization"
 
 interface CollaboratorsFieldProps {
   /** Selected collaborator human ids — the form's source of truth. */
@@ -119,11 +121,13 @@ export function CollaboratorsField({
                 className="inline-flex items-center gap-1.5 rounded-full border bg-muted/40 py-1 pl-1 pr-2 text-xs"
               >
                 {h.picture_url ? (
-                  // biome-ignore lint/performance/noImgElement: user-uploaded S3 avatar
-                  <img
+                  <Image
                     src={h.picture_url}
                     alt=""
+                    width={20}
+                    height={20}
                     className="h-5 w-5 rounded-full object-cover"
+                    {...imageOptimization(h.picture_url)}
                   />
                 ) : (
                   <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-muted text-[9px] font-medium text-muted-foreground">
@@ -190,11 +194,13 @@ export function CollaboratorsField({
                     onClick={() => add(h)}
                   >
                     {h.picture_url ? (
-                      // biome-ignore lint/performance/noImgElement: user-uploaded S3 avatar
-                      <img
+                      <Image
                         src={h.picture_url}
                         alt=""
+                        width={24}
+                        height={24}
                         className="h-6 w-6 rounded-full object-cover"
+                        {...imageOptimization(h.picture_url)}
                       />
                     ) : (
                       <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-muted text-[10px] font-medium text-muted-foreground">

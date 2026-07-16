@@ -212,6 +212,17 @@ async def submit_review(
     status_before = application.status
     updated_application = approval_calculator.recalculate_status(db, application)
 
+    # If the review just accepted the application, convert the paid application
+    # fee into credit. This is the backoffice manual-accept path; without it the
+    # fee-to-credit grant never fires for popups that require manual review.
+    # Flush-only helper (idempotent no-op unless ACCEPTED with an approved fee);
+    # the commit below persists it alongside the status change.
+    from app.api.application.crud import _maybe_grant_fee_credit
+
+    _maybe_grant_fee_credit(db, updated_application)
+    db.commit()
+    db.refresh(updated_application)
+
     # Send status-change emails if the application just reached a final decision
     if updated_application.human:
         await send_application_status_email(
@@ -241,7 +252,6 @@ async def list_pending_reviews(
     """
     from app.api.application.crud import applications_crud
     from app.api.application.router import _build_application_public
-    from app.api.application.schemas import ApplicationStatus
     from app.api.popup_reviewer.crud import popup_reviewers_crud
 
     reviewer_assignments = popup_reviewers_crud.find_by_user(db, current_user.id)
@@ -255,33 +265,19 @@ async def list_pending_reviews(
                 results=[],
                 paging=Paging(offset=skip, limit=limit, total=0),
             )
-
-        candidates = []
-        for pid in popup_ids:
-            apps, _ = applications_crud.find_by_popup(
-                db, pid, limit=1000, status_filter=ApplicationStatus.IN_REVIEW
-            )
-            candidates.extend(apps)
     else:
-        candidates, _ = applications_crud.find_by_status(
-            db,
-            status_filter=ApplicationStatus.IN_REVIEW,
-            popup_id=popup_id,
-            limit=1000,
-        )
+        popup_ids = [popup_id] if popup_id else None
 
-    reviewed_ids = set(
-        application_reviews_crud.get_decisions_by_reviewer_for_applications(
-            db, current_user.id, [c.id for c in candidates]
-        )
+    pending_apps, total = applications_crud.find_pending_review(
+        db,
+        reviewer_id=current_user.id,
+        popup_ids=popup_ids,
+        skip=skip,
+        limit=limit,
     )
-    pending_apps = [a for a in candidates if a.id not in reviewed_ids]
-
-    total = len(pending_apps)
-    paginated = pending_apps[skip : skip + limit]
 
     return ListModel(
-        results=[_build_application_public(a) for a in paginated],
+        results=[_build_application_public(a) for a in pending_apps],
         paging=Paging(offset=skip, limit=limit, total=total),
     )
 

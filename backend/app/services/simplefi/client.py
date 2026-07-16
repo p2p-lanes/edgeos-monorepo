@@ -1,7 +1,6 @@
-import hashlib
-import hmac
 import urllib.parse
 from decimal import Decimal
+from enum import StrEnum
 from typing import Any
 
 import httpx
@@ -16,13 +15,52 @@ from tenacity import (
 
 from app.core.config import settings
 
+# ---------------------------------------------------------------------------
+# Cancel outcome helpers (ADR-3)
+# ---------------------------------------------------------------------------
+
+# SimpleFi uses "canceled" (one L) for payment_requests and "cancelled" (two L)
+# for installment_plans. Both spellings are accepted throughout this module.
+TERMINAL_CANCEL_STATUSES: frozenset[str] = frozenset(
+    {"canceled", "cancelled", "expired", "refunded"}
+)
+APPROVED_STATUSES: frozenset[str] = frozenset({"approved", "active", "completed"})
+
+
+class CancelOutcome(StrEnum):
+    """Result of a SimpleFi cancel call, used by supersede and sweeper logic."""
+
+    CANCELED = "canceled"
+    ALREADY_APPROVED = "already_approved"
+
+
+class CancelOutcomeAmbiguousError(Exception):
+    """Raised when a cancel response cannot be classified as a definitive outcome.
+
+    Callers MUST treat this exception as 'do not release holds' — the resource
+    is in an indeterminate state (e.g. still 'pending', empty, or unknown status)
+    and releasing holds would risk a double-spend.
+    """
+
+
+def _normalize_cancel_status(status: str) -> str:
+    """Return the status string lowercased and stripped for classification."""
+    return status.lower().strip()
+
 
 class SimpleFIPaymentResponse(BaseModel):
-    """Response from SimpleFI payment creation."""
+    """Response from SimpleFI payment creation.
+
+    `id` is the external identifier we store in ``payments.external_id`` —
+    a payment_request_id for one-shot requests, or an installment_plan_id
+    when ``is_installment_plan`` is True. Both kinds are looked up the same
+    way by webhook handlers.
+    """
 
     id: str
     status: str
     checkout_url: str
+    is_installment_plan: bool = False
 
 
 class SimpleFIPaymentRequestStatus(BaseModel):
@@ -99,9 +137,26 @@ class SimpleFIClient:
         portal_base_override: str | None = None,
         success_path: str | None = None,
         cancel_path: str | None = None,
+        max_installments: int | None = None,
+        installment_interval: str = "month",
+        installment_interval_count: int = 1,
+        user_email: str | None = None,
+        plan_name: str | None = None,
+        success_behavior: str = "manual",
     ) -> SimpleFIPaymentResponse:
         """
-        Create a payment request in SimpleFI.
+        Create a payment request OR an installment plan in SimpleFI.
+
+        When ``max_installments`` is None or < 2 (the default), this hits
+        ``POST /payment_requests`` exactly as before. When ``max_installments``
+        is >= 2 this hits ``POST /installment_plans`` instead: the plan is
+        created in ``pending`` status and the buyer picks the actual number
+        of installments on SimpleFi's checkout UI; activation fires our
+        ``installment_plan_activated`` webhook.
+
+        Both modes return a uniform ``SimpleFIPaymentResponse`` — ``id`` is
+        either a payment_request_id (one-shot) or an installment_plan_id
+        (installments). ``is_installment_plan`` tells callers which path ran.
 
         Args:
             amount: The payment amount
@@ -118,9 +173,21 @@ class SimpleFIClient:
                 provided, overrides the default passes/buy?checkout=success path.
             cancel_path: Full URL override for the cancel redirect. When
                 provided, overrides the default passes/buy path.
+            max_installments: Ceiling of installments offered to the buyer.
+                If None or < 2, a one-shot payment_request is created instead.
+            installment_interval: One of "day" | "week" | "month" | "year".
+            installment_interval_count: Multiplier on the interval (e.g.
+                interval="week", interval_count=2 → bi-weekly).
+            user_email: Required when creating an installment plan.
+            plan_name: Optional display name for the installment plan
+                (shown to the buyer in SimpleFi's UI).
+            success_behavior: "manual" (SimpleFi's default — the buyer clicks
+                through to the success URL) or "automatic" (SimpleFi redirects
+                immediately after approval).
 
         Returns:
-            SimpleFIPaymentResponse with id, status, and checkout_url
+            SimpleFIPaymentResponse with id, status, checkout_url, and
+            is_installment_plan flag.
         """
         notification_url = urllib.parse.urljoin(
             settings.BACKEND_URL, "/api/v1/payments/webhook/simplefi"
@@ -132,6 +199,31 @@ class SimpleFIClient:
             or f"{portal_base}/portal/{popup_slug}/passes/buy?checkout=success"
         )
         cancel_url = cancel_path or f"{portal_base}/portal/{popup_slug}/passes/buy"
+        redirect_urls = {
+            "success_url": success_url,
+            "cancel_url": cancel_url,
+            "success_behavior": success_behavior,
+        }
+
+        if max_installments is not None and max_installments >= 2:
+            if not user_email:
+                raise ValueError(
+                    "user_email is required when creating an installment plan"
+                )
+            return self._create_installment_plan(
+                amount=amount,
+                currency=currency,
+                max_installments=max_installments,
+                interval=installment_interval,
+                interval_count=installment_interval_count,
+                user_email=user_email,
+                plan_name=plan_name,
+                reference=reference,
+                notification_url=notification_url,
+                redirect_urls=redirect_urls,
+                popup_slug=popup_slug,
+                tenant_slug=tenant_slug,
+            )
 
         body = {
             "amount": float(amount),
@@ -139,10 +231,7 @@ class SimpleFIClient:
             "reference": reference or {},
             "memo": memo,
             "notification_url": notification_url,
-            "redirect_urls": {
-                "success_url": success_url,
-                "cancel_url": cancel_url,
-            },
+            "redirect_urls": redirect_urls,
         }
 
         logger.info(
@@ -169,6 +258,71 @@ class SimpleFIClient:
             id=data["id"],
             status=data["status"],
             checkout_url=data["checkout_v2_url"],
+            is_installment_plan=False,
+        )
+
+    def _create_installment_plan(
+        self,
+        *,
+        amount: Decimal,
+        currency: str,
+        max_installments: int,
+        interval: str,
+        interval_count: int,
+        user_email: str,
+        plan_name: str | None,
+        reference: dict[str, Any] | None,
+        notification_url: str,
+        redirect_urls: dict[str, str],
+        popup_slug: str,
+        tenant_slug: str,
+    ) -> SimpleFIPaymentResponse:
+        """POST to /installment_plans with the buyer-pickable ceiling.
+
+        We send ``max_installments`` (not ``number_of_installments``) so SimpleFi
+        creates the plan in ``pending`` status and renders the per-cycle
+        selector to the buyer. Activation arrives later via the
+        ``installment_plan_activated`` webhook.
+        """
+        body: dict[str, Any] = {
+            "total_amount": float(amount),
+            "currency": currency,
+            "max_installments": max_installments,
+            "interval": interval,
+            "interval_count": interval_count,
+            "user_email": user_email,
+            "reference": reference or {},
+            "notification_url": notification_url,
+            "redirect_urls": redirect_urls,
+        }
+        if plan_name:
+            body["name"] = plan_name
+
+        logger.info(
+            "SimpleFI create installment plan: amount={} currency={} max_installments={} interval={}x{} popup_slug={} tenant_slug={} reference_keys={}",
+            amount,
+            currency,
+            max_installments,
+            interval_count,
+            interval,
+            popup_slug,
+            tenant_slug,
+            sorted(body["reference"].keys()),
+        )
+        data = self._make_request("POST", "/installment_plans", json=body)
+
+        logger.info(
+            "SimpleFI installment plan response: external_id={} status={} checkout_url={}",
+            data.get("id"),
+            data.get("status"),
+            data.get("checkout_url"),
+        )
+
+        return SimpleFIPaymentResponse(
+            id=data["id"],
+            status=data["status"],
+            checkout_url=data["checkout_url"],
+            is_installment_plan=True,
         )
 
     def get_payment_request_status(
@@ -184,48 +338,179 @@ class SimpleFIClient:
             status=payload["status"],
         )
 
+    # ------------------------------------------------------------------
+    # Non-retrying request helper (ADR-3)
+    # ------------------------------------------------------------------
+
+    def _non_retrying_request(self, method: str, endpoint: str) -> httpx.Response:
+        """Make a single HTTP request without the tenacity retry loop.
+
+        Unlike ``_make_request``, this method:
+        - Returns the raw ``httpx.Response`` so callers can inspect the status
+          code before deciding how to classify the outcome.
+        - Does NOT retry on ``HTTPStatusError`` or ``RequestError`` — a 4xx
+          from a cancel call carries semantic meaning (already terminal) and
+          must not be retried away.
+        """
+        url = f"{self.base_url}{endpoint}"
+        headers = {"Authorization": f"Bearer {self.api_key}"}
+        with httpx.Client(timeout=self.timeout) as client:
+            response = client.request(method, url, headers=headers)
+        logger.info(
+            "SimpleFI {} {} -> {}",
+            method,
+            url,
+            response.status_code,
+        )
+        return response
+
+    # ------------------------------------------------------------------
+    # Outcome classifier (shared by both cancel methods)
+    # ------------------------------------------------------------------
+
+    def _non_retrying_get_status(
+        self, endpoint: str, nested_key: str
+    ) -> SimpleFIPaymentRequestStatus:
+        """Fetch a resource's status with a SINGLE non-retrying GET attempt.
+
+        Used as the 4xx-cancel fallback so the call remains bounded to one
+        attempt instead of the retrying ``_make_request`` path (3 attempts,
+        exponential back-off, up to ~30 s on a checkout-blocking call).
+
+        On failure — transport error or any non-2xx response — the exception
+        propagates directly.  Callers MUST treat any exception as
+        'do not release holds'.
+
+        Args:
+            endpoint: GET endpoint, e.g. ``/payment_requests/{id}``.
+            nested_key: Key used to unwrap a nested payload, e.g.
+                ``"payment_request"`` or ``"installment_plan"``.
+        """
+        response = self._non_retrying_request("GET", endpoint)
+        response.raise_for_status()
+        data = response.json()
+        payload = data.get(nested_key, data)
+        return SimpleFIPaymentRequestStatus(
+            id=payload["id"],
+            status=payload["status"],
+        )
+
+    def _classify_cancel_status(
+        self, status: str, resource_id: str, resource_type: str
+    ) -> CancelOutcome:
+        """Map a normalized SimpleFi status string to a ``CancelOutcome``.
+
+        Raises ``CancelOutcomeAmbiguousError`` if the status cannot be
+        classified (e.g. still 'pending', empty, or unknown after a cancel).
+        Callers MUST treat it as 'do not release holds'.
+        """
+        normalized = _normalize_cancel_status(status)
+        if normalized in TERMINAL_CANCEL_STATUSES:
+            return CancelOutcome.CANCELED
+        if normalized in APPROVED_STATUSES:
+            return CancelOutcome.ALREADY_APPROVED
+        raise CancelOutcomeAmbiguousError(
+            f"Cannot classify {resource_type} {resource_id!r}: "
+            f"unresolvable status={status!r}"
+        )
+
+    # ------------------------------------------------------------------
+    # Cancel methods (ADR-3)
+    # ------------------------------------------------------------------
+
+    def cancel_payment_request(self, payment_id: str) -> CancelOutcome:
+        """Cancel a SimpleFi payment_request without retrying.
+
+        Outcome mapping (ADR-3):
+        - 2xx with terminal status (canceled/cancelled/expired/refunded) → CANCELED
+        - 2xx or 4xx with approved/active/completed → ALREADY_APPROVED
+        - 2xx with unresolvable status (pending/empty/unknown) → raises
+          ``CancelOutcomeAmbiguousError``; callers MUST not release holds
+        - 4xx (already terminal) → single non-retrying re-read via
+          ``_non_retrying_get_status`` to classify; on re-read failure the
+          exception propagates (= do not release holds)
+        - 5xx → raise ``HTTPStatusError``
+        - Transport/timeout → raise ``RequestError``
+        """
+        response = self._non_retrying_request(
+            "PUT", f"/payment_requests/{payment_id}/cancel"
+        )
+
+        if response.status_code < 400:
+            data = response.json()
+            status = data.get("status", "")
+            return self._classify_cancel_status(status, payment_id, "payment_request")
+
+        if response.status_code < 500:
+            # 4xx: resource already in a terminal or approved state — re-read the
+            # current status with a SINGLE non-retrying attempt so this
+            # checkout-blocking path cannot stall for up to ~30 s under the
+            # retrying _make_request path. On re-read failure the exception
+            # propagates; callers must not release holds.
+            logger.warning(
+                "SimpleFI cancel payment_request {} returned {} — re-reading status (single attempt)",
+                payment_id,
+                response.status_code,
+            )
+            current = self._non_retrying_get_status(
+                f"/payment_requests/{payment_id}", "payment_request"
+            )
+            return self._classify_cancel_status(
+                current.status, payment_id, "payment_request"
+            )
+
+        # 5xx: genuine server error — raise
+        response.raise_for_status()
+        raise RuntimeError("unreachable")  # satisfy type checker
+
+    def cancel_installment_plan(self, plan_id: str) -> CancelOutcome:
+        """Cancel a SimpleFi installment_plan without retrying.
+
+        Identical outcome mapping to ``cancel_payment_request`` but targets the
+        ``/installment_plans`` endpoint. On 4xx, falls back to a SINGLE
+        non-retrying status re-read via ``_non_retrying_get_status`` (not the
+        retrying ``_make_request`` path) so the fallback stays bounded to one
+        extra attempt. On re-read failure the exception propagates; callers must
+        not release holds.
+
+        Note: SimpleFi uses 'cancelled' (two L) in installment_plan status
+        responses; the normalizer accepts both spellings.
+        """
+        response = self._non_retrying_request(
+            "PUT", f"/installment_plans/{plan_id}/cancel"
+        )
+
+        if response.status_code < 400:
+            data = response.json()
+            status = data.get("status", "")
+            return self._classify_cancel_status(status, plan_id, "installment_plan")
+
+        if response.status_code < 500:
+            logger.warning(
+                "SimpleFI cancel installment_plan {} returned {} — re-reading status (single attempt)",
+                plan_id,
+                response.status_code,
+            )
+            current = self._non_retrying_get_status(
+                f"/installment_plans/{plan_id}", "installment_plan"
+            )
+            return self._classify_cancel_status(
+                current.status, plan_id, "installment_plan"
+            )
+
+        response.raise_for_status()
+        raise RuntimeError("unreachable")
+
+    def get_installment_plan_status(self, plan_id: str) -> SimpleFIPaymentRequestStatus:
+        """Fetch the latest status for an existing SimpleFI installment plan."""
+        data = self._make_request("GET", f"/installment_plans/{plan_id}")
+        payload = data.get("installment_plan", data)
+        return SimpleFIPaymentRequestStatus(
+            id=payload["id"],
+            status=payload["status"],
+        )
+
 
 def get_simplefi_client(api_key: str) -> SimpleFIClient:
     """Get a SimpleFI client instance with the provided API key."""
     return SimpleFIClient(api_key)
-
-
-def verify_webhook_signature(
-    payload: bytes, signature: str | None, secret: str | None
-) -> bool:
-    """
-    Verify SimpleFI webhook signature using HMAC-SHA256.
-
-    Args:
-        payload: Raw request body bytes
-        signature: Signature from X-SimpleFI-Signature header
-        secret: The popup's simplefi_api_key used as webhook secret
-
-    Returns:
-        True if signature is valid or secret is not configured (skip validation).
-        False if signature is invalid.
-    """
-    # Skip validation if no secret is configured
-    if not secret:
-        logger.warning("No SimpleFI API key configured, skipping signature validation")
-        return True
-
-    # Reject if signature is missing but secret is configured
-    if not signature:
-        logger.warning("Missing webhook signature header")
-        return False
-
-    # Compute expected signature
-    expected = hmac.new(
-        secret.encode("utf-8"),
-        payload,
-        hashlib.sha256,
-    ).hexdigest()
-
-    # Compare signatures using constant-time comparison
-    is_valid = hmac.compare_digest(expected, signature)
-
-    if not is_valid:
-        logger.warning("Invalid webhook signature")
-
-    return is_valid

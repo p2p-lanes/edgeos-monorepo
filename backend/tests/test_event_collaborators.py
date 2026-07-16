@@ -68,6 +68,8 @@ def _create_payload(popup: Popups, *, collaborator_ids: list[uuid.UUID]) -> dict
         "start_time": "2026-05-05T14:00:00+00:00",
         "end_time": "2026-05-05T15:00:00+00:00",
         "timezone": "UTC",
+        "custom_location_name": "Test Spot",
+        "custom_location_url": "https://maps.google.com/?q=test",
         "visibility": "public",
         "status": "published",
         "collaborator_ids": [str(c) for c in collaborator_ids],

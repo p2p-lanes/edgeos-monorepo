@@ -39,6 +39,7 @@ import { EmptyState } from "@/components/Common/EmptyState"
 import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
 import { StatusBadge } from "@/components/Common/StatusBadge"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
+import { OrderVenuesDialog } from "@/components/events/OrderVenuesDialog"
 import { VenuesGridView } from "@/components/events/VenuesGridView"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -550,6 +551,7 @@ function VenuesPage() {
         {selectedPopupId && (
           <div className="flex items-center gap-2">
             <VenuesViewSwitcher view={view} onViewChange={setView} />
+            <OrderVenuesDialog popupId={selectedPopupId} />
             <Button asChild>
               <Link to="/events/venues/new">
                 <Plus className="mr-2 h-4 w-4" />
