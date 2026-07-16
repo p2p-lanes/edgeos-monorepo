@@ -155,7 +155,7 @@ def get_optional_human(
         return None
     try:
         payload = decode_access_token(token)
-    except (HTTPException, KeyError):
+    except Exception:  # noqa: BLE001 — optional auth: any bad token degrades to anonymous
         return None
     if payload.token_type != "human":
         return None

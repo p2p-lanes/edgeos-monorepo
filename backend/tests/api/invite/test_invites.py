@@ -544,6 +544,40 @@ class TestInvitePreview:
         )
         assert as_other.status_code == 410, as_other.json()
 
+    def test_preview_already_redeemed_when_application_from_another_invite(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+        admin_user_tenant_a: Users,
+    ) -> None:
+        """A human with an application for this popup (one per popup) gets
+        already_redeemed=True even on a DIFFERENT, still-valid invite link.
+
+        They cannot redeem a second invite for the same popup, so the portal
+        redirects them to their existing checkout instead of the invite page.
+        """
+        popup = _make_popup(db, tenant_a)
+        tok_a = f"first-{uuid.uuid4().hex[:12]}"
+        tok_b = f"second-{uuid.uuid4().hex[:12]}"
+        _make_invite(db, popup, admin_user_tenant_a, token=tok_a, max_uses=1)
+        # Invite B is fresh and NOT exhausted — the recognition still applies.
+        _make_invite(db, popup, admin_user_tenant_a, token=tok_b, max_uses=10)
+        human = _make_human(db, tenant_a)
+
+        redeem = client.post(
+            f"/api/v1/invites/redeem/{tok_a}",
+            json={"popup_id": str(popup.id)},
+            headers=_auth(_human_token(human)),
+        )
+        assert redeem.status_code in (200, 201), redeem.json()
+
+        preview_b = client.get(
+            f"/api/v1/invites/redeem/{tok_b}", headers=_auth(_human_token(human))
+        )
+        assert preview_b.status_code == 200, preview_b.json()
+        assert preview_b.json()["already_redeemed"] is True
+
 
 # ---------------------------------------------------------------------------
 # Portal redemption — POST /invites/redeem/{token}
