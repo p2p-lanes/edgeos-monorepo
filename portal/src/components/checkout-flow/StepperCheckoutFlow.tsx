@@ -18,6 +18,7 @@ import { shouldUseDynamicStep } from "./registries/stepRegistry"
 import { CONTENT_ONLY_TEMPLATES } from "./registries/variantRegistry"
 import type { ScrollyCheckoutFlowProps } from "./ScrollyCheckoutFlow"
 import SectionHeader from "./SectionHeader"
+import StepFootnotes from "./StepFootnotes"
 import { AmanitaBackground } from "./skins/amanita/AmanitaBackground"
 import AmanitaBuyerStep from "./skins/amanita/AmanitaBuyerStep"
 import AmanitaCatalogSection from "./skins/amanita/AmanitaCatalogSection"
@@ -452,6 +453,11 @@ export default function StepperCheckoutFlow({
     cta_label?: string
     cta_hint?: string
   }
+  // The active step's raw config, for the trailing FAQs/footnotes blocks.
+  const currentTemplateConfig = current?.config?.template_config as
+    | Record<string, unknown>
+    | null
+    | undefined
 
   const renderStepContent = (section: (typeof sections)[number]) => {
     const { stepType, config } = section
@@ -666,15 +672,11 @@ export default function StepperCheckoutFlow({
                 offers the field on every step — buyer and confirm included —
                 and the catalog only covers the product ones. */}
             {isAmanita && (
-              <AmanitaStepFaqs
-                templateConfig={
-                  current.config?.template_config as
-                    | Record<string, unknown>
-                    | null
-                    | undefined
-                }
-              />
+              <AmanitaStepFaqs templateConfig={currentTemplateConfig} />
             )}
+            {/* Last on the step, under the FAQs — the mockup's centred
+                clarifications below the Extras cards. */}
+            <StepFootnotes skin={skin} templateConfig={currentTemplateConfig} />
           </>
         )}
       </main>
