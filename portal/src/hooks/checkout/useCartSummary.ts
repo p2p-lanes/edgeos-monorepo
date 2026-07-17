@@ -148,13 +148,16 @@ export function useCartSummary({
     // it removed (the surplus carries over as balance).
     const creditApplied = discountedSubtotal - grandTotal
 
+    // Count total units, not distinct lines: a cart with "2 × A" and "1 × B"
+    // reads as 3 items, not 2. Patron is a single contribution and meal plans
+    // are one per attendee/week, so those stay line-counted.
     const itemCount =
-      selectedPasses.length +
-      (housing ? 1 : 0) +
-      merch.length +
+      selectedPasses.reduce((sum, p) => sum + (p.quantity ?? 1), 0) +
+      (housing ? (housing.quantity ?? 1) : 0) +
+      merch.reduce((sum, m) => sum + (m.quantity ?? 1), 0) +
       (patron ? 1 : 0) +
       mealPlans.length +
-      allDynamicItems.length
+      allDynamicItems.reduce((sum, d) => sum + (d.quantity ?? 1), 0)
 
     return {
       passesSubtotal,

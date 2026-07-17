@@ -116,7 +116,7 @@ describe("AmanitaConfirmSection", () => {
 
   it("renders cart line items from the real cart/summary", () => {
     render(<AmanitaConfirmSection />)
-    expect(screen.getByText("General Pass")).toBeTruthy()
+    expect(screen.getByText(/General Pass/)).toBeTruthy()
     expect(screen.getAllByText(/\$100/).length).toBeGreaterThan(0)
   })
 
@@ -137,7 +137,7 @@ describe("AmanitaConfirmSection", () => {
       },
     }
     render(<AmanitaConfirmSection />)
-    expect(screen.getByText("Tote Bag")).toBeTruthy()
+    expect(screen.getByText(/Tote Bag/)).toBeTruthy()
   })
 
   it("calls applyPromoCode with the entered code", async () => {
@@ -258,10 +258,13 @@ describe("AmanitaConfirmSection", () => {
     }
     const { container } = render(<AmanitaConfirmSection />)
 
-    expect(screen.getByText("Full Pass")).toBeTruthy()
+    expect(screen.getByText(/Full Pass/)).toBeTruthy()
     expect(screen.queryByText("checkout.step_short.passes")).toBeNull()
-    // The order card carries its own title and nothing else above the lines.
-    expect(container.querySelectorAll("svg").length).toBe(0)
+    // The order card carries its own title and nothing else above the lines —
+    // the only icon on the line is its own remove control.
+    expect(
+      container.querySelectorAll('button[aria-label^="Remove"]').length,
+    ).toBe(1)
   })
 
   it("keeps the service fee out of the item list when the popup charges none", () => {

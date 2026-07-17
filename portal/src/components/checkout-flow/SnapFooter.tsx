@@ -304,7 +304,7 @@ export default function SnapFooter({
         {isCartOpen && (
           <div className="bg-white shadow-2xl rounded-2xl mb-2 relative z-30 max-h-[60vh] overflow-hidden">
             <div className="px-4 py-4 overflow-y-auto max-h-[calc(60vh-80px)]">
-              <CartItemList />
+              <CartItemList showServiceFee={isOnConfirm} />
             </div>
           </div>
         )}

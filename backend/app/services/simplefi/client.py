@@ -64,10 +64,18 @@ class SimpleFIPaymentResponse(BaseModel):
 
 
 class SimpleFIPaymentRequestStatus(BaseModel):
-    """Minimal payment request status payload."""
+    """Minimal payment request status payload.
+
+    ``paid_installments_count`` is only populated for installment plans. For
+    one-shot payment requests it stays ``None``. It carries how many
+    installments SimpleFi has actually charged, which is the real "buyer paid"
+    signal for a plan — the ``active`` status alone only means the plan was
+    activated, not that the first installment cleared.
+    """
 
     id: str
     status: str
+    paid_installments_count: int | None = None
 
 
 class SimpleFIClient:
@@ -508,6 +516,7 @@ class SimpleFIClient:
         return SimpleFIPaymentRequestStatus(
             id=payload["id"],
             status=payload["status"],
+            paid_installments_count=payload.get("paid_installments_count"),
         )
 
 

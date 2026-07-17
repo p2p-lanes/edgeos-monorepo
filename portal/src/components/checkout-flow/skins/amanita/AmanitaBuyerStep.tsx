@@ -192,11 +192,15 @@ function AmanitaField({
             type="tel"
             inputMode="numeric"
             autoComplete="tel-national"
+            maxLength={15}
             placeholder={placeholder}
             value={national}
-            onChange={(e) =>
-              onChange(name, `+${dialFor(country)}${e.target.value}`)
-            }
+            onChange={(e) => {
+              // Keep the national part digits-only and within E.164's length —
+              // a `tel` input still accepts letters, so filter here.
+              const digits = e.target.value.replace(/\D/g, "").slice(0, 15)
+              onChange(name, `+${dialFor(country)}${digits}`)
+            }}
             aria-invalid={hasError || undefined}
             className="w-full min-w-0 rounded-xl border px-4 py-3 text-deep outline-none transition-shadow focus:ring-2 focus:ring-accent"
             style={FIELD_INPUT_STYLE(hasError)}
