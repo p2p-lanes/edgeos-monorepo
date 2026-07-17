@@ -19,7 +19,9 @@ import type { VariantProps } from "../registries/variantRegistry"
 // present, never throw on an empty/undefined config:
 //   {
 //     "date_logo_url": "https://…",   // wordmark + date banner image
-//     "edition_url": "https://…",     // edition banner image (e.g. "3rd ed.")
+//     "edition": "string",            // edition line (e.g. "Third edition")
+//     "edition_url": "https://…",     // legacy edition banner image — used only
+//                                     //   when `edition` text is absent
 //     "headline": "string",           // main H1
 //     "subtitle": "string",           // italic tagline under the headline
 //     "date_badge": "string",         // pill text (e.g. extended dates)
@@ -40,6 +42,7 @@ import type { VariantProps } from "../registries/variantRegistry"
 
 interface HeroConfig {
   date_logo_url?: string
+  edition?: string
   edition_url?: string
   headline?: string
   subtitle?: string
@@ -116,6 +119,7 @@ export default function VariantHero({
 
   const hasAnyContent =
     config.date_logo_url ||
+    config.edition ||
     config.edition_url ||
     config.headline ||
     config.subtitle ||
@@ -136,14 +140,18 @@ export default function VariantHero({
           eager={isFirstSection}
         />
       )}
-      {config.edition_url && (
+      {config.edition ? (
+        <p className="font-condensed text-sm font-semibold uppercase tracking-[0.24em] text-sand md:text-base">
+          {config.edition}
+        </p>
+      ) : config.edition_url ? (
         <HeroImage
           src={config.edition_url}
           alt=""
           className="w-[min(240px,60%)]"
           eager={isFirstSection}
         />
-      )}
+      ) : null}
 
       {config.headline && (
         <h1
