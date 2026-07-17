@@ -583,6 +583,38 @@ export function CheckoutProvider({
     sig: openCartSig,
   })
 
+  // Persist the buyer's "your information" fields for a same-browser reload,
+  // mirroring the open cart. Backend recovery stays cart-only; this is just a
+  // local convenience so a refresh doesn't wipe a half-filled form. Only for
+  // open checkout — authenticated flows carry buyer data on the account.
+  const buyerStorageKey = openCartPopupSlug
+    ? `open-checkout-buyer:${openCartPopupSlug}`
+    : null
+  const buyerRestoredRef = useRef(false)
+  useEffect(() => {
+    if (!buyerStorageKey || buyerRestoredRef.current) return
+    buyerRestoredRef.current = true
+    // A signed-link / external prefill wins — never clobber it.
+    if (Object.keys(initialBuyerValues).length > 0) return
+    try {
+      const raw = localStorage.getItem(buyerStorageKey)
+      if (!raw) return
+      const parsed = JSON.parse(raw) as Record<string, unknown>
+      if (parsed && typeof parsed === "object") setBuyerValues(parsed)
+    } catch {
+      // corrupt or unavailable storage — start fresh
+    }
+  }, [buyerStorageKey, initialBuyerValues])
+  useEffect(() => {
+    if (!buyerStorageKey) return
+    if (Object.keys(buyerValues).length === 0) return
+    try {
+      localStorage.setItem(buyerStorageKey, JSON.stringify(buyerValues))
+    } catch {
+      // quota exceeded / private mode — non-fatal
+    }
+  }, [buyerStorageKey, buyerValues])
+
   const queryClient = useQueryClient()
   const router = useRouter()
 
