@@ -111,6 +111,31 @@
   display: none;
 }
 
+/* ── 4b · Thin scrollbar ────────────────────────────────────────── */
+/* Replaces the chunky native scrollbar on the skin's scrollable
+   surfaces (e.g. the FAQs drawer) with the same slim, brand-tinted one
+   the backoffice uses. Scoped to descendants so the outer checkout
+   scroll (an ancestor, hidden via .no-scrollbar) is untouched. Native
+   <select> dropdown lists are OS-rendered and cannot be restyled. */
+.checkout-amanita {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(193, 170, 136, 0.5) transparent;
+}
+.checkout-amanita ::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.checkout-amanita ::-webkit-scrollbar-track {
+  background: transparent;
+}
+.checkout-amanita ::-webkit-scrollbar-thumb {
+  background-color: rgba(193, 170, 136, 0.5);
+  border-radius: 9999px;
+}
+.checkout-amanita ::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(193, 170, 136, 0.75);
+}
+
 /* ── 5 · Ornamental buttons ─────────────────────────────────────── */
 /* The frame art (webp with a transparent interior) is stretched
    100%/100% over its own rounded navy background — gems that

@@ -303,7 +303,7 @@
       "confirm_title": "Confirm",
       "confirm_intro": "Review your order before moving on to payment.",
       "confirm_order_title": "Your order",
-      "confirm_empty_title": "You haven't picked your passes yet",
+      "confirm_empty_title": "You haven't picked your tickets yet",
       "confirm_empty_body": "Head back to the tickets section and choose how you want to experience the event.",
       "confirm_go_tickets": "See tickets",
       "confirm_patron_label": "Community contribution",
