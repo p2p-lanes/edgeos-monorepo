@@ -778,8 +778,12 @@ function StepConfigContent({ stepId }: { stepId: string }) {
             <TranslationManager
               entityType="ticketing_step"
               entityId={step.id}
-              translatableFields={["title", "description"]}
-              sourceData={{ title: step.title, description: step.description }}
+              translatableFields={["title", "description", "watermark"]}
+              sourceData={{
+                title: step.title,
+                description: step.description,
+                watermark: step.watermark ?? "",
+              }}
               nestedField="template_config"
               nestedSource={step.template_config}
               supportedLanguages={popup!.supported_languages!}

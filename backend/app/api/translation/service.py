@@ -11,7 +11,7 @@ TRANSLATABLE_FIELDS: dict[str, list[str]] = {
     "group": ["name", "description", "welcome_message"],
     "form_field": ["label", "placeholder", "help_text", "options"],
     "form_section": ["label", "description"],
-    "ticketing_step": ["title", "description"],
+    "ticketing_step": ["title", "description", "watermark"],
 }
 
 
