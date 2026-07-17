@@ -1,5 +1,8 @@
 import { OpenAPI } from "@/client"
-import { LANGUAGE_STORAGE_KEY } from "@/lib/language-storage"
+import {
+  getActiveRequestLanguage,
+  LANGUAGE_STORAGE_KEY,
+} from "@/lib/language-storage"
 
 if (!process.env.NEXT_PUBLIC_API_URL) {
   throw new Error("NEXT_PUBLIC_API_URL is not configured")
@@ -25,16 +28,18 @@ OpenAPI.interceptors.request.use((config) => {
   if (tenantId) {
     config.headers = { ...config.headers, "X-Tenant-Id": tenantId }
   }
-  // Prefer the ?lang (or ?locale) URL param, then the stored language. The URL
-  // is available synchronously on the first render, before the language
-  // provider persists the choice to localStorage in an effect. Reading only
-  // localStorage raced that write: the first runtime request went out without
-  // Accept-Language and returned the popup default, so a ?lang=en deep link
-  // showed the source language until a later refetch (e.g. on window focus).
-  // The backend overlay is default-agnostic, so sending the default (or an
-  // unsupported value) simply finds no translations and returns the source.
+  // Prefer the language the provider is currently showing (set synchronously
+  // on switch), then the ?lang/?locale URL param, then the stored language.
+  // The in-memory value wins because a mid-session switch updates the UI before
+  // its ?lang navigation lands — reading the URL there would refetch dynamic
+  // content in the previous language. It stays null until the provider mounts,
+  // so the first render / a ?lang deep link still resolves via the URL param
+  // (reading only localStorage raced the provider's write and dropped the
+  // header on the first runtime request). The backend overlay is
+  // default-agnostic, so an unsupported value simply returns the source.
   const params = new URLSearchParams(window.location.search)
   const language =
+    getActiveRequestLanguage() ||
     params.get("lang") ||
     params.get("locale") ||
     localStorage.getItem(LANGUAGE_STORAGE_KEY)

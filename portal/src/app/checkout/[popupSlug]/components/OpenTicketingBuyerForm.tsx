@@ -235,17 +235,10 @@ export function OpenTicketingBuyerForm({
       <section className="space-y-6 px-6 py-6">
         {sections.map((section) => (
           <section key={section.id} className="space-y-4">
-            {sections.length > 1 ? (
-              <div>
-                <h3 className="text-base font-semibold">{section.title}</h3>
-                {section.subtitle ? (
-                  <p className="text-sm text-muted-foreground">
-                    {section.subtitle}
-                  </p>
-                ) : null}
-              </div>
-            ) : null}
-
+            {/* The whole buyer step already announces itself with its own
+                step title, so the personal-info sections stay unlabelled —
+                the synthetic base group and any single configured section
+                both read as one block instead of a redundant heading. */}
             <div className="grid gap-4 md:grid-cols-2">
               {section.fields.map(({ name, field }) => {
                 if (name === "email") {

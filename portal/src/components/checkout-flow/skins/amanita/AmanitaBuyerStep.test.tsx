@@ -140,8 +140,9 @@ describe("AmanitaBuyerStep — schema-driven rendering", () => {
   describe("section heading", () => {
     // The structural email/first_name/last_name carry no section_id, so
     // getCheckoutSchemaSections parks them in a synthetic "_unsectioned_base"
-    // group titled with a hardcoded "Personal information". Rendering that
-    // alongside the organizer's own section printed the heading twice.
+    // group titled with a hardcoded "Personal information". The buyer step
+    // suppresses every section heading, so neither that artifact nor the
+    // organizer's own section label ever reaches the card.
     function twoSectionSchema() {
       return {
         base_fields: {
@@ -174,10 +175,13 @@ describe("AmanitaBuyerStep — schema-driven rendering", () => {
       } as unknown as ApplicationFormSchema
     }
 
-    it("prints the organizer's heading exactly once", () => {
+    // The step already leads with its own title, so the buyer form prints
+    // no section heading at all — neither the organizer's own section label
+    // nor the synthetic "Personal information" portal artifact.
+    it("never prints the organizer's section heading", () => {
       buyerFormSchema = twoSectionSchema()
       render(<AmanitaBuyerStep />)
-      expect(screen.getAllByText("Personal Information")).toHaveLength(1)
+      expect(screen.queryByText("Personal Information")).toBeNull()
     })
 
     it("never prints the synthetic 'Personal information' group title", () => {
@@ -186,17 +190,10 @@ describe("AmanitaBuyerStep — schema-driven rendering", () => {
       expect(screen.queryByText("Personal information")).toBeNull()
     })
 
-    // "arriba de todo los campos" — the heading leads, every field follows it.
-    it("puts the heading above every field", () => {
+    it("renders no section heading element", () => {
       buyerFormSchema = twoSectionSchema()
       const { container } = render(<AmanitaBuyerStep />)
-      const heading = screen.getByText("Personal Information")
-      const email = screen.getByLabelText("Email")
-      expect(
-        heading.compareDocumentPosition(email) &
-          Node.DOCUMENT_POSITION_FOLLOWING,
-      ).toBeTruthy()
-      expect(container.querySelectorAll("h3")).toHaveLength(1)
+      expect(container.querySelectorAll("h3")).toHaveLength(0)
     })
   })
 

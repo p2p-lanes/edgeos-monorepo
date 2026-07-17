@@ -67,16 +67,76 @@ class FormFieldsCRUD(BaseCRUD[FormFields, FormFieldCreate, FormFieldUpdate]):
         return session.exec(statement).first()
 
     def generate_field_name(
-        self, session: Session, label: str, popup_id: uuid.UUID
+        self,
+        session: Session,
+        label: str,
+        popup_id: uuid.UUID,
+        exclude_id: uuid.UUID | None = None,
     ) -> str:
-        """Generate a unique field name from a label."""
+        """Generate a unique field name from a label.
+
+        ``exclude_id`` skips a field's own row in the collision check so a
+        rename can't be suffixed against itself.
+        """
         base = _slugify(label)
         name = base
         counter = 1
-        while self.get_by_name(session, name, popup_id):
+        while True:
+            existing = self.get_by_name(session, name, popup_id)
+            if existing is None or existing.id == exclude_id:
+                return name
             name = f"{base}_{counter}"
             counter += 1
-        return name
+
+    def is_field_name_in_use(
+        self, session: Session, name: str, popup_id: uuid.UUID
+    ) -> bool:
+        """Return True if submitted data or config references this field name.
+
+        Checks application custom_fields (and their snapshots) plus ticketing
+        step section visibility conditions. Once any of these reference the
+        name, renaming it would orphan data, so the key must stay frozen.
+        """
+        from app.api.application.models import Applications, ApplicationSnapshots
+        from app.api.ticketing_step.crud import ticketing_steps_crud
+
+        app_stmt = (
+            select(Applications.id)
+            .where(
+                Applications.popup_id == popup_id,
+                col(Applications.custom_fields).has_key(name),
+            )
+            .limit(1)
+        )
+        if session.exec(app_stmt).first() is not None:
+            return True
+
+        snapshot_stmt = (
+            select(ApplicationSnapshots.id)
+            .join(
+                Applications,
+                col(ApplicationSnapshots.application_id) == col(Applications.id),
+            )
+            .where(
+                Applications.popup_id == popup_id,
+                col(ApplicationSnapshots.custom_fields).has_key(name),
+            )
+            .limit(1)
+        )
+        if session.exec(snapshot_stmt).first() is not None:
+            return True
+
+        steps, _ = ticketing_steps_crud.find_by_popup(session, popup_id, limit=1000)
+        for step in steps:
+            sections = (step.template_config or {}).get("sections", [])
+            for section in sections:
+                if not isinstance(section, dict):
+                    continue
+                visible_if = section.get("visible_if")
+                if isinstance(visible_if, dict) and visible_if.get("field_id") == name:
+                    return True
+
+        return False
 
     def find_by_popup(
         self,
