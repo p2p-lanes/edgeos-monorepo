@@ -251,7 +251,7 @@ function ProductCard({
 
   return (
     <article
-      className="overflow-hidden rounded-2xl bg-cream text-left md:flex"
+      className="overflow-hidden rounded-2xl bg-cream text-left md:flex md:min-h-[19rem]"
       style={CREAM_CARD_STYLE}
     >
       {image && (
@@ -262,8 +262,9 @@ function ProductCard({
           <Image
             src={image}
             alt={section.label}
-            width={640}
-            height={360}
+            width={1600}
+            height={1200}
+            sizes="(min-width: 768px) 40vw, 100vw"
             loading="lazy"
             className="h-full w-full object-cover"
             {...imageOptimization(image)}

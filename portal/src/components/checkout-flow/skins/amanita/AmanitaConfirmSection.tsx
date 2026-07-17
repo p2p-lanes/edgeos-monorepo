@@ -578,80 +578,76 @@ export default function AmanitaConfirmSection({
           {/* Coupon — no rule above it: it reads as part of the order, and the
               only divider before the totals is the one the ladder sits on. */}
           {popup?.allows_coupons && hasDiscountableItems && (
-            <>
-              <div className="px-5 py-4 md:px-8">
-                <label
-                  htmlFor="ck-cupon"
-                  className="font-condensed text-xs font-medium uppercase tracking-[0.16em] text-primary"
-                >
-                  {t("checkout.amanita.confirm_coupon_label")}
-                </label>
-                <div className="mt-1.5 flex gap-2">
-                  <input
-                    id="ck-cupon"
-                    type="text"
-                    value={promoInput}
-                    onChange={(e) => {
-                      setPromoInput(e.target.value.toUpperCase())
-                      setPromoError("")
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault()
-                        handleApplyPromo()
-                      }
-                    }}
-                    placeholder={t(
-                      "checkout.amanita.confirm_coupon_placeholder",
-                    )}
-                    disabled={cart.promoCodeValid}
-                    className="w-full min-w-0 rounded-xl border px-4 py-2.5 text-sm uppercase text-deep outline-none transition-shadow focus:ring-2 focus:ring-accent disabled:opacity-60"
-                    style={{
-                      backgroundColor: "#faf6ef",
-                      borderColor: promoError ? ERROR : "rgba(4,34,49,0.18)",
-                    }}
-                  />
-                  {cart.promoCodeValid ? (
-                    <button
-                      type="button"
-                      onClick={handleClearPromo}
-                      aria-label={t("checkout.amanita.confirm_coupon_remove")}
-                      className="shrink-0 rounded-full border px-4 py-2.5 font-condensed text-xs font-medium uppercase tracking-[0.12em] text-deep transition-colors"
-                      style={{ borderColor: "rgba(4,34,49,0.18)" }}
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={handleApplyPromo}
-                      disabled={promoLoading || isLoading || !promoInput.trim()}
-                      className="shrink-0 rounded-full bg-primary px-5 py-2.5 font-condensed text-xs font-medium uppercase tracking-[0.12em] text-cream transition-colors hover:bg-deep disabled:opacity-60"
-                    >
-                      {promoLoading || isLoading ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        t("checkout.amanita.confirm_coupon_apply")
-                      )}
-                    </button>
-                  )}
-                </div>
-                {promoError && (
-                  <div
-                    className="flex items-center gap-1.5 text-xs mt-2"
-                    style={{ color: ERROR }}
+            <div className="px-5 py-4 md:px-8">
+              <label
+                htmlFor="ck-cupon"
+                className="font-condensed text-xs font-medium uppercase tracking-[0.16em] text-primary"
+              >
+                {t("checkout.amanita.confirm_coupon_label")}
+              </label>
+              <div className="mt-1.5 flex gap-2">
+                <input
+                  id="ck-cupon"
+                  type="text"
+                  value={promoInput}
+                  onChange={(e) => {
+                    setPromoInput(e.target.value.toUpperCase())
+                    setPromoError("")
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault()
+                      handleApplyPromo()
+                    }
+                  }}
+                  placeholder={t("checkout.amanita.confirm_coupon_placeholder")}
+                  disabled={cart.promoCodeValid}
+                  className="w-full min-w-0 rounded-xl border px-4 py-2.5 text-sm uppercase text-deep outline-none transition-shadow focus:ring-2 focus:ring-accent disabled:opacity-60"
+                  style={{
+                    backgroundColor: "#faf6ef",
+                    borderColor: promoError ? ERROR : "rgba(4,34,49,0.18)",
+                  }}
+                />
+                {cart.promoCodeValid ? (
+                  <button
+                    type="button"
+                    onClick={handleClearPromo}
+                    aria-label={t("checkout.amanita.confirm_coupon_remove")}
+                    className="shrink-0 rounded-full border px-4 py-2.5 font-condensed text-xs font-medium uppercase tracking-[0.12em] text-deep transition-colors"
+                    style={{ borderColor: "rgba(4,34,49,0.18)" }}
                   >
-                    <AlertCircle className="w-3 h-3" />
-                    <span>{promoError}</span>
-                  </div>
-                )}
-                {cart.promoCodeValid && (
-                  <p className="text-xs font-semibold mt-2 text-primary">
-                    {t("checkout.amanita.confirm_coupon_applied")}
-                  </p>
+                    <X className="w-4 h-4" />
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleApplyPromo}
+                    disabled={promoLoading || isLoading || !promoInput.trim()}
+                    className="shrink-0 rounded-full bg-primary px-5 py-2.5 font-condensed text-xs font-medium uppercase tracking-[0.12em] text-cream transition-colors hover:bg-deep disabled:opacity-60"
+                  >
+                    {promoLoading || isLoading ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      t("checkout.amanita.confirm_coupon_apply")
+                    )}
+                  </button>
                 )}
               </div>
-            </>
+              {promoError && (
+                <div
+                  className="flex items-center gap-1.5 text-xs mt-2"
+                  style={{ color: ERROR }}
+                >
+                  <AlertCircle className="w-3 h-3" />
+                  <span>{promoError}</span>
+                </div>
+              )}
+              {cart.promoCodeValid && (
+                <p className="text-xs font-semibold mt-2 text-primary">
+                  {t("checkout.amanita.confirm_coupon_applied")}
+                </p>
+              )}
+            </div>
           )}
 
           {/* Terms and conditions */}
