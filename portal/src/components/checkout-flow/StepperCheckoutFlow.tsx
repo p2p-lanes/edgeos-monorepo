@@ -401,6 +401,14 @@ export default function StepperCheckoutFlow({
   const current = sections[active]
   const isLast = active === last
   const nextSection = !isLast ? sections[active + 1] : undefined
+  // The service fee only shows from the confirm step on, so earlier steps read
+  // as a products-only "Subtotal" with the fee neither shown nor folded into
+  // the bar's headline number.
+  const isConfirmStep = current?.stepType === "confirm"
+  const deferServiceFee = !isConfirmStep && summary.contributionSubtotal > 0
+  const footerTotal = deferServiceFee
+    ? summary.grandTotal - summary.contributionSubtotal
+    : summary.grandTotal
   // Both of these read the cart through the provider rather than re-deriving
   // it from `cart.*`: an open checkout routes ticket picks to
   // `cart.dynamicItems`, never `cart.passes` (useTicketsStep.ts:284,336), so
@@ -728,9 +736,13 @@ export default function StepperCheckoutFlow({
                 {t("common.back")}
               </button>
               <div className="flex min-w-0 flex-col items-center">
-                <span className={TOTAL_LABEL_CLASSES[skin]}>Total</span>
+                <span className={TOTAL_LABEL_CLASSES[skin]}>
+                  {deferServiceFee
+                    ? t("openCheckout.summary_subtotal")
+                    : t("common.total")}
+                </span>
                 <span className={TOTAL_VALUE_CLASSES[skin]}>
-                  {formatCurrency(summary.grandTotal)}
+                  {formatCurrency(footerTotal)}
                 </span>
               </div>
               {isLast ? (

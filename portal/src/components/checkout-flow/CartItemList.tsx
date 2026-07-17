@@ -17,7 +17,13 @@ import { useCheckout } from "@/providers/checkoutProvider"
 import { useCityProvider } from "@/providers/cityProvider"
 import { formatCurrency } from "@/types/checkout"
 
-export default function CartItemList() {
+export default function CartItemList({
+  showServiceFee = true,
+}: {
+  /** The service fee only makes sense once the buyer reaches the confirm
+   *  step; earlier steps show products only. Defaults to shown. */
+  showServiceFee?: boolean
+} = {}) {
   const { t } = useTranslation()
   const { getCity } = useCityProvider()
   const popup = getCity()
@@ -347,8 +353,10 @@ export default function CartItemList() {
         </div>
       )}
 
-      {/* Contribution fee — mandatory when popup has it enabled; no buyer toggle */}
-      {summary.contributionSubtotal > 0 && (
+      {/* Contribution fee — mandatory when popup has it enabled; no buyer
+          toggle. Hidden until the confirm step so earlier steps show a
+          products-only cart. */}
+      {showServiceFee && summary.contributionSubtotal > 0 && (
         <div className="mb-4">
           <div className="flex items-center justify-between py-2">
             <div className="flex items-center gap-3 min-w-0">
