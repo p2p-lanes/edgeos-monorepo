@@ -46,11 +46,6 @@ const IMAGE_FIELDS = [
     description: "The large artwork at the top of the hero.",
   },
   {
-    key: "edition_url",
-    label: "Edition banner",
-    description: "Secondary banner under the wordmark.",
-  },
-  {
     key: "divider_url",
     label: "Divider ornament",
     description: "Sits above the subtitle.",
@@ -58,6 +53,11 @@ const IMAGE_FIELDS = [
 ] as const
 
 const TEXT_FIELDS = [
+  {
+    key: "edition",
+    label: "Edition",
+    placeholder: "Tercera edición: El Portal",
+  },
   {
     key: "headline",
     label: "Headline",
