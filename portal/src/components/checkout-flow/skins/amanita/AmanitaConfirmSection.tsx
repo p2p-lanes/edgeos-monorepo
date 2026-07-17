@@ -62,6 +62,29 @@ const ROW_BORDER = "rgba(4,34,49,0.12)"
 const MUTED = "#4a6670"
 const ERROR = "#b3271e"
 
+// Per-line remove control for the order summary, so an item can be dropped
+// from the cart here instead of scrolling back to its product card. Changing
+// quantity stays on the catalog card; here the cross clears the whole line.
+function RemoveButton({
+  name,
+  onClick,
+}: {
+  name: string
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={`Remove ${name}`}
+      className="p-1 shrink-0 transition-colors hover:opacity-70"
+      style={{ color: MUTED }}
+    >
+      <X className="h-4 w-4" />
+    </button>
+  )
+}
+
 function SectionLabel({
   icon: Icon,
   children,
@@ -121,8 +144,28 @@ export default function AmanitaConfirmSection({
     buyerValues,
     buyerGeneralError,
     removeMealPlan,
+    togglePass,
+    resetDayProduct,
+    removeDynamicItem,
+    clearHousing,
+    updateMerchQuantity,
+    clearPatron,
     housingDatesShown,
   } = useCheckout()
+
+  // Removing a pass mirrors the footer cart: day passes reset, everything else
+  // toggles its quantity to zero.
+  const handleRemovePass = (attendeeId: string, productId: string) => {
+    const pass = cart.passes.find(
+      (p) => p.attendeeId === attendeeId && p.productId === productId,
+    )
+    if (!pass) return
+    if (pass.product.duration_type === "day") {
+      resetDayProduct(attendeeId, productId)
+    } else {
+      togglePass(attendeeId, productId, 0)
+    }
+  }
   const { getCity } = useCityProvider()
   const popup = getCity()
   const { getRelevantApplication } = useApplication()
@@ -327,8 +370,7 @@ export default function AmanitaConfirmSection({
                         >
                           <div className="flex flex-col">
                             <span style={{ color: MUTED }}>
-                              {pass.quantity > 1 && <>{pass.quantity} × </>}
-                              {pass.product.name}
+                              {pass.quantity} × {pass.product.name}
                             </span>
                             {isNonDiscountable(pass.product) && (
                               <span
@@ -339,9 +381,17 @@ export default function AmanitaConfirmSection({
                               </span>
                             )}
                           </div>
-                          <span className="font-medium text-deep shrink-0">
-                            {formatCurrency(pass.originalPrice ?? pass.price)}
-                          </span>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <span className="font-medium text-deep">
+                              {formatCurrency(pass.originalPrice ?? pass.price)}
+                            </span>
+                            <RemoveButton
+                              name={pass.product.name}
+                              onClick={() =>
+                                handleRemovePass(attendeeId, pass.productId)
+                              }
+                            />
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -366,8 +416,7 @@ export default function AmanitaConfirmSection({
                       >
                         <div className="flex flex-col">
                           <span style={{ color: MUTED }}>
-                            {item.quantity > 1 && <>{item.quantity} × </>}
-                            {item.product.name}
+                            {item.quantity} × {item.product.name}
                           </span>
                           {isNonDiscountable(item.product) && (
                             <span
@@ -378,9 +427,17 @@ export default function AmanitaConfirmSection({
                             </span>
                           )}
                         </div>
-                        <span className="font-medium text-deep shrink-0">
-                          {formatCurrency(item.price)}
-                        </span>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className="font-medium text-deep">
+                            {formatCurrency(item.price)}
+                          </span>
+                          <RemoveButton
+                            name={item.product.name}
+                            onClick={() =>
+                              removeDynamicItem(stepType, item.productId)
+                            }
+                          />
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -400,10 +457,7 @@ export default function AmanitaConfirmSection({
                 <div className="flex items-start justify-between">
                   <div>
                     <p className="text-sm font-medium text-deep">
-                      {cart.housing.quantity > 1 && (
-                        <>{cart.housing.quantity} × </>
-                      )}
-                      {cart.housing.product.name}
+                      {cart.housing.quantity} × {cart.housing.product.name}
                     </p>
                     <p className="text-xs" style={{ color: MUTED }}>
                       {cart.housing.pricePerDay !== false
@@ -425,9 +479,15 @@ export default function AmanitaConfirmSection({
                       </p>
                     )}
                   </div>
-                  <span className="font-medium text-deep text-sm shrink-0">
-                    {formatCurrency(cart.housing.totalPrice)}
-                  </span>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="font-medium text-deep text-sm">
+                      {formatCurrency(cart.housing.totalPrice)}
+                    </span>
+                    <RemoveButton
+                      name={cart.housing.product.name}
+                      onClick={clearHousing}
+                    />
+                  </div>
                 </div>
               </div>
             </>
@@ -449,8 +509,7 @@ export default function AmanitaConfirmSection({
                     >
                       <div className="flex flex-col">
                         <span style={{ color: MUTED }}>
-                          {item.quantity > 1 && <>{item.quantity} × </>}
-                          {item.product.name}
+                          {item.quantity} × {item.product.name}
                         </span>
                         {isNonDiscountable(item.product) && (
                           <span
@@ -461,9 +520,15 @@ export default function AmanitaConfirmSection({
                           </span>
                         )}
                       </div>
-                      <span className="font-medium text-deep shrink-0">
-                        {formatCurrency(item.totalPrice)}
-                      </span>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="font-medium text-deep">
+                          {formatCurrency(item.totalPrice)}
+                        </span>
+                        <RemoveButton
+                          name={item.product.name}
+                          onClick={() => updateMerchQuantity(item.productId, 0)}
+                        />
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -491,9 +556,15 @@ export default function AmanitaConfirmSection({
                       {notEligibleCaption}
                     </span>
                   </div>
-                  <span className="font-medium text-deep shrink-0">
-                    {formatCurrency(cart.patron.amount)}
-                  </span>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="font-medium text-deep">
+                      {formatCurrency(cart.patron.amount)}
+                    </span>
+                    <RemoveButton
+                      name={t("checkout.amanita.confirm_patron_label")}
+                      onClick={clearPatron}
+                    />
+                  </div>
                 </div>
               </div>
             </>
@@ -536,17 +607,12 @@ export default function AmanitaConfirmSection({
                         <span className="font-medium text-deep">
                           {formatCurrency(mp.product.price)}
                         </span>
-                        <button
-                          type="button"
+                        <RemoveButton
+                          name={mp.product.name}
                           onClick={() =>
                             removeMealPlan(mp.attendeeId, mp.productId)
                           }
-                          aria-label={`Remove ${mp.product.name}`}
-                          className="p-1 transition-colors"
-                          style={{ color: MUTED }}
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
+                        />
                       </div>
                     </div>
                   ))}
