@@ -2,6 +2,7 @@
 @import "tw-animate-css";
 @import "@fontsource-variable/geist";
 @import "@fontsource-variable/geist-mono";
+@import "@fontsource-variable/space-grotesk";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -9,6 +10,7 @@
   --font-sans: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
   --font-mono:
     "Geist Mono Variable", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --font-display: "Space Grotesk Variable", "Space Grotesk", sans-serif;
 }
 
 @theme inline {
