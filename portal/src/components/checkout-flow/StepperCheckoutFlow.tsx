@@ -3,7 +3,7 @@
 import { ArrowLeft, ArrowRight } from "lucide-react"
 import Image from "next/image"
 import type { CSSProperties } from "react"
-import { useCallback, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { Loader } from "@/components/ui/Loader"
 import { type CheckoutSkin, resolveCheckoutSkin } from "@/lib/checkout-skin"
@@ -286,6 +286,17 @@ export default function StepperCheckoutFlow({
   const [active, setActive] = useState(0)
   const last = Math.max(0, sections.length - 1)
 
+  // Each step should open at the top. The checkout scrolls inside an
+  // overflow container (not the window), so on a step change we reset that
+  // scroller rather than leaving the previous step's Y position.
+  const rootRef = useRef<HTMLDivElement>(null)
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `active` is the trigger; the body only reads a ref
+  useEffect(() => {
+    const scroller = rootRef.current?.closest(".overflow-y-auto")
+    if (scroller) scroller.scrollTop = 0
+    else window.scrollTo(0, 0)
+  }, [active])
+
   const goTo = useCallback(
     (index: number) => {
       const clamped = Math.min(Math.max(index, 0), last)
@@ -535,7 +546,7 @@ export default function StepperCheckoutFlow({
   }
 
   return (
-    <div className={ROOT_CLASSES[skin]}>
+    <div ref={rootRef} className={ROOT_CLASSES[skin]}>
       {isAmanita && <AmanitaBackground />}
 
       {/* pills nav */}
