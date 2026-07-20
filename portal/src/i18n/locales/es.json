@@ -469,7 +469,6 @@
   "profile": {
     "my_profile": "Mi Perfil",
     "header_subtitle": "Administrá tu experiencia e historial en {{tenant}}",
-    "my_collectibles": "Mis Coleccionables",
     "invoices": "Facturas",
     "edit_profile": "Editar perfil",
     "hide_linked_emails": "Ocultar emails vinculados",
