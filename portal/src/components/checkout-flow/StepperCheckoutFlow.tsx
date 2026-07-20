@@ -290,11 +290,32 @@ export default function StepperCheckoutFlow({
   // overflow container (not the window), so on a step change we reset that
   // scroller rather than leaving the previous step's Y position.
   const rootRef = useRef<HTMLDivElement>(null)
+  // The pill row overflows horizontally when there are many steps. Keep a
+  // handle on the track and each pill so a step change can bring the active
+  // pill into view (keyed by `section.id` because the navbar maps over
+  // `navSections` while `active` indexes into `sections`).
+  const navRef = useRef<HTMLElement>(null)
+  const pillRefs = useRef<Map<string, HTMLButtonElement>>(new Map())
   // biome-ignore lint/correctness/useExhaustiveDependencies: `active` is the trigger; the body only reads a ref
   useEffect(() => {
     const scroller = rootRef.current?.closest(".overflow-y-auto")
     if (scroller) scroller.scrollTop = 0
     else window.scrollTo(0, 0)
+  }, [active])
+
+  // Centre the active pill in its horizontal track on step change (click or
+  // Back/Next). Mirrors ScrollySectionNav's compact-mode safety net so both
+  // shells behave the same. Separate from the vertical reset above: distinct
+  // concerns, distinct effects.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `active` is the trigger; the body only reads refs
+  useEffect(() => {
+    const activeId = sections[active]?.id
+    const btn = activeId ? pillRefs.current.get(activeId) : undefined
+    const nav = navRef.current
+    if (btn && nav) {
+      const target = btn.offsetLeft + btn.offsetWidth / 2 - nav.clientWidth / 2
+      nav.scrollTo({ left: Math.max(0, target), behavior: "smooth" })
+    }
   }, [active])
 
   const goTo = useCallback(
@@ -564,6 +585,7 @@ export default function StepperCheckoutFlow({
         style={NAV_OUTER[skin].style}
       >
         <nav
+          ref={navRef}
           aria-label="Checkout sections"
           className={NAV_INNER[skin].className}
         >
@@ -580,6 +602,10 @@ export default function StepperCheckoutFlow({
             return (
               <button
                 key={section.id}
+                ref={(el) => {
+                  if (el) pillRefs.current.set(section.id, el)
+                  else pillRefs.current.delete(section.id)
+                }}
                 type="button"
                 onClick={() => goTo(idx)}
                 aria-current={isActive ? "step" : undefined}
