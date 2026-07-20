@@ -61,7 +61,7 @@ export function usePopupsRedirect() {
 
   useEffect(() => {
     if (popups.length === 0) return
-    if (pathname === "/portal/poaps" || pathname === "/portal/profile") return
+    if (pathname === "/portal/profile") return
 
     const findCity = (slug?: string) =>
       popups.find((city) => (slug ? city.slug === slug : true))

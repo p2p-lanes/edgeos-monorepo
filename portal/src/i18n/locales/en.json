@@ -470,7 +470,6 @@
   "profile": {
     "my_profile": "My Profile",
     "header_subtitle": "Manage your {{tenant}}'s experience and history",
-    "my_collectibles": "My Collectibles",
     "invoices": "Invoices",
     "edit_profile": "Edit Profile",
     "hide_linked_emails": "Hide linked emails",

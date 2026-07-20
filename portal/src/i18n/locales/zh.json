@@ -402,7 +402,6 @@
   "profile": {
     "my_profile": "我的个人资料",
     "header_subtitle": "管理您在 {{tenant}} 的体验和历史",
-    "my_collectibles": "我的收藏品",
     "invoices": "发票",
     "edit_profile": "编辑资料",
     "hide_linked_emails": "隐藏关联邮箱",
