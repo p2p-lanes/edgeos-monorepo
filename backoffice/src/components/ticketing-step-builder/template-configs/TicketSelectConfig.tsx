@@ -6,8 +6,8 @@ import {
   FormFieldsService,
   ProductsService,
 } from "@/client"
+import { CollapsibleSection } from "@/components/ticketing-step-builder/step-detail/CollapsibleSection"
 import { Label } from "@/components/ui/label"
-import { Separator } from "@/components/ui/separator"
 import { cn } from "@/lib/utils"
 import { SectionsEditor } from "./sections/SectionsEditor"
 import {
@@ -208,62 +208,65 @@ export function TicketSelectConfig({
 
   return (
     <div className="flex flex-col gap-5">
-      {/* Design Variant */}
-      <div className="flex flex-col gap-3">
-        <div>
-          <Label className="text-sm font-medium">Design Variant</Label>
-          <p className="text-xs text-muted-foreground">
-            Choose how ticket passes are displayed in the checkout
-          </p>
-        </div>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-          {TICKET_SELECT_VARIANTS.map((v) => {
-            const isActive = variant === v.value
-            const Preview = VARIANT_PREVIEW_MAP[v.value]
-            return (
-              <button
-                key={v.value}
-                type="button"
-                onClick={() =>
-                  onChange({
-                    ...config,
-                    ...parsed,
-                    variant: v.value === "stacked" ? undefined : v.value,
-                  })
-                }
-                className={cn(
-                  "relative flex flex-col items-center gap-2 rounded-lg border-2 p-3 text-center transition-all hover:bg-accent/50",
-                  isActive ? "border-primary bg-primary/5" : "border-border",
-                )}
-              >
-                {isActive && (
-                  <div className="absolute top-1.5 right-1.5 w-4 h-4 rounded-full bg-primary flex items-center justify-center">
-                    <Check className="w-2.5 h-2.5 text-primary-foreground" />
+      <CollapsibleSection
+        title="Card appearance"
+        description="How passes are displayed"
+      >
+        {/* Design Variant */}
+        <div className="flex flex-col gap-3">
+          <div>
+            <Label className="text-sm font-medium">Design Variant</Label>
+            <p className="text-xs text-muted-foreground">
+              Choose how ticket passes are displayed in the checkout
+            </p>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {TICKET_SELECT_VARIANTS.map((v) => {
+              const isActive = variant === v.value
+              const Preview = VARIANT_PREVIEW_MAP[v.value]
+              return (
+                <button
+                  key={v.value}
+                  type="button"
+                  onClick={() =>
+                    onChange({
+                      ...config,
+                      ...parsed,
+                      variant: v.value === "stacked" ? undefined : v.value,
+                    })
+                  }
+                  className={cn(
+                    "relative flex flex-col items-center gap-2 rounded-lg border-2 p-3 text-center transition-all hover:bg-accent/50",
+                    isActive ? "border-primary bg-primary/5" : "border-border",
+                  )}
+                >
+                  {isActive && (
+                    <div className="absolute top-1.5 right-1.5 w-4 h-4 rounded-full bg-primary flex items-center justify-center">
+                      <Check className="w-2.5 h-2.5 text-primary-foreground" />
+                    </div>
+                  )}
+                  <div className="w-full px-1">
+                    <Preview />
                   </div>
-                )}
-                <div className="w-full px-1">
-                  <Preview />
-                </div>
-                <div>
-                  <p
-                    className={cn(
-                      "text-xs font-medium",
-                      isActive && "text-primary",
-                    )}
-                  >
-                    {v.label}
-                  </p>
-                  <p className="text-[10px] text-muted-foreground leading-tight mt-0.5">
-                    {v.description}
-                  </p>
-                </div>
-              </button>
-            )
-          })}
+                  <div>
+                    <p
+                      className={cn(
+                        "text-xs font-medium",
+                        isActive && "text-primary",
+                      )}
+                    >
+                      {v.label}
+                    </p>
+                    <p className="text-[10px] text-muted-foreground leading-tight mt-0.5">
+                      {v.description}
+                    </p>
+                  </div>
+                </button>
+              )
+            })}
+          </div>
         </div>
-      </div>
-
-      <Separator />
+      </CollapsibleSection>
 
       <SectionsEditor
         sections={parsed.sections}

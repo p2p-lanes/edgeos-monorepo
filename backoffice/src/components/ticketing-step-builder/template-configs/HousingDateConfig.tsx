@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query"
 import { Check } from "lucide-react"
 
 import { ProductsService } from "@/client"
+import { CollapsibleSection } from "@/components/ticketing-step-builder/step-detail/CollapsibleSection"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { Switch } from "@/components/ui/switch"
@@ -181,99 +182,106 @@ export function HousingDateConfig({
 
   return (
     <div className="flex flex-col gap-5">
-      {/* Design Variant */}
-      <div className="flex flex-col gap-3">
-        <div>
-          <Label className="text-sm font-medium">Design Variant</Label>
-          <p className="text-xs text-muted-foreground">
-            Choose how housing options are displayed in the checkout
-          </p>
-        </div>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-          {HOUSING_VARIANTS.map((v) => {
-            const isActive = variant === v.value
-            const Preview = PREVIEW_MAP[v.value]
-            return (
-              <button
-                key={v.value}
-                type="button"
-                onClick={() =>
-                  onChange({
-                    ...config,
-                    ...parsed,
-                    variant: v.value === "default" ? undefined : v.value,
-                  })
-                }
-                className={cn(
-                  "relative flex flex-col items-center gap-2 rounded-lg border-2 p-3 text-center transition-all hover:bg-accent/50",
-                  isActive ? "border-primary bg-primary/5" : "border-border",
-                )}
-              >
-                {isActive && (
-                  <div className="absolute top-1.5 right-1.5 w-4 h-4 rounded-full bg-primary flex items-center justify-center">
-                    <Check className="w-2.5 h-2.5 text-primary-foreground" />
-                  </div>
-                )}
-                <div className="w-full px-1">
-                  <Preview />
-                </div>
-                <div>
-                  <p
+      <CollapsibleSection
+        title="Card appearance"
+        description="Layout, dates and pricing"
+      >
+        <div className="flex flex-col gap-5">
+          {/* Design Variant */}
+          <div className="flex flex-col gap-3">
+            <div>
+              <Label className="text-sm font-medium">Design Variant</Label>
+              <p className="text-xs text-muted-foreground">
+                Choose how housing options are displayed in the checkout
+              </p>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {HOUSING_VARIANTS.map((v) => {
+                const isActive = variant === v.value
+                const Preview = PREVIEW_MAP[v.value]
+                return (
+                  <button
+                    key={v.value}
+                    type="button"
+                    onClick={() =>
+                      onChange({
+                        ...config,
+                        ...parsed,
+                        variant: v.value === "default" ? undefined : v.value,
+                      })
+                    }
                     className={cn(
-                      "text-xs font-medium",
-                      isActive && "text-primary",
+                      "relative flex flex-col items-center gap-2 rounded-lg border-2 p-3 text-center transition-all hover:bg-accent/50",
+                      isActive
+                        ? "border-primary bg-primary/5"
+                        : "border-border",
                     )}
                   >
-                    {v.label}
-                  </p>
-                  <p className="text-[10px] text-muted-foreground leading-tight mt-0.5">
-                    {v.description}
-                  </p>
-                </div>
-              </button>
-            )
-          })}
+                    {isActive && (
+                      <div className="absolute top-1.5 right-1.5 w-4 h-4 rounded-full bg-primary flex items-center justify-center">
+                        <Check className="w-2.5 h-2.5 text-primary-foreground" />
+                      </div>
+                    )}
+                    <div className="w-full px-1">
+                      <Preview />
+                    </div>
+                    <div>
+                      <p
+                        className={cn(
+                          "text-xs font-medium",
+                          isActive && "text-primary",
+                        )}
+                      >
+                        {v.label}
+                      </p>
+                      <p className="text-[10px] text-muted-foreground leading-tight mt-0.5">
+                        {v.description}
+                      </p>
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          <Separator />
+
+          {/* Date picker visibility */}
+          <div className="flex items-center justify-between">
+            <div>
+              <Label className="text-sm font-medium">Show date picker</Label>
+              <p className="text-xs text-muted-foreground">
+                Let customers pick check-in and check-out dates. When disabled,
+                housing behaves like a flat-price ticket with no stay selection.
+              </p>
+            </div>
+            <Switch checked={showDates} onCheckedChange={updateShowDates} />
+          </div>
+
+          <Separator />
+
+          {/* Pricing Mode — only meaningful when dates are shown */}
+          <div
+            className={cn(
+              "flex items-center justify-between",
+              !showDates && "opacity-50",
+            )}
+          >
+            <div>
+              <Label className="text-sm font-medium">Price per night</Label>
+              <p className="text-xs text-muted-foreground">
+                Multiply the product price by the number of nights. Requires the
+                date picker to be enabled.
+              </p>
+            </div>
+            <Switch
+              checked={pricePerDay}
+              disabled={!showDates}
+              onCheckedChange={updatePricePerDay}
+            />
+          </div>
         </div>
-      </div>
-
-      <Separator />
-
-      {/* Date picker visibility */}
-      <div className="flex items-center justify-between">
-        <div>
-          <Label className="text-sm font-medium">Show date picker</Label>
-          <p className="text-xs text-muted-foreground">
-            Let customers pick check-in and check-out dates. When disabled,
-            housing behaves like a flat-price ticket with no stay selection.
-          </p>
-        </div>
-        <Switch checked={showDates} onCheckedChange={updateShowDates} />
-      </div>
-
-      <Separator />
-
-      {/* Pricing Mode — only meaningful when dates are shown */}
-      <div
-        className={cn(
-          "flex items-center justify-between",
-          !showDates && "opacity-50",
-        )}
-      >
-        <div>
-          <Label className="text-sm font-medium">Price per night</Label>
-          <p className="text-xs text-muted-foreground">
-            Multiply the product price by the number of nights. Requires the
-            date picker to be enabled.
-          </p>
-        </div>
-        <Switch
-          checked={pricePerDay}
-          disabled={!showDates}
-          onCheckedChange={updatePricePerDay}
-        />
-      </div>
-
-      <Separator />
+      </CollapsibleSection>
 
       <SectionsEditor
         sections={parsed.sections}
