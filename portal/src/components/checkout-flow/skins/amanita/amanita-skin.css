@@ -32,8 +32,7 @@
   --color-forest: #153b34;
   --color-violet: #736b93;
 
-  /* ornament tints consumed by generic templates (VariantHero's bullet) */
-  --hero-bullet-color: var(--color-sand);
+  /* tints consumed by generic templates (VariantHero) */
   --hero-badge-border-color: rgba(193, 170, 136, 0.55);
   --hero-badge-bg-color: rgba(193, 170, 136, 0.12);
   --hero-text-color: rgba(241, 235, 227, 0.85);
@@ -112,6 +111,31 @@
   display: none;
 }
 
+/* ── 4b · Thin scrollbar ────────────────────────────────────────── */
+/* Replaces the chunky native scrollbar on the skin's scrollable
+   surfaces (e.g. the FAQs drawer) with the same slim, brand-tinted one
+   the backoffice uses. Scoped to descendants so the outer checkout
+   scroll (an ancestor, hidden via .no-scrollbar) is untouched. Native
+   <select> dropdown lists are OS-rendered and cannot be restyled. */
+.checkout-amanita {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(193, 170, 136, 0.5) transparent;
+}
+.checkout-amanita ::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.checkout-amanita ::-webkit-scrollbar-track {
+  background: transparent;
+}
+.checkout-amanita ::-webkit-scrollbar-thumb {
+  background-color: rgba(193, 170, 136, 0.5);
+  border-radius: 9999px;
+}
+.checkout-amanita ::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(193, 170, 136, 0.75);
+}
+
 /* ── 5 · Ornamental buttons ─────────────────────────────────────── */
 /* The frame art (webp with a transparent interior) is stretched
    100%/100% over its own rounded navy background — gems that
@@ -123,17 +147,17 @@
    Assets rewritten to /checkout-skins/amanita/... */
 .checkout-amanita .btn-ornate,
 .checkout-amanita .btn-ornate-2 {
-  background-color: rgba(7, 19, 34, 0.92) !important;
-  background-size: 100% 100% !important;
-  background-repeat: no-repeat !important;
-  border-radius: 12px !important;
-  color: #f1ebe3 !important;
+  background-color: rgba(7, 19, 34, 0.92);
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  border-radius: 12px;
+  color: #f1ebe3;
 }
 .checkout-amanita .btn-ornate {
-  background-image: url("/checkout-skins/amanita/btn-primary.webp") !important;
+  background-image: url("/checkout-skins/amanita/btn-primary.webp");
 }
 .checkout-amanita .btn-ornate-2 {
-  background-image: url("/checkout-skins/amanita/btn-secondary-1.webp") !important;
+  background-image: url("/checkout-skins/amanita/btn-secondary-1.webp");
 }
 
 /* `.btn-gold-fill` turns an ornate button into a flat gold plate (the frame
@@ -146,13 +170,13 @@
    The `!important`s match the rules they override above. */
 .checkout-amanita .btn-ornate.btn-gold-fill,
 .checkout-amanita .btn-ornate-2.btn-gold-fill {
-  background-color: #bfa67f !important;
-  color: #0a1a24 !important;
-  text-shadow: none !important;
+  background-color: #bfa67f;
+  color: #0a1a24;
+  text-shadow: none;
 }
 .checkout-amanita .btn-ornate.btn-gold-fill:hover,
 .checkout-amanita .btn-ornate-2.btn-gold-fill:hover {
-  background-color: #cdb48c !important;
+  background-color: #cdb48c;
 }
 
 /* Also the focus ring: the reference does this with `focus-visible:ring-*`
@@ -160,14 +184,14 @@
    expressed here instead. */
 .checkout-amanita .ck-gold,
 .checkout-amanita .ck-gold:hover {
-  box-shadow: 0 0 0 1px rgba(84, 62, 26, 0.22) !important;
+  box-shadow: 0 0 0 1px rgba(84, 62, 26, 0.22);
 }
 .checkout-amanita .ck-gold:focus-visible {
   outline: none;
   box-shadow:
     0 0 0 1px rgba(84, 62, 26, 0.22),
     0 0 0 2px var(--color-deep),
-    0 0 0 4px var(--color-accent) !important;
+    0 0 0 4px var(--color-accent);
 }
 
 /* ── 6 · Twinkling stars animation ──────────────────────────────── */
@@ -195,10 +219,10 @@
   .checkout-amanita *,
   .checkout-amanita *::before,
   .checkout-amanita *::after {
-    animation-duration: 0.001ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.001ms !important;
-    scroll-behavior: auto !important;
+    animation-duration: 0.001ms;
+    animation-iteration-count: 1;
+    transition-duration: 0.001ms;
+    scroll-behavior: auto;
   }
 }
 
@@ -346,4 +370,18 @@
 .checkout-amanita .ck-gem-flourish {
   aspect-ratio: 1400 / 123;
   mask-image: url(/checkout-skins/amanita/sep-gem-flourish.webp);
+}
+
+/* Hero bullet ornament: same gold star as <GoldStar>, but reached from the
+   generic VariantHero, which can't import skin code. star.svg is petrol, so
+   it's masked and repainted sand rather than used as an <img>. */
+.checkout-amanita .ck-hero-bullet {
+  display: inline-block;
+  width: 0.875rem;
+  height: 0.875rem;
+  background-color: var(--color-sand);
+  mask-image: url(/checkout-skins/amanita/ornaments/star.svg);
+  mask-repeat: no-repeat;
+  mask-position: center;
+  mask-size: contain;
 }

@@ -184,8 +184,6 @@
     "sold_out": "Sold out",
     "sale_upcoming": "Upcoming",
     "sale_ended": "Ended",
-    "buyer_step_title": "Your information",
-    "buyer_step_description": "Complete your information before payment.",
     "buyer_hero_title": "You're one step away!",
     "buyer_hero_subtitle": "We need a couple of details to reserve your spot.",
     "buyer_hero_trust": "Your privacy matters. We don't share your data with third parties.",
@@ -297,12 +295,15 @@
       "buyer_title": "You're one step away!",
       "buyer_intro": "Just a few details to issue your tickets — then all that's left is to confirm.",
       "buyer_privacy": "Your data travels safely: we only use it to issue your tickets and contact you about your purchase.",
+      "buyer_placeholder_email": "you@email.com",
+      "buyer_placeholder_first_name": "Your first name",
+      "buyer_placeholder_last_name": "Your last name",
       "whatsapp_country_aria": "WhatsApp country code",
       "confirm_kicker": "Last step",
       "confirm_title": "Confirm",
       "confirm_intro": "Review your order before moving on to payment.",
       "confirm_order_title": "Your order",
-      "confirm_empty_title": "You haven't picked your passes yet",
+      "confirm_empty_title": "You haven't picked your tickets yet",
       "confirm_empty_body": "Head back to the tickets section and choose how you want to experience the event.",
       "confirm_go_tickets": "See tickets",
       "confirm_patron_label": "Community contribution",
@@ -338,8 +339,7 @@
       "catalog_show_less": "Show less",
       "catalog_add_aria": "Add {{product}}",
       "catalog_add_one_aria": "Add one more {{product}}",
-      "catalog_remove_one_aria": "Remove one {{product}}",
-      "confirm_cta": "Confirm purchase"
+      "catalog_remove_one_aria": "Remove one {{product}}"
     }
   },
   "openCheckout": {
@@ -470,7 +470,6 @@
   "profile": {
     "my_profile": "My Profile",
     "header_subtitle": "Manage your {{tenant}}'s experience and history",
-    "my_collectibles": "My Collectibles",
     "invoices": "Invoices",
     "edit_profile": "Edit Profile",
     "hide_linked_emails": "Hide linked emails",

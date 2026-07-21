@@ -208,6 +208,7 @@ export function FieldConfigPanel({
             onChange={(e) => handleChange("label", e.target.value)}
             placeholder="Field label"
           />
+          <p className="text-xs text-muted-foreground">Key: {field.name}</p>
         </div>
       )}
 

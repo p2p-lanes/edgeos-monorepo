@@ -19,6 +19,16 @@ const nextConfig: NextConfig = {
         source: "/_next/static/:path*",
         headers: [{ key: "Access-Control-Allow-Origin", value: "*" }],
       },
+      // Skin art reached from a stylesheet resolves against the CDN, not the
+      // tenant domain, so it is cross-origin for the same reason fonts are.
+      // Chrome fetches `mask-image` in CORS mode (`background-image` it does
+      // not), so without this the masked pieces — the hero bullet star, the
+      // `.ck-gem-*` separators — silently paint nothing while the plain
+      // backgrounds beside them load fine.
+      {
+        source: "/checkout-skins/:path*",
+        headers: [{ key: "Access-Control-Allow-Origin", value: "*" }],
+      },
     ]
   },
   transpilePackages: ["@edgeos/shared-form-ui", "@edgeos/shared-events"],

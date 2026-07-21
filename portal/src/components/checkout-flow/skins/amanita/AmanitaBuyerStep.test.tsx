@@ -12,6 +12,7 @@
  */
 import { fireEvent, render, screen } from "@testing-library/react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
+import type { TicketingStepPublic } from "@/client"
 import type { ApplicationFormSchema } from "@/types/form-schema"
 import AmanitaBuyerStep from "./AmanitaBuyerStep"
 
@@ -71,11 +72,77 @@ describe("AmanitaBuyerStep — schema-driven rendering", () => {
     expect(screen.getByLabelText("Email")).toBeTruthy()
   })
 
+  describe("structural field placeholders", () => {
+    const NAME_FIELDS = {
+      first_name: {
+        type: "text",
+        label: "Nombre",
+        required: true,
+        target: "human",
+        position: 1,
+      },
+      last_name: {
+        type: "text",
+        label: "Apellido",
+        required: true,
+        target: "human",
+        position: 2,
+      },
+    }
+
+    it("suggests example text in email, first name and last name", () => {
+      buyerFormSchema = schema({ email: EMAIL_FIELD, ...NAME_FIELDS })
+      render(<AmanitaBuyerStep />)
+
+      expect(
+        (screen.getByLabelText("Email") as HTMLInputElement).placeholder,
+      ).toBe("checkout.amanita.buyer_placeholder_email")
+      expect(
+        (screen.getByLabelText("Nombre") as HTMLInputElement).placeholder,
+      ).toBe("checkout.amanita.buyer_placeholder_first_name")
+      expect(
+        (screen.getByLabelText("Apellido") as HTMLInputElement).placeholder,
+      ).toBe("checkout.amanita.buyer_placeholder_last_name")
+    })
+
+    it("never overrides a placeholder the organizer authored", () => {
+      buyerFormSchema = schema({
+        email: { ...EMAIL_FIELD, placeholder: "socio@club.com" },
+      })
+      render(<AmanitaBuyerStep />)
+
+      expect(
+        (screen.getByLabelText("Email") as HTMLInputElement).placeholder,
+      ).toBe("socio@club.com")
+    })
+
+    it("leaves a field the skin knows nothing about without one", () => {
+      buyerFormSchema = schema(
+        {},
+        {
+          instagram: {
+            type: "text",
+            label: "Instagram",
+            required: false,
+            target: "human",
+            position: 0,
+          },
+        },
+      )
+      render(<AmanitaBuyerStep />)
+
+      expect(
+        (screen.getByLabelText("Instagram") as HTMLInputElement).placeholder,
+      ).toBe("")
+    })
+  })
+
   describe("section heading", () => {
     // The structural email/first_name/last_name carry no section_id, so
     // getCheckoutSchemaSections parks them in a synthetic "_unsectioned_base"
-    // group titled with a hardcoded "Personal information". Rendering that
-    // alongside the organizer's own section printed the heading twice.
+    // group titled with a hardcoded "Personal information". The buyer step
+    // suppresses every section heading, so neither that artifact nor the
+    // organizer's own section label ever reaches the card.
     function twoSectionSchema() {
       return {
         base_fields: {
@@ -108,10 +175,13 @@ describe("AmanitaBuyerStep — schema-driven rendering", () => {
       } as unknown as ApplicationFormSchema
     }
 
-    it("prints the organizer's heading exactly once", () => {
+    // The step already leads with its own title, so the buyer form prints
+    // no section heading at all — neither the organizer's own section label
+    // nor the synthetic "Personal information" portal artifact.
+    it("never prints the organizer's section heading", () => {
       buyerFormSchema = twoSectionSchema()
       render(<AmanitaBuyerStep />)
-      expect(screen.getAllByText("Personal Information")).toHaveLength(1)
+      expect(screen.queryByText("Personal Information")).toBeNull()
     })
 
     it("never prints the synthetic 'Personal information' group title", () => {
@@ -120,17 +190,10 @@ describe("AmanitaBuyerStep — schema-driven rendering", () => {
       expect(screen.queryByText("Personal information")).toBeNull()
     })
 
-    // "arriba de todo los campos" — the heading leads, every field follows it.
-    it("puts the heading above every field", () => {
+    it("renders no section heading element", () => {
       buyerFormSchema = twoSectionSchema()
       const { container } = render(<AmanitaBuyerStep />)
-      const heading = screen.getByText("Personal Information")
-      const email = screen.getByLabelText("Email")
-      expect(
-        heading.compareDocumentPosition(email) &
-          Node.DOCUMENT_POSITION_FOLLOWING,
-      ).toBeTruthy()
-      expect(container.querySelectorAll("h3")).toHaveLength(1)
+      expect(container.querySelectorAll("h3")).toHaveLength(0)
     })
   })
 
@@ -315,6 +378,60 @@ describe("AmanitaBuyerStep — schema-driven rendering", () => {
       invalidFields = ["email"]
       render(<AmanitaBuyerStep />)
       expect(screen.queryByText("checkout.field_required")).toBeNull()
+    })
+  })
+
+  // The stepper hides its generic SectionHeader on this skin, so the step
+  // config's copy reaches the shopper through this section's shell or not at
+  // all. It used to hardcode the skin's strings: an organizer renamed the step
+  // in the backoffice and nothing on screen moved.
+  describe("step heading", () => {
+    const CONFIG = {
+      id: "s1",
+      step_type: "buyer",
+      title: "Tus Datos",
+      description: "Necesitamos saber a quién le emitimos las entradas.",
+      watermark: "Paso 2",
+      template_config: null,
+    } as unknown as TicketingStepPublic
+
+    it("takes title, description and watermark from the step config", () => {
+      render(<AmanitaBuyerStep stepConfig={CONFIG} />)
+      expect(screen.getByText("Tus Datos")).toBeTruthy()
+      expect(
+        screen.getByText("Necesitamos saber a quién le emitimos las entradas."),
+      ).toBeTruthy()
+      expect(screen.getByText("Paso 2")).toBeTruthy()
+    })
+
+    it("prefers a template_config kicker over the watermark", () => {
+      render(
+        <AmanitaBuyerStep
+          stepConfig={
+            { ...CONFIG, template_config: { kicker: "Casi listo" } } as never
+          }
+        />,
+      )
+      expect(screen.getByText("Casi listo")).toBeTruthy()
+      expect(screen.queryByText("Paso 2")).toBeNull()
+    })
+
+    // An organizer who cleared the description wants no intro — not the
+    // skin's opinion of one.
+    it("shows no intro when the configured step has no description", () => {
+      render(
+        <AmanitaBuyerStep
+          stepConfig={{ ...CONFIG, description: null } as never}
+        />,
+      )
+      expect(screen.queryByText("checkout.amanita.buyer_intro")).toBeNull()
+    })
+
+    it("falls back to the skin's copy when no step is configured", () => {
+      render(<AmanitaBuyerStep />)
+      expect(screen.getByText("checkout.amanita.buyer_title")).toBeTruthy()
+      expect(screen.getByText("checkout.amanita.buyer_kicker")).toBeTruthy()
+      expect(screen.getByText("checkout.amanita.buyer_intro")).toBeTruthy()
     })
   })
 

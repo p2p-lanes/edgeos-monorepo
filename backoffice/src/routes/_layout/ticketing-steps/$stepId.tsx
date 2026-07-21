@@ -22,6 +22,12 @@ import {
   TEMPLATE_DEFINITIONS,
 } from "@/components/ticketing-step-builder/constants"
 import { TEMPLATE_CONFIG_REGISTRY } from "@/components/ticketing-step-builder/template-configs"
+import {
+  buildFaqsValue,
+  type FaqItem,
+  FaqItemsEditor,
+  parseFaqItems,
+} from "@/components/ticketing-step-builder/template-configs/FaqItemsEditor"
 import { TranslationManager } from "@/components/translations/TranslationManager"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
@@ -239,6 +245,23 @@ function StepConfigContent({ stepId }: { stepId: string }) {
     ? TEMPLATE_CONFIG_REGISTRY[template]
     : undefined
 
+  // This step's own FAQs, stored under `template_config.faqs` — nested rather
+  // than at the top level so they can't collide with the `faqs` template's own
+  // `items`, which feed the global drawer.
+  const stepFaqs = (templateConfig?.faqs ?? null) as Record<
+    string,
+    unknown
+  > | null
+  const stepFaqsTitle = (stepFaqs?.title as string) ?? ""
+  const stepFaqItems = parseFaqItems(stepFaqs?.items)
+
+  const setStepFaqs = (title: string, items: FaqItem[]) => {
+    setTemplateConfig({
+      ...templateConfig,
+      faqs: buildFaqsValue(title, items),
+    })
+  }
+
   const hasTranslations = (popup?.supported_languages?.length ?? 0) > 1
 
   return (
@@ -370,7 +393,8 @@ function StepConfigContent({ stepId }: { stepId: string }) {
               </div>
 
               {!CONTENT_ONLY_TEMPLATES.has(template) &&
-                step.step_type !== "confirm" && (
+                step.step_type !== "confirm" &&
+                step.step_type !== "buyer" && (
                   <div className="flex flex-col gap-1.5">
                     <Label htmlFor="step-product-category">
                       Product Category
@@ -426,6 +450,64 @@ function StepConfigContent({ stepId }: { stepId: string }) {
               </div>
             </CardContent>
           </Card>
+
+          {/* This step's own FAQs, shown below its content. Hidden on the
+              `faqs` template, whose whole purpose is already a question list —
+              a step there would carry two. */}
+          {template !== "faqs" && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">FAQs</CardTitle>
+                <CardDescription>
+                  Questions shown below this step's content. Rendered only on
+                  the Amanita checkout skin.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <FaqItemsEditor
+                  title={stepFaqsTitle}
+                  items={stepFaqItems}
+                  titleDescription="Heading shown above the questions. Leave empty for none."
+                  onChangeTitle={(next) => setStepFaqs(next, stepFaqItems)}
+                  onChangeItems={(next) => setStepFaqs(stepFaqsTitle, next)}
+                />
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Pay button label (only for confirm step) */}
+          {step.step_type === "confirm" && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Pay Button</CardTitle>
+                <CardDescription>
+                  The button that completes the purchase
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="confirm-cta-label">Button Label</Label>
+                  <Input
+                    id="confirm-cta-label"
+                    value={(templateConfig?.cta_label as string) ?? ""}
+                    onChange={(e) =>
+                      setTemplateConfig({
+                        ...templateConfig,
+                        cta_label: e.target.value || undefined,
+                      })
+                    }
+                    placeholder="Pagar"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Shown on both the bottom bar's button and the one inside the
+                    confirm card — they always read the same. Leave empty to use
+                    the checkout's own wording, translated per shopper. Once
+                    set, translate it in this step's Translations tab.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Insurance Card Content (only for confirm step) */}
           {step.step_type === "confirm" &&
@@ -578,8 +660,11 @@ function StepConfigContent({ stepId }: { stepId: string }) {
               </Alert>
             ))}
 
-          {/* Template Selection & Configuration (hidden for confirm step) */}
-          {step.step_type !== "confirm" && (
+          {/* Template Selection & Configuration (hidden for the steps whose
+              template is not a choice: confirm, and buyer — the checkout
+              renders both by step_type, so swapping their template would only
+              produce a step that no longer draws itself.) */}
+          {step.step_type !== "confirm" && step.step_type !== "buyer" && (
             <>
               <Card>
                 <CardHeader>
@@ -693,8 +778,12 @@ function StepConfigContent({ stepId }: { stepId: string }) {
             <TranslationManager
               entityType="ticketing_step"
               entityId={step.id}
-              translatableFields={["title", "description"]}
-              sourceData={{ title: step.title, description: step.description }}
+              translatableFields={["title", "description", "watermark"]}
+              sourceData={{
+                title: step.title,
+                description: step.description,
+                watermark: step.watermark ?? "",
+              }}
               nestedField="template_config"
               nestedSource={step.template_config}
               supportedLanguages={popup!.supported_languages!}

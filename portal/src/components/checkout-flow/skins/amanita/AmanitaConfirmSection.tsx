@@ -23,32 +23,35 @@
  * Payment triggers: the mockup's in-card "Confirmar compra" button was
  * originally omitted here, leaving the stepper's fixed bottom bar as the sole
  * trigger. It is now rendered alongside the bar's, matching the mockup, so the
- * same payment has two buttons. They are deliberately NOT independent: `onPay`
- * and `payDisabled` are the bar's own handler and gate, passed down. Deriving
- * a second `canPay` here from `useCheckout()` would let the two disagree — the
- * card could still look armed while the bar is mid-submit, which is exactly
- * how a double charge gets in.
+ * same payment has two buttons. They are deliberately NOT independent: `onPay`,
+ * `payDisabled` and `payLabel` are the bar's own handler, gate and label,
+ * passed down. Deriving a second `canPay` here from `useCheckout()` would let
+ * the two disagree — the card could still look armed while the bar is
+ * mid-submit, which is exactly how a double charge gets in. The label is
+ * threaded for the milder version of the same failure: this card used to print
+ * its own "Confirmar compra" next to a bar that said "Pagar".
  */
+import type { LucideIcon } from "lucide-react"
 import {
   AlertCircle,
   CloudRain,
-  HandCoins,
   Heart,
   Home,
   Loader2,
   ShoppingBag,
-  Ticket,
   Utensils,
   X,
 } from "lucide-react"
+import Image from "next/image"
 import { useState } from "react"
 import { useTranslation } from "react-i18next"
+import type { TicketingStepPublic } from "@/client"
 import { useApplication } from "@/providers/applicationProvider"
 import { useCheckout } from "@/providers/checkoutProvider"
 import { useCityProvider } from "@/providers/cityProvider"
 import { formatCheckoutDate, formatCurrency } from "@/types/checkout"
 import { CornerFrame } from "./Ornaments"
-import { SectionShell } from "./SectionShell"
+import { SectionShell, shellCopy } from "./SectionShell"
 
 const CREAM_CARD_STYLE = {
   border: "1px solid rgba(193,170,136,0.4)",
@@ -59,11 +62,34 @@ const ROW_BORDER = "rgba(4,34,49,0.12)"
 const MUTED = "#4a6670"
 const ERROR = "#b3271e"
 
+// Per-line remove control for the order summary, so an item can be dropped
+// from the cart here instead of scrolling back to its product card. Changing
+// quantity stays on the catalog card; here the cross clears the whole line.
+function RemoveButton({
+  name,
+  onClick,
+}: {
+  name: string
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={`Remove ${name}`}
+      className="p-1 shrink-0 transition-colors hover:opacity-70"
+      style={{ color: MUTED }}
+    >
+      <X className="h-4 w-4" />
+    </button>
+  )
+}
+
 function SectionLabel({
   icon: Icon,
   children,
 }: {
-  icon: typeof Ticket
+  icon: LucideIcon
   children: React.ReactNode
 }) {
   return (
@@ -83,12 +109,23 @@ export default function AmanitaConfirmSection({
   onGoToTickets,
   onPay,
   payDisabled,
+  payLabel,
+  stepConfig,
 }: {
   onGoToTickets?: () => void
   /** The stepper's own payment handler — see the header note on why this is
    *  passed in rather than pulled from `useCheckout()` here. */
   onPay?: () => void
   payDisabled?: boolean
+  /** The bottom bar's own CTA label, so both triggers for this payment read
+   *  the same. Passed in for the same reason `onPay` is — there is
+   *  deliberately no local fallback, since re-deriving it here is exactly how
+   *  the two came to disagree. */
+  payLabel?: string
+  /** The organizer's confirm step, when one is configured — it names this
+   *  section. Optional: the funnel shows a confirm step whether or not a row
+   *  exists for it, and then the skin's own copy stands in. */
+  stepConfig?: TicketingStepPublic | null
 }) {
   const { t } = useTranslation()
   const {
@@ -104,12 +141,31 @@ export default function AmanitaConfirmSection({
     monthUpgradeCredit,
     termsAccepted,
     setTermsAccepted,
-    stepConfigs,
     buyerValues,
     buyerGeneralError,
     removeMealPlan,
+    togglePass,
+    resetDayProduct,
+    removeDynamicItem,
+    clearHousing,
+    updateMerchQuantity,
+    clearPatron,
     housingDatesShown,
   } = useCheckout()
+
+  // Removing a pass mirrors the footer cart: day passes reset, everything else
+  // toggles its quantity to zero.
+  const handleRemovePass = (attendeeId: string, productId: string) => {
+    const pass = cart.passes.find(
+      (p) => p.attendeeId === attendeeId && p.productId === productId,
+    )
+    if (!pass) return
+    if (pass.product.duration_type === "day") {
+      resetDayProduct(attendeeId, productId)
+    } else {
+      togglePass(attendeeId, productId, 0)
+    }
+  }
   const { getCity } = useCityProvider()
   const popup = getCity()
   const { getRelevantApplication } = useApplication()
@@ -188,15 +244,41 @@ export default function AmanitaConfirmSection({
   const showEligibleQualifier = summary.discount > 0 && nonDiscountableTotal > 0
   const notEligibleCaption = t("checkout.discount.not_eligible_caption")
 
+  // `summary.subtotal` already contains the service fee (useCartSummary.ts:
+  // `originalSubtotal`), but the ladder below prints that fee as its own line
+  // on the way to the Total — so showing it raw counted the fee twice on
+  // screen and, with nothing discounted, made Subtotal and Total identical.
+  // Taking it out is what makes the column add up: subtotal − adjustments +
+  // fee = total. Insurance stays in, deliberately: it has no line of its own
+  // down here, so pulling it out would leave the arithmetic short instead.
+  const subtotalBeforeFee = summary.subtotal - summary.contributionSubtotal
+
+  const copy = shellCopy(stepConfig, {
+    kicker: t("checkout.amanita.confirm_kicker"),
+    title: t("checkout.amanita.confirm_title"),
+    intro: t("checkout.amanita.confirm_intro"),
+  })
+
   if (!hasCartItems) {
     return (
-      <SectionShell
-        gem="bold"
-        kicker={t("checkout.amanita.confirm_kicker")}
-        title={t("checkout.amanita.confirm_title")}
-      >
+      /* No intro here even when one is configured: it describes reviewing an
+         order, and there is nothing to review yet — the empty state says so
+         in its own words. */
+      <SectionShell gem="bold" kicker={copy.kicker} title={copy.title}>
         <div className="flex flex-col items-center gap-4 py-10 text-center">
-          <ShoppingBag className="w-12 h-12 text-cream/60" aria-hidden="true" />
+          {/* The brand mark, not a shopping bag: this is the one spot on the
+              skin where a generic e-commerce glyph stood in for it. Same asset
+              and intrinsic size as the nav's "home" pill. `opacity-60` keeps
+              the muting the icon it replaces had, so the title stays the loud
+              thing here. */}
+          <Image
+            src="/checkout-skins/amanita/logo-hongo.webp"
+            alt=""
+            aria-hidden
+            width={115}
+            height={30}
+            className="opacity-60"
+          />
           <p className="font-display text-xl uppercase tracking-wide text-cream">
             {t("checkout.amanita.confirm_empty_title")}
           </p>
@@ -221,9 +303,9 @@ export default function AmanitaConfirmSection({
   return (
     <SectionShell
       gem="bold"
-      kicker={t("checkout.amanita.confirm_kicker")}
-      title={t("checkout.amanita.confirm_title")}
-      intro={t("checkout.amanita.confirm_intro")}
+      kicker={copy.kicker}
+      title={copy.title}
+      intro={copy.intro}
     >
       {buyerGeneralError ? (
         <div
@@ -270,12 +352,10 @@ export default function AmanitaConfirmSection({
             {t("checkout.amanita.confirm_order_title")}
           </h3>
 
-          {/* Passes */}
+          {/* Passes — no group heading: "Tu compra" already says what the
+              list is, and the mockup runs the lines flat under it. */}
           {cart.passes.length > 0 && (
             <div className="px-5 py-4 md:px-8">
-              <SectionLabel icon={Ticket}>
-                {t("checkout.step_short.passes")}
-              </SectionLabel>
               <div className="space-y-3">
                 {Object.entries(passesByAttendee).map(
                   ([attendeeId, passes]) => (
@@ -290,8 +370,7 @@ export default function AmanitaConfirmSection({
                         >
                           <div className="flex flex-col">
                             <span style={{ color: MUTED }}>
-                              {pass.quantity > 1 && <>{pass.quantity} × </>}
-                              {pass.product.name}
+                              {pass.quantity} × {pass.product.name}
                             </span>
                             {isNonDiscountable(pass.product) && (
                               <span
@@ -302,9 +381,17 @@ export default function AmanitaConfirmSection({
                               </span>
                             )}
                           </div>
-                          <span className="font-medium text-deep shrink-0">
-                            {formatCurrency(pass.originalPrice ?? pass.price)}
-                          </span>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <span className="font-medium text-deep">
+                              {formatCurrency(pass.originalPrice ?? pass.price)}
+                            </span>
+                            <RemoveButton
+                              name={pass.product.name}
+                              onClick={() =>
+                                handleRemovePass(attendeeId, pass.productId)
+                              }
+                            />
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -317,13 +404,10 @@ export default function AmanitaConfirmSection({
           {/* Dynamic items (templated steps) */}
           {Object.entries(cart.dynamicItems).map(([stepType, items]) => {
             if (items.length === 0) return null
-            const stepConfig = stepConfigs.find((s) => s.step_type === stepType)
-            const label = stepConfig?.title ?? stepType
             return (
               <div key={stepType}>
                 <div className="border-t" style={{ borderColor: ROW_BORDER }} />
                 <div className="px-5 py-4 md:px-8">
-                  <SectionLabel icon={Ticket}>{label}</SectionLabel>
                   <div className="space-y-1">
                     {items.map((item) => (
                       <div
@@ -332,8 +416,7 @@ export default function AmanitaConfirmSection({
                       >
                         <div className="flex flex-col">
                           <span style={{ color: MUTED }}>
-                            {item.quantity > 1 && <>{item.quantity} × </>}
-                            {item.product.name}
+                            {item.quantity} × {item.product.name}
                           </span>
                           {isNonDiscountable(item.product) && (
                             <span
@@ -344,9 +427,17 @@ export default function AmanitaConfirmSection({
                             </span>
                           )}
                         </div>
-                        <span className="font-medium text-deep shrink-0">
-                          {formatCurrency(item.price)}
-                        </span>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className="font-medium text-deep">
+                            {formatCurrency(item.price)}
+                          </span>
+                          <RemoveButton
+                            name={item.product.name}
+                            onClick={() =>
+                              removeDynamicItem(stepType, item.productId)
+                            }
+                          />
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -366,10 +457,7 @@ export default function AmanitaConfirmSection({
                 <div className="flex items-start justify-between">
                   <div>
                     <p className="text-sm font-medium text-deep">
-                      {cart.housing.quantity > 1 && (
-                        <>{cart.housing.quantity} × </>
-                      )}
-                      {cart.housing.product.name}
+                      {cart.housing.quantity} × {cart.housing.product.name}
                     </p>
                     <p className="text-xs" style={{ color: MUTED }}>
                       {cart.housing.pricePerDay !== false
@@ -391,9 +479,15 @@ export default function AmanitaConfirmSection({
                       </p>
                     )}
                   </div>
-                  <span className="font-medium text-deep text-sm shrink-0">
-                    {formatCurrency(cart.housing.totalPrice)}
-                  </span>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="font-medium text-deep text-sm">
+                      {formatCurrency(cart.housing.totalPrice)}
+                    </span>
+                    <RemoveButton
+                      name={cart.housing.product.name}
+                      onClick={clearHousing}
+                    />
+                  </div>
                 </div>
               </div>
             </>
@@ -415,8 +509,7 @@ export default function AmanitaConfirmSection({
                     >
                       <div className="flex flex-col">
                         <span style={{ color: MUTED }}>
-                          {item.quantity > 1 && <>{item.quantity} × </>}
-                          {item.product.name}
+                          {item.quantity} × {item.product.name}
                         </span>
                         {isNonDiscountable(item.product) && (
                           <span
@@ -427,9 +520,15 @@ export default function AmanitaConfirmSection({
                           </span>
                         )}
                       </div>
-                      <span className="font-medium text-deep shrink-0">
-                        {formatCurrency(item.totalPrice)}
-                      </span>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="font-medium text-deep">
+                          {formatCurrency(item.totalPrice)}
+                        </span>
+                        <RemoveButton
+                          name={item.product.name}
+                          onClick={() => updateMerchQuantity(item.productId, 0)}
+                        />
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -457,9 +556,15 @@ export default function AmanitaConfirmSection({
                       {notEligibleCaption}
                     </span>
                   </div>
-                  <span className="font-medium text-deep shrink-0">
-                    {formatCurrency(cart.patron.amount)}
-                  </span>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="font-medium text-deep">
+                      {formatCurrency(cart.patron.amount)}
+                    </span>
+                    <RemoveButton
+                      name={t("checkout.amanita.confirm_patron_label")}
+                      onClick={clearPatron}
+                    />
+                  </div>
                 </div>
               </div>
             </>
@@ -502,17 +607,12 @@ export default function AmanitaConfirmSection({
                         <span className="font-medium text-deep">
                           {formatCurrency(mp.product.price)}
                         </span>
-                        <button
-                          type="button"
+                        <RemoveButton
+                          name={mp.product.name}
                           onClick={() =>
                             removeMealPlan(mp.attendeeId, mp.productId)
                           }
-                          aria-label={`Remove ${mp.product.name}`}
-                          className="p-1 transition-colors"
-                          style={{ color: MUTED }}
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
+                        />
                       </div>
                     </div>
                   ))}
@@ -541,118 +641,177 @@ export default function AmanitaConfirmSection({
             </>
           )}
 
-          {/* Contribution fee */}
-          {summary.contributionSubtotal > 0 && (
-            <>
-              <div className="border-t" style={{ borderColor: ROW_BORDER }} />
-              <div className="px-5 py-4 md:px-8">
-                <div className="flex items-center justify-between gap-3 text-sm">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <HandCoins
-                      className="w-4 h-4 shrink-0"
-                      style={{ color: MUTED }}
-                    />
-                    <span className="text-deep">
-                      {popup?.contribution_label ||
-                        t("checkout.contribution.fallbackLabel")}
-                      {popup?.contribution_percentage
-                        ? ` (${Number(popup.contribution_percentage)}%)`
-                        : ""}
-                    </span>
-                  </div>
-                  <span className="font-medium text-deep shrink-0">
-                    {formatCurrency(summary.contributionSubtotal)}
-                  </span>
-                </div>
-                {popup?.contribution_description && (
-                  <p className="text-xs mt-2 ml-6" style={{ color: MUTED }}>
-                    {popup.contribution_description}
-                  </p>
-                )}
-              </div>
-            </>
-          )}
-
-          {/* Coupon */}
+          {/* Coupon — no rule above it: it reads as part of the order, and the
+              only divider before the totals is the one the ladder sits on. */}
           {popup?.allows_coupons && hasDiscountableItems && (
-            <>
-              <div className="border-t" style={{ borderColor: ROW_BORDER }} />
-              <div className="px-5 py-4 md:px-8">
-                <label
-                  htmlFor="ck-cupon"
-                  className="font-condensed text-xs font-medium uppercase tracking-[0.16em] text-primary"
-                >
-                  {t("checkout.amanita.confirm_coupon_label")}
-                </label>
-                <div className="mt-1.5 flex gap-2">
-                  <input
-                    id="ck-cupon"
-                    type="text"
-                    value={promoInput}
-                    onChange={(e) => {
-                      setPromoInput(e.target.value.toUpperCase())
-                      setPromoError("")
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault()
-                        handleApplyPromo()
-                      }
-                    }}
-                    placeholder={t(
-                      "checkout.amanita.confirm_coupon_placeholder",
-                    )}
-                    disabled={cart.promoCodeValid}
-                    className="w-full min-w-0 rounded-xl border px-4 py-2.5 text-sm uppercase text-deep outline-none transition-shadow focus:ring-2 focus:ring-accent disabled:opacity-60"
-                    style={{
-                      backgroundColor: "#faf6ef",
-                      borderColor: promoError ? ERROR : "rgba(4,34,49,0.18)",
-                    }}
-                  />
-                  {cart.promoCodeValid ? (
-                    <button
-                      type="button"
-                      onClick={handleClearPromo}
-                      aria-label={t("checkout.amanita.confirm_coupon_remove")}
-                      className="shrink-0 rounded-full border px-4 py-2.5 font-condensed text-xs font-medium uppercase tracking-[0.12em] text-deep transition-colors"
-                      style={{ borderColor: "rgba(4,34,49,0.18)" }}
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={handleApplyPromo}
-                      disabled={promoLoading || isLoading || !promoInput.trim()}
-                      className="shrink-0 rounded-full bg-primary px-5 py-2.5 font-condensed text-xs font-medium uppercase tracking-[0.12em] text-cream transition-colors hover:bg-deep disabled:opacity-60"
-                    >
-                      {promoLoading || isLoading ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        t("checkout.amanita.confirm_coupon_apply")
-                      )}
-                    </button>
-                  )}
-                </div>
-                {promoError && (
-                  <div
-                    className="flex items-center gap-1.5 text-xs mt-2"
-                    style={{ color: ERROR }}
+            <div className="px-5 py-4 md:px-8">
+              <label
+                htmlFor="ck-cupon"
+                className="font-condensed text-xs font-medium uppercase tracking-[0.16em] text-primary"
+              >
+                {t("checkout.amanita.confirm_coupon_label")}
+              </label>
+              <div className="mt-1.5 flex gap-2">
+                <input
+                  id="ck-cupon"
+                  type="text"
+                  value={promoInput}
+                  onChange={(e) => {
+                    setPromoInput(e.target.value.toUpperCase())
+                    setPromoError("")
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault()
+                      handleApplyPromo()
+                    }
+                  }}
+                  placeholder={t("checkout.amanita.confirm_coupon_placeholder")}
+                  disabled={cart.promoCodeValid}
+                  className="w-full min-w-0 rounded-xl border px-4 py-2.5 text-sm uppercase text-deep outline-none transition-shadow focus:ring-2 focus:ring-accent disabled:opacity-60"
+                  style={{
+                    backgroundColor: "#faf6ef",
+                    borderColor: promoError ? ERROR : "rgba(4,34,49,0.18)",
+                  }}
+                />
+                {cart.promoCodeValid ? (
+                  <button
+                    type="button"
+                    onClick={handleClearPromo}
+                    aria-label={t("checkout.amanita.confirm_coupon_remove")}
+                    className="shrink-0 rounded-full border px-4 py-2.5 font-condensed text-xs font-medium uppercase tracking-[0.12em] text-deep transition-colors"
+                    style={{ borderColor: "rgba(4,34,49,0.18)" }}
                   >
-                    <AlertCircle className="w-3 h-3" />
-                    <span>{promoError}</span>
-                  </div>
-                )}
-                {cart.promoCodeValid && (
-                  <p className="text-xs font-semibold mt-2 text-primary">
-                    {t("checkout.amanita.confirm_coupon_applied")}
-                  </p>
+                    <X className="w-4 h-4" />
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleApplyPromo}
+                    disabled={promoLoading || isLoading || !promoInput.trim()}
+                    className="shrink-0 rounded-full bg-primary px-5 py-2.5 font-condensed text-xs font-medium uppercase tracking-[0.12em] text-cream transition-colors hover:bg-deep disabled:opacity-60"
+                  >
+                    {promoLoading || isLoading ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      t("checkout.amanita.confirm_coupon_apply")
+                    )}
+                  </button>
                 )}
               </div>
-            </>
+              {promoError && (
+                <div
+                  className="flex items-center gap-1.5 text-xs mt-2"
+                  style={{ color: ERROR }}
+                >
+                  <AlertCircle className="w-3 h-3" />
+                  <span>{promoError}</span>
+                </div>
+              )}
+              {cart.promoCodeValid && (
+                <p className="text-xs font-semibold mt-2 text-primary">
+                  {t("checkout.amanita.confirm_coupon_applied")}
+                </p>
+              )}
+            </div>
           )}
 
           {/* Terms and conditions */}
+          {/* Totals — the mockup's reading order: Subtotal (of the items, fee
+              excluded), then every adjustment, then the service fee that gets
+              added on, then the Total itself. Read top to bottom the column
+              now arrives at the Total. Subtotal always shows: it is the top of
+              that ladder, and hiding it whenever nothing was discounted left
+              the fee looking like it was added to thin air. */}
+          <div
+            className="border-t px-5 py-4 md:px-8"
+            style={{ borderColor: ROW_BORDER }}
+          >
+            <div
+              className="flex items-center justify-between text-sm"
+              style={{ color: MUTED }}
+            >
+              <p>{t("checkout.amanita.confirm_subtotal_label")}</p>
+              <p className="font-condensed text-base">
+                {formatCurrency(subtotalBeforeFee)}
+              </p>
+            </div>
+            {summary.discount > 0 && (
+              <div className="mt-1 flex items-center justify-between text-sm text-primary">
+                <p>
+                  {showEligibleQualifier
+                    ? t("checkout.discount.promo_discount_eligible_label")
+                    : t("checkout.amanita.confirm_discount_label")}
+                </p>
+                <p className="font-condensed text-base">
+                  −{formatCurrency(summary.discount)}
+                </p>
+              </div>
+            )}
+            {isEditing && editCredit > 0 && (
+              <div className="mt-1 flex items-center justify-between text-sm text-primary">
+                <p>{t("checkout.amanita.confirm_edit_credit_label")}</p>
+                <p className="font-condensed text-base">
+                  −{formatCurrency(editCredit)}
+                </p>
+              </div>
+            )}
+            {monthUpgradeCredit > 0 && (
+              <div className="mt-1 flex items-center justify-between text-sm text-primary">
+                <p>{t("checkout.amanita.confirm_credit_label")}</p>
+                <p className="font-condensed text-base">
+                  −{formatCurrency(monthUpgradeCredit)}
+                </p>
+              </div>
+            )}
+            {accountCredit > 0 && (
+              <div className="mt-1 flex items-center justify-between text-sm text-primary">
+                <p>{t("checkout.amanita.confirm_account_credit_label")}</p>
+                <p className="font-condensed text-base">
+                  −{formatCurrency(accountCredit)}
+                </p>
+              </div>
+            )}
+            {summary.contributionSubtotal > 0 && (
+              <>
+                <div
+                  className="mt-1 flex items-center justify-between gap-3 text-sm"
+                  style={{ color: MUTED }}
+                >
+                  <p className="min-w-0">
+                    {popup?.contribution_label ||
+                      t("checkout.contribution.fallbackLabel")}
+                    {popup?.contribution_percentage
+                      ? ` (${Number(popup.contribution_percentage)}%)`
+                      : ""}
+                  </p>
+                  <p className="shrink-0 font-condensed text-base">
+                    {formatCurrency(summary.contributionSubtotal)}
+                  </p>
+                </div>
+                {popup?.contribution_description && (
+                  <p className="mt-1 text-xs" style={{ color: MUTED }}>
+                    {popup.contribution_description}
+                  </p>
+                )}
+              </>
+            )}
+            <div className="mt-2 flex items-end justify-between">
+              <p className="font-condensed text-sm font-medium uppercase tracking-[0.2em] text-primary">
+                {t("checkout.amanita.confirm_total_label")}
+              </p>
+              <p className="font-condensed text-3xl leading-none text-deep">
+                {formatCurrency(summary.grandTotal)}
+              </p>
+            </div>
+            {summary.grandTotal === 0 && (
+              <p className="mt-2 text-center text-sm text-primary">
+                {t("checkout.amanita.confirm_free_note")}
+              </p>
+            )}
+          </div>
+
+          {/* Terms — after the ladder, next to the button they gate. */}
           {popup?.terms_and_conditions_url && (
             <>
               <div className="border-t" style={{ borderColor: ROW_BORDER }} />
@@ -681,78 +840,18 @@ export default function AmanitaConfirmSection({
             </>
           )}
 
-          {/* Totals */}
-          <div
-            className="border-t px-5 py-4 md:px-8"
-            style={{ borderColor: ROW_BORDER }}
-          >
-            {summary.discount > 0 && (
-              <div
-                className="flex justify-between text-sm mb-2"
-                style={{ color: MUTED }}
-              >
-                <span>{t("checkout.amanita.confirm_subtotal_label")}</span>
-                <span>{formatCurrency(summary.subtotal)}</span>
-              </div>
-            )}
-            {summary.discount > 0 && (
-              <div className="flex justify-between text-sm mb-2 text-primary">
-                <span>
-                  {showEligibleQualifier
-                    ? t("checkout.discount.promo_discount_eligible_label")
-                    : t("checkout.amanita.confirm_discount_label")}
-                </span>
-                <span>-{formatCurrency(summary.discount)}</span>
-              </div>
-            )}
-            {isEditing && editCredit > 0 && (
-              <div className="flex justify-between text-sm mb-2 text-primary">
-                <span>{t("checkout.amanita.confirm_edit_credit_label")}</span>
-                <span>-{formatCurrency(editCredit)}</span>
-              </div>
-            )}
-            {monthUpgradeCredit > 0 && (
-              <div className="flex justify-between text-sm mb-2 text-primary">
-                <span>{t("checkout.amanita.confirm_credit_label")}</span>
-                <span>-{formatCurrency(monthUpgradeCredit)}</span>
-              </div>
-            )}
-            {accountCredit > 0 && (
-              <div className="flex justify-between text-sm mb-2 text-primary">
-                <span>
-                  {t("checkout.amanita.confirm_account_credit_label")}
-                </span>
-                <span>-{formatCurrency(accountCredit)}</span>
-              </div>
-            )}
-            <div className="flex items-end justify-between">
-              <p className="font-condensed text-sm font-medium uppercase tracking-[0.2em] text-primary">
-                {summary.discount > 0 || summary.credit > 0
-                  ? t("checkout.amanita.confirm_total_label")
-                  : t("checkout.amanita.confirm_subtotal_label")}
-              </p>
-              <p className="font-condensed text-3xl leading-none text-deep">
-                {formatCurrency(summary.grandTotal)}
-              </p>
-            </div>
-            {summary.grandTotal === 0 && (
-              <p className="mt-2 text-center text-sm text-primary">
-                {t("checkout.amanita.confirm_free_note")}
-              </p>
-            )}
-            {onPay && (
+          {onPay && (
+            <div className="px-5 pb-5 md:px-8 md:pb-8">
               <button
                 type="button"
                 onClick={onPay}
                 disabled={payDisabled}
-                className="btn-ornate-2 btn-gold-fill ck-gold mt-5 flex w-full items-center justify-center whitespace-nowrap py-3 font-condensed text-sm font-medium uppercase tracking-[0.12em] transition-all duration-200 hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50"
+                className="btn-ornate-2 btn-gold-fill ck-gold flex w-full items-center justify-center whitespace-nowrap py-3 font-condensed text-sm font-medium uppercase tracking-[0.12em] transition-all duration-200 hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {summary.grandTotal === 0
-                  ? t("checkout.actions.claim_pass")
-                  : t("checkout.amanita.confirm_cta")}
+                {payLabel}
               </button>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       </CornerFrame>
     </SectionShell>

@@ -542,8 +542,10 @@ export function useOpenCartPersistence({
         ? (state as CartSelectionState & { buyerEmail?: string }).buyerEmail
         : buyerEmail
 
-    // Require a valid email AND at least one product in cart
-    if (!email || !email.includes("@")) return
+    // Need at least one product to save. The email is only required for the
+    // backend upsert (cross-device recovery) — the localStorage copy below is
+    // written regardless, so a same-browser reload keeps the cart even before
+    // the buyer reaches the "your information" step and enters an email.
     if (!hasCartItems(state)) return
 
     if (debounceRef.current) {
@@ -559,6 +561,10 @@ export function useOpenCartPersistence({
         cartId: cartMetaRef.current.cartId,
         restoreToken: cartMetaRef.current.restoreToken,
       })
+
+      // The backend upsert (cross-device recovery) needs an email; until the
+      // buyer provides one the localStorage copy above is enough.
+      if (!email || !email.includes("@")) return
 
       // Serialize through inFlightUpsertRef so this call cannot race the
       // mount restore-refresh upsert and clobber cartMetaRef (P4 fix).

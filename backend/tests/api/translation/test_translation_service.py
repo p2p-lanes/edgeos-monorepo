@@ -107,6 +107,7 @@ class TestExtractTranslatableLeaves:
         # an otherwise translated checkout with no field to fix it in.
         config = {
             "headline": "4 días de música, arte, yoga y talleres",
+            "edition": "Tercera edición: El Portal",
             "subtitle": "Una celebración de amor, apertura y conexión",
             "date_badge": "Experiencia Extendida — 17, 18 y 19 de noviembre",
             "cta_label": "Ver Entradas →",
@@ -117,6 +118,7 @@ class TestExtractTranslatableLeaves:
         }
         assert extract_translatable_leaves(config) == {
             "headline": "4 días de música, arte, yoga y talleres",
+            "edition": "Tercera edición: El Portal",
             "subtitle": "Una celebración de amor, apertura y conexión",
             "date_badge": "Experiencia Extendida — 17, 18 y 19 de noviembre",
             "cta_label": "Ver Entradas →",
@@ -173,6 +175,13 @@ class TestApplyTicketingStepOverlay:
             "label": "Passes",
         }
         assert result["template_config"]["footer_text"] == "Pie"
+
+    def test_watermark_is_overlaid(self):
+        data = {"title": "Titulo", "watermark": "Elegi tus entradas"}
+        translation = {"title": "Title", "watermark": "Pick your tickets"}
+        result = apply_ticketing_step_overlay(data, translation)
+        assert result["title"] == "Title"
+        assert result["watermark"] == "Pick your tickets"
 
 
 class TestFieldHint:

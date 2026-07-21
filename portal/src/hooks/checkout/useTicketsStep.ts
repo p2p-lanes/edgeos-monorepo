@@ -163,6 +163,9 @@ function buildSectionVMs(
   return groups.map(({ section, products }) => ({
     key: section.key,
     label: section.label,
+    image_url: section.image_url,
+    image_aspect: section.image_aspect,
+    description: section.description,
     rows: products.map((p) => buildRowVM(p, hasFullOrMonthSelected, isEditing)),
   }))
 }
@@ -409,6 +412,9 @@ export function useTicketsStep({
       ({ section, products: sectionProducts }) => ({
         key: section.key,
         label: section.label,
+        image_url: section.image_url,
+        image_aspect: section.image_aspect,
+        description: section.description,
         rows: sectionProducts.map((p) => {
           const qty = getQty(p.id)
           const usesStepper = supportsQuantitySelectorLocal(p.max_per_order)

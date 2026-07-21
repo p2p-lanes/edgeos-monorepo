@@ -13,7 +13,7 @@ import asyncio
 import uuid
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 from sqlalchemy import text
 from sqlmodel import Session
@@ -164,10 +164,17 @@ def _fresh_coupon_uses(db: Session, coupon_id: uuid.UUID) -> int:
     return c.current_uses
 
 
-def _simplefi_status_mock(status_str: str) -> MagicMock:
-    """Build a SimpleFIPaymentRequestStatus-like mock returning the given status."""
+def _simplefi_status_mock(
+    status_str: str, paid_installments_count: int | None = None
+) -> MagicMock:
+    """Build a SimpleFIPaymentRequestStatus-like mock returning the given status.
+
+    ``paid_installments_count`` is only meaningful for installment plans; it
+    defaults to ``None`` to mirror a one-shot payment request.
+    """
     mock = MagicMock()
     mock.status = status_str
+    mock.paid_installments_count = paid_installments_count
     return mock
 
 
@@ -254,11 +261,6 @@ PATCH_STATUS = "app.services.simplefi.client.SimpleFIClient.get_payment_request_
 PATCH_PLAN_STATUS = (
     "app.services.simplefi.client.SimpleFIClient.get_installment_plan_status"
 )
-# The sweeper imports _send_payment_confirmed_email at module level from
-# app.services.payment_notifications, binding it in its own namespace.
-# To intercept the call, patch the name in the SWEEPER module, not the
-# source module (standard from-import patch location rule).
-PATCH_EMAIL = "app.services.pending_payment_sweeper._send_payment_confirmed_email"
 
 
 class TestSweeperMatrix:
@@ -326,11 +328,7 @@ class TestSweeperMatrix:
         coupon = _make_coupon(db, popup, current_uses=2)
         payment = _make_stale_pending_payment(db, tenant_a, popup, coupon=coupon)
 
-        with (
-            patch(PATCH_STATUS, return_value=_simplefi_status_mock("approved")),
-            patch(PATCH_EMAIL) as mock_email,
-        ):
-            mock_email.return_value = None
+        with patch(PATCH_STATUS, return_value=_simplefi_status_mock("approved")):
             result = asyncio.run(
                 sweep_pending_payments(
                     db, threshold_minutes=STALE_MINUTES, batch_size=100
@@ -739,36 +737,38 @@ class TestSweeperSessionRollbackOnFailure:
 
 
 # ---------------------------------------------------------------------------
-# B2: Approved-path email failure is counted in email_failures, not failures
+# B2: Installment plan approval gates on paid_installments_count, not "active"
 # ---------------------------------------------------------------------------
 
 
-class TestSweeperApprovedEmailFailure:
-    """B2: when the email dispatch fails for an approved payment, the payment
-    IS approved in the DB, the summary shows approved_reconciled=1 and
-    email_failures=1, and failures stays 0.
+class TestSweeperInstallmentPlanApprovalGate:
+    """B2: for installment plans the sweeper approves on a charged cuota, not
+    on the ``active`` plan status.
 
-    The payment being approved must NOT be undone just because email failed.
-    Email failure is an ops signal (alert/retry), not a payment failure.
+    Our Payment row represents only the first cuota. A plan can be ``active``
+    (activated) with ``paid_installments_count == 0`` — no money cleared yet.
+    Approving on ``active`` alone would assign products before the buyer paid.
+    The real signal is ``paid_installments_count >= 1`` (or a completed plan).
     """
 
-    def test_email_failure_counted_separately_payment_approved(
+    def test_active_plan_with_zero_cuotas_is_skipped_not_approved(
         self,
         db: Session,
         tenant_a: Tenants,
     ) -> None:
-        """Approved payment with email failure: approved_reconciled=1,
-        email_failures=1, failures=0, payment status APPROVED in DB."""
-        popup = _make_popup_with_key(db, tenant_a, slug_prefix="b2-ef")
-        payment = _make_stale_pending_payment(db, tenant_a, popup)
+        """Installment plan 'active' with paid_installments_count=0 → skip.
 
-        with (
-            patch(PATCH_STATUS, return_value=_simplefi_status_mock("approved")),
-            patch(
-                PATCH_EMAIL,
-                new_callable=AsyncMock,
-                side_effect=RuntimeError("smtp down"),
-            ) as _mock_email,
+        The plan is activated but no cuota cleared; the sweeper must not
+        approve or assign products.
+        """
+        popup = _make_popup_with_key(db, tenant_a, slug_prefix="b2-act0")
+        payment = _make_stale_pending_payment(
+            db, tenant_a, popup, is_installment_plan=True
+        )
+
+        with patch(
+            PATCH_PLAN_STATUS,
+            return_value=_simplefi_status_mock("active", paid_installments_count=0),
         ):
             result = asyncio.run(
                 sweep_pending_payments(
@@ -776,14 +776,61 @@ class TestSweeperApprovedEmailFailure:
                 )
             )
 
-        # Payment MUST be APPROVED — email failure must not revert approval.
-        assert _fresh_status(db, payment.id) == PaymentStatus.APPROVED.value
+        assert _fresh_status(db, payment.id) == PaymentStatus.PENDING.value
+        assert result["skipped"] >= 1
+        assert result["approved_reconciled"] == 0
 
-        # Summary: approved counted, email failure tracked separately,
-        # general failures counter untouched.
+    def test_active_plan_with_first_cuota_paid_is_approved(
+        self,
+        db: Session,
+        tenant_a: Tenants,
+    ) -> None:
+        """Installment plan 'active' with paid_installments_count=1 → approve.
+
+        First cuota cleared, so the Payment (which represents that cuota) is
+        approved and products are assigned.
+        """
+        popup = _make_popup_with_key(db, tenant_a, slug_prefix="b2-act1")
+        payment = _make_stale_pending_payment(
+            db, tenant_a, popup, is_installment_plan=True
+        )
+
+        with patch(
+            PATCH_PLAN_STATUS,
+            return_value=_simplefi_status_mock("active", paid_installments_count=1),
+        ):
+            result = asyncio.run(
+                sweep_pending_payments(
+                    db, threshold_minutes=STALE_MINUTES, batch_size=100
+                )
+            )
+
+        assert _fresh_status(db, payment.id) == PaymentStatus.APPROVED.value
         assert result["approved_reconciled"] >= 1
-        assert result["email_failures"] >= 1
-        assert result["failures"] == 0
+
+    def test_completed_plan_is_approved(
+        self,
+        db: Session,
+        tenant_a: Tenants,
+    ) -> None:
+        """Installment plan 'completed' → approve (paid by definition)."""
+        popup = _make_popup_with_key(db, tenant_a, slug_prefix="b2-comp")
+        payment = _make_stale_pending_payment(
+            db, tenant_a, popup, is_installment_plan=True
+        )
+
+        with patch(
+            PATCH_PLAN_STATUS,
+            return_value=_simplefi_status_mock("completed", paid_installments_count=3),
+        ):
+            result = asyncio.run(
+                sweep_pending_payments(
+                    db, threshold_minutes=STALE_MINUTES, batch_size=100
+                )
+            )
+
+        assert _fresh_status(db, payment.id) == PaymentStatus.APPROVED.value
+        assert result["approved_reconciled"] >= 1
 
 
 # ---------------------------------------------------------------------------

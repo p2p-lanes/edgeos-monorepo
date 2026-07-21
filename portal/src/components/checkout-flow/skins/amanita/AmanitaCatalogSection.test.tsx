@@ -160,4 +160,52 @@ describe("AmanitaCatalogSection", () => {
     fireEvent.click(plusButton)
     expect(setRowQuantity).not.toHaveBeenCalled()
   })
+
+  it("captions the card with the section's own image and description", () => {
+    section.image_url = "https://cdn.example.com/tickets-section.png"
+    section.description = "Acceso a los 4 días del festival"
+
+    const { container } = render(
+      <AmanitaCatalogSection stepConfig={stepConfig} />,
+    )
+
+    expect(screen.getByText("Acceso a los 4 días del festival")).toBeTruthy()
+    const img = container.querySelector("img")
+    expect(img).toBeTruthy()
+    // next/image may rewrite the src through its loader, so match the asset.
+    expect(img?.getAttribute("src")).toContain("tickets-section")
+  })
+
+  it("ignores the products' own image and description", () => {
+    product1.image_url = "https://cdn.example.com/full-pass-product.png"
+    product1.description = "Descripción del producto Full Pass"
+    section.image_url = undefined
+    section.description = undefined
+
+    const { container } = render(
+      <AmanitaCatalogSection stepConfig={stepConfig} />,
+    )
+
+    expect(container.querySelector("img")).toBeNull()
+    expect(screen.queryByText("Descripción del producto Full Pass")).toBeNull()
+    // The card still renders its rows — only the captioning is gone.
+    expect(screen.getByText("Full Pass")).toBeTruthy()
+  })
+
+  it("does not let a product caption a section that authored none", () => {
+    product1.image_url = "https://cdn.example.com/full-pass-product.png"
+    product1.description = "Descripción del producto Full Pass"
+    section.image_url = "https://cdn.example.com/tickets-section.png"
+    section.description = "Acceso a los 4 días del festival"
+
+    const { container } = render(
+      <AmanitaCatalogSection stepConfig={stepConfig} />,
+    )
+
+    expect(container.querySelectorAll("img").length).toBe(1)
+    expect(container.querySelector("img")?.getAttribute("src")).not.toContain(
+      "full-pass-product",
+    )
+    expect(screen.queryByText("Descripción del producto Full Pass")).toBeNull()
+  })
 })

@@ -425,16 +425,6 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
               </form.Field>
             </div>
 
-            {/* Product Details metadata (edit only) */}
-            {isEdit && (
-              <div className="flex gap-6 text-sm text-muted-foreground">
-                <div>
-                  <span className="text-xs uppercase tracking-wider">Slug</span>
-                  <p className="font-mono">{defaultValues.slug}</p>
-                </div>
-              </div>
-            )}
-
             <Separator />
 
             {/* Description */}
