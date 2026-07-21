@@ -272,6 +272,7 @@ export function TicketSelectConfig({
         sections={parsed.sections}
         onChange={updateSections}
         products={products}
+        productCategory={productCategory}
         showMediaFields={false}
         showAttendeeCategories={true}
         attendeeCategories={attendeeCategories}

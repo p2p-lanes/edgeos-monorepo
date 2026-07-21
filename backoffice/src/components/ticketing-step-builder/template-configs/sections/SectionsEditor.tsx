@@ -11,9 +11,10 @@ import {
   SortableContext,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable"
-import { Plus } from "lucide-react"
+import { AlertTriangle, Plus } from "lucide-react"
 import { useEffect, useState } from "react"
 
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { SectionEditor } from "./SectionEditor"
@@ -30,6 +31,9 @@ interface SectionsEditorProps {
   sections: ProductSection[]
   onChange: (sections: ProductSection[]) => void
   products: SectionProduct[]
+  /** The step's product category. Products are resolved into the checkout by
+   *  this category, so sections render empty without it. */
+  productCategory?: string | null
   assignLabel?: string
   showMediaFields?: boolean
   showAttendeeCategories?: boolean
@@ -63,6 +67,7 @@ export function SectionsEditor({
   sections,
   onChange,
   products,
+  productCategory,
   assignLabel = "Assign product",
   showMediaFields = true,
   showAttendeeCategories = false,
@@ -138,6 +143,16 @@ export function SectionsEditor({
           Configure how products are grouped in the checkout
         </p>
       </div>
+
+      {sections.length > 0 && !productCategory && (
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription>
+            This step has no product category, so its products will not appear
+            in the checkout. Set a Product Category under Display & advanced.
+          </AlertDescription>
+        </Alert>
+      )}
 
       {sections.length === 0 ? (
         <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed p-6 text-center">

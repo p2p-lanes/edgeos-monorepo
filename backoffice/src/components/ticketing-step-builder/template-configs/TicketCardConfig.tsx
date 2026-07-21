@@ -243,6 +243,7 @@ export function TicketCardConfig({
         sections={parsed.sections}
         onChange={updateSections}
         products={products}
+        productCategory={productCategory}
         showMediaFields={true}
       />
     </div>

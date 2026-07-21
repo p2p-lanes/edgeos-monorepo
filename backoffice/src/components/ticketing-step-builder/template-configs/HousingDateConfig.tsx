@@ -287,6 +287,7 @@ export function HousingDateConfig({
         sections={parsed.sections}
         onChange={updateSections}
         products={products}
+        productCategory={productCategory}
         assignLabel="Assign room"
       />
     </div>
