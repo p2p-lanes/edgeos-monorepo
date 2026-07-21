@@ -1,10 +1,22 @@
 import { useSortable } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
-import { GripVertical, Package, Plus, Trash2, X } from "lucide-react"
+import {
+  ChevronDown,
+  GripVertical,
+  Package,
+  Plus,
+  Trash2,
+  X,
+} from "lucide-react"
 import { useState } from "react"
 
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible"
 import { ImageUpload } from "@/components/ui/image-upload"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -15,7 +27,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Separator } from "@/components/ui/separator"
 import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
 
@@ -122,6 +133,7 @@ export function SortableSectionCard({
     (p) => !section.product_ids.includes(p.id),
   )
 
+  const [open, setOpen] = useState(section.product_ids.length === 0)
   const [showProductPicker, setShowProductPicker] = useState(false)
 
   const handleCategoryToggle = (catId: string, checked: boolean) => {
@@ -171,13 +183,35 @@ export function SortableSectionCard({
     })
   }
 
+  const matchedCategoryLabels =
+    showAttendeeCategories && Array.isArray(section.attendee_categories)
+      ? attendeeCategories
+          .filter((c) => section.attendee_categories?.includes(c.id))
+          .map((c) => c.label)
+      : []
+
+  const summaryHints: string[] = []
+  if (matchedCategoryLabels.length > 0) {
+    summaryHints.push(matchedCategoryLabels.join(", "))
+  } else if (section.visible_if?.field_id) {
+    summaryHints.push("conditional")
+  }
+  const summary = [`${assignedProducts.length} products`, ...summaryHints].join(
+    " · ",
+  )
+
+  const showTargeting =
+    showAttendeeCategories || visibilityFormFields.length > 0
+
   return (
-    <div
+    <Collapsible
       ref={setNodeRef}
       style={style}
-      className="rounded-lg border bg-background shadow-sm"
+      open={open}
+      onOpenChange={setOpen}
+      className="group rounded-lg border bg-background shadow-sm"
     >
-      <div className="flex items-center gap-3 px-3 py-3">
+      <div className="flex items-center gap-2 px-3 py-2">
         <button
           type="button"
           className="cursor-grab text-muted-foreground hover:text-foreground shrink-0"
@@ -187,14 +221,17 @@ export function SortableSectionCard({
           <GripVertical className="h-4 w-4" />
         </button>
 
-        <div className="flex-1 min-w-0">
-          <Input
-            value={section.label}
-            onChange={(e) => onUpdate(section.key, { label: e.target.value })}
-            className="h-7 text-sm font-medium"
-            placeholder="Section label"
-          />
-        </div>
+        <CollapsibleTrigger className="flex flex-1 min-w-0 items-center gap-2 text-left">
+          <div className="flex-1 min-w-0">
+            <div className="truncate text-sm font-medium">
+              {section.label || "Untitled section"}
+            </div>
+            <div className="truncate text-xs text-muted-foreground">
+              {summary}
+            </div>
+          </div>
+          <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
+        </CollapsibleTrigger>
 
         <Button
           variant="ghost"
@@ -206,133 +243,65 @@ export function SortableSectionCard({
         </Button>
       </div>
 
-      {showMediaFields && (
-        <div className="px-3 pb-3 flex flex-col gap-2">
-          <div className="flex flex-col gap-1">
-            <label
-              htmlFor={`${section.key}-image`}
-              className="text-xs font-medium text-muted-foreground"
-            >
-              Image
-            </label>
-            <ImageUpload
-              value={section.image_url || null}
-              onChange={(url) =>
-                onUpdate(section.key, { image_url: url ?? "" })
-              }
-            />
-          </div>
-          <div className="flex flex-col gap-1">
-            <label
-              htmlFor={`${section.key}-description`}
-              className="text-xs font-medium text-muted-foreground"
-            >
-              Description
-            </label>
-            <Textarea
-              id={`${section.key}-description`}
-              value={section.description ?? ""}
-              onChange={(e) =>
-                onUpdate(section.key, { description: e.target.value })
-              }
-              placeholder="Short description shown on the property card"
-              className="min-h-[60px] text-sm"
-            />
-          </div>
+      <CollapsibleContent className="border-t p-3 flex flex-col gap-4">
+        <div className="flex flex-col gap-1">
+          <Label
+            htmlFor={`${section.key}-label`}
+            className="text-xs font-medium text-muted-foreground"
+          >
+            Label
+          </Label>
+          <Input
+            id={`${section.key}-label`}
+            value={section.label}
+            onChange={(e) => onUpdate(section.key, { label: e.target.value })}
+            className="h-8 text-sm font-medium"
+            placeholder="Section label"
+          />
         </div>
-      )}
 
-      {showAttendeeCategories && (
-        <div className="px-3 pb-3">
-          <div className="flex flex-col gap-1.5">
-            <Label className="text-xs font-medium text-muted-foreground">
-              Visible to
-            </Label>
-            <div className="flex items-center gap-4">
-              {attendeeCategories.map(({ id, label }) => (
-                <div key={id} className="flex items-center gap-1.5">
-                  <Checkbox
-                    id={`${section.key}-cat-${id}`}
-                    checked={(section.attendee_categories ?? []).includes(id)}
-                    onCheckedChange={(checked) =>
-                      handleCategoryToggle(id, checked === true)
-                    }
-                  />
-                  <label
-                    htmlFor={`${section.key}-cat-${id}`}
-                    className="text-xs cursor-pointer"
-                  >
-                    {label}
-                  </label>
-                </div>
-              ))}
-            </div>
-            {section.attendee_categories == null && (
-              <span className="text-xs text-muted-foreground">
-                Visible to all attendees
-              </span>
-            )}
-          </div>
-        </div>
-      )}
-
-      {visibilityFormFields.length > 0 && (
-        <div className="px-3 pb-3">
-          <div className="flex flex-col gap-1.5">
-            <Label className="text-xs font-medium text-muted-foreground">
-              Visibility condition
-            </Label>
-            <div className="flex flex-wrap items-center gap-2">
-              <Select
-                value={section.visible_if?.field_id ?? NO_FIELD}
-                onValueChange={handleVisibilityFieldChange}
+        {showMediaFields && (
+          <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-1">
+              <label
+                htmlFor={`${section.key}-image`}
+                className="text-xs font-medium text-muted-foreground"
               >
-                <SelectTrigger className="h-7 text-xs w-[200px]">
-                  <SelectValue placeholder="No condition" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={NO_FIELD}>No condition</SelectItem>
-                  {visibilityFormFields.map((f) => (
-                    <SelectItem key={f.name} value={f.name}>
-                      {f.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {visibilityField && visibilityField.options.length > 0 && (
-                <>
-                  <span className="text-xs text-muted-foreground">equals</span>
-                  <Select
-                    value={visibilityValue ?? ""}
-                    onValueChange={handleVisibilityValueChange}
-                  >
-                    <SelectTrigger className="h-7 text-xs w-[140px]">
-                      <SelectValue placeholder="Select value" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {visibilityField.options.map((opt) => (
-                        <SelectItem key={opt} value={opt}>
-                          {opt}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </>
-              )}
+                Image
+              </label>
+              <ImageUpload
+                value={section.image_url || null}
+                onChange={(url) =>
+                  onUpdate(section.key, { image_url: url ?? "" })
+                }
+              />
             </div>
-            {!section.visible_if?.field_id && (
-              <span className="text-xs text-muted-foreground">
-                Always visible
-              </span>
-            )}
+            <div className="flex flex-col gap-1">
+              <label
+                htmlFor={`${section.key}-description`}
+                className="text-xs font-medium text-muted-foreground"
+              >
+                Description
+              </label>
+              <Textarea
+                id={`${section.key}-description`}
+                value={section.description ?? ""}
+                onChange={(e) =>
+                  onUpdate(section.key, { description: e.target.value })
+                }
+                placeholder="Short description shown on the property card"
+                className="min-h-[60px] text-sm"
+              />
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {assignedProducts.length > 0 && (
-        <>
-          <Separator />
-          <div className="px-3 py-2">
+        <div className="flex flex-col gap-1.5">
+          <Label className="text-xs font-medium text-muted-foreground">
+            Products ({assignedProducts.length})
+          </Label>
+
+          {assignedProducts.length > 0 && (
             <div className="flex flex-col gap-1">
               {assignedProducts.map((p) => {
                 const inactive = p.is_active === false
@@ -376,77 +345,170 @@ export function SortableSectionCard({
                 )
               })}
             </div>
-          </div>
-        </>
-      )}
+          )}
 
-      {availableProducts.length > 0 && (
-        <div className="px-3 pb-2">
-          {showProductPicker ? (
-            <div className="flex flex-col gap-1 rounded border p-2 bg-muted/30">
-              {availableProducts.map((p) => {
-                const inactive = p.is_active === false
-                return (
-                  <button
-                    key={p.id}
-                    type="button"
-                    className={cn(
-                      "flex items-center gap-2 text-xs text-left py-1 px-1 rounded hover:bg-accent",
-                      inactive && "opacity-50",
-                    )}
-                    onClick={() => {
-                      onUpdate(section.key, {
-                        product_ids: [...section.product_ids, p.id],
-                      })
-                      setShowProductPicker(false)
-                    }}
-                  >
-                    <Package className="h-3 w-3 shrink-0 text-muted-foreground" />
-                    <div className="flex-1 min-w-0 flex flex-col">
-                      <div className="flex items-center gap-1.5">
-                        <span className="truncate">{p.name}</span>
-                        {inactive && (
-                          <span className="shrink-0 rounded border px-1 py-px text-[10px] uppercase tracking-wide text-muted-foreground">
-                            Inactive
+          {availableProducts.length > 0 &&
+            (showProductPicker ? (
+              <div className="flex flex-col gap-1 rounded border p-2 bg-muted/30">
+                {availableProducts.map((p) => {
+                  const inactive = p.is_active === false
+                  return (
+                    <button
+                      key={p.id}
+                      type="button"
+                      className={cn(
+                        "flex items-center gap-2 text-xs text-left py-1 px-1 rounded hover:bg-accent",
+                        inactive && "opacity-50",
+                      )}
+                      onClick={() =>
+                        onUpdate(section.key, {
+                          product_ids: [...section.product_ids, p.id],
+                        })
+                      }
+                    >
+                      <Package className="h-3 w-3 shrink-0 text-muted-foreground" />
+                      <div className="flex-1 min-w-0 flex flex-col">
+                        <div className="flex items-center gap-1.5">
+                          <span className="truncate">{p.name}</span>
+                          {inactive && (
+                            <span className="shrink-0 rounded border px-1 py-px text-[10px] uppercase tracking-wide text-muted-foreground">
+                              Inactive
+                            </span>
+                          )}
+                        </div>
+                        {p.slug && (
+                          <span className="truncate font-mono text-[10px] text-muted-foreground/70">
+                            {p.slug}
                           </span>
                         )}
                       </div>
-                      {p.slug && (
-                        <span className="truncate font-mono text-[10px] text-muted-foreground/70">
-                          {p.slug}
+                      {p.price != null && (
+                        <span className="shrink-0 font-mono tabular-nums text-muted-foreground">
+                          ${p.price}
                         </span>
                       )}
-                    </div>
-                    {p.price != null && (
-                      <span className="shrink-0 font-mono tabular-nums text-muted-foreground">
-                        ${p.price}
-                      </span>
-                    )}
-                  </button>
-                )
-              })}
+                    </button>
+                  )
+                })}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 text-xs mt-1"
+                  onClick={() => setShowProductPicker(false)}
+                >
+                  Done
+                </Button>
+              </div>
+            ) : (
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-6 text-xs mt-1"
-                onClick={() => setShowProductPicker(false)}
+                className="h-6 text-xs w-full"
+                onClick={() => setShowProductPicker(true)}
               >
-                Cancel
+                <Plus className="h-3 w-3 mr-1" />
+                {assignLabel}
               </Button>
-            </div>
-          ) : (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-6 text-xs w-full"
-              onClick={() => setShowProductPicker(true)}
-            >
-              <Plus className="h-3 w-3 mr-1" />
-              {assignLabel}
-            </Button>
-          )}
+            ))}
         </div>
-      )}
-    </div>
+
+        {showTargeting && (
+          <Collapsible className="group/targeting flex flex-col gap-2 pt-2">
+            <CollapsibleTrigger className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground">
+              <ChevronDown className="h-3.5 w-3.5 shrink-0 transition-transform group-data-[state=open]/targeting:rotate-180" />
+              Targeting &amp; visibility
+            </CollapsibleTrigger>
+            <CollapsibleContent className="flex flex-col gap-3">
+              {showAttendeeCategories && (
+                <div className="flex flex-col gap-1.5">
+                  <Label className="text-xs font-medium text-muted-foreground">
+                    Visible to
+                  </Label>
+                  <div className="flex items-center gap-4">
+                    {attendeeCategories.map(({ id, label }) => (
+                      <div key={id} className="flex items-center gap-1.5">
+                        <Checkbox
+                          id={`${section.key}-cat-${id}`}
+                          checked={(section.attendee_categories ?? []).includes(
+                            id,
+                          )}
+                          onCheckedChange={(checked) =>
+                            handleCategoryToggle(id, checked === true)
+                          }
+                        />
+                        <label
+                          htmlFor={`${section.key}-cat-${id}`}
+                          className="text-xs cursor-pointer"
+                        >
+                          {label}
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                  {section.attendee_categories == null && (
+                    <span className="text-xs text-muted-foreground">
+                      Visible to all attendees
+                    </span>
+                  )}
+                </div>
+              )}
+
+              {visibilityFormFields.length > 0 && (
+                <div className="flex flex-col gap-1.5">
+                  <Label className="text-xs font-medium text-muted-foreground">
+                    Show only if
+                  </Label>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Select
+                      value={section.visible_if?.field_id ?? NO_FIELD}
+                      onValueChange={handleVisibilityFieldChange}
+                    >
+                      <SelectTrigger className="h-7 text-xs w-[200px]">
+                        <SelectValue placeholder="No condition" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={NO_FIELD}>No condition</SelectItem>
+                        {visibilityFormFields.map((f) => (
+                          <SelectItem key={f.name} value={f.name}>
+                            {f.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {visibilityField && visibilityField.options.length > 0 && (
+                      <>
+                        <span className="text-xs text-muted-foreground">
+                          equals
+                        </span>
+                        <Select
+                          value={visibilityValue ?? ""}
+                          onValueChange={handleVisibilityValueChange}
+                        >
+                          <SelectTrigger className="h-7 text-xs w-[140px]">
+                            <SelectValue placeholder="Select value" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {visibilityField.options.map((opt) => (
+                              <SelectItem key={opt} value={opt}>
+                                {opt}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </>
+                    )}
+                  </div>
+                  {!section.visible_if?.field_id && (
+                    <span className="text-xs text-muted-foreground">
+                      Always visible
+                    </span>
+                  )}
+                </div>
+              )}
+            </CollapsibleContent>
+          </Collapsible>
+        )}
+      </CollapsibleContent>
+    </Collapsible>
   )
 }
