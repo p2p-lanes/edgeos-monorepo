@@ -2,16 +2,10 @@ import { Link } from "@tanstack/react-router"
 import { Info } from "lucide-react"
 
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { CollapsibleSection } from "./CollapsibleSection"
 
 interface ConfirmStepFieldsProps {
   popupId: string
@@ -30,48 +24,40 @@ export function ConfirmStepFields({
 
   return (
     <>
-      {/* Pay button label */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Pay Button</CardTitle>
-          <CardDescription>
-            The button that completes the purchase
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="confirm-cta-label">Button Label</Label>
-            <Input
-              id="confirm-cta-label"
-              value={(templateConfig?.cta_label as string) ?? ""}
-              onChange={(e) =>
-                onTemplateConfigChange({
-                  ...templateConfig,
-                  cta_label: e.target.value || undefined,
-                })
-              }
-              placeholder="Pagar"
-            />
-            <p className="text-xs text-muted-foreground">
-              Shown on both the bottom bar's button and the one inside the
-              confirm card. They always read the same. Leave empty to use the
-              checkout's own wording, translated per shopper. Once set,
-              translate it in this step's Translations tab.
-            </p>
-          </div>
-        </CardContent>
-      </Card>
+      <CollapsibleSection
+        title="Pay Button"
+        description="The button that completes the purchase"
+        defaultOpen
+      >
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="confirm-cta-label">Button Label</Label>
+          <Input
+            id="confirm-cta-label"
+            value={(templateConfig?.cta_label as string) ?? ""}
+            onChange={(e) =>
+              onTemplateConfigChange({
+                ...templateConfig,
+                cta_label: e.target.value || undefined,
+              })
+            }
+            placeholder="Pagar"
+          />
+          <p className="text-xs text-muted-foreground">
+            Shown on both the bottom bar's button and the one inside the confirm
+            card. They always read the same. Leave empty to use the checkout's
+            own wording, translated per shopper. Once set, translate it in this
+            step's Translations tab.
+          </p>
+        </div>
+      </CollapsibleSection>
 
-      {/* Insurance card content */}
       {insuranceEnabled ? (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Insurance Card</CardTitle>
-            <CardDescription>
-              Text displayed inside the insurance toggle card in this step
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-4">
+        <CollapsibleSection
+          title="Insurance Card"
+          description="Text displayed inside the insurance toggle card in this step"
+          defaultOpen
+        >
+          <div className="flex flex-col gap-4">
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="insurance-card-title">Card Title</Label>
               <Input
@@ -160,8 +146,8 @@ export function ConfirmStepFields({
                 Each line becomes a benefit bullet in the card.
               </p>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </CollapsibleSection>
       ) : (
         <Alert>
           <Info className="h-4 w-4" />

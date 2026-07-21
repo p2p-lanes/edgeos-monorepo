@@ -4,7 +4,7 @@ import {
   useQueryClient,
   useSuspenseQuery,
 } from "@tanstack/react-query"
-import { ChevronDown, Trash2 } from "lucide-react"
+import { Trash2 } from "lucide-react"
 import { Suspense, useEffect, useRef, useState } from "react"
 
 import {
@@ -14,6 +14,7 @@ import {
   TicketingStepsService,
 } from "@/client"
 import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
+import { CollapsibleSection } from "@/components/ticketing-step-builder/step-detail/CollapsibleSection"
 import { ConfirmStepFields } from "@/components/ticketing-step-builder/step-detail/ConfirmStepFields"
 import { StepContentSection } from "@/components/ticketing-step-builder/step-detail/StepContentSection"
 import { StepDisplaySettings } from "@/components/ticketing-step-builder/step-detail/StepDisplaySettings"
@@ -26,11 +27,6 @@ import {
 } from "@/components/ticketing-step-builder/template-configs/FaqItemsEditor"
 import { TranslationManager } from "@/components/translations/TranslationManager"
 import { Button } from "@/components/ui/button"
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible"
 import { LoadingButton } from "@/components/ui/loading-button"
 import { Separator } from "@/components/ui/separator"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -299,28 +295,18 @@ function StepDetailContent({ stepId, onClose }: StepDetailPanelProps) {
               `faqs` template, whose whole purpose is already a question list —
               a step there would carry two. */}
           {template !== "faqs" && (
-            <Collapsible className="rounded-lg border">
-              <CollapsibleTrigger asChild>
-                <button
-                  type="button"
-                  className="group flex w-full items-center justify-between gap-2 p-3 text-sm font-medium"
-                >
-                  FAQs
-                  <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
-                </button>
-              </CollapsibleTrigger>
-              <CollapsibleContent>
-                <div className="border-t p-3">
-                  <FaqItemsEditor
-                    title={stepFaqsTitle}
-                    items={stepFaqItems}
-                    titleDescription="Heading shown above the questions. Leave empty for none."
-                    onChangeTitle={(next) => setStepFaqs(next, stepFaqItems)}
-                    onChangeItems={(next) => setStepFaqs(stepFaqsTitle, next)}
-                  />
-                </div>
-              </CollapsibleContent>
-            </Collapsible>
+            <CollapsibleSection
+              title="FAQs"
+              description="Questions shown below this step's content. Rendered only on the Amanita checkout skin."
+            >
+              <FaqItemsEditor
+                title={stepFaqsTitle}
+                items={stepFaqItems}
+                titleDescription="Heading shown above the questions. Leave empty for none."
+                onChangeTitle={(next) => setStepFaqs(next, stepFaqItems)}
+                onChangeItems={(next) => setStepFaqs(stepFaqsTitle, next)}
+              />
+            </CollapsibleSection>
           )}
 
           {/* Actions */}
