@@ -1,3 +1,4 @@
+import type React from "react"
 import { toast } from "sonner"
 
 interface ToastAction {
@@ -21,7 +22,11 @@ const useCustomToast = () => {
     })
   }
 
-  return { showSuccessToast, showErrorToast }
+  const showWarningToast = (title: string, description?: React.ReactNode) => {
+    toast.warning(title, { description })
+  }
+
+  return { showSuccessToast, showErrorToast, showWarningToast }
 }
 
 export default useCustomToast

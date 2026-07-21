@@ -42,6 +42,7 @@ import { DangerZone } from "@/components/Common/DangerZone"
 import { FieldError } from "@/components/Common/FieldError"
 import { FormErrorSummary } from "@/components/Common/FormErrorSummary"
 import { ApprovalStrategyForm } from "@/components/forms/ApprovalStrategyForm"
+import { getMissingLaunchFields } from "@/components/forms/popupLaunchChecklist"
 import { ReviewersManager } from "@/components/forms/ReviewersManager"
 import { TranslationManager } from "@/components/translations/TranslationManager"
 import { Badge } from "@/components/ui/badge"
@@ -136,7 +137,8 @@ function deriveCheckoutMode(saleType: SaleType): CheckoutMode {
 export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const { showSuccessToast, showErrorToast } = useCustomToast()
+  const { showSuccessToast, showErrorToast, showWarningToast } =
+    useCustomToast()
   const { isOperatorOrAbove } = useAuth()
   const isEdit = !!defaultValues
   const readOnly = !isOperatorOrAbove
@@ -333,6 +335,22 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
         checkin_pass_lead_days: value.checkin_pass_lead_days
           ? Number(value.checkin_pass_lead_days)
           : null,
+      }
+      if (value.status === "active") {
+        const missing = getMissingLaunchFields(value)
+        if (missing.length > 0) {
+          showWarningToast(
+            "Saved, but not ready to launch",
+            <>
+              <p>These fields are required before this pop-up can go live:</p>
+              <ul className="mt-1 list-disc pl-4">
+                {missing.map((f) => (
+                  <li key={f}>{f}</li>
+                ))}
+              </ul>
+            </>,
+          )
+        }
       }
       if (isEdit) {
         updateMutation.mutate(payload)
