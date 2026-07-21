@@ -36,7 +36,20 @@ import {
   UnsavedChangesDialog,
   useDirtyBlocker,
 } from "@/hooks/useUnsavedChanges"
+import { cn } from "@/lib/utils"
 import { createErrorHandler } from "@/utils"
+
+// Templates whose config is a master-detail or grid editor and therefore
+// benefit from a wider detail pane; content-only templates stay narrow for
+// comfortable reading line length.
+const WIDE_CONFIG_TEMPLATES = new Set([
+  "ticket-select",
+  "ticket-card",
+  "housing-date",
+  "meal-plan-select",
+  "image-gallery",
+  "merch-image",
+])
 
 interface StepDetailPanelProps {
   stepId: string
@@ -225,7 +238,12 @@ function StepDetailContent({ stepId, onClose }: StepDetailPanelProps) {
   const hasTranslations = (popup?.supported_languages?.length ?? 0) > 1
 
   return (
-    <div className="flex flex-col gap-6 max-w-2xl">
+    <div
+      className={cn(
+        "flex flex-col gap-6",
+        WIDE_CONFIG_TEMPLATES.has(template) ? "max-w-5xl" : "max-w-2xl",
+      )}
+    >
       <Tabs defaultValue="general" className="flex flex-col gap-6">
         <TabsList>
           <TabsTrigger value="general">General</TabsTrigger>

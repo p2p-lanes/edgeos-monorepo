@@ -110,27 +110,29 @@ export function SectionEditor({
   const showTargeting =
     showAttendeeCategories || visibilityFormFields.length > 0
 
+  const labelField = (
+    <div className="flex flex-col gap-1">
+      <Label
+        htmlFor={`${section.key}-label`}
+        className="text-xs font-medium text-muted-foreground"
+      >
+        Label
+      </Label>
+      <Input
+        id={`${section.key}-label`}
+        value={section.label}
+        onChange={(e) => onUpdate(section.key, { label: e.target.value })}
+        className="h-8 text-sm font-medium"
+        placeholder="Section label"
+      />
+    </div>
+  )
+
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-col gap-1">
-        <Label
-          htmlFor={`${section.key}-label`}
-          className="text-xs font-medium text-muted-foreground"
-        >
-          Label
-        </Label>
-        <Input
-          id={`${section.key}-label`}
-          value={section.label}
-          onChange={(e) => onUpdate(section.key, { label: e.target.value })}
-          className="h-8 text-sm font-medium"
-          placeholder="Section label"
-        />
-      </div>
-
-      {showMediaFields && (
-        <div className="flex flex-col gap-2">
-          <div className="flex flex-col gap-1">
+      {showMediaFields ? (
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
+          <div className="flex flex-col gap-1 sm:w-48 sm:shrink-0">
             <label
               htmlFor={`${section.key}-image`}
               className="text-xs font-medium text-muted-foreground"
@@ -144,24 +146,29 @@ export function SectionEditor({
               }
             />
           </div>
-          <div className="flex flex-col gap-1">
-            <label
-              htmlFor={`${section.key}-description`}
-              className="text-xs font-medium text-muted-foreground"
-            >
-              Description
-            </label>
-            <Textarea
-              id={`${section.key}-description`}
-              value={section.description ?? ""}
-              onChange={(e) =>
-                onUpdate(section.key, { description: e.target.value })
-              }
-              placeholder="Short description shown on the property card"
-              className="min-h-[60px] text-sm"
-            />
+          <div className="flex min-w-0 flex-1 flex-col gap-3">
+            {labelField}
+            <div className="flex flex-col gap-1">
+              <label
+                htmlFor={`${section.key}-description`}
+                className="text-xs font-medium text-muted-foreground"
+              >
+                Description
+              </label>
+              <Textarea
+                id={`${section.key}-description`}
+                value={section.description ?? ""}
+                onChange={(e) =>
+                  onUpdate(section.key, { description: e.target.value })
+                }
+                placeholder="Short description shown on the section card"
+                className="min-h-[120px] max-h-[280px] text-sm"
+              />
+            </div>
           </div>
         </div>
+      ) : (
+        labelField
       )}
 
       <div className="flex flex-col gap-1.5">
