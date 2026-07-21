@@ -1,28 +1,8 @@
 import { render, screen } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { describe, expect, it, vi } from "vitest"
-import type { ProductSection } from "./SortableSectionCard"
-import { SortableSectionCard } from "./SortableSectionCard"
-
-// DnD context mock — SortableSectionCard uses useSortable internally
-vi.mock("@dnd-kit/sortable", () => ({
-  useSortable: () => ({
-    attributes: {},
-    listeners: {},
-    setNodeRef: vi.fn(),
-    transform: null,
-    transition: undefined,
-    isDragging: false,
-  }),
-}))
-
-vi.mock("@dnd-kit/utilities", () => ({
-  CSS: {
-    Transform: {
-      toString: () => "",
-    },
-  },
-}))
+import { SectionEditor } from "./SectionEditor"
+import type { ProductSection } from "./sectionTypes"
 
 // ImageUpload is irrelevant for these tests
 vi.mock("@/components/ui/image-upload", () => ({
@@ -45,16 +25,11 @@ function makeSection(overrides: Partial<ProductSection> = {}): ProductSection {
   }
 }
 
-async function renderCard(
-  section: ProductSection,
-  onUpdate = vi.fn(),
-  onDelete = vi.fn(),
-) {
+async function renderEditor(section: ProductSection, onUpdate = vi.fn()) {
   const result = render(
-    <SortableSectionCard
+    <SectionEditor
       section={section}
       onUpdate={onUpdate}
-      onDelete={onDelete}
       products={[]}
       showAttendeeCategories={true}
       showMediaFields={false}
@@ -68,16 +43,16 @@ async function renderCard(
   return result
 }
 
-describe("SortableSectionCard — attendee category checkboxes", () => {
+describe("SectionEditor — attendee category checkboxes", () => {
   it("renders checkboxes for each category", async () => {
-    await renderCard(makeSection())
+    await renderEditor(makeSection())
     expect(screen.getByLabelText("Main")).toBeInTheDocument()
     expect(screen.getByLabelText("Spouse")).toBeInTheDocument()
     expect(screen.getByLabelText("Kid")).toBeInTheDocument()
   })
 
   it("null attendee_categories: all checkboxes unchecked and 'Visible to all attendees' hint shown", async () => {
-    await renderCard(makeSection({ attendee_categories: null }))
+    await renderEditor(makeSection({ attendee_categories: null }))
 
     const mainCb = screen.getByLabelText("Main")
     const spouseCb = screen.getByLabelText("Spouse")
@@ -94,7 +69,7 @@ describe("SortableSectionCard — attendee category checkboxes", () => {
   it("clicking Main alone calls onUpdate with attendee_categories containing its UUID", async () => {
     const onUpdate = vi.fn()
     const user = userEvent.setup()
-    await renderCard(makeSection({ attendee_categories: null }), onUpdate)
+    await renderEditor(makeSection({ attendee_categories: null }), onUpdate)
 
     await user.click(screen.getByLabelText("Main"))
 
@@ -107,7 +82,7 @@ describe("SortableSectionCard — attendee category checkboxes", () => {
     const onUpdate = vi.fn()
     const user = userEvent.setup()
     // Start with 2 checked (main, spouse) — checking Kid makes all → collapse
-    await renderCard(
+    await renderEditor(
       makeSection({ attendee_categories: ["cat-main", "cat-spouse"] }),
       onUpdate,
     )
@@ -122,7 +97,7 @@ describe("SortableSectionCard — attendee category checkboxes", () => {
   it("unchecking the only checked box calls onUpdate with attendee_categories: null (empty collapse)", async () => {
     const onUpdate = vi.fn()
     const user = userEvent.setup()
-    await renderCard(
+    await renderEditor(
       makeSection({ attendee_categories: ["cat-main"] }),
       onUpdate,
     )
@@ -135,7 +110,7 @@ describe("SortableSectionCard — attendee category checkboxes", () => {
   })
 
   it("existing ['cat-main','cat-spouse'] renders Main+Spouse checked, Kid unchecked, no hint", async () => {
-    await renderCard(
+    await renderEditor(
       makeSection({ attendee_categories: ["cat-main", "cat-spouse"] }),
     )
 

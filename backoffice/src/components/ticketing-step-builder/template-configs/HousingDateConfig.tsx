@@ -1,31 +1,16 @@
-import {
-  closestCenter,
-  DndContext,
-  type DragEndEvent,
-  PointerSensor,
-  useSensor,
-  useSensors,
-} from "@dnd-kit/core"
-import {
-  arrayMove,
-  SortableContext,
-  verticalListSortingStrategy,
-} from "@dnd-kit/sortable"
 import { useQuery } from "@tanstack/react-query"
-import { Check, Plus } from "lucide-react"
+import { Check } from "lucide-react"
 
 import { ProductsService } from "@/client"
-import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { Switch } from "@/components/ui/switch"
 import { cn } from "@/lib/utils"
+import { SectionsEditor } from "./sections/SectionsEditor"
 import {
   type ProductSection,
   parseConfigSections,
-  SortableSectionCard,
-  toKey,
-} from "./SortableSectionCard"
+} from "./sections/sectionTypes"
 import type { TemplateConfigProps } from "./types"
 
 const HOUSING_VARIANTS = [
@@ -175,52 +160,8 @@ export function HousingDateConfig({
     is_active: p.is_active,
   }))
 
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
-  )
-
   const updateSections = (sections: ProductSection[]) => {
     onChange({ ...config, sections })
-  }
-
-  const handleSectionUpdate = (
-    key: string,
-    updates: Partial<ProductSection>,
-  ) => {
-    updateSections(
-      parsed.sections.map((s) => (s.key === key ? { ...s, ...updates } : s)),
-    )
-  }
-
-  const handleSectionDelete = (key: string) => {
-    updateSections(parsed.sections.filter((s) => s.key !== key))
-  }
-
-  const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event
-    if (!over || active.id === over.id) return
-
-    const oldIndex = parsed.sections.findIndex((s) => s.key === active.id)
-    const newIndex = parsed.sections.findIndex((s) => s.key === over.id)
-    if (oldIndex === -1 || newIndex === -1) return
-
-    const reordered = arrayMove(parsed.sections, oldIndex, newIndex).map(
-      (s, i) => ({ ...s, order: i }),
-    )
-    updateSections(reordered)
-  }
-
-  const handleAddSection = () => {
-    const newLabel = `Property ${parsed.sections.length + 1}`
-    const newSection: ProductSection = {
-      key: `${toKey(newLabel)}-${Date.now()}`,
-      label: newLabel,
-      order: parsed.sections.length,
-      product_ids: [],
-      description: "",
-      image_url: "",
-    }
-    updateSections([...parsed.sections, newSection])
   }
 
   const updateShowDates = (enabled: boolean) => {
@@ -334,52 +275,12 @@ export function HousingDateConfig({
 
       <Separator />
 
-      {/* Property Sections */}
-      <div className="flex items-center justify-between">
-        <div>
-          <Label className="text-sm font-medium">Property Sections</Label>
-          <p className="text-xs text-muted-foreground">
-            Group housing products by property or hotel
-          </p>
-        </div>
-        <Button variant="outline" size="sm" onClick={handleAddSection}>
-          <Plus className="h-3.5 w-3.5 mr-1" />
-          Add Property
-        </Button>
-      </div>
-
-      {parsed.sections.length === 0 ? (
-        <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
-          No sections configured. Housing products will be displayed as a flat
-          list.
-        </div>
-      ) : (
-        <DndContext
-          sensors={sensors}
-          collisionDetection={closestCenter}
-          onDragEnd={handleDragEnd}
-        >
-          <SortableContext
-            items={parsed.sections.map((s) => s.key)}
-            strategy={verticalListSortingStrategy}
-          >
-            <div className="flex flex-col gap-2">
-              {parsed.sections
-                .sort((a, b) => a.order - b.order)
-                .map((section) => (
-                  <SortableSectionCard
-                    key={section.key}
-                    section={section}
-                    onUpdate={handleSectionUpdate}
-                    onDelete={handleSectionDelete}
-                    products={products}
-                    assignLabel="Assign room"
-                  />
-                ))}
-            </div>
-          </SortableContext>
-        </DndContext>
-      )}
+      <SectionsEditor
+        sections={parsed.sections}
+        onChange={updateSections}
+        products={products}
+        assignLabel="Assign room"
+      />
     </div>
   )
 }
