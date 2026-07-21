@@ -167,6 +167,7 @@ export function SectionsEditor({
                       key={section.key}
                       section={section}
                       selected={section.key === selectedKey}
+                      showThumbnail={showMediaFields}
                       summary={sectionSummary(
                         section,
                         showAttendeeCategories,

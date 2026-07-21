@@ -10,6 +10,9 @@ interface SectionRailRowProps {
   section: ProductSection
   selected: boolean
   summary: string
+  /** Sections only carry an image when the template uses media fields; hide
+   *  the thumbnail entirely otherwise so it doesn't imply a missing image. */
+  showThumbnail?: boolean
   onSelect: (key: string) => void
   onDelete: (key: string) => void
 }
@@ -18,6 +21,7 @@ export function SectionRailRow({
   section,
   selected,
   summary,
+  showThumbnail = false,
   onSelect,
   onDelete,
 }: SectionRailRowProps) {
@@ -62,17 +66,19 @@ export function SectionRailRow({
         onClick={() => onSelect(section.key)}
         className="flex min-w-0 flex-1 items-center gap-2 text-left"
       >
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-md border bg-muted">
-          {section.image_url ? (
-            <img
-              src={section.image_url}
-              alt=""
-              className="h-full w-full object-cover"
-            />
-          ) : (
-            <ImageIcon className="h-4 w-4 text-muted-foreground" />
-          )}
-        </div>
+        {showThumbnail && (
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-md border bg-muted">
+            {section.image_url ? (
+              <img
+                src={section.image_url}
+                alt=""
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              <ImageIcon className="h-4 w-4 text-muted-foreground" />
+            )}
+          </div>
+        )}
         <div className="min-w-0 flex-1">
           <div className="truncate text-sm font-medium">
             {section.label || "Untitled section"}
