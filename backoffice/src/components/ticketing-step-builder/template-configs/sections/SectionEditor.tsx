@@ -1,4 +1,4 @@
-import { ChevronDown, Package, Plus, X } from "lucide-react"
+import { ChevronDown, Package, Plus, Search, X } from "lucide-react"
 import { useState } from "react"
 
 import { Button } from "@/components/ui/button"
@@ -59,6 +59,23 @@ export function SectionEditor({
   )
 
   const [showProductPicker, setShowProductPicker] = useState(false)
+  const [pickerQuery, setPickerQuery] = useState("")
+
+  const normalizedQuery = pickerQuery.trim().toLowerCase()
+  const filteredAvailable = normalizedQuery
+    ? availableProducts.filter(
+        (p) =>
+          p.name.toLowerCase().includes(normalizedQuery) ||
+          (p.slug?.toLowerCase().includes(normalizedQuery) ?? false),
+      )
+    : availableProducts
+  // Only worth a search box once the list is long enough to scan.
+  const showPickerSearch = availableProducts.length > 6
+
+  const closePicker = () => {
+    setShowProductPicker(false)
+    setPickerQuery("")
+  }
 
   const handleCategoryToggle = (catId: string, checked: boolean) => {
     const current = section.attendee_categories ?? []
@@ -231,52 +248,70 @@ export function SectionEditor({
 
         {availableProducts.length > 0 &&
           (showProductPicker ? (
-            <div className="flex flex-col gap-1 rounded border p-2 bg-muted/30">
-              {availableProducts.map((p) => {
-                const inactive = p.is_active === false
-                return (
-                  <button
-                    key={p.id}
-                    type="button"
-                    className={cn(
-                      "flex items-center gap-2 text-xs text-left py-1 px-1 rounded hover:bg-accent",
-                      inactive && "opacity-50",
-                    )}
-                    onClick={() =>
-                      onUpdate(section.key, {
-                        product_ids: [...section.product_ids, p.id],
-                      })
-                    }
-                  >
-                    <Package className="h-3 w-3 shrink-0 text-muted-foreground" />
-                    <div className="flex-1 min-w-0 flex flex-col">
-                      <div className="flex items-center gap-1.5">
-                        <span className="truncate">{p.name}</span>
-                        {inactive && (
-                          <span className="shrink-0 rounded border px-1 py-px text-[10px] uppercase tracking-wide text-muted-foreground">
-                            Inactive
+            <div className="flex flex-col gap-2 rounded border p-2 bg-muted/30">
+              {showPickerSearch && (
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    value={pickerQuery}
+                    onChange={(e) => setPickerQuery(e.target.value)}
+                    placeholder="Search products"
+                    className="h-7 pl-7 text-xs"
+                  />
+                </div>
+              )}
+              <div className="flex max-h-64 flex-col gap-1 overflow-auto">
+                {filteredAvailable.map((p) => {
+                  const inactive = p.is_active === false
+                  return (
+                    <button
+                      key={p.id}
+                      type="button"
+                      className={cn(
+                        "flex items-center gap-2 text-xs text-left py-1 px-1 rounded hover:bg-accent",
+                        inactive && "opacity-50",
+                      )}
+                      onClick={() =>
+                        onUpdate(section.key, {
+                          product_ids: [...section.product_ids, p.id],
+                        })
+                      }
+                    >
+                      <Package className="h-3 w-3 shrink-0 text-muted-foreground" />
+                      <div className="flex-1 min-w-0 flex flex-col">
+                        <div className="flex items-center gap-1.5">
+                          <span className="truncate">{p.name}</span>
+                          {inactive && (
+                            <span className="shrink-0 rounded border px-1 py-px text-[10px] uppercase tracking-wide text-muted-foreground">
+                              Inactive
+                            </span>
+                          )}
+                        </div>
+                        {p.slug && (
+                          <span className="truncate font-mono text-[10px] text-muted-foreground/70">
+                            {p.slug}
                           </span>
                         )}
                       </div>
-                      {p.slug && (
-                        <span className="truncate font-mono text-[10px] text-muted-foreground/70">
-                          {p.slug}
+                      {p.price != null && (
+                        <span className="shrink-0 font-mono tabular-nums text-muted-foreground">
+                          ${p.price}
                         </span>
                       )}
-                    </div>
-                    {p.price != null && (
-                      <span className="shrink-0 font-mono tabular-nums text-muted-foreground">
-                        ${p.price}
-                      </span>
-                    )}
-                  </button>
-                )
-              })}
+                    </button>
+                  )
+                })}
+                {filteredAvailable.length === 0 && (
+                  <p className="px-1 py-2 text-center text-xs text-muted-foreground">
+                    No products match your search
+                  </p>
+                )}
+              </div>
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-6 text-xs mt-1"
-                onClick={() => setShowProductPicker(false)}
+                className="h-6 text-xs"
+                onClick={closePicker}
               >
                 Done
               </Button>
