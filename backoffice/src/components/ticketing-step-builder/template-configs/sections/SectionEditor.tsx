@@ -173,39 +173,46 @@ export function SectionEditor({
 
       <div className="flex flex-col gap-1.5">
         <Label className="text-xs font-medium text-muted-foreground">
-          Products and pricing ({assignedProducts.length})
+          Products ({assignedProducts.length})
         </Label>
 
         {assignedProducts.length > 0 && (
-          <div className="flex flex-col gap-1">
+          <div className="flex flex-col divide-y rounded-md border">
             {assignedProducts.map((p) => {
               const inactive = p.is_active === false
               return (
                 <div
                   key={p.id}
                   className={cn(
-                    "flex items-center gap-2 text-xs text-muted-foreground py-0.5",
+                    "flex items-center gap-2 px-2 py-1.5 text-xs",
                     inactive && "opacity-50",
                   )}
                 >
-                  <Package className="h-3 w-3 shrink-0" />
-                  <span className="truncate">{p.name}</span>
-                  {inactive && (
-                    <span className="shrink-0 rounded border px-1 py-px text-[10px] uppercase tracking-wide">
-                      Inactive
-                    </span>
-                  )}
+                  <Package className="h-3 w-3 shrink-0 text-muted-foreground" />
+                  <div className="flex min-w-0 flex-1 flex-col">
+                    <div className="flex items-center gap-1.5">
+                      <span className="truncate font-medium">{p.name}</span>
+                      {inactive && (
+                        <span className="shrink-0 rounded border px-1 py-px text-[10px] uppercase tracking-wide text-muted-foreground">
+                          Inactive
+                        </span>
+                      )}
+                    </div>
+                    {p.slug && (
+                      <span className="truncate font-mono text-[10px] text-muted-foreground/70">
+                        {p.slug}
+                      </span>
+                    )}
+                  </div>
                   {p.price != null && (
-                    <span className="ml-auto shrink-0 font-mono tabular-nums">
+                    <span className="shrink-0 font-mono tabular-nums text-muted-foreground">
                       ${p.price}
                     </span>
                   )}
                   <button
                     type="button"
-                    className={cn(
-                      "shrink-0 hover:text-destructive",
-                      p.price == null && "ml-auto",
-                    )}
+                    className="shrink-0 text-muted-foreground hover:text-destructive"
+                    aria-label={`Remove ${p.name}`}
                     onClick={() =>
                       onUpdate(section.key, {
                         product_ids: section.product_ids.filter(
