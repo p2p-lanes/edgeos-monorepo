@@ -34,7 +34,7 @@ import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
-import { toKey } from "./SortableSectionCard"
+import { toKey } from "./sections/sectionTypes"
 import type { TemplateConfigProps } from "./types"
 
 // ---------------------------------------------------------------------------

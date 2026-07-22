@@ -10,15 +10,21 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
 import useCustomToast from "@/hooks/useCustomToast"
+import { cn } from "@/lib/utils"
 import { createErrorHandler } from "@/utils"
 import { getStepTypeDefinition, TEMPLATE_DEFINITIONS } from "./constants"
 
 interface SortableStepCardProps {
   step: TicketingStepPublic
   onEdit: (step: TicketingStepPublic) => void
+  selected?: boolean
 }
 
-export function SortableStepCard({ step, onEdit }: SortableStepCardProps) {
+export function SortableStepCard({
+  step,
+  onEdit,
+  selected,
+}: SortableStepCardProps) {
   const queryClient = useQueryClient()
   const { showErrorToast } = useCustomToast()
 
@@ -85,7 +91,10 @@ export function SortableStepCard({ step, onEdit }: SortableStepCardProps) {
     <div
       ref={setNodeRef}
       style={style}
-      className="flex items-center gap-3 rounded-lg border bg-background px-3 py-3 shadow-sm"
+      className={cn(
+        "flex items-center gap-3 rounded-lg border bg-background px-3 py-3 shadow-sm",
+        selected && "border-primary ring-1 ring-primary",
+      )}
     >
       {/* Drag handle */}
       <button
