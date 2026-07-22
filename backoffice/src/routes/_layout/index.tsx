@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query"
-import { createFileRoute, Link } from "@tanstack/react-router"
+import { createFileRoute, Link, Navigate } from "@tanstack/react-router"
 import { AlertTriangle, ArrowRight, Clock, ListChecks } from "lucide-react"
+import { useEffect, useState } from "react"
 
 import {
   type ApplicationPublic,
@@ -18,21 +19,64 @@ import {
   KeyMetricsCards,
   RevenueBreakdownCharts,
 } from "@/components/Dashboard"
+import { onboardingDismissedKey } from "@/components/Dashboard/TrialOnboarding"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
 import useAuth from "@/hooks/useAuth"
+import { useCurrentTenant } from "@/hooks/useCurrentTenant"
 
 export const Route = createFileRoute("/_layout/")({
-  component: Dashboard,
+  component: HomePage,
   head: () => ({
     meta: [{ title: "Dashboard - EdgeOS" }],
   }),
 })
 
+// Free-trial tenants land on the Onboarding section instead of the dashboard
+// (which is empty until they configure their gathering anyway). "Skip for
+// now" over there marks it dismissed for this browser, after which `/` is the
+// dashboard again — Onboarding stays reachable from the sidebar.
+function HomePage() {
+  const { data: tenant, isLoading: tenantLoading } = useCurrentTenant()
+
+  // Avoid flashing the dashboard while we don't know the trial status yet.
+  if (tenantLoading) {
+    return (
+      <div className="flex flex-col gap-4">
+        <Skeleton className="h-8 w-64" />
+        <Skeleton className="h-40 w-full" />
+      </div>
+    )
+  }
+
+  const dismissed =
+    !!tenant?.id &&
+    localStorage.getItem(onboardingDismissedKey(tenant.id)) === "1"
+
+  if (tenant?.is_trial && !dismissed) {
+    return <Navigate to="/onboarding" replace />
+  }
+
+  return <Dashboard />
+}
+
 function Dashboard() {
   const { user: currentUser, isOperatorOrAbove, isSuperadmin } = useAuth()
   const { selectedPopupId, selectedTenantId, isContextReady } = useWorkspace()
+
+  // "Welcome back" is wrong on a user's very first visit (e.g. straight from
+  // the trial signup). Per-user, per-browser marker until a real onboarding
+  // flow replaces it.
+  const [isFirstVisit, setIsFirstVisit] = useState(false)
+  useEffect(() => {
+    if (!currentUser?.id) return
+    const key = `dashboard_seen_${currentUser.id}`
+    if (!localStorage.getItem(key)) {
+      localStorage.setItem(key, "1")
+      setIsFirstVisit(true)
+    }
+  }, [currentUser?.id])
 
   const {
     data: enriched,
@@ -63,7 +107,8 @@ function Dashboard() {
       <div className="flex flex-col gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">
-            Welcome back, {currentUser?.full_name || currentUser?.email}
+            {isFirstVisit ? "Welcome" : "Welcome back"},{" "}
+            {currentUser?.full_name || currentUser?.email}
           </h1>
           <p className="text-muted-foreground text-sm">
             Event performance overview
@@ -192,7 +237,7 @@ function NeedsAttention({
 
   return (
     <div>
-      <h2 className="text-sm font-semibold mb-2 flex items-center gap-2 text-yellow-600 dark:text-yellow-400">
+      <h2 className="text-sm font-semibold mb-2 flex items-center gap-2 text-warning">
         <AlertTriangle className="h-3.5 w-3.5" />
         Needs Attention
       </h2>
@@ -202,7 +247,7 @@ function NeedsAttention({
             <Card className="transition-colors hover:bg-muted/50 cursor-pointer py-0">
               <CardContent className="flex items-center gap-3 p-3">
                 <item.icon
-                  className={`h-4 w-4 shrink-0 ${item.variant === "warning" ? "text-yellow-500" : "text-muted-foreground"}`}
+                  className={`h-4 w-4 shrink-0 ${item.variant === "warning" ? "text-warning" : "text-muted-foreground"}`}
                 />
                 <span className="text-sm font-medium flex-1">{item.label}</span>
                 <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" />

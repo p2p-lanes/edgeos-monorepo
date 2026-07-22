@@ -119,7 +119,7 @@ export function CouponForm({ defaultValues, onSuccess }: CouponFormProps) {
         })
       } else {
         if (!selectedPopupId) {
-          showErrorToast("Please select a popup first")
+          showErrorToast("Please select a gathering first")
           return
         }
         if (!value.code || !value.discount_value) {

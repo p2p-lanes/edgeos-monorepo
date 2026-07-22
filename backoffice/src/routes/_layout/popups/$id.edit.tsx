@@ -12,7 +12,7 @@ import { useGoBack } from "@/hooks/useGoBack"
 export const Route = createFileRoute("/_layout/popups/$id/edit")({
   component: EditPopupPage,
   head: () => ({
-    meta: [{ title: "Edit Pop-up - EdgeOS" }],
+    meta: [{ title: "Edit Gathering - EdgeOS" }],
   }),
 })
 
@@ -35,8 +35,8 @@ function EditPopupPage() {
 
   return (
     <FormPageLayout
-      title="Edit Pop-up"
-      description="Update pop-up settings and configuration"
+      title="Edit Gathering"
+      description="Update gathering settings and configuration"
       backTo="/popups"
     >
       <QueryErrorBoundary>

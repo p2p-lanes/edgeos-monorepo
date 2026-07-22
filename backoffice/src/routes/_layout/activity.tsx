@@ -344,7 +344,7 @@ function Activity() {
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Activity</h1>
         <p className="text-muted-foreground">
-          Audit history of admin actions for the selected pop-up
+          Audit history of admin actions for the selected gathering
         </p>
       </div>
       {!isContextReady ? (

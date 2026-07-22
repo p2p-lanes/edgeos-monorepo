@@ -20,10 +20,9 @@ export const Route = createFileRoute("/_layout/email-templates/")({
 })
 
 const CATEGORY_COLORS: Record<string, string> = {
-  Auth: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300",
-  Application:
-    "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300",
-  Payment: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300",
+  Auth: "bg-info-soft text-info",
+  Application: "bg-chart-3/15 text-chart-3",
+  Payment: "bg-success-soft text-success",
 }
 
 export function TemplateList() {
@@ -89,7 +88,7 @@ export function TemplateList() {
               {requiresPopup && !selectedPopupId ? (
                 <Button variant="ghost" size="sm" disabled>
                   <Pencil className="mr-1.5 h-3.5 w-3.5" />
-                  Select popup to edit
+                  Select gathering to edit
                 </Button>
               ) : (
                 <Button variant="ghost" size="sm" asChild>
@@ -129,7 +128,7 @@ export function EmailTemplatesPage() {
     <div className="flex flex-col gap-6">
       {needsTenantSelection && <WorkspaceAlert resource="email templates" />}
       {needsPopupSelection && (
-        <WorkspaceAlert resource="popup-scoped email templates" />
+        <WorkspaceAlert resource="gathering-scoped email templates" />
       )}
       <div className="flex items-center justify-between">
         <div>

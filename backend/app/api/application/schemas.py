@@ -118,6 +118,17 @@ class ApplicationBase(SQLModel):
     incentive_currency: str | None = Field(default=None, max_length=10, nullable=True)
 
 
+class ApplicationReviewerVote(BaseModel):
+    """Compact reviewer + decision pair for the applications list."""
+
+    reviewer_id: uuid.UUID
+    reviewer_full_name: str | None = None
+    reviewer_email: str | None = None
+    decision: ReviewDecision
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class ApplicationPublic(BaseModel):
     """Application schema for API responses."""
 
@@ -160,6 +171,11 @@ class ApplicationPublic(BaseModel):
     # Computed fields
     red_flag: bool = False
     review_decision: ReviewDecision | None = None
+
+    # Review + comment summary for the applications list
+    review_count: int = 0
+    reviewers: list[ApplicationReviewerVote] = []
+    comment_count: int = 0
 
     model_config = ConfigDict(from_attributes=True)
 

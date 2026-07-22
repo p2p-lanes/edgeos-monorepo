@@ -9,7 +9,7 @@ export function AuthLayout({ children }: AuthLayoutProps) {
   return (
     <div className="grid min-h-svh lg:grid-cols-2">
       <div className="bg-muted dark:bg-zinc-900 relative hidden lg:flex lg:flex-col lg:items-center lg:justify-center gap-6">
-        <Logo variant="full" className="h-16" asLink={false} />
+        <Logo variant="full" className="h-16 text-4xl" asLink={false} />
         <p className="text-muted-foreground text-sm max-w-xs text-center">
           Manage your events, applications, and payments — all in one place.
         </p>

@@ -30,6 +30,11 @@ from app.utils.encryption import encrypt
 
 router = APIRouter(prefix="/tenants", tags=["tenants"])
 
+# Machine-readable detail (and domain-cache sentinel) for suspended tenants.
+# Kept equal to app.api.auth.crud.TRIAL_ENDED_DETAIL so every surface returns
+# the same shape: 403 {"detail": "trial_ended"}.
+TRIAL_ENDED_SENTINEL = "trial_ended"
+
 
 def _smtp_password_configured_after_payload(
     current_encrypted: str | None,
@@ -89,12 +94,17 @@ async def get_tenant_by_domain(
     avoid leaking which domains are registered (spec NFR2).
     No authentication required — used by portal middleware on every request.
     """
-    # Cache-first: hit returns JSON or the "null" sentinel (cached 404)
+    # Cache-first: hit returns JSON or a sentinel ("null" = cached 404,
+    # "trial_ended" = cached suspension)
     cached = domain_cache.get(domain)
     if cached is not None:
         if cached == "null":
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail="Not found"
+            )
+        if cached == TRIAL_ENDED_SENTINEL:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN, detail=TRIAL_ENDED_SENTINEL
             )
         return TenantAnonymousPublic.model_validate_json(cached)
 
@@ -103,6 +113,15 @@ async def get_tenant_by_domain(
     if tenant is None:
         domain_cache.set(domain, "null")
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
+
+    # Suspended tenant (expired trial): the portal shows a "trial ended" screen.
+    # Distinct from 404 so the frontend can tell "unknown host" from
+    # "known but paused". Data and credentials remain intact.
+    if tenant.suspended_at is not None:
+        domain_cache.set(domain, TRIAL_ENDED_SENTINEL)
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail=TRIAL_ENDED_SENTINEL
+        )
 
     result = TenantAnonymousPublic.model_validate(tenant)
 
@@ -130,6 +149,11 @@ async def get_tenant_by_slug(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Tenant not found",
+        )
+
+    if tenant.suspended_at is not None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail=TRIAL_ENDED_SENTINEL
         )
 
     return TenantAnonymousPublic.model_validate(tenant)

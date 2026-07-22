@@ -561,6 +561,25 @@ class HumansCRUD(BaseCRUD[Humans, HumanCreate, HumanUpdate]):
         )
         return list(session.exec(statement).all())
 
+    def count_active_comments_by_humans(
+        self, session: Session, human_ids: list[uuid.UUID]
+    ) -> dict[uuid.UUID, int]:
+        """Return a map of human_id -> non-deleted comment count.
+
+        Single grouped query so callers listing many humans avoid N+1.
+        """
+        if not human_ids:
+            return {}
+        statement = (
+            select(HumanComment.human_id, func.count())
+            .where(
+                col(HumanComment.human_id).in_(human_ids),
+                col(HumanComment.deleted_at).is_(None),
+            )
+            .group_by(col(HumanComment.human_id))
+        )
+        return dict(session.exec(statement).all())
+
     def list_enrichment_facts(
         self, session: Session, human_id: uuid.UUID
     ) -> list[HumanEnrichmentFact]:

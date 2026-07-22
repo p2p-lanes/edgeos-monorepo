@@ -34,7 +34,7 @@ export function AvailabilityIndicator({
   }
   if (availability.status === "available") {
     return (
-      <p className="flex items-center gap-1 text-xs text-green-600 dark:text-green-500">
+      <p className="flex items-center gap-1 text-xs text-success">
         <Check className="h-3.5 w-3.5" /> Slot available
       </p>
     )
