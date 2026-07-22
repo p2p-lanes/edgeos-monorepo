@@ -52,6 +52,7 @@ from app.core.dependencies.users import (
     CurrentAdmin,
     CurrentHuman,
     HumanTenantSession,
+    SessionDep,
     needs,
 )
 from app.services.email_helpers import send_application_status_email
@@ -63,25 +64,25 @@ portal_router = APIRouter(prefix="/portal", tags=["portal"])
 
 
 def _get_reviewer_identities(
+    control_db,
     reviewer_ids: list[uuid.UUID],
 ) -> dict[uuid.UUID, tuple[str | None, str | None]]:
-    """Fetch reviewer (full_name, email) from the main engine.
+    """Fetch reviewer (full_name, email) via the control-plane session.
 
-    Reviewers are Users, which live in the main DB (not the tenant DB), so
-    tenant sessions can't join them. One batched query for the whole page.
+    Reviewers are Users, which live in the main DB (not the tenant DB), so we
+    read them through the main-engine session (``control_db``), not the tenant
+    session. One batched query for the whole page.
     """
     if not reviewer_ids:
         return {}
 
-    from sqlmodel import Session, select
+    from sqlmodel import select
 
     from app.api.user.models import Users
-    from app.core.db import engine
 
-    with Session(engine) as session:
-        id_col = Users.id  # ty:ignore[invalid-assignment]
-        users = session.exec(select(Users).where(id_col.in_(reviewer_ids))).all()
-        return {user.id: (user.full_name, user.email) for user in users}
+    id_col = Users.id  # ty:ignore[invalid-assignment]
+    users = control_db.exec(select(Users).where(id_col.in_(reviewer_ids))).all()
+    return {user.id: (user.full_name, user.email) for user in users}
 
 
 def _build_application_public(
@@ -177,6 +178,7 @@ def _build_application_public(
 async def list_applications(
     db: AdminOrApiKeySession_ApplicationsRead,
     _: AdminOrApiKey_ApplicationsRead,
+    control_db: SessionDep,
     popup_id: uuid.UUID | None = None,
     human_id: uuid.UUID | None = None,
     reviewed_by: uuid.UUID | None = None,
@@ -216,9 +218,10 @@ async def list_applications(
     # Reviewer names live in the main DB; comment counts on the human (tenant
     # DB). Resolve both in one batched query each to keep the list N+1-free.
     reviewer_identities = _get_reviewer_identities(
+        control_db,
         list(
             {r.reviewer_id for application in applications for r in application.reviews}
-        )
+        ),
     )
     # human_comments is now tenant-scoped (RLS), so it is read through the same
     # tenant session as the applications.
