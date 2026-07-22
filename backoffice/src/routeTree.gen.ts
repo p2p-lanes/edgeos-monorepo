@@ -39,6 +39,7 @@ import { Route as LayoutProductsNewRouteImport } from './routes/_layout/products
 import { Route as LayoutPopupsNewRouteImport } from './routes/_layout/popups/new'
 import { Route as LayoutOrganizationsNewRouteImport } from './routes/_layout/organizations/new'
 import { Route as LayoutHumansNewRouteImport } from './routes/_layout/humans/new'
+import { Route as LayoutHumansIdRouteImport } from './routes/_layout/humans/$id'
 import { Route as LayoutGroupsNewRouteImport } from './routes/_layout/groups/new'
 import { Route as LayoutFormBuilderNewRouteImport } from './routes/_layout/form-builder/new'
 import { Route as LayoutEventsSettingsRouteImport } from './routes/_layout/events/settings'
@@ -58,7 +59,6 @@ import { Route as LayoutProductsIdEditRouteImport } from './routes/_layout/produ
 import { Route as LayoutPopupsIdEditRouteImport } from './routes/_layout/popups/$id.edit'
 import { Route as LayoutPopupsIdBulkGrantRouteImport } from './routes/_layout/popups/$id.bulk-grant'
 import { Route as LayoutOrganizationsIdEditRouteImport } from './routes/_layout/organizations/$id.edit'
-import { Route as LayoutHumansIdEditRouteImport } from './routes/_layout/humans/$id.edit'
 import { Route as LayoutGroupsIdEditRouteImport } from './routes/_layout/groups/$id.edit'
 import { Route as LayoutFormBuilderSectionsNewRouteImport } from './routes/_layout/form-builder/sections/new'
 import { Route as LayoutFormBuilderIdEditRouteImport } from './routes/_layout/form-builder/$id.edit'
@@ -226,6 +226,11 @@ const LayoutHumansNewRoute = LayoutHumansNewRouteImport.update({
   path: '/humans/new',
   getParentRoute: () => LayoutRoute,
 } as any)
+const LayoutHumansIdRoute = LayoutHumansIdRouteImport.update({
+  id: '/humans/$id',
+  path: '/humans/$id',
+  getParentRoute: () => LayoutRoute,
+} as any)
 const LayoutGroupsNewRoute = LayoutGroupsNewRouteImport.update({
   id: '/groups/new',
   path: '/groups/new',
@@ -324,11 +329,6 @@ const LayoutOrganizationsIdEditRoute =
     path: '/organizations/$id/edit',
     getParentRoute: () => LayoutRoute,
   } as any)
-const LayoutHumansIdEditRoute = LayoutHumansIdEditRouteImport.update({
-  id: '/humans/$id/edit',
-  path: '/humans/$id/edit',
-  getParentRoute: () => LayoutRoute,
-} as any)
 const LayoutGroupsIdEditRoute = LayoutGroupsIdEditRouteImport.update({
   id: '/groups/$id/edit',
   path: '/groups/$id/edit',
@@ -424,6 +424,7 @@ export interface FileRoutesByFullPath {
   '/events/settings': typeof LayoutEventsSettingsRoute
   '/form-builder/new': typeof LayoutFormBuilderNewRoute
   '/groups/new': typeof LayoutGroupsNewRoute
+  '/humans/$id': typeof LayoutHumansIdRoute
   '/humans/new': typeof LayoutHumansNewRoute
   '/organizations/new': typeof LayoutOrganizationsNewRoute
   '/popups/new': typeof LayoutPopupsNewRoute
@@ -453,7 +454,6 @@ export interface FileRoutesByFullPath {
   '/form-builder/$id/edit': typeof LayoutFormBuilderIdEditRoute
   '/form-builder/sections/new': typeof LayoutFormBuilderSectionsNewRoute
   '/groups/$id/edit': typeof LayoutGroupsIdEditRoute
-  '/humans/$id/edit': typeof LayoutHumansIdEditRoute
   '/organizations/$id/edit': typeof LayoutOrganizationsIdEditRoute
   '/popups/$id/bulk-grant': typeof LayoutPopupsIdBulkGrantRoute
   '/popups/$id/edit': typeof LayoutPopupsIdEditRoute
@@ -488,6 +488,7 @@ export interface FileRoutesByTo {
   '/events/settings': typeof LayoutEventsSettingsRoute
   '/form-builder/new': typeof LayoutFormBuilderNewRoute
   '/groups/new': typeof LayoutGroupsNewRoute
+  '/humans/$id': typeof LayoutHumansIdRoute
   '/humans/new': typeof LayoutHumansNewRoute
   '/organizations/new': typeof LayoutOrganizationsNewRoute
   '/popups/new': typeof LayoutPopupsNewRoute
@@ -517,7 +518,6 @@ export interface FileRoutesByTo {
   '/form-builder/$id/edit': typeof LayoutFormBuilderIdEditRoute
   '/form-builder/sections/new': typeof LayoutFormBuilderSectionsNewRoute
   '/groups/$id/edit': typeof LayoutGroupsIdEditRoute
-  '/humans/$id/edit': typeof LayoutHumansIdEditRoute
   '/organizations/$id/edit': typeof LayoutOrganizationsIdEditRoute
   '/popups/$id/bulk-grant': typeof LayoutPopupsIdBulkGrantRoute
   '/popups/$id/edit': typeof LayoutPopupsIdEditRoute
@@ -554,6 +554,7 @@ export interface FileRoutesById {
   '/_layout/events/settings': typeof LayoutEventsSettingsRoute
   '/_layout/form-builder/new': typeof LayoutFormBuilderNewRoute
   '/_layout/groups/new': typeof LayoutGroupsNewRoute
+  '/_layout/humans/$id': typeof LayoutHumansIdRoute
   '/_layout/humans/new': typeof LayoutHumansNewRoute
   '/_layout/organizations/new': typeof LayoutOrganizationsNewRoute
   '/_layout/popups/new': typeof LayoutPopupsNewRoute
@@ -583,7 +584,6 @@ export interface FileRoutesById {
   '/_layout/form-builder/$id/edit': typeof LayoutFormBuilderIdEditRoute
   '/_layout/form-builder/sections/new': typeof LayoutFormBuilderSectionsNewRoute
   '/_layout/groups/$id/edit': typeof LayoutGroupsIdEditRoute
-  '/_layout/humans/$id/edit': typeof LayoutHumansIdEditRoute
   '/_layout/organizations/$id/edit': typeof LayoutOrganizationsIdEditRoute
   '/_layout/popups/$id/bulk-grant': typeof LayoutPopupsIdBulkGrantRoute
   '/_layout/popups/$id/edit': typeof LayoutPopupsIdEditRoute
@@ -620,6 +620,7 @@ export interface FileRouteTypes {
     | '/events/settings'
     | '/form-builder/new'
     | '/groups/new'
+    | '/humans/$id'
     | '/humans/new'
     | '/organizations/new'
     | '/popups/new'
@@ -649,7 +650,6 @@ export interface FileRouteTypes {
     | '/form-builder/$id/edit'
     | '/form-builder/sections/new'
     | '/groups/$id/edit'
-    | '/humans/$id/edit'
     | '/organizations/$id/edit'
     | '/popups/$id/bulk-grant'
     | '/popups/$id/edit'
@@ -684,6 +684,7 @@ export interface FileRouteTypes {
     | '/events/settings'
     | '/form-builder/new'
     | '/groups/new'
+    | '/humans/$id'
     | '/humans/new'
     | '/organizations/new'
     | '/popups/new'
@@ -713,7 +714,6 @@ export interface FileRouteTypes {
     | '/form-builder/$id/edit'
     | '/form-builder/sections/new'
     | '/groups/$id/edit'
-    | '/humans/$id/edit'
     | '/organizations/$id/edit'
     | '/popups/$id/bulk-grant'
     | '/popups/$id/edit'
@@ -749,6 +749,7 @@ export interface FileRouteTypes {
     | '/_layout/events/settings'
     | '/_layout/form-builder/new'
     | '/_layout/groups/new'
+    | '/_layout/humans/$id'
     | '/_layout/humans/new'
     | '/_layout/organizations/new'
     | '/_layout/popups/new'
@@ -778,7 +779,6 @@ export interface FileRouteTypes {
     | '/_layout/form-builder/$id/edit'
     | '/_layout/form-builder/sections/new'
     | '/_layout/groups/$id/edit'
-    | '/_layout/humans/$id/edit'
     | '/_layout/organizations/$id/edit'
     | '/_layout/popups/$id/bulk-grant'
     | '/_layout/popups/$id/edit'
@@ -1008,6 +1008,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LayoutHumansNewRouteImport
       parentRoute: typeof LayoutRoute
     }
+    '/_layout/humans/$id': {
+      id: '/_layout/humans/$id'
+      path: '/humans/$id'
+      fullPath: '/humans/$id'
+      preLoaderRoute: typeof LayoutHumansIdRouteImport
+      parentRoute: typeof LayoutRoute
+    }
     '/_layout/groups/new': {
       id: '/_layout/groups/new'
       path: '/groups/new'
@@ -1141,13 +1148,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LayoutOrganizationsIdEditRouteImport
       parentRoute: typeof LayoutRoute
     }
-    '/_layout/humans/$id/edit': {
-      id: '/_layout/humans/$id/edit'
-      path: '/humans/$id/edit'
-      fullPath: '/humans/$id/edit'
-      preLoaderRoute: typeof LayoutHumansIdEditRouteImport
-      parentRoute: typeof LayoutRoute
-    }
     '/_layout/groups/$id/edit': {
       id: '/_layout/groups/$id/edit'
       path: '/groups/$id/edit'
@@ -1264,6 +1264,7 @@ interface LayoutRouteChildren {
   LayoutEventsSettingsRoute: typeof LayoutEventsSettingsRoute
   LayoutFormBuilderNewRoute: typeof LayoutFormBuilderNewRoute
   LayoutGroupsNewRoute: typeof LayoutGroupsNewRoute
+  LayoutHumansIdRoute: typeof LayoutHumansIdRoute
   LayoutHumansNewRoute: typeof LayoutHumansNewRoute
   LayoutOrganizationsNewRoute: typeof LayoutOrganizationsNewRoute
   LayoutPopupsNewRoute: typeof LayoutPopupsNewRoute
@@ -1293,7 +1294,6 @@ interface LayoutRouteChildren {
   LayoutFormBuilderIdEditRoute: typeof LayoutFormBuilderIdEditRoute
   LayoutFormBuilderSectionsNewRoute: typeof LayoutFormBuilderSectionsNewRoute
   LayoutGroupsIdEditRoute: typeof LayoutGroupsIdEditRoute
-  LayoutHumansIdEditRoute: typeof LayoutHumansIdEditRoute
   LayoutOrganizationsIdEditRoute: typeof LayoutOrganizationsIdEditRoute
   LayoutPopupsIdBulkGrantRoute: typeof LayoutPopupsIdBulkGrantRoute
   LayoutPopupsIdEditRoute: typeof LayoutPopupsIdEditRoute
@@ -1328,6 +1328,7 @@ const LayoutRouteChildren: LayoutRouteChildren = {
   LayoutEventsSettingsRoute: LayoutEventsSettingsRoute,
   LayoutFormBuilderNewRoute: LayoutFormBuilderNewRoute,
   LayoutGroupsNewRoute: LayoutGroupsNewRoute,
+  LayoutHumansIdRoute: LayoutHumansIdRoute,
   LayoutHumansNewRoute: LayoutHumansNewRoute,
   LayoutOrganizationsNewRoute: LayoutOrganizationsNewRoute,
   LayoutPopupsNewRoute: LayoutPopupsNewRoute,
@@ -1357,7 +1358,6 @@ const LayoutRouteChildren: LayoutRouteChildren = {
   LayoutFormBuilderIdEditRoute: LayoutFormBuilderIdEditRoute,
   LayoutFormBuilderSectionsNewRoute: LayoutFormBuilderSectionsNewRoute,
   LayoutGroupsIdEditRoute: LayoutGroupsIdEditRoute,
-  LayoutHumansIdEditRoute: LayoutHumansIdEditRoute,
   LayoutOrganizationsIdEditRoute: LayoutOrganizationsIdEditRoute,
   LayoutPopupsIdBulkGrantRoute: LayoutPopupsIdBulkGrantRoute,
   LayoutPopupsIdEditRoute: LayoutPopupsIdEditRoute,
