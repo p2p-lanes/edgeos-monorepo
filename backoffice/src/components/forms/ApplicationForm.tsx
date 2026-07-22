@@ -150,7 +150,7 @@ export function ApplicationForm({ onSuccess }: ApplicationFormProps) {
     },
     onSubmit: ({ value }) => {
       if (!selectedPopupId) {
-        showErrorToast("Please select a popup first")
+        showErrorToast("Please select a gathering first")
         return
       }
 

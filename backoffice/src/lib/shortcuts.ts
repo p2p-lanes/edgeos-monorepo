@@ -69,7 +69,7 @@ interface CreateRoute {
 
 const CREATE_ROUTES: Record<string, CreateRoute> = {
   popups: {
-    label: "New Popup",
+    label: "New Gathering",
     path: "/popups/new",
     permission: PERMISSION_LEVELS.ADMIN,
   },

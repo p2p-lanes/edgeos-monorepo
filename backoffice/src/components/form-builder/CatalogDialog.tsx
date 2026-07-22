@@ -47,7 +47,7 @@ export function CatalogDialog({
     onSuccess: (_created, fieldName) => {
       const label =
         data?.find((f) => f.field_name === fieldName)?.label ?? fieldName
-      showSuccessToast(`"${label}" added to the popup`)
+      showSuccessToast(`"${label}" added to the gathering`)
       queryClient.invalidateQueries({ queryKey: ["form-fields"] })
     },
     onError: createErrorHandler(showErrorToast),

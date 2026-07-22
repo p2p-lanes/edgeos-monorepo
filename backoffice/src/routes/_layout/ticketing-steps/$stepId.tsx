@@ -647,14 +647,14 @@ function StepConfigContent({ stepId }: { stepId: string }) {
               <Alert>
                 <Info className="h-4 w-4" />
                 <AlertDescription>
-                  Enable insurance in popup settings to configure the card
+                  Enable insurance in gathering settings to configure the card
                   content.{" "}
                   <Link
                     to="/popups/$id/edit"
                     params={{ id: step.popup_id }}
                     className="underline font-medium"
                   >
-                    Go to Popup Settings
+                    Go to Gathering Settings
                   </Link>
                 </AlertDescription>
               </Alert>

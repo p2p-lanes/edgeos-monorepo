@@ -486,7 +486,7 @@ export function EventsDayView({
                     ))}
                     {isViewingToday && (
                       <div
-                        className="absolute left-0 right-0 z-10 h-0.5 bg-red-500 pointer-events-none"
+                        className="absolute left-0 right-0 z-10 h-0.5 bg-destructive pointer-events-none"
                         style={{ top: nowMin * MIN_PX }}
                         aria-hidden="true"
                       />
@@ -515,7 +515,7 @@ export function EventsDayView({
                             className={cn(
                               "absolute rounded-md border transition-colors p-1.5 overflow-hidden text-xs text-left",
                               isHighlighted
-                                ? "border-amber-400 bg-amber-100 hover:bg-amber-200 dark:bg-amber-900/40 dark:hover:bg-amber-900/60"
+                                ? "border-warning/25 bg-warning-soft hover:bg-warning/20"
                                 : "border-primary/30 bg-primary/10 hover:bg-primary/20",
                             )}
                             style={{
@@ -573,7 +573,7 @@ export function EventsDayView({
                               </div>
                             )}
                             {!isShort && event.track_title && (
-                              <div className="flex items-center gap-1 text-[10px] font-medium text-violet-700 dark:text-violet-300 mt-0.5">
+                              <div className="flex items-center gap-1 text-[10px] font-medium text-chart-3 mt-0.5">
                                 <Layers className="h-2.5 w-2.5" />
                                 <span className="truncate">
                                   {event.track_title}
@@ -671,7 +671,7 @@ export function EventsDayView({
                       ))}
                       {isViewingToday && (
                         <div
-                          className="absolute top-0 bottom-0 z-10 w-0.5 bg-red-500 pointer-events-none"
+                          className="absolute top-0 bottom-0 z-10 w-0.5 bg-destructive pointer-events-none"
                           style={{ left: nowMin * M_MIN_W }}
                           aria-hidden="true"
                         />
@@ -694,7 +694,7 @@ export function EventsDayView({
                             className={cn(
                               "absolute rounded-md border transition-colors px-1.5 py-1 overflow-hidden text-left",
                               isHighlighted
-                                ? "border-amber-400 bg-amber-100 hover:bg-amber-200 dark:bg-amber-900/40 dark:hover:bg-amber-900/60"
+                                ? "border-warning/25 bg-warning-soft hover:bg-warning/20"
                                 : "border-primary/30 bg-primary/10 hover:bg-primary/20",
                             )}
                             style={{

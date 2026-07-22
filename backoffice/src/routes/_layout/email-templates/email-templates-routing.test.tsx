@@ -155,7 +155,7 @@ describe("email template routing behavior", () => {
     expect(await screen.findByText("Portal Login Code")).toBeInTheDocument()
     expect(screen.getByText("Application Received")).toBeInTheDocument()
     expect(screen.getByText("Custom")).toBeInTheDocument()
-    expect(screen.getByText("Select popup to edit")).toBeInTheDocument()
+    expect(screen.getByText("Select gathering to edit")).toBeInTheDocument()
 
     await waitFor(() => {
       expect(mockListEmailTemplates).toHaveBeenCalledWith()

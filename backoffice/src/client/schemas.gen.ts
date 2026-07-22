@@ -18381,6 +18381,35 @@ export const TenantPublicSchema = {
             title: 'Meta Capi Configured',
             default: false
         },
+        is_trial: {
+            type: 'boolean',
+            title: 'Is Trial',
+            default: false
+        },
+        trial_expires_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Trial Expires At'
+        },
+        suspended_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Suspended At'
+        },
         smtp_host: {
             anyOf: [
                 {
@@ -19910,6 +19939,103 @@ export const TranslationPublicSchema = {
     type: 'object',
     required: ['id', 'tenant_id', 'entity_type', 'entity_id', 'language', 'data'],
     title: 'TranslationPublic'
+} as const;
+
+export const TrialCodeSentResponseSchema = {
+    properties: {
+        message: {
+            type: 'string',
+            title: 'Message'
+        },
+        email: {
+            type: 'string',
+            title: 'Email'
+        },
+        expires_in_minutes: {
+            type: 'integer',
+            title: 'Expires In Minutes'
+        }
+    },
+    type: 'object',
+    required: ['message', 'email', 'expires_in_minutes'],
+    title: 'TrialCodeSentResponse'
+} as const;
+
+export const TrialCreateSchema = {
+    properties: {
+        gathering_name: {
+            type: 'string',
+            maxLength: 255,
+            minLength: 1,
+            title: 'Gathering Name'
+        },
+        email: {
+            type: 'string',
+            maxLength: 255,
+            format: 'email',
+            title: 'Email'
+        }
+    },
+    type: 'object',
+    required: ['gathering_name', 'email'],
+    title: 'TrialCreate',
+    description: 'Body for POST /trials — start a self-serve trial signup.'
+} as const;
+
+export const TrialProvisionedResponseSchema = {
+    properties: {
+        access_token: {
+            type: 'string',
+            title: 'Access Token'
+        },
+        token_type: {
+            type: 'string',
+            title: 'Token Type',
+            default: 'bearer'
+        },
+        tenant_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Tenant Id'
+        },
+        popup_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Popup Id'
+        },
+        backoffice_url: {
+            type: 'string',
+            title: 'Backoffice Url'
+        }
+    },
+    type: 'object',
+    required: ['access_token', 'tenant_id', 'popup_id', 'backoffice_url'],
+    title: 'TrialProvisionedResponse',
+    description: `Returned by POST /trials/verify on successful provisioning.
+
+access_token has the same shape as /auth/user/authenticate (user JWT),
+so the frontend can store it and land directly in the backoffice.`
+} as const;
+
+export const TrialVerifySchema = {
+    properties: {
+        email: {
+            type: 'string',
+            maxLength: 255,
+            format: 'email',
+            title: 'Email'
+        },
+        code: {
+            type: 'string',
+            maxLength: 6,
+            minLength: 6,
+            title: 'Code'
+        }
+    },
+    type: 'object',
+    required: ['email', 'code'],
+    title: 'TrialVerify',
+    description: 'Body for POST /trials/verify — redeem the emailed OTP.'
 } as const;
 
 export const UserAuthSchema = {

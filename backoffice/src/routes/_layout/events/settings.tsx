@@ -146,7 +146,8 @@ function EventSettingsForm() {
         <p className="text-sm text-muted-foreground">
           When off, humans can still browse existing events but the Create Event
           button is hidden. To hide the events section entirely, toggle the
-          popup-level "Events module" feature flag in the popup settings.
+          gathering-level "Events module" feature flag in the gathering
+          settings.
         </p>
       </div>
 
@@ -295,7 +296,7 @@ function EventSettingsForm() {
         <ChipInput
           value={currentSettings.approval_notification_emails ?? []}
           disabled={readOnly}
-          placeholder="admin@your-popup.com"
+          placeholder="admin@your-gathering.com"
           validate={(entry) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(entry)}
           onChange={(next) =>
             upsertMutation.mutate({
@@ -326,7 +327,7 @@ function EventSettingsForm() {
           <div className="space-y-0.5">
             <Label className="text-base">Humans can create venues</Label>
             <p className="text-sm text-muted-foreground">
-              Allow non-admin users to add new venues for this pop-up.
+              Allow non-admin users to add new venues for this gathering.
             </p>
           </div>
           <Switch
@@ -380,7 +381,7 @@ function EventSettingsPage() {
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Event Settings</h1>
         <p className="text-muted-foreground">
-          Configure event creation and publishing rules for this pop-up
+          Configure event creation and publishing rules for this gathering
         </p>
       </div>
       {selectedPopupId ? (

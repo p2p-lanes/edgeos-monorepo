@@ -128,7 +128,7 @@ function WeightedVoting({
         <div className="flex flex-col gap-1">
           <Button
             size="sm"
-            className="w-full justify-start bg-green-700 hover:bg-green-800 text-white"
+            className="w-full justify-start bg-success hover:bg-success/90 text-success-foreground"
             onClick={() => handleVote("strong_yes")}
           >
             <ChevronUp className="h-3.5 w-3.5" />
@@ -137,7 +137,7 @@ function WeightedVoting({
           </Button>
           <Button
             size="sm"
-            className="w-full justify-start bg-green-500 hover:bg-green-600 text-white"
+            className="w-full justify-start bg-success/80 hover:bg-success/70 text-success-foreground"
             onClick={() => handleVote("yes")}
           >
             <ThumbsUp className="h-3.5 w-3.5" />
@@ -145,7 +145,7 @@ function WeightedVoting({
           </Button>
           <Button
             size="sm"
-            className="w-full justify-start bg-red-400 hover:bg-red-500 text-white"
+            className="w-full justify-start bg-destructive/80 hover:bg-destructive/70 text-destructive-foreground"
             onClick={() => handleVote("no")}
           >
             <ThumbsDown className="h-3.5 w-3.5" />
@@ -153,7 +153,7 @@ function WeightedVoting({
           </Button>
           <Button
             size="sm"
-            className="w-full justify-start bg-red-700 hover:bg-red-800 text-white"
+            className="w-full justify-start bg-destructive hover:bg-destructive/90 text-destructive-foreground"
             onClick={() => handleVote("strong_no")}
           >
             <ChevronDown className="h-3.5 w-3.5" />
@@ -245,7 +245,7 @@ function SimpleVoting({
         <div className="flex flex-col gap-1">
           <Button
             size="sm"
-            className="w-full justify-start bg-green-600 hover:bg-green-700 text-white border-0"
+            className="w-full justify-start bg-success hover:bg-success/90 text-success-foreground border-0"
             onClick={() => handleClick("yes")}
           >
             <ThumbsUp className="h-3.5 w-3.5" />
@@ -253,7 +253,7 @@ function SimpleVoting({
           </Button>
           <Button
             size="sm"
-            className="w-full justify-start bg-red-600 hover:bg-red-700 text-white border-0"
+            className="w-full justify-start bg-destructive hover:bg-destructive/90 text-destructive-foreground border-0"
             onClick={() => handleClick("no")}
           >
             <ThumbsDown className="h-3.5 w-3.5" />
@@ -574,7 +574,7 @@ function ScholarshipPanel({
               <div className="flex gap-2">
                 <LoadingButton
                   size="sm"
-                  className="bg-green-600 hover:bg-green-700 text-white border-0"
+                  className="bg-success hover:bg-success/90 text-success-foreground border-0"
                   loading={mutation.isPending}
                   onClick={handleApprove}
                 >
