@@ -77,7 +77,9 @@ export function TenantSelector() {
   if (isLoading) {
     return (
       <div className="space-y-2">
-        <Label className="text-xs text-muted-foreground">Organization</Label>
+        <Label className="text-xs text-sidebar-foreground/70">
+          Organization
+        </Label>
         <Skeleton className="h-9 w-full" />
       </div>
     )
@@ -85,7 +87,7 @@ export function TenantSelector() {
 
   if (!tenants?.results?.length) {
     return (
-      <div className="py-2 text-sm text-muted-foreground">
+      <div className="py-2 text-sm text-sidebar-foreground/70">
         {isError
           ? "Failed to load organizations"
           : "No organizations available"}
@@ -95,7 +97,7 @@ export function TenantSelector() {
 
   return (
     <div className="space-y-2">
-      <Label className="text-xs text-muted-foreground flex items-center gap-1">
+      <Label className="text-xs text-sidebar-foreground/70 flex items-center gap-1">
         <Building2 className="h-3 w-3" />
         Organization
       </Label>
