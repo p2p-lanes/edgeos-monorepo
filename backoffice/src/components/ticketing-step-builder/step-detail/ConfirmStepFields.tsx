@@ -152,13 +152,14 @@ export function ConfirmStepFields({
         <Alert>
           <Info className="h-4 w-4" />
           <AlertDescription>
-            Enable insurance in popup settings to configure the card content.{" "}
+            Enable insurance in gathering settings to configure the card
+            content.{" "}
             <Link
               to="/popups/$id/edit"
               params={{ id: popupId }}
               className="underline font-medium"
             >
-              Go to Popup Settings
+              Go to Gathering Settings
             </Link>
           </AlertDescription>
         </Alert>
