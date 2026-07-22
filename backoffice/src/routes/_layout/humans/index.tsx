@@ -378,7 +378,7 @@ function HumansTableContent() {
       searchValue={search}
       onSearchChange={setSearch}
       onRowClick={(human) =>
-        navigate({ to: "/humans/$id/edit", params: { id: human.id } })
+        navigate({ to: "/humans/$id", params: { id: human.id } })
       }
       filterBar={
         <div className="flex items-center gap-2">

@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { Link } from "@tanstack/react-router"
 import {
-  AlertTriangle,
   ChevronDown,
   ChevronUp,
   DollarSign,
@@ -20,13 +20,14 @@ import {
   ApplicationsService,
   ApprovalStrategiesService,
   FormFieldsService,
+  PaymentsService,
   type PopupAdmin,
   PopupsService,
   type ReviewDecision,
   type ScholarshipDecisionRequest,
 } from "@/client"
 import { StatusBadge } from "@/components/Common/StatusBadge"
-import { Badge } from "@/components/ui/badge"
+import { HumanRatingBadge } from "@/components/Humans/HumanRatingBadge"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -772,6 +773,16 @@ export function ApplicationDetail({
     queryFn: () => PopupsService.getPopup({ popupId: application.popup_id }),
   })
 
+  const { data: paymentsData } = useQuery({
+    queryKey: ["payments", "by-application", application.id],
+    queryFn: () =>
+      PaymentsService.listPayments({
+        applicationId: application.id,
+        limit: 100,
+      }),
+  })
+  const payments = paymentsData?.results ?? []
+
   const isWeightedVoting = approvalStrategy?.strategy_type === "weighted"
   const canReview = isOperatorOrAbove && application.status === "in review"
   const companions =
@@ -910,16 +921,19 @@ export function ApplicationDetail({
       {/* Hero */}
       <div className="space-y-1">
         <div className="flex items-start justify-between gap-4">
-          <h2 className="text-3xl font-semibold">
-            {application.human?.first_name} {application.human?.last_name}
-          </h2>
+          <Link
+            to="/humans/$id"
+            params={{ id: application.human_id }}
+            className="group inline-flex items-start gap-2"
+            title="View human profile"
+          >
+            <h2 className="text-3xl font-semibold group-hover:underline">
+              {application.human?.first_name} {application.human?.last_name}
+            </h2>
+            <ExternalLink className="mt-1.5 h-4 w-4 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+          </Link>
           <div className="flex shrink-0 items-center gap-2">
-            {application.red_flag && (
-              <Badge variant="destructive">
-                <AlertTriangle className="mr-1 h-3 w-3" />
-                Flagged
-              </Badge>
-            )}
+            <HumanRatingBadge rating={application.human?.rating} />
             <StatusBadge status={application.status} />
           </div>
         </div>
@@ -1041,6 +1055,48 @@ export function ApplicationDetail({
         </>
       )}
 
+      {/* Payments — no single-payment detail exists, so link out to the
+          payments table filtered to this application. */}
+      {payments.length > 0 && (
+        <>
+          <Separator />
+          <InlineSection title="Payments">
+            {payments.map((p) => (
+              <div
+                key={p.id}
+                className="flex items-center justify-between gap-3 py-3"
+              >
+                <div className="min-w-0">
+                  <p className="font-mono text-sm">
+                    {Number(p.amount ?? 0).toLocaleString(undefined, {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}{" "}
+                    {p.currency ?? ""}
+                  </p>
+                  {p.created_at && (
+                    <p className="text-xs text-muted-foreground">
+                      {new Date(p.created_at).toLocaleDateString()}
+                    </p>
+                  )}
+                </div>
+                <StatusBadge status={p.status ?? ""} />
+              </div>
+            ))}
+            <div className="pt-1">
+              <Link
+                to="/payments"
+                search={{ applicationId: application.id }}
+                className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
+              >
+                View in Payments
+                <ExternalLink className="h-3.5 w-3.5" />
+              </Link>
+            </div>
+          </InlineSection>
+        </>
+      )}
+
       {/* Scholarship Panel */}
       {application.scholarship_request && popup?.allows_scholarship && (
         <ScholarshipPanel
@@ -1050,8 +1106,8 @@ export function ApplicationDetail({
         />
       )}
 
-      {/* Grant Credit Panel — admin only */}
-      {isAdmin && (
+      {/* Grant Credit Panel — admin only, and only once accepted */}
+      {isAdmin && application.status === "accepted" && (
         <GrantCreditPanel
           application={application}
           onSuccess={onReviewSuccess}

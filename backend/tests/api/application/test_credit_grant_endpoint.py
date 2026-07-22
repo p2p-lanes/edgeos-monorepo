@@ -67,12 +67,13 @@ def _make_application(
     human: Humans,
     *,
     credit: Decimal = Decimal("0"),
+    status: str = ApplicationStatus.ACCEPTED.value,
 ) -> Applications:
     application = Applications(
         tenant_id=tenant.id,
         popup_id=popup.id,
         human_id=human.id,
-        status=ApplicationStatus.ACCEPTED.value,
+        status=status,
         credit=credit,
     )
     db.add(application)
@@ -137,6 +138,35 @@ class TestCreditGrantEndpoint:
         assert entry.details["source"] == "manual"
         assert Decimal(entry.details["amount"]) == Decimal("200.00")
         assert entry.details.get("note") == "Welcome grant"
+
+    def test_credit_rejected_when_not_accepted(
+        self,
+        client: TestClient,
+        db: Session,
+        admin_token_tenant_a: str,
+        tenant_a: Tenants,
+    ) -> None:
+        """Credit can only be granted to an accepted application."""
+        popup = _make_popup(db, tenant_a)
+        human = _make_human(db, tenant_a)
+        application = _make_application(
+            db,
+            tenant_a,
+            popup,
+            human,
+            status=ApplicationStatus.IN_REVIEW.value,
+        )
+
+        response = client.post(
+            f"/api/v1/applications/{application.id}/credit",
+            json={"amount": "200.00"},
+            headers=_auth(admin_token_tenant_a),
+        )
+        assert response.status_code == 400, response.text
+
+        db.expire_all()
+        db.refresh(application)
+        assert application.credit == Decimal("0")
 
     def test_amount_zero_rejected(
         self,

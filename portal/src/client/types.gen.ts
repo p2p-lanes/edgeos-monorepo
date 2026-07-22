@@ -241,6 +241,9 @@ export type ApplicationPublic = {
     attendees?: Array<AttendeePublic>;
     red_flag?: boolean;
     review_decision?: (ReviewDecision | null);
+    review_count?: number;
+    reviewers?: Array<ApplicationReviewerVote>;
+    comment_count?: number;
 };
 
 /**
@@ -249,6 +252,16 @@ export type ApplicationPublic = {
 export type ApplicationReviewCreate = {
     decision: ReviewDecision;
     notes?: (string | null);
+};
+
+/**
+ * Compact reviewer + decision pair for the applications list.
+ */
+export type ApplicationReviewerVote = {
+    reviewer_id: string;
+    reviewer_full_name?: (string | null);
+    reviewer_email?: (string | null);
+    decision: ReviewDecision;
 };
 
 /**
@@ -3734,6 +3747,9 @@ export type TenantPublic = {
     ga_measurement_id?: (string | null);
     id: string;
     meta_capi_configured?: boolean;
+    is_trial?: boolean;
+    trial_expires_at?: (string | null);
+    suspended_at?: (string | null);
     smtp_host?: (string | null);
     smtp_port?: (number | null);
     smtp_user?: (string | null);
@@ -4041,6 +4057,42 @@ export type TranslationPublic = {
     };
     created_at?: (string | null);
     updated_at?: (string | null);
+};
+
+export type TrialCodeSentResponse = {
+    message: string;
+    email: string;
+    expires_in_minutes: number;
+};
+
+/**
+ * Body for POST /trials — start a self-serve trial signup.
+ */
+export type TrialCreate = {
+    gathering_name: string;
+    email: string;
+};
+
+/**
+ * Returned by POST /trials/verify on successful provisioning.
+ *
+ * access_token has the same shape as /auth/user/authenticate (user JWT),
+ * so the frontend can store it and land directly in the backoffice.
+ */
+export type TrialProvisionedResponse = {
+    access_token: string;
+    token_type?: string;
+    tenant_id: string;
+    popup_id: string;
+    backoffice_url: string;
+};
+
+/**
+ * Body for POST /trials/verify — redeem the emailed OTP.
+ */
+export type TrialVerify = {
+    email: string;
+    code: string;
 };
 
 /**
@@ -6039,6 +6091,7 @@ export type HumansListHumanApiKeysResponse = (Array<ApiKeyPublic>);
 
 export type HumansListHumanCommentsData = {
     humanId: string;
+    xTenantId?: (string | null);
 };
 
 export type HumansListHumanCommentsResponse = (ListModel_HumanCommentPublic_);
@@ -6046,6 +6099,7 @@ export type HumansListHumanCommentsResponse = (ListModel_HumanCommentPublic_);
 export type HumansCreateHumanCommentData = {
     humanId: string;
     requestBody: HumanCommentCreate;
+    xTenantId?: (string | null);
 };
 
 export type HumansCreateHumanCommentResponse = (HumanCommentPublic);
@@ -6054,6 +6108,7 @@ export type HumansUpdateHumanCommentData = {
     commentId: string;
     humanId: string;
     requestBody: HumanCommentUpdate;
+    xTenantId?: (string | null);
 };
 
 export type HumansUpdateHumanCommentResponse = (HumanCommentPublic);
@@ -6061,6 +6116,7 @@ export type HumansUpdateHumanCommentResponse = (HumanCommentPublic);
 export type HumansDeleteHumanCommentData = {
     commentId: string;
     humanId: string;
+    xTenantId?: (string | null);
 };
 
 export type HumansDeleteHumanCommentResponse = (void);
@@ -6817,6 +6873,18 @@ export type TranslationsDeleteTranslationData = {
 };
 
 export type TranslationsDeleteTranslationResponse = (void);
+
+export type TrialsCreateTrialData = {
+    requestBody: TrialCreate;
+};
+
+export type TrialsCreateTrialResponse = (TrialCodeSentResponse);
+
+export type TrialsVerifyTrialData = {
+    requestBody: TrialVerify;
+};
+
+export type TrialsVerifyTrialResponse = (TrialProvisionedResponse);
 
 export type UploadsGetPresignedUploadUrlData = {
     requestBody: PresignedUrlRequest;

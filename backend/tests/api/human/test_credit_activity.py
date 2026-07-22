@@ -100,7 +100,7 @@ class TestCreditActivityProjection:
         )
         db.commit()
 
-        items, total = build_human_activity(db, db, human.id, skip=0, limit=100)
+        items, total = build_human_activity(db, human.id, skip=0, limit=100)
 
         credit_items = [i for i in items if i.kind == HumanActivityKind.CREDIT_GRANTED]
         assert len(credit_items) >= 1
@@ -128,7 +128,7 @@ class TestCreditActivityProjection:
         )
         db.commit()
 
-        items, _ = build_human_activity(db, db, human.id, skip=0, limit=100)
+        items, _ = build_human_activity(db, human.id, skip=0, limit=100)
 
         credit_items = [i for i in items if i.kind == HumanActivityKind.CREDIT_APPLIED]
         assert len(credit_items) >= 1
@@ -154,7 +154,7 @@ class TestCreditActivityProjection:
         )
         db.commit()
 
-        items, _ = build_human_activity(db, db, human.id, skip=0, limit=100)
+        items, _ = build_human_activity(db, human.id, skip=0, limit=100)
 
         credit_items = [i for i in items if i.kind == HumanActivityKind.CREDIT_RESTORED]
         assert len(credit_items) >= 1
@@ -201,7 +201,7 @@ class TestCreditActivityProjection:
         )
         db.commit()
 
-        items, _ = build_human_activity(db, db, human.id, skip=0, limit=100)
+        items, _ = build_human_activity(db, human.id, skip=0, limit=100)
 
         kinds = {i.kind for i in items}
         assert HumanActivityKind.CREDIT_GRANTED in kinds
