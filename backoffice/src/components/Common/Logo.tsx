@@ -46,7 +46,7 @@ export function Logo({
   }) => (
     <span
       className={cn(
-        "font-display inline-flex items-center text-xl font-bold tracking-tight text-foreground",
+        "font-display inline-flex items-center text-xl font-bold tracking-tight text-white",
         logoClassName,
       )}
     >
