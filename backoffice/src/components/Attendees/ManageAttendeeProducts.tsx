@@ -271,7 +271,7 @@ export function ManageAttendeeProducts({
                     </p>
                     <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 pl-8 pr-2 text-xs">
                       {ticket.last_scan_at ? (
-                        <span className="inline-flex items-center gap-1 text-green-600">
+                        <span className="inline-flex items-center gap-1 text-success">
                           <CircleCheck className="h-3.5 w-3.5" />
                           Checked in{" "}
                           {new Date(ticket.last_scan_at).toLocaleString()}

@@ -541,17 +541,18 @@ const RATING_STYLES: Record<
   { label: string; className: string; icon: "flag" | "star" } | null
 > = {
   unrated: null,
-  red_flag: { label: "Red flag", className: "text-red-600", icon: "flag" },
+  red_flag: { label: "Red flag", className: "text-destructive", icon: "flag" },
   orange_flag: {
     label: "Orange flag",
-    className: "text-orange-500",
+    className: "text-warning",
     icon: "flag",
   },
   green_flag: {
     label: "Green flag",
-    className: "text-green-600",
+    className: "text-success",
     icon: "flag",
   },
+  // The star keeps a fixed gold — it is an iconographic accent, not a UI state.
   star: { label: "Star", className: "text-amber-500", icon: "star" },
 }
 
@@ -581,8 +582,8 @@ const DECISION_LABELS: Record<ReviewDecision, string> = {
 
 function decisionDotClass(decision: ReviewDecision): string {
   return decision === "yes" || decision === "strong_yes"
-    ? "bg-green-500"
-    : "bg-red-500"
+    ? "bg-success"
+    : "bg-destructive"
 }
 
 function ReviewsCell({
