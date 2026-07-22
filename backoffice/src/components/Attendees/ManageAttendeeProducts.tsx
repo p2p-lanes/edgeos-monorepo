@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { Plus, Ticket, Trash2 } from "lucide-react"
-import { useMemo, useState } from "react"
+import { CircleCheck, Plus, Ticket, Trash2 } from "lucide-react"
+import { useState } from "react"
 
 import {
   type ApiError,
@@ -8,7 +8,6 @@ import {
   type AttendeeWithOriginPublic,
   type ProductPublic,
   ProductsService,
-  TicketingStepsService,
 } from "@/client"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -32,10 +31,6 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import useCustomToast from "@/hooks/useCustomToast"
-import {
-  computeTicketEligibility,
-  isProductAssignable,
-} from "@/lib/ticketEligibility"
 import { createErrorHandler } from "@/utils"
 
 /**
@@ -72,31 +67,11 @@ export function ManageAttendeeProducts({
         limit: 200,
       }),
   })
-  const allProducts = productList?.results ?? []
-
-  // Ticketing-step segmentation: only show ticket products this attendee's
-  // category may buy (mirrors the portal checkout). Products in non-segmented
-  // categories (housing, merch, …) pass through unchanged.
-  const { data: stepsList } = useQuery({
-    queryKey: ["ticketing-steps", attendee.popup_id],
-    queryFn: () =>
-      TicketingStepsService.listTicketingSteps({
-        popupId: attendee.popup_id,
-        limit: 100,
-      }),
-  })
-  const eligibility = useMemo(
-    () =>
-      computeTicketEligibility(
-        stepsList?.results ?? [],
-        attendee.category_id ?? null,
-      ),
-    [stepsList, attendee.category_id],
-  )
-  const products = useMemo(
-    () => allProducts.filter((p) => isProductAssignable(p, eligibility)),
-    [allProducts, eligibility],
-  )
+  // Admin manual assignment can grant ANY active product for the popup. The
+  // portal checkout segmentation (ticketing steps) intentionally does NOT gate
+  // the backoffice — this panel is the escape hatch for comps and fixes the
+  // category could not self-purchase at checkout.
+  const products = productList?.results ?? []
 
   const onMutationSuccess = (updated: AttendeeWithOriginPublic) => {
     queryClient.setQueryData(["attendees", attendee.id], updated)
@@ -201,88 +176,130 @@ export function ManageAttendeeProducts({
             </p>
           ) : (
             <div className="space-y-2">
-              {tickets.map((ticket) => (
-                <div key={ticket.id} className="rounded-lg border p-3">
-                  <div className="flex items-center gap-2">
-                    <Ticket className="h-4 w-4 shrink-0 text-muted-foreground" />
-                    <div className="min-w-0 flex-1">
-                      <Select
-                        value={ticket.product_id}
-                        disabled={isBusy}
-                        onValueChange={(productId) => {
-                          if (productId !== ticket.product_id) {
-                            swapMutation.mutate({
-                              ticketId: ticket.id,
-                              productId,
-                            })
-                          }
-                        }}
-                      >
-                        <SelectTrigger className="w-full border-0 px-2 font-medium shadow-none focus:ring-0">
-                          <SelectValue
-                            placeholder={ticket.product_name ?? "Product"}
-                          />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {/* Keep the current product selectable even if it is
-                              no longer active, so it never renders blank. */}
-                          {!products.some(
-                            (p) => p.id === ticket.product_id,
-                          ) && (
-                            <SelectItem value={ticket.product_id}>
-                              {ticket.product_name ?? "Current product"}{" "}
-                              (inactive)
-                            </SelectItem>
-                          )}
-                          {products.map((p) => (
-                            <SelectItem key={p.id} value={p.id}>
-                              {p.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    {confirmRemoveId === ticket.id ? (
-                      <div className="flex items-center gap-1">
-                        <Button
-                          variant="destructive"
-                          size="sm"
+              {tickets.map((ticket) => {
+                const meta = (ticket.purchase_metadata ?? {}) as Record<
+                  string,
+                  unknown
+                >
+                const dietary =
+                  typeof meta.dietary_restriction === "string"
+                    ? meta.dietary_restriction
+                    : null
+                const special =
+                  typeof meta.special_request === "string"
+                    ? meta.special_request
+                    : null
+                return (
+                  <div key={ticket.id} className="rounded-lg border p-3">
+                    <div className="flex items-center gap-2">
+                      <Ticket className="h-4 w-4 shrink-0 text-muted-foreground" />
+                      <div className="min-w-0 flex-1">
+                        <Select
+                          value={ticket.product_id}
                           disabled={isBusy}
-                          onClick={() => removeMutation.mutate(ticket.id)}
+                          onValueChange={(productId) => {
+                            if (productId !== ticket.product_id) {
+                              swapMutation.mutate({
+                                ticketId: ticket.id,
+                                productId,
+                              })
+                            }
+                          }}
                         >
-                          Remove
-                        </Button>
+                          <SelectTrigger className="w-full border-0 px-2 font-medium shadow-none focus:ring-0">
+                            <SelectValue
+                              placeholder={ticket.product_name ?? "Product"}
+                            />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {/* Keep the current product selectable even if it is
+                              no longer active, so it never renders blank. */}
+                            {!products.some(
+                              (p) => p.id === ticket.product_id,
+                            ) && (
+                              <SelectItem value={ticket.product_id}>
+                                {ticket.product_name ?? "Current product"}{" "}
+                                (inactive)
+                              </SelectItem>
+                            )}
+                            {products.map((p) => (
+                              <SelectItem key={p.id} value={p.id}>
+                                {p.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {confirmRemoveId === ticket.id ? (
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            disabled={isBusy}
+                            onClick={() => removeMutation.mutate(ticket.id)}
+                          >
+                            Remove
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            disabled={isBusy}
+                            onClick={() => setConfirmRemoveId(null)}
+                          >
+                            Cancel
+                          </Button>
+                        </div>
+                      ) : (
                         <Button
                           variant="ghost"
-                          size="sm"
+                          size="icon"
+                          aria-label="Remove ticket"
                           disabled={isBusy}
-                          onClick={() => setConfirmRemoveId(null)}
+                          onClick={() => setConfirmRemoveId(ticket.id)}
                         >
-                          Cancel
+                          <Trash2 className="h-4 w-4 text-muted-foreground" />
                         </Button>
-                      </div>
-                    ) : (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        aria-label="Remove ticket"
-                        disabled={isBusy}
-                        onClick={() => setConfirmRemoveId(ticket.id)}
+                      )}
+                    </div>
+                    <p className="mt-1 pl-8 pr-2 text-xs text-muted-foreground">
+                      Code:{" "}
+                      <span className="font-mono">{ticket.check_in_code}</span>
+                      <span className="ml-2 italic">
+                        · tap the name to change
+                      </span>
+                    </p>
+                    <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 pl-8 pr-2 text-xs">
+                      {ticket.last_scan_at ? (
+                        <span className="inline-flex items-center gap-1 text-green-600">
+                          <CircleCheck className="h-3.5 w-3.5" />
+                          Checked in{" "}
+                          {new Date(ticket.last_scan_at).toLocaleString()}
+                        </span>
+                      ) : ticket.requires_check_in ? (
+                        <span className="text-muted-foreground">
+                          Not scanned
+                        </span>
+                      ) : null}
+                      <Badge
+                        variant={ticket.payment_id ? "outline" : "secondary"}
                       >
-                        <Trash2 className="h-4 w-4 text-muted-foreground" />
-                      </Button>
-                    )}
+                        {ticket.payment_id ? "Paid" : "Granted"}
+                      </Badge>
+                      {dietary && (
+                        <span className="text-muted-foreground">
+                          Dietary: {dietary}
+                        </span>
+                      )}
+                      {special && (
+                        <span className="text-muted-foreground">
+                          Note: {special}
+                        </span>
+                      )}
+                    </div>
                   </div>
-                  <p className="mt-1 pl-8 pr-2 text-xs text-muted-foreground">
-                    Code:{" "}
-                    <span className="font-mono">{ticket.check_in_code}</span>
-                    <span className="ml-2 italic">
-                      · tap the name to change
-                    </span>
-                  </p>
-                </div>
-              ))}
+                )
+              })}
             </div>
           )}
         </div>
