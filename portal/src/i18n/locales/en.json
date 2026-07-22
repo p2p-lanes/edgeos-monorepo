@@ -717,7 +717,14 @@
       "page_title": "{{popupName}} - Calendar",
       "page_title_fallback": "Calendar",
       "subheading": "Upcoming events at {{popupName}}",
-      "subheading_with_tz": "Upcoming events at {{popupName}}, times shown in {{timezone}}"
+      "subheading_with_tz": "Upcoming events at {{popupName}}, times shown in {{timezone}}",
+      "tv": {
+        "heading": "{{popupName}} — Schedule",
+        "page_title": "{{popupName}} - Calendar (TV)",
+        "page_title_fallback": "Calendar (TV)",
+        "timezone_note": "All times shown in {{timezone}}",
+        "happening_now": "Now"
+      }
     },
     "detail": {
       "event_not_found": "Event not found",
