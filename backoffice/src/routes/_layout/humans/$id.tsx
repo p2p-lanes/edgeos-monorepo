@@ -18,9 +18,8 @@ import { HumanActivity } from "@/components/Humans/HumanActivity"
 import { HumanApiKeysCard } from "@/components/Humans/HumanApiKeysCard"
 import { HumanCommentThread } from "@/components/Humans/HumanCommentThread"
 import { HumanProfileEditForm } from "@/components/Humans/HumanProfileEditForm"
+import { HumanRatingBadge } from "@/components/Humans/HumanRatingBadge"
 import { HumanRatingControl } from "@/components/Humans/HumanRatingControl"
-import { ratingMeta } from "@/components/Humans/humanFields"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -84,7 +83,6 @@ function EditHumanContent({ humanId }: { humanId: string }) {
     [human.first_name, human.last_name].filter(Boolean).join(" ") ||
     human.email ||
     humanId
-  const rating = ratingMeta(human.rating)
 
   return (
     <Tabs defaultValue="details" className="space-y-6">
@@ -117,7 +115,7 @@ function EditHumanContent({ humanId }: { humanId: string }) {
                     <h2 className="truncate text-xl font-semibold">
                       {displayName}
                     </h2>
-                    <Badge variant={rating.badge}>{rating.label}</Badge>
+                    <HumanRatingBadge rating={human.rating} showUnrated />
                   </div>
                   <p className="truncate text-sm text-muted-foreground">
                     {human.email}

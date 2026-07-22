@@ -1,7 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Link } from "@tanstack/react-router"
 import {
-  AlertTriangle,
   ChevronDown,
   ChevronUp,
   DollarSign,
@@ -28,7 +27,7 @@ import {
   type ScholarshipDecisionRequest,
 } from "@/client"
 import { StatusBadge } from "@/components/Common/StatusBadge"
-import { Badge } from "@/components/ui/badge"
+import { HumanRatingBadge } from "@/components/Humans/HumanRatingBadge"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -934,12 +933,7 @@ export function ApplicationDetail({
             <ExternalLink className="mt-1.5 h-4 w-4 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
           </Link>
           <div className="flex shrink-0 items-center gap-2">
-            {application.red_flag && (
-              <Badge variant="destructive">
-                <AlertTriangle className="mr-1 h-3 w-3" />
-                Flagged
-              </Badge>
-            )}
+            <HumanRatingBadge rating={application.human?.rating} />
             <StatusBadge status={application.status} />
           </div>
         </div>
