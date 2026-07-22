@@ -444,9 +444,9 @@ function Humans() {
       {needsTenantSelection && (
         <Alert>
           <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Select a tenant</AlertTitle>
+          <AlertTitle>Select an organization</AlertTitle>
           <AlertDescription>
-            Please select a tenant from the sidebar to view humans.
+            Please select an organization from the sidebar to view humans.
           </AlertDescription>
         </Alert>
       )}

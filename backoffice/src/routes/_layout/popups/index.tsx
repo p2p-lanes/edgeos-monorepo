@@ -264,9 +264,10 @@ function Popups() {
       {needsTenantSelection && (
         <Alert>
           <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Select a tenant</AlertTitle>
+          <AlertTitle>Select an organization</AlertTitle>
           <AlertDescription>
-            Please select a tenant from the sidebar to view and manage pop-ups.
+            Please select an organization from the sidebar to view and manage
+            gatherings.
           </AlertDescription>
         </Alert>
       )}
@@ -274,7 +275,7 @@ function Popups() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Gatherings</h1>
           <p className="text-muted-foreground">
-            Manage your pop-ups and their configurations
+            Manage your gatherings and their configurations
           </p>
         </div>
         {canManagePopups && <AddPopupButton />}

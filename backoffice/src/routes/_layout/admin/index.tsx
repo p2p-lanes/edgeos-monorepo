@@ -170,7 +170,7 @@ function TenantUsersTableContent({ tenantId }: { tenantId: string | null }) {
           <EmptyState
             icon={Users}
             title="No users yet"
-            description="Add users to manage access for this tenant."
+            description="Add users to manage access for this organization."
             action={
               <Button asChild>
                 <Link to="/admin/new">
@@ -257,9 +257,9 @@ function TenantUsersTable({ tenantId }: { tenantId: string | null }) {
     return (
       <Alert>
         <AlertCircle className="h-4 w-4" />
-        <AlertTitle>Select a tenant</AlertTitle>
+        <AlertTitle>Select an organization</AlertTitle>
         <AlertDescription>
-          Please select a tenant from the sidebar to view users.
+          Please select an organization from the sidebar to view users.
         </AlertDescription>
       </Alert>
     )

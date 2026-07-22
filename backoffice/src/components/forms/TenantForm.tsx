@@ -363,7 +363,7 @@ export function TenantForm({ defaultValues, onSuccess }: TenantFormProps) {
               <InlineRow
                 icon={<Megaphone className="h-4 w-4 text-muted-foreground" />}
                 label="Meta Pixel"
-                description="Load the tenant's Meta Pixel on the portal and checkout."
+                description="Load the organization's Meta Pixel on the portal and checkout."
               >
                 <Switch
                   id="meta_tracking_enabled"
@@ -450,7 +450,7 @@ export function TenantForm({ defaultValues, onSuccess }: TenantFormProps) {
               <InlineRow
                 icon={<Megaphone className="h-4 w-4 text-muted-foreground" />}
                 label="Google Analytics"
-                description="Load the tenant's Google Analytics on the portal and checkout."
+                description="Load the organization's Google Analytics on the portal and checkout."
               >
                 <Switch
                   id="ga_tracking_enabled"

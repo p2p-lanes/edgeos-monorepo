@@ -173,7 +173,9 @@ function EventViewContent() {
 
   const handleShare = async () => {
     if (!portalUrl) {
-      showErrorToast("Set a portal domain for this tenant to share events")
+      showErrorToast(
+        "Set a portal domain for this organization to share events",
+      )
       return
     }
     try {
