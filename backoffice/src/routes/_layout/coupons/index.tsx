@@ -155,7 +155,7 @@ function Coupons() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Coupons</h1>
           <p className="text-muted-foreground">
-            Manage discount codes for your popups
+            Manage discount codes for your gatherings
           </p>
         </div>
         {isOperatorOrAbove && isContextReady && <AddCouponButton />}

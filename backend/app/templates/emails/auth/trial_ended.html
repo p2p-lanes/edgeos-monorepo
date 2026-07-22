@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+
+{% block title %}Your trial has ended{% endblock %}
+
+{% block content %}
+<h1>Your trial has ended</h1>
+
+<p>Hi,</p>
+
+<p>
+    Your {{ project_name }} trial for <strong>{{ gathering_name }}</strong> has ended
+    and the workspace is now paused.
+</p>
+
+<p>
+    Nothing has been deleted. Your gathering, forms, and data are all intact —
+    we can reactivate the workspace as soon as you are ready.
+</p>
+
+<p>
+    To continue using {{ project_name }}, reply to this email and we will get
+    you set up.
+</p>
+
+<p>
+    Best regards,<br>
+    The {{ project_name }} Team
+</p>
+{% endblock %}

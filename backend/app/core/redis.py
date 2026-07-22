@@ -131,6 +131,7 @@ class AuthCodeStore:
     PREFIX_USER = "authcode:user"
     PREFIX_HUMAN = "authcode:human"
     PREFIX_PENDING = "authcode:pending"
+    PREFIX_TRIAL = "authcode:trial"
 
     def __init__(self, expiration_minutes: int = 15, max_attempts: int = 5):
         self.expiration = timedelta(minutes=expiration_minutes)
@@ -165,6 +166,15 @@ class AuthCodeStore:
         prefix = self.PREFIX_PENDING if is_pending else self.PREFIX_HUMAN
         identifier = f"{origin}:{tenant_id}:{email.lower()}"
         return self._store_code(prefix, identifier, code)
+
+    def store_trial_code(self, email: str, code: str) -> bool:
+        """Store auth code for a self-serve trial signup (keyed by email only —
+        no tenant exists yet)."""
+        return self._store_code(self.PREFIX_TRIAL, email.lower(), code)
+
+    def verify_trial_code(self, email: str, code: str) -> tuple[bool, str]:
+        """Verify auth code for a self-serve trial signup."""
+        return self._verify_code(self.PREFIX_TRIAL, email.lower(), code)
 
     def _store_code(self, prefix: str, identifier: str, code: str) -> bool:
         """Store an auth code with expiration."""
@@ -348,6 +358,76 @@ class PendingHumanStore:
             logger.warning(f"Failed to delete pending human: {e}")
 
 
+class PendingTrialStore:
+    """Store pending self-serve trial signups in Redis.
+
+    Mirrors PendingHumanStore but is keyed by email only — the tenant does
+    not exist until the OTP is verified.
+    """
+
+    PREFIX = "pending_trial"
+
+    def __init__(self, expiration_minutes: int = 15):
+        self.expiration = timedelta(minutes=expiration_minutes)
+
+    def _get_key(self, email: str) -> str:
+        return f"{self.PREFIX}:{email.lower()}"
+
+    def store(self, email: str, gathering_name: str) -> bool:
+        """Store pending trial data."""
+        client = get_redis()
+        if client is None:
+            return False
+
+        key = self._get_key(email)
+        data = {
+            "email": email.lower(),
+            "gathering_name": gathering_name,
+        }
+
+        try:
+            client.hset(key, mapping=data)
+            client.expire(key, self.expiration)
+            return True
+        except redis.RedisError as e:
+            logger.warning(f"Failed to store pending trial: {e}")
+            return False
+
+    def get(self, email: str) -> dict | None:
+        """Get pending trial data."""
+        client = get_redis()
+        if client is None:
+            return None
+
+        key = self._get_key(email)
+
+        try:
+            data = client.hgetall(key)
+            if not data:
+                return None
+
+            str_data: dict[str, str] = data  # type: ignore[assignment]
+            return {
+                "email": str_data["email"],
+                "gathering_name": str_data["gathering_name"],
+            }
+        except (redis.RedisError, KeyError) as e:
+            logger.warning(f"Failed to get pending trial: {e}")
+            return None
+
+    def delete(self, email: str) -> None:
+        """Delete pending trial data."""
+        client = get_redis()
+        if client is None:
+            return
+
+        key = self._get_key(email)
+        try:
+            client.delete(key)
+        except redis.RedisError as e:
+            logger.warning(f"Failed to delete pending trial: {e}")
+
+
 # Pre-configured rate limiters
 login_rate_limiter = RateLimiter(
     prefix="login",
@@ -360,6 +440,9 @@ auth_code_store = AuthCodeStore(expiration_minutes=15, max_attempts=5)
 
 # Pending human store
 pending_human_store = PendingHumanStore(expiration_minutes=15)
+
+# Pending trial store (self-serve trial signups awaiting OTP verification)
+pending_trial_store = PendingTrialStore(expiration_minutes=15)
 
 
 def is_redis_available() -> bool:

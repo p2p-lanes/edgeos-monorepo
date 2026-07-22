@@ -35,6 +35,7 @@ from app.api import (
     ticketing_step,
     track,
     translation,
+    trial,
     upload,
     user,
 )
@@ -47,6 +48,7 @@ api_router = APIRouter()
 api_router.include_router(user.router)
 api_router.include_router(auth.router)
 api_router.include_router(tenant.router)
+api_router.include_router(trial.router)
 api_router.include_router(human.router)
 api_router.include_router(api_key.router)
 api_router.include_router(admin_api_key.router)

@@ -21,6 +21,17 @@ const codeSchema = z
 export const Route = createFileRoute("/login")({
   component: Login,
   beforeLoad: async () => {
+    // Magic-link handoff (/login#token=<jwt>) from the trial signup flow and
+    // its welcome email. The fragment never reaches the server; strip it from
+    // history so the token doesn't linger in the address bar.
+    const match = window.location.hash.match(/token=([^&]+)/)
+    if (match) {
+      localStorage.setItem("access_token", decodeURIComponent(match[1]))
+      window.history.replaceState(null, "", window.location.pathname)
+      throw redirect({
+        to: "/",
+      })
+    }
     if (isLoggedIn()) {
       throw redirect({
         to: "/",

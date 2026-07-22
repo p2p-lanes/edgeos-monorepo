@@ -145,6 +145,9 @@ from app.api.track.models import Tracks
 from app.api.track.schemas import TrackCreate, TrackPublic, TrackUpdate
 from app.api.translation.models import Translations
 from app.api.translation.schemas import TranslationCreate, TranslationPublic
+
+# Self-serve trials
+from app.api.trial.models import PendingTrials
 from app.api.user.models import Users
 from app.api.user.schemas import UserCreate, UserPublic, UserUpdate
 
@@ -165,6 +168,8 @@ __all__ = [
     "ApiKeyPublic",
     # Auth
     "PendingHumans",
+    # Self-serve trials
+    "PendingTrials",
     # Core models
     "Humans",
     "HumanCreate",

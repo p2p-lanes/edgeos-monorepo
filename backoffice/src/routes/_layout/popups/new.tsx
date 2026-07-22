@@ -9,7 +9,7 @@ import { useGoBack } from "@/hooks/useGoBack"
 export const Route = createFileRoute("/_layout/popups/new")({
   component: NewPopup,
   head: () => ({
-    meta: [{ title: "New Pop-up - EdgeOS" }],
+    meta: [{ title: "New Gathering - EdgeOS" }],
   }),
 })
 
@@ -31,8 +31,8 @@ function NewPopup() {
 
   return (
     <FormPageLayout
-      title="Create Pop-up"
-      description="Add a new pop-up to manage"
+      title="Create Gathering"
+      description="Add a new gathering to manage"
       backTo="/popups"
     >
       <PopupForm onSuccess={goBack} />

@@ -1069,7 +1069,7 @@ function ApplicationsTableContent({
           <EmptyState
             icon={ClipboardList}
             title="No applications yet"
-            description="Applications will appear here once people apply to your popup."
+            description="Applications will appear here once people apply to your gathering."
           />
         ) : undefined
       }

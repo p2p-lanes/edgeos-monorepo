@@ -19,13 +19,13 @@ export function WorkspaceAlert({
 }: WorkspaceAlertProps) {
   const message =
     action === "create"
-      ? `Please select a popup from the sidebar before creating a ${resource}.`
-      : `Please select a popup from the sidebar to view ${resource}.`
+      ? `Please select a gathering from the sidebar before creating a ${resource}.`
+      : `Please select a gathering from the sidebar to view ${resource}.`
 
   return (
     <Alert>
       <AlertCircle className="h-4 w-4" />
-      <AlertTitle>Select a popup</AlertTitle>
+      <AlertTitle>Select a gathering</AlertTitle>
       <AlertDescription>{message}</AlertDescription>
     </Alert>
   )

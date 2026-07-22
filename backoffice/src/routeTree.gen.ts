@@ -15,6 +15,7 @@ import { Route as LayoutIndexRouteImport } from './routes/_layout/index'
 import { Route as LayoutThirdPartyAppsRouteImport } from './routes/_layout/third-party-apps'
 import { Route as LayoutSettingsRouteImport } from './routes/_layout/settings'
 import { Route as LayoutPaymentsRouteImport } from './routes/_layout/payments'
+import { Route as LayoutOnboardingRouteImport } from './routes/_layout/onboarding'
 import { Route as LayoutCheckInRouteImport } from './routes/_layout/check-in'
 import { Route as LayoutApiKeysRouteImport } from './routes/_layout/api-keys'
 import { Route as LayoutActivityRouteImport } from './routes/_layout/activity'
@@ -100,6 +101,11 @@ const LayoutSettingsRoute = LayoutSettingsRouteImport.update({
 const LayoutPaymentsRoute = LayoutPaymentsRouteImport.update({
   id: '/payments',
   path: '/payments',
+  getParentRoute: () => LayoutRoute,
+} as any)
+const LayoutOnboardingRoute = LayoutOnboardingRouteImport.update({
+  id: '/onboarding',
+  path: '/onboarding',
   getParentRoute: () => LayoutRoute,
 } as any)
 const LayoutCheckInRoute = LayoutCheckInRouteImport.update({
@@ -408,6 +414,7 @@ export interface FileRoutesByFullPath {
   '/activity': typeof LayoutActivityRoute
   '/api-keys': typeof LayoutApiKeysRoute
   '/check-in': typeof LayoutCheckInRoute
+  '/onboarding': typeof LayoutOnboardingRoute
   '/payments': typeof LayoutPaymentsRoute
   '/settings': typeof LayoutSettingsRoute
   '/third-party-apps': typeof LayoutThirdPartyAppsRoute
@@ -471,6 +478,7 @@ export interface FileRoutesByTo {
   '/activity': typeof LayoutActivityRoute
   '/api-keys': typeof LayoutApiKeysRoute
   '/check-in': typeof LayoutCheckInRoute
+  '/onboarding': typeof LayoutOnboardingRoute
   '/payments': typeof LayoutPaymentsRoute
   '/settings': typeof LayoutSettingsRoute
   '/third-party-apps': typeof LayoutThirdPartyAppsRoute
@@ -537,6 +545,7 @@ export interface FileRoutesById {
   '/_layout/activity': typeof LayoutActivityRoute
   '/_layout/api-keys': typeof LayoutApiKeysRoute
   '/_layout/check-in': typeof LayoutCheckInRoute
+  '/_layout/onboarding': typeof LayoutOnboardingRoute
   '/_layout/payments': typeof LayoutPaymentsRoute
   '/_layout/settings': typeof LayoutSettingsRoute
   '/_layout/third-party-apps': typeof LayoutThirdPartyAppsRoute
@@ -604,6 +613,7 @@ export interface FileRouteTypes {
     | '/activity'
     | '/api-keys'
     | '/check-in'
+    | '/onboarding'
     | '/payments'
     | '/settings'
     | '/third-party-apps'
@@ -667,6 +677,7 @@ export interface FileRouteTypes {
     | '/activity'
     | '/api-keys'
     | '/check-in'
+    | '/onboarding'
     | '/payments'
     | '/settings'
     | '/third-party-apps'
@@ -732,6 +743,7 @@ export interface FileRouteTypes {
     | '/_layout/activity'
     | '/_layout/api-keys'
     | '/_layout/check-in'
+    | '/_layout/onboarding'
     | '/_layout/payments'
     | '/_layout/settings'
     | '/_layout/third-party-apps'
@@ -838,6 +850,13 @@ declare module '@tanstack/react-router' {
       path: '/payments'
       fullPath: '/payments'
       preLoaderRoute: typeof LayoutPaymentsRouteImport
+      parentRoute: typeof LayoutRoute
+    }
+    '/_layout/onboarding': {
+      id: '/_layout/onboarding'
+      path: '/onboarding'
+      fullPath: '/onboarding'
+      preLoaderRoute: typeof LayoutOnboardingRouteImport
       parentRoute: typeof LayoutRoute
     }
     '/_layout/check-in': {
@@ -1247,6 +1266,7 @@ interface LayoutRouteChildren {
   LayoutActivityRoute: typeof LayoutActivityRoute
   LayoutApiKeysRoute: typeof LayoutApiKeysRoute
   LayoutCheckInRoute: typeof LayoutCheckInRoute
+  LayoutOnboardingRoute: typeof LayoutOnboardingRoute
   LayoutPaymentsRoute: typeof LayoutPaymentsRoute
   LayoutSettingsRoute: typeof LayoutSettingsRoute
   LayoutThirdPartyAppsRoute: typeof LayoutThirdPartyAppsRoute
@@ -1311,6 +1331,7 @@ const LayoutRouteChildren: LayoutRouteChildren = {
   LayoutActivityRoute: LayoutActivityRoute,
   LayoutApiKeysRoute: LayoutApiKeysRoute,
   LayoutCheckInRoute: LayoutCheckInRoute,
+  LayoutOnboardingRoute: LayoutOnboardingRoute,
   LayoutPaymentsRoute: LayoutPaymentsRoute,
   LayoutSettingsRoute: LayoutSettingsRoute,
   LayoutThirdPartyAppsRoute: LayoutThirdPartyAppsRoute,
