@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { Link } from "@tanstack/react-router"
 import {
   AlertTriangle,
   ChevronDown,
@@ -910,9 +911,17 @@ export function ApplicationDetail({
       {/* Hero */}
       <div className="space-y-1">
         <div className="flex items-start justify-between gap-4">
-          <h2 className="text-3xl font-semibold">
-            {application.human?.first_name} {application.human?.last_name}
-          </h2>
+          <Link
+            to="/humans/$id"
+            params={{ id: application.human_id }}
+            className="group inline-flex items-start gap-2"
+            title="View human profile"
+          >
+            <h2 className="text-3xl font-semibold group-hover:underline">
+              {application.human?.first_name} {application.human?.last_name}
+            </h2>
+            <ExternalLink className="mt-1.5 h-4 w-4 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+          </Link>
           <div className="flex shrink-0 items-center gap-2">
             {application.red_flag && (
               <Badge variant="destructive">

@@ -1170,6 +1170,24 @@ export const ApplicationPublicSchema = {
                     type: 'null'
                 }
             ]
+        },
+        review_count: {
+            type: 'integer',
+            title: 'Review Count',
+            default: 0
+        },
+        reviewers: {
+            items: {
+                '$ref': '#/components/schemas/ApplicationReviewerVote'
+            },
+            type: 'array',
+            title: 'Reviewers',
+            default: []
+        },
+        comment_count: {
+            type: 'integer',
+            title: 'Comment Count',
+            default: 0
         }
     },
     type: 'object',
@@ -1288,6 +1306,45 @@ export const ApplicationReviewPublicSchema = {
     required: ['id', 'application_id', 'reviewer_id', 'tenant_id', 'decision'],
     title: 'ApplicationReviewPublic',
     description: 'ApplicationReview schema for API responses.'
+} as const;
+
+export const ApplicationReviewerVoteSchema = {
+    properties: {
+        reviewer_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Reviewer Id'
+        },
+        reviewer_full_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Reviewer Full Name'
+        },
+        reviewer_email: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Reviewer Email'
+        },
+        decision: {
+            '$ref': '#/components/schemas/ReviewDecision'
+        }
+    },
+    type: 'object',
+    required: ['reviewer_id', 'decision'],
+    title: 'ApplicationReviewerVote',
+    description: 'Compact reviewer + decision pair for the applications list.'
 } as const;
 
 export const ApplicationStatsSchema = {

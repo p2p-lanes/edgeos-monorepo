@@ -2121,9 +2121,11 @@ export class CheckoutService {
     
     /**
      * Upsert Open Cart
-     * Save (create or replace) the anonymous open-checkout cart for an email.
+     * Save (create or replace) the open-checkout cart for an email.
      *
-     * Fully public (no JWT), keyed by (popup, email). Returns a signed
+     * Fully public (no JWT). The email is resolved to a human so the cart is keyed
+     * by (human, popup) — the same key as the authenticated portal cart — and a
+     * buyer never ends up with two carts for the same popup. Returns a signed
      * `restore_token` when the popup configures an open_checkout_signing_secret so
      * the client can later rebuild the cart cross-device. Rate-limited 30/min/IP.
      * @param data The data for the request.
@@ -5724,10 +5726,8 @@ export class HumansService {
      * Aggregate a human's full activity timeline (admin-only).
      *
      * Built on read from applications, payments, attendees, manual notes, rating
-     * changes and comments. RLS on the TenantSession scopes the tenant-owned
-     * sources; comments live in a global table with no RLS, so they are read via
-     * the privileged `control_db` (the RLS check above already proved tenant
-     * ownership of this human).
+     * changes and comments. Every source, comments included, is now tenant-scoped
+     * by RLS on the TenantSession.
      * @param data The data for the request.
      * @param data.humanId
      * @param data.skip Number of items to skip
@@ -5816,6 +5816,7 @@ export class HumansService {
      * List a human's comments, oldest first.
      * @param data The data for the request.
      * @param data.humanId
+     * @param data.xTenantId
      * @returns ListModel_HumanCommentPublic_ Successful Response
      * @throws ApiError
      */
@@ -5825,6 +5826,9 @@ export class HumansService {
             url: '/api/v1/humans/{human_id}/comments',
             path: {
                 human_id: data.humanId
+            },
+            headers: {
+                'X-Tenant-Id': data.xTenantId
             },
             errors: {
                 422: 'Validation Error'
@@ -5838,6 +5842,7 @@ export class HumansService {
      * @param data The data for the request.
      * @param data.humanId
      * @param data.requestBody
+     * @param data.xTenantId
      * @returns HumanCommentPublic Successful Response
      * @throws ApiError
      */
@@ -5847,6 +5852,9 @@ export class HumansService {
             url: '/api/v1/humans/{human_id}/comments',
             path: {
                 human_id: data.humanId
+            },
+            headers: {
+                'X-Tenant-Id': data.xTenantId
             },
             body: data.requestBody,
             mediaType: 'application/json',
@@ -5863,6 +5871,7 @@ export class HumansService {
      * @param data.humanId
      * @param data.commentId
      * @param data.requestBody
+     * @param data.xTenantId
      * @returns HumanCommentPublic Successful Response
      * @throws ApiError
      */
@@ -5873,6 +5882,9 @@ export class HumansService {
             path: {
                 human_id: data.humanId,
                 comment_id: data.commentId
+            },
+            headers: {
+                'X-Tenant-Id': data.xTenantId
             },
             body: data.requestBody,
             mediaType: 'application/json',
@@ -5888,6 +5900,7 @@ export class HumansService {
      * @param data The data for the request.
      * @param data.humanId
      * @param data.commentId
+     * @param data.xTenantId
      * @returns void Successful Response
      * @throws ApiError
      */
@@ -5898,6 +5911,9 @@ export class HumansService {
             path: {
                 human_id: data.humanId,
                 comment_id: data.commentId
+            },
+            headers: {
+                'X-Tenant-Id': data.xTenantId
             },
             errors: {
                 422: 'Validation Error'

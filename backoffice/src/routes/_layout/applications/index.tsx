@@ -7,37 +7,47 @@ import {
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router"
 import type { ColumnDef } from "@tanstack/react-table"
 import {
-  AlertTriangle,
   ClipboardList,
   Download,
   EllipsisVertical,
+  ExternalLink,
+  Flag,
   ListChecks,
+  MessageSquare,
   Plus,
+  Star,
   ThumbsDown,
   ThumbsUp,
+  Users,
 } from "lucide-react"
-import { Suspense, useCallback, useEffect, useState } from "react"
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react"
 
 import {
   type ApiError,
   type ApplicationPublic,
+  type ApplicationReviewerVote,
   ApplicationReviewsService,
   type ApplicationStatus,
   ApplicationsService,
   ApprovalStrategiesService,
   DashboardService,
   FormFieldsService,
+  type HumanRating,
+  HumansService,
   type PopupReviewerPublic,
   PopupReviewersService,
   PopupsService,
   type ReviewDecision,
 } from "@/client"
+import {
+  type ApplicationsView,
+  ApplicationsViewSwitcher,
+} from "@/components/applications/ApplicationsViewSwitcher"
 import { DataTable, SortableHeader } from "@/components/Common/DataTable"
 import { EmptyState } from "@/components/Common/EmptyState"
 import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
 import { StatusBadge } from "@/components/Common/StatusBadge"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -56,6 +66,11 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { LoadingButton } from "@/components/ui/loading-button"
 import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -63,6 +78,11 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
 import useAuth from "@/hooks/useAuth"
 import useCustomToast from "@/hooks/useCustomToast"
@@ -72,14 +92,81 @@ import {
   validateTableSearch,
 } from "@/hooks/useTableSearchParams"
 import { exportToCsv, fetchAllPages } from "@/lib/export"
+import { cn } from "@/lib/utils"
 import { createErrorHandler } from "@/utils"
 
 /** Schema shape returned by FormFieldsService.getApplicationSchema */
 interface ApplicationSchema {
   custom_fields: Record<
     string,
-    { label: string; position?: number; [key: string]: unknown }
+    {
+      label: string
+      type?: string
+      position?: number
+      options?: string[]
+      [key: string]: unknown
+    }
   >
+}
+
+const APPLICATIONS_VIEW_STORAGE_KEY = "edgeos:applications-view"
+const VALID_APPLICATIONS_VIEWS = new Set<ApplicationsView>(["default", "wide"])
+
+function readStoredApplicationsView(): ApplicationsView {
+  if (typeof window === "undefined") return "default"
+  const raw = localStorage.getItem(APPLICATIONS_VIEW_STORAGE_KEY)
+  return raw && VALID_APPLICATIONS_VIEWS.has(raw as ApplicationsView)
+    ? (raw as ApplicationsView)
+    : "default"
+}
+
+function formatCustomFieldValue(value: unknown, type?: string): string {
+  if (value === null || value === undefined || value === "") return "—"
+  if (type === "boolean") return value ? "Yes" : "No"
+  if (type === "multiselect" && Array.isArray(value)) return value.join(", ")
+  if (type === "signature") {
+    const sig = value as { signature?: string }
+    return sig?.signature ? "Signed" : "—"
+  }
+  if (type === "date" && typeof value === "string") {
+    return new Date(value).toLocaleDateString()
+  }
+  if (Array.isArray(value)) return value.join(", ")
+  if (typeof value === "object") return "—"
+  return String(value)
+}
+
+// Build one toggleable, hidden-by-default column per custom form-builder
+// field so operators can surface any dynamic attribute from the toggle
+// columns menu. Ordered by the schema position, matching the form builder.
+function buildCustomFieldColumns(
+  formSchema?: ApplicationSchema,
+): ColumnDef<ApplicationPublic>[] {
+  const customFields = formSchema?.custom_fields ?? {}
+  return Object.entries(customFields)
+    .sort(
+      ([, a], [, b]) =>
+        (a.position ?? Number.MAX_SAFE_INTEGER) -
+        (b.position ?? Number.MAX_SAFE_INTEGER),
+    )
+    .map(([name, def]) => {
+      const label = def.label || name
+      return {
+        id: `custom_${name}`,
+        accessorFn: (row) => row.custom_fields?.[name],
+        header: label,
+        meta: { label, toggleable: true, defaultHidden: true },
+        enableSorting: false,
+        cell: ({ row }) => (
+          <span className="text-muted-foreground">
+            {formatCustomFieldValue(
+              row.original.custom_fields?.[name],
+              def.type,
+            )}
+          </span>
+        ),
+      } satisfies ColumnDef<ApplicationPublic>
+    })
 }
 
 const APPLICATION_STATUS_OPTIONS: {
@@ -449,18 +536,181 @@ function ApplicationActionsMenu({
   )
 }
 
+const RATING_STYLES: Record<
+  HumanRating,
+  { label: string; className: string; icon: "flag" | "star" } | null
+> = {
+  unrated: null,
+  red_flag: { label: "Red flag", className: "text-red-600", icon: "flag" },
+  orange_flag: {
+    label: "Orange flag",
+    className: "text-orange-500",
+    icon: "flag",
+  },
+  green_flag: {
+    label: "Green flag",
+    className: "text-green-600",
+    icon: "flag",
+  },
+  star: { label: "Star", className: "text-amber-500", icon: "star" },
+}
+
+function RatingBadge({ rating }: { rating?: HumanRating }) {
+  const style = rating ? RATING_STYLES[rating] : null
+  if (!style) return <span className="text-muted-foreground">—</span>
+  const Icon = style.icon === "star" ? Star : Flag
+  return (
+    <span className="inline-flex items-center" title={style.label}>
+      <Icon
+        className={cn(
+          "h-4 w-4",
+          style.className,
+          style.icon === "star" && "fill-current",
+        )}
+      />
+    </span>
+  )
+}
+
+const DECISION_LABELS: Record<ReviewDecision, string> = {
+  strong_yes: "Strong yes",
+  yes: "Yes",
+  no: "No",
+  strong_no: "Strong no",
+}
+
+function decisionDotClass(decision: ReviewDecision): string {
+  return decision === "yes" || decision === "strong_yes"
+    ? "bg-green-500"
+    : "bg-red-500"
+}
+
+function ReviewsCell({
+  count,
+  reviewers,
+}: {
+  count: number
+  reviewers: ApplicationReviewerVote[]
+}) {
+  if (!count) return <span className="text-muted-foreground">—</span>
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span
+          data-no-row-click
+          className="inline-flex cursor-default items-center gap-1 rounded-md border px-2 py-0.5 text-xs"
+        >
+          <Users className="h-3.5 w-3.5 text-muted-foreground" />
+          {count}
+        </span>
+      </TooltipTrigger>
+      <TooltipContent side="bottom" className="max-w-xs">
+        <div className="flex flex-col gap-1">
+          {reviewers.length === 0 ? (
+            <span>
+              {count} review{count === 1 ? "" : "s"}
+            </span>
+          ) : (
+            reviewers.map((r) => (
+              <div key={r.reviewer_id} className="flex items-center gap-2">
+                <span
+                  className={cn(
+                    "h-2 w-2 shrink-0 rounded-full",
+                    decisionDotClass(r.decision),
+                  )}
+                />
+                <span className="font-medium">
+                  {r.reviewer_full_name ??
+                    r.reviewer_email ??
+                    "Unknown reviewer"}
+                </span>
+                <span className="text-muted-foreground">
+                  {DECISION_LABELS[r.decision]}
+                </span>
+              </div>
+            ))
+          )}
+        </div>
+      </TooltipContent>
+    </Tooltip>
+  )
+}
+
+function CommentsCell({ humanId, count }: { humanId: string; count: number }) {
+  const [open, setOpen] = useState(false)
+  const { data, isLoading } = useQuery({
+    queryKey: ["human-comments", humanId],
+    queryFn: () => HumansService.listHumanComments({ humanId }),
+    enabled: open,
+  })
+
+  if (!count) return <span className="text-muted-foreground">—</span>
+
+  const comments = data?.results ?? []
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          data-no-row-click
+          className="inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs text-muted-foreground hover:bg-muted"
+        >
+          <MessageSquare className="h-3.5 w-3.5" />
+          {count}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-80 p-0" data-no-row-click>
+        <div className="max-h-72 space-y-3 overflow-y-auto p-3">
+          {isLoading ? (
+            <p className="text-sm text-muted-foreground">Loading...</p>
+          ) : comments.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No comments</p>
+          ) : (
+            comments.map((c) => (
+              <div key={c.id} className="space-y-0.5">
+                <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                  <span className="font-medium text-foreground">
+                    {c.author_name || c.author_email || "Unknown"}
+                  </span>
+                  <span>{new Date(c.created_at).toLocaleString()}</span>
+                </div>
+                <p className="whitespace-pre-line break-words text-sm">
+                  {c.body}
+                </p>
+              </div>
+            ))
+          )}
+        </div>
+        <div className="border-t p-2">
+          <Link
+            to="/humans/$id"
+            params={{ id: humanId }}
+            className="flex items-center gap-1 text-sm font-medium text-primary hover:underline"
+          >
+            View profile
+            <ExternalLink className="h-3.5 w-3.5" />
+          </Link>
+        </div>
+      </PopoverContent>
+    </Popover>
+  )
+}
+
 const getColumns = (
   isWeightedVoting: boolean,
   showReviewerDecision: boolean,
+  customColumns: ColumnDef<ApplicationPublic>[] = [],
 ): ColumnDef<ApplicationPublic>[] => [
   {
     accessorKey: "human.first_name",
     header: ({ column }) => <SortableHeader label="Name" column={column} />,
-    meta: { label: "Name", toggleable: false },
+    meta: { label: "Name", toggleable: false, sticky: "left" },
     cell: ({ row }) => (
+      // Name links to the human; the rest of the row opens the application.
+      // Without this, comments is the only path from an application to its human.
       <Link
-        to="/applications/$id"
-        params={{ id: row.original.id }}
+        to="/humans/$id"
+        params={{ id: row.original.human_id }}
         className="font-medium hover:underline"
       >
         {row.original.human?.first_name} {row.original.human?.last_name}
@@ -482,6 +732,30 @@ const getColumns = (
     cell: ({ row }) => <StatusBadge status={row.original.status} />,
   },
   {
+    id: "reviews",
+    header: "Reviews",
+    meta: { label: "Reviews", toggleable: true },
+    enableSorting: false,
+    cell: ({ row }) => (
+      <ReviewsCell
+        count={row.original.review_count ?? 0}
+        reviewers={row.original.reviewers ?? []}
+      />
+    ),
+  },
+  {
+    id: "comments",
+    header: "Comments",
+    meta: { label: "Comments", toggleable: true },
+    enableSorting: false,
+    cell: ({ row }) => (
+      <CommentsCell
+        humanId={row.original.human_id}
+        count={row.original.comment_count ?? 0}
+      />
+    ),
+  },
+  {
     accessorKey: "attendees",
     header: "Companions",
     meta: { label: "Companions", toggleable: true },
@@ -492,16 +766,12 @@ const getColumns = (
     },
   },
   {
-    accessorKey: "red_flag",
-    header: "Flagged",
-    meta: { label: "Flagged", toggleable: true },
-    cell: ({ row }) =>
-      row.original.red_flag ? (
-        <Badge variant="destructive">
-          <AlertTriangle className="mr-1 h-3 w-3" />
-          Flagged
-        </Badge>
-      ) : null,
+    id: "rating",
+    accessorFn: (row) => row.human?.rating,
+    header: "Rating",
+    meta: { label: "Rating", toggleable: true },
+    enableSorting: false,
+    cell: ({ row }) => <RatingBadge rating={row.original.human?.rating} />,
   },
   {
     accessorKey: "submitted_at",
@@ -546,10 +816,11 @@ const getColumns = (
         } satisfies ColumnDef<ApplicationPublic>,
       ]
     : []),
+  ...customColumns,
   {
     id: "actions",
     header: () => <span className="sr-only">Actions</span>,
-    meta: { toggleable: false },
+    meta: { toggleable: false, sticky: "right" },
     cell: ({ row }) => (
       <div className="flex justify-end">
         <ApplicationActionsMenu
@@ -561,7 +832,11 @@ const getColumns = (
   },
 ]
 
-function ApplicationsTableContent() {
+function ApplicationsTableContent({
+  customColumns,
+}: {
+  customColumns: ColumnDef<ApplicationPublic>[]
+}) {
   const { selectedPopupId } = useWorkspace()
   const { isOperatorOrAbove } = useAuth()
   const queryClient = useQueryClient()
@@ -740,7 +1015,7 @@ function ApplicationsTableContent() {
   })
 
   const isWeightedVoting = approvalStrategy?.strategy_type === "weighted"
-  const columns = getColumns(isWeightedVoting, !!reviewerId)
+  const columns = getColumns(isWeightedVoting, !!reviewerId, customColumns)
   const canBulkReview = isOperatorOrAbove && !isWeightedVoting
 
   if (!applications) return <Skeleton className="h-64 w-full" />
@@ -751,7 +1026,13 @@ function ApplicationsTableContent() {
       data={applications.results}
       tableId="applications"
       searchPlaceholder="Search by name or email..."
-      hiddenOnMobile={["attendees", "red_flag", "submitted_at", "referral"]}
+      hiddenOnMobile={[
+        "attendees",
+        "rating",
+        "comments",
+        "submitted_at",
+        "referral",
+      ]}
       searchValue={search}
       onSearchChange={setSearch}
       onRowClick={(application) =>
@@ -856,6 +1137,12 @@ function Applications() {
   const { isOperatorOrAbove, isSuperadmin } = useAuth()
   const { isContextReady, selectedPopupId } = useWorkspace()
   const [isExporting, setIsExporting] = useState(false)
+  const [view, setView] = useState<ApplicationsView>(readStoredApplicationsView)
+
+  const handleViewChange = useCallback((next: ApplicationsView) => {
+    setView(next)
+    localStorage.setItem(APPLICATIONS_VIEW_STORAGE_KEY, next)
+  }, [])
 
   const { data: formSchema } = useQuery({
     queryKey: ["form-fields-schema", selectedPopupId],
@@ -867,6 +1154,11 @@ function Applications() {
     },
     enabled: !!selectedPopupId,
   })
+
+  const customColumns = useMemo(
+    () => buildCustomFieldColumns(formSchema),
+    [formSchema],
+  )
 
   const handleExport = async () => {
     if (!selectedPopupId) return
@@ -937,7 +1229,14 @@ function Applications() {
   }
 
   return (
-    <div className="flex flex-col gap-6">
+    <div
+      className={cn(
+        "flex flex-col gap-6",
+        view === "wide" &&
+          isContextReady &&
+          "relative left-1/2 w-[calc(100vw-18rem)] -translate-x-1/2",
+      )}
+    >
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Applications</h1>
@@ -946,6 +1245,12 @@ function Applications() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {isContextReady && (
+            <ApplicationsViewSwitcher
+              view={view}
+              onViewChange={handleViewChange}
+            />
+          )}
           {isContextReady && isOperatorOrAbove && (
             <Button variant="outline" asChild>
               <Link to="/applications/review-queue">
@@ -972,7 +1277,7 @@ function Applications() {
       ) : (
         <QueryErrorBoundary>
           <Suspense fallback={<Skeleton className="h-64 w-full" />}>
-            <ApplicationsTableContent />
+            <ApplicationsTableContent customColumns={customColumns} />
           </Suspense>
         </QueryErrorBoundary>
       )}

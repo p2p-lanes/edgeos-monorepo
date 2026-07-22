@@ -241,6 +241,9 @@ export type ApplicationPublic = {
     attendees?: Array<AttendeePublic>;
     red_flag?: boolean;
     review_decision?: (ReviewDecision | null);
+    review_count?: number;
+    reviewers?: Array<ApplicationReviewerVote>;
+    comment_count?: number;
 };
 
 /**
@@ -249,6 +252,16 @@ export type ApplicationPublic = {
 export type ApplicationReviewCreate = {
     decision: ReviewDecision;
     notes?: (string | null);
+};
+
+/**
+ * Compact reviewer + decision pair for the applications list.
+ */
+export type ApplicationReviewerVote = {
+    reviewer_id: string;
+    reviewer_full_name?: (string | null);
+    reviewer_email?: (string | null);
+    decision: ReviewDecision;
 };
 
 /**
@@ -6039,6 +6052,7 @@ export type HumansListHumanApiKeysResponse = (Array<ApiKeyPublic>);
 
 export type HumansListHumanCommentsData = {
     humanId: string;
+    xTenantId?: (string | null);
 };
 
 export type HumansListHumanCommentsResponse = (ListModel_HumanCommentPublic_);
@@ -6046,6 +6060,7 @@ export type HumansListHumanCommentsResponse = (ListModel_HumanCommentPublic_);
 export type HumansCreateHumanCommentData = {
     humanId: string;
     requestBody: HumanCommentCreate;
+    xTenantId?: (string | null);
 };
 
 export type HumansCreateHumanCommentResponse = (HumanCommentPublic);
@@ -6054,6 +6069,7 @@ export type HumansUpdateHumanCommentData = {
     commentId: string;
     humanId: string;
     requestBody: HumanCommentUpdate;
+    xTenantId?: (string | null);
 };
 
 export type HumansUpdateHumanCommentResponse = (HumanCommentPublic);
@@ -6061,6 +6077,7 @@ export type HumansUpdateHumanCommentResponse = (HumanCommentPublic);
 export type HumansDeleteHumanCommentData = {
     commentId: string;
     humanId: string;
+    xTenantId?: (string | null);
 };
 
 export type HumansDeleteHumanCommentResponse = (void);
