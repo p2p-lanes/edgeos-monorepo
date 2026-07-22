@@ -1059,8 +1059,8 @@ export function ApplicationDetail({
         />
       )}
 
-      {/* Grant Credit Panel — admin only */}
-      {isAdmin && (
+      {/* Grant Credit Panel — admin only, and only once accepted */}
+      {isAdmin && application.status === "accepted" && (
         <GrantCreditPanel
           application={application}
           onSuccess={onReviewSuccess}

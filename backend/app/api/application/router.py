@@ -634,6 +634,12 @@ async def grant_application_credit(
             detail="Application not found",
         )
 
+    if application.status != ApplicationStatus.ACCEPTED.value:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Credit can only be granted to an accepted application.",
+        )
+
     new_balance = adjust_application_credit(
         db,
         application,
