@@ -81,7 +81,12 @@ def _make_product(
 
 
 def _make_form_section(
-    db: Session, popup: Popups, *, order: int = 0, label: str = "Buyer Info"
+    db: Session,
+    popup: Popups,
+    *,
+    order: int = 0,
+    label: str = "Buyer Info",
+    hidden: bool = False,
 ) -> FormSections:
     section = FormSections(
         id=uuid.uuid4(),
@@ -89,6 +94,7 @@ def _make_form_section(
         popup_id=popup.id,
         label=label,
         order=order,
+        hidden=hidden,
     )
     db.add(section)
     db.flush()
@@ -266,6 +272,66 @@ def test_runtime_only_enabled_ticketing_steps(
     assert response.status_code == 200, response.text
     body = response.json()
     assert [step["title"] for step in body["ticketing_steps"]] == ["Visible Step"]
+
+
+def test_runtime_excludes_hidden_sections_and_their_fields(
+    client: TestClient, db: Session, tenant_a: Tenants
+) -> None:
+    """Hidden sections and their fields never reach the anonymous checkout,
+    in buyer_form or in form_schema."""
+    popup = _make_direct_popup(db, tenant_a)
+    visible = _make_form_section(db, popup, label="Visible Info")
+    _make_form_field(db, popup, visible, name="visible_field", label="Visible")
+    hidden = _make_form_section(db, popup, label="Secret Info", order=1, hidden=True)
+    hidden_field = _make_form_field(
+        db, popup, hidden, name="secret_field", label="Secret"
+    )
+    db.commit()
+
+    response = client.get(
+        f"/api/v1/checkout/{popup.slug}/runtime",
+        headers={"X-Tenant-Id": str(tenant_a.id)},
+    )
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+
+    section_labels = [sec["label"] for sec in body["buyer_form"]]
+    assert section_labels == ["Visible Info"]
+    field_names = [f["name"] for sec in body["buyer_form"] for f in sec["form_fields"]]
+    assert hidden_field.name not in field_names
+
+    schema = body["form_schema"]
+    assert hidden_field.name not in schema["custom_fields"]
+    assert str(hidden.id) not in [sec["id"] for sec in schema["sections"]]
+
+
+def test_purchase_validation_ignores_required_fields_in_hidden_sections(
+    db: Session, tenant_a: Tenants
+) -> None:
+    """The purchase-side required check mirrors the bootstrap: fields in
+    hidden sections are never asked, so they can't block a buyer."""
+    from fastapi import HTTPException
+
+    from app.api.payment.crud import payments_crud
+
+    popup = _make_direct_popup(db, tenant_a)
+    hidden = _make_form_section(db, popup, label="Hidden", hidden=True)
+    _make_form_field(db, popup, hidden, name="hidden_req", label="Hidden Req")
+    visible = _make_form_section(db, popup, label="Visible", order=1)
+    visible_field = _make_form_field(
+        db, popup, visible, name="visible_req", label="Visible Req"
+    )
+    db.commit()
+    db.refresh(popup)
+
+    # Hidden required field missing → accepted.
+    payments_crud._validate_open_ticketing_form_data(popup, {visible_field.name: "ok"})
+
+    # Visible required field missing → still rejected.
+    with pytest.raises(HTTPException) as exc_info:
+        payments_crud._validate_open_ticketing_form_data(popup, {})
+    assert exc_info.value.status_code == 422
 
 
 def test_runtime_unknown_slug_returns_404(

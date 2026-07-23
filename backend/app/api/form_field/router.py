@@ -6,6 +6,7 @@ from fastapi import APIRouter, Header, HTTPException, status
 from app.api.base_field_config.constants import BASE_FIELD_DEFINITIONS
 from app.api.base_field_config.crud import (
     base_field_configs_crud,
+    ensure_base_field_update_allowed,
     field_applies_to_popup,
 )
 from app.api.base_field_config.models import BaseFieldConfigs
@@ -371,37 +372,10 @@ async def update_form_field(
             k: getattr(field_in, k) for k in field_in.model_fields_set & configurable
         }
 
-        # Non-removable elementals (first_name, last_name) cannot be made optional.
-        definition = BASE_FIELD_DEFINITIONS.get(base_config.field_name, {})
-        if (
-            not definition.get("removable", True)
-            and "required" in update_data
-            and update_data["required"] is False
-        ):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Field '{base_config.field_name}' is required and cannot be made optional",
-            )
-
-        # `field_type` is only writeable on base configs whose catalog entry
-        # whitelists alternatives — and only to a value inside that whitelist.
-        allowed_field_types = definition.get("allowed_field_types")
         if "field_type" in field_in.model_fields_set:
-            if not allowed_field_types:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Field '{base_config.field_name}' does not allow type overrides",
-                )
-            new_type = field_in.field_type
-            if new_type is not None and new_type not in allowed_field_types:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=(
-                        f"Field type '{new_type}' is not allowed for "
-                        f"'{base_config.field_name}'"
-                    ),
-                )
-            update_data["field_type"] = new_type
+            update_data["field_type"] = field_in.field_type
+
+        ensure_base_field_update_allowed(base_config, update_data)
 
         config_update = BaseFieldConfigUpdate(**update_data)
         updated_config = base_field_configs_crud.update(db, base_config, config_update)
