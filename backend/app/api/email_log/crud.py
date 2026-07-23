@@ -1,15 +1,16 @@
 """CRUD helpers for the email log.
 
-Write path: ``create`` records one row per dispatched email. Read path:
+Write path: ``create`` records one row per dispatched email. Read paths:
 ``get_reminder_stats`` powers the reminder dispatcher's cadence/cap logic by
-counting successfully sent emails of a given type for a given entity.
+counting successfully sent emails of a given type for a given entity, and
+``find`` backs the backoffice email activity feed.
 """
 
 import uuid
 from datetime import datetime
 
 from sqlalchemy import func
-from sqlmodel import Session, select
+from sqlmodel import Session, col, or_, select
 
 from app.api.email_log.models import EmailLogs
 from app.api.email_log.schemas import EmailLogStatus
@@ -86,6 +87,52 @@ class EmailLogCRUD:
         ).one()
         count, last_sent_at = row
         return int(count or 0), last_sent_at
+
+    def find(
+        self,
+        session: Session,
+        *,
+        popup_id: uuid.UUID | None = None,
+        template_type: str | None = None,
+        status: str | None = None,
+        search: str | None = None,
+        skip: int = 0,
+        limit: int = 50,
+    ) -> tuple[list[EmailLogs], int]:
+        """Return a page of email log entries plus the total count.
+
+        Filterable by popup/template type/status and a free-text ``search``
+        over recipient and subject. Newest first; tenant scoping is enforced
+        by RLS on the email_logs table.
+        """
+        conditions = []
+        if popup_id is not None:
+            conditions.append(EmailLogs.popup_id == popup_id)
+        if template_type is not None:
+            conditions.append(EmailLogs.template_type == template_type)
+        if status is not None:
+            conditions.append(EmailLogs.status == status)
+        if search:
+            like = f"%{search.strip()}%"
+            conditions.append(
+                or_(
+                    col(EmailLogs.to_email).ilike(like),
+                    col(EmailLogs.subject).ilike(like),
+                )
+            )
+
+        total = session.exec(
+            select(func.count()).select_from(EmailLogs).where(*conditions)
+        ).one()
+
+        rows = session.exec(
+            select(EmailLogs)
+            .where(*conditions)
+            .order_by(col(EmailLogs.created_at).desc())
+            .offset(skip)
+            .limit(limit)
+        ).all()
+        return list(rows), total
 
 
 email_logs_crud = EmailLogCRUD()

@@ -5451,6 +5451,112 @@ export const DistributionItemSchema = {
     description: 'Single slice in a distribution chart.'
 } as const;
 
+export const EmailLogPublicSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        tenant_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Tenant Id'
+        },
+        popup_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Popup Id'
+        },
+        template_type: {
+            type: 'string',
+            title: 'Template Type'
+        },
+        to_email: {
+            type: 'string',
+            title: 'To Email'
+        },
+        application_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Application Id'
+        },
+        payment_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Payment Id'
+        },
+        human_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Human Id'
+        },
+        subject: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Subject'
+        },
+        status: {
+            type: 'string',
+            title: 'Status'
+        },
+        error: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Error'
+        },
+        created_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Created At'
+        }
+    },
+    type: 'object',
+    required: ['id', 'tenant_id', 'template_type', 'to_email', 'status', 'created_at'],
+    title: 'EmailLogPublic',
+    description: 'A single email log entry returned to the backoffice.'
+} as const;
+
 export const EmailTemplateCreateSchema = {
     properties: {
         popup_id: {
@@ -11297,6 +11403,24 @@ export const ListModel_CouponPublic_Schema = {
     type: 'object',
     required: ['results', 'paging'],
     title: 'ListModel[CouponPublic]'
+} as const;
+
+export const ListModel_EmailLogPublic_Schema = {
+    properties: {
+        results: {
+            items: {
+                '$ref': '#/components/schemas/EmailLogPublic'
+            },
+            type: 'array',
+            title: 'Results'
+        },
+        paging: {
+            '$ref': '#/components/schemas/Paging'
+        }
+    },
+    type: 'object',
+    required: ['results', 'paging'],
+    title: 'ListModel[EmailLogPublic]'
 } as const;
 
 export const ListModel_EmailTemplatePublic_Schema = {

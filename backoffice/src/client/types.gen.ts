@@ -1283,6 +1283,24 @@ export type DistributionItem = {
     percentage?: string;
 };
 
+/**
+ * A single email log entry returned to the backoffice.
+ */
+export type EmailLogPublic = {
+    id: string;
+    tenant_id: string;
+    popup_id?: (string | null);
+    template_type: string;
+    to_email: string;
+    application_id?: (string | null);
+    payment_id?: (string | null);
+    human_id?: (string | null);
+    subject?: (string | null);
+    status: string;
+    error?: (string | null);
+    created_at: string;
+};
+
 export type EmailTemplateCreate = {
     popup_id?: (string | null);
     template_type: string;
@@ -2404,6 +2422,11 @@ export type ListModel_CheckInListItem_ = {
 
 export type ListModel_CouponPublic_ = {
     results: Array<CouponPublic>;
+    paging: Paging;
+};
+
+export type ListModel_EmailLogPublic_ = {
+    results: Array<EmailLogPublic>;
     paging: Paging;
 };
 
@@ -5069,6 +5092,24 @@ export type DashboardGetEnrichedDashboardData = {
 };
 
 export type DashboardGetEnrichedDashboardResponse = (EnrichedDashboardStats);
+
+export type EmailLogsListEmailLogsData = {
+    /**
+     * Maximum number of items to return
+     */
+    limit?: number;
+    popupId?: (string | null);
+    search?: (string | null);
+    /**
+     * Number of items to skip
+     */
+    skip?: number;
+    status?: (string | null);
+    templateType?: (string | null);
+    xTenantId?: (string | null);
+};
+
+export type EmailLogsListEmailLogsResponse = (ListModel_EmailLogPublic_);
 
 export type EmailTemplatesListTemplateTypesResponse = (Array<TemplateTypeInfo>);
 
