@@ -204,6 +204,9 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
   const [applicationReminderOn, setApplicationReminderOn] = useState(
     Boolean(defaultValues?.abandoned_application_delay_days),
   )
+  const [checkinPassOn, setCheckinPassOn] = useState(
+    Boolean(defaultValues?.checkin_pass_lead_days),
+  )
 
   const form = useForm({
     defaultValues: {
@@ -1541,37 +1544,73 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
                   ) : null
                 }
               </form.Subscribe>
-
-              <form.Field name="checkin_pass_lead_days">
-                {(field) => (
-                  <InlineRow
-                    icon={<QrCode className="h-4 w-4 text-muted-foreground" />}
-                    label="Check-in Pass Email"
-                    description="Days before the event start to email attendees their check-in QR code. Leave empty to disable."
-                  >
-                    <Input
-                      id="checkin_pass_lead_days"
-                      type="number"
-                      min="1"
-                      step="1"
-                      placeholder="e.g. 3"
-                      value={field.state.value}
-                      onChange={(e) => field.handleChange(e.target.value)}
-                      disabled={readOnly}
-                      className="max-w-[120px] text-sm"
-                    />
-                  </InlineRow>
-                )}
-              </form.Field>
             </InlineSection>
 
             <Separator />
 
-            {/* Automatic reminder emails. The persisted on/off switch is the
-                delay column (null = off): the UI switch seeds a default delay
+            {/* Automatic emails. The persisted on/off switch of each row is
+                its days column (null = off): the UI switch seeds a default
                 when enabled and clears the whole block when disabled. Max only
                 applies to repeating reminders, so it unlocks with Every. */}
-            <InlineSection title="Automatic Reminder Emails">
+            <InlineSection title="Automatic Emails">
+              <InlineRow
+                icon={<QrCode className="h-4 w-4 text-muted-foreground" />}
+                label="Check-in Pass"
+                description="Email attendees their check-in QR code before the event starts"
+              >
+                <div className="flex flex-col items-end gap-2">
+                  <div className="flex items-center gap-3">
+                    {checkinPassOn && (
+                      <form.Field name="checkin_pass_lead_days">
+                        {(field) => (
+                          <div className="space-y-1">
+                            <p className="text-center text-[10px] text-muted-foreground">
+                              Days before
+                            </p>
+                            <Input
+                              id="checkin_pass_lead_days"
+                              type="number"
+                              min="1"
+                              step="1"
+                              placeholder="3"
+                              value={field.state.value}
+                              onChange={(e) =>
+                                field.handleChange(e.target.value)
+                              }
+                              disabled={readOnly}
+                              className="max-w-[80px] text-sm"
+                            />
+                          </div>
+                        )}
+                      </form.Field>
+                    )}
+                    <Switch
+                      id="checkin_pass_enabled"
+                      checked={checkinPassOn}
+                      onCheckedChange={(checked) => {
+                        setCheckinPassOn(checked)
+                        if (checked) {
+                          if (!form.getFieldValue("checkin_pass_lead_days")) {
+                            form.setFieldValue("checkin_pass_lead_days", "3")
+                          }
+                        } else {
+                          form.setFieldValue("checkin_pass_lead_days", "")
+                        }
+                      }}
+                      disabled={readOnly}
+                    />
+                  </div>
+                  {checkinPassOn && (
+                    <Link
+                      to="/email-templates/$type/edit"
+                      params={{ type: "check_in_pass" }}
+                      className="text-xs text-primary hover:underline"
+                    >
+                      Edit email template
+                    </Link>
+                  )}
+                </div>
+              </InlineRow>
               <InlineRow
                 icon={
                   <ShoppingCart className="h-4 w-4 text-muted-foreground" />
