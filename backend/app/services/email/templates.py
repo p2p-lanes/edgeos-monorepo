@@ -171,6 +171,28 @@ class AbandonedCartContext(BaseModel):
     order_summary: str | None = None
 
 
+class PurchaseReminderContext(BaseModel):
+    """Context for application/purchase_reminder.html template.
+
+    Sent to an accepted applicant who has not purchased yet, nudging them to
+    buy their passes.
+    """
+
+    first_name: str
+    passes_url: str | None = None
+
+
+class AbandonedApplicationContext(BaseModel):
+    """Context for application/abandoned_application.html template.
+
+    Sent to someone whose application is still in draft, nudging them to
+    finish it.
+    """
+
+    first_name: str
+    application_url: str | None = None
+
+
 class EditPassesConfirmedContext(BaseModel):
     """Context for payment/edit_passes_confirmed.html template.
 
@@ -363,6 +385,8 @@ class EmailTemplates:
     APPLICATION_ACCEPTED_SCHOLARSHIP_REJECTED = (
         "application/accepted_scholarship_rejected.html"
     )
+    PURCHASE_REMINDER = "application/purchase_reminder.html"
+    ABANDONED_APPLICATION = "application/abandoned_application.html"
 
     # Payment
     PAYMENT_CONFIRMED = "payment/confirmed.html"
@@ -390,6 +414,8 @@ TEMPLATE_TYPE_TO_FILE: dict[EmailTemplateType, str] = {
     EmailTemplateType.APPLICATION_ACCEPTED_WITH_DISCOUNT: "application/accepted_with_discount.html",
     EmailTemplateType.APPLICATION_ACCEPTED_WITH_INCENTIVE: "application/accepted_with_incentive.html",
     EmailTemplateType.APPLICATION_ACCEPTED_SCHOLARSHIP_REJECTED: "application/accepted_scholarship_rejected.html",
+    EmailTemplateType.PURCHASE_REMINDER: "application/purchase_reminder.html",
+    EmailTemplateType.ABANDONED_APPLICATION: "application/abandoned_application.html",
     EmailTemplateType.PAYMENT_CONFIRMED: "payment/confirmed.html",
     EmailTemplateType.ABANDONED_CART: "payment/abandoned_cart.html",
     EmailTemplateType.EDIT_PASSES_CONFIRMED: "payment/edit_passes_confirmed.html",
@@ -812,6 +838,58 @@ POPUP_TEMPLATE_METADATA: list[dict[str, Any]] = [
                 "label": "Passes URL",
                 "type": "string",
                 "description": "Deep link to this popup's passes page",
+                "required": False,
+                "group": "General",
+            },
+            *_POPUP_EVENT_VARIABLES,
+        ],
+    },
+    {
+        "type": EmailTemplateType.PURCHASE_REMINDER,
+        "label": "Purchase Reminder",
+        "description": "Sent to an accepted applicant who has not purchased yet, nudging them to buy their passes.",
+        "category": "Application",
+        "default_subject": "Complete your registration for {{ popup_name }}",
+        "variables": [
+            {
+                "name": "first_name",
+                "label": "First Name",
+                "type": "string",
+                "description": "Applicant's first name",
+                "required": True,
+                "group": "Applicant",
+            },
+            {
+                "name": "passes_url",
+                "label": "Passes URL",
+                "type": "string",
+                "description": "Deep link to this popup's passes page",
+                "required": False,
+                "group": "General",
+            },
+            *_POPUP_EVENT_VARIABLES,
+        ],
+    },
+    {
+        "type": EmailTemplateType.ABANDONED_APPLICATION,
+        "label": "Abandoned Application",
+        "description": "Sent to someone whose application is still in draft, nudging them to finish it.",
+        "category": "Application",
+        "default_subject": "Finish your application for {{ popup_name }}",
+        "variables": [
+            {
+                "name": "first_name",
+                "label": "First Name",
+                "type": "string",
+                "description": "Applicant's first name",
+                "required": True,
+                "group": "Applicant",
+            },
+            {
+                "name": "application_url",
+                "label": "Application URL",
+                "type": "string",
+                "description": "Deep link to the applicant's draft application",
                 "required": False,
                 "group": "General",
             },

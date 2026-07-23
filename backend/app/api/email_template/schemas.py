@@ -20,6 +20,8 @@ class EmailTemplateType(StrEnum):
     )
     PAYMENT_CONFIRMED = "payment_confirmed"
     ABANDONED_CART = "abandoned_cart"
+    PURCHASE_REMINDER = "purchase_reminder"
+    ABANDONED_APPLICATION = "abandoned_application"
     EDIT_PASSES_CONFIRMED = "edit_passes_confirmed"
     EVENT_INVITATION = "event_invitation"
     EVENT_UPDATED = "event_updated"
