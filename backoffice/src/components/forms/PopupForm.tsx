@@ -397,7 +397,11 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
           </TabsList>
 
           {/* ─── General ─────────────────────────────────────────────── */}
-          <TabsContent value="general" forceMount className="space-y-6 data-[state=inactive]:hidden">
+          <TabsContent
+            value="general"
+            forceMount
+            className="space-y-6 data-[state=inactive]:hidden"
+          >
             {/* Hero: Name + Status */}
             <div className="space-y-3">
               <form.Field
@@ -644,7 +648,11 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
           </TabsContent>
 
           {/* ─── Commerce ────────────────────────────────────────────── */}
-          <TabsContent value="commerce" forceMount className="space-y-6 data-[state=inactive]:hidden">
+          <TabsContent
+            value="commerce"
+            forceMount
+            className="space-y-6 data-[state=inactive]:hidden"
+          >
             {/* Sale Model — keep commerce decisions near the event identity,
             like the previous implementation. */}
             <div className="space-y-3">
@@ -1385,7 +1393,11 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
           </TabsContent>
 
           {/* ─── Features ────────────────────────────────────────────── */}
-          <TabsContent value="features" forceMount className="space-y-6 data-[state=inactive]:hidden">
+          <TabsContent
+            value="features"
+            forceMount
+            className="space-y-6 data-[state=inactive]:hidden"
+          >
             {/* Event Options */}
             <InlineSection title="Gathering Options">
               <form.Field name="allows_coupons">
@@ -1592,7 +1604,11 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
           </TabsContent>
 
           {/* ─── Branding ────────────────────────────────────────────── */}
-          <TabsContent value="branding" forceMount className="space-y-6 data-[state=inactive]:hidden">
+          <TabsContent
+            value="branding"
+            forceMount
+            className="space-y-6 data-[state=inactive]:hidden"
+          >
             {/* Branding */}
             <InlineSection title="Branding">
               <form.Field name="image_url">
