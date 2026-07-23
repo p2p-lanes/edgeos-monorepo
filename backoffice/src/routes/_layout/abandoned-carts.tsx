@@ -82,7 +82,7 @@ const columns: ColumnDef<AbandonedCartPublic>[] = [
   },
   {
     id: "popup_name",
-    header: "Pop-up",
+    header: "Gathering",
     cell: ({ row }) => <span>{row.original.popup.name}</span>,
   },
   {
@@ -257,7 +257,7 @@ function AbandonedCarts() {
         [
           { key: "name", label: "Name" },
           { key: "email", label: "Email" },
-          { key: "event", label: "Pop-up" },
+          { key: "event", label: "Gathering" },
           { key: "items", label: "Items" },
           { key: "payment_attempts", label: "Payment Attempts" },
           { key: "last_activity", label: "Last Activity", type: "date" },

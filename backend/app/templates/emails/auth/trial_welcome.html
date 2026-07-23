@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+
+{% block title %}Your trial has started{% endblock %}
+
+{% block content %}
+<h1 style="text-align: center;">Your trial has started</h1>
+
+<div style="text-align: left;">
+    <p>Hi,</p>
+
+    <p>
+        Your {{ project_name }} workspace for <strong>{{ gathering_name }}</strong> is ready.
+        You have {{ trial_days | default('7') }} days of full access — no card required.
+    </p>
+
+    <p>Here is how to get set up:</p>
+
+    <ol style="margin: 0 0 20px; padding-left: 24px; color: #666666; font-size: 16px; line-height: 1.6;">
+        <li style="margin-bottom: 12px;"><strong>Configure your organization settings</strong> — branding and sender details, so emails go out under your name.</li>
+        <li style="margin-bottom: 12px;"><strong>Complete your gathering</strong> — dates, location, and description for {{ gathering_name }}.</li>
+        <li style="margin-bottom: 12px;"><strong>Build your application form</strong> — the questions people answer to apply or register.</li>
+        <li style="margin-bottom: 0;"><strong>Invite your team</strong> — add teammates so they can review applications with you.</li>
+    </ol>
+</div>
+
+<div style="text-align: center; margin: 30px 0;">
+    {% set button_url = backoffice_url %}
+    {% set button_text = "Open your backoffice" %}
+    {% include 'components/button.html' with context %}
+</div>
+
+<div style="text-align: left;">
+    <p>
+        If you have questions at any point, just reply to this email.
+    </p>
+
+    <p>
+        Best regards,<br>
+        The {{ project_name }} Team
+    </p>
+</div>
+{% endblock %}

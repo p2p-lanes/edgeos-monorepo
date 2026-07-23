@@ -60,7 +60,7 @@ const ROLE_OPTIONS: {
   {
     value: "admin",
     label: "Admin",
-    description: "Full tenant access",
+    description: "Full organization access",
   },
   {
     value: "operator",

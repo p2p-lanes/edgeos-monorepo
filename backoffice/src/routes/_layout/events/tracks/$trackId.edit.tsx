@@ -138,7 +138,7 @@ function TrackEventsList({ trackId }: { trackId: string }) {
               }
               className={
                 event.visibility === "private"
-                  ? "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300 border-transparent"
+                  ? "bg-warning-soft text-warning border-transparent"
                   : undefined
               }
             >

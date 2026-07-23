@@ -378,7 +378,7 @@ function HumansTableContent() {
       searchValue={search}
       onSearchChange={setSearch}
       onRowClick={(human) =>
-        navigate({ to: "/humans/$id/edit", params: { id: human.id } })
+        navigate({ to: "/humans/$id", params: { id: human.id } })
       }
       filterBar={
         <div className="flex items-center gap-2">
@@ -406,7 +406,7 @@ function HumansTableContent() {
           <EmptyState
             icon={Users}
             title="No humans yet"
-            description="Humans will appear here once end-users register through your popups."
+            description="Humans will appear here once end-users register through your gatherings."
           />
         ) : undefined
       }
@@ -444,9 +444,9 @@ function Humans() {
       {needsTenantSelection && (
         <Alert>
           <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Select a tenant</AlertTitle>
+          <AlertTitle>Select an organization</AlertTitle>
           <AlertDescription>
-            Please select a tenant from the sidebar to view humans.
+            Please select an organization from the sidebar to view humans.
           </AlertDescription>
         </Alert>
       )}
@@ -454,7 +454,7 @@ function Humans() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Humans</h1>
           <p className="text-muted-foreground">
-            End-users who interact with your popups
+            End-users who interact with your gatherings
           </p>
         </div>
         {isSuperadmin && isContextReady && <AddHumanButton />}

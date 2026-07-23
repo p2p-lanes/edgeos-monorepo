@@ -72,7 +72,19 @@ declare module "@tanstack/react-table" {
     label?: string
     toggleable?: boolean
     defaultHidden?: boolean
+    /**
+     * Pin the column to an edge so it stays visible while the table scrolls
+     * horizontally. Use for a leading identity column ("left") and a trailing
+     * actions column ("right") on wide tables with many columns.
+     */
+    sticky?: "left" | "right"
   }
+}
+
+function stickyColumnClassName(sticky?: "left" | "right"): string | undefined {
+  if (sticky === "left") return "sticky left-0 z-20 bg-background"
+  if (sticky === "right") return "sticky right-0 z-20 bg-background"
+  return undefined
 }
 
 interface PaginationState {
@@ -433,7 +445,12 @@ export function DataTable<TData, TValue>({
               <TableRow key={headerGroup.id} className="hover:bg-transparent">
                 {headerGroup.headers.map((header) => {
                   return (
-                    <TableHead key={header.id}>
+                    <TableHead
+                      key={header.id}
+                      className={stickyColumnClassName(
+                        header.column.columnDef.meta?.sticky,
+                      )}
+                    >
                       {header.isPlaceholder
                         ? null
                         : flexRender(
@@ -478,7 +495,12 @@ export function DataTable<TData, TValue>({
                       onClick={clickable ? handleClick : undefined}
                     >
                       {row.getVisibleCells().map((cell) => (
-                        <TableCell key={cell.id}>
+                        <TableCell
+                          key={cell.id}
+                          className={stickyColumnClassName(
+                            cell.column.columnDef.meta?.sticky,
+                          )}
+                        >
                           {flexRender(
                             cell.column.columnDef.cell,
                             cell.getContext(),

@@ -93,7 +93,7 @@ export const columns: ColumnDef<UserTableData>[] = [
           <span
             className={cn(
               "size-2 rounded-full",
-              isDeleted ? "bg-gray-400" : "bg-green-500",
+              isDeleted ? "bg-muted-foreground" : "bg-success",
             )}
           />
           <span className={isDeleted ? "text-muted-foreground" : ""}>

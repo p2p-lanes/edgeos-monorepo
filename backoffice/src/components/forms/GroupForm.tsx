@@ -127,7 +127,7 @@ export function GroupForm({ defaultValues, onSuccess }: GroupFormProps) {
         })
       } else {
         if (!selectedPopupId) {
-          showErrorToast("Please select a popup first")
+          showErrorToast("Please select a gathering first")
           return
         }
         createMutation.mutate({

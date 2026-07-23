@@ -1,13 +1,5 @@
+import { closestCenter, DndContext } from "@dnd-kit/core"
 import {
-  closestCenter,
-  DndContext,
-  type DragEndEvent,
-  PointerSensor,
-  useSensor,
-  useSensors,
-} from "@dnd-kit/core"
-import {
-  arrayMove,
   SortableContext,
   useSortable,
   verticalListSortingStrategy,
@@ -19,6 +11,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { Textarea } from "@/components/ui/textarea"
+import { useListReorder } from "./useListReorder"
 
 // The title + sortable question list, shared by the `faqs` template's own
 // editor (FaqsConfig, which adds a layout picker on top) and the per-step
@@ -136,8 +129,10 @@ export function FaqItemsEditor({
   titlePlaceholder?: string
   titleDescription?: string
 }) {
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+  const { sensors, handleDragEnd } = useListReorder(
+    items,
+    onChangeItems,
+    (item) => item.id,
   )
 
   const handleAddItem = () => {
@@ -161,17 +156,6 @@ export function FaqItemsEditor({
 
   const handleDeleteItem = (id: string) => {
     onChangeItems(items.filter((item) => item.id !== id))
-  }
-
-  const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event
-    if (!over || active.id === over.id) return
-
-    const oldIndex = items.findIndex((item) => item.id === active.id)
-    const newIndex = items.findIndex((item) => item.id === over.id)
-    if (oldIndex === -1 || newIndex === -1) return
-
-    onChangeItems(arrayMove(items, oldIndex, newIndex))
   }
 
   return (

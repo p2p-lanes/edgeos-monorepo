@@ -213,6 +213,10 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
         Check-in codes live on AttendeeProducts (one per purchased ticket) and
         are created when the product is purchased, not when the attendee is.
         """
+        from app.services.trial_limits import enforce_trial_attendee_cap
+
+        enforce_trial_attendee_cap(session, tenant_id)
+
         # If email provided but no human_id, try to find matching Human
         if email and not human_id:
             human_id = self._find_human_id_by_email(session, email, tenant_id)
@@ -309,6 +313,9 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
         Check-in codes live on AttendeeProducts (one per purchased ticket).
         """
         from app.api.attendee_category.crud import attendee_categories_crud
+        from app.services.trial_limits import enforce_trial_attendee_cap
+
+        enforce_trial_attendee_cap(session, tenant_id)
 
         main_cat = attendee_categories_crud.get_primary_for_popup(session, popup_id)
         attendee = Attendees(
@@ -348,6 +355,9 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
             return existing
 
         from app.api.attendee_category.crud import attendee_categories_crud
+        from app.services.trial_limits import enforce_trial_attendee_cap
+
+        enforce_trial_attendee_cap(session, tenant_id)
 
         main_cat = attendee_categories_crud.get_primary_for_popup(session, popup_id)
         attendee = Attendees(

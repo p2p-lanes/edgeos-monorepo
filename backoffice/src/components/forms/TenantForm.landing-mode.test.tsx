@@ -190,7 +190,7 @@ describe("TenantForm — landing_mode toggle", () => {
 
     await waitFor(() => {
       expect(
-        screen.getByText(/more than one active popup/i),
+        screen.getByText(/more than one active gathering/i),
       ).toBeInTheDocument()
     })
   })
@@ -221,7 +221,7 @@ describe("TenantForm — landing_mode toggle", () => {
 
     // Wait a tick then verify no warning
     await waitFor(() => {
-      expect(screen.queryByText(/more than one active popup/i)).toBeNull()
+      expect(screen.queryByText(/more than one active gathering/i)).toBeNull()
     })
   })
 

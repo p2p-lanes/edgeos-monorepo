@@ -1,5 +1,6 @@
 import re
 import uuid
+from datetime import datetime
 from typing import Self
 
 from pydantic import EmailStr, model_validator
@@ -190,6 +191,10 @@ class TenantPublic(TenantBase):
     id: uuid.UUID
     custom_domain_active: bool  # required, no default — forces non-optional in OpenAPI
     meta_capi_configured: bool = False
+    # Trial lifecycle (backoffice surfaces a banner / expiry countdown)
+    is_trial: bool = False
+    trial_expires_at: datetime | None = None
+    suspended_at: datetime | None = None
     smtp_host: str | None = None
     smtp_port: int | None = None
     smtp_user: str | None = None

@@ -14,7 +14,7 @@ const statusMap: Record<
   pending_fee: {
     variant: "outline",
     label: "Pending Fee",
-    className: "border-amber-300 bg-amber-100 text-amber-800",
+    className: "bg-warning-soft text-warning border-warning/25",
   },
   inactive: { variant: "secondary" },
   draft: { variant: "outline" },
@@ -30,17 +30,17 @@ const statusMap: Record<
   orange_flag: {
     variant: "outline",
     label: "🟠 Orange Flag",
-    className: "border-orange-300 bg-orange-100 text-orange-800",
+    className: "bg-warning-soft text-warning border-warning/25",
   },
   green_flag: {
     variant: "outline",
     label: "🟢 Green Flag",
-    className: "border-green-300 bg-green-100 text-green-800",
+    className: "bg-success-soft text-success border-success/25",
   },
   star: {
     variant: "outline",
     label: "⭐ Star",
-    className: "border-yellow-400 bg-yellow-100 text-yellow-800",
+    className: "bg-info-soft text-info border-info/25",
   },
   ambassador: { variant: "default" },
   regular: { variant: "outline" },
