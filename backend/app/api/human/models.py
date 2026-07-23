@@ -94,6 +94,7 @@ class HumanComment(SQLModel, table=True):
         sa_column=Column(UUID(as_uuid=True), primary_key=True),
     )
 
+    tenant_id: uuid.UUID = Field(foreign_key="tenants.id", index=True)
     human_id: uuid.UUID = Field(foreign_key="humans.id", index=True)
 
     author_user_id: uuid.UUID | None = Field(

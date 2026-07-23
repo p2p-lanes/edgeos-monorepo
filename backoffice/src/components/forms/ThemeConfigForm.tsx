@@ -624,8 +624,8 @@ function CheckoutLayoutSection({
       <div className="flex flex-col px-3 py-2.5">
         <span className="text-sm font-medium">Checkout layout</span>
         <span className="text-[11px] text-muted-foreground">
-          Navigation shell and visual skin for this popup's checkout. Existing
-          popups default to Scrolly + Default.
+          Navigation shell and visual skin for this gathering's checkout.
+          Existing gatherings default to Scrolly + Default.
         </span>
       </div>
       <div className="space-y-2 border-t px-3 pb-3 pt-3">
@@ -1268,7 +1268,7 @@ function ColorField({
     <div
       className={cn(
         "flex items-center gap-2 rounded-md px-1.5 py-1 transition-colors",
-        isHighlighted && "bg-blue-50 dark:bg-blue-950/30",
+        isHighlighted && "bg-info-soft",
       )}
       onMouseEnter={() => onHover([colorKey])}
       onFocus={() => onHover([colorKey])}

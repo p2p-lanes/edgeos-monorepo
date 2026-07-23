@@ -40,6 +40,9 @@ from app.services.email.templates import (
     LoginCodeUserContext,
     PaymentConfirmedContext,
     SilentUndefined,
+    TrialEndedContext,
+    TrialReminderContext,
+    TrialWelcomeContext,
     coerce_email_template_type,
     get_template_scope,
     log_missing_template_variables,
@@ -544,6 +547,58 @@ class EmailService:
             tenant_id=tenant_id,
             from_address=from_address,
             from_name=from_name,
+            db_session=db_session,
+        )
+
+    async def send_trial_welcome(
+        self,
+        to: str,
+        subject: str,
+        context: TrialWelcomeContext,
+        db_session: Session | None = None,
+    ) -> bool:
+        """Send the trial welcome email (onboarding checklist).
+
+        Always delivered via the global SMTP fallback — the freshly created
+        trial tenant has no SMTP of its own.
+        """
+        return await self.send_template_email(
+            to=to,
+            subject=subject,
+            template_name=EmailTemplates.TRIAL_WELCOME,
+            context=context.model_dump(exclude_none=True),
+            db_session=db_session,
+        )
+
+    async def send_trial_reminder(
+        self,
+        to: str,
+        subject: str,
+        context: TrialReminderContext,
+        db_session: Session | None = None,
+    ) -> bool:
+        """Send the '2 days left' trial reminder email (global SMTP)."""
+        return await self.send_template_email(
+            to=to,
+            subject=subject,
+            template_name=EmailTemplates.TRIAL_REMINDER,
+            context=context.model_dump(exclude_none=True),
+            db_session=db_session,
+        )
+
+    async def send_trial_ended(
+        self,
+        to: str,
+        subject: str,
+        context: TrialEndedContext,
+        db_session: Session | None = None,
+    ) -> bool:
+        """Send the trial-ended notice when a tenant is suspended (global SMTP)."""
+        return await self.send_template_email(
+            to=to,
+            subject=subject,
+            template_name=EmailTemplates.TRIAL_ENDED,
+            context=context.model_dump(exclude_none=True),
             db_session=db_session,
         )
 

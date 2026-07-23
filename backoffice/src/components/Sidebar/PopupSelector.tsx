@@ -104,7 +104,7 @@ export function PopupSelector() {
 
   if (needsTenantSelection) {
     return (
-      <div className="py-2 text-sm text-muted-foreground">
+      <div className="py-2 text-sm text-sidebar-foreground/70">
         Select an organization first
       </div>
     )
@@ -113,7 +113,7 @@ export function PopupSelector() {
   if (isLoading) {
     return (
       <div className="space-y-2">
-        <Label className="text-xs text-muted-foreground">Pop-up</Label>
+        <Label className="text-xs text-sidebar-foreground/70">Gathering</Label>
         <Skeleton className="h-9 w-full" />
       </div>
     )
@@ -121,21 +121,21 @@ export function PopupSelector() {
 
   if (!popups?.results?.length) {
     return (
-      <div className="py-2 text-sm text-muted-foreground">
-        {isError ? "Failed to load pop-ups" : "No pop-ups available"}
+      <div className="py-2 text-sm text-sidebar-foreground/70">
+        {isError ? "Failed to load gatherings" : "No gatherings available"}
       </div>
     )
   }
 
   return (
     <div className="space-y-2">
-      <Label className="text-xs text-muted-foreground flex items-center gap-1">
+      <Label className="text-xs text-sidebar-foreground/70 flex items-center gap-1">
         <Calendar className="h-3 w-3" />
-        Pop-up
+        Gathering
       </Label>
       <Select value={selectedPopupId ?? ""} onValueChange={handlePopupChange}>
         <SelectTrigger className="w-full">
-          <SelectValue placeholder="Select pop-up" />
+          <SelectValue placeholder="Select gathering" />
         </SelectTrigger>
         <SelectContent>
           {popups.results.map((popup) => (
@@ -154,8 +154,8 @@ export function PopupSelector() {
           <DialogHeader>
             <DialogTitle>Unsaved changes</DialogTitle>
             <DialogDescription>
-              You have unsaved changes that will be lost if you switch pop-ups.
-              Are you sure you want to continue?
+              You have unsaved changes that will be lost if you switch
+              gatherings. Are you sure you want to continue?
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

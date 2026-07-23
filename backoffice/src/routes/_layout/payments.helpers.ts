@@ -12,6 +12,7 @@ interface PaymentsQueryInput {
   statusFilter?: PaymentStatus
   sortBy?: string
   sortOrder?: "asc" | "desc"
+  applicationId?: string | null
 }
 
 interface PaymentsPaging {
@@ -41,6 +42,7 @@ export function buildPaymentsQueryConfig({
   statusFilter,
   sortBy,
   sortOrder,
+  applicationId,
 }: PaymentsQueryInput) {
   const normalizedSearch = search.trim()
 
@@ -48,7 +50,11 @@ export function buildPaymentsQueryConfig({
     params: {
       skip: page * pageSize,
       limit: pageSize,
-      popupId: popupId || undefined,
+      // The backend only honors application_id when popup_id is absent
+      // (popup_id routes to find_by_popup, which ignores it). An application is
+      // already popup-scoped, so drop the popup filter when filtering by one.
+      popupId: applicationId ? undefined : popupId || undefined,
+      applicationId: applicationId || undefined,
       search: normalizedSearch || undefined,
       paymentStatus: statusFilter || undefined,
       sortBy: sortBy || undefined,
@@ -64,6 +70,7 @@ export function buildPaymentsQueryConfig({
         statusFilter,
         sortBy,
         sortOrder,
+        applicationId: applicationId || undefined,
       },
     ],
   }

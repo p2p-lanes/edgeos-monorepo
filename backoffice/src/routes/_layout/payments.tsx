@@ -8,6 +8,7 @@ import {
   Download,
   FileText,
   Loader2,
+  X,
 } from "lucide-react"
 import { Fragment, Suspense, useCallback, useState } from "react"
 import { toast } from "sonner"
@@ -58,6 +59,7 @@ function getPaymentsQueryOptions(
   statusFilter?: PaymentStatus,
   sortBy?: string,
   sortOrder?: "asc" | "desc",
+  applicationId?: string | null,
 ) {
   const queryConfig = buildPaymentsQueryConfig({
     popupId,
@@ -67,6 +69,7 @@ function getPaymentsQueryOptions(
     statusFilter,
     sortBy,
     sortOrder,
+    applicationId,
   })
 
   return {
@@ -172,6 +175,7 @@ const VALID_PAYMENT_STATUSES: Set<string> = new Set([
 
 type PaymentsSearchParams = TableSearchParams & {
   status?: PaymentStatus
+  applicationId?: string
 }
 
 export const Route = createFileRoute("/_layout/payments")({
@@ -180,6 +184,9 @@ export const Route = createFileRoute("/_layout/payments")({
     ...validateTableSearch(raw),
     ...(typeof raw.status === "string" && VALID_PAYMENT_STATUSES.has(raw.status)
       ? { status: raw.status as PaymentStatus }
+      : {}),
+    ...(typeof raw.applicationId === "string" && raw.applicationId
+      ? { applicationId: raw.applicationId }
       : {}),
   }),
   head: () => ({
@@ -318,7 +325,7 @@ function getColumns(hasInvoice: boolean): ColumnDef<PaymentPublic>[] {
             </span>
             {showReason && adj ? (
               <span
-                className={`text-xs ${adj.isDiscount ? "text-green-600" : "text-amber-600"}`}
+                className={`text-xs ${adj.isDiscount ? "text-success" : "text-warning"}`}
               >
                 adjustment {adj.isDiscount ? "−" : "+"}
                 {adj.pct}%
@@ -580,7 +587,7 @@ function PaymentSubRow({ row }: { row: Row<PaymentPublic> }) {
               >
                 {discountLabel}
               </td>
-              <td className="py-0.5 pl-4 text-right font-mono tabular-nums text-green-600">
+              <td className="py-0.5 pl-4 text-right font-mono tabular-nums text-success">
                 -${discountAmount.toFixed(2)}
               </td>
             </tr>
@@ -630,7 +637,7 @@ function PaymentSubRow({ row }: { row: Row<PaymentPublic> }) {
                   {railAdj.pct}%)
                 </td>
                 <td
-                  className={`py-0.5 pl-4 text-right font-mono tabular-nums ${railAdj.isDiscount ? "text-green-600" : "text-amber-600"}`}
+                  className={`py-0.5 pl-4 text-right font-mono tabular-nums ${railAdj.isDiscount ? "text-success" : "text-warning"}`}
                 >
                   {railAdj.isDiscount ? "−" : "+"}$
                   {Math.abs(railAdj.delta).toFixed(2)}
@@ -674,6 +681,7 @@ function PaymentsTableContent() {
   const { search, pagination, sorting, setSearch, setPagination, setSorting } =
     useTableSearchParams(searchParams, "/payments")
   const statusFilter = searchParams.status
+  const applicationId = searchParams.applicationId
 
   const { data: payments } = useQuery({
     ...getPaymentsQueryOptions(
@@ -684,6 +692,7 @@ function PaymentsTableContent() {
       statusFilter,
       sorting[0]?.id,
       sorting[0]?.desc ? "desc" : "asc",
+      applicationId,
     ),
     placeholderData: keepPreviousData,
   })
@@ -734,17 +743,42 @@ function PaymentsTableContent() {
         onPaginationChange: setPagination,
       }}
       filterBar={
-        <StatusDropdownFilter
-          popupId={selectedPopupId}
-          selected={statusFilter}
-          onSelect={(value) => {
-            navigate({
-              to: "/payments",
-              search: (prev) => ({ ...prev, status: value, page: 0 }),
-              replace: true,
-            })
-          }}
-        />
+        <div className="flex flex-wrap items-center gap-2">
+          <StatusDropdownFilter
+            popupId={selectedPopupId}
+            selected={statusFilter}
+            onSelect={(value) => {
+              navigate({
+                to: "/payments",
+                search: (prev) => ({ ...prev, status: value, page: 0 }),
+                replace: true,
+              })
+            }}
+          />
+          {applicationId && (
+            <Badge variant="secondary" className="gap-1 py-1 pl-2.5 pr-1">
+              Application
+              <button
+                type="button"
+                aria-label="Clear application filter"
+                onClick={() =>
+                  navigate({
+                    to: "/payments",
+                    search: {
+                      ...searchParams,
+                      applicationId: undefined,
+                      page: 0,
+                    },
+                    replace: true,
+                  })
+                }
+                className="rounded-sm p-0.5 transition-colors hover:bg-foreground/10"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </Badge>
+          )}
+        </div>
       }
       renderSubComponent={PaymentSubRow}
       emptyState={

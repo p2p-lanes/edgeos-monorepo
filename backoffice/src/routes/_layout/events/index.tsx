@@ -440,7 +440,7 @@ function buildEventColumns(
               variant={visibilityVariant[visibility] ?? "outline"}
               className={
                 visibility === "private"
-                  ? "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300 border-transparent"
+                  ? "bg-warning-soft text-warning border-transparent"
                   : undefined
               }
             >
@@ -453,7 +453,7 @@ function buildEventColumns(
             variant={statusVariant[status] ?? "secondary"}
             className={
               status === "pending_approval"
-                ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300 border-transparent"
+                ? "bg-warning-soft text-warning border-transparent"
                 : undefined
             }
           >
@@ -1117,7 +1117,7 @@ function EventsTableContent({
             <EmptyState
               icon={CalendarDays}
               title="No events yet"
-              description="Create the first event for this pop-up."
+              description="Create the first event for this gathering."
               action={
                 <Button asChild>
                   <Link to="/events/new">
@@ -1368,7 +1368,7 @@ function EventsPage() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Events</h1>
           <p className="text-muted-foreground">
-            Manage events for the selected pop-up
+            Manage events for the selected gathering
           </p>
         </div>
         {selectedPopupId && (

@@ -17,6 +17,7 @@ from app.api.application.schemas import (
     ApplicationAdminCreate,
     ApplicationCreate,
     ApplicationPublic,
+    ApplicationReviewerVote,
     ApplicationStatus,
     ApplicationUpdate,
     AttendeeInfo,
@@ -40,6 +41,7 @@ from app.api.attendee.schemas import (
     AttendeeUpdate,
     AttendeeWithTickets,
 )
+from app.api.human.crud import humans_crud
 from app.api.shared.enums import SaleType, UserRole
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
 from app.core.dependencies.users import (
@@ -50,6 +52,7 @@ from app.core.dependencies.users import (
     CurrentAdmin,
     CurrentHuman,
     HumanTenantSession,
+    SessionDep,
     needs,
 )
 from app.services.email_helpers import send_application_status_email
@@ -60,9 +63,33 @@ router = APIRouter(prefix="/applications", tags=["applications"])
 portal_router = APIRouter(prefix="/portal", tags=["portal"])
 
 
+def _get_reviewer_identities(
+    control_db,
+    reviewer_ids: list[uuid.UUID],
+) -> dict[uuid.UUID, tuple[str | None, str | None]]:
+    """Fetch reviewer (full_name, email) via the control-plane session.
+
+    Reviewers are Users, which live in the main DB (not the tenant DB), so we
+    read them through the main-engine session (``control_db``), not the tenant
+    session. One batched query for the whole page.
+    """
+    if not reviewer_ids:
+        return {}
+
+    from sqlmodel import select
+
+    from app.api.user.models import Users
+
+    id_col = Users.id  # ty:ignore[invalid-assignment]
+    users = control_db.exec(select(Users).where(id_col.in_(reviewer_ids))).all()
+    return {user.id: (user.full_name, user.email) for user in users}
+
+
 def _build_application_public(
     application,
     review_decision=None,
+    reviewers=None,
+    comment_count=0,
 ) -> ApplicationPublic:
     """Build ApplicationPublic with attendees and products."""
     from app.api.attendee.schemas import AttendeeProductPublic
@@ -140,6 +167,9 @@ def _build_application_public(
         attendees=attendees,
         red_flag=application.red_flag,
         review_decision=review_decision,
+        review_count=len(reviewers) if reviewers is not None else 0,
+        reviewers=reviewers or [],
+        comment_count=comment_count,
     )
     return app_public
 
@@ -148,6 +178,7 @@ def _build_application_public(
 async def list_applications(
     db: AdminOrApiKeySession_ApplicationsRead,
     _: AdminOrApiKey_ApplicationsRead,
+    control_db: SessionDep,
     popup_id: uuid.UUID | None = None,
     human_id: uuid.UUID | None = None,
     reviewed_by: uuid.UUID | None = None,
@@ -184,10 +215,38 @@ async def list_applications(
         else {}
     )
 
+    # Reviewer names live in the main DB; comment counts on the human (tenant
+    # DB). Resolve both in one batched query each to keep the list N+1-free.
+    reviewer_identities = _get_reviewer_identities(
+        control_db,
+        list(
+            {r.reviewer_id for application in applications for r in application.reviews}
+        ),
+    )
+    # human_comments is now tenant-scoped (RLS), so it is read through the same
+    # tenant session as the applications.
+    comment_counts = humans_crud.count_active_comments_by_humans(
+        db, [application.human_id for application in applications]
+    )
+
     results = [
         _build_application_public(
             application,
             review_decision=review_decisions.get(application.id),
+            reviewers=[
+                ApplicationReviewerVote(
+                    reviewer_id=r.reviewer_id,
+                    reviewer_full_name=reviewer_identities.get(
+                        r.reviewer_id, (None, None)
+                    )[0],
+                    reviewer_email=reviewer_identities.get(r.reviewer_id, (None, None))[
+                        1
+                    ],
+                    decision=r.decision,
+                )
+                for r in application.reviews
+            ],
+            comment_count=comment_counts.get(application.human_id, 0),
         )
         for application in applications
     ]
@@ -576,6 +635,12 @@ async def grant_application_credit(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Application not found",
+        )
+
+    if application.status != ApplicationStatus.ACCEPTED.value:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Credit can only be granted to an accepted application.",
         )
 
     new_balance = adjust_application_credit(

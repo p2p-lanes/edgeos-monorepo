@@ -103,7 +103,7 @@ const CURRENCIES = [
 
 const SALE_TYPE_COPY = {
   application: {
-    label: "Popup / application flow",
+    label: "Gathering / application flow",
     description:
       "People apply first. Use this when you need review workflows, companions, or applicant-specific options.",
   },
@@ -147,7 +147,7 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
     mutationFn: (data: PopupCreate) =>
       PopupsService.createPopup({ requestBody: data }),
     onSuccess: (data) => {
-      showSuccessToast("Pop-up created successfully", {
+      showSuccessToast("Gathering created successfully", {
         label: "View",
         onClick: () =>
           navigate({ to: "/popups/$id/edit", params: { id: data.id } }),
@@ -166,7 +166,7 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
         requestBody: data,
       }),
     onSuccess: () => {
-      showSuccessToast("Pop-up updated successfully")
+      showSuccessToast("Gathering updated successfully")
       queryClient.invalidateQueries({ queryKey: ["popups"] })
       queryClient.invalidateQueries({ queryKey: ["form-fields"] })
       queryClient.invalidateQueries({ queryKey: ["form-sections"] })
@@ -179,7 +179,7 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
   const deleteMutation = useMutation({
     mutationFn: () => PopupsService.deletePopup({ popupId: defaultValues!.id }),
     onSuccess: () => {
-      showSuccessToast("Pop-up deleted successfully")
+      showSuccessToast("Gathering deleted successfully")
       queryClient.invalidateQueries({ queryKey: ["popups"] })
       navigate({ to: "/popups" })
     },
@@ -378,7 +378,7 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
         <FormErrorSummary
           form={form}
           fieldLabels={{
-            name: "Pop-up Name",
+            name: "Gathering Name",
             tagline: "Tagline",
             location: "Location",
             slug: "Slug",
@@ -410,7 +410,7 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
                 {(field) => (
                   <div>
                     <HeroInput
-                      placeholder="Pop-up Name"
+                      placeholder="Gathering Name"
                       value={field.state.value}
                       onBlur={field.handleBlur}
                       onChange={(e) => field.handleChange(e.target.value)}
@@ -447,7 +447,7 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
                       Location
                     </Label>
                     <Input
-                      placeholder="Pop-up location or venue"
+                      placeholder="Gathering location or venue"
                       value={field.state.value}
                       onBlur={field.handleBlur}
                       onChange={(e) => field.handleChange(e.target.value)}
@@ -506,7 +506,7 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
             <Separator />
 
             {/* Event Details */}
-            <InlineSection title="Pop-up Details">
+            <InlineSection title="Gathering Details">
               <form.Field
                 name="start_date"
                 validators={{
@@ -673,7 +673,7 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
                       label="Sale Type"
                       description={
                         isEdit
-                          ? "Change sale type only if this popup has no approved payments yet"
+                          ? "Change sale type only if this gathering has no approved payments yet"
                           : "Choose whether people apply first or buy tickets directly"
                       }
                     >
@@ -1387,13 +1387,13 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
           {/* ─── Features ────────────────────────────────────────────── */}
           <TabsContent value="features" forceMount className="space-y-6 data-[state=inactive]:hidden">
             {/* Event Options */}
-            <InlineSection title="Pop-up Options">
+            <InlineSection title="Gathering Options">
               <form.Field name="allows_coupons">
                 {(field) => (
                   <InlineRow
                     icon={<Ticket className="h-4 w-4 text-muted-foreground" />}
                     label="Discount Coupons"
-                    description="Enable discount coupons for this pop-up"
+                    description="Enable discount coupons for this gathering"
                   >
                     <Switch
                       id="allows_coupons"

@@ -169,6 +169,7 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
                     Attendees.category_ref  # type: ignore[arg-type]
                 ),
                 selectinload(Applications.human),  # type: ignore[arg-type]
+                selectinload(Applications.reviews),  # type: ignore[arg-type]
             )
             .order_by(desc(Applications.created_at))  # type: ignore[arg-type]
             .offset(skip)

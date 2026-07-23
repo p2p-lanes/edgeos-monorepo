@@ -1,9 +1,10 @@
 import uuid
+from datetime import datetime
 from typing import TYPE_CHECKING
 
 from sqlalchemy import Index, Text, text
 from sqlalchemy.dialects.postgresql import UUID
-from sqlmodel import Column, Field, Relationship
+from sqlmodel import Column, DateTime, Field, Relationship
 
 from app.api.tenant.schemas import TenantBase
 
@@ -54,6 +55,21 @@ class Tenants(TenantBase, table=True):
     )
     smtp_tls: bool | None = Field(default=True)
     smtp_ssl: bool | None = Field(default=False)
+
+    # Self-serve trial lifecycle. suspended_at is a REVERSIBLE suspension:
+    # unlike the `deleted` soft-delete it keeps data and PG credentials
+    # intact — reactivation = clearing the field.
+    is_trial: bool = Field(default=False)
+    trial_expires_at: datetime | None = Field(
+        default=None, sa_type=DateTime(timezone=True)
+    )
+    suspended_at: datetime | None = Field(
+        default=None, sa_type=DateTime(timezone=True)
+    )
+    # Idempotency marker for the "2 days left" trial reminder email.
+    trial_reminder_sent_at: datetime | None = Field(
+        default=None, sa_type=DateTime(timezone=True)
+    )
 
     @property
     def meta_capi_configured(self) -> bool:
