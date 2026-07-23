@@ -42,6 +42,7 @@ import { DangerZone } from "@/components/Common/DangerZone"
 import { FieldError } from "@/components/Common/FieldError"
 import { FormErrorSummary } from "@/components/Common/FormErrorSummary"
 import { ApprovalStrategyForm } from "@/components/forms/ApprovalStrategyForm"
+import { getMissingLaunchFields } from "@/components/forms/popupLaunchChecklist"
 import { ReviewersManager } from "@/components/forms/ReviewersManager"
 import { TranslationManager } from "@/components/translations/TranslationManager"
 import { Badge } from "@/components/ui/badge"
@@ -136,7 +137,8 @@ function deriveCheckoutMode(saleType: SaleType): CheckoutMode {
 export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const { showSuccessToast, showErrorToast } = useCustomToast()
+  const { showSuccessToast, showErrorToast, showWarningToast } =
+    useCustomToast()
   const { isOperatorOrAbove } = useAuth()
   const isEdit = !!defaultValues
   const readOnly = !isOperatorOrAbove
@@ -334,6 +336,22 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
           ? Number(value.checkin_pass_lead_days)
           : null,
       }
+      if (value.status === "active") {
+        const missing = getMissingLaunchFields(value)
+        if (missing.length > 0) {
+          showWarningToast(
+            "Saved, but not ready to launch",
+            <>
+              <p>These fields are required before this pop-up can go live:</p>
+              <ul className="mt-1 list-disc pl-4">
+                {missing.map((f) => (
+                  <li key={f}>{f}</li>
+                ))}
+              </ul>
+            </>,
+          )
+        }
+      }
       if (isEdit) {
         updateMutation.mutate(payload)
       } else {
@@ -347,34 +365,43 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
 
   return (
     <div className="space-y-6">
-      <Tabs defaultValue="general" className="mx-auto max-w-2xl space-y-6">
-        <TabsList>
-          <TabsTrigger value="general">General</TabsTrigger>
-          <TabsTrigger value="translations">Translations</TabsTrigger>
-        </TabsList>
-        <TabsContent value="general" className="space-y-6">
-          <form
-            noValidate
-            onSubmit={(e) => {
-              e.preventDefault()
-              if (!readOnly) {
-                form.handleSubmit()
-              }
-            }}
-            className="mx-auto max-w-2xl space-y-6"
-          >
-            <FormErrorSummary
-              form={form}
-              fieldLabels={{
-                name: "Gathering Name",
-                tagline: "Tagline",
-                location: "Location",
-                slug: "Slug",
-                start_date: "Start Date",
-                end_date: "End Date",
-              }}
-            />
+      <form
+        noValidate
+        onSubmit={(e) => {
+          e.preventDefault()
+          if (!readOnly) {
+            form.handleSubmit()
+          }
+        }}
+        className="mx-auto max-w-2xl space-y-6"
+      >
+        <FormErrorSummary
+          form={form}
+          fieldLabels={{
+            name: "Gathering Name",
+            tagline: "Tagline",
+            location: "Location",
+            slug: "Slug",
+            start_date: "Start Date",
+            end_date: "End Date",
+          }}
+        />
 
+        <Tabs defaultValue="general" className="space-y-6">
+          <TabsList>
+            <TabsTrigger value="general">General</TabsTrigger>
+            <TabsTrigger value="commerce">Commerce</TabsTrigger>
+            <TabsTrigger value="features">Features</TabsTrigger>
+            <TabsTrigger value="branding">Branding</TabsTrigger>
+            <TabsTrigger value="languages">Languages</TabsTrigger>
+          </TabsList>
+
+          {/* ─── General ─────────────────────────────────────────────── */}
+          <TabsContent
+            value="general"
+            forceMount
+            className="space-y-6 data-[state=inactive]:hidden"
+          >
             {/* Hero: Name + Status */}
             <div className="space-y-3">
               <form.Field
@@ -482,6 +509,150 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
 
             <Separator />
 
+            {/* Event Details */}
+            <InlineSection title="Gathering Details">
+              <form.Field
+                name="start_date"
+                validators={{
+                  onChange: ({ value }) => {
+                    if (readOnly || !value || isEdit) return undefined
+                    const today = new Date()
+                    today.setHours(0, 0, 0, 0)
+                    const startDate = new Date(value)
+                    startDate.setHours(0, 0, 0, 0)
+                    if (startDate < today) {
+                      return "Start date must be today or in the future"
+                    }
+                    return undefined
+                  },
+                }}
+              >
+                {(field) => (
+                  <div>
+                    <InlineRow
+                      icon={
+                        <Calendar className="h-4 w-4 text-muted-foreground" />
+                      }
+                      label="Start Date"
+                    >
+                      <DatePicker
+                        id="start_date"
+                        value={field.state.value}
+                        onChange={field.handleChange}
+                        disabled={readOnly}
+                        placeholder="Select date"
+                        className="w-auto"
+                      />
+                    </InlineRow>
+                    <FieldError errors={field.state.meta.errors} />
+                  </div>
+                )}
+              </form.Field>
+
+              <form.Subscribe selector={(state) => state.values.start_date}>
+                {(startDate) => {
+                  const startDateAsDate = startDate
+                    ? (() => {
+                        const [y, m, d] = startDate
+                          .slice(0, 10)
+                          .split("-")
+                          .map(Number)
+                        return new Date(y, m - 1, d)
+                      })()
+                    : undefined
+                  return (
+                    <form.Field
+                      name="end_date"
+                      validators={{
+                        onChange: ({ value, fieldApi }) => {
+                          if (readOnly || !value) return undefined
+                          const startDateValue =
+                            fieldApi.form.getFieldValue("start_date")
+                          if (!startDateValue) return undefined
+                          const sd = new Date(startDateValue)
+                          const endDate = new Date(value)
+                          if (endDate < sd) {
+                            return "End date cannot be before start date"
+                          }
+                          return undefined
+                        },
+                      }}
+                    >
+                      {(field) => (
+                        <div>
+                          <InlineRow
+                            icon={
+                              <Calendar className="h-4 w-4 text-muted-foreground" />
+                            }
+                            label="End Date"
+                          >
+                            <DatePicker
+                              id="end_date"
+                              value={field.state.value}
+                              onChange={field.handleChange}
+                              disabled={readOnly}
+                              placeholder="Select date"
+                              defaultMonth={startDateAsDate}
+                              className="w-auto"
+                            />
+                          </InlineRow>
+                          <FieldError errors={field.state.meta.errors} />
+                        </div>
+                      )}
+                    </form.Field>
+                  )
+                }}
+              </form.Subscribe>
+            </InlineSection>
+
+            {/* Application review — approval strategy + reviewers (edit only,
+            application sale_type only — direct-sale popups have no application
+            flow, so these are meaningless) */}
+            {isEdit && (
+              <form.Subscribe selector={(state) => state.values.sale_type}>
+                {(saleType) =>
+                  saleType === "application" ? (
+                    <>
+                      <Separator />
+
+                      <ApprovalStrategyForm
+                        popupId={defaultValues!.id}
+                        readOnly={readOnly}
+                        variant="inline"
+                      />
+
+                      <Separator />
+
+                      <ConditionalReviewersManager
+                        popupId={defaultValues!.id}
+                        tenantId={defaultValues!.tenant_id}
+                        readOnly={readOnly}
+                        variant="inline"
+                      />
+                    </>
+                  ) : null
+                }
+              </form.Subscribe>
+            )}
+
+            {isEdit && !readOnly && (
+              <DangerZone
+                description="Once you delete this event, all associated products, groups, coupons, and attendee data will be permanently removed. This action cannot be undone."
+                onDelete={() => deleteMutation.mutate()}
+                isDeleting={deleteMutation.isPending}
+                confirmText="Delete Event"
+                resourceName={defaultValues.name}
+                variant="inline"
+              />
+            )}
+          </TabsContent>
+
+          {/* ─── Commerce ────────────────────────────────────────────── */}
+          <TabsContent
+            value="commerce"
+            forceMount
+            className="space-y-6 data-[state=inactive]:hidden"
+          >
             {/* Sale Model — keep commerce decisions near the event identity,
             like the previous implementation. */}
             <div className="space-y-3">
@@ -598,171 +769,8 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
 
             <Separator />
 
-            {/* Event Details */}
-            <InlineSection title="Gathering Details">
-              <form.Field
-                name="start_date"
-                validators={{
-                  onChange: ({ value }) => {
-                    if (readOnly || !value || isEdit) return undefined
-                    const today = new Date()
-                    today.setHours(0, 0, 0, 0)
-                    const startDate = new Date(value)
-                    startDate.setHours(0, 0, 0, 0)
-                    if (startDate < today) {
-                      return "Start date must be today or in the future"
-                    }
-                    return undefined
-                  },
-                }}
-              >
-                {(field) => (
-                  <div>
-                    <InlineRow
-                      icon={
-                        <Calendar className="h-4 w-4 text-muted-foreground" />
-                      }
-                      label="Start Date"
-                    >
-                      <DatePicker
-                        id="start_date"
-                        value={field.state.value}
-                        onChange={field.handleChange}
-                        disabled={readOnly}
-                        placeholder="Select date"
-                        className="w-auto"
-                      />
-                    </InlineRow>
-                    <FieldError errors={field.state.meta.errors} />
-                  </div>
-                )}
-              </form.Field>
-
-              <form.Subscribe selector={(state) => state.values.start_date}>
-                {(startDate) => {
-                  const startDateAsDate = startDate
-                    ? (() => {
-                        const [y, m, d] = startDate
-                          .slice(0, 10)
-                          .split("-")
-                          .map(Number)
-                        return new Date(y, m - 1, d)
-                      })()
-                    : undefined
-                  return (
-                    <form.Field
-                      name="end_date"
-                      validators={{
-                        onChange: ({ value, fieldApi }) => {
-                          if (readOnly || !value) return undefined
-                          const startDateValue =
-                            fieldApi.form.getFieldValue("start_date")
-                          if (!startDateValue) return undefined
-                          const sd = new Date(startDateValue)
-                          const endDate = new Date(value)
-                          if (endDate < sd) {
-                            return "End date cannot be before start date"
-                          }
-                          return undefined
-                        },
-                      }}
-                    >
-                      {(field) => (
-                        <div>
-                          <InlineRow
-                            icon={
-                              <Calendar className="h-4 w-4 text-muted-foreground" />
-                            }
-                            label="End Date"
-                          >
-                            <DatePicker
-                              id="end_date"
-                              value={field.state.value}
-                              onChange={field.handleChange}
-                              disabled={readOnly}
-                              placeholder="Select date"
-                              defaultMonth={startDateAsDate}
-                              className="w-auto"
-                            />
-                          </InlineRow>
-                          <FieldError errors={field.state.meta.errors} />
-                        </div>
-                      )}
-                    </form.Field>
-                  )
-                }}
-              </form.Subscribe>
-            </InlineSection>
-
-            <Separator />
-
-            {/* Event Options */}
-            <InlineSection title="Gathering Options">
-              <form.Field name="allows_coupons">
-                {(field) => (
-                  <InlineRow
-                    icon={<Ticket className="h-4 w-4 text-muted-foreground" />}
-                    label="Discount Coupons"
-                    description="Enable discount coupons for this gathering"
-                  >
-                    <Switch
-                      id="allows_coupons"
-                      checked={field.state.value}
-                      onCheckedChange={(checked) => field.handleChange(checked)}
-                      disabled={readOnly}
-                    />
-                  </InlineRow>
-                )}
-              </form.Field>
-
-              <form.Field name="allows_scholarship">
-                {(field) => (
-                  <InlineRow
-                    icon={
-                      <GraduationCap className="h-4 w-4 text-muted-foreground" />
-                    }
-                    label="Scholarship Requests"
-                    description="Allow applicants to request financial assistance"
-                  >
-                    <Switch
-                      id="allows_scholarship"
-                      checked={!!field.state.value}
-                      onCheckedChange={(checked) => field.handleChange(checked)}
-                      disabled={readOnly}
-                    />
-                  </InlineRow>
-                )}
-              </form.Field>
-
-              <form.Subscribe
-                selector={(state) => state.values.allows_scholarship}
-              >
-                {(allowsScholarship) =>
-                  allowsScholarship ? (
-                    <form.Field name="allows_incentive">
-                      {(field) => (
-                        <InlineRow
-                          icon={
-                            <DollarSign className="h-4 w-4 text-muted-foreground" />
-                          }
-                          label="Cash Incentives"
-                          description="Allow assigning a cash grant alongside scholarship approval"
-                        >
-                          <Switch
-                            id="allows_incentive"
-                            checked={!!field.state.value}
-                            onCheckedChange={(checked) =>
-                              field.handleChange(checked)
-                            }
-                            disabled={readOnly}
-                          />
-                        </InlineRow>
-                      )}
-                    </form.Field>
-                  ) : null
-                }
-              </form.Subscribe>
-
+            {/* Application fee */}
+            <InlineSection title="Application fee">
               <form.Field name="requires_application_fee">
                 {(field) => (
                   <InlineRow
@@ -816,229 +824,6 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
                   ) : null
                 }
               </form.Subscribe>
-
-              <form.Field name="checkin_pass_lead_days">
-                {(field) => (
-                  <InlineRow
-                    icon={<QrCode className="h-4 w-4 text-muted-foreground" />}
-                    label="Check-in Pass Email"
-                    description="Days before the event start to email attendees their check-in QR code. Leave empty to disable."
-                  >
-                    <Input
-                      id="checkin_pass_lead_days"
-                      type="number"
-                      min="1"
-                      step="1"
-                      placeholder="e.g. 3"
-                      value={field.state.value}
-                      onChange={(e) => field.handleChange(e.target.value)}
-                      disabled={readOnly}
-                      className="max-w-[120px] text-sm"
-                    />
-                  </InlineRow>
-                )}
-              </form.Field>
-            </InlineSection>
-
-            <Separator />
-
-            {/* Companion Types — only available when editing an existing popup */}
-            {isEdit && defaultValues && (
-              <>
-                <AttendeeCategoriesEditor
-                  popupId={defaultValues.id}
-                  readOnly={readOnly}
-                />
-                <Separator />
-              </>
-            )}
-
-            {/* Branding */}
-            <InlineSection title="Branding">
-              <form.Field name="image_url">
-                {(field) => (
-                  <div className="space-y-2 py-3">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted">
-                        <Image className="h-4 w-4 text-muted-foreground" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium">Cover Image</p>
-                        <p className="text-xs text-muted-foreground">
-                          Main event image used in cards, tickets, application
-                          headers, invoices, and emails
-                        </p>
-                      </div>
-                    </div>
-                    <ImageUpload
-                      value={field.state.value || null}
-                      onChange={(url) => field.handleChange(url ?? "")}
-                      disabled={readOnly}
-                    />
-                  </div>
-                )}
-              </form.Field>
-
-              <form.Field name="icon_url">
-                {(field) => (
-                  <div className="space-y-2 py-3">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted">
-                        <Image className="h-4 w-4 text-muted-foreground" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium">Icon</p>
-                        <p className="text-xs text-muted-foreground">
-                          Small icon shown in the portal sidebar popup menu
-                        </p>
-                      </div>
-                    </div>
-                    <ImageUpload
-                      value={field.state.value || null}
-                      onChange={(url) => field.handleChange(url ?? "")}
-                      disabled={readOnly}
-                    />
-                  </div>
-                )}
-              </form.Field>
-
-              <form.Field name="favicon_url">
-                {(field) => (
-                  <div className="space-y-2 py-3">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted">
-                        <Image className="h-4 w-4 text-muted-foreground" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium">Favicon</p>
-                        <p className="text-xs text-muted-foreground">
-                          Browser tab icon shown on the public checkout for this
-                          popup. Overrides the tenant default.
-                        </p>
-                      </div>
-                    </div>
-                    <ImageUpload
-                      value={field.state.value || null}
-                      onChange={(url) => field.handleChange(url ?? "")}
-                      disabled={readOnly}
-                    />
-                  </div>
-                )}
-              </form.Field>
-
-              <form.Field name="express_checkout_background">
-                {(field) => (
-                  <div className="space-y-2 py-3">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted">
-                        <Image className="h-4 w-4 text-muted-foreground" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium">
-                          Checkout Background
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          Full-screen background for checkout, invite, and
-                          success pages. Image or MP4 video (autoplay + audio
-                          toggle). Falls back to Cover Image, then tenant
-                          background.
-                        </p>
-                      </div>
-                    </div>
-                    <ImageUpload
-                      value={field.state.value || null}
-                      onChange={(url) => field.handleChange(url ?? "")}
-                      disabled={readOnly}
-                      accept="image+video"
-                    />
-                  </div>
-                )}
-              </form.Field>
-            </InlineSection>
-
-            <Separator />
-
-            {/* Links */}
-            <InlineSection title="Links">
-              <form.Field name="web_url">
-                {(field) => (
-                  <InlineRow
-                    icon={<Globe className="h-4 w-4 text-muted-foreground" />}
-                    label="Website"
-                  >
-                    <Input
-                      id="web_url"
-                      type="url"
-                      placeholder="https://example.com"
-                      value={field.state.value}
-                      onChange={(e) => field.handleChange(e.target.value)}
-                      disabled={readOnly}
-                      className="max-w-xs text-sm"
-                    />
-                  </InlineRow>
-                )}
-              </form.Field>
-
-              <form.Field name="blog_url">
-                {(field) => (
-                  <InlineRow
-                    icon={
-                      <FileText className="h-4 w-4 text-muted-foreground" />
-                    }
-                    label="Blog"
-                  >
-                    <Input
-                      id="blog_url"
-                      type="url"
-                      placeholder="https://example.com/blog"
-                      value={field.state.value}
-                      onChange={(e) => field.handleChange(e.target.value)}
-                      disabled={readOnly}
-                      className="max-w-xs text-sm"
-                    />
-                  </InlineRow>
-                )}
-              </form.Field>
-
-              <form.Field name="twitter_url">
-                {(field) => (
-                  <InlineRow
-                    icon={
-                      <LinkIcon className="h-4 w-4 text-muted-foreground" />
-                    }
-                    label="Twitter"
-                  >
-                    <Input
-                      id="twitter_url"
-                      type="url"
-                      placeholder="https://twitter.com/example"
-                      value={field.state.value}
-                      onChange={(e) => field.handleChange(e.target.value)}
-                      disabled={readOnly}
-                      className="max-w-xs text-sm"
-                    />
-                  </InlineRow>
-                )}
-              </form.Field>
-
-              <form.Field name="terms_and_conditions_url">
-                {(field) => (
-                  <InlineRow
-                    icon={<Scale className="h-4 w-4 text-muted-foreground" />}
-                    label="Terms & Conditions"
-                  >
-                    <Input
-                      id="terms_and_conditions_url"
-                      type="url"
-                      placeholder="https://example.com/terms"
-                      value={field.state.value}
-                      onChange={(e) => field.handleChange(e.target.value)}
-                      disabled={readOnly}
-                      className="max-w-xs text-sm"
-                    />
-                  </InlineRow>
-                )}
-              </form.Field>
             </InlineSection>
 
             <Separator />
@@ -1605,6 +1390,103 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
                 }
               </form.Subscribe>
             </InlineSection>
+          </TabsContent>
+
+          {/* ─── Features ────────────────────────────────────────────── */}
+          <TabsContent
+            value="features"
+            forceMount
+            className="space-y-6 data-[state=inactive]:hidden"
+          >
+            {/* Event Options */}
+            <InlineSection title="Gathering Options">
+              <form.Field name="allows_coupons">
+                {(field) => (
+                  <InlineRow
+                    icon={<Ticket className="h-4 w-4 text-muted-foreground" />}
+                    label="Discount Coupons"
+                    description="Enable discount coupons for this gathering"
+                  >
+                    <Switch
+                      id="allows_coupons"
+                      checked={field.state.value}
+                      onCheckedChange={(checked) => field.handleChange(checked)}
+                      disabled={readOnly}
+                    />
+                  </InlineRow>
+                )}
+              </form.Field>
+
+              <form.Field name="allows_scholarship">
+                {(field) => (
+                  <InlineRow
+                    icon={
+                      <GraduationCap className="h-4 w-4 text-muted-foreground" />
+                    }
+                    label="Scholarship Requests"
+                    description="Allow applicants to request financial assistance"
+                  >
+                    <Switch
+                      id="allows_scholarship"
+                      checked={!!field.state.value}
+                      onCheckedChange={(checked) => field.handleChange(checked)}
+                      disabled={readOnly}
+                    />
+                  </InlineRow>
+                )}
+              </form.Field>
+
+              <form.Subscribe
+                selector={(state) => state.values.allows_scholarship}
+              >
+                {(allowsScholarship) =>
+                  allowsScholarship ? (
+                    <form.Field name="allows_incentive">
+                      {(field) => (
+                        <InlineRow
+                          icon={
+                            <DollarSign className="h-4 w-4 text-muted-foreground" />
+                          }
+                          label="Cash Incentives"
+                          description="Allow assigning a cash grant alongside scholarship approval"
+                        >
+                          <Switch
+                            id="allows_incentive"
+                            checked={!!field.state.value}
+                            onCheckedChange={(checked) =>
+                              field.handleChange(checked)
+                            }
+                            disabled={readOnly}
+                          />
+                        </InlineRow>
+                      )}
+                    </form.Field>
+                  ) : null
+                }
+              </form.Subscribe>
+
+              <form.Field name="checkin_pass_lead_days">
+                {(field) => (
+                  <InlineRow
+                    icon={<QrCode className="h-4 w-4 text-muted-foreground" />}
+                    label="Check-in Pass Email"
+                    description="Days before the event start to email attendees their check-in QR code. Leave empty to disable."
+                  >
+                    <Input
+                      id="checkin_pass_lead_days"
+                      type="number"
+                      min="1"
+                      step="1"
+                      placeholder="e.g. 3"
+                      value={field.state.value}
+                      onChange={(e) => field.handleChange(e.target.value)}
+                      disabled={readOnly}
+                      className="max-w-[120px] text-sm"
+                    />
+                  </InlineRow>
+                )}
+              </form.Field>
+            </InlineSection>
 
             <Separator />
 
@@ -1708,8 +1590,216 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
               </form.Field>
             </InlineSection>
 
+            {/* Companion Types — only available when editing an existing popup */}
+            {isEdit && defaultValues && (
+              <>
+                <Separator />
+
+                <AttendeeCategoriesEditor
+                  popupId={defaultValues.id}
+                  readOnly={readOnly}
+                />
+              </>
+            )}
+          </TabsContent>
+
+          {/* ─── Branding ────────────────────────────────────────────── */}
+          <TabsContent
+            value="branding"
+            forceMount
+            className="space-y-6 data-[state=inactive]:hidden"
+          >
+            {/* Branding */}
+            <InlineSection title="Branding">
+              <form.Field name="image_url">
+                {(field) => (
+                  <div className="space-y-2 py-3">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted">
+                        <Image className="h-4 w-4 text-muted-foreground" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium">Cover Image</p>
+                        <p className="text-xs text-muted-foreground">
+                          Main event image used in cards, tickets, application
+                          headers, invoices, and emails
+                        </p>
+                      </div>
+                    </div>
+                    <ImageUpload
+                      value={field.state.value || null}
+                      onChange={(url) => field.handleChange(url ?? "")}
+                      disabled={readOnly}
+                    />
+                  </div>
+                )}
+              </form.Field>
+
+              <form.Field name="icon_url">
+                {(field) => (
+                  <div className="space-y-2 py-3">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted">
+                        <Image className="h-4 w-4 text-muted-foreground" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium">Icon</p>
+                        <p className="text-xs text-muted-foreground">
+                          Small icon shown in the portal sidebar popup menu
+                        </p>
+                      </div>
+                    </div>
+                    <ImageUpload
+                      value={field.state.value || null}
+                      onChange={(url) => field.handleChange(url ?? "")}
+                      disabled={readOnly}
+                    />
+                  </div>
+                )}
+              </form.Field>
+
+              <form.Field name="favicon_url">
+                {(field) => (
+                  <div className="space-y-2 py-3">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted">
+                        <Image className="h-4 w-4 text-muted-foreground" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium">Favicon</p>
+                        <p className="text-xs text-muted-foreground">
+                          Browser tab icon shown on the public checkout for this
+                          popup. Overrides the tenant default.
+                        </p>
+                      </div>
+                    </div>
+                    <ImageUpload
+                      value={field.state.value || null}
+                      onChange={(url) => field.handleChange(url ?? "")}
+                      disabled={readOnly}
+                    />
+                  </div>
+                )}
+              </form.Field>
+
+              <form.Field name="express_checkout_background">
+                {(field) => (
+                  <div className="space-y-2 py-3">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted">
+                        <Image className="h-4 w-4 text-muted-foreground" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium">
+                          Checkout Background
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Full-screen background for checkout, invite, and
+                          success pages. Image or MP4 video (autoplay + audio
+                          toggle). Falls back to Cover Image, then tenant
+                          background.
+                        </p>
+                      </div>
+                    </div>
+                    <ImageUpload
+                      value={field.state.value || null}
+                      onChange={(url) => field.handleChange(url ?? "")}
+                      disabled={readOnly}
+                      accept="image+video"
+                    />
+                  </div>
+                )}
+              </form.Field>
+            </InlineSection>
+
             <Separator />
 
+            {/* Links */}
+            <InlineSection title="Links">
+              <form.Field name="web_url">
+                {(field) => (
+                  <InlineRow
+                    icon={<Globe className="h-4 w-4 text-muted-foreground" />}
+                    label="Website"
+                  >
+                    <Input
+                      id="web_url"
+                      type="url"
+                      placeholder="https://example.com"
+                      value={field.state.value}
+                      onChange={(e) => field.handleChange(e.target.value)}
+                      disabled={readOnly}
+                      className="max-w-xs text-sm"
+                    />
+                  </InlineRow>
+                )}
+              </form.Field>
+
+              <form.Field name="blog_url">
+                {(field) => (
+                  <InlineRow
+                    icon={
+                      <FileText className="h-4 w-4 text-muted-foreground" />
+                    }
+                    label="Blog"
+                  >
+                    <Input
+                      id="blog_url"
+                      type="url"
+                      placeholder="https://example.com/blog"
+                      value={field.state.value}
+                      onChange={(e) => field.handleChange(e.target.value)}
+                      disabled={readOnly}
+                      className="max-w-xs text-sm"
+                    />
+                  </InlineRow>
+                )}
+              </form.Field>
+
+              <form.Field name="twitter_url">
+                {(field) => (
+                  <InlineRow
+                    icon={
+                      <LinkIcon className="h-4 w-4 text-muted-foreground" />
+                    }
+                    label="Twitter"
+                  >
+                    <Input
+                      id="twitter_url"
+                      type="url"
+                      placeholder="https://twitter.com/example"
+                      value={field.state.value}
+                      onChange={(e) => field.handleChange(e.target.value)}
+                      disabled={readOnly}
+                      className="max-w-xs text-sm"
+                    />
+                  </InlineRow>
+                )}
+              </form.Field>
+
+              <form.Field name="terms_and_conditions_url">
+                {(field) => (
+                  <InlineRow
+                    icon={<Scale className="h-4 w-4 text-muted-foreground" />}
+                    label="Terms & Conditions"
+                  >
+                    <Input
+                      id="terms_and_conditions_url"
+                      type="url"
+                      placeholder="https://example.com/terms"
+                      value={field.state.value}
+                      onChange={(e) => field.handleChange(e.target.value)}
+                      disabled={readOnly}
+                      className="max-w-xs text-sm"
+                    />
+                  </InlineRow>
+                )}
+              </form.Field>
+            </InlineSection>
+          </TabsContent>
+
+          {/* ─── Languages & Translations ───────────────────────────── */}
+          <TabsContent value="languages" className="space-y-6">
             {/* Languages */}
             <InlineSection title="Languages">
               <form.Field name="default_language">
@@ -1787,103 +1877,58 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
 
             <Separator />
 
-            {/* Approval strategy + Reviewers (edit only, application sale_type only —
-            direct-sale popups have no application flow, so these are meaningless) */}
-            {isEdit && (
-              <form.Subscribe selector={(state) => state.values.sale_type}>
-                {(saleType) =>
-                  saleType === "application" ? (
-                    <>
-                      <Separator />
-
-                      <ApprovalStrategyForm
-                        popupId={defaultValues!.id}
-                        readOnly={readOnly}
-                        variant="inline"
-                      />
-
-                      <Separator />
-
-                      <ConditionalReviewersManager
-                        popupId={defaultValues!.id}
-                        tenantId={defaultValues!.tenant_id}
-                        readOnly={readOnly}
-                        variant="inline"
-                      />
-                    </>
-                  ) : null
+            {/* Translations */}
+            {!isEdit ? (
+              <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
+                Save the event first to add translations.
+              </div>
+            ) : (defaultValues?.supported_languages?.length ?? 0) <= 1 ? (
+              <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
+                Enable a second language to translate this event.
+              </div>
+            ) : (
+              <form.Subscribe selector={(state) => state.isDirty}>
+                {(isDirty) =>
+                  isDirty ? (
+                    <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
+                      Save your changes first to translate the latest content.
+                    </div>
+                  ) : (
+                    <TranslationManager
+                      entityType="popup"
+                      entityId={defaultValues!.id}
+                      translatableFields={["name", "tagline", "location"]}
+                      sourceData={{
+                        name: defaultValues!.name,
+                        tagline: defaultValues!.tagline,
+                        location: defaultValues!.location,
+                      }}
+                      supportedLanguages={defaultValues!.supported_languages!}
+                      defaultLanguage={defaultValues!.default_language!}
+                    />
+                  )
                 }
               </form.Subscribe>
             )}
+          </TabsContent>
+        </Tabs>
 
-            <Separator />
-
-            {/* Form Actions */}
-            <div className="flex gap-4">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => navigate({ to: "/popups" })}
-              >
-                {readOnly ? "Back" : "Cancel"}
-              </Button>
-              {!readOnly && (
-                <LoadingButton type="submit" loading={isPending}>
-                  {isEdit ? "Save Changes" : "Create Event"}
-                </LoadingButton>
-              )}
-            </div>
-          </form>
-
-          {isEdit && !readOnly && (
-            <div className="mx-auto max-w-2xl">
-              <DangerZone
-                description="Once you delete this event, all associated products, groups, coupons, and attendee data will be permanently removed. This action cannot be undone."
-                onDelete={() => deleteMutation.mutate()}
-                isDeleting={deleteMutation.isPending}
-                confirmText="Delete Event"
-                resourceName={defaultValues.name}
-                variant="inline"
-              />
-            </div>
+        {/* Form Actions */}
+        <div className="flex gap-4">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => navigate({ to: "/popups" })}
+          >
+            {readOnly ? "Back" : "Cancel"}
+          </Button>
+          {!readOnly && (
+            <LoadingButton type="submit" loading={isPending}>
+              {isEdit ? "Save Changes" : "Create Event"}
+            </LoadingButton>
           )}
-        </TabsContent>
-
-        <TabsContent value="translations">
-          {!isEdit ? (
-            <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
-              Save the event first to add translations.
-            </div>
-          ) : (defaultValues?.supported_languages?.length ?? 0) <= 1 ? (
-            <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
-              Enable a second language to translate this event.
-            </div>
-          ) : (
-            <form.Subscribe selector={(state) => state.isDirty}>
-              {(isDirty) =>
-                isDirty ? (
-                  <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
-                    Save your changes first to translate the latest content.
-                  </div>
-                ) : (
-                  <TranslationManager
-                    entityType="popup"
-                    entityId={defaultValues!.id}
-                    translatableFields={["name", "tagline", "location"]}
-                    sourceData={{
-                      name: defaultValues!.name,
-                      tagline: defaultValues!.tagline,
-                      location: defaultValues!.location,
-                    }}
-                    supportedLanguages={defaultValues!.supported_languages!}
-                    defaultLanguage={defaultValues!.default_language!}
-                  />
-                )
-              }
-            </form.Subscribe>
-          )}
-        </TabsContent>
-      </Tabs>
+        </div>
+      </form>
 
       <UnsavedChangesDialog blocker={blocker} />
     </div>

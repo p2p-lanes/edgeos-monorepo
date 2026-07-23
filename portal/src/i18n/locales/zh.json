@@ -1,4 +1,12 @@
 {
+  "help": {
+    "aria_label": "获取帮助",
+    "title": "需要帮助吗？",
+    "description": "有问题或需要协助？给我们发送电子邮件，我们会尽快回复您。",
+    "email_button": "发送电子邮件",
+    "email_subject": "帮助请求 — {{popup}}",
+    "email_subject_generic": "帮助请求"
+  },
   "common": {
     "apply": "应用",
     "back": "返回",

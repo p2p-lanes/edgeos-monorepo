@@ -1,4 +1,12 @@
 {
+  "help": {
+    "aria_label": "Fá aðstoð",
+    "title": "Þarftu aðstoð?",
+    "description": "Ertu með spurningu eða þarft aðstoð? Sendu okkur tölvupóst og við höfum samband.",
+    "email_button": "Senda tölvupóst",
+    "email_subject": "Beiðni um aðstoð — {{popup}}",
+    "email_subject_generic": "Beiðni um aðstoð"
+  },
   "common": {
     "apply": "Sækja um",
     "back": "Til baka",
