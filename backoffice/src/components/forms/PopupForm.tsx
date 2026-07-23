@@ -1,6 +1,6 @@
 import { useForm } from "@tanstack/react-form"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { useNavigate } from "@tanstack/react-router"
+import { Link, useNavigate } from "@tanstack/react-router"
 import {
   Building2,
   Calendar,
@@ -26,6 +26,7 @@ import {
   Ticket,
   Users,
 } from "lucide-react"
+import { useState } from "react"
 import {
   ApprovalStrategiesService,
   type CheckoutMode,
@@ -191,6 +192,19 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
     return date.slice(0, 10)
   }
 
+  // UI-only enable state per reminder type. The persisted switch is the delay
+  // column (null = off); toggling on seeds a default delay, toggling off
+  // clears the whole block so the save payload nulls it.
+  const [cartReminderOn, setCartReminderOn] = useState(
+    Boolean(defaultValues?.abandoned_cart_delay_days),
+  )
+  const [purchaseReminderOn, setPurchaseReminderOn] = useState(
+    Boolean(defaultValues?.purchase_reminder_delay_days),
+  )
+  const [applicationReminderOn, setApplicationReminderOn] = useState(
+    Boolean(defaultValues?.abandoned_application_delay_days),
+  )
+
   const form = useForm({
     defaultValues: {
       name: defaultValues?.name ?? "",
@@ -355,7 +369,8 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
           : null,
         // A reminder's delay is its on/off switch (empty = disabled); when it
         // is empty we null the whole block so orphaned repeat/max values never
-        // linger behind a disabled reminder.
+        // linger behind a disabled reminder. Max only applies to repeating
+        // reminders, so it also requires a repeat interval.
         abandoned_cart_delay_days: value.abandoned_cart_delay_days
           ? Number(value.abandoned_cart_delay_days)
           : null,
@@ -364,7 +379,9 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
             ? Number(value.abandoned_cart_repeat_days)
             : null,
         abandoned_cart_max_count:
-          value.abandoned_cart_delay_days && value.abandoned_cart_max_count
+          value.abandoned_cart_delay_days &&
+          value.abandoned_cart_repeat_days &&
+          value.abandoned_cart_max_count
             ? Number(value.abandoned_cart_max_count)
             : null,
         purchase_reminder_delay_days: value.purchase_reminder_delay_days
@@ -377,6 +394,7 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
             : null,
         purchase_reminder_max_count:
           value.purchase_reminder_delay_days &&
+          value.purchase_reminder_repeat_days &&
           value.purchase_reminder_max_count
             ? Number(value.purchase_reminder_max_count)
             : null,
@@ -390,6 +408,7 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
             : null,
         abandoned_application_max_count:
           value.abandoned_application_delay_days &&
+          value.abandoned_application_repeat_days &&
           value.abandoned_application_max_count
             ? Number(value.abandoned_application_max_count)
             : null,
@@ -1548,266 +1567,404 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
 
             <Separator />
 
-            {/* Automatic reminder emails. Each reminder's delay doubles as its
-                on/off switch: empty means disabled, so repeat/max stay locked
-                until a delay is set. */}
+            {/* Automatic reminder emails. The persisted on/off switch is the
+                delay column (null = off): the UI switch seeds a default delay
+                when enabled and clears the whole block when disabled. Max only
+                applies to repeating reminders, so it unlocks with Every. */}
             <InlineSection title="Automatic Reminder Emails">
-              <form.Subscribe
-                selector={(state) => state.values.abandoned_cart_delay_days}
+              <InlineRow
+                icon={
+                  <ShoppingCart className="h-4 w-4 text-muted-foreground" />
+                }
+                label="Abandoned Cart"
+                description="Email buyers who did not complete their purchase"
               >
-                {(cartDelay) => (
-                  <InlineRow
-                    icon={
-                      <ShoppingCart className="h-4 w-4 text-muted-foreground" />
-                    }
-                    label="Abandoned Cart"
-                    description="Email buyers who did not complete their purchase. First email after the set days, then repeating up to the max. Leave days empty to disable."
-                  >
-                    <div className="flex items-end gap-2">
-                      <form.Field name="abandoned_cart_delay_days">
-                        {(field) => (
-                          <div className="space-y-1">
-                            <p className="text-center text-[10px] text-muted-foreground">
-                              Days
-                            </p>
-                            <Input
-                              id="abandoned_cart_delay_days"
-                              type="number"
-                              min="1"
-                              step="1"
-                              placeholder="off"
-                              value={field.state.value}
-                              onChange={(e) =>
-                                field.handleChange(e.target.value)
-                              }
-                              disabled={readOnly}
-                              className="max-w-[72px] text-sm"
-                            />
-                          </div>
-                        )}
-                      </form.Field>
-                      <form.Field name="abandoned_cart_repeat_days">
-                        {(field) => (
-                          <div className="space-y-1">
-                            <p className="text-center text-[10px] text-muted-foreground">
-                              Every
-                            </p>
-                            <Input
-                              id="abandoned_cart_repeat_days"
-                              type="number"
-                              min="1"
-                              step="1"
-                              placeholder="days"
-                              value={field.state.value}
-                              onChange={(e) =>
-                                field.handleChange(e.target.value)
-                              }
-                              disabled={readOnly || !cartDelay}
-                              className="max-w-[72px] text-sm"
-                            />
-                          </div>
-                        )}
-                      </form.Field>
-                      <form.Field name="abandoned_cart_max_count">
-                        {(field) => (
-                          <div className="space-y-1">
-                            <p className="text-center text-[10px] text-muted-foreground">
-                              Max
-                            </p>
-                            <Input
-                              id="abandoned_cart_max_count"
-                              type="number"
-                              min="1"
-                              step="1"
-                              placeholder="sends"
-                              value={field.state.value}
-                              onChange={(e) =>
-                                field.handleChange(e.target.value)
-                              }
-                              disabled={readOnly || !cartDelay}
-                              className="max-w-[72px] text-sm"
-                            />
-                          </div>
-                        )}
-                      </form.Field>
-                    </div>
-                  </InlineRow>
-                )}
-              </form.Subscribe>
+                <div className="flex flex-col items-end gap-2">
+                  <div className="flex items-center gap-3">
+                    {cartReminderOn && (
+                      <div className="flex items-end gap-2">
+                        <form.Field name="abandoned_cart_delay_days">
+                          {(field) => (
+                            <div className="space-y-1">
+                              <p className="text-center text-[10px] text-muted-foreground">
+                                Delay (days)
+                              </p>
+                              <Input
+                                id="abandoned_cart_delay_days"
+                                type="number"
+                                min="1"
+                                step="1"
+                                placeholder="3"
+                                value={field.state.value}
+                                onChange={(e) =>
+                                  field.handleChange(e.target.value)
+                                }
+                                disabled={readOnly}
+                                className="max-w-[80px] text-sm"
+                              />
+                            </div>
+                          )}
+                        </form.Field>
+                        <form.Field name="abandoned_cart_repeat_days">
+                          {(field) => (
+                            <div className="space-y-1">
+                              <p className="text-center text-[10px] text-muted-foreground">
+                                Every (days)
+                              </p>
+                              <Input
+                                id="abandoned_cart_repeat_days"
+                                type="number"
+                                min="1"
+                                step="1"
+                                placeholder="once"
+                                value={field.state.value}
+                                onChange={(e) =>
+                                  field.handleChange(e.target.value)
+                                }
+                                disabled={readOnly}
+                                className="max-w-[80px] text-sm"
+                              />
+                            </div>
+                          )}
+                        </form.Field>
+                        <form.Subscribe
+                          selector={(state) =>
+                            state.values.abandoned_cart_repeat_days
+                          }
+                        >
+                          {(cartRepeat) => (
+                            <form.Field name="abandoned_cart_max_count">
+                              {(field) => (
+                                <div className="space-y-1">
+                                  <p className="text-center text-[10px] text-muted-foreground">
+                                    Max sends
+                                  </p>
+                                  <Input
+                                    id="abandoned_cart_max_count"
+                                    type="number"
+                                    min="1"
+                                    step="1"
+                                    placeholder="12"
+                                    value={field.state.value}
+                                    onChange={(e) =>
+                                      field.handleChange(e.target.value)
+                                    }
+                                    disabled={readOnly || !cartRepeat}
+                                    className="max-w-[80px] text-sm"
+                                  />
+                                </div>
+                              )}
+                            </form.Field>
+                          )}
+                        </form.Subscribe>
+                      </div>
+                    )}
+                    <Switch
+                      id="abandoned_cart_reminder_enabled"
+                      checked={cartReminderOn}
+                      onCheckedChange={(checked) => {
+                        setCartReminderOn(checked)
+                        if (checked) {
+                          if (
+                            !form.getFieldValue("abandoned_cart_delay_days")
+                          ) {
+                            form.setFieldValue("abandoned_cart_delay_days", "3")
+                          }
+                        } else {
+                          form.setFieldValue("abandoned_cart_delay_days", "")
+                          form.setFieldValue("abandoned_cart_repeat_days", "")
+                          form.setFieldValue("abandoned_cart_max_count", "")
+                        }
+                      }}
+                      disabled={readOnly}
+                    />
+                  </div>
+                  {cartReminderOn && (
+                    <Link
+                      to="/email-templates/$type/edit"
+                      params={{ type: "abandoned_cart" }}
+                      className="text-xs text-primary hover:underline"
+                    >
+                      Edit email template
+                    </Link>
+                  )}
+                </div>
+              </InlineRow>
 
               <form.Subscribe selector={(state) => state.values.sale_type}>
                 {(saleType) =>
                   saleType === "application" ? (
                     <>
-                      <form.Subscribe
-                        selector={(state) =>
-                          state.values.purchase_reminder_delay_days
+                      <InlineRow
+                        icon={
+                          <CreditCard className="h-4 w-4 text-muted-foreground" />
                         }
+                        label="Purchase Reminder"
+                        description="Email accepted applicants who have not purchased yet"
                       >
-                        {(purchaseDelay) => (
-                          <InlineRow
-                            icon={
-                              <CreditCard className="h-4 w-4 text-muted-foreground" />
-                            }
-                            label="Purchase Reminder"
-                            description="Email accepted applicants who have not purchased yet. First email after the set days, then repeating up to the max. Leave days empty to disable."
-                          >
-                            <div className="flex items-end gap-2">
-                              <form.Field name="purchase_reminder_delay_days">
-                                {(field) => (
-                                  <div className="space-y-1">
-                                    <p className="text-center text-[10px] text-muted-foreground">
-                                      Days
-                                    </p>
-                                    <Input
-                                      id="purchase_reminder_delay_days"
-                                      type="number"
-                                      min="1"
-                                      step="1"
-                                      placeholder="off"
-                                      value={field.state.value}
-                                      onChange={(e) =>
-                                        field.handleChange(e.target.value)
-                                      }
-                                      disabled={readOnly}
-                                      className="max-w-[72px] text-sm"
-                                    />
-                                  </div>
-                                )}
-                              </form.Field>
-                              <form.Field name="purchase_reminder_repeat_days">
-                                {(field) => (
-                                  <div className="space-y-1">
-                                    <p className="text-center text-[10px] text-muted-foreground">
-                                      Every
-                                    </p>
-                                    <Input
-                                      id="purchase_reminder_repeat_days"
-                                      type="number"
-                                      min="1"
-                                      step="1"
-                                      placeholder="days"
-                                      value={field.state.value}
-                                      onChange={(e) =>
-                                        field.handleChange(e.target.value)
-                                      }
-                                      disabled={readOnly || !purchaseDelay}
-                                      className="max-w-[72px] text-sm"
-                                    />
-                                  </div>
-                                )}
-                              </form.Field>
-                              <form.Field name="purchase_reminder_max_count">
-                                {(field) => (
-                                  <div className="space-y-1">
-                                    <p className="text-center text-[10px] text-muted-foreground">
-                                      Max
-                                    </p>
-                                    <Input
-                                      id="purchase_reminder_max_count"
-                                      type="number"
-                                      min="1"
-                                      step="1"
-                                      placeholder="sends"
-                                      value={field.state.value}
-                                      onChange={(e) =>
-                                        field.handleChange(e.target.value)
-                                      }
-                                      disabled={readOnly || !purchaseDelay}
-                                      className="max-w-[72px] text-sm"
-                                    />
-                                  </div>
-                                )}
-                              </form.Field>
-                            </div>
-                          </InlineRow>
-                        )}
-                      </form.Subscribe>
+                        <div className="flex flex-col items-end gap-2">
+                          <div className="flex items-center gap-3">
+                            {purchaseReminderOn && (
+                              <div className="flex items-end gap-2">
+                                <form.Field name="purchase_reminder_delay_days">
+                                  {(field) => (
+                                    <div className="space-y-1">
+                                      <p className="text-center text-[10px] text-muted-foreground">
+                                        Delay (days)
+                                      </p>
+                                      <Input
+                                        id="purchase_reminder_delay_days"
+                                        type="number"
+                                        min="1"
+                                        step="1"
+                                        placeholder="3"
+                                        value={field.state.value}
+                                        onChange={(e) =>
+                                          field.handleChange(e.target.value)
+                                        }
+                                        disabled={readOnly}
+                                        className="max-w-[80px] text-sm"
+                                      />
+                                    </div>
+                                  )}
+                                </form.Field>
+                                <form.Field name="purchase_reminder_repeat_days">
+                                  {(field) => (
+                                    <div className="space-y-1">
+                                      <p className="text-center text-[10px] text-muted-foreground">
+                                        Every (days)
+                                      </p>
+                                      <Input
+                                        id="purchase_reminder_repeat_days"
+                                        type="number"
+                                        min="1"
+                                        step="1"
+                                        placeholder="once"
+                                        value={field.state.value}
+                                        onChange={(e) =>
+                                          field.handleChange(e.target.value)
+                                        }
+                                        disabled={readOnly}
+                                        className="max-w-[80px] text-sm"
+                                      />
+                                    </div>
+                                  )}
+                                </form.Field>
+                                <form.Subscribe
+                                  selector={(state) =>
+                                    state.values.purchase_reminder_repeat_days
+                                  }
+                                >
+                                  {(purchaseRepeat) => (
+                                    <form.Field name="purchase_reminder_max_count">
+                                      {(field) => (
+                                        <div className="space-y-1">
+                                          <p className="text-center text-[10px] text-muted-foreground">
+                                            Max sends
+                                          </p>
+                                          <Input
+                                            id="purchase_reminder_max_count"
+                                            type="number"
+                                            min="1"
+                                            step="1"
+                                            placeholder="12"
+                                            value={field.state.value}
+                                            onChange={(e) =>
+                                              field.handleChange(e.target.value)
+                                            }
+                                            disabled={
+                                              readOnly || !purchaseRepeat
+                                            }
+                                            className="max-w-[80px] text-sm"
+                                          />
+                                        </div>
+                                      )}
+                                    </form.Field>
+                                  )}
+                                </form.Subscribe>
+                              </div>
+                            )}
+                            <Switch
+                              id="purchase_reminder_enabled"
+                              checked={purchaseReminderOn}
+                              onCheckedChange={(checked) => {
+                                setPurchaseReminderOn(checked)
+                                if (checked) {
+                                  if (
+                                    !form.getFieldValue(
+                                      "purchase_reminder_delay_days",
+                                    )
+                                  ) {
+                                    form.setFieldValue(
+                                      "purchase_reminder_delay_days",
+                                      "3",
+                                    )
+                                  }
+                                } else {
+                                  form.setFieldValue(
+                                    "purchase_reminder_delay_days",
+                                    "",
+                                  )
+                                  form.setFieldValue(
+                                    "purchase_reminder_repeat_days",
+                                    "",
+                                  )
+                                  form.setFieldValue(
+                                    "purchase_reminder_max_count",
+                                    "",
+                                  )
+                                }
+                              }}
+                              disabled={readOnly}
+                            />
+                          </div>
+                          {purchaseReminderOn && (
+                            <Link
+                              to="/email-templates/$type/edit"
+                              params={{ type: "purchase_reminder" }}
+                              className="text-xs text-primary hover:underline"
+                            >
+                              Edit email template
+                            </Link>
+                          )}
+                        </div>
+                      </InlineRow>
 
-                      <form.Subscribe
-                        selector={(state) =>
-                          state.values.abandoned_application_delay_days
+                      <InlineRow
+                        icon={
+                          <FileText className="h-4 w-4 text-muted-foreground" />
                         }
+                        label="Abandoned Application"
+                        description="Email applicants whose application is still in draft, counted from their last edit"
                       >
-                        {(applicationDelay) => (
-                          <InlineRow
-                            icon={
-                              <FileText className="h-4 w-4 text-muted-foreground" />
-                            }
-                            label="Abandoned Application"
-                            description="Email applicants whose application is still in draft. First email after the set days since their last edit, then repeating up to the max. Leave days empty to disable."
-                          >
-                            <div className="flex items-end gap-2">
-                              <form.Field name="abandoned_application_delay_days">
-                                {(field) => (
-                                  <div className="space-y-1">
-                                    <p className="text-center text-[10px] text-muted-foreground">
-                                      Days
-                                    </p>
-                                    <Input
-                                      id="abandoned_application_delay_days"
-                                      type="number"
-                                      min="1"
-                                      step="1"
-                                      placeholder="off"
-                                      value={field.state.value}
-                                      onChange={(e) =>
-                                        field.handleChange(e.target.value)
-                                      }
-                                      disabled={readOnly}
-                                      className="max-w-[72px] text-sm"
-                                    />
-                                  </div>
-                                )}
-                              </form.Field>
-                              <form.Field name="abandoned_application_repeat_days">
-                                {(field) => (
-                                  <div className="space-y-1">
-                                    <p className="text-center text-[10px] text-muted-foreground">
-                                      Every
-                                    </p>
-                                    <Input
-                                      id="abandoned_application_repeat_days"
-                                      type="number"
-                                      min="1"
-                                      step="1"
-                                      placeholder="days"
-                                      value={field.state.value}
-                                      onChange={(e) =>
-                                        field.handleChange(e.target.value)
-                                      }
-                                      disabled={readOnly || !applicationDelay}
-                                      className="max-w-[72px] text-sm"
-                                    />
-                                  </div>
-                                )}
-                              </form.Field>
-                              <form.Field name="abandoned_application_max_count">
-                                {(field) => (
-                                  <div className="space-y-1">
-                                    <p className="text-center text-[10px] text-muted-foreground">
-                                      Max
-                                    </p>
-                                    <Input
-                                      id="abandoned_application_max_count"
-                                      type="number"
-                                      min="1"
-                                      step="1"
-                                      placeholder="sends"
-                                      value={field.state.value}
-                                      onChange={(e) =>
-                                        field.handleChange(e.target.value)
-                                      }
-                                      disabled={readOnly || !applicationDelay}
-                                      className="max-w-[72px] text-sm"
-                                    />
-                                  </div>
-                                )}
-                              </form.Field>
-                            </div>
-                          </InlineRow>
-                        )}
-                      </form.Subscribe>
+                        <div className="flex flex-col items-end gap-2">
+                          <div className="flex items-center gap-3">
+                            {applicationReminderOn && (
+                              <div className="flex items-end gap-2">
+                                <form.Field name="abandoned_application_delay_days">
+                                  {(field) => (
+                                    <div className="space-y-1">
+                                      <p className="text-center text-[10px] text-muted-foreground">
+                                        Delay (days)
+                                      </p>
+                                      <Input
+                                        id="abandoned_application_delay_days"
+                                        type="number"
+                                        min="1"
+                                        step="1"
+                                        placeholder="3"
+                                        value={field.state.value}
+                                        onChange={(e) =>
+                                          field.handleChange(e.target.value)
+                                        }
+                                        disabled={readOnly}
+                                        className="max-w-[80px] text-sm"
+                                      />
+                                    </div>
+                                  )}
+                                </form.Field>
+                                <form.Field name="abandoned_application_repeat_days">
+                                  {(field) => (
+                                    <div className="space-y-1">
+                                      <p className="text-center text-[10px] text-muted-foreground">
+                                        Every (days)
+                                      </p>
+                                      <Input
+                                        id="abandoned_application_repeat_days"
+                                        type="number"
+                                        min="1"
+                                        step="1"
+                                        placeholder="once"
+                                        value={field.state.value}
+                                        onChange={(e) =>
+                                          field.handleChange(e.target.value)
+                                        }
+                                        disabled={readOnly}
+                                        className="max-w-[80px] text-sm"
+                                      />
+                                    </div>
+                                  )}
+                                </form.Field>
+                                <form.Subscribe
+                                  selector={(state) =>
+                                    state.values
+                                      .abandoned_application_repeat_days
+                                  }
+                                >
+                                  {(applicationRepeat) => (
+                                    <form.Field name="abandoned_application_max_count">
+                                      {(field) => (
+                                        <div className="space-y-1">
+                                          <p className="text-center text-[10px] text-muted-foreground">
+                                            Max sends
+                                          </p>
+                                          <Input
+                                            id="abandoned_application_max_count"
+                                            type="number"
+                                            min="1"
+                                            step="1"
+                                            placeholder="12"
+                                            value={field.state.value}
+                                            onChange={(e) =>
+                                              field.handleChange(e.target.value)
+                                            }
+                                            disabled={
+                                              readOnly || !applicationRepeat
+                                            }
+                                            className="max-w-[80px] text-sm"
+                                          />
+                                        </div>
+                                      )}
+                                    </form.Field>
+                                  )}
+                                </form.Subscribe>
+                              </div>
+                            )}
+                            <Switch
+                              id="abandoned_application_reminder_enabled"
+                              checked={applicationReminderOn}
+                              onCheckedChange={(checked) => {
+                                setApplicationReminderOn(checked)
+                                if (checked) {
+                                  if (
+                                    !form.getFieldValue(
+                                      "abandoned_application_delay_days",
+                                    )
+                                  ) {
+                                    form.setFieldValue(
+                                      "abandoned_application_delay_days",
+                                      "3",
+                                    )
+                                  }
+                                } else {
+                                  form.setFieldValue(
+                                    "abandoned_application_delay_days",
+                                    "",
+                                  )
+                                  form.setFieldValue(
+                                    "abandoned_application_repeat_days",
+                                    "",
+                                  )
+                                  form.setFieldValue(
+                                    "abandoned_application_max_count",
+                                    "",
+                                  )
+                                }
+                              }}
+                              disabled={readOnly}
+                            />
+                          </div>
+                          {applicationReminderOn && (
+                            <Link
+                              to="/email-templates/$type/edit"
+                              params={{ type: "abandoned_application" }}
+                              className="text-xs text-primary hover:underline"
+                            >
+                              Edit email template
+                            </Link>
+                          )}
+                        </div>
+                      </InlineRow>
                     </>
                   ) : null
                 }
