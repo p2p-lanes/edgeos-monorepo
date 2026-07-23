@@ -5578,7 +5578,7 @@ export const EmailTemplatePublicSchema = {
 
 export const EmailTemplateTypeSchema = {
     type: 'string',
-    enum: ['login_code_user', 'login_code_human', 'application_received', 'application_accepted', 'application_rejected', 'application_accepted_with_discount', 'application_accepted_with_incentive', 'application_accepted_scholarship_rejected', 'payment_confirmed', 'abandoned_cart', 'edit_passes_confirmed', 'event_invitation', 'event_updated', 'event_cancelled', 'event_rsvp_cancelled', 'event_approval_approved', 'event_approval_rejected', 'check_in_pass'],
+    enum: ['login_code_user', 'login_code_human', 'application_received', 'application_accepted', 'application_rejected', 'application_accepted_with_discount', 'application_accepted_with_incentive', 'application_accepted_scholarship_rejected', 'payment_confirmed', 'abandoned_cart', 'purchase_reminder', 'abandoned_application', 'edit_passes_confirmed', 'event_invitation', 'event_updated', 'event_cancelled', 'event_rsvp_cancelled', 'event_approval_approved', 'event_approval_rejected', 'check_in_pass'],
     title: 'EmailTemplateType'
 } as const;
 
@@ -13539,6 +13539,105 @@ export const PopupAdminSchema = {
             title: 'Installments Interval Count',
             default: 1
         },
+        abandoned_cart_delay_days: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Abandoned Cart Delay Days'
+        },
+        abandoned_cart_repeat_days: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Abandoned Cart Repeat Days'
+        },
+        abandoned_cart_max_count: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Abandoned Cart Max Count'
+        },
+        purchase_reminder_delay_days: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Purchase Reminder Delay Days'
+        },
+        purchase_reminder_repeat_days: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Purchase Reminder Repeat Days'
+        },
+        purchase_reminder_max_count: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Purchase Reminder Max Count'
+        },
+        abandoned_application_delay_days: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Abandoned Application Delay Days'
+        },
+        abandoned_application_repeat_days: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Abandoned Application Repeat Days'
+        },
+        abandoned_application_max_count: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Abandoned Application Max Count'
+        },
         id: {
             type: 'string',
             format: 'uuid',
@@ -14028,6 +14127,105 @@ export const PopupCreateSchema = {
                 }
             ],
             title: 'Checkin Pass Lead Days'
+        },
+        abandoned_cart_delay_days: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Abandoned Cart Delay Days'
+        },
+        abandoned_cart_repeat_days: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Abandoned Cart Repeat Days'
+        },
+        abandoned_cart_max_count: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Abandoned Cart Max Count'
+        },
+        purchase_reminder_delay_days: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Purchase Reminder Delay Days'
+        },
+        purchase_reminder_repeat_days: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Purchase Reminder Repeat Days'
+        },
+        purchase_reminder_max_count: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Purchase Reminder Max Count'
+        },
+        abandoned_application_delay_days: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Abandoned Application Delay Days'
+        },
+        abandoned_application_repeat_days: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Abandoned Application Repeat Days'
+        },
+        abandoned_application_max_count: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Abandoned Application Max Count'
         }
     },
     type: 'object',
@@ -15097,6 +15295,105 @@ export const PopupUpdateSchema = {
                 }
             ],
             title: 'Checkin Pass Lead Days'
+        },
+        abandoned_cart_delay_days: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Abandoned Cart Delay Days'
+        },
+        abandoned_cart_repeat_days: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Abandoned Cart Repeat Days'
+        },
+        abandoned_cart_max_count: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Abandoned Cart Max Count'
+        },
+        purchase_reminder_delay_days: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Purchase Reminder Delay Days'
+        },
+        purchase_reminder_repeat_days: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Purchase Reminder Repeat Days'
+        },
+        purchase_reminder_max_count: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Purchase Reminder Max Count'
+        },
+        abandoned_application_delay_days: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Abandoned Application Delay Days'
+        },
+        abandoned_application_repeat_days: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Abandoned Application Repeat Days'
+        },
+        abandoned_application_max_count: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Abandoned Application Max Count'
         }
     },
     additionalProperties: false,

@@ -1304,7 +1304,7 @@ export type EmailTemplatePublic = {
     updated_at?: (string | null);
 };
 
-export type EmailTemplateType = 'login_code_user' | 'login_code_human' | 'application_received' | 'application_accepted' | 'application_rejected' | 'application_accepted_with_discount' | 'application_accepted_with_incentive' | 'application_accepted_scholarship_rejected' | 'payment_confirmed' | 'abandoned_cart' | 'edit_passes_confirmed' | 'event_invitation' | 'event_updated' | 'event_cancelled' | 'event_rsvp_cancelled' | 'event_approval_approved' | 'event_approval_rejected' | 'check_in_pass';
+export type EmailTemplateType = 'login_code_user' | 'login_code_human' | 'application_received' | 'application_accepted' | 'application_rejected' | 'application_accepted_with_discount' | 'application_accepted_with_incentive' | 'application_accepted_scholarship_rejected' | 'payment_confirmed' | 'abandoned_cart' | 'purchase_reminder' | 'abandoned_application' | 'edit_passes_confirmed' | 'event_invitation' | 'event_updated' | 'event_cancelled' | 'event_rsvp_cancelled' | 'event_approval_approved' | 'event_approval_rejected' | 'check_in_pass';
 
 export type EmailTemplateUpdate = {
     subject?: (string | null);
@@ -2910,6 +2910,15 @@ export type PopupAdmin = {
     installments_max?: (number | null);
     installments_interval?: InstallmentInterval;
     installments_interval_count?: number;
+    abandoned_cart_delay_days?: (number | null);
+    abandoned_cart_repeat_days?: (number | null);
+    abandoned_cart_max_count?: (number | null);
+    purchase_reminder_delay_days?: (number | null);
+    purchase_reminder_repeat_days?: (number | null);
+    purchase_reminder_max_count?: (number | null);
+    abandoned_application_delay_days?: (number | null);
+    abandoned_application_repeat_days?: (number | null);
+    abandoned_application_max_count?: (number | null);
     id: string;
 };
 
@@ -2968,6 +2977,15 @@ export type PopupCreate = {
     installments_interval?: InstallmentInterval;
     installments_interval_count?: number;
     checkin_pass_lead_days?: (number | null);
+    abandoned_cart_delay_days?: (number | null);
+    abandoned_cart_repeat_days?: (number | null);
+    abandoned_cart_max_count?: (number | null);
+    purchase_reminder_delay_days?: (number | null);
+    purchase_reminder_repeat_days?: (number | null);
+    purchase_reminder_max_count?: (number | null);
+    abandoned_application_delay_days?: (number | null);
+    abandoned_application_repeat_days?: (number | null);
+    abandoned_application_max_count?: (number | null);
 };
 
 /**
@@ -3108,6 +3126,15 @@ export type PopupUpdate = {
     installments_interval?: (InstallmentInterval | null);
     installments_interval_count?: (number | null);
     checkin_pass_lead_days?: (number | null);
+    abandoned_cart_delay_days?: (number | null);
+    abandoned_cart_repeat_days?: (number | null);
+    abandoned_cart_max_count?: (number | null);
+    purchase_reminder_delay_days?: (number | null);
+    purchase_reminder_repeat_days?: (number | null);
+    purchase_reminder_max_count?: (number | null);
+    abandoned_application_delay_days?: (number | null);
+    abandoned_application_repeat_days?: (number | null);
+    abandoned_application_max_count?: (number | null);
 };
 
 /**
