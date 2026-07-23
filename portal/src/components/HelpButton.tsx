@@ -13,25 +13,23 @@ import { useCityProvider } from "@/providers/cityProvider"
 import { useTenant } from "@/providers/tenantProvider"
 
 /**
- * Fallback support address used when the tenant has no configured
- * `sender_email`. Per-popup email is not exposed on `PopupPublic`, so the
- * tenant address is the most specific override available to the portal.
- */
-const FALLBACK_EMAIL = "info@edgecity.live"
-
-/**
  * Floating help button shown on every portal page. Opens a small popover that
  * lets the visitor email support. The destination is the tenant's configured
- * `sender_email`, falling back to {@link FALLBACK_EMAIL}. Must be mounted inside
- * both `CityProvider` and `TenantProvider` (see `Providers.tsx`).
+ * `sender_email`; when the tenant has no address the button is not rendered.
+ * Must be mounted inside both `CityProvider` and `TenantProvider` (see
+ * `Providers.tsx`).
  */
 const HelpButton = () => {
   const { t } = useTranslation()
   const { tenant } = useTenant()
   const { getCity } = useCityProvider()
 
+  const email = tenant?.sender_email?.trim()
+  if (!email) {
+    return null
+  }
+
   const popup = getCity()
-  const email = tenant?.sender_email?.trim() || FALLBACK_EMAIL
   const subject = popup?.name
     ? t("help.email_subject", { popup: popup.name })
     : t("help.email_subject_generic")
