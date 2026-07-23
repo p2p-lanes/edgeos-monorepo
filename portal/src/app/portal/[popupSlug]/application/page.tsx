@@ -96,8 +96,7 @@ export default function FormPage() {
   useEffect(() => {
     if (
       application &&
-      (application.status === "accepted" ||
-        application.status === "rejected")
+      (application.status === "accepted" || application.status === "rejected")
     ) {
       router.replace(`/portal/${city?.slug}`)
     }
