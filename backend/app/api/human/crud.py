@@ -608,6 +608,7 @@ class HumansCRUD(BaseCRUD[Humans, HumanCreate, HumanUpdate]):
             field=fact_in.field,
             value=fact_in.value,
             source=fact_in.source.value,
+            source_label=fact_in.source_label,
             evidence=fact_in.evidence,
             confidence=fact_in.confidence,
             raw=fact_in.raw,

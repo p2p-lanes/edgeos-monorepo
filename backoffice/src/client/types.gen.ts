@@ -2259,6 +2259,7 @@ export type HumanEnrichmentFactCreate = {
     field: string;
     value: string;
     source: EnrichmentSource;
+    source_label?: (string | null);
     evidence?: (string | null);
     confidence?: (number | null);
     raw?: ({
@@ -2272,11 +2273,8 @@ export type HumanEnrichmentFactPublic = {
     field: string;
     value: string;
     source: EnrichmentSource;
-    evidence?: (string | null);
+    source_label?: (string | null);
     confidence?: (number | null);
-    raw?: ({
-    [key: string]: unknown;
-} | null);
     created_at: string;
 };
 
