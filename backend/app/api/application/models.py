@@ -11,6 +11,7 @@ from app.api.application.schemas import (
     ApplicationSnapshotBase,
     ApplicationStatus,
 )
+from app.api.shared.models import CommentMixin
 
 if TYPE_CHECKING:
     from app.api.application_review.models import ApplicationReviews
@@ -123,6 +124,10 @@ class Applications(ApplicationBase, table=True):
         back_populates="application",
         sa_relationship_kwargs={"cascade": "all, delete-orphan"},
     )
+    comments: list["ApplicationComment"] = Relationship(
+        back_populates="application",
+        sa_relationship_kwargs={"cascade": "all, delete-orphan"},
+    )
 
     @property
     def red_flag(self) -> bool:
@@ -186,3 +191,25 @@ class Applications(ApplicationBase, table=True):
             custom_fields=self.custom_fields,
             status=self.status,
         )
+
+
+class ApplicationComment(CommentMixin, table=True):
+    """A single comment in an application's flat review thread.
+
+    Reviewers leave shared notes (e.g. the reason for a rejection) visible to
+    every operator. Separate from ``ApplicationReviews.notes``, which belongs to
+    a single vote. Shared comment columns come from ``CommentMixin``;
+    ``tenant_id`` and ``application_id`` stay concrete.
+    """
+
+    __tablename__ = "application_comments"
+
+    id: uuid.UUID = Field(
+        default_factory=uuid.uuid4,
+        sa_column=Column(UUID(as_uuid=True), primary_key=True),
+    )
+
+    tenant_id: uuid.UUID = Field(foreign_key="tenants.id", index=True)
+    application_id: uuid.UUID = Field(foreign_key="applications.id", index=True)
+
+    application: "Applications" = Relationship(back_populates="comments")

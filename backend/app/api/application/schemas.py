@@ -5,6 +5,7 @@ from enum import Enum, StrEnum
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import Field as PydanticField
 from sqlalchemy import Boolean, Numeric, String, Text
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlmodel import Column, DateTime, Field, SQLModel
@@ -176,6 +177,34 @@ class ApplicationPublic(BaseModel):
     review_count: int = 0
     reviewers: list[ApplicationReviewerVote] = []
     comment_count: int = 0
+    # True only in the review-queue path when the current reviewer skipped this
+    # application; defaults False everywhere else.
+    skipped_by_me: bool = False
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+# --------------------------------------------------------------------------- #
+# Comments — shared review thread on an application; mirrors human comments.
+# Separate from ApplicationReviews.notes (which belongs to a single vote).
+# --------------------------------------------------------------------------- #
+class ApplicationCommentCreate(BaseModel):
+    body: str = PydanticField(min_length=1)
+
+
+class ApplicationCommentUpdate(BaseModel):
+    body: str = PydanticField(min_length=1)
+
+
+class ApplicationCommentPublic(BaseModel):
+    id: uuid.UUID
+    application_id: uuid.UUID
+    author_user_id: uuid.UUID | None = None
+    author_name: str | None = None
+    author_email: str | None = None
+    body: str
+    created_at: datetime
+    edited_at: datetime | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
