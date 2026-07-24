@@ -241,23 +241,26 @@ class ApplicationReviewSkipsCRUD(
         )
         return session.exec(statement).first()
 
-    def get_skipped_application_ids(
+    def get_skip_reasons_by_application(
         self,
         session: Session,
-        reviewer_id: uuid.UUID,
         application_ids: list[uuid.UUID],
-    ) -> set[uuid.UUID]:
-        """Return the subset of ``application_ids`` this reviewer has skipped.
+        reviewer_id: uuid.UUID,
+    ) -> dict[uuid.UUID, str | None]:
+        """Map application_id -> skip reason for this reviewer's skips.
 
         Single query so callers listing many applications avoid N+1.
+        Membership means "skipped"; the reason may be None.
         """
         if not application_ids:
-            return set()
-        statement = select(ApplicationReviewSkips.application_id).where(
+            return {}
+        statement = select(
+            ApplicationReviewSkips.application_id, ApplicationReviewSkips.reason
+        ).where(
             ApplicationReviewSkips.reviewer_id == reviewer_id,
             ApplicationReviewSkips.application_id.in_(application_ids),
         )
-        return set(session.exec(statement).all())
+        return dict(session.exec(statement).all())
 
     def upsert_skip(
         self,

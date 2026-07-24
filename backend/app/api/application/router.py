@@ -37,7 +37,10 @@ from app.api.application.schemas import (
     PopupAccessResponse,
     ScholarshipDecisionRequest,
 )
-from app.api.application_review.crud import application_reviews_crud
+from app.api.application_review.crud import (
+    application_review_skips_crud,
+    application_reviews_crud,
+)
 from app.api.attendee.schemas import (
     AttendeeCreate,
     AttendeePublic,
@@ -97,6 +100,7 @@ def _build_application_public(
     reviewers=None,
     comment_count=0,
     skipped_by_me=False,
+    my_skip_reason: str | None = None,
 ) -> ApplicationPublic:
     """Build ApplicationPublic with attendees and products."""
     from app.api.attendee.schemas import AttendeeProductPublic
@@ -178,6 +182,7 @@ def _build_application_public(
         reviewers=reviewers or [],
         comment_count=comment_count,
         skipped_by_me=skipped_by_me,
+        my_skip_reason=my_skip_reason,
     )
     return app_public
 
@@ -185,7 +190,7 @@ def _build_application_public(
 @router.get("", response_model=ListModel[ApplicationPublic])
 async def list_applications(
     db: AdminOrApiKeySession_ApplicationsRead,
-    _: AdminOrApiKey_ApplicationsRead,
+    current_user: AdminOrApiKey_ApplicationsRead,
     control_db: SessionDep,
     popup_id: uuid.UUID | None = None,
     human_id: uuid.UUID | None = None,
@@ -237,6 +242,17 @@ async def list_applications(
         db, [application.id for application in applications]
     )
 
+    # Current user's own skips for this page; API keys resolve to a user too,
+    # so the id is always present — guard anyway for identity-less callers.
+    current_user_id = getattr(current_user, "id", None)
+    skip_reasons = (
+        application_review_skips_crud.get_skip_reasons_by_application(
+            db, [application.id for application in applications], current_user_id
+        )
+        if current_user_id
+        else {}
+    )
+
     results = [
         _build_application_public(
             application,
@@ -255,6 +271,8 @@ async def list_applications(
                 for r in application.reviews
             ],
             comment_count=comment_counts.get(application.id, 0),
+            skipped_by_me=application.id in skip_reasons,
+            my_skip_reason=skip_reasons.get(application.id),
         )
         for application in applications
     ]
@@ -603,7 +621,7 @@ async def grant_tickets_admin(
 async def get_application(
     application_id: uuid.UUID,
     db: AdminOrApiKeySession_ApplicationsRead,
-    _: AdminOrApiKey_ApplicationsRead,
+    current_user: AdminOrApiKey_ApplicationsRead,
 ) -> ApplicationPublic:
     """Get a single application (BO only)."""
     application = crud.applications_crud.get(db, application_id)
@@ -615,7 +633,21 @@ async def get_application(
         )
 
     comment_count = len(crud.applications_crud.list_comments(db, application_id))
-    return _build_application_public(application, comment_count=comment_count)
+
+    current_user_id = getattr(current_user, "id", None)
+    my_skip = (
+        application_review_skips_crud.get_by_application_reviewer(
+            db, application_id, current_user_id
+        )
+        if current_user_id
+        else None
+    )
+    return _build_application_public(
+        application,
+        comment_count=comment_count,
+        skipped_by_me=my_skip is not None,
+        my_skip_reason=my_skip.reason if my_skip else None,
+    )
 
 
 @router.post(
