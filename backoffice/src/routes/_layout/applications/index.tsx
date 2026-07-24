@@ -39,6 +39,14 @@ import {
   type ReviewDecision,
 } from "@/client"
 import {
+  ApplicationFilterBuilder,
+  type CustomFilterField,
+  type FilterCondition,
+  type FilterMatch,
+  isCompleteCondition,
+  sanitizeFilterConditions,
+} from "@/components/Applications/ApplicationFilterBuilder"
+import {
   type ApplicationsView,
   ApplicationsViewSwitcher,
 } from "@/components/applications/ApplicationsViewSwitcher"
@@ -199,6 +207,34 @@ const APPLICATION_STATUS_OPTIONS: {
   { value: "rejected", label: "Rejected" },
 ]
 
+const FILTER_STATUS_OPTIONS = [
+  ...APPLICATION_STATUS_OPTIONS,
+  { value: "withdrawn", label: "Withdrawn" },
+]
+
+// Custom form fields become filterable attributes; select-like fields keep
+// their options so the value input can offer them.
+function buildCustomFilterFields(
+  formSchema?: ApplicationSchema,
+): CustomFilterField[] {
+  const customFields = formSchema?.custom_fields ?? {}
+  return Object.entries(customFields)
+    .filter(([, def]) => !isDisplayOnlyField(def))
+    .sort(
+      ([, a], [, b]) =>
+        (a.position ?? Number.MAX_SAFE_INTEGER) -
+        (b.position ?? Number.MAX_SAFE_INTEGER),
+    )
+    .map(([name, def]) => ({
+      name,
+      label: def.short_label || def.label || name,
+      options: def.options,
+      isSelect:
+        (def.type === "select" || def.type === "multiselect") &&
+        (def.options?.length ?? 0) > 0,
+    }))
+}
+
 function getApplicationsQueryOptions(
   popupId: string | null,
   page: number,
@@ -206,6 +242,7 @@ function getApplicationsQueryOptions(
   search?: string,
   statusFilter?: ApplicationStatus,
   reviewedBy?: string,
+  filters?: string,
 ) {
   return {
     queryFn: () =>
@@ -216,11 +253,12 @@ function getApplicationsQueryOptions(
         reviewedBy: reviewedBy || undefined,
         search: search || undefined,
         statusFilter: statusFilter || undefined,
+        filters: filters || undefined,
       }),
     queryKey: [
       "applications",
       popupId,
-      { page, pageSize, search, statusFilter, reviewedBy },
+      { page, pageSize, search, statusFilter, reviewedBy, filters },
     ],
   }
 }
@@ -367,19 +405,28 @@ const VALID_STATUSES: Set<string> = new Set([
 type ApplicationsSearchParams = TableSearchParams & {
   reviewerId?: string
   status?: ApplicationStatus
+  match?: FilterMatch
+  filters?: FilterCondition[]
 }
 
 export const Route = createFileRoute("/_layout/applications/")({
   component: Applications,
-  validateSearch: (raw: Record<string, unknown>): ApplicationsSearchParams => ({
-    ...validateTableSearch(raw),
-    ...(typeof raw.status === "string" && VALID_STATUSES.has(raw.status)
-      ? { status: raw.status as ApplicationStatus }
-      : {}),
-    ...(typeof raw.reviewerId === "string" && raw.reviewerId
-      ? { reviewerId: raw.reviewerId }
-      : {}),
-  }),
+  validateSearch: (raw: Record<string, unknown>): ApplicationsSearchParams => {
+    const filters = sanitizeFilterConditions(raw.filters)
+    return {
+      ...validateTableSearch(raw),
+      ...(typeof raw.status === "string" && VALID_STATUSES.has(raw.status)
+        ? { status: raw.status as ApplicationStatus }
+        : {}),
+      ...(typeof raw.reviewerId === "string" && raw.reviewerId
+        ? { reviewerId: raw.reviewerId }
+        : {}),
+      ...(raw.match === "any" && filters.length
+        ? { match: "any" as const }
+        : {}),
+      ...(filters.length ? { filters } : {}),
+    }
+  },
   head: () => ({
     meta: [{ title: "Applications - EdgeOS" }],
   }),
@@ -868,8 +915,10 @@ const getColumns = (
 
 function ApplicationsTableContent({
   customColumns,
+  customFilterFields,
 }: {
   customColumns: ColumnDef<ApplicationPublic>[]
+  customFilterFields: CustomFilterField[]
 }) {
   const { selectedPopupId } = useWorkspace()
   const { isOperatorOrAbove } = useAuth()
@@ -883,6 +932,19 @@ function ApplicationsTableContent({
   )
   const statusFilter = searchParams.status
   const reviewerId = searchParams.reviewerId
+  const filterMatch = searchParams.match ?? "all"
+  const filterConditions = useMemo(
+    () => searchParams.filters ?? [],
+    [searchParams.filters],
+  )
+
+  // Rows with a missing value stay in the UI but never reach the request.
+  const filtersJson = useMemo(() => {
+    const complete = filterConditions.filter(isCompleteCondition)
+    return complete.length
+      ? JSON.stringify({ match: filterMatch, conditions: complete })
+      : undefined
+  }, [filterConditions, filterMatch])
 
   const setStatusFilter = useCallback(
     (value: ApplicationStatus | undefined) => {
@@ -914,6 +976,23 @@ function ApplicationsTableContent({
     [navigate],
   )
 
+  const setFilters = useCallback(
+    (match: FilterMatch, conditions: FilterCondition[]) => {
+      navigate({
+        to: "/applications",
+        search: (prev: Record<string, unknown>) => ({
+          ...prev,
+          match:
+            match === "any" && conditions.length ? ("any" as const) : undefined,
+          filters: conditions.length ? conditions : undefined,
+          page: 0,
+        }),
+        replace: true,
+      })
+    },
+    [navigate],
+  )
+
   const { data: applications } = useQuery({
     ...getApplicationsQueryOptions(
       selectedPopupId,
@@ -922,6 +1001,7 @@ function ApplicationsTableContent({
       search,
       statusFilter,
       reviewerId,
+      filtersJson,
     ),
     placeholderData: keepPreviousData,
   })
@@ -1091,6 +1171,13 @@ function ApplicationsTableContent({
               disabled={reviewers.length === 0}
             />
           ) : null}
+          <ApplicationFilterBuilder
+            statusOptions={FILTER_STATUS_OPTIONS}
+            customFields={customFilterFields}
+            match={filterMatch}
+            conditions={filterConditions}
+            onChange={setFilters}
+          />
         </div>
       }
       serverPagination={{
@@ -1191,6 +1278,11 @@ function Applications() {
 
   const customColumns = useMemo(
     () => buildCustomFieldColumns(formSchema),
+    [formSchema],
+  )
+
+  const customFilterFields = useMemo(
+    () => buildCustomFilterFields(formSchema),
     [formSchema],
   )
 
@@ -1318,7 +1410,10 @@ function Applications() {
       ) : (
         <QueryErrorBoundary>
           <Suspense fallback={<Skeleton className="h-64 w-full" />}>
-            <ApplicationsTableContent customColumns={customColumns} />
+            <ApplicationsTableContent
+              customColumns={customColumns}
+              customFilterFields={customFilterFields}
+            />
           </Suspense>
         </QueryErrorBoundary>
       )}
