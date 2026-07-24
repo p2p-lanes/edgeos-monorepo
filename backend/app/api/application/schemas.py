@@ -414,7 +414,11 @@ APPLICATION_FILTER_FIELD_OPS: dict[str, set[str]] = {
     "referral": _TEXT_OPS,
     "gender": _ENUMISH_OPS,
     "age": _ENUMISH_OPS,
+    "skipped_by_me": {"eq"},
+    "reviewed_by_me": {"eq"},
 }
+# Virtual fields resolved against the calling user's own review/skip rows.
+VIRTUAL_REVIEWER_FIELDS = frozenset({"skipped_by_me", "reviewed_by_me"})
 CUSTOM_FIELD_PREFIX = "custom."
 _VALUELESS_OPS = {"is_empty", "not_empty"}
 
@@ -451,6 +455,9 @@ class ApplicationFilterCondition(BaseModel):
         elif self.field == "scholarship_request":
             if not isinstance(self.value, bool):
                 raise ValueError("Scholarship request filter needs true or false.")
+        elif self.field in VIRTUAL_REVIEWER_FIELDS:
+            if not isinstance(self.value, bool):
+                raise ValueError(f"Filter '{self.field}' needs true or false.")
         elif self.op in {"before", "after"}:
             if not isinstance(self.value, str):
                 raise ValueError(f"Invalid date for '{self.field}'.")

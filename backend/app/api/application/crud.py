@@ -15,6 +15,7 @@ from app.api.application.models import (
     ApplicationSnapshots,
 )
 from app.api.application.schemas import (
+    VIRTUAL_REVIEWER_FIELDS,
     ApplicationAdminCreate,
     ApplicationCommentCreate,
     ApplicationCommentUpdate,
@@ -100,8 +101,25 @@ def _text_condition_expression(column, op: str, value):
     return and_(column.is_not(None), column != "")
 
 
-def _filter_condition_expression(condition: ApplicationFilterCondition):
+def _filter_condition_expression(
+    condition: ApplicationFilterCondition,
+    reviewer_id: uuid.UUID | None = None,
+):
     """Map one validated filter condition to a SQLAlchemy boolean expression."""
+    if condition.field in VIRTUAL_REVIEWER_FIELDS:
+        # Same EXISTS shape as find_pending_review, scoped to the current user.
+        model = (
+            ApplicationReviewSkips
+            if condition.field == "skipped_by_me"
+            else ApplicationReviews
+        )
+        has_row = (
+            exists()
+            .where(model.application_id == Applications.id)
+            .where(model.reviewer_id == reviewer_id)
+        )
+        return has_row if condition.value else ~has_row
+
     custom_name = condition.custom_field_name
     if custom_name is not None:
         # JSONB accessor keeps the field name a bound parameter, never raw SQL.
@@ -133,9 +151,27 @@ def _filter_condition_expression(condition: ApplicationFilterCondition):
     return _text_condition_expression(column, condition.op, condition.value)
 
 
-def build_application_filter_expression(filters: ApplicationFilters):
-    """Combine the filter group into one boolean expression (None when empty)."""
-    expressions = [_filter_condition_expression(c) for c in filters.conditions]
+def build_application_filter_expression(
+    filters: ApplicationFilters,
+    reviewer_id: uuid.UUID | None = None,
+):
+    """Combine the filter group into one boolean expression (None when empty).
+
+    ``reviewer_id`` resolves the per-current-user virtual fields
+    (skipped_by_me, reviewed_by_me); using them without it is a 422.
+    """
+    if reviewer_id is None:
+        for condition in filters.conditions:
+            if condition.field in VIRTUAL_REVIEWER_FIELDS:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=(
+                        f"Filtering by '{condition.field}' requires a signed-in user."
+                    ),
+                )
+    expressions = [
+        _filter_condition_expression(c, reviewer_id) for c in filters.conditions
+    ]
     if not expressions:
         return None
     if filters.match == "any":
@@ -207,8 +243,13 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         search: str | None = None,
         reviewed_by: uuid.UUID | None = None,
         filters: ApplicationFilters | None = None,
+        reviewer_id: uuid.UUID | None = None,
     ) -> tuple[list[Applications], int]:
-        """Find applications by popup_id with optional status filter and eager loading."""
+        """Find applications by popup_id with optional status filter and eager loading.
+
+        ``reviewer_id`` is the calling user's id, used only by the virtual
+        per-user filter fields (skipped_by_me, reviewed_by_me).
+        """
         base_statement = select(Applications).where(Applications.popup_id == popup_id)
 
         if status_filter:
@@ -239,7 +280,9 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
             )
 
         if filters is not None:
-            filter_expression = build_application_filter_expression(filters)
+            filter_expression = build_application_filter_expression(
+                filters, reviewer_id
+            )
             if filter_expression is not None:
                 base_statement = base_statement.where(filter_expression)
 

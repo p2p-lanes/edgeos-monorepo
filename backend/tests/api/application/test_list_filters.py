@@ -18,13 +18,16 @@ from sqlmodel import Session
 
 from app.api.application.models import Applications
 from app.api.application.schemas import ApplicationStatus
+from app.api.application_review.models import ApplicationReviewSkips
 from app.api.human.models import Humans
 from app.api.popup.models import Popups
 from app.api.tenant.models import Tenants
+from app.api.user.models import Users
 from tests.api.application_review.test_pending_reviews import (
     _auth,
     _make_admin,
     _make_popup,
+    _make_review,
 )
 
 # ---------------------------------------------------------------------------
@@ -66,6 +69,22 @@ def _make_application(
     db.commit()
     db.refresh(application)
     return application
+
+
+def _make_skip(
+    db: Session,
+    tenant: Tenants,
+    application: Applications,
+    reviewer: Users,
+) -> None:
+    db.add(
+        ApplicationReviewSkips(
+            application_id=application.id,
+            reviewer_id=reviewer.id,
+            tenant_id=tenant.id,
+        )
+    )
+    db.commit()
 
 
 def _list(
@@ -304,3 +323,96 @@ class TestApplicationListFilters:
             client, admin, tenant_a, popup, {"match": "all", "conditions": []}
         )
         assert _ids(response) == {str(first.id), str(second.id)}
+
+    def test_skipped_by_me_is_per_reviewer(
+        self, db: Session, tenant_a: Tenants, client: TestClient
+    ) -> None:
+        popup = _make_popup(db, tenant_a)
+        reviewer_a = _make_admin(db, tenant_a)
+        reviewer_b = _make_admin(db, tenant_a)
+        skipped = _make_application(db, tenant_a, popup)
+        other = _make_application(db, tenant_a, popup)
+        _make_skip(db, tenant_a, skipped, reviewer_a)
+
+        response = _list(
+            client, reviewer_a, tenant_a, popup, _one("skipped_by_me", "eq", True)
+        )
+        assert _ids(response) == {str(skipped.id)}
+
+        # The skip belongs to reviewer A only; B sees no skipped apps.
+        response = _list(
+            client, reviewer_b, tenant_a, popup, _one("skipped_by_me", "eq", True)
+        )
+        assert _ids(response) == set()
+
+        response = _list(
+            client, reviewer_a, tenant_a, popup, _one("skipped_by_me", "eq", False)
+        )
+        assert _ids(response) == {str(other.id)}
+
+    def test_reviewed_by_me_is_per_reviewer(
+        self, db: Session, tenant_a: Tenants, client: TestClient
+    ) -> None:
+        popup = _make_popup(db, tenant_a)
+        reviewer_a = _make_admin(db, tenant_a)
+        reviewer_b = _make_admin(db, tenant_a)
+        reviewed = _make_application(db, tenant_a, popup)
+        other = _make_application(db, tenant_a, popup)
+        _make_review(db, tenant_a, reviewed, reviewer_a)
+
+        response = _list(
+            client, reviewer_a, tenant_a, popup, _one("reviewed_by_me", "eq", True)
+        )
+        assert _ids(response) == {str(reviewed.id)}
+
+        response = _list(
+            client, reviewer_b, tenant_a, popup, _one("reviewed_by_me", "eq", True)
+        )
+        assert _ids(response) == set()
+
+        response = _list(
+            client, reviewer_a, tenant_a, popup, _one("reviewed_by_me", "eq", False)
+        )
+        assert _ids(response) == {str(other.id)}
+
+    def test_my_pending_work_combined_filter(
+        self, db: Session, tenant_a: Tenants, client: TestClient
+    ) -> None:
+        # "My pending work": in review AND not yet reviewed by me.
+        popup = _make_popup(db, tenant_a)
+        reviewer = _make_admin(db, tenant_a)
+        pending = _make_application(db, tenant_a, popup)
+        reviewed = _make_application(db, tenant_a, popup)
+        _make_review(db, tenant_a, reviewed, reviewer)
+        _make_application(db, tenant_a, popup, status=ApplicationStatus.ACCEPTED.value)
+
+        response = _list(
+            client,
+            reviewer,
+            tenant_a,
+            popup,
+            {
+                "match": "all",
+                "conditions": [
+                    {"field": "status", "op": "eq", "value": "in review"},
+                    {"field": "reviewed_by_me", "op": "eq", "value": False},
+                ],
+            },
+        )
+        assert _ids(response) == {str(pending.id)}
+
+    def test_virtual_field_non_boolean_value_returns_422(
+        self, db: Session, tenant_a: Tenants, client: TestClient
+    ) -> None:
+        popup = _make_popup(db, tenant_a)
+        admin = _make_admin(db, tenant_a)
+
+        response = _list(
+            client, admin, tenant_a, popup, _one("skipped_by_me", "eq", "yes")
+        )
+        assert response.status_code == 422, response.text
+
+        response = _list(
+            client, admin, tenant_a, popup, _one("reviewed_by_me", "contains", True)
+        )
+        assert response.status_code == 422, response.text

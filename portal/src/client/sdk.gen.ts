@@ -386,7 +386,9 @@ export class ApplicationsService {
      * ``filters`` is a JSON filter group:
      * ``{"match": "all"|"any", "conditions": [{"field", "op", "value"}]}``.
      * It only applies to the popup_id listing and is combined (AND) with the
-     * legacy status_filter/search/reviewed_by params.
+     * legacy status_filter/search/reviewed_by params. The virtual fields
+     * ``skipped_by_me`` and ``reviewed_by_me`` (op ``eq``, boolean value)
+     * resolve against the calling user's own skips and reviews.
      * @param data The data for the request.
      * @param data.popupId
      * @param data.humanId
