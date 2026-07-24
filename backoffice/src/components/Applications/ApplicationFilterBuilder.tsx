@@ -99,6 +99,18 @@ function buildFieldDefs(
       ops: EMPTYABLE_TEXT_OPS,
       options: SCHOLARSHIP_STATUS_OPTIONS,
     },
+    {
+      key: "skipped_by_me",
+      label: "Skipped by me",
+      kind: "boolean",
+      ops: ["eq"],
+    },
+    {
+      key: "reviewed_by_me",
+      label: "Reviewed by me",
+      kind: "boolean",
+      ops: ["eq"],
+    },
     { key: "submitted_at", label: "Submitted", kind: "date", ops: DATE_OPS },
     { key: "accepted_at", label: "Accepted", kind: "date", ops: DATE_OPS },
     { key: "referral", label: "Referral", kind: "text", ops: FULL_TEXT_OPS },
