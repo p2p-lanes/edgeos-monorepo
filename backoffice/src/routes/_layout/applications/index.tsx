@@ -10,11 +10,11 @@ import {
   ClipboardList,
   Download,
   EllipsisVertical,
-  ExternalLink,
   Flag,
   ListChecks,
   MessageSquare,
   Plus,
+  SkipForward,
   Star,
   ThumbsDown,
   ThumbsUp,
@@ -33,7 +33,6 @@ import {
   DashboardService,
   FormFieldsService,
   type HumanRating,
-  HumansService,
   type PopupReviewerPublic,
   PopupReviewersService,
   PopupsService,
@@ -637,11 +636,18 @@ function ReviewsCell({
   )
 }
 
-function CommentsCell({ humanId, count }: { humanId: string; count: number }) {
+function CommentsCell({
+  applicationId,
+  count,
+}: {
+  applicationId: string
+  count: number
+}) {
   const [open, setOpen] = useState(false)
   const { data, isLoading } = useQuery({
-    queryKey: ["human-comments", humanId],
-    queryFn: () => HumansService.listHumanComments({ humanId }),
+    queryKey: ["application-comments", applicationId],
+    queryFn: () =>
+      ApplicationsService.listApplicationComments({ applicationId }),
     enabled: open,
   })
 
@@ -682,16 +688,6 @@ function CommentsCell({ humanId, count }: { humanId: string; count: number }) {
             ))
           )}
         </div>
-        <div className="border-t p-2">
-          <Link
-            to="/humans/$id"
-            params={{ id: humanId }}
-            className="flex items-center gap-1 text-sm font-medium text-primary hover:underline"
-          >
-            View profile
-            <ExternalLink className="h-3.5 w-3.5" />
-          </Link>
-        </div>
       </PopoverContent>
     </Popover>
   )
@@ -730,7 +726,20 @@ const getColumns = (
     accessorKey: "status",
     header: ({ column }) => <SortableHeader label="Status" column={column} />,
     meta: { label: "Status", toggleable: true },
-    cell: ({ row }) => <StatusBadge status={row.original.status} />,
+    cell: ({ row }) => (
+      <div className="flex items-center gap-1.5">
+        <StatusBadge status={row.original.status} />
+        {row.original.skipped_by_me && (
+          <span
+            title="You skipped this application"
+            className="inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-xs text-muted-foreground"
+          >
+            <SkipForward className="h-3 w-3" />
+            Skipped
+          </span>
+        )}
+      </div>
+    ),
   },
   {
     id: "reviews",
@@ -751,7 +760,7 @@ const getColumns = (
     enableSorting: false,
     cell: ({ row }) => (
       <CommentsCell
-        humanId={row.original.human_id}
+        applicationId={row.original.id}
         count={row.original.comment_count ?? 0}
       />
     ),

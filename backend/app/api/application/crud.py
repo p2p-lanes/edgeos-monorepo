@@ -9,16 +9,25 @@ from sqlalchemy.dialects import postgresql
 from sqlalchemy.orm import selectinload
 from sqlmodel import Session, col, func, select
 
-from app.api.application.models import Applications, ApplicationSnapshots
+from app.api.application.models import (
+    ApplicationComment,
+    Applications,
+    ApplicationSnapshots,
+)
 from app.api.application.schemas import (
     ApplicationAdminCreate,
+    ApplicationCommentCreate,
+    ApplicationCommentUpdate,
     ApplicationCreate,
     ApplicationStatus,
     ApplicationUpdate,
     PopupAccessResponse,
     ScholarshipDecisionRequest,
 )
-from app.api.application_review.models import ApplicationReviews
+from app.api.application_review.models import (
+    ApplicationReviews,
+    ApplicationReviewSkips,
+)
 from app.api.attendee.crud import attendees_crud
 from app.api.attendee.models import AttendeeProducts, Attendees
 from app.api.attendee_category.models import AttendeeCategories
@@ -234,9 +243,17 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
             .where(ApplicationReviews.application_id == Applications.id)
             .where(ApplicationReviews.reviewer_id == reviewer_id)
         )
+        # This reviewer skipped the app: drop it from their queue only, without
+        # touching the vote tally.
+        already_skipped = (
+            exists()
+            .where(ApplicationReviewSkips.application_id == Applications.id)
+            .where(ApplicationReviewSkips.reviewer_id == reviewer_id)
+        )
         base_statement = select(Applications).where(
             Applications.status == ApplicationStatus.IN_REVIEW.value,
             ~already_reviewed,
+            ~already_skipped,
         )
 
         if popup_ids is not None:
@@ -1416,6 +1433,84 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
             allowed=False,
             reason="no_access",
         )
+
+    def list_comments(
+        self, session: Session, application_id: uuid.UUID
+    ) -> list[ApplicationComment]:
+        """Return an application's non-deleted comments, oldest first."""
+        statement = (
+            select(ApplicationComment)
+            .where(
+                ApplicationComment.application_id == application_id,
+                col(ApplicationComment.deleted_at).is_(None),
+            )
+            .order_by(col(ApplicationComment.created_at).asc())
+        )
+        return list(session.exec(statement).all())
+
+    def count_active_comments_by_applications(
+        self, session: Session, application_ids: list[uuid.UUID]
+    ) -> dict[uuid.UUID, int]:
+        """Return a map of application_id -> non-deleted comment count.
+
+        Single grouped query so callers listing many applications avoid N+1.
+        """
+        if not application_ids:
+            return {}
+        statement = (
+            select(ApplicationComment.application_id, func.count())
+            .where(
+                col(ApplicationComment.application_id).in_(application_ids),
+                col(ApplicationComment.deleted_at).is_(None),
+            )
+            .group_by(col(ApplicationComment.application_id))
+        )
+        return dict(session.exec(statement).all())
+
+    def create_comment(
+        self,
+        session: Session,
+        application: Applications,
+        comment_in: ApplicationCommentCreate,
+        author_user_id: uuid.UUID,
+        author_name: str | None,
+        author_email: str | None,
+    ) -> ApplicationComment:
+        """Add a comment to an application, snapshotting the author identity."""
+        comment = ApplicationComment(
+            tenant_id=application.tenant_id,
+            application_id=application.id,
+            author_user_id=author_user_id,
+            author_name=author_name,
+            author_email=author_email,
+            body=comment_in.body,
+        )
+        session.add(comment)
+        session.commit()
+        session.refresh(comment)
+        return comment
+
+    def update_comment(
+        self,
+        session: Session,
+        comment: ApplicationComment,
+        comment_in: ApplicationCommentUpdate,
+    ) -> ApplicationComment:
+        """Edit a comment's body and stamp ``edited_at``."""
+        comment.body = comment_in.body
+        comment.edited_at = datetime.now(UTC)
+        session.add(comment)
+        session.commit()
+        session.refresh(comment)
+        return comment
+
+    def soft_delete_comment(
+        self, session: Session, comment: ApplicationComment
+    ) -> None:
+        """Soft-delete a comment: the row is preserved, hidden from reads."""
+        comment.deleted_at = datetime.now(UTC)
+        session.add(comment)
+        session.commit()
 
 
 def _maybe_grant_fee_credit(

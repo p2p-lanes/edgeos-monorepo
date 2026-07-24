@@ -9,6 +9,7 @@ from sqlmodel import Column, Field, Relationship, SQLModel
 from app.api.group.models import GroupLeaders, GroupMembers
 from app.api.human.schemas import HumanBase
 from app.api.shared.enums import HumanRating
+from app.api.shared.models import CommentMixin
 
 if TYPE_CHECKING:
     from app.api.application.models import Applications
@@ -79,12 +80,12 @@ class Humans(HumanBase, table=True):
         return None
 
 
-class HumanComment(SQLModel, table=True):
+class HumanComment(CommentMixin, table=True):
     """A single comment in a human's flat discussion thread.
 
-    Mirrors TaskComment: comments justify the human's rating, and the author
-    identity (name/email) is snapshotted at write time so the thread stays
-    readable even if the user is later renamed or removed.
+    Mirrors TaskComment: comments justify the human's rating. Shared comment
+    columns (author snapshot, body, timestamps, soft-delete) come from
+    ``CommentMixin``; ``tenant_id`` and ``human_id`` stay concrete.
     """
 
     __tablename__ = "human_comments"
@@ -96,33 +97,6 @@ class HumanComment(SQLModel, table=True):
 
     tenant_id: uuid.UUID = Field(foreign_key="tenants.id", index=True)
     human_id: uuid.UUID = Field(foreign_key="humans.id", index=True)
-
-    author_user_id: uuid.UUID | None = Field(
-        default=None, foreign_key="users.id", nullable=True
-    )
-    author_name: str | None = Field(default=None, sa_column=Column(Text, nullable=True))
-    author_email: str | None = Field(
-        default=None, sa_column=Column(Text, nullable=True)
-    )
-
-    body: str = Field(sa_column=Column(Text, nullable=False))
-
-    created_at: datetime = Field(
-        default_factory=lambda: datetime.now(UTC),
-        sa_column=Column(
-            DateTime(timezone=True), server_default=func.now(), nullable=False
-        ),
-    )
-    # Set when the body is edited; surfaced as an "edited" marker in the UI.
-    edited_at: datetime | None = Field(
-        default=None,
-        sa_column=Column(DateTime(timezone=True), nullable=True),
-    )
-    # Soft-delete: row is preserved, hidden from reads.
-    deleted_at: datetime | None = Field(
-        default=None,
-        sa_column=Column(DateTime(timezone=True), nullable=True),
-    )
 
 
 class HumanEnrichmentFact(SQLModel, table=True):

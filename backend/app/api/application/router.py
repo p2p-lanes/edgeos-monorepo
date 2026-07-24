@@ -10,11 +10,15 @@ from fastapi.responses import Response
 from loguru import logger
 
 from app.api.application import crud
+from app.api.application.models import ApplicationComment
 from app.api.application.schemas import (
     AdminGrantTicketsRequest,
     AdminGrantTicketsResponse,
     ApplicantParticipation,
     ApplicationAdminCreate,
+    ApplicationCommentCreate,
+    ApplicationCommentPublic,
+    ApplicationCommentUpdate,
     ApplicationCreate,
     ApplicationPublic,
     ApplicationReviewerVote,
@@ -41,7 +45,6 @@ from app.api.attendee.schemas import (
     AttendeeUpdate,
     AttendeeWithTickets,
 )
-from app.api.human.crud import humans_crud
 from app.api.shared.enums import SaleType, UserRole
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
 from app.core.dependencies.users import (
@@ -51,8 +54,11 @@ from app.core.dependencies.users import (
     AdminOrApiKeySession_ApplicationsWrite,
     CurrentAdmin,
     CurrentHuman,
+    CurrentOperator,
+    CurrentUser,
     HumanTenantSession,
     SessionDep,
+    TenantSession,
     needs,
 )
 from app.services.email_helpers import send_application_status_email
@@ -90,6 +96,7 @@ def _build_application_public(
     review_decision=None,
     reviewers=None,
     comment_count=0,
+    skipped_by_me=False,
 ) -> ApplicationPublic:
     """Build ApplicationPublic with attendees and products."""
     from app.api.attendee.schemas import AttendeeProductPublic
@@ -170,6 +177,7 @@ def _build_application_public(
         review_count=len(reviewers) if reviewers is not None else 0,
         reviewers=reviewers or [],
         comment_count=comment_count,
+        skipped_by_me=skipped_by_me,
     )
     return app_public
 
@@ -223,10 +231,10 @@ async def list_applications(
             {r.reviewer_id for application in applications for r in application.reviews}
         ),
     )
-    # human_comments is now tenant-scoped (RLS), so it is read through the same
-    # tenant session as the applications.
-    comment_counts = humans_crud.count_active_comments_by_humans(
-        db, [application.human_id for application in applications]
+    # Application comments are tenant-scoped (RLS), read through the same tenant
+    # session as the applications. One batched query keeps the list N+1-free.
+    comment_counts = crud.applications_crud.count_active_comments_by_applications(
+        db, [application.id for application in applications]
     )
 
     results = [
@@ -246,7 +254,7 @@ async def list_applications(
                 )
                 for r in application.reviews
             ],
-            comment_count=comment_counts.get(application.human_id, 0),
+            comment_count=comment_counts.get(application.id, 0),
         )
         for application in applications
     ]
@@ -606,7 +614,8 @@ async def get_application(
             detail="Application not found",
         )
 
-    return _build_application_public(application)
+    comment_count = len(crud.applications_crud.list_comments(db, application_id))
+    return _build_application_public(application, comment_count=comment_count)
 
 
 @router.post(
@@ -1546,6 +1555,130 @@ async def review_scholarship(
         )
 
     return _build_application_public(application)
+
+
+# ---------------------------------------------------------------------------
+# Comments — a shared review thread on an application. Any operator reads and
+# adds; the author edits their own; the author or a superadmin soft-deletes.
+# Scoped to the caller's tenant (superadmin bypass). Mirrors human comments.
+# ---------------------------------------------------------------------------
+def _get_application_in_tenant_or_404(db, application_id: uuid.UUID, current_user):  # noqa: ANN001
+    """Load an application or 404, hiding applications outside the caller's tenant."""
+    application = crud.applications_crud.get(db, application_id)
+    if not application or (
+        current_user.role != UserRole.SUPERADMIN
+        and application.tenant_id != current_user.tenant_id
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Application not found",
+        )
+    return application
+
+
+@router.get(
+    "/{application_id}/comments",
+    response_model=ListModel[ApplicationCommentPublic],
+)
+async def list_application_comments(
+    application_id: uuid.UUID,
+    db: TenantSession,
+    current_user: CurrentUser,
+) -> ListModel[ApplicationCommentPublic]:
+    """List an application's comments, oldest first."""
+    _get_application_in_tenant_or_404(db, application_id, current_user)
+    comments = crud.applications_crud.list_comments(db, application_id)
+    return ListModel[ApplicationCommentPublic](
+        results=[ApplicationCommentPublic.model_validate(c) for c in comments],
+        paging=Paging(offset=0, limit=len(comments), total=len(comments)),
+    )
+
+
+@router.post(
+    "/{application_id}/comments",
+    response_model=ApplicationCommentPublic,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_application_comment(
+    application_id: uuid.UUID,
+    comment_in: ApplicationCommentCreate,
+    db: TenantSession,
+    current_user: CurrentOperator,
+) -> ApplicationCommentPublic:
+    """Add a comment to an application."""
+    application = _get_application_in_tenant_or_404(db, application_id, current_user)
+    comment = crud.applications_crud.create_comment(
+        db,
+        application,
+        comment_in,
+        author_user_id=current_user.id,
+        author_name=current_user.full_name,
+        author_email=current_user.email,
+    )
+    return ApplicationCommentPublic.model_validate(comment)
+
+
+@router.put(
+    "/{application_id}/comments/{comment_id}",
+    response_model=ApplicationCommentPublic,
+)
+async def update_application_comment(
+    application_id: uuid.UUID,
+    comment_id: uuid.UUID,
+    comment_in: ApplicationCommentUpdate,
+    db: TenantSession,
+    current_user: CurrentOperator,
+) -> ApplicationCommentPublic:
+    """Edit your own comment."""
+    _get_application_in_tenant_or_404(db, application_id, current_user)
+    comment = db.get(ApplicationComment, comment_id)
+    if (
+        not comment
+        or comment.application_id != application_id
+        or comment.deleted_at is not None
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Comment not found"
+        )
+    if comment.author_user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can only edit your own comments",
+        )
+    comment = crud.applications_crud.update_comment(db, comment, comment_in)
+    return ApplicationCommentPublic.model_validate(comment)
+
+
+@router.delete(
+    "/{application_id}/comments/{comment_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def delete_application_comment(
+    application_id: uuid.UUID,
+    comment_id: uuid.UUID,
+    db: TenantSession,
+    current_user: CurrentOperator,
+) -> None:
+    """Soft-delete a comment: the author, or any superadmin. Row is preserved."""
+    _get_application_in_tenant_or_404(db, application_id, current_user)
+    comment = db.get(ApplicationComment, comment_id)
+    if (
+        not comment
+        or comment.application_id != application_id
+        or comment.deleted_at is not None
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Comment not found"
+        )
+    if (
+        current_user.role != UserRole.SUPERADMIN
+        and comment.author_user_id != current_user.id
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can only delete your own comments",
+        )
+    crud.applications_crud.soft_delete_comment(db, comment)
 
 
 # ---------------------------------------------------------------------------
