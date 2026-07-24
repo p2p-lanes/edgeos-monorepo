@@ -325,6 +325,43 @@ function SkipReview({
     onError: (err) => createErrorHandler(showErrorToast)(err as ApiError),
   })
 
+  const unskipMutation = useMutation({
+    mutationFn: () =>
+      ApplicationReviewsService.unskipApplication({
+        applicationId: application.id,
+      }),
+    onSuccess: () => {
+      showSuccessToast("Application returned to your queue")
+      onSuccess()
+    },
+    onError: (err) => createErrorHandler(showErrorToast)(err as ApiError),
+  })
+
+  if (application.skipped_by_me) {
+    return (
+      <div className="space-y-2 rounded-md border bg-muted/30 p-3">
+        <p className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+          <SkipForward className="h-3.5 w-3.5" />
+          You skipped this application
+        </p>
+        {application.my_skip_reason && (
+          <p className="text-sm whitespace-pre-wrap">
+            {application.my_skip_reason}
+          </p>
+        )}
+        <LoadingButton
+          size="sm"
+          variant="outline"
+          className="w-full"
+          loading={unskipMutation.isPending}
+          onClick={() => unskipMutation.mutate()}
+        >
+          Undo Skip
+        </LoadingButton>
+      </div>
+    )
+  }
+
   return (
     <>
       <Button
@@ -403,6 +440,35 @@ function ReviewSummary({
         </div>
       ))}
     </InlineSection>
+  )
+}
+
+// ========================
+// Review Tool Card
+// ========================
+
+function ToolCard({
+  title,
+  icon,
+  action,
+  children,
+}: {
+  title: string
+  icon?: ReactNode
+  action?: ReactNode
+  children: ReactNode
+}) {
+  return (
+    <section className="rounded-lg border bg-card p-4">
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          {icon}
+          <h3 className="text-sm font-semibold">{title}</h3>
+        </div>
+        {action}
+      </div>
+      {children}
+    </section>
   )
 }
 
@@ -522,83 +588,79 @@ function ScholarshipPanel({
 
   return (
     <>
-      <Separator />
-      <InlineSection title="Scholarship">
-        {/* Status */}
-        <InlineRow
-          icon={<GraduationCap className="h-4 w-4 text-muted-foreground" />}
-          label="Scholarship Status"
-        >
-          <StatusBadge status={scholarshipStatus ?? "none"} />
-        </InlineRow>
-
-        {/* Approved details */}
-        {isApproved && !isEditing && discountValue !== null && (
-          <InlineRow label="Discount">
-            <span className="font-mono text-sm font-medium">
-              {discountValue}%
-            </span>
-          </InlineRow>
-        )}
-        {isApproved &&
-          !isEditing &&
-          popup.allows_incentive &&
-          incentiveValue !== null &&
-          incentiveValue > 0 && (
-            <InlineRow label="Incentive">
-              <span className="font-mono text-sm font-medium">
-                {incentiveValue} {application.incentive_currency}
-              </span>
-            </InlineRow>
+      <ToolCard
+        title="Scholarship"
+        icon={<GraduationCap className="h-4 w-4 text-muted-foreground" />}
+        action={<StatusBadge status={scholarshipStatus ?? "none"} />}
+      >
+        <div className="space-y-3">
+          {/* Approved details */}
+          {isApproved && !isEditing && (
+            <div className="space-y-2">
+              {discountValue !== null && (
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-muted-foreground">
+                    Discount
+                  </span>
+                  <span className="font-mono text-sm font-medium">
+                    {discountValue}%
+                  </span>
+                </div>
+              )}
+              {popup.allows_incentive &&
+                incentiveValue !== null &&
+                incentiveValue > 0 && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-muted-foreground">
+                      Incentive
+                    </span>
+                    <span className="font-mono text-sm font-medium">
+                      {incentiveValue} {application.incentive_currency}
+                    </span>
+                  </div>
+                )}
+              <Button
+                size="sm"
+                variant="outline"
+                className="w-full"
+                onClick={handleEnterEdit}
+                disabled={mutation.isPending}
+              >
+                Edit Discount
+              </Button>
+            </div>
           )}
-        {isApproved && !isEditing && (
-          <div className="py-3">
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={handleEnterEdit}
-              disabled={mutation.isPending}
-            >
-              Edit Discount
-            </Button>
-          </div>
-        )}
 
-        {/* Details text */}
-        {application.scholarship_details && (
-          <div className="py-3">
-            <p className="text-xs text-muted-foreground mb-1">
-              Scholarship Details
-            </p>
-            <p className="text-sm whitespace-pre-wrap">
-              {application.scholarship_details}
-            </p>
-          </div>
-        )}
-
-        {/* Video URL */}
-        {application.scholarship_video_url && (
-          <InlineRow label="Video">
-            <a
-              href={application.scholarship_video_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-1 text-sm text-primary hover:underline"
-            >
-              Watch
-              <ExternalLink className="h-3 w-3" />
-            </a>
-          </InlineRow>
-        )}
-
-        {/* Admin controls — when pending or editing an approved scholarship */}
-        {showForm && (
-          <div className="space-y-4 py-3">
-            <div className="space-y-3">
-              <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                {isEditing ? "Edit Scholarship" : "Approve Scholarship"}
+          {/* Details text */}
+          {application.scholarship_details && (
+            <div>
+              <p className="text-xs text-muted-foreground mb-1">Details</p>
+              <p className="text-sm whitespace-pre-wrap">
+                {application.scholarship_details}
               </p>
-              <div className="space-y-2">
+            </div>
+          )}
+
+          {/* Video URL */}
+          {application.scholarship_video_url && (
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-muted-foreground">Video</span>
+              <a
+                href={application.scholarship_video_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1 text-sm text-primary hover:underline"
+              >
+                Watch
+                <ExternalLink className="h-3 w-3" />
+              </a>
+            </div>
+          )}
+
+          {/* Admin controls — when pending or editing an approved scholarship */}
+          {showForm && (
+            <div className="space-y-3">
+              <div className="space-y-1.5">
                 <Label htmlFor="discount_pct" className="text-sm">
                   Discount Percentage (0–100)
                 </Label>
@@ -611,13 +673,12 @@ function ScholarshipPanel({
                   onChange={(e) =>
                     setDiscountPct(sanitizeNumericInput(e.target.value, 100))
                   }
-                  className="max-w-[160px]"
                 />
               </div>
 
               {popup.allows_incentive && (
                 <>
-                  <div className="space-y-2">
+                  <div className="space-y-1.5">
                     <Label htmlFor="incentive_amount" className="text-sm">
                       Incentive Amount (optional)
                     </Label>
@@ -630,10 +691,9 @@ function ScholarshipPanel({
                       onChange={(e) =>
                         setIncentiveAmount(sanitizeNumericInput(e.target.value))
                       }
-                      className="max-w-[160px]"
                     />
                   </div>
-                  <div className="space-y-2">
+                  <div className="space-y-1.5">
                     <Label htmlFor="incentive_currency" className="text-sm">
                       Currency
                     </Label>
@@ -649,10 +709,10 @@ function ScholarshipPanel({
                 </>
               )}
 
-              <div className="flex gap-2">
+              <div className="flex flex-col gap-2 pt-1">
                 <LoadingButton
                   size="sm"
-                  className="bg-success hover:bg-success/90 text-success-foreground border-0"
+                  className="w-full bg-success hover:bg-success/90 text-success-foreground border-0"
                   loading={mutation.isPending}
                   onClick={handleApprove}
                 >
@@ -662,6 +722,7 @@ function ScholarshipPanel({
                   <Button
                     size="sm"
                     variant="outline"
+                    className="w-full"
                     onClick={handleCancelEdit}
                     disabled={mutation.isPending}
                   >
@@ -670,7 +731,8 @@ function ScholarshipPanel({
                 ) : (
                   <Button
                     size="sm"
-                    variant="destructive"
+                    variant="outline"
+                    className="w-full text-destructive hover:text-destructive"
                     onClick={() => setRejectDialogOpen(true)}
                     disabled={mutation.isPending}
                   >
@@ -679,9 +741,9 @@ function ScholarshipPanel({
                 )}
               </div>
             </div>
-          </div>
-        )}
-      </InlineSection>
+          )}
+        </div>
+      </ToolCard>
 
       {/* Reject confirmation dialog */}
       <Dialog open={rejectDialogOpen} onOpenChange={setRejectDialogOpen}>
@@ -761,42 +823,47 @@ function GrantCreditPanel({
   // The current balance is already shown as "Account Credit" in the applicant
   // details above; don't repeat it here.
   return (
-    <>
-      <Separator />
-      <InlineSection title="Grant Credit">
-        <div className="space-y-3">
-          <div className="space-y-1">
-            <Label htmlFor="grant-credit-amount">Amount</Label>
-            <Input
-              id="grant-credit-amount"
-              type="number"
-              min="0.01"
-              step="0.01"
-              placeholder="0.00"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-            />
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="grant-credit-note">Note (optional)</Label>
-            <Input
-              id="grant-credit-note"
-              type="text"
-              placeholder="Reason for grant"
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-            />
-          </div>
-          <LoadingButton
-            loading={mutation.isPending}
-            onClick={handleSubmit}
-            className="w-full"
-          >
-            Grant Credit
-          </LoadingButton>
+    <ToolCard
+      title="Grant Credit"
+      icon={<DollarSign className="h-4 w-4 text-muted-foreground" />}
+    >
+      <div className="space-y-3">
+        <div className="space-y-1.5">
+          <Label htmlFor="grant-credit-amount" className="text-sm">
+            Amount
+          </Label>
+          <Input
+            id="grant-credit-amount"
+            type="number"
+            min="0.01"
+            step="0.01"
+            placeholder="0.00"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+          />
         </div>
-      </InlineSection>
-    </>
+        <div className="space-y-1.5">
+          <Label htmlFor="grant-credit-note" className="text-sm">
+            Note (optional)
+          </Label>
+          <Input
+            id="grant-credit-note"
+            type="text"
+            placeholder="Reason for grant"
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+          />
+        </div>
+        <LoadingButton
+          size="sm"
+          loading={mutation.isPending}
+          onClick={handleSubmit}
+          className="w-full"
+        >
+          Grant Credit
+        </LoadingButton>
+      </div>
+    </ToolCard>
   )
 }
 
@@ -1004,218 +1071,230 @@ export function ApplicationDetail({
     reviewSummary &&
     reviewSummary.total_reviews > 0
 
-  return (
-    <div className="relative mx-auto w-[32rem] max-w-full space-y-6">
-      {/* Hero */}
-      <div className="space-y-1">
-        <div className="flex items-start justify-between gap-4">
-          <Link
-            to="/humans/$id"
-            params={{ id: application.human_id }}
-            className="group inline-flex items-start gap-2"
-            title="View human profile"
-          >
-            <h2 className="text-3xl font-semibold group-hover:underline">
-              {application.human?.first_name} {application.human?.last_name}
-            </h2>
-            <ExternalLink className="mt-1.5 h-4 w-4 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
-          </Link>
-          <div className="flex shrink-0 items-center gap-2">
-            <HumanRatingBadge rating={application.human?.rating} />
-            <StatusBadge status={application.status} />
-          </div>
-        </div>
-        <p className="text-sm text-muted-foreground">
-          {application.human?.email}
-        </p>
-      </div>
+  const showScholarship = Boolean(
+    application.scholarship_request && popup?.allows_scholarship,
+  )
+  const showGrantCredit = isAdmin && application.status === "accepted"
+  const showComments = application.status !== "draft" && isOperatorOrAbove
+  const hasTools = showScholarship || showGrantCredit || showComments
+  const hasSidebar = canReview || Boolean(hasReviews) || hasTools
 
-      {headerExtra}
-
-      {/* Mobile action panel */}
-      {canReview && (
-        <div className="space-y-4 lg:hidden">
-          {votingPanel}
-          {hasReviews && <ReviewSummary summary={reviewSummary} />}
-          <Separator />
-        </div>
-      )}
-
-      <Separator />
-
-      {/* Review summary (when not reviewer but reviews exist) */}
-      {!canReview && hasReviews && (
-        <>
-          <ReviewSummary summary={reviewSummary} />
-          <Separator />
-        </>
-      )}
-
-      {/* Applicant */}
-      <InlineSection title="Applicant">
-        {application.human?.residence && (
-          <InlineRow
-            icon={<MapPin className="h-4 w-4 text-muted-foreground" />}
-            label="Residence"
-          >
-            <span className="text-sm">{application.human.residence}</span>
-          </InlineRow>
-        )}
-        {application.human?.telegram && (
-          <InlineRow
-            icon={<MessageCircle className="h-4 w-4 text-muted-foreground" />}
-            label="Telegram"
-          >
-            <span className="text-sm">{application.human.telegram}</span>
-          </InlineRow>
-        )}
-        {application.human?.gender && (
-          <InlineRow label="Gender">
-            <span className="text-sm capitalize">
-              {application.human.gender}
-            </span>
-          </InlineRow>
-        )}
-        {application.human?.age && (
-          <InlineRow label="Age Range">
-            <span className="text-sm">{application.human.age}</span>
-          </InlineRow>
-        )}
-        {application.referral && (
-          <InlineRow label="Referral">
-            <span className="text-sm">{application.referral}</span>
-          </InlineRow>
-        )}
-        {(() => {
-          const credit = Number(application.credit)
-          return credit > 0 ? (
-            <InlineRow
-              icon={<DollarSign className="h-4 w-4 text-muted-foreground" />}
-              label="Account Credit"
-            >
-              <span className="font-mono text-sm">${credit.toFixed(2)}</span>
-            </InlineRow>
-          ) : null
-        })()}
-      </InlineSection>
-
-      {/* Unsectioned custom fields */}
-      {unsectionedCustomFields.length > 0 && (
-        <>
-          <Separator />
-          <div className="grid gap-x-6 gap-y-3 sm:grid-cols-2">
-            {unsectionedCustomFields.map(([key, value]) =>
-              renderCustomField(key, value),
-            )}
-          </div>
-        </>
-      )}
-
-      {/* Sectioned custom fields */}
-      {Object.entries(sectionedCustomFields).map(
-        ([sectionId, { label: sectionLabel, fields }]) => (
-          <div key={sectionId}>
-            <Separator />
-            <InlineSection title={sectionLabel} className="capitalize pt-4">
-              <div className="grid gap-x-6 gap-y-3 sm:grid-cols-2 py-3">
-                {fields.map(([key, value]) => renderCustomField(key, value))}
-              </div>
-            </InlineSection>
-          </div>
-        ),
-      )}
-
-      {/* Companions */}
-      {companions.length > 0 && (
-        <>
-          <Separator />
-          <InlineSection title={`Companions (${companions.length})`}>
-            {companions.map((attendee) => (
-              <div key={attendee.id} className="py-3">
-                <p className="text-sm font-medium">{attendee.name}</p>
-                <p className="text-xs text-muted-foreground">
-                  {attendee.email} ·{" "}
-                  <span className="capitalize">{attendee.category}</span>
-                </p>
-              </div>
-            ))}
-          </InlineSection>
-        </>
-      )}
-
-      {/* Payments — no single-payment detail exists, so link out to the
-          payments table filtered to this application. */}
-      {payments.length > 0 && (
-        <>
-          <Separator />
-          <InlineSection title="Payments">
-            {payments.map((p) => (
-              <div
-                key={p.id}
-                className="flex items-center justify-between gap-3 py-3"
-              >
-                <div className="min-w-0">
-                  <p className="font-mono text-sm">
-                    {Number(p.amount ?? 0).toLocaleString(undefined, {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}{" "}
-                    {p.currency ?? ""}
-                  </p>
-                  {p.created_at && (
-                    <p className="text-xs text-muted-foreground">
-                      {new Date(p.created_at).toLocaleDateString()}
-                    </p>
-                  )}
-                </div>
-                <StatusBadge status={p.status ?? ""} />
-              </div>
-            ))}
-            <div className="pt-1">
-              <Link
-                to="/payments"
-                search={{ applicationId: application.id }}
-                className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
-              >
-                View in Payments
-                <ExternalLink className="h-3.5 w-3.5" />
-              </Link>
-            </div>
-          </InlineSection>
-        </>
-      )}
-
-      {/* Scholarship Panel */}
-      {application.scholarship_request && popup?.allows_scholarship && (
+  const reviewTools = (
+    <>
+      {showScholarship && popup && (
         <ScholarshipPanel
           application={application}
           popup={popup}
           onSuccess={onReviewSuccess}
         />
       )}
-
-      {/* Grant Credit Panel — admin only, and only once accepted */}
-      {isAdmin && application.status === "accepted" && (
+      {showGrantCredit && (
         <GrantCreditPanel
           application={application}
           onSuccess={onReviewSuccess}
         />
       )}
-
-      {/* Comment thread — shared reviewer notes on this application */}
-      {application.status !== "draft" && isOperatorOrAbove && (
-        <>
-          <Separator />
+      {showComments && (
+        <section className="rounded-lg border bg-card p-4">
           <ApplicationCommentThread applicationId={application.id} />
-        </>
+        </section>
       )}
+    </>
+  )
 
-      {/* Desktop action panel */}
-      {canReview && (
-        <aside className="absolute top-0 left-[calc(100%+2rem)] hidden w-56 lg:block">
-          <div className="sticky top-24 space-y-6">
+  return (
+    <div className="mx-auto flex w-full max-w-5xl justify-center gap-10">
+      <div className="min-w-0 w-full max-w-[32rem] space-y-6">
+        {/* Hero */}
+        <div className="space-y-1">
+          <div className="flex items-start justify-between gap-4">
+            <Link
+              to="/humans/$id"
+              params={{ id: application.human_id }}
+              className="group inline-flex items-start gap-2"
+              title="View human profile"
+            >
+              <h2 className="text-3xl font-semibold group-hover:underline">
+                {application.human?.first_name} {application.human?.last_name}
+              </h2>
+              <ExternalLink className="mt-1.5 h-4 w-4 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+            </Link>
+            <div className="flex shrink-0 items-center gap-2">
+              <HumanRatingBadge rating={application.human?.rating} />
+              <StatusBadge status={application.status} />
+            </div>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            {application.human?.email}
+          </p>
+        </div>
+
+        {headerExtra}
+
+        {/* Mobile action panel */}
+        {canReview && (
+          <div className="space-y-4 lg:hidden">
             {votingPanel}
             {hasReviews && <ReviewSummary summary={reviewSummary} />}
+            <Separator />
+          </div>
+        )}
+
+        <Separator />
+
+        {/* Review summary (when not reviewer but reviews exist) */}
+        {!canReview && hasReviews && (
+          <div className="lg:hidden">
+            <ReviewSummary summary={reviewSummary} />
+            <Separator />
+          </div>
+        )}
+
+        {/* Applicant */}
+        <InlineSection title="Applicant">
+          {application.human?.residence && (
+            <InlineRow
+              icon={<MapPin className="h-4 w-4 text-muted-foreground" />}
+              label="Residence"
+            >
+              <span className="text-sm">{application.human.residence}</span>
+            </InlineRow>
+          )}
+          {application.human?.telegram && (
+            <InlineRow
+              icon={<MessageCircle className="h-4 w-4 text-muted-foreground" />}
+              label="Telegram"
+            >
+              <span className="text-sm">{application.human.telegram}</span>
+            </InlineRow>
+          )}
+          {application.human?.gender && (
+            <InlineRow label="Gender">
+              <span className="text-sm capitalize">
+                {application.human.gender}
+              </span>
+            </InlineRow>
+          )}
+          {application.human?.age && (
+            <InlineRow label="Age Range">
+              <span className="text-sm">{application.human.age}</span>
+            </InlineRow>
+          )}
+          {application.referral && (
+            <InlineRow label="Referral">
+              <span className="text-sm">{application.referral}</span>
+            </InlineRow>
+          )}
+          {(() => {
+            const credit = Number(application.credit)
+            return credit > 0 ? (
+              <InlineRow
+                icon={<DollarSign className="h-4 w-4 text-muted-foreground" />}
+                label="Account Credit"
+              >
+                <span className="font-mono text-sm">${credit.toFixed(2)}</span>
+              </InlineRow>
+            ) : null
+          })()}
+        </InlineSection>
+
+        {/* Unsectioned custom fields */}
+        {unsectionedCustomFields.length > 0 && (
+          <>
+            <Separator />
+            <div className="grid gap-x-6 gap-y-3 sm:grid-cols-2">
+              {unsectionedCustomFields.map(([key, value]) =>
+                renderCustomField(key, value),
+              )}
+            </div>
+          </>
+        )}
+
+        {/* Sectioned custom fields */}
+        {Object.entries(sectionedCustomFields).map(
+          ([sectionId, { label: sectionLabel, fields }]) => (
+            <div key={sectionId}>
+              <Separator />
+              <InlineSection title={sectionLabel} className="capitalize pt-4">
+                <div className="grid gap-x-6 gap-y-3 sm:grid-cols-2 py-3">
+                  {fields.map(([key, value]) => renderCustomField(key, value))}
+                </div>
+              </InlineSection>
+            </div>
+          ),
+        )}
+
+        {/* Companions */}
+        {companions.length > 0 && (
+          <>
+            <Separator />
+            <InlineSection title={`Companions (${companions.length})`}>
+              {companions.map((attendee) => (
+                <div key={attendee.id} className="py-3">
+                  <p className="text-sm font-medium">{attendee.name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {attendee.email} ·{" "}
+                    <span className="capitalize">{attendee.category}</span>
+                  </p>
+                </div>
+              ))}
+            </InlineSection>
+          </>
+        )}
+
+        {/* Payments — no single-payment detail exists, so link out to the
+          payments table filtered to this application. */}
+        {payments.length > 0 && (
+          <>
+            <Separator />
+            <InlineSection title="Payments">
+              {payments.map((p) => (
+                <div
+                  key={p.id}
+                  className="flex items-center justify-between gap-3 py-3"
+                >
+                  <div className="min-w-0">
+                    <p className="font-mono text-sm">
+                      {Number(p.amount ?? 0).toLocaleString(undefined, {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}{" "}
+                      {p.currency ?? ""}
+                    </p>
+                    {p.created_at && (
+                      <p className="text-xs text-muted-foreground">
+                        {new Date(p.created_at).toLocaleDateString()}
+                      </p>
+                    )}
+                  </div>
+                  <StatusBadge status={p.status ?? ""} />
+                </div>
+              ))}
+              <div className="pt-1">
+                <Link
+                  to="/payments"
+                  search={{ applicationId: application.id }}
+                  className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
+                >
+                  View in Payments
+                  <ExternalLink className="h-3.5 w-3.5" />
+                </Link>
+              </div>
+            </InlineSection>
+          </>
+        )}
+
+        {/* Mobile review tools — on desktop they live in the sidebar */}
+        {hasTools && <div className="space-y-4 lg:hidden">{reviewTools}</div>}
+      </div>
+
+      {/* Desktop review sidebar */}
+      {hasSidebar && (
+        <aside className="hidden w-80 shrink-0 lg:block">
+          <div className="sticky top-24 max-h-[calc(100vh-7rem)] space-y-4 overflow-y-auto pr-1">
+            {canReview && votingPanel}
+            {hasReviews && <ReviewSummary summary={reviewSummary} />}
+            {reviewTools}
           </div>
         </aside>
       )}

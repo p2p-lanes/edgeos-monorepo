@@ -1292,6 +1292,17 @@ export const ApplicationPublicSchema = {
             type: 'boolean',
             title: 'Skipped By Me',
             default: false
+        },
+        my_skip_reason: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'My Skip Reason'
         }
     },
     type: 'object',

@@ -151,6 +151,25 @@ export type ApplicationAdminCreate = {
     group_id?: (string | null);
 };
 
+export type ApplicationCommentCreate = {
+    body: string;
+};
+
+export type ApplicationCommentPublic = {
+    id: string;
+    application_id: string;
+    author_user_id?: (string | null);
+    author_name?: (string | null);
+    author_email?: (string | null);
+    body: string;
+    created_at: string;
+    edited_at?: (string | null);
+};
+
+export type ApplicationCommentUpdate = {
+    body: string;
+};
+
 /**
  * Application schema for creation.
  *
@@ -244,6 +263,8 @@ export type ApplicationPublic = {
     review_count?: number;
     reviewers?: Array<ApplicationReviewerVote>;
     comment_count?: number;
+    skipped_by_me?: boolean;
+    my_skip_reason?: (string | null);
 };
 
 /**
@@ -278,6 +299,25 @@ export type ApplicationReviewPublic = {
     updated_at?: (string | null);
     reviewer_email?: (string | null);
     reviewer_full_name?: (string | null);
+};
+
+/**
+ * Schema for skipping (passing on) an application.
+ */
+export type ApplicationReviewSkipCreate = {
+    reason?: (string | null);
+};
+
+/**
+ * ApplicationReviewSkip schema for API responses.
+ */
+export type ApplicationReviewSkipPublic = {
+    id: string;
+    application_id: string;
+    reviewer_id: string;
+    tenant_id: string;
+    reason?: (string | null);
+    created_at?: (string | null);
 };
 
 /**
@@ -2383,6 +2423,11 @@ export type ListModel_AbandonedCartPublic_ = {
     paging: Paging;
 };
 
+export type ListModel_ApplicationCommentPublic_ = {
+    results: Array<ApplicationCommentPublic>;
+    paging: Paging;
+};
+
 export type ListModel_ApplicationPublic_ = {
     results: Array<ApplicationPublic>;
     paging: Paging;
@@ -4459,6 +4504,21 @@ export type ApplicationReviewsListMyReviewsData = {
 
 export type ApplicationReviewsListMyReviewsResponse = (ListModel_ApplicationReviewPublic_);
 
+export type ApplicationReviewsSkipApplicationData = {
+    applicationId: string;
+    requestBody: ApplicationReviewSkipCreate;
+    xTenantId?: (string | null);
+};
+
+export type ApplicationReviewsSkipApplicationResponse = (ApplicationReviewSkipPublic);
+
+export type ApplicationReviewsUnskipApplicationData = {
+    applicationId: string;
+    xTenantId?: (string | null);
+};
+
+export type ApplicationReviewsUnskipApplicationResponse = (void);
+
 export type ApplicationsListApplicationsData = {
     humanId?: (string | null);
     /**
@@ -4610,6 +4670,38 @@ export type ApplicationsReviewScholarshipData = {
 };
 
 export type ApplicationsReviewScholarshipResponse = (ApplicationPublic);
+
+export type ApplicationsListApplicationCommentsData = {
+    applicationId: string;
+    xTenantId?: (string | null);
+};
+
+export type ApplicationsListApplicationCommentsResponse = (ListModel_ApplicationCommentPublic_);
+
+export type ApplicationsCreateApplicationCommentData = {
+    applicationId: string;
+    requestBody: ApplicationCommentCreate;
+    xTenantId?: (string | null);
+};
+
+export type ApplicationsCreateApplicationCommentResponse = (ApplicationCommentPublic);
+
+export type ApplicationsUpdateApplicationCommentData = {
+    applicationId: string;
+    commentId: string;
+    requestBody: ApplicationCommentUpdate;
+    xTenantId?: (string | null);
+};
+
+export type ApplicationsUpdateApplicationCommentResponse = (ApplicationCommentPublic);
+
+export type ApplicationsDeleteApplicationCommentData = {
+    applicationId: string;
+    commentId: string;
+    xTenantId?: (string | null);
+};
+
+export type ApplicationsDeleteApplicationCommentResponse = (void);
 
 export type ApprovalStrategiesGetApprovalStrategyData = {
     popupId: string;
