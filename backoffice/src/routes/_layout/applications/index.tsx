@@ -751,7 +751,11 @@ const getColumns = (
         <StatusBadge status={row.original.status} />
         {row.original.skipped_by_me && (
           <span
-            title="You skipped this application"
+            title={
+              row.original.my_skip_reason
+                ? `You skipped this application: ${row.original.my_skip_reason}`
+                : "You skipped this application"
+            }
             className="inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-xs text-muted-foreground"
           >
             <SkipForward className="h-3 w-3" />

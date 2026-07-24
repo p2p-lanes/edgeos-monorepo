@@ -264,6 +264,7 @@ export type ApplicationPublic = {
     reviewers?: Array<ApplicationReviewerVote>;
     comment_count?: number;
     skipped_by_me?: boolean;
+    my_skip_reason?: (string | null);
 };
 
 /**

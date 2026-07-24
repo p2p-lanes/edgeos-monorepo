@@ -177,9 +177,10 @@ class ApplicationPublic(BaseModel):
     review_count: int = 0
     reviewers: list[ApplicationReviewerVote] = []
     comment_count: int = 0
-    # True only in the review-queue path when the current reviewer skipped this
-    # application; defaults False everywhere else.
+    # Current reviewer's own skip state; populated in the list, detail, and
+    # review-queue paths.
     skipped_by_me: bool = False
+    my_skip_reason: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
 

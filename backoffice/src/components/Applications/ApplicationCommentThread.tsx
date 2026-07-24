@@ -72,7 +72,7 @@ function CommentRow({
   })
 
   return (
-    <div className="rounded-lg border bg-card p-3">
+    <div className="rounded-md border bg-muted/30 p-3">
       <div className="mb-1 flex items-center justify-between gap-2">
         <span className="text-sm font-medium">
           {comment.author_name || comment.author_email || "Unknown"}

@@ -281,13 +281,17 @@ async def list_pending_reviews(
         limit=limit,
     )
 
-    skipped_ids = application_review_skips_crud.get_skipped_application_ids(
-        db, current_user.id, [a.id for a in pending_apps]
+    skip_reasons = application_review_skips_crud.get_skip_reasons_by_application(
+        db, [a.id for a in pending_apps], current_user.id
     )
 
     return ListModel(
         results=[
-            _build_application_public(a, skipped_by_me=a.id in skipped_ids)
+            _build_application_public(
+                a,
+                skipped_by_me=a.id in skip_reasons,
+                my_skip_reason=skip_reasons.get(a.id),
+            )
             for a in pending_apps
         ],
         paging=Paging(offset=skip, limit=limit, total=total),
