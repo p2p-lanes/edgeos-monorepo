@@ -206,11 +206,6 @@ const APPLICATION_STATUS_OPTIONS: {
   { value: "rejected", label: "Rejected" },
 ]
 
-const FILTER_STATUS_OPTIONS = [
-  ...APPLICATION_STATUS_OPTIONS,
-  { value: "withdrawn", label: "Withdrawn" },
-]
-
 // Custom form fields become filterable attributes; select-like fields keep
 // their options so the value input can offer them.
 function buildCustomFilterFields(
@@ -1185,7 +1180,13 @@ function ApplicationsTableContent({
             onSelect={setStatusFilter}
           />
           <ApplicationFilterBuilder
-            statusOptions={FILTER_STATUS_OPTIONS}
+            statusOptions={
+              popup?.requires_application_fee === false
+                ? APPLICATION_STATUS_OPTIONS.filter(
+                    (opt) => opt.value !== "pending_fee",
+                  )
+                : APPLICATION_STATUS_OPTIONS
+            }
             customFields={customFilterFields}
             reviewerOptions={reviewers.map((reviewer) => ({
               value: reviewer.user_id,
