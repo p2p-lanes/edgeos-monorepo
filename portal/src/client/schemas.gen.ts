@@ -691,6 +691,105 @@ If email is provided and human doesn't exist, a new Human record is created.
 Companions (spouse/kids) can be added during initial submission.`
 } as const;
 
+export const ApplicationCommentCreateSchema = {
+    properties: {
+        body: {
+            type: 'string',
+            minLength: 1,
+            title: 'Body'
+        }
+    },
+    type: 'object',
+    required: ['body'],
+    title: 'ApplicationCommentCreate'
+} as const;
+
+export const ApplicationCommentPublicSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        application_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Application Id'
+        },
+        author_user_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Author User Id'
+        },
+        author_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Author Name'
+        },
+        author_email: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Author Email'
+        },
+        body: {
+            type: 'string',
+            title: 'Body'
+        },
+        created_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Created At'
+        },
+        edited_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Edited At'
+        }
+    },
+    type: 'object',
+    required: ['id', 'application_id', 'body', 'created_at'],
+    title: 'ApplicationCommentPublic'
+} as const;
+
+export const ApplicationCommentUpdateSchema = {
+    properties: {
+        body: {
+            type: 'string',
+            minLength: 1,
+            title: 'Body'
+        }
+    },
+    type: 'object',
+    required: ['body'],
+    title: 'ApplicationCommentUpdate'
+} as const;
+
 export const ApplicationCreateSchema = {
     properties: {
         popup_id: {
@@ -1188,6 +1287,11 @@ export const ApplicationPublicSchema = {
             type: 'integer',
             title: 'Comment Count',
             default: 0
+        },
+        skipped_by_me: {
+            type: 'boolean',
+            title: 'Skipped By Me',
+            default: false
         }
     },
     type: 'object',
@@ -1306,6 +1410,77 @@ export const ApplicationReviewPublicSchema = {
     required: ['id', 'application_id', 'reviewer_id', 'tenant_id', 'decision'],
     title: 'ApplicationReviewPublic',
     description: 'ApplicationReview schema for API responses.'
+} as const;
+
+export const ApplicationReviewSkipCreateSchema = {
+    properties: {
+        reason: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Reason'
+        }
+    },
+    type: 'object',
+    title: 'ApplicationReviewSkipCreate',
+    description: 'Schema for skipping (passing on) an application.'
+} as const;
+
+export const ApplicationReviewSkipPublicSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        application_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Application Id'
+        },
+        reviewer_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Reviewer Id'
+        },
+        tenant_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Tenant Id'
+        },
+        reason: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Reason'
+        },
+        created_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Created At'
+        }
+    },
+    type: 'object',
+    required: ['id', 'application_id', 'reviewer_id', 'tenant_id'],
+    title: 'ApplicationReviewSkipPublic',
+    description: 'ApplicationReviewSkip schema for API responses.'
 } as const;
 
 export const ApplicationReviewerVoteSchema = {
@@ -10574,6 +10749,18 @@ export const HumanEnrichmentFactCreateSchema = {
         source: {
             '$ref': '#/components/schemas/EnrichmentSource'
         },
+        source_label: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 200
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Source Label'
+        },
         evidence: {
             anyOf: [
                 {
@@ -10638,7 +10825,7 @@ export const HumanEnrichmentFactPublicSchema = {
         source: {
             '$ref': '#/components/schemas/EnrichmentSource'
         },
-        evidence: {
+        source_label: {
             anyOf: [
                 {
                     type: 'string'
@@ -10647,7 +10834,7 @@ export const HumanEnrichmentFactPublicSchema = {
                     type: 'null'
                 }
             ],
-            title: 'Evidence'
+            title: 'Source Label'
         },
         confidence: {
             anyOf: [
@@ -10659,18 +10846,6 @@ export const HumanEnrichmentFactPublicSchema = {
                 }
             ],
             title: 'Confidence'
-        },
-        raw: {
-            anyOf: [
-                {
-                    additionalProperties: true,
-                    type: 'object'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Raw'
         },
         created_at: {
             type: 'string',
@@ -11274,6 +11449,24 @@ export const ListModel_AbandonedCartPublic_Schema = {
     type: 'object',
     required: ['results', 'paging'],
     title: 'ListModel[AbandonedCartPublic]'
+} as const;
+
+export const ListModel_ApplicationCommentPublic_Schema = {
+    properties: {
+        results: {
+            items: {
+                '$ref': '#/components/schemas/ApplicationCommentPublic'
+            },
+            type: 'array',
+            title: 'Results'
+        },
+        paging: {
+            '$ref': '#/components/schemas/Paging'
+        }
+    },
+    type: 'object',
+    required: ['results', 'paging'],
+    title: 'ListModel[ApplicationCommentPublic]'
 } as const;
 
 export const ListModel_ApplicationPublic_Schema = {

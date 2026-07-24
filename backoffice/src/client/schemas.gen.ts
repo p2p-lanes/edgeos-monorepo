@@ -10749,6 +10749,18 @@ export const HumanEnrichmentFactCreateSchema = {
         source: {
             '$ref': '#/components/schemas/EnrichmentSource'
         },
+        source_label: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 200
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Source Label'
+        },
         evidence: {
             anyOf: [
                 {
@@ -10813,7 +10825,7 @@ export const HumanEnrichmentFactPublicSchema = {
         source: {
             '$ref': '#/components/schemas/EnrichmentSource'
         },
-        evidence: {
+        source_label: {
             anyOf: [
                 {
                     type: 'string'
@@ -10822,7 +10834,7 @@ export const HumanEnrichmentFactPublicSchema = {
                     type: 'null'
                 }
             ],
-            title: 'Evidence'
+            title: 'Source Label'
         },
         confidence: {
             anyOf: [
@@ -10834,18 +10846,6 @@ export const HumanEnrichmentFactPublicSchema = {
                 }
             ],
             title: 'Confidence'
-        },
-        raw: {
-            anyOf: [
-                {
-                    additionalProperties: true,
-                    type: 'object'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Raw'
         },
         created_at: {
             type: 'string',
