@@ -1003,6 +1003,9 @@ function ApplicationsTableContent({
         to: "/applications",
         search: (prev: Record<string, unknown>) => ({
           ...prev,
+          // Scrub the legacy param so validateSearch cannot fold it back into
+          // a resurrected condition after the user edits the filters.
+          status: undefined,
           match:
             match === "any" && conditions.length ? ("any" as const) : undefined,
           filters: conditions.length ? conditions : undefined,
