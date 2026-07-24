@@ -46,6 +46,10 @@ from app.api.check_in.schemas import CheckInPayload, CheckInPublic
 from app.api.coupon.models import Coupons
 from app.api.coupon.schemas import CouponCreate, CouponPublic, CouponUpdate
 
+# Email log (append-only dispatch history)
+from app.api.email_log.models import EmailLogs
+from app.api.email_log.schemas import EmailLogPublic, EmailLogStatus
+
 # Email templates
 from app.api.email_template.models import EmailTemplates
 from app.api.email_template.schemas import (
@@ -206,6 +210,10 @@ __all__ = [
     "TaskUpdate",
     "TaskPublic",
     "TaskDetailPublic",
+    # Email log
+    "EmailLogs",
+    "EmailLogPublic",
+    "EmailLogStatus",
     # Email templates
     "EmailTemplates",
     "EmailTemplateCreate",

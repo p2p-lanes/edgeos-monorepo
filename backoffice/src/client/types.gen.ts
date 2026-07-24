@@ -1322,6 +1322,24 @@ export type DistributionItem = {
     percentage?: string;
 };
 
+/**
+ * A single email log entry returned to the backoffice.
+ */
+export type EmailLogPublic = {
+    id: string;
+    tenant_id: string;
+    popup_id?: (string | null);
+    template_type: string;
+    to_email: string;
+    application_id?: (string | null);
+    payment_id?: (string | null);
+    human_id?: (string | null);
+    subject?: (string | null);
+    status: string;
+    error?: (string | null);
+    created_at: string;
+};
+
 export type EmailTemplateCreate = {
     popup_id?: (string | null);
     template_type: string;
@@ -1343,7 +1361,7 @@ export type EmailTemplatePublic = {
     updated_at?: (string | null);
 };
 
-export type EmailTemplateType = 'login_code_user' | 'login_code_human' | 'application_received' | 'application_accepted' | 'application_rejected' | 'application_accepted_with_discount' | 'application_accepted_with_incentive' | 'application_accepted_scholarship_rejected' | 'payment_confirmed' | 'abandoned_cart' | 'edit_passes_confirmed' | 'event_invitation' | 'event_updated' | 'event_cancelled' | 'event_rsvp_cancelled' | 'event_approval_approved' | 'event_approval_rejected' | 'check_in_pass';
+export type EmailTemplateType = 'login_code_user' | 'login_code_human' | 'application_received' | 'application_accepted' | 'application_rejected' | 'application_accepted_with_discount' | 'application_accepted_with_incentive' | 'application_accepted_scholarship_rejected' | 'payment_confirmed' | 'abandoned_cart' | 'purchase_reminder' | 'abandoned_application' | 'edit_passes_confirmed' | 'event_invitation' | 'event_updated' | 'event_cancelled' | 'event_rsvp_cancelled' | 'event_approval_approved' | 'event_approval_rejected' | 'check_in_pass';
 
 export type EmailTemplateUpdate = {
     subject?: (string | null);
@@ -2451,6 +2469,11 @@ export type ListModel_CouponPublic_ = {
     paging: Paging;
 };
 
+export type ListModel_EmailLogPublic_ = {
+    results: Array<EmailLogPublic>;
+    paging: Paging;
+};
+
 export type ListModel_EmailTemplatePublic_ = {
     results: Array<EmailTemplatePublic>;
     paging: Paging;
@@ -2954,6 +2977,15 @@ export type PopupAdmin = {
     installments_max?: (number | null);
     installments_interval?: InstallmentInterval;
     installments_interval_count?: number;
+    abandoned_cart_delay_days?: (number | null);
+    abandoned_cart_repeat_days?: (number | null);
+    abandoned_cart_max_count?: (number | null);
+    purchase_reminder_delay_days?: (number | null);
+    purchase_reminder_repeat_days?: (number | null);
+    purchase_reminder_max_count?: (number | null);
+    abandoned_application_delay_days?: (number | null);
+    abandoned_application_repeat_days?: (number | null);
+    abandoned_application_max_count?: (number | null);
     id: string;
 };
 
@@ -3012,6 +3044,15 @@ export type PopupCreate = {
     installments_interval?: InstallmentInterval;
     installments_interval_count?: number;
     checkin_pass_lead_days?: (number | null);
+    abandoned_cart_delay_days?: (number | null);
+    abandoned_cart_repeat_days?: (number | null);
+    abandoned_cart_max_count?: (number | null);
+    purchase_reminder_delay_days?: (number | null);
+    purchase_reminder_repeat_days?: (number | null);
+    purchase_reminder_max_count?: (number | null);
+    abandoned_application_delay_days?: (number | null);
+    abandoned_application_repeat_days?: (number | null);
+    abandoned_application_max_count?: (number | null);
 };
 
 /**
@@ -3152,6 +3193,15 @@ export type PopupUpdate = {
     installments_interval?: (InstallmentInterval | null);
     installments_interval_count?: (number | null);
     checkin_pass_lead_days?: (number | null);
+    abandoned_cart_delay_days?: (number | null);
+    abandoned_cart_repeat_days?: (number | null);
+    abandoned_cart_max_count?: (number | null);
+    purchase_reminder_delay_days?: (number | null);
+    purchase_reminder_repeat_days?: (number | null);
+    purchase_reminder_max_count?: (number | null);
+    abandoned_application_delay_days?: (number | null);
+    abandoned_application_repeat_days?: (number | null);
+    abandoned_application_max_count?: (number | null);
 };
 
 /**
@@ -5133,6 +5183,24 @@ export type DashboardGetEnrichedDashboardData = {
 };
 
 export type DashboardGetEnrichedDashboardResponse = (EnrichedDashboardStats);
+
+export type EmailLogsListEmailLogsData = {
+    /**
+     * Maximum number of items to return
+     */
+    limit?: number;
+    popupId?: (string | null);
+    search?: (string | null);
+    /**
+     * Number of items to skip
+     */
+    skip?: number;
+    status?: (string | null);
+    templateType?: (string | null);
+    xTenantId?: (string | null);
+};
+
+export type EmailLogsListEmailLogsResponse = (ListModel_EmailLogPublic_);
 
 export type EmailTemplatesListTemplateTypesResponse = (Array<TemplateTypeInfo>);
 

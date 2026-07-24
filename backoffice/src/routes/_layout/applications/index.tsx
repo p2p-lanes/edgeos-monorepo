@@ -103,6 +103,7 @@ interface ApplicationSchema {
       type?: string
       position?: number
       options?: string[]
+      config?: { is_checkbox?: boolean }
       [key: string]: unknown
     }
   >
@@ -127,12 +128,22 @@ function formatCustomFieldValue(value: unknown, type?: string): string {
     const sig = value as { signature?: string }
     return sig?.signature ? "Signed" : "—"
   }
+  if (type === "image_upload") return "Uploaded"
   if (type === "date" && typeof value === "string") {
     return new Date(value).toLocaleDateString()
   }
   if (Array.isArray(value)) return value.join(", ")
   if (typeof value === "object") return "—"
   return String(value)
+}
+
+// Display-only fields never collect a response, so they have no data to
+// surface as a column. rich_text collects a boolean only in checkbox mode.
+function isDisplayOnlyField(def: {
+  type?: string
+  config?: { is_checkbox?: boolean }
+}): boolean {
+  return def.type === "rich_text" && !def.config?.is_checkbox
 }
 
 // Build one toggleable, hidden-by-default column per custom form-builder
@@ -143,6 +154,7 @@ function buildCustomFieldColumns(
 ): ColumnDef<ApplicationPublic>[] {
   const customFields = formSchema?.custom_fields ?? {}
   return Object.entries(customFields)
+    .filter(([, def]) => !isDisplayOnlyField(def))
     .sort(
       ([, a], [, b]) =>
         (a.position ?? Number.MAX_SAFE_INTEGER) -
@@ -153,7 +165,11 @@ function buildCustomFieldColumns(
       return {
         id: `custom_${name}`,
         accessorFn: (row) => row.custom_fields?.[name],
-        header: label,
+        header: () => (
+          <span className="block max-w-48 truncate" title={label}>
+            {label}
+          </span>
+        ),
         meta: { label, toggleable: true, defaultHidden: true },
         enableSorting: false,
         cell: ({ row }) => (
@@ -1213,6 +1229,10 @@ function Applications() {
       // Try to match each data key to the current schema for label
       // and position; fall back to a formatted version of the key.
       const customColumns = [...seenKeys]
+        .filter((name) => {
+          const schemaDef = schemaLookup[name]
+          return !schemaDef || !isDisplayOnlyField(schemaDef)
+        })
         .map((name) => {
           const schemaDef = schemaLookup[name] as
             | { label?: string; position?: number }

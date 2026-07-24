@@ -2,6 +2,7 @@
 
 import "@/i18n/config"
 import type { ReactNode } from "react"
+import HelpButton from "@/components/HelpButton"
 import { SidebarProvider } from "@/components/Sidebar/SidebarComponents"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import useResolvedAttendees from "@/hooks/useResolvedAttendees"
@@ -31,7 +32,10 @@ const Providers = ({ children }: { children: ReactNode }) => {
             <ApplicationProvider>
               <DiscountProvider>
                 <PassesBridge>
-                  <SidebarProvider>{children}</SidebarProvider>
+                  <SidebarProvider>
+                    {children}
+                    <HelpButton />
+                  </SidebarProvider>
                 </PassesBridge>
               </DiscountProvider>
             </ApplicationProvider>

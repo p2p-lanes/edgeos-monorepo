@@ -1075,6 +1075,23 @@ async def update_my_application(
     profile_update = {k: v for k, v in update_data.items() if k in profile_fields}
     app_update = {k: v for k, v in update_data.items() if k not in profile_fields}
 
+    # Enforce form validation before any state is applied: submits (and edits
+    # of already-submitted applications) validate the merged state with full
+    # required checks; draft saves only type-check provided values.
+    resolved_custom_fields = crud.applications_crud.validate_portal_update(
+        db, application, update_data
+    )
+
+    # Store exactly what was validated: incoming custom_fields replace the
+    # stored answers for every field the current form renders (the portal
+    # sends the full form state, so an absent key means "cleared"), while
+    # answers the form no longer renders are preserved.
+    if "custom_fields" in app_update:
+        if app_update["custom_fields"] is None:
+            del app_update["custom_fields"]
+        elif resolved_custom_fields is not None:
+            app_update["custom_fields"] = resolved_custom_fields
+
     # Update human profile if needed
     if profile_update:
         humans_crud.update(db, application.human, HumanUpdate(**profile_update))

@@ -90,15 +90,13 @@ export default function FormPage() {
     }
   }, [importSource, existingApp])
 
-  // Once submitted, the application is no longer accessible from the form —
-  // same behavior as a fee-less submit. draft/pending_fee stay editable so the
-  // applicant can still finish or retry the fee payment.
+  // Resolved applications are no longer accessible from the form.
+  // draft/pending_fee/in review stay editable so the applicant can still finish,
+  // retry the fee payment, or update details while the application is under review.
   useEffect(() => {
     if (
       application &&
-      (application.status === "in review" ||
-        application.status === "accepted" ||
-        application.status === "rejected")
+      (application.status === "accepted" || application.status === "rejected")
     ) {
       router.replace(`/portal/${city?.slug}`)
     }
@@ -142,10 +140,9 @@ export default function FormPage() {
     return <Loader />
   }
 
-  // Submitted or resolved applications never render the form. The effect above
-  // redirects to the portal home; show a loader meanwhile to avoid flashing it.
+  // Resolved applications never render the form. The effect above redirects to
+  // the portal home; show a loader meanwhile to avoid flashing it.
   if (
-    application?.status === "in review" ||
     application?.status === "accepted" ||
     application?.status === "rejected"
   ) {

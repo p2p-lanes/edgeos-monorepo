@@ -1,4 +1,12 @@
 {
+  "help": {
+    "aria_label": "Obtener ayuda",
+    "title": "¿Necesitas ayuda?",
+    "description": "¿Tienes una pregunta o necesitas asistencia? Escríbenos un email y te responderemos.",
+    "email_button": "Enviar email",
+    "email_subject": "Solicitud de ayuda — {{popup}}",
+    "email_subject_generic": "Solicitud de ayuda"
+  },
   "cartBadge": {
     "title": "Tu carrito",
     "aria_open": "Abrir carrito",

@@ -13,7 +13,7 @@ it never affects the approval tally. One skip per reviewer per application.
 Both carry ``tenant_id`` + the standard tenant-isolation RLS policy and grants.
 
 Revision ID: e88d72173244
-Revises: 3d1b2dce2b7b
+Revises: d5b8e2f1a9c4
 Create Date: 2026-07-23 00:00:00.000000
 
 """
@@ -29,7 +29,7 @@ from app.alembic.utils import (
 
 # revision identifiers, used by Alembic.
 revision = "e88d72173244"
-down_revision = "3d1b2dce2b7b"
+down_revision = "d5b8e2f1a9c4"
 branch_labels = None
 depends_on = None
 

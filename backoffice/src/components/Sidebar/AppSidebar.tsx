@@ -14,6 +14,7 @@ import {
   ListChecks,
   ListTree,
   Mail,
+  MailCheck,
   MapPin,
   Package,
   Palette,
@@ -79,6 +80,7 @@ const popupItems: Item[] = [
   { icon: LayoutList, title: "Ticketing Steps", path: "/ticketing-steps" },
   { icon: Palette, title: "Theme", path: "/theme" },
   { icon: Mail, title: "Email Templates", path: "/email-templates" },
+  { icon: MailCheck, title: "Email Logs", path: "/email-logs" },
 ]
 
 const eventItems: Item[] = [
