@@ -1278,6 +1278,7 @@ function Applications() {
   const { isOperatorOrAbove, isSuperadmin } = useAuth()
   const { isContextReady, selectedPopupId } = useWorkspace()
   const { search, filtersJson } = useApplicationsFilterParams()
+  const { showSuccessToast, showErrorToast } = useCustomToast()
   const [isExporting, setIsExporting] = useState(false)
   const [view, setView] = useState<ApplicationsView>(readStoredApplicationsView)
 
@@ -1323,6 +1324,15 @@ function Applications() {
           filters: filtersJson,
         }),
       )
+
+      if (results.length === 0) {
+        showErrorToast(
+          isExportFiltered
+            ? "No applications match the current filters"
+            : "There are no applications to export",
+        )
+        return
+      }
 
       const baseColumns = [
         { key: "human.email", label: "Email" },
@@ -1381,6 +1391,9 @@ function Applications() {
         isExportFiltered ? "applications-filtered" : "applications",
         results as unknown as Record<string, unknown>[],
         [...baseColumns, ...customColumns],
+      )
+      showSuccessToast(
+        `Exported ${results.length} application${results.length === 1 ? "" : "s"}`,
       )
     } finally {
       setIsExporting(false)
