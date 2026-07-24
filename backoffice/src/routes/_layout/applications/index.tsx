@@ -451,6 +451,31 @@ export const Route = createFileRoute("/_layout/applications/")({
   }),
 })
 
+// Single source for the filter-related search params, shared by the table
+// and the CSV export so both always query the same subset.
+function useApplicationsFilterParams() {
+  const searchParams = Route.useSearch()
+  const filterMatch = searchParams.match ?? "all"
+  const filterConditions = useMemo(
+    () => searchParams.filters ?? [],
+    [searchParams.filters],
+  )
+  // Rows with a missing value stay in the UI but never reach the request.
+  const filtersJson = useMemo(() => {
+    const complete = filterConditions.filter(isCompleteCondition)
+    return complete.length
+      ? JSON.stringify({ match: filterMatch, conditions: complete })
+      : undefined
+  }, [filterConditions, filterMatch])
+  return {
+    search: searchParams.search ?? "",
+    reviewerId: searchParams.reviewerId,
+    filterMatch,
+    filterConditions,
+    filtersJson,
+  }
+}
+
 function SubmitReviewDialog({
   application,
   decision,
@@ -949,20 +974,8 @@ function ApplicationsTableContent({
     searchParams,
     "/applications",
   )
-  const reviewerId = searchParams.reviewerId
-  const filterMatch = searchParams.match ?? "all"
-  const filterConditions = useMemo(
-    () => searchParams.filters ?? [],
-    [searchParams.filters],
-  )
-
-  // Rows with a missing value stay in the UI but never reach the request.
-  const filtersJson = useMemo(() => {
-    const complete = filterConditions.filter(isCompleteCondition)
-    return complete.length
-      ? JSON.stringify({ match: filterMatch, conditions: complete })
-      : undefined
-  }, [filterConditions, filterMatch])
+  const { reviewerId, filterMatch, filterConditions, filtersJson } =
+    useApplicationsFilterParams()
 
   // The quick status select is a shortcut over the filter conditions: it maps
   // to a single "status is X" condition and shows Custom for anything richer.
@@ -1308,6 +1321,7 @@ function AddApplicationButton() {
 function Applications() {
   const { isOperatorOrAbove, isSuperadmin } = useAuth()
   const { isContextReady, selectedPopupId } = useWorkspace()
+  const { search, reviewerId, filtersJson } = useApplicationsFilterParams()
   const [isExporting, setIsExporting] = useState(false)
   const [view, setView] = useState<ApplicationsView>(readStoredApplicationsView)
 
@@ -1337,6 +1351,9 @@ function Applications() {
     [formSchema],
   )
 
+  // Export what the table shows: the same search, reviewer and filter
+  // conditions drive the fetch, just without pagination.
+  const isExportFiltered = Boolean(search || reviewerId || filtersJson)
   const handleExport = async () => {
     if (!selectedPopupId) return
     setIsExporting(true)
@@ -1346,6 +1363,9 @@ function Applications() {
           skip,
           limit,
           popupId: selectedPopupId,
+          search: search || undefined,
+          reviewedBy: reviewerId || undefined,
+          filters: filtersJson,
         }),
       )
 
@@ -1403,7 +1423,7 @@ function Applications() {
         .map(({ key, label }) => ({ key, label }))
 
       exportToCsv(
-        "applications",
+        isExportFiltered ? "applications-filtered" : "applications",
         results as unknown as Record<string, unknown>[],
         [...baseColumns, ...customColumns],
       )
@@ -1448,9 +1468,18 @@ function Applications() {
               variant="outline"
               onClick={handleExport}
               disabled={isExporting}
+              title={
+                isExportFiltered
+                  ? "Exports the applications matching the current filters"
+                  : "Exports all applications for this gathering"
+              }
             >
               <Download className="mr-2 h-4 w-4" />
-              {isExporting ? "Exporting..." : "Export CSV"}
+              {isExporting
+                ? "Exporting..."
+                : isExportFiltered
+                  ? "Export filtered CSV"
+                  : "Export CSV"}
             </Button>
           )}
           {isSuperadmin && isContextReady && <AddApplicationButton />}
