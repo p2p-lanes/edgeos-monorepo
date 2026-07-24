@@ -237,7 +237,8 @@ class HumanEnrichmentFactCreate(BaseModel):
     field: str = Field(min_length=1, max_length=100)
     value: str = Field(min_length=1)
     source: EnrichmentSource
-    evidence: str | None = None  # permalink / event id / org URL
+    source_label: str | None = Field(default=None, max_length=200)
+    evidence: str | None = None  # permalink / event id / org URL (internal)
     confidence: float | None = None  # 0..1, optional
     raw: dict | None = None  # structured payload (msg/chat/event ids)
 
@@ -248,9 +249,8 @@ class HumanEnrichmentFactPublic(BaseModel):
     field: str
     value: str
     source: EnrichmentSource
-    evidence: str | None = None
+    source_label: str | None = None
     confidence: float | None = None
-    raw: dict | None = None
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)

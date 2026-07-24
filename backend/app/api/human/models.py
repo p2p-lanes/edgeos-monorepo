@@ -127,6 +127,12 @@ class HumanEnrichmentFact(SQLModel, table=True):
     value: str = Field(sa_column=Column(Text, nullable=False))
     # Provenance — see EnrichmentSource (telegram|event|custom_fields|org|manual).
     source: str = Field(sa_column=Column(String(20), nullable=False))
+    # Human-readable source name snapshotted at extraction time (e.g. the
+    # Telegram group title). The UI shows this instead of the raw evidence
+    # link, which stays internal for auditing.
+    source_label: str | None = Field(
+        default=None, sa_column=Column(String(200), nullable=True)
+    )
     # Permalink / event id / org URL backing the fact.
     evidence: str | None = Field(default=None, sa_column=Column(Text, nullable=True))
     # Agent's 0..1 confidence score, optional.
