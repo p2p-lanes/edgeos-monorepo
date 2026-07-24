@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+
+{% block title %}Complete Your Registration{% endblock %}
+
+{% block content %}
+<h1>Your spot is confirmed. Complete your registration!</h1>
+
+<p>Hi {{ first_name }},</p>
+
+<p>
+    Your application to <strong>{{ popup_name }}</strong> has been accepted and your spot is confirmed.
+    You have not completed your purchase yet, so there is one more step to lock in your participation.
+</p>
+
+<div style="background-color: #d4edda; border-radius: 8px; padding: 20px; margin: 20px 0; border-left: 4px solid #28a745;">
+    <h2 style="margin-top: 0; color: #155724;">Next Step</h2>
+    <p style="color: #155724; margin-bottom: 0;">
+        Purchase your passes to secure your place at {{ popup_name }}.
+    </p>
+</div>
+
+{% if passes_url %}
+<div style="text-align: center; margin: 30px 0;">
+    <a href="{{ passes_url }}" class="button" style="background-color: #28a745;">
+        Complete Purchase
+    </a>
+</div>
+{% endif %}
+
+<div class="spacer"></div>
+
+<p>
+    We look forward to seeing you at {{ popup_name }}!
+</p>
+
+<p>
+    Best regards,<br>
+    The {{ project_name }} Team
+</p>
+{% endblock %}
