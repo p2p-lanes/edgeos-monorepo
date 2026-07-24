@@ -1,10 +1,18 @@
+import json
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from enum import Enum, StrEnum
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, field_validator
+from fastapi import HTTPException
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    ValidationError,
+    field_validator,
+    model_validator,
+)
 from pydantic import Field as PydanticField
 from sqlalchemy import Boolean, Numeric, String, Text
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB
@@ -387,6 +395,122 @@ class ApplicationFilter(BaseModel):
     status: ApplicationStatus | None = None
     email: str | None = None
     scholarship_status: str | None = None
+
+
+# Complex list filters (BO applications table).
+# Allowed operators per field. `custom.<name>` targets custom_fields[<name>].
+# Text eq/neq are exact (case-sensitive); contains/not_contains are
+# case-insensitive. is_empty matches NULL or empty string.
+_TEXT_OPS = {"eq", "neq", "contains", "not_contains", "is_empty", "not_empty"}
+_ENUMISH_OPS = {"eq", "neq", "is_empty", "not_empty"}
+_DATE_OPS = {"before", "after", "is_empty", "not_empty"}
+
+APPLICATION_FILTER_FIELD_OPS: dict[str, set[str]] = {
+    "status": {"eq", "neq"},
+    "scholarship_request": {"eq"},
+    "scholarship_status": _ENUMISH_OPS,
+    "submitted_at": _DATE_OPS,
+    "accepted_at": _DATE_OPS,
+    "referral": _TEXT_OPS,
+    "gender": _ENUMISH_OPS,
+    "age": _ENUMISH_OPS,
+}
+CUSTOM_FIELD_PREFIX = "custom."
+_VALUELESS_OPS = {"is_empty", "not_empty"}
+
+
+class ApplicationFilterCondition(BaseModel):
+    """One condition of the applications list filter group."""
+
+    field: str
+    op: str
+    value: str | bool | None = None
+
+    @model_validator(mode="after")
+    def validate_field_op(self) -> "ApplicationFilterCondition":
+        if self.field.startswith(CUSTOM_FIELD_PREFIX):
+            if not self.field[len(CUSTOM_FIELD_PREFIX) :]:
+                raise ValueError("Custom field name is missing.")
+            allowed = _TEXT_OPS
+        else:
+            allowed = APPLICATION_FILTER_FIELD_OPS.get(self.field)
+            if allowed is None:
+                raise ValueError(f"Filtering by '{self.field}' is not supported.")
+        if self.op not in allowed:
+            raise ValueError(
+                f"Operator '{self.op}' is not supported for '{self.field}'."
+            )
+
+        if self.op in _VALUELESS_OPS:
+            return self
+
+        if self.field == "status":
+            valid_statuses = {s.value for s in ApplicationStatus}
+            if self.value not in valid_statuses:
+                raise ValueError("Invalid status value.")
+        elif self.field == "scholarship_request":
+            if not isinstance(self.value, bool):
+                raise ValueError("Scholarship request filter needs true or false.")
+        elif self.op in {"before", "after"}:
+            if not isinstance(self.value, str):
+                raise ValueError(f"Invalid date for '{self.field}'.")
+            try:
+                date.fromisoformat(self.value)
+            except ValueError:
+                raise ValueError(f"Invalid date for '{self.field}'.") from None
+        elif not isinstance(self.value, str):
+            raise ValueError(f"Invalid value for '{self.field}'.")
+        return self
+
+    @property
+    def custom_field_name(self) -> str | None:
+        """Custom field key when this condition targets custom_fields."""
+        if self.field.startswith(CUSTOM_FIELD_PREFIX):
+            return self.field[len(CUSTOM_FIELD_PREFIX) :]
+        return None
+
+    @property
+    def date_value(self) -> date:
+        """Parsed ISO date value for before/after conditions."""
+        return date.fromisoformat(str(self.value))
+
+
+class ApplicationFilters(BaseModel):
+    """Filter group for the BO applications list.
+
+    ``match`` combines conditions with AND ("all") or OR ("any").
+    """
+
+    match: Literal["all", "any"] = "all"
+    conditions: list[ApplicationFilterCondition] = PydanticField(default_factory=list)
+
+    def references_human_fields(self) -> bool:
+        """True when any condition targets a Humans column (needs join)."""
+        return any(c.field in ("gender", "age") for c in self.conditions)
+
+
+def parse_application_filters(raw: str | None) -> ApplicationFilters | None:
+    """Parse the ``filters`` query param JSON into ApplicationFilters.
+
+    Raises HTTPException 422 with a user-oriented message when the JSON is
+    malformed or a condition uses an unsupported field, operator, or value.
+    """
+    if raw is None:
+        return None
+    try:
+        payload = json.loads(raw)
+    except json.JSONDecodeError:
+        raise HTTPException(
+            status_code=422, detail="Filters are not valid. Please check them."
+        ) from None
+    try:
+        return ApplicationFilters.model_validate(payload)
+    except ValidationError as exc:
+        first = exc.errors()[0]
+        message = str(first.get("msg", "")).removeprefix("Value error, ").strip()
+        if not message or first.get("type") != "value_error":
+            message = "Filters are not valid. Please check them."
+        raise HTTPException(status_code=422, detail=message) from None
 
 
 class ScholarshipDecisionRequest(BaseModel):

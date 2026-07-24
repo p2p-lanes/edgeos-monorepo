@@ -382,12 +382,18 @@ export class ApplicationsService {
     /**
      * List Applications
      * List applications with optional filters (BO only).
+     *
+     * ``filters`` is a JSON filter group:
+     * ``{"match": "all"|"any", "conditions": [{"field", "op", "value"}]}``.
+     * It only applies to the popup_id listing and is combined (AND) with the
+     * legacy status_filter/search/reviewed_by params.
      * @param data The data for the request.
      * @param data.popupId
      * @param data.humanId
      * @param data.reviewedBy
      * @param data.statusFilter
      * @param data.search
+     * @param data.filters
      * @param data.skip Number of items to skip
      * @param data.limit Maximum number of items to return
      * @param data.xTenantId
@@ -407,6 +413,7 @@ export class ApplicationsService {
                 reviewed_by: data.reviewedBy,
                 status_filter: data.statusFilter,
                 search: data.search,
+                filters: data.filters,
                 skip: data.skip,
                 limit: data.limit
             },

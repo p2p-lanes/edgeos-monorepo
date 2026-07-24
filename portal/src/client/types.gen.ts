@@ -4518,6 +4518,7 @@ export type ApplicationReviewsUnskipApplicationData = {
 export type ApplicationReviewsUnskipApplicationResponse = (void);
 
 export type ApplicationsListApplicationsData = {
+    filters?: (string | null);
     humanId?: (string | null);
     /**
      * Maximum number of items to return
