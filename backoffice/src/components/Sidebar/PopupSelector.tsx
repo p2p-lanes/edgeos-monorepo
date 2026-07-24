@@ -52,6 +52,17 @@ export function PopupSelector() {
     setSelectedPopupId(value)
     if (isOnEditPage) {
       navigate({ to: getWorkspaceFallbackPath(location.pathname) })
+    } else {
+      // A page number from the previous popup would leave the new list on an
+      // empty page, so drop it while keeping the rest of the filters.
+      navigate({
+        to: ".",
+        search: (prev: Record<string, unknown>) => ({
+          ...prev,
+          page: undefined,
+        }),
+        replace: true,
+      })
     }
   }
 
