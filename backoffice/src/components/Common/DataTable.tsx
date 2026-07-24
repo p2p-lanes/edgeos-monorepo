@@ -402,7 +402,10 @@ export function DataTable<TData, TValue>({
                   <p>Toggle columns</p>
                 </TooltipContent>
               </Tooltip>
-              <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuContent
+                align="end"
+                className="max-h-[70vh] w-56 overflow-y-auto"
+              >
                 <DropdownMenuLabel>Toggle columns</DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 {table
@@ -418,7 +421,12 @@ export function DataTable<TData, TValue>({
                       checked={col.getIsVisible()}
                       onCheckedChange={(value) => col.toggleVisibility(!!value)}
                     >
-                      {col.columnDef.meta?.label}
+                      <span
+                        className="truncate"
+                        title={col.columnDef.meta?.label}
+                      >
+                        {col.columnDef.meta?.label}
+                      </span>
                     </DropdownMenuCheckboxItem>
                   ))}
               </DropdownMenuContent>
