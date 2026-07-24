@@ -240,7 +240,6 @@ function getApplicationsQueryOptions(
   page: number,
   pageSize: number,
   search?: string,
-  statusFilter?: ApplicationStatus,
   reviewedBy?: string,
   filters?: string,
 ) {
@@ -252,13 +251,12 @@ function getApplicationsQueryOptions(
         popupId: popupId || undefined,
         reviewedBy: reviewedBy || undefined,
         search: search || undefined,
-        statusFilter: statusFilter || undefined,
         filters: filters || undefined,
       }),
     queryKey: [
       "applications",
       popupId,
-      { page, pageSize, search, statusFilter, reviewedBy, filters },
+      { page, pageSize, search, reviewedBy, filters },
     ],
   }
 }
@@ -293,7 +291,7 @@ function StatusDropdownFilter({
 }: {
   popupId: string | null
   requiresApplicationFee?: boolean
-  selected: ApplicationStatus | undefined
+  selected: ApplicationStatus | "custom" | undefined
   onSelect: (value: ApplicationStatus | undefined) => void
 }) {
   const { counts, total } = useStatusCounts(popupId)
@@ -301,9 +299,15 @@ function StatusDropdownFilter({
     requiresApplicationFee === false
       ? APPLICATION_STATUS_OPTIONS.filter((opt) => opt.value !== "pending_fee")
       : APPLICATION_STATUS_OPTIONS
-  const selectedOption = selected
-    ? statusOptions.find((option) => option.value === selected)
-    : undefined
+  // Status combinations built in the filter builder (or statuses outside the
+  // quick options) render as a read-only "Custom" entry.
+  const isCustom =
+    selected === "custom" ||
+    (!!selected && !statusOptions.some((option) => option.value === selected))
+  const selectedOption =
+    selected && !isCustom
+      ? statusOptions.find((option) => option.value === selected)
+      : undefined
 
   const options = [
     { value: "all" as const, label: "All", count: total },
@@ -314,21 +318,24 @@ function StatusDropdownFilter({
     })),
   ]
 
-  const currentLabel = selectedOption?.label ?? "All"
-  const currentCount = selectedOption
-    ? (counts[selectedOption.value] ?? 0)
-    : total
+  const currentLabel = isCustom ? "Custom" : (selectedOption?.label ?? "All")
+  const currentCount = isCustom
+    ? null
+    : selectedOption
+      ? (counts[selectedOption.value] ?? 0)
+      : total
 
   return (
     <Select
-      value={selectedOption?.value ?? "all"}
+      value={isCustom ? "custom" : (selectedOption?.value ?? "all")}
       onValueChange={(v) =>
         onSelect(v === "all" ? undefined : (v as ApplicationStatus))
       }
     >
       <SelectTrigger className="h-9 w-[180px]">
         <SelectValue>
-          {currentLabel} ({currentCount})
+          {currentLabel}
+          {currentCount !== null ? ` (${currentCount})` : ""}
         </SelectValue>
       </SelectTrigger>
       <SelectContent>
@@ -345,6 +352,14 @@ function StatusDropdownFilter({
             </span>
           </SelectItem>
         ))}
+        {isCustom && (
+          <SelectItem value="custom" disabled>
+            <span className="flex w-full items-center justify-between gap-4">
+              <span>Custom</span>
+              <span className="text-muted-foreground">via filters</span>
+            </span>
+          </SelectItem>
+        )}
       </SelectContent>
     </Select>
   )
@@ -404,7 +419,6 @@ const VALID_STATUSES: Set<string> = new Set([
 
 type ApplicationsSearchParams = TableSearchParams & {
   reviewerId?: string
-  status?: ApplicationStatus
   match?: FilterMatch
   filters?: FilterCondition[]
 }
@@ -413,11 +427,16 @@ export const Route = createFileRoute("/_layout/applications/")({
   component: Applications,
   validateSearch: (raw: Record<string, unknown>): ApplicationsSearchParams => {
     const filters = sanitizeFilterConditions(raw.filters)
+    // Legacy ?status= links fold into the filter conditions.
+    if (
+      typeof raw.status === "string" &&
+      VALID_STATUSES.has(raw.status) &&
+      !filters.some((condition) => condition.field === "status")
+    ) {
+      filters.push({ field: "status", op: "eq", value: raw.status })
+    }
     return {
       ...validateTableSearch(raw),
-      ...(typeof raw.status === "string" && VALID_STATUSES.has(raw.status)
-        ? { status: raw.status as ApplicationStatus }
-        : {}),
       ...(typeof raw.reviewerId === "string" && raw.reviewerId
         ? { reviewerId: raw.reviewerId }
         : {}),
@@ -930,7 +949,6 @@ function ApplicationsTableContent({
     searchParams,
     "/applications",
   )
-  const statusFilter = searchParams.status
   const reviewerId = searchParams.reviewerId
   const filterMatch = searchParams.match ?? "all"
   const filterConditions = useMemo(
@@ -946,20 +964,23 @@ function ApplicationsTableContent({
       : undefined
   }, [filterConditions, filterMatch])
 
-  const setStatusFilter = useCallback(
-    (value: ApplicationStatus | undefined) => {
-      navigate({
-        to: "/applications",
-        search: (prev: Record<string, unknown>) => ({
-          ...prev,
-          status: value,
-          page: 0,
-        }),
-        replace: true,
-      })
-    },
-    [navigate],
-  )
+  // The quick status select is a shortcut over the filter conditions: it maps
+  // to a single "status is X" condition and shows Custom for anything richer.
+  const statusFilter: ApplicationStatus | "custom" | undefined = useMemo(() => {
+    const statusConditions = filterConditions.filter(
+      (condition) => condition.field === "status",
+    )
+    if (statusConditions.length === 0) return undefined
+    const [only] = statusConditions
+    if (
+      statusConditions.length === 1 &&
+      only.op === "eq" &&
+      (filterMatch === "all" || filterConditions.length === 1)
+    ) {
+      return only.value as ApplicationStatus
+    }
+    return "custom"
+  }, [filterConditions, filterMatch])
 
   const setReviewerFilter = useCallback(
     (value: string | undefined) => {
@@ -993,13 +1014,25 @@ function ApplicationsTableContent({
     [navigate],
   )
 
+  const setStatusFilter = useCallback(
+    (value: ApplicationStatus | undefined) => {
+      const rest = filterConditions.filter(
+        (condition) => condition.field !== "status",
+      )
+      setFilters(
+        filterMatch,
+        value ? [...rest, { field: "status", op: "eq", value }] : rest,
+      )
+    },
+    [filterConditions, filterMatch, setFilters],
+  )
+
   const { data: applications } = useQuery({
     ...getApplicationsQueryOptions(
       selectedPopupId,
       pagination.pageIndex,
       pagination.pageSize,
       search,
-      statusFilter,
       reviewerId,
       filtersJson,
     ),
@@ -1030,13 +1063,28 @@ function ApplicationsTableContent({
   })
 
   useEffect(() => {
-    if (
-      popup?.requires_application_fee === false &&
-      statusFilter === "pending_fee"
-    ) {
-      setStatusFilter(undefined)
+    if (popup?.requires_application_fee !== false) return
+    const hasPendingFee = filterConditions.some(
+      (condition) =>
+        condition.field === "status" && condition.value === "pending_fee",
+    )
+    if (hasPendingFee) {
+      setFilters(
+        filterMatch,
+        filterConditions.filter(
+          (condition) =>
+            !(
+              condition.field === "status" && condition.value === "pending_fee"
+            ),
+        ),
+      )
     }
-  }, [popup?.requires_application_fee, setStatusFilter, statusFilter])
+  }, [
+    popup?.requires_application_fee,
+    filterConditions,
+    filterMatch,
+    setFilters,
+  ])
 
   const reviewers = popupReviewers?.results ?? []
 
