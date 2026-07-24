@@ -33,7 +33,6 @@ import {
   DashboardService,
   FormFieldsService,
   type HumanRating,
-  type PopupReviewerPublic,
   PopupReviewersService,
   PopupsService,
   type ReviewDecision,
@@ -354,66 +353,6 @@ function StatusDropdownFilter({
             </span>
           </SelectItem>
         )}
-      </SelectContent>
-    </Select>
-  )
-}
-
-function ReviewerDropdownFilter({
-  reviewers,
-  selected,
-  onSelect,
-  disabled = false,
-}: {
-  reviewers: PopupReviewerPublic[]
-  selected: string | undefined
-  onSelect: (value: string | undefined) => void
-  disabled?: boolean
-}) {
-  // Reviewer combinations built in the filter builder (or reviewers no longer
-  // in this popup) render as a read-only "Custom" entry.
-  const isCustom =
-    selected === "custom" ||
-    (!!selected && !reviewers.some((reviewer) => reviewer.user_id === selected))
-  const selectedReviewer =
-    selected && !isCustom
-      ? reviewers.find((reviewer) => reviewer.user_id === selected)
-      : undefined
-
-  const currentLabel = disabled
-    ? "No reviewers"
-    : isCustom
-      ? "Custom"
-      : (selectedReviewer?.user_full_name ??
-        selectedReviewer?.user_email ??
-        "All reviewers")
-
-  return (
-    <Select
-      value={isCustom ? "custom" : (selected ?? "all")}
-      onValueChange={(value) => onSelect(value === "all" ? undefined : value)}
-      disabled={disabled}
-    >
-      <SelectTrigger className="h-9 w-[220px]">
-        <SelectValue>{currentLabel}</SelectValue>
-      </SelectTrigger>
-      <SelectContent>
-        <SelectItem value="all">All reviewers</SelectItem>
-        {isCustom && (
-          <SelectItem value="custom" disabled>
-            <span className="flex w-full items-center justify-between gap-4">
-              <span>Custom</span>
-              <span className="text-muted-foreground">via filters</span>
-            </span>
-          </SelectItem>
-        )}
-        {reviewers.map((reviewer) => (
-          <SelectItem key={reviewer.id} value={reviewer.user_id}>
-            {reviewer.user_full_name ??
-              reviewer.user_email ??
-              "Unknown reviewer"}
-          </SelectItem>
-        ))}
       </SelectContent>
     </Select>
   )
@@ -1055,11 +994,6 @@ function ApplicationsTableContent({
     [upsertQuickFilter],
   )
 
-  const setReviewerFilter = useCallback(
-    (value: string | undefined) => upsertQuickFilter("reviewed_by", value),
-    [upsertQuickFilter],
-  )
-
   const { data: applications } = useQuery({
     ...getApplicationsQueryOptions(
       selectedPopupId,
@@ -1250,14 +1184,6 @@ function ApplicationsTableContent({
             selected={statusFilter}
             onSelect={setStatusFilter}
           />
-          {selectedPopupId ? (
-            <ReviewerDropdownFilter
-              reviewers={reviewers}
-              selected={reviewerFilter}
-              onSelect={setReviewerFilter}
-              disabled={reviewers.length === 0}
-            />
-          ) : null}
           <ApplicationFilterBuilder
             statusOptions={FILTER_STATUS_OPTIONS}
             customFields={customFilterFields}
