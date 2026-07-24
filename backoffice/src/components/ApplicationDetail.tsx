@@ -8,6 +8,7 @@ import {
   GraduationCap,
   MapPin,
   MessageCircle,
+  SkipForward,
   ThumbsDown,
   ThumbsUp,
 } from "lucide-react"
@@ -26,6 +27,7 @@ import {
   type ReviewDecision,
   type ScholarshipDecisionRequest,
 } from "@/client"
+import { ApplicationCommentThread } from "@/components/Applications/ApplicationCommentThread"
 import { StatusBadge } from "@/components/Common/StatusBadge"
 import { HumanRatingBadge } from "@/components/Humans/HumanRatingBadge"
 import { Button } from "@/components/ui/button"
@@ -43,6 +45,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { LoadingButton } from "@/components/ui/loading-button"
 import { Separator } from "@/components/ui/separator"
+import { Textarea } from "@/components/ui/textarea"
 import useAuth from "@/hooks/useAuth"
 import useCustomToast from "@/hooks/useCustomToast"
 import { cn } from "@/lib/utils"
@@ -288,6 +291,80 @@ function SimpleVoting({
               }
             >
               {pendingDecision === "yes" ? "Approve" : "Reject"}
+            </LoadingButton>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  )
+}
+
+function SkipReview({
+  application,
+  onSuccess,
+}: {
+  application: ApplicationPublic
+  onSuccess: () => void
+}) {
+  const { showSuccessToast, showErrorToast } = useCustomToast()
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const [reason, setReason] = useState("")
+
+  const mutation = useMutation({
+    mutationFn: () =>
+      ApplicationReviewsService.skipApplication({
+        applicationId: application.id,
+        requestBody: { reason: reason.trim() || null },
+      }),
+    onSuccess: () => {
+      showSuccessToast("Application skipped")
+      setDialogOpen(false)
+      setReason("")
+      onSuccess()
+    },
+    onError: (err) => createErrorHandler(showErrorToast)(err as ApiError),
+  })
+
+  return (
+    <>
+      <Button
+        size="sm"
+        variant="ghost"
+        className="w-full justify-start text-muted-foreground"
+        onClick={() => setDialogOpen(true)}
+      >
+        <SkipForward className="h-3.5 w-3.5" />
+        Skip
+      </Button>
+
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Skip Application</DialogTitle>
+            <DialogDescription>
+              This removes the application from your review queue without
+              casting a vote. You can add an optional reason.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="skip-reason">Reason (optional)</Label>
+            <Textarea
+              id="skip-reason"
+              rows={3}
+              placeholder="Why are you skipping this application?"
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+            />
+          </div>
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button variant="outline">Cancel</Button>
+            </DialogClose>
+            <LoadingButton
+              loading={mutation.isPending}
+              onClick={() => mutation.mutate()}
+            >
+              Skip
             </LoadingButton>
           </DialogFooter>
         </DialogContent>
@@ -905,10 +982,21 @@ export function ApplicationDetail({
     )
   }
 
-  const votingPanel = isWeightedVoting ? (
-    <WeightedVoting application={application} onSuccess={handleReviewSuccess} />
-  ) : (
-    <SimpleVoting application={application} onSuccess={handleReviewSuccess} />
+  const votingPanel = (
+    <div className="space-y-4">
+      {isWeightedVoting ? (
+        <WeightedVoting
+          application={application}
+          onSuccess={handleReviewSuccess}
+        />
+      ) : (
+        <SimpleVoting
+          application={application}
+          onSuccess={handleReviewSuccess}
+        />
+      )}
+      <SkipReview application={application} onSuccess={handleReviewSuccess} />
+    </div>
   )
 
   const hasReviews =
@@ -1112,6 +1200,14 @@ export function ApplicationDetail({
           application={application}
           onSuccess={onReviewSuccess}
         />
+      )}
+
+      {/* Comment thread — shared reviewer notes on this application */}
+      {application.status !== "draft" && isOperatorOrAbove && (
+        <>
+          <Separator />
+          <ApplicationCommentThread applicationId={application.id} />
+        </>
       )}
 
       {/* Desktop action panel */}

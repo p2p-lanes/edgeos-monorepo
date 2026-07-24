@@ -151,6 +151,25 @@ export type ApplicationAdminCreate = {
     group_id?: (string | null);
 };
 
+export type ApplicationCommentCreate = {
+    body: string;
+};
+
+export type ApplicationCommentPublic = {
+    id: string;
+    application_id: string;
+    author_user_id?: (string | null);
+    author_name?: (string | null);
+    author_email?: (string | null);
+    body: string;
+    created_at: string;
+    edited_at?: (string | null);
+};
+
+export type ApplicationCommentUpdate = {
+    body: string;
+};
+
 /**
  * Application schema for creation.
  *
@@ -244,6 +263,7 @@ export type ApplicationPublic = {
     review_count?: number;
     reviewers?: Array<ApplicationReviewerVote>;
     comment_count?: number;
+    skipped_by_me?: boolean;
 };
 
 /**
@@ -278,6 +298,25 @@ export type ApplicationReviewPublic = {
     updated_at?: (string | null);
     reviewer_email?: (string | null);
     reviewer_full_name?: (string | null);
+};
+
+/**
+ * Schema for skipping (passing on) an application.
+ */
+export type ApplicationReviewSkipCreate = {
+    reason?: (string | null);
+};
+
+/**
+ * ApplicationReviewSkip schema for API responses.
+ */
+export type ApplicationReviewSkipPublic = {
+    id: string;
+    application_id: string;
+    reviewer_id: string;
+    tenant_id: string;
+    reason?: (string | null);
+    created_at?: (string | null);
 };
 
 /**
@@ -1283,6 +1322,24 @@ export type DistributionItem = {
     percentage?: string;
 };
 
+/**
+ * A single email log entry returned to the backoffice.
+ */
+export type EmailLogPublic = {
+    id: string;
+    tenant_id: string;
+    popup_id?: (string | null);
+    template_type: string;
+    to_email: string;
+    application_id?: (string | null);
+    payment_id?: (string | null);
+    human_id?: (string | null);
+    subject?: (string | null);
+    status: string;
+    error?: (string | null);
+    created_at: string;
+};
+
 export type EmailTemplateCreate = {
     popup_id?: (string | null);
     template_type: string;
@@ -1304,7 +1361,7 @@ export type EmailTemplatePublic = {
     updated_at?: (string | null);
 };
 
-export type EmailTemplateType = 'login_code_user' | 'login_code_human' | 'application_received' | 'application_accepted' | 'application_rejected' | 'application_accepted_with_discount' | 'application_accepted_with_incentive' | 'application_accepted_scholarship_rejected' | 'payment_confirmed' | 'abandoned_cart' | 'edit_passes_confirmed' | 'event_invitation' | 'event_updated' | 'event_cancelled' | 'event_rsvp_cancelled' | 'event_approval_approved' | 'event_approval_rejected' | 'check_in_pass';
+export type EmailTemplateType = 'login_code_user' | 'login_code_human' | 'application_received' | 'application_accepted' | 'application_rejected' | 'application_accepted_with_discount' | 'application_accepted_with_incentive' | 'application_accepted_scholarship_rejected' | 'payment_confirmed' | 'abandoned_cart' | 'purchase_reminder' | 'abandoned_application' | 'edit_passes_confirmed' | 'event_invitation' | 'event_updated' | 'event_cancelled' | 'event_rsvp_cancelled' | 'event_approval_approved' | 'event_approval_rejected' | 'check_in_pass';
 
 export type EmailTemplateUpdate = {
     subject?: (string | null);
@@ -2365,6 +2422,11 @@ export type ListModel_AbandonedCartPublic_ = {
     paging: Paging;
 };
 
+export type ListModel_ApplicationCommentPublic_ = {
+    results: Array<ApplicationCommentPublic>;
+    paging: Paging;
+};
+
 export type ListModel_ApplicationPublic_ = {
     results: Array<ApplicationPublic>;
     paging: Paging;
@@ -2407,6 +2469,11 @@ export type ListModel_CheckInListItem_ = {
 
 export type ListModel_CouponPublic_ = {
     results: Array<CouponPublic>;
+    paging: Paging;
+};
+
+export type ListModel_EmailLogPublic_ = {
+    results: Array<EmailLogPublic>;
     paging: Paging;
 };
 
@@ -2913,6 +2980,15 @@ export type PopupAdmin = {
     installments_max?: (number | null);
     installments_interval?: InstallmentInterval;
     installments_interval_count?: number;
+    abandoned_cart_delay_days?: (number | null);
+    abandoned_cart_repeat_days?: (number | null);
+    abandoned_cart_max_count?: (number | null);
+    purchase_reminder_delay_days?: (number | null);
+    purchase_reminder_repeat_days?: (number | null);
+    purchase_reminder_max_count?: (number | null);
+    abandoned_application_delay_days?: (number | null);
+    abandoned_application_repeat_days?: (number | null);
+    abandoned_application_max_count?: (number | null);
     id: string;
 };
 
@@ -2971,6 +3047,15 @@ export type PopupCreate = {
     installments_interval?: InstallmentInterval;
     installments_interval_count?: number;
     checkin_pass_lead_days?: (number | null);
+    abandoned_cart_delay_days?: (number | null);
+    abandoned_cart_repeat_days?: (number | null);
+    abandoned_cart_max_count?: (number | null);
+    purchase_reminder_delay_days?: (number | null);
+    purchase_reminder_repeat_days?: (number | null);
+    purchase_reminder_max_count?: (number | null);
+    abandoned_application_delay_days?: (number | null);
+    abandoned_application_repeat_days?: (number | null);
+    abandoned_application_max_count?: (number | null);
 };
 
 /**
@@ -3111,6 +3196,15 @@ export type PopupUpdate = {
     installments_interval?: (InstallmentInterval | null);
     installments_interval_count?: (number | null);
     checkin_pass_lead_days?: (number | null);
+    abandoned_cart_delay_days?: (number | null);
+    abandoned_cart_repeat_days?: (number | null);
+    abandoned_cart_max_count?: (number | null);
+    purchase_reminder_delay_days?: (number | null);
+    purchase_reminder_repeat_days?: (number | null);
+    purchase_reminder_max_count?: (number | null);
+    abandoned_application_delay_days?: (number | null);
+    abandoned_application_repeat_days?: (number | null);
+    abandoned_application_max_count?: (number | null);
 };
 
 /**
@@ -4409,6 +4503,21 @@ export type ApplicationReviewsListMyReviewsData = {
 
 export type ApplicationReviewsListMyReviewsResponse = (ListModel_ApplicationReviewPublic_);
 
+export type ApplicationReviewsSkipApplicationData = {
+    applicationId: string;
+    requestBody: ApplicationReviewSkipCreate;
+    xTenantId?: (string | null);
+};
+
+export type ApplicationReviewsSkipApplicationResponse = (ApplicationReviewSkipPublic);
+
+export type ApplicationReviewsUnskipApplicationData = {
+    applicationId: string;
+    xTenantId?: (string | null);
+};
+
+export type ApplicationReviewsUnskipApplicationResponse = (void);
+
 export type ApplicationsListApplicationsData = {
     humanId?: (string | null);
     /**
@@ -4560,6 +4669,38 @@ export type ApplicationsReviewScholarshipData = {
 };
 
 export type ApplicationsReviewScholarshipResponse = (ApplicationPublic);
+
+export type ApplicationsListApplicationCommentsData = {
+    applicationId: string;
+    xTenantId?: (string | null);
+};
+
+export type ApplicationsListApplicationCommentsResponse = (ListModel_ApplicationCommentPublic_);
+
+export type ApplicationsCreateApplicationCommentData = {
+    applicationId: string;
+    requestBody: ApplicationCommentCreate;
+    xTenantId?: (string | null);
+};
+
+export type ApplicationsCreateApplicationCommentResponse = (ApplicationCommentPublic);
+
+export type ApplicationsUpdateApplicationCommentData = {
+    applicationId: string;
+    commentId: string;
+    requestBody: ApplicationCommentUpdate;
+    xTenantId?: (string | null);
+};
+
+export type ApplicationsUpdateApplicationCommentResponse = (ApplicationCommentPublic);
+
+export type ApplicationsDeleteApplicationCommentData = {
+    applicationId: string;
+    commentId: string;
+    xTenantId?: (string | null);
+};
+
+export type ApplicationsDeleteApplicationCommentResponse = (void);
 
 export type ApprovalStrategiesGetApprovalStrategyData = {
     popupId: string;
@@ -5045,6 +5186,24 @@ export type DashboardGetEnrichedDashboardData = {
 };
 
 export type DashboardGetEnrichedDashboardResponse = (EnrichedDashboardStats);
+
+export type EmailLogsListEmailLogsData = {
+    /**
+     * Maximum number of items to return
+     */
+    limit?: number;
+    popupId?: (string | null);
+    search?: (string | null);
+    /**
+     * Number of items to skip
+     */
+    skip?: number;
+    status?: (string | null);
+    templateType?: (string | null);
+    xTenantId?: (string | null);
+};
+
+export type EmailLogsListEmailLogsResponse = (ListModel_EmailLogPublic_);
 
 export type EmailTemplatesListTemplateTypesResponse = (Array<TemplateTypeInfo>);
 

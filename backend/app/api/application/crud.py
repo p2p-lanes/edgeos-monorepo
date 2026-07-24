@@ -1,7 +1,7 @@
 import uuid
 from datetime import UTC, datetime
 from decimal import Decimal
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from fastapi import HTTPException, status
 from sqlalchemy import desc, exists, or_
@@ -9,16 +9,25 @@ from sqlalchemy.dialects import postgresql
 from sqlalchemy.orm import selectinload
 from sqlmodel import Session, col, func, select
 
-from app.api.application.models import Applications, ApplicationSnapshots
+from app.api.application.models import (
+    ApplicationComment,
+    Applications,
+    ApplicationSnapshots,
+)
 from app.api.application.schemas import (
     ApplicationAdminCreate,
+    ApplicationCommentCreate,
+    ApplicationCommentUpdate,
     ApplicationCreate,
     ApplicationStatus,
     ApplicationUpdate,
     PopupAccessResponse,
     ScholarshipDecisionRequest,
 )
-from app.api.application_review.models import ApplicationReviews
+from app.api.application_review.models import (
+    ApplicationReviews,
+    ApplicationReviewSkips,
+)
 from app.api.attendee.crud import attendees_crud
 from app.api.attendee.models import AttendeeProducts, Attendees
 from app.api.attendee_category.models import AttendeeCategories
@@ -234,9 +243,17 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
             .where(ApplicationReviews.application_id == Applications.id)
             .where(ApplicationReviews.reviewer_id == reviewer_id)
         )
+        # This reviewer skipped the app: drop it from their queue only, without
+        # touching the vote tally.
+        already_skipped = (
+            exists()
+            .where(ApplicationReviewSkips.application_id == Applications.id)
+            .where(ApplicationReviewSkips.reviewer_id == reviewer_id)
+        )
         base_statement = select(Applications).where(
             Applications.status == ApplicationStatus.IN_REVIEW.value,
             ~already_reviewed,
+            ~already_skipped,
         )
 
         if popup_ids is not None:
@@ -478,12 +495,14 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         # the form never asked for.
         is_express_checkout = bool(getattr(app_data, "group_id", None))
 
-        # Validate custom_fields against form field definitions
-        if validate_custom_fields and app_data.custom_fields:
+        # Validate custom_fields against form field definitions. Non-draft
+        # submissions must run even with empty/absent custom_fields so
+        # missing required fields are reported.
+        if validate_custom_fields and (app_data.custom_fields or not is_draft):
             is_valid, errors = form_fields_crud.validate_custom_fields(
                 session,
                 app_data.popup_id,
-                app_data.custom_fields,
+                app_data.custom_fields or {},
                 skip_required=is_draft,
                 is_express_checkout=is_express_checkout,
             )
@@ -716,12 +735,14 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         # portal; mirror that scope here when the admin creates one too.
         is_express_checkout = bool(getattr(app_data, "group_id", None))
 
-        # Validate custom_fields against form field definitions
-        if validate_custom_fields and app_data.custom_fields:
+        # Validate custom_fields against form field definitions. Non-draft
+        # submissions must run even with empty/absent custom_fields so
+        # missing required fields are reported.
+        if validate_custom_fields and (app_data.custom_fields or not is_draft):
             is_valid, errors = form_fields_crud.validate_custom_fields(
                 session,
                 app_data.popup_id,
-                app_data.custom_fields,
+                app_data.custom_fields or {},
                 skip_required=is_draft,
                 is_express_checkout=is_express_checkout,
             )
@@ -924,6 +945,108 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
             _maybe_grant_fee_credit(session, application)
         else:
             self.create_snapshot(session, application, "submitted")
+
+    def validate_portal_update(
+        self,
+        session: Session,
+        application: Applications,
+        update_data: dict[str, Any],
+    ) -> dict[str, Any] | None:
+        """Validate a portal application update against the popup's form.
+
+        The portal sends the full form state on every save and omits
+        cleared/empty answers, so an incoming ``custom_fields`` dict replaces
+        the stored answers for every field the current form renders: a
+        schema-known key absent from the payload means "cleared". Stored keys
+        the form does not render (deleted, renamed, or hidden fields, or
+        fields outside the Express Checkout mini-form) are preserved so old
+        answers stay interpretable.
+
+        When the update results in a non-draft status (submitting, or editing
+        an already-submitted application), that resolved state must satisfy
+        the same required and type checks the create path enforces. Draft
+        saves skip required checks but still type-check the resolved values.
+
+        ``update_data`` must contain only the keys the caller explicitly sent
+        (``model_dump(exclude_unset=True)``).
+
+        Returns the resolved ``custom_fields`` the caller must store, or
+        ``None`` when the payload does not update them.
+        """
+        from app.api.form_field.crud import form_fields_crud
+
+        incoming_status = update_data.get("status")
+        if incoming_status is not None:
+            incoming_status = getattr(incoming_status, "value", incoming_status)
+        resulting_status = incoming_status or application.status
+        is_draft = _is_draft_status(resulting_status)
+
+        # Group applications use the Express Checkout reduced form on the
+        # portal; keep the relaxed required subset for their updates too.
+        is_express_checkout = bool(update_data.get("group_id") or application.group_id)
+
+        stored_custom: dict[str, Any] = application.custom_fields or {}
+        incoming_custom = update_data.get("custom_fields")
+        resolved_custom: dict[str, Any] | None = None
+        if incoming_custom is not None:
+            rendered = form_fields_crud.get_portal_rendered_field_names(
+                session,
+                application.popup_id,
+                is_express_checkout=is_express_checkout,
+            )
+            resolved_custom = {
+                k: v for k, v in stored_custom.items() if k not in rendered
+            } | incoming_custom
+
+        # Validate exactly the state that will be stored. When custom_fields
+        # isn't in the payload the stored answers stay untouched, but a
+        # non-draft result must still satisfy required checks against them.
+        if resolved_custom is not None:
+            custom_fields = resolved_custom
+        else:
+            custom_fields = {} if is_draft else stored_custom
+
+        is_valid, errors = form_fields_crud.validate_custom_fields(
+            session,
+            application.popup_id,
+            custom_fields,
+            skip_required=is_draft,
+            is_express_checkout=is_express_checkout,
+        )
+        if not is_valid:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={"message": "Invalid custom fields", "errors": errors},
+            )
+
+        if is_draft:
+            return resolved_custom
+
+        # Base fields: stored application values overlaid with the incoming
+        # payload; target=human fields fall back to the Human record inside
+        # validate_base_fields.
+        base_data: dict[str, Any] = {
+            "referral": application.referral,
+            "info_not_shared": application.info_not_shared,
+            "scholarship_request": application.scholarship_request,
+            "scholarship_details": application.scholarship_details,
+            "scholarship_video_url": application.scholarship_video_url,
+        }
+        base_data.update({k: v for k, v in update_data.items() if v is not None})
+        is_valid, errors = form_fields_crud.validate_base_fields(
+            session,
+            application.popup_id,
+            base_data,
+            application.human,
+            is_express_checkout=is_express_checkout,
+        )
+        if not is_valid:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={"message": "Invalid base fields", "errors": errors},
+            )
+
+        return resolved_custom
 
     def update_with_profile(
         self,
@@ -1416,6 +1539,84 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
             allowed=False,
             reason="no_access",
         )
+
+    def list_comments(
+        self, session: Session, application_id: uuid.UUID
+    ) -> list[ApplicationComment]:
+        """Return an application's non-deleted comments, oldest first."""
+        statement = (
+            select(ApplicationComment)
+            .where(
+                ApplicationComment.application_id == application_id,
+                col(ApplicationComment.deleted_at).is_(None),
+            )
+            .order_by(col(ApplicationComment.created_at).asc())
+        )
+        return list(session.exec(statement).all())
+
+    def count_active_comments_by_applications(
+        self, session: Session, application_ids: list[uuid.UUID]
+    ) -> dict[uuid.UUID, int]:
+        """Return a map of application_id -> non-deleted comment count.
+
+        Single grouped query so callers listing many applications avoid N+1.
+        """
+        if not application_ids:
+            return {}
+        statement = (
+            select(ApplicationComment.application_id, func.count())
+            .where(
+                col(ApplicationComment.application_id).in_(application_ids),
+                col(ApplicationComment.deleted_at).is_(None),
+            )
+            .group_by(col(ApplicationComment.application_id))
+        )
+        return dict(session.exec(statement).all())
+
+    def create_comment(
+        self,
+        session: Session,
+        application: Applications,
+        comment_in: ApplicationCommentCreate,
+        author_user_id: uuid.UUID,
+        author_name: str | None,
+        author_email: str | None,
+    ) -> ApplicationComment:
+        """Add a comment to an application, snapshotting the author identity."""
+        comment = ApplicationComment(
+            tenant_id=application.tenant_id,
+            application_id=application.id,
+            author_user_id=author_user_id,
+            author_name=author_name,
+            author_email=author_email,
+            body=comment_in.body,
+        )
+        session.add(comment)
+        session.commit()
+        session.refresh(comment)
+        return comment
+
+    def update_comment(
+        self,
+        session: Session,
+        comment: ApplicationComment,
+        comment_in: ApplicationCommentUpdate,
+    ) -> ApplicationComment:
+        """Edit a comment's body and stamp ``edited_at``."""
+        comment.body = comment_in.body
+        comment.edited_at = datetime.now(UTC)
+        session.add(comment)
+        session.commit()
+        session.refresh(comment)
+        return comment
+
+    def soft_delete_comment(
+        self, session: Session, comment: ApplicationComment
+    ) -> None:
+        """Soft-delete a comment: the row is preserved, hidden from reads."""
+        comment.deleted_at = datetime.now(UTC)
+        session.add(comment)
+        session.commit()
 
 
 def _maybe_grant_fee_credit(

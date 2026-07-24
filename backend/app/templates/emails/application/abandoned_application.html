@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+
+{% block title %}Finish Your Application{% endblock %}
+
+{% block content %}
+<h1>Finish your application</h1>
+
+<p>Hi {{ first_name }},</p>
+
+<p>
+    Your application to <strong>{{ popup_name }}</strong> is still unfinished.
+    It has not been submitted yet, so it will not be reviewed until you complete it.
+</p>
+
+<div style="background-color: #fff3cd; border-radius: 8px; padding: 20px; margin: 20px 0; border-left: 4px solid #ffc107;">
+    <h2 style="margin-top: 0; color: #856404;">Next Step</h2>
+    <p style="color: #856404; margin-bottom: 0;">
+        Complete and submit your application to be considered for {{ popup_name }}.
+    </p>
+</div>
+
+{% if application_url %}
+<div style="text-align: center; margin: 30px 0;">
+    <a href="{{ application_url }}" class="button" style="background-color: #ffc107; color: #333333 !important;">
+        Finish Application
+    </a>
+</div>
+{% endif %}
+
+<div class="spacer"></div>
+
+<p>
+    We hope to see your application for {{ popup_name }} soon!
+</p>
+
+<p>
+    Best regards,<br>
+    The {{ project_name }} Team
+</p>
+{% endblock %}

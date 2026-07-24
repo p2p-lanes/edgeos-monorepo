@@ -1,6 +1,7 @@
 import uuid
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
+from fastapi import HTTPException, status
 from pydantic import BaseModel
 from sqlmodel import Session, select
 
@@ -23,6 +24,47 @@ def field_applies_to_popup(field_name: str, popup: "Popups") -> bool:
     if field_name in SCHOLARSHIP_FIELDS and not popup.allows_scholarship:
         return False
     return True
+
+
+def ensure_base_field_update_allowed(
+    config: BaseFieldConfigs, update_fields: dict[str, Any]
+) -> None:
+    """Enforce catalog invariants on a base field config update.
+
+    ``update_fields`` must contain only the keys the caller explicitly sent
+    (``model_dump(exclude_unset=True)``). Shared by the /form-fields and
+    /base-field-configs update routes so both enforce the same rules.
+    """
+    definition = BASE_FIELD_DEFINITIONS.get(config.field_name, {})
+
+    # Non-removable elementals (first_name, last_name) cannot be made optional.
+    if (
+        not definition.get("removable", True)
+        and "required" in update_fields
+        and update_fields["required"] is False
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Field '{config.field_name}' is required and cannot be made optional",
+        )
+
+    # `field_type` is only writeable on base configs whose catalog entry
+    # whitelists alternatives — and only to a value inside that whitelist.
+    if "field_type" in update_fields:
+        allowed_field_types = definition.get("allowed_field_types")
+        if not allowed_field_types:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Field '{config.field_name}' does not allow type overrides",
+            )
+        new_type = update_fields["field_type"]
+        if new_type is not None and new_type not in allowed_field_types:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    f"Field type '{new_type}' is not allowed for '{config.field_name}'"
+                ),
+            )
 
 
 class BaseFieldConfigsCRUD(

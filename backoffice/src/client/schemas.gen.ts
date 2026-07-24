@@ -691,6 +691,105 @@ If email is provided and human doesn't exist, a new Human record is created.
 Companions (spouse/kids) can be added during initial submission.`
 } as const;
 
+export const ApplicationCommentCreateSchema = {
+    properties: {
+        body: {
+            type: 'string',
+            minLength: 1,
+            title: 'Body'
+        }
+    },
+    type: 'object',
+    required: ['body'],
+    title: 'ApplicationCommentCreate'
+} as const;
+
+export const ApplicationCommentPublicSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        application_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Application Id'
+        },
+        author_user_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Author User Id'
+        },
+        author_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Author Name'
+        },
+        author_email: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Author Email'
+        },
+        body: {
+            type: 'string',
+            title: 'Body'
+        },
+        created_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Created At'
+        },
+        edited_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Edited At'
+        }
+    },
+    type: 'object',
+    required: ['id', 'application_id', 'body', 'created_at'],
+    title: 'ApplicationCommentPublic'
+} as const;
+
+export const ApplicationCommentUpdateSchema = {
+    properties: {
+        body: {
+            type: 'string',
+            minLength: 1,
+            title: 'Body'
+        }
+    },
+    type: 'object',
+    required: ['body'],
+    title: 'ApplicationCommentUpdate'
+} as const;
+
 export const ApplicationCreateSchema = {
     properties: {
         popup_id: {
@@ -1188,6 +1287,11 @@ export const ApplicationPublicSchema = {
             type: 'integer',
             title: 'Comment Count',
             default: 0
+        },
+        skipped_by_me: {
+            type: 'boolean',
+            title: 'Skipped By Me',
+            default: false
         }
     },
     type: 'object',
@@ -1306,6 +1410,77 @@ export const ApplicationReviewPublicSchema = {
     required: ['id', 'application_id', 'reviewer_id', 'tenant_id', 'decision'],
     title: 'ApplicationReviewPublic',
     description: 'ApplicationReview schema for API responses.'
+} as const;
+
+export const ApplicationReviewSkipCreateSchema = {
+    properties: {
+        reason: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Reason'
+        }
+    },
+    type: 'object',
+    title: 'ApplicationReviewSkipCreate',
+    description: 'Schema for skipping (passing on) an application.'
+} as const;
+
+export const ApplicationReviewSkipPublicSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        application_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Application Id'
+        },
+        reviewer_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Reviewer Id'
+        },
+        tenant_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Tenant Id'
+        },
+        reason: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Reason'
+        },
+        created_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Created At'
+        }
+    },
+    type: 'object',
+    required: ['id', 'application_id', 'reviewer_id', 'tenant_id'],
+    title: 'ApplicationReviewSkipPublic',
+    description: 'ApplicationReviewSkip schema for API responses.'
 } as const;
 
 export const ApplicationReviewerVoteSchema = {
@@ -5451,6 +5626,112 @@ export const DistributionItemSchema = {
     description: 'Single slice in a distribution chart.'
 } as const;
 
+export const EmailLogPublicSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        tenant_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Tenant Id'
+        },
+        popup_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Popup Id'
+        },
+        template_type: {
+            type: 'string',
+            title: 'Template Type'
+        },
+        to_email: {
+            type: 'string',
+            title: 'To Email'
+        },
+        application_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Application Id'
+        },
+        payment_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Payment Id'
+        },
+        human_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Human Id'
+        },
+        subject: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Subject'
+        },
+        status: {
+            type: 'string',
+            title: 'Status'
+        },
+        error: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Error'
+        },
+        created_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Created At'
+        }
+    },
+    type: 'object',
+    required: ['id', 'tenant_id', 'template_type', 'to_email', 'status', 'created_at'],
+    title: 'EmailLogPublic',
+    description: 'A single email log entry returned to the backoffice.'
+} as const;
+
 export const EmailTemplateCreateSchema = {
     properties: {
         popup_id: {
@@ -5578,7 +5859,7 @@ export const EmailTemplatePublicSchema = {
 
 export const EmailTemplateTypeSchema = {
     type: 'string',
-    enum: ['login_code_user', 'login_code_human', 'application_received', 'application_accepted', 'application_rejected', 'application_accepted_with_discount', 'application_accepted_with_incentive', 'application_accepted_scholarship_rejected', 'payment_confirmed', 'abandoned_cart', 'edit_passes_confirmed', 'event_invitation', 'event_updated', 'event_cancelled', 'event_rsvp_cancelled', 'event_approval_approved', 'event_approval_rejected', 'check_in_pass'],
+    enum: ['login_code_user', 'login_code_human', 'application_received', 'application_accepted', 'application_rejected', 'application_accepted_with_discount', 'application_accepted_with_incentive', 'application_accepted_scholarship_rejected', 'payment_confirmed', 'abandoned_cart', 'purchase_reminder', 'abandoned_application', 'edit_passes_confirmed', 'event_invitation', 'event_updated', 'event_cancelled', 'event_rsvp_cancelled', 'event_approval_approved', 'event_approval_rejected', 'check_in_pass'],
     title: 'EmailTemplateType'
 } as const;
 
@@ -11170,6 +11451,24 @@ export const ListModel_AbandonedCartPublic_Schema = {
     title: 'ListModel[AbandonedCartPublic]'
 } as const;
 
+export const ListModel_ApplicationCommentPublic_Schema = {
+    properties: {
+        results: {
+            items: {
+                '$ref': '#/components/schemas/ApplicationCommentPublic'
+            },
+            type: 'array',
+            title: 'Results'
+        },
+        paging: {
+            '$ref': '#/components/schemas/Paging'
+        }
+    },
+    type: 'object',
+    required: ['results', 'paging'],
+    title: 'ListModel[ApplicationCommentPublic]'
+} as const;
+
 export const ListModel_ApplicationPublic_Schema = {
     properties: {
         results: {
@@ -11330,6 +11629,24 @@ export const ListModel_CouponPublic_Schema = {
     type: 'object',
     required: ['results', 'paging'],
     title: 'ListModel[CouponPublic]'
+} as const;
+
+export const ListModel_EmailLogPublic_Schema = {
+    properties: {
+        results: {
+            items: {
+                '$ref': '#/components/schemas/EmailLogPublic'
+            },
+            type: 'array',
+            title: 'Results'
+        },
+        paging: {
+            '$ref': '#/components/schemas/Paging'
+        }
+    },
+    type: 'object',
+    required: ['results', 'paging'],
+    title: 'ListModel[EmailLogPublic]'
 } as const;
 
 export const ListModel_EmailTemplatePublic_Schema = {
@@ -13572,6 +13889,105 @@ export const PopupAdminSchema = {
             title: 'Installments Interval Count',
             default: 1
         },
+        abandoned_cart_delay_days: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Abandoned Cart Delay Days'
+        },
+        abandoned_cart_repeat_days: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Abandoned Cart Repeat Days'
+        },
+        abandoned_cart_max_count: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Abandoned Cart Max Count'
+        },
+        purchase_reminder_delay_days: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Purchase Reminder Delay Days'
+        },
+        purchase_reminder_repeat_days: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Purchase Reminder Repeat Days'
+        },
+        purchase_reminder_max_count: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Purchase Reminder Max Count'
+        },
+        abandoned_application_delay_days: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Abandoned Application Delay Days'
+        },
+        abandoned_application_repeat_days: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Abandoned Application Repeat Days'
+        },
+        abandoned_application_max_count: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Abandoned Application Max Count'
+        },
         id: {
             type: 'string',
             format: 'uuid',
@@ -14061,6 +14477,105 @@ export const PopupCreateSchema = {
                 }
             ],
             title: 'Checkin Pass Lead Days'
+        },
+        abandoned_cart_delay_days: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Abandoned Cart Delay Days'
+        },
+        abandoned_cart_repeat_days: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Abandoned Cart Repeat Days'
+        },
+        abandoned_cart_max_count: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Abandoned Cart Max Count'
+        },
+        purchase_reminder_delay_days: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Purchase Reminder Delay Days'
+        },
+        purchase_reminder_repeat_days: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Purchase Reminder Repeat Days'
+        },
+        purchase_reminder_max_count: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Purchase Reminder Max Count'
+        },
+        abandoned_application_delay_days: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Abandoned Application Delay Days'
+        },
+        abandoned_application_repeat_days: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Abandoned Application Repeat Days'
+        },
+        abandoned_application_max_count: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Abandoned Application Max Count'
         }
     },
     type: 'object',
@@ -15130,6 +15645,105 @@ export const PopupUpdateSchema = {
                 }
             ],
             title: 'Checkin Pass Lead Days'
+        },
+        abandoned_cart_delay_days: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Abandoned Cart Delay Days'
+        },
+        abandoned_cart_repeat_days: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Abandoned Cart Repeat Days'
+        },
+        abandoned_cart_max_count: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Abandoned Cart Max Count'
+        },
+        purchase_reminder_delay_days: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Purchase Reminder Delay Days'
+        },
+        purchase_reminder_repeat_days: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Purchase Reminder Repeat Days'
+        },
+        purchase_reminder_max_count: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Purchase Reminder Max Count'
+        },
+        abandoned_application_delay_days: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Abandoned Application Delay Days'
+        },
+        abandoned_application_repeat_days: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Abandoned Application Repeat Days'
+        },
+        abandoned_application_max_count: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Abandoned Application Max Count'
         }
     },
     additionalProperties: false,
