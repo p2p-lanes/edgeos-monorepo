@@ -596,11 +596,13 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         form_data: dict[str, Any],
     ) -> None:
         """Validate required custom buyer fields. form_data is keyed by raw field name; base fields (email/first_name/last_name) live top-level on BuyerInfo and are validated by Pydantic."""
+        # Hidden sections are never rendered in the checkout, so their fields
+        # can't be required here.
         required_field_names = {
             field.name
             for section in popup.form_sections
             for field in section.form_fields
-            if section.kind == "standard" and field.required
+            if section.kind == "standard" and not section.hidden and field.required
         }
 
         missing = [
