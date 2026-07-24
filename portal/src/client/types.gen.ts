@@ -1821,6 +1821,7 @@ export type EventVisibility = 'public' | 'private' | 'unlisted';
 export type FormFieldCreate = {
     popup_id: string;
     label: string;
+    short_label?: (string | null);
     field_type?: string;
     section_id?: (string | null);
     position?: number;
@@ -1842,6 +1843,7 @@ export type FormFieldPublic = {
     popup_id: string;
     name: string;
     label: string;
+    short_label?: (string | null);
     field_type: string;
     section_id?: (string | null);
     section_label?: (string | null);
@@ -1864,6 +1866,7 @@ export type FormFieldPublic = {
 
 export type FormFieldUpdate = {
     label?: (string | null);
+    short_label?: (string | null);
     field_type?: (string | null);
     section_id?: (string | null);
     position?: (number | null);

@@ -100,6 +100,7 @@ interface ApplicationSchema {
     string,
     {
       label: string
+      short_label?: string
       type?: string
       position?: number
       options?: string[]
@@ -161,12 +162,15 @@ function buildCustomFieldColumns(
         (b.position ?? Number.MAX_SAFE_INTEGER),
     )
     .map(([name, def]) => {
-      const label = def.label || name
+      const label = def.short_label || def.label || name
+      // When a short label names the column, hover still reveals the
+      // full question.
+      const title = def.short_label ? def.label || label : label
       return {
         id: `custom_${name}`,
         accessorFn: (row) => row.custom_fields?.[name],
         header: () => (
-          <span className="block max-w-48 truncate" title={label}>
+          <span className="block max-w-48 truncate" title={title}>
             {label}
           </span>
         ),
@@ -1235,13 +1239,16 @@ function Applications() {
         })
         .map((name) => {
           const schemaDef = schemaLookup[name] as
-            | { label?: string; position?: number }
+            | { label?: string; short_label?: string; position?: number }
             | undefined
           return {
             key: `custom_fields.${name}`,
             label:
-              schemaDef?.label ??
-              name.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
+              schemaDef?.short_label ||
+              (schemaDef?.label ??
+                name
+                  .replace(/_/g, " ")
+                  .replace(/\b\w/g, (c) => c.toUpperCase())),
             position: schemaDef?.position ?? Number.MAX_SAFE_INTEGER,
           }
         })

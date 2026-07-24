@@ -539,6 +539,8 @@ class FormFieldsCRUD(BaseCRUD[FormFields, FormFieldCreate, FormFieldUpdate]):
                 "min_date": field.min_date,
                 "max_date": field.max_date,
             }
+            if field.short_label:
+                custom_entry["short_label"] = field.short_label
             if field.options:
                 custom_entry["options"] = field.options
             if field.placeholder:

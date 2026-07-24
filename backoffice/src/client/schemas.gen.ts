@@ -8593,6 +8593,17 @@ export const FormFieldCreateSchema = {
             type: 'string',
             title: 'Label'
         },
+        short_label: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Short Label'
+        },
         field_type: {
             type: 'string',
             title: 'Field Type',
@@ -8732,6 +8743,17 @@ export const FormFieldPublicSchema = {
         label: {
             type: 'string',
             title: 'Label'
+        },
+        short_label: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Short Label'
         },
         field_type: {
             type: 'string',
@@ -8905,6 +8927,17 @@ export const FormFieldUpdateSchema = {
                 }
             ],
             title: 'Label'
+        },
+        short_label: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Short Label'
         },
         field_type: {
             anyOf: [

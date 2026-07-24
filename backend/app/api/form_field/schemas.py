@@ -51,6 +51,9 @@ class FormFieldBase(SQLModel):
     popup_id: uuid.UUID = Field(foreign_key="popups.id", index=True)
     name: str = Field(index=True)
     label: str
+    # Optional short identifier used by the backoffice as the applications
+    # table column header. The portal always renders the full `label`.
+    short_label: str | None = Field(default=None, nullable=True)
     field_type: str = Field(default=FormFieldType.TEXT.value)
     section_id: uuid.UUID | None = Field(
         default=None, nullable=True, foreign_key="formsections.id"
@@ -82,6 +85,7 @@ class FormFieldPublic(BaseModel):
     popup_id: uuid.UUID
     name: str
     label: str
+    short_label: str | None = None
     field_type: str
     section_id: uuid.UUID | None = None
     section_label: str | None = None
@@ -107,6 +111,7 @@ class FormFieldPublic(BaseModel):
 class FormFieldCreate(BaseModel):
     popup_id: uuid.UUID
     label: str
+    short_label: str | None = None
     field_type: str = FormFieldType.TEXT.value
     section_id: uuid.UUID | None = None
     position: int = 0
@@ -124,6 +129,9 @@ class FormFieldCreate(BaseModel):
 
 class FormFieldUpdate(BaseModel):
     label: str | None = None
+    # Explicit null clears the short label; absent key leaves it untouched
+    # (update applies model_dump(exclude_unset=True), same as min_date/max_date).
+    short_label: str | None = None
     field_type: str | None = None
     section_id: uuid.UUID | None = None
     position: int | None = None
