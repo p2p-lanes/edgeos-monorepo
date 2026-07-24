@@ -209,7 +209,9 @@ async def list_applications(
     It only applies to the popup_id listing and is combined (AND) with the
     legacy status_filter/search/reviewed_by params. The virtual fields
     ``skipped_by_me`` and ``reviewed_by_me`` (op ``eq``, boolean value)
-    resolve against the calling user's own skips and reviews.
+    resolve against the calling user's own skips and reviews. The
+    ``reviewed_by`` field (ops ``eq``/``neq``, reviewer user id as UUID
+    string) matches applications reviewed (or not) by that reviewer.
     """
     parsed_filters = parse_application_filters(filters)
     if popup_id:

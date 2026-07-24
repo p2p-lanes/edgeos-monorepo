@@ -401,6 +401,92 @@ class TestApplicationListFilters:
         )
         assert _ids(response) == {str(pending.id)}
 
+    def test_reviewed_by_eq_and_neq(
+        self, db: Session, tenant_a: Tenants, client: TestClient
+    ) -> None:
+        popup = _make_popup(db, tenant_a)
+        admin = _make_admin(db, tenant_a)
+        reviewer_a = _make_admin(db, tenant_a)
+        reviewer_b = _make_admin(db, tenant_a)
+        reviewed_by_a = _make_application(db, tenant_a, popup)
+        reviewed_by_b = _make_application(db, tenant_a, popup)
+        unreviewed = _make_application(db, tenant_a, popup)
+        _make_review(db, tenant_a, reviewed_by_a, reviewer_a)
+        _make_review(db, tenant_a, reviewed_by_b, reviewer_b)
+
+        response = _list(
+            client,
+            admin,
+            tenant_a,
+            popup,
+            _one("reviewed_by", "eq", str(reviewer_a.id)),
+        )
+        assert _ids(response) == {str(reviewed_by_a.id)}
+
+        response = _list(
+            client,
+            admin,
+            tenant_a,
+            popup,
+            _one("reviewed_by", "neq", str(reviewer_a.id)),
+        )
+        assert _ids(response) == {str(reviewed_by_b.id), str(unreviewed.id)}
+
+    def test_reviewed_by_combined_with_status(
+        self, db: Session, tenant_a: Tenants, client: TestClient
+    ) -> None:
+        popup = _make_popup(db, tenant_a)
+        admin = _make_admin(db, tenant_a)
+        reviewer = _make_admin(db, tenant_a)
+        match = _make_application(
+            db, tenant_a, popup, status=ApplicationStatus.ACCEPTED.value
+        )
+        in_review = _make_application(db, tenant_a, popup)
+        _make_review(db, tenant_a, match, reviewer)
+        _make_review(db, tenant_a, in_review, reviewer)
+        _make_application(db, tenant_a, popup, status=ApplicationStatus.ACCEPTED.value)
+
+        response = _list(
+            client,
+            admin,
+            tenant_a,
+            popup,
+            {
+                "match": "all",
+                "conditions": [
+                    {"field": "status", "op": "eq", "value": "accepted"},
+                    {"field": "reviewed_by", "op": "eq", "value": str(reviewer.id)},
+                ],
+            },
+        )
+        assert _ids(response) == {str(match.id)}
+
+    def test_reviewed_by_invalid_uuid_returns_422(
+        self, db: Session, tenant_a: Tenants, client: TestClient
+    ) -> None:
+        popup = _make_popup(db, tenant_a)
+        admin = _make_admin(db, tenant_a)
+
+        response = _list(
+            client, admin, tenant_a, popup, _one("reviewed_by", "eq", "not-a-uuid")
+        )
+        assert response.status_code == 422, response.text
+
+    def test_reviewed_by_disallowed_op_returns_422(
+        self, db: Session, tenant_a: Tenants, client: TestClient
+    ) -> None:
+        popup = _make_popup(db, tenant_a)
+        admin = _make_admin(db, tenant_a)
+
+        response = _list(
+            client,
+            admin,
+            tenant_a,
+            popup,
+            _one("reviewed_by", "contains", str(uuid.uuid4())),
+        )
+        assert response.status_code == 422, response.text
+
     def test_virtual_field_non_boolean_value_returns_422(
         self, db: Session, tenant_a: Tenants, client: TestClient
     ) -> None:

@@ -120,6 +120,15 @@ def _filter_condition_expression(
         )
         return has_row if condition.value else ~has_row
 
+    if condition.field == "reviewed_by":
+        # Any-reviewer variant: independent of the calling user's reviewer_id.
+        has_row = (
+            exists()
+            .where(ApplicationReviews.application_id == Applications.id)
+            .where(ApplicationReviews.reviewer_id == condition.uuid_value)
+        )
+        return has_row if condition.op == "eq" else ~has_row
+
     custom_name = condition.custom_field_name
     if custom_name is not None:
         # JSONB accessor keeps the field name a bound parameter, never raw SQL.

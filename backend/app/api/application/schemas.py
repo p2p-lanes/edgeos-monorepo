@@ -416,6 +416,7 @@ APPLICATION_FILTER_FIELD_OPS: dict[str, set[str]] = {
     "age": _ENUMISH_OPS,
     "skipped_by_me": {"eq"},
     "reviewed_by_me": {"eq"},
+    "reviewed_by": {"eq", "neq"},
 }
 # Virtual fields resolved against the calling user's own review/skip rows.
 VIRTUAL_REVIEWER_FIELDS = frozenset({"skipped_by_me", "reviewed_by_me"})
@@ -458,6 +459,15 @@ class ApplicationFilterCondition(BaseModel):
         elif self.field in VIRTUAL_REVIEWER_FIELDS:
             if not isinstance(self.value, bool):
                 raise ValueError(f"Filter '{self.field}' needs true or false.")
+        elif self.field == "reviewed_by":
+            if not isinstance(self.value, str):
+                raise ValueError("Filter 'reviewed_by' needs a valid reviewer.")
+            try:
+                uuid.UUID(self.value)
+            except ValueError:
+                raise ValueError(
+                    "Filter 'reviewed_by' needs a valid reviewer."
+                ) from None
         elif self.op in {"before", "after"}:
             if not isinstance(self.value, str):
                 raise ValueError(f"Invalid date for '{self.field}'.")
@@ -480,6 +490,11 @@ class ApplicationFilterCondition(BaseModel):
     def date_value(self) -> date:
         """Parsed ISO date value for before/after conditions."""
         return date.fromisoformat(str(self.value))
+
+    @property
+    def uuid_value(self) -> uuid.UUID:
+        """Parsed UUID value for reviewer id conditions."""
+        return uuid.UUID(str(self.value))
 
 
 class ApplicationFilters(BaseModel):
