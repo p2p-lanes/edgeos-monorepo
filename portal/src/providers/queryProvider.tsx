@@ -8,17 +8,22 @@ import {
 } from "@tanstack/react-query"
 import { type ReactNode, useState } from "react"
 import { ApiError } from "@/client"
+import { getAuthRedirectPath } from "@/lib/safe-return-to"
 
 function handleApiError(error: Error) {
   if (error instanceof ApiError && error.status === 401) {
     if (typeof window !== "undefined") {
       localStorage.removeItem("token")
+      const { pathname, search, hash } = window.location
       const isPublicRoute =
-        window.location.pathname.startsWith("/checkout") ||
-        window.location.pathname.startsWith("/groups/") ||
-        window.location.pathname.includes("/invite/")
-      if (!isPublicRoute) {
-        window.location.href = "/auth"
+        pathname.startsWith("/checkout") ||
+        pathname.startsWith("/groups/") ||
+        pathname.includes("/invite/")
+      const isAuthRoute = pathname === "/auth" || pathname.startsWith("/auth/")
+      if (!isPublicRoute && !isAuthRoute) {
+        window.location.replace(
+          getAuthRedirectPath(`${pathname}${search}${hash}`),
+        )
       }
     }
   }
