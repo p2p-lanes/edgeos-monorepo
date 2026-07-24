@@ -77,6 +77,7 @@ const SCHOLARSHIP_STATUS_OPTIONS = [
 function buildFieldDefs(
   statusOptions: { value: string; label: string }[],
   customFields: CustomFilterField[],
+  reviewerOptions: { value: string; label: string }[] = [],
 ): FilterFieldDef[] {
   const fixed: FilterFieldDef[] = [
     {
@@ -111,6 +112,17 @@ function buildFieldDefs(
       kind: "boolean",
       ops: ["eq"],
     },
+    ...(reviewerOptions.length
+      ? [
+          {
+            key: "reviewed_by",
+            label: "Reviewed by",
+            kind: "select",
+            ops: ["eq", "neq"],
+            options: reviewerOptions,
+          } satisfies FilterFieldDef,
+        ]
+      : []),
     { key: "submitted_at", label: "Submitted", kind: "date", ops: DATE_OPS },
     { key: "accepted_at", label: "Accepted", kind: "date", ops: DATE_OPS },
     { key: "referral", label: "Referral", kind: "text", ops: FULL_TEXT_OPS },
@@ -271,17 +283,19 @@ function ConditionValueInput({
 export function ApplicationFilterBuilder({
   statusOptions,
   customFields,
+  reviewerOptions,
   match,
   conditions,
   onChange,
 }: {
   statusOptions: { value: string; label: string }[]
   customFields: CustomFilterField[]
+  reviewerOptions?: { value: string; label: string }[]
   match: FilterMatch
   conditions: FilterCondition[]
   onChange: (match: FilterMatch, conditions: FilterCondition[]) => void
 }) {
-  const fieldDefs = buildFieldDefs(statusOptions, customFields)
+  const fieldDefs = buildFieldDefs(statusOptions, customFields, reviewerOptions)
   const fixedDefs = fieldDefs.filter((def) => !def.key.startsWith("custom."))
   const customDefs = fieldDefs.filter((def) => def.key.startsWith("custom."))
   const activeCount = conditions.filter(isCompleteCondition).length

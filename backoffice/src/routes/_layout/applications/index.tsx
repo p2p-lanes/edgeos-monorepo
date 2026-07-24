@@ -240,7 +240,6 @@ function getApplicationsQueryOptions(
   page: number,
   pageSize: number,
   search?: string,
-  reviewedBy?: string,
   filters?: string,
 ) {
   return {
@@ -249,15 +248,10 @@ function getApplicationsQueryOptions(
         skip: page * pageSize,
         limit: pageSize,
         popupId: popupId || undefined,
-        reviewedBy: reviewedBy || undefined,
         search: search || undefined,
         filters: filters || undefined,
       }),
-    queryKey: [
-      "applications",
-      popupId,
-      { page, pageSize, search, reviewedBy, filters },
-    ],
+    queryKey: ["applications", popupId, { page, pageSize, search, filters }],
   }
 }
 
@@ -376,19 +370,27 @@ function ReviewerDropdownFilter({
   onSelect: (value: string | undefined) => void
   disabled?: boolean
 }) {
-  const selectedReviewer = selected
-    ? reviewers.find((reviewer) => reviewer.user_id === selected)
-    : undefined
+  // Reviewer combinations built in the filter builder (or reviewers no longer
+  // in this popup) render as a read-only "Custom" entry.
+  const isCustom =
+    selected === "custom" ||
+    (!!selected && !reviewers.some((reviewer) => reviewer.user_id === selected))
+  const selectedReviewer =
+    selected && !isCustom
+      ? reviewers.find((reviewer) => reviewer.user_id === selected)
+      : undefined
 
   const currentLabel = disabled
     ? "No reviewers"
-    : (selectedReviewer?.user_full_name ??
-      selectedReviewer?.user_email ??
-      "All reviewers")
+    : isCustom
+      ? "Custom"
+      : (selectedReviewer?.user_full_name ??
+        selectedReviewer?.user_email ??
+        "All reviewers")
 
   return (
     <Select
-      value={selected ?? "all"}
+      value={isCustom ? "custom" : (selected ?? "all")}
       onValueChange={(value) => onSelect(value === "all" ? undefined : value)}
       disabled={disabled}
     >
@@ -397,6 +399,14 @@ function ReviewerDropdownFilter({
       </SelectTrigger>
       <SelectContent>
         <SelectItem value="all">All reviewers</SelectItem>
+        {isCustom && (
+          <SelectItem value="custom" disabled>
+            <span className="flex w-full items-center justify-between gap-4">
+              <span>Custom</span>
+              <span className="text-muted-foreground">via filters</span>
+            </span>
+          </SelectItem>
+        )}
         {reviewers.map((reviewer) => (
           <SelectItem key={reviewer.id} value={reviewer.user_id}>
             {reviewer.user_full_name ??
@@ -418,7 +428,6 @@ const VALID_STATUSES: Set<string> = new Set([
 ])
 
 type ApplicationsSearchParams = TableSearchParams & {
-  reviewerId?: string
   match?: FilterMatch
   filters?: FilterCondition[]
 }
@@ -427,7 +436,7 @@ export const Route = createFileRoute("/_layout/applications/")({
   component: Applications,
   validateSearch: (raw: Record<string, unknown>): ApplicationsSearchParams => {
     const filters = sanitizeFilterConditions(raw.filters)
-    // Legacy ?status= links fold into the filter conditions.
+    // Legacy ?status= and ?reviewerId= links fold into the filter conditions.
     if (
       typeof raw.status === "string" &&
       VALID_STATUSES.has(raw.status) &&
@@ -435,11 +444,15 @@ export const Route = createFileRoute("/_layout/applications/")({
     ) {
       filters.push({ field: "status", op: "eq", value: raw.status })
     }
+    if (
+      typeof raw.reviewerId === "string" &&
+      raw.reviewerId &&
+      !filters.some((condition) => condition.field === "reviewed_by")
+    ) {
+      filters.push({ field: "reviewed_by", op: "eq", value: raw.reviewerId })
+    }
     return {
       ...validateTableSearch(raw),
-      ...(typeof raw.reviewerId === "string" && raw.reviewerId
-        ? { reviewerId: raw.reviewerId }
-        : {}),
       ...(raw.match === "any" && filters.length
         ? { match: "any" as const }
         : {}),
@@ -469,7 +482,6 @@ function useApplicationsFilterParams() {
   }, [filterConditions, filterMatch])
   return {
     search: searchParams.search ?? "",
-    reviewerId: searchParams.reviewerId,
     filterMatch,
     filterConditions,
     filtersJson,
@@ -974,41 +986,34 @@ function ApplicationsTableContent({
     searchParams,
     "/applications",
   )
-  const { reviewerId, filterMatch, filterConditions, filtersJson } =
+  const { filterMatch, filterConditions, filtersJson } =
     useApplicationsFilterParams()
 
-  // The quick status select is a shortcut over the filter conditions: it maps
-  // to a single "status is X" condition and shows Custom for anything richer.
-  const statusFilter: ApplicationStatus | "custom" | undefined = useMemo(() => {
-    const statusConditions = filterConditions.filter(
-      (condition) => condition.field === "status",
-    )
-    if (statusConditions.length === 0) return undefined
-    const [only] = statusConditions
-    if (
-      statusConditions.length === 1 &&
-      only.op === "eq" &&
-      (filterMatch === "all" || filterConditions.length === 1)
-    ) {
-      return only.value as ApplicationStatus
-    }
-    return "custom"
-  }, [filterConditions, filterMatch])
-
-  const setReviewerFilter = useCallback(
-    (value: string | undefined) => {
-      navigate({
-        to: "/applications",
-        search: (prev: Record<string, unknown>) => ({
-          ...prev,
-          reviewerId: value,
-          page: 0,
-        }),
-        replace: true,
-      })
+  // The quick selects are shortcuts over the filter conditions: each maps to
+  // a single "field is X" condition and shows Custom for anything richer.
+  const deriveQuickFilter = useCallback(
+    (field: string): string | undefined => {
+      const matching = filterConditions.filter(
+        (condition) => condition.field === field,
+      )
+      if (matching.length === 0) return undefined
+      const [only] = matching
+      if (
+        matching.length === 1 &&
+        only.op === "eq" &&
+        (filterMatch === "all" || filterConditions.length === 1)
+      ) {
+        return typeof only.value === "string" ? only.value : "custom"
+      }
+      return "custom"
     },
-    [navigate],
+    [filterConditions, filterMatch],
   )
+  const statusFilter = deriveQuickFilter("status") as
+    | ApplicationStatus
+    | "custom"
+    | undefined
+  const reviewerFilter = deriveQuickFilter("reviewed_by")
 
   const setFilters = useCallback(
     (match: FilterMatch, conditions: FilterCondition[]) => {
@@ -1016,9 +1021,10 @@ function ApplicationsTableContent({
         to: "/applications",
         search: (prev: Record<string, unknown>) => ({
           ...prev,
-          // Scrub the legacy param so validateSearch cannot fold it back into
-          // a resurrected condition after the user edits the filters.
+          // Scrub the legacy params so validateSearch cannot fold them back
+          // into resurrected conditions after the user edits the filters.
           status: undefined,
+          reviewerId: undefined,
           match:
             match === "any" && conditions.length ? ("any" as const) : undefined,
           filters: conditions.length ? conditions : undefined,
@@ -1030,17 +1036,28 @@ function ApplicationsTableContent({
     [navigate],
   )
 
-  const setStatusFilter = useCallback(
-    (value: ApplicationStatus | undefined) => {
+  const upsertQuickFilter = useCallback(
+    (field: string, value: string | undefined) => {
       const rest = filterConditions.filter(
-        (condition) => condition.field !== "status",
+        (condition) => condition.field !== field,
       )
       setFilters(
         filterMatch,
-        value ? [...rest, { field: "status", op: "eq", value }] : rest,
+        value ? [...rest, { field, op: "eq", value }] : rest,
       )
     },
     [filterConditions, filterMatch, setFilters],
+  )
+
+  const setStatusFilter = useCallback(
+    (value: ApplicationStatus | undefined) =>
+      upsertQuickFilter("status", value),
+    [upsertQuickFilter],
+  )
+
+  const setReviewerFilter = useCallback(
+    (value: string | undefined) => upsertQuickFilter("reviewed_by", value),
+    [upsertQuickFilter],
   )
 
   const { data: applications } = useQuery({
@@ -1049,7 +1066,6 @@ function ApplicationsTableContent({
       pagination.pageIndex,
       pagination.pageSize,
       search,
-      reviewerId,
       filtersJson,
     ),
     placeholderData: keepPreviousData,
@@ -1104,24 +1120,27 @@ function ApplicationsTableContent({
 
   const reviewers = popupReviewers?.results ?? []
 
+  // Drop reviewer conditions that reference reviewers outside the current
+  // popup (e.g. after switching gatherings).
   useEffect(() => {
-    if (!reviewerId) return
-    if (!selectedPopupId) {
-      setReviewerFilter(undefined)
-      return
-    }
-    if (
-      popupReviewers &&
-      !reviewers.some((reviewer) => reviewer.user_id === reviewerId)
-    ) {
-      setReviewerFilter(undefined)
+    if (!popupReviewers) return
+    const isInvalid = (condition: FilterCondition) =>
+      condition.field === "reviewed_by" &&
+      (!selectedPopupId ||
+        !reviewers.some((reviewer) => reviewer.user_id === condition.value))
+    if (filterConditions.some(isInvalid)) {
+      setFilters(
+        filterMatch,
+        filterConditions.filter((condition) => !isInvalid(condition)),
+      )
     }
   }, [
     popupReviewers,
-    reviewerId,
     reviewers,
     selectedPopupId,
-    setReviewerFilter,
+    filterConditions,
+    filterMatch,
+    setFilters,
   ])
 
   const bulkReviewMutation = useMutation({
@@ -1193,7 +1212,11 @@ function ApplicationsTableContent({
   })
 
   const isWeightedVoting = approvalStrategy?.strategy_type === "weighted"
-  const columns = getColumns(isWeightedVoting, !!reviewerId, customColumns)
+  const columns = getColumns(
+    isWeightedVoting,
+    !!reviewerFilter && reviewerFilter !== "custom",
+    customColumns,
+  )
   const canBulkReview = isOperatorOrAbove && !isWeightedVoting
 
   if (!applications) return <Skeleton className="h-64 w-full" />
@@ -1230,7 +1253,7 @@ function ApplicationsTableContent({
           {selectedPopupId ? (
             <ReviewerDropdownFilter
               reviewers={reviewers}
-              selected={reviewerId}
+              selected={reviewerFilter}
               onSelect={setReviewerFilter}
               disabled={reviewers.length === 0}
             />
@@ -1238,6 +1261,13 @@ function ApplicationsTableContent({
           <ApplicationFilterBuilder
             statusOptions={FILTER_STATUS_OPTIONS}
             customFields={customFilterFields}
+            reviewerOptions={reviewers.map((reviewer) => ({
+              value: reviewer.user_id,
+              label:
+                reviewer.user_full_name ??
+                reviewer.user_email ??
+                reviewer.user_id,
+            }))}
             match={filterMatch}
             conditions={filterConditions}
             onChange={setFilters}
@@ -1321,7 +1351,7 @@ function AddApplicationButton() {
 function Applications() {
   const { isOperatorOrAbove, isSuperadmin } = useAuth()
   const { isContextReady, selectedPopupId } = useWorkspace()
-  const { search, reviewerId, filtersJson } = useApplicationsFilterParams()
+  const { search, filtersJson } = useApplicationsFilterParams()
   const [isExporting, setIsExporting] = useState(false)
   const [view, setView] = useState<ApplicationsView>(readStoredApplicationsView)
 
@@ -1353,7 +1383,7 @@ function Applications() {
 
   // Export what the table shows: the same search, reviewer and filter
   // conditions drive the fetch, just without pagination.
-  const isExportFiltered = Boolean(search || reviewerId || filtersJson)
+  const isExportFiltered = Boolean(search || filtersJson)
   const handleExport = async () => {
     if (!selectedPopupId) return
     setIsExporting(true)
@@ -1364,7 +1394,6 @@ function Applications() {
           limit,
           popupId: selectedPopupId,
           search: search || undefined,
-          reviewedBy: reviewerId || undefined,
           filters: filtersJson,
         }),
       )
