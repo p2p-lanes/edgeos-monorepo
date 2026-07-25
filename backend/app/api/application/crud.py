@@ -4,7 +4,7 @@ from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 
 from fastapi import HTTPException, status
-from sqlalchemy import desc, exists, or_
+from sqlalchemy import and_, desc, exists, or_
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.orm import selectinload
 from sqlmodel import Session, col, func, select
@@ -15,10 +15,13 @@ from app.api.application.models import (
     ApplicationSnapshots,
 )
 from app.api.application.schemas import (
+    VIRTUAL_REVIEWER_FIELDS,
     ApplicationAdminCreate,
     ApplicationCommentCreate,
     ApplicationCommentUpdate,
     ApplicationCreate,
+    ApplicationFilterCondition,
+    ApplicationFilters,
     ApplicationStatus,
     ApplicationUpdate,
     PopupAccessResponse,
@@ -69,6 +72,120 @@ def _is_draft_status(status_value: object) -> bool:
     if status_value is None:
         return True
     return getattr(status_value, "value", status_value) == ApplicationStatus.DRAFT.value
+
+
+def _escape_like(value: str) -> str:
+    """Escape LIKE wildcards so user input matches literally."""
+    return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
+def _text_condition_expression(column, op: str, value):
+    """Boolean expression for a nullable text column.
+
+    eq is exact; contains is case-insensitive; negative ops (neq,
+    not_contains) also match NULL/missing values; is_empty means NULL or "".
+    """
+    if op == "eq":
+        return column == value
+    if op == "neq":
+        return or_(column.is_(None), column != value)
+    if op == "contains":
+        return column.ilike(f"%{_escape_like(str(value))}%", escape="\\")
+    if op == "not_contains":
+        return or_(
+            column.is_(None),
+            ~column.ilike(f"%{_escape_like(str(value))}%", escape="\\"),
+        )
+    if op == "is_empty":
+        return or_(column.is_(None), column == "")
+    return and_(column.is_not(None), column != "")
+
+
+def _filter_condition_expression(
+    condition: ApplicationFilterCondition,
+    reviewer_id: uuid.UUID | None = None,
+):
+    """Map one validated filter condition to a SQLAlchemy boolean expression."""
+    if condition.field in VIRTUAL_REVIEWER_FIELDS:
+        # Same EXISTS shape as find_pending_review, scoped to the current user.
+        model = (
+            ApplicationReviewSkips
+            if condition.field == "skipped_by_me"
+            else ApplicationReviews
+        )
+        has_row = (
+            exists()
+            .where(model.application_id == Applications.id)
+            .where(model.reviewer_id == reviewer_id)
+        )
+        return has_row if condition.value else ~has_row
+
+    if condition.field == "reviewed_by":
+        # Any-reviewer variant: independent of the calling user's reviewer_id.
+        has_row = (
+            exists()
+            .where(ApplicationReviews.application_id == Applications.id)
+            .where(ApplicationReviews.reviewer_id == condition.uuid_value)
+        )
+        return has_row if condition.op == "eq" else ~has_row
+
+    custom_name = condition.custom_field_name
+    if custom_name is not None:
+        # JSONB accessor keeps the field name a bound parameter, never raw SQL.
+        column = col(Applications.custom_fields)[custom_name].astext
+        return _text_condition_expression(column, condition.op, condition.value)
+
+    if condition.field == "status":
+        if condition.op == "eq":
+            return Applications.status == condition.value
+        return Applications.status != condition.value
+
+    if condition.field == "scholarship_request":
+        return col(Applications.scholarship_request) == condition.value
+
+    if condition.field in ("submitted_at", "accepted_at"):
+        column = col(getattr(Applications, condition.field))
+        if condition.op == "before":
+            return func.date(column) < condition.date_value
+        if condition.op == "after":
+            return func.date(column) > condition.date_value
+        if condition.op == "is_empty":
+            return column.is_(None)
+        return column.is_not(None)
+
+    if condition.field in ("gender", "age"):
+        column = col(getattr(Humans, condition.field))
+    else:
+        column = col(getattr(Applications, condition.field))
+    return _text_condition_expression(column, condition.op, condition.value)
+
+
+def build_application_filter_expression(
+    filters: ApplicationFilters,
+    reviewer_id: uuid.UUID | None = None,
+):
+    """Combine the filter group into one boolean expression (None when empty).
+
+    ``reviewer_id`` resolves the per-current-user virtual fields
+    (skipped_by_me, reviewed_by_me); using them without it is a 422.
+    """
+    if reviewer_id is None:
+        for condition in filters.conditions:
+            if condition.field in VIRTUAL_REVIEWER_FIELDS:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=(
+                        f"Filtering by '{condition.field}' requires a signed-in user."
+                    ),
+                )
+    expressions = [
+        _filter_condition_expression(c, reviewer_id) for c in filters.conditions
+    ]
+    if not expressions:
+        return None
+    if filters.match == "any":
+        return or_(*expressions)
+    return and_(*expressions)
 
 
 class RedFlaggedHumanError(Exception):
@@ -134,8 +251,14 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         status_filter: ApplicationStatus | None = None,
         search: str | None = None,
         reviewed_by: uuid.UUID | None = None,
+        filters: ApplicationFilters | None = None,
+        reviewer_id: uuid.UUID | None = None,
     ) -> tuple[list[Applications], int]:
-        """Find applications by popup_id with optional status filter and eager loading."""
+        """Find applications by popup_id with optional status filter and eager loading.
+
+        ``reviewer_id`` is the calling user's id, used only by the virtual
+        per-user filter fields (skipped_by_me, reviewed_by_me).
+        """
         base_statement = select(Applications).where(Applications.popup_id == popup_id)
 
         if status_filter:
@@ -143,19 +266,34 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
                 Applications.status == status_filter.value
             )
 
-        # Apply text search if provided - search in human fields
-        if search:
-            search_term = f"%{search}%"
+        # Join Humans once, whether needed by text search, a human-field
+        # filter condition, or both.
+        needs_human_join = bool(search) or bool(
+            filters and filters.references_human_fields()
+        )
+        if needs_human_join:
             base_statement = base_statement.join(
                 Humans,
                 Applications.human_id == Humans.id,  # type: ignore[arg-type]
-            ).where(
+            )
+
+        # Apply text search if provided - search in human fields
+        if search:
+            search_term = f"%{search}%"
+            base_statement = base_statement.where(
                 or_(
                     col(Humans.first_name).ilike(search_term),
                     col(Humans.last_name).ilike(search_term),
                     col(Humans.email).ilike(search_term),
                 )
             )
+
+        if filters is not None:
+            filter_expression = build_application_filter_expression(
+                filters, reviewer_id
+            )
+            if filter_expression is not None:
+                base_statement = base_statement.where(filter_expression)
 
         if reviewed_by:
             has_review = (

@@ -33,11 +33,18 @@ import {
   DashboardService,
   FormFieldsService,
   type HumanRating,
-  type PopupReviewerPublic,
   PopupReviewersService,
   PopupsService,
   type ReviewDecision,
 } from "@/client"
+import {
+  ApplicationFilterBuilder,
+  type CustomFilterField,
+  type FilterCondition,
+  type FilterMatch,
+  isCompleteCondition,
+  sanitizeFilterConditions,
+} from "@/components/Applications/ApplicationFilterBuilder"
 import {
   type ApplicationsView,
   ApplicationsViewSwitcher,
@@ -199,13 +206,35 @@ const APPLICATION_STATUS_OPTIONS: {
   { value: "rejected", label: "Rejected" },
 ]
 
+// Custom form fields become filterable attributes; select-like fields keep
+// their options so the value input can offer them.
+function buildCustomFilterFields(
+  formSchema?: ApplicationSchema,
+): CustomFilterField[] {
+  const customFields = formSchema?.custom_fields ?? {}
+  return Object.entries(customFields)
+    .filter(([, def]) => !isDisplayOnlyField(def))
+    .sort(
+      ([, a], [, b]) =>
+        (a.position ?? Number.MAX_SAFE_INTEGER) -
+        (b.position ?? Number.MAX_SAFE_INTEGER),
+    )
+    .map(([name, def]) => ({
+      name,
+      label: def.short_label || def.label || name,
+      options: def.options,
+      isSelect:
+        (def.type === "select" || def.type === "multiselect") &&
+        (def.options?.length ?? 0) > 0,
+    }))
+}
+
 function getApplicationsQueryOptions(
   popupId: string | null,
   page: number,
   pageSize: number,
   search?: string,
-  statusFilter?: ApplicationStatus,
-  reviewedBy?: string,
+  filters?: string,
 ) {
   return {
     queryFn: () =>
@@ -213,15 +242,10 @@ function getApplicationsQueryOptions(
         skip: page * pageSize,
         limit: pageSize,
         popupId: popupId || undefined,
-        reviewedBy: reviewedBy || undefined,
         search: search || undefined,
-        statusFilter: statusFilter || undefined,
+        filters: filters || undefined,
       }),
-    queryKey: [
-      "applications",
-      popupId,
-      { page, pageSize, search, statusFilter, reviewedBy },
-    ],
+    queryKey: ["applications", popupId, { page, pageSize, search, filters }],
   }
 }
 
@@ -255,7 +279,7 @@ function StatusDropdownFilter({
 }: {
   popupId: string | null
   requiresApplicationFee?: boolean
-  selected: ApplicationStatus | undefined
+  selected: ApplicationStatus | "custom" | undefined
   onSelect: (value: ApplicationStatus | undefined) => void
 }) {
   const { counts, total } = useStatusCounts(popupId)
@@ -263,9 +287,15 @@ function StatusDropdownFilter({
     requiresApplicationFee === false
       ? APPLICATION_STATUS_OPTIONS.filter((opt) => opt.value !== "pending_fee")
       : APPLICATION_STATUS_OPTIONS
-  const selectedOption = selected
-    ? statusOptions.find((option) => option.value === selected)
-    : undefined
+  // Status combinations built in the filter builder (or statuses outside the
+  // quick options) render as a read-only "Custom" entry.
+  const isCustom =
+    selected === "custom" ||
+    (!!selected && !statusOptions.some((option) => option.value === selected))
+  const selectedOption =
+    selected && !isCustom
+      ? statusOptions.find((option) => option.value === selected)
+      : undefined
 
   const options = [
     { value: "all" as const, label: "All", count: total },
@@ -276,21 +306,24 @@ function StatusDropdownFilter({
     })),
   ]
 
-  const currentLabel = selectedOption?.label ?? "All"
-  const currentCount = selectedOption
-    ? (counts[selectedOption.value] ?? 0)
-    : total
+  const currentLabel = isCustom ? "Custom" : (selectedOption?.label ?? "All")
+  const currentCount = isCustom
+    ? null
+    : selectedOption
+      ? (counts[selectedOption.value] ?? 0)
+      : total
 
   return (
     <Select
-      value={selectedOption?.value ?? "all"}
+      value={isCustom ? "custom" : (selectedOption?.value ?? "all")}
       onValueChange={(v) =>
         onSelect(v === "all" ? undefined : (v as ApplicationStatus))
       }
     >
       <SelectTrigger className="h-9 w-[180px]">
         <SelectValue>
-          {currentLabel} ({currentCount})
+          {currentLabel}
+          {currentCount !== null ? ` (${currentCount})` : ""}
         </SelectValue>
       </SelectTrigger>
       <SelectContent>
@@ -307,50 +340,14 @@ function StatusDropdownFilter({
             </span>
           </SelectItem>
         ))}
-      </SelectContent>
-    </Select>
-  )
-}
-
-function ReviewerDropdownFilter({
-  reviewers,
-  selected,
-  onSelect,
-  disabled = false,
-}: {
-  reviewers: PopupReviewerPublic[]
-  selected: string | undefined
-  onSelect: (value: string | undefined) => void
-  disabled?: boolean
-}) {
-  const selectedReviewer = selected
-    ? reviewers.find((reviewer) => reviewer.user_id === selected)
-    : undefined
-
-  const currentLabel = disabled
-    ? "No reviewers"
-    : (selectedReviewer?.user_full_name ??
-      selectedReviewer?.user_email ??
-      "All reviewers")
-
-  return (
-    <Select
-      value={selected ?? "all"}
-      onValueChange={(value) => onSelect(value === "all" ? undefined : value)}
-      disabled={disabled}
-    >
-      <SelectTrigger className="h-9 w-[220px]">
-        <SelectValue>{currentLabel}</SelectValue>
-      </SelectTrigger>
-      <SelectContent>
-        <SelectItem value="all">All reviewers</SelectItem>
-        {reviewers.map((reviewer) => (
-          <SelectItem key={reviewer.id} value={reviewer.user_id}>
-            {reviewer.user_full_name ??
-              reviewer.user_email ??
-              "Unknown reviewer"}
+        {isCustom && (
+          <SelectItem value="custom" disabled>
+            <span className="flex w-full items-center justify-between gap-4">
+              <span>Custom</span>
+              <span className="text-muted-foreground">via filters</span>
+            </span>
           </SelectItem>
-        ))}
+        )}
       </SelectContent>
     </Select>
   )
@@ -365,25 +362,65 @@ const VALID_STATUSES: Set<string> = new Set([
 ])
 
 type ApplicationsSearchParams = TableSearchParams & {
-  reviewerId?: string
-  status?: ApplicationStatus
+  match?: FilterMatch
+  filters?: FilterCondition[]
 }
 
 export const Route = createFileRoute("/_layout/applications/")({
   component: Applications,
-  validateSearch: (raw: Record<string, unknown>): ApplicationsSearchParams => ({
-    ...validateTableSearch(raw),
-    ...(typeof raw.status === "string" && VALID_STATUSES.has(raw.status)
-      ? { status: raw.status as ApplicationStatus }
-      : {}),
-    ...(typeof raw.reviewerId === "string" && raw.reviewerId
-      ? { reviewerId: raw.reviewerId }
-      : {}),
-  }),
+  validateSearch: (raw: Record<string, unknown>): ApplicationsSearchParams => {
+    const filters = sanitizeFilterConditions(raw.filters)
+    // Legacy ?status= and ?reviewerId= links fold into the filter conditions.
+    if (
+      typeof raw.status === "string" &&
+      VALID_STATUSES.has(raw.status) &&
+      !filters.some((condition) => condition.field === "status")
+    ) {
+      filters.push({ field: "status", op: "eq", value: raw.status })
+    }
+    if (
+      typeof raw.reviewerId === "string" &&
+      raw.reviewerId &&
+      !filters.some((condition) => condition.field === "reviewed_by")
+    ) {
+      filters.push({ field: "reviewed_by", op: "eq", value: raw.reviewerId })
+    }
+    return {
+      ...validateTableSearch(raw),
+      ...(raw.match === "any" && filters.length
+        ? { match: "any" as const }
+        : {}),
+      ...(filters.length ? { filters } : {}),
+    }
+  },
   head: () => ({
     meta: [{ title: "Applications - EdgeOS" }],
   }),
 })
+
+// Single source for the filter-related search params, shared by the table
+// and the CSV export so both always query the same subset.
+function useApplicationsFilterParams() {
+  const searchParams = Route.useSearch()
+  const filterMatch = searchParams.match ?? "all"
+  const filterConditions = useMemo(
+    () => searchParams.filters ?? [],
+    [searchParams.filters],
+  )
+  // Rows with a missing value stay in the UI but never reach the request.
+  const filtersJson = useMemo(() => {
+    const complete = filterConditions.filter(isCompleteCondition)
+    return complete.length
+      ? JSON.stringify({ match: filterMatch, conditions: complete })
+      : undefined
+  }, [filterConditions, filterMatch])
+  return {
+    search: searchParams.search ?? "",
+    filterMatch,
+    filterConditions,
+    filtersJson,
+  }
+}
 
 function SubmitReviewDialog({
   application,
@@ -868,8 +905,10 @@ const getColumns = (
 
 function ApplicationsTableContent({
   customColumns,
+  customFilterFields,
 }: {
   customColumns: ColumnDef<ApplicationPublic>[]
+  customFilterFields: CustomFilterField[]
 }) {
   const { selectedPopupId } = useWorkspace()
   const { isOperatorOrAbove } = useAuth()
@@ -881,16 +920,48 @@ function ApplicationsTableContent({
     searchParams,
     "/applications",
   )
-  const statusFilter = searchParams.status
-  const reviewerId = searchParams.reviewerId
+  const { filterMatch, filterConditions, filtersJson } =
+    useApplicationsFilterParams()
 
-  const setStatusFilter = useCallback(
-    (value: ApplicationStatus | undefined) => {
+  // The quick selects are shortcuts over the filter conditions: each maps to
+  // a single "field is X" condition and shows Custom for anything richer.
+  const deriveQuickFilter = useCallback(
+    (field: string): string | undefined => {
+      const matching = filterConditions.filter(
+        (condition) => condition.field === field,
+      )
+      if (matching.length === 0) return undefined
+      const [only] = matching
+      if (
+        matching.length === 1 &&
+        only.op === "eq" &&
+        (filterMatch === "all" || filterConditions.length === 1)
+      ) {
+        return typeof only.value === "string" ? only.value : "custom"
+      }
+      return "custom"
+    },
+    [filterConditions, filterMatch],
+  )
+  const statusFilter = deriveQuickFilter("status") as
+    | ApplicationStatus
+    | "custom"
+    | undefined
+  const reviewerFilter = deriveQuickFilter("reviewed_by")
+
+  const setFilters = useCallback(
+    (match: FilterMatch, conditions: FilterCondition[]) => {
       navigate({
         to: "/applications",
         search: (prev: Record<string, unknown>) => ({
           ...prev,
-          status: value,
+          // Scrub the legacy params so validateSearch cannot fold them back
+          // into resurrected conditions after the user edits the filters.
+          status: undefined,
+          reviewerId: undefined,
+          match:
+            match === "any" && conditions.length ? ("any" as const) : undefined,
+          filters: conditions.length ? conditions : undefined,
           page: 0,
         }),
         replace: true,
@@ -899,19 +970,23 @@ function ApplicationsTableContent({
     [navigate],
   )
 
-  const setReviewerFilter = useCallback(
-    (value: string | undefined) => {
-      navigate({
-        to: "/applications",
-        search: (prev: Record<string, unknown>) => ({
-          ...prev,
-          reviewerId: value,
-          page: 0,
-        }),
-        replace: true,
-      })
+  const upsertQuickFilter = useCallback(
+    (field: string, value: string | undefined) => {
+      const rest = filterConditions.filter(
+        (condition) => condition.field !== field,
+      )
+      setFilters(
+        filterMatch,
+        value ? [...rest, { field, op: "eq", value }] : rest,
+      )
     },
-    [navigate],
+    [filterConditions, filterMatch, setFilters],
+  )
+
+  const setStatusFilter = useCallback(
+    (value: ApplicationStatus | undefined) =>
+      upsertQuickFilter("status", value),
+    [upsertQuickFilter],
   )
 
   const { data: applications } = useQuery({
@@ -920,8 +995,7 @@ function ApplicationsTableContent({
       pagination.pageIndex,
       pagination.pageSize,
       search,
-      statusFilter,
-      reviewerId,
+      filtersJson,
     ),
     placeholderData: keepPreviousData,
   })
@@ -950,34 +1024,52 @@ function ApplicationsTableContent({
   })
 
   useEffect(() => {
-    if (
-      popup?.requires_application_fee === false &&
-      statusFilter === "pending_fee"
-    ) {
-      setStatusFilter(undefined)
+    if (popup?.requires_application_fee !== false) return
+    const hasPendingFee = filterConditions.some(
+      (condition) =>
+        condition.field === "status" && condition.value === "pending_fee",
+    )
+    if (hasPendingFee) {
+      setFilters(
+        filterMatch,
+        filterConditions.filter(
+          (condition) =>
+            !(
+              condition.field === "status" && condition.value === "pending_fee"
+            ),
+        ),
+      )
     }
-  }, [popup?.requires_application_fee, setStatusFilter, statusFilter])
+  }, [
+    popup?.requires_application_fee,
+    filterConditions,
+    filterMatch,
+    setFilters,
+  ])
 
   const reviewers = popupReviewers?.results ?? []
 
+  // Drop reviewer conditions that reference reviewers outside the current
+  // popup (e.g. after switching gatherings).
   useEffect(() => {
-    if (!reviewerId) return
-    if (!selectedPopupId) {
-      setReviewerFilter(undefined)
-      return
-    }
-    if (
-      popupReviewers &&
-      !reviewers.some((reviewer) => reviewer.user_id === reviewerId)
-    ) {
-      setReviewerFilter(undefined)
+    if (!popupReviewers) return
+    const isInvalid = (condition: FilterCondition) =>
+      condition.field === "reviewed_by" &&
+      (!selectedPopupId ||
+        !reviewers.some((reviewer) => reviewer.user_id === condition.value))
+    if (filterConditions.some(isInvalid)) {
+      setFilters(
+        filterMatch,
+        filterConditions.filter((condition) => !isInvalid(condition)),
+      )
     }
   }, [
     popupReviewers,
-    reviewerId,
     reviewers,
     selectedPopupId,
-    setReviewerFilter,
+    filterConditions,
+    filterMatch,
+    setFilters,
   ])
 
   const bulkReviewMutation = useMutation({
@@ -1049,7 +1141,11 @@ function ApplicationsTableContent({
   })
 
   const isWeightedVoting = approvalStrategy?.strategy_type === "weighted"
-  const columns = getColumns(isWeightedVoting, !!reviewerId, customColumns)
+  const columns = getColumns(
+    isWeightedVoting,
+    !!reviewerFilter && reviewerFilter !== "custom",
+    customColumns,
+  )
   const canBulkReview = isOperatorOrAbove && !isWeightedVoting
 
   if (!applications) return <Skeleton className="h-64 w-full" />
@@ -1083,14 +1179,26 @@ function ApplicationsTableContent({
             selected={statusFilter}
             onSelect={setStatusFilter}
           />
-          {selectedPopupId ? (
-            <ReviewerDropdownFilter
-              reviewers={reviewers}
-              selected={reviewerId}
-              onSelect={setReviewerFilter}
-              disabled={reviewers.length === 0}
-            />
-          ) : null}
+          <ApplicationFilterBuilder
+            statusOptions={
+              popup?.requires_application_fee === false
+                ? APPLICATION_STATUS_OPTIONS.filter(
+                    (opt) => opt.value !== "pending_fee",
+                  )
+                : APPLICATION_STATUS_OPTIONS
+            }
+            customFields={customFilterFields}
+            reviewerOptions={reviewers.map((reviewer) => ({
+              value: reviewer.user_id,
+              label:
+                reviewer.user_full_name ??
+                reviewer.user_email ??
+                reviewer.user_id,
+            }))}
+            match={filterMatch}
+            conditions={filterConditions}
+            onChange={setFilters}
+          />
         </div>
       }
       serverPagination={{
@@ -1170,6 +1278,8 @@ function AddApplicationButton() {
 function Applications() {
   const { isOperatorOrAbove, isSuperadmin } = useAuth()
   const { isContextReady, selectedPopupId } = useWorkspace()
+  const { search, filtersJson } = useApplicationsFilterParams()
+  const { showSuccessToast, showErrorToast } = useCustomToast()
   const [isExporting, setIsExporting] = useState(false)
   const [view, setView] = useState<ApplicationsView>(readStoredApplicationsView)
 
@@ -1194,6 +1304,14 @@ function Applications() {
     [formSchema],
   )
 
+  const customFilterFields = useMemo(
+    () => buildCustomFilterFields(formSchema),
+    [formSchema],
+  )
+
+  // Export what the table shows: the same search, reviewer and filter
+  // conditions drive the fetch, just without pagination.
+  const isExportFiltered = Boolean(search || filtersJson)
   const handleExport = async () => {
     if (!selectedPopupId) return
     setIsExporting(true)
@@ -1203,8 +1321,19 @@ function Applications() {
           skip,
           limit,
           popupId: selectedPopupId,
+          search: search || undefined,
+          filters: filtersJson,
         }),
       )
+
+      if (results.length === 0) {
+        showErrorToast(
+          isExportFiltered
+            ? "No applications match the current filters"
+            : "There are no applications to export",
+        )
+        return
+      }
 
       const baseColumns = [
         { key: "human.email", label: "Email" },
@@ -1260,9 +1389,12 @@ function Applications() {
         .map(({ key, label }) => ({ key, label }))
 
       exportToCsv(
-        "applications",
+        isExportFiltered ? "applications-filtered" : "applications",
         results as unknown as Record<string, unknown>[],
         [...baseColumns, ...customColumns],
+      )
+      showSuccessToast(
+        `Exported ${results.length} application${results.length === 1 ? "" : "s"}`,
       )
     } finally {
       setIsExporting(false)
@@ -1305,9 +1437,18 @@ function Applications() {
               variant="outline"
               onClick={handleExport}
               disabled={isExporting}
+              title={
+                isExportFiltered
+                  ? "Exports the applications matching the current filters"
+                  : "Exports all applications for this gathering"
+              }
             >
               <Download className="mr-2 h-4 w-4" />
-              {isExporting ? "Exporting..." : "Export CSV"}
+              {isExporting
+                ? "Exporting..."
+                : isExportFiltered
+                  ? "Export filtered CSV"
+                  : "Export CSV"}
             </Button>
           )}
           {isSuperadmin && isContextReady && <AddApplicationButton />}
@@ -1318,7 +1459,10 @@ function Applications() {
       ) : (
         <QueryErrorBoundary>
           <Suspense fallback={<Skeleton className="h-64 w-full" />}>
-            <ApplicationsTableContent customColumns={customColumns} />
+            <ApplicationsTableContent
+              customColumns={customColumns}
+              customFilterFields={customFilterFields}
+            />
           </Suspense>
         </QueryErrorBoundary>
       )}

@@ -36,6 +36,7 @@ from app.api.application.schemas import (
     ParticipationResponse,
     PopupAccessResponse,
     ScholarshipDecisionRequest,
+    parse_application_filters,
 )
 from app.api.application_review.crud import (
     application_review_skips_crud,
@@ -197,10 +198,22 @@ async def list_applications(
     reviewed_by: uuid.UUID | None = None,
     status_filter: ApplicationStatus | None = None,
     search: str | None = None,
+    filters: str | None = None,
     skip: PaginationSkip = 0,
     limit: PaginationLimit = 100,
 ) -> ListModel[ApplicationPublic]:
-    """List applications with optional filters (BO only)."""
+    """List applications with optional filters (BO only).
+
+    ``filters`` is a JSON filter group:
+    ``{"match": "all"|"any", "conditions": [{"field", "op", "value"}]}``.
+    It only applies to the popup_id listing and is combined (AND) with the
+    legacy status_filter/search/reviewed_by params. The virtual fields
+    ``skipped_by_me`` and ``reviewed_by_me`` (op ``eq``, boolean value)
+    resolve against the calling user's own skips and reviews. The
+    ``reviewed_by`` field (ops ``eq``/``neq``, reviewer user id as UUID
+    string) matches applications reviewed (or not) by that reviewer.
+    """
+    parsed_filters = parse_application_filters(filters)
     if popup_id:
         applications, total = crud.applications_crud.find_by_popup(
             db,
@@ -210,6 +223,8 @@ async def list_applications(
             status_filter=status_filter,
             search=search,
             reviewed_by=reviewed_by,
+            filters=parsed_filters,
+            reviewer_id=getattr(current_user, "id", None),
         )
     elif human_id:
         applications, total = crud.applications_crud.find_by_human(
