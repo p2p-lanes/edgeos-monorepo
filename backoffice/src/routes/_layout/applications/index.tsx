@@ -14,13 +14,22 @@ import {
   ListChecks,
   MessageSquare,
   Plus,
+  Search,
   SkipForward,
   Star,
   ThumbsDown,
   ThumbsUp,
   Users,
+  X,
 } from "lucide-react"
-import { Suspense, useCallback, useEffect, useMemo, useState } from "react"
+import {
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react"
 
 import {
   type ApiError,
@@ -45,6 +54,7 @@ import {
   isCompleteCondition,
   sanitizeFilterConditions,
 } from "@/components/Applications/ApplicationFilterBuilder"
+import { ApplicationsGroupedView } from "@/components/Applications/ApplicationsGroupedView"
 import {
   type ApplicationsView,
   ApplicationsViewSwitcher,
@@ -70,6 +80,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { Input } from "@/components/ui/input"
 import { LoadingButton } from "@/components/ui/loading-button"
 import {
   Popover,
@@ -79,7 +90,9 @@ import {
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
@@ -229,6 +242,139 @@ function buildCustomFilterFields(
     }))
 }
 
+/** Custom form-builder field usable as a grouping attribute. */
+interface GroupByField {
+  key: string
+  label: string
+  options?: string[]
+}
+
+const FIXED_GROUP_BY_OPTIONS: { value: string; label: string }[] = [
+  { value: "status", label: "Status" },
+  { value: "scholarship_status", label: "Scholarship status" },
+  { value: "gender", label: "Gender" },
+  { value: "age", label: "Age" },
+]
+
+const VALID_GROUP_BY_FIELDS = new Set(
+  FIXED_GROUP_BY_OPTIONS.map((option) => option.value),
+)
+
+// Only closed-vocabulary custom fields group well; free-text fields have
+// too high a cardinality to produce useful buckets.
+function buildGroupByCustomFields(
+  formSchema?: ApplicationSchema,
+): GroupByField[] {
+  const customFields = formSchema?.custom_fields ?? {}
+  return Object.entries(customFields)
+    .filter(
+      ([, def]) =>
+        def.type === "select" ||
+        def.type === "multiselect" ||
+        def.type === "boolean",
+    )
+    .sort(
+      ([, a], [, b]) =>
+        (a.position ?? Number.MAX_SAFE_INTEGER) -
+        (b.position ?? Number.MAX_SAFE_INTEGER),
+    )
+    .map(([name, def]) => ({
+      key: `custom.${name}`,
+      label: def.short_label || def.label || name,
+      options: def.options,
+    }))
+}
+
+function GroupBySelect({
+  value,
+  onChange,
+  customFields,
+}: {
+  value?: string
+  onChange: (value: string | undefined) => void
+  customFields: GroupByField[]
+}) {
+  const activeLabel =
+    FIXED_GROUP_BY_OPTIONS.find((option) => option.value === value)?.label ??
+    customFields.find((field) => field.key === value)?.label
+  return (
+    <Select
+      value={value ?? "none"}
+      onValueChange={(next) => onChange(next === "none" ? undefined : next)}
+    >
+      <SelectTrigger className="h-9 w-[190px]">
+        <SelectValue>
+          {value ? `Group: ${activeLabel ?? value}` : "Group by"}
+        </SelectValue>
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="none">No grouping</SelectItem>
+        {FIXED_GROUP_BY_OPTIONS.map((option) => (
+          <SelectItem key={option.value} value={option.value}>
+            {option.label}
+          </SelectItem>
+        ))}
+        {customFields.length > 0 && (
+          <SelectGroup>
+            <SelectLabel>Form fields</SelectLabel>
+            {customFields.map((field) => (
+              <SelectItem key={field.key} value={field.key}>
+                {field.label}
+              </SelectItem>
+            ))}
+          </SelectGroup>
+        )}
+      </SelectContent>
+    </Select>
+  )
+}
+
+// Standalone debounced search box for the grouped view, where no single
+// DataTable owns the toolbar. Mirrors the DataTable search behavior.
+function DebouncedSearchInput({
+  value,
+  onChange,
+  placeholder,
+}: {
+  value: string
+  onChange: (value: string) => void
+  placeholder: string
+}) {
+  const [local, setLocal] = useState(value)
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>(null)
+
+  useEffect(() => {
+    setLocal(value)
+  }, [value])
+
+  const handleChange = (next: string) => {
+    setLocal(next)
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(() => onChange(next), 300)
+  }
+
+  return (
+    <div className="relative w-full min-w-0 sm:max-w-xs">
+      <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+      <Input
+        placeholder={placeholder}
+        value={local}
+        onChange={(e) => handleChange(e.target.value)}
+        className="pl-9 pr-8"
+      />
+      {local && (
+        <button
+          type="button"
+          onClick={() => handleChange("")}
+          className="absolute right-2 top-1/2 -translate-y-1/2 rounded-sm p-0.5 text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      )}
+    </div>
+  )
+}
+
 function getApplicationsQueryOptions(
   popupId: string | null,
   page: number,
@@ -364,6 +510,7 @@ const VALID_STATUSES: Set<string> = new Set([
 type ApplicationsSearchParams = TableSearchParams & {
   match?: FilterMatch
   filters?: FilterCondition[]
+  groupBy?: string
 }
 
 export const Route = createFileRoute("/_layout/applications/")({
@@ -385,12 +532,19 @@ export const Route = createFileRoute("/_layout/applications/")({
     ) {
       filters.push({ field: "reviewed_by", op: "eq", value: raw.reviewerId })
     }
+    const groupBy =
+      typeof raw.groupBy === "string" &&
+      (VALID_GROUP_BY_FIELDS.has(raw.groupBy) ||
+        raw.groupBy.startsWith("custom."))
+        ? raw.groupBy
+        : undefined
     return {
       ...validateTableSearch(raw),
       ...(raw.match === "any" && filters.length
         ? { match: "any" as const }
         : {}),
       ...(filters.length ? { filters } : {}),
+      ...(groupBy ? { groupBy } : {}),
     }
   },
   head: () => ({
@@ -906,9 +1060,13 @@ const getColumns = (
 function ApplicationsTableContent({
   customColumns,
   customFilterFields,
+  groupByCustomFields,
+  isSchemaLoaded,
 }: {
   customColumns: ColumnDef<ApplicationPublic>[]
   customFilterFields: CustomFilterField[]
+  groupByCustomFields: GroupByField[]
+  isSchemaLoaded: boolean
 }) {
   const { selectedPopupId } = useWorkspace()
   const { isOperatorOrAbove } = useAuth()
@@ -989,6 +1147,44 @@ function ApplicationsTableContent({
     [upsertQuickFilter],
   )
 
+  const setGroupBy = useCallback(
+    (value: string | undefined) => {
+      navigate({
+        to: "/applications",
+        search: (prev: Record<string, unknown>) => ({
+          ...prev,
+          groupBy: value,
+          page: 0,
+        }),
+        replace: true,
+      })
+    },
+    [navigate],
+  )
+
+  // Grouping needs a selected popup; the counts endpoint is popup-scoped.
+  const groupBy =
+    selectedPopupId && searchParams.groupBy ? searchParams.groupBy : undefined
+
+  // Drop custom group fields that no longer exist in the schema (e.g. after
+  // switching gatherings).
+  useEffect(() => {
+    if (!isSchemaLoaded || !groupBy?.startsWith("custom.")) return
+    if (!groupByCustomFields.some((field) => field.key === groupBy)) {
+      setGroupBy(undefined)
+    }
+  }, [isSchemaLoaded, groupBy, groupByCustomFields, setGroupBy])
+
+  const groupValueOrder = useMemo(() => {
+    if (groupBy === "status") {
+      return APPLICATION_STATUS_OPTIONS.map((option) => option.value)
+    }
+    if (groupBy?.startsWith("custom.")) {
+      return groupByCustomFields.find((field) => field.key === groupBy)?.options
+    }
+    return undefined
+  }, [groupBy, groupByCustomFields])
+
   const { data: applications } = useQuery({
     ...getApplicationsQueryOptions(
       selectedPopupId,
@@ -998,6 +1194,8 @@ function ApplicationsTableContent({
       filtersJson,
     ),
     placeholderData: keepPreviousData,
+    // The grouped view fetches its own per-group pages instead.
+    enabled: !groupBy,
   })
 
   const { data: popupReviewers } = useQuery({
@@ -1148,6 +1346,76 @@ function ApplicationsTableContent({
   )
   const canBulkReview = isOperatorOrAbove && !isWeightedVoting
 
+  const hiddenOnMobile = [
+    "attendees",
+    "rating",
+    "comments",
+    "submitted_at",
+    "referral",
+  ]
+
+  const filterBar = (
+    <div className="flex flex-wrap items-center gap-2">
+      <StatusDropdownFilter
+        popupId={selectedPopupId}
+        requiresApplicationFee={popup?.requires_application_fee}
+        selected={statusFilter}
+        onSelect={setStatusFilter}
+      />
+      <ApplicationFilterBuilder
+        statusOptions={
+          popup?.requires_application_fee === false
+            ? APPLICATION_STATUS_OPTIONS.filter(
+                (opt) => opt.value !== "pending_fee",
+              )
+            : APPLICATION_STATUS_OPTIONS
+        }
+        customFields={customFilterFields}
+        reviewerOptions={reviewers.map((reviewer) => ({
+          value: reviewer.user_id,
+          label:
+            reviewer.user_full_name ?? reviewer.user_email ?? reviewer.user_id,
+        }))}
+        match={filterMatch}
+        conditions={filterConditions}
+        onChange={setFilters}
+      />
+      <GroupBySelect
+        value={searchParams.groupBy}
+        onChange={setGroupBy}
+        customFields={groupByCustomFields}
+      />
+    </div>
+  )
+
+  if (groupBy && selectedPopupId) {
+    return (
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
+          <div className="flex min-w-0 flex-1 items-center gap-3">
+            <DebouncedSearchInput
+              value={search}
+              onChange={setSearch}
+              placeholder="Search by name or email..."
+            />
+            <div className="flex min-w-0 flex-1 items-center">{filterBar}</div>
+          </div>
+        </div>
+        <ApplicationsGroupedView
+          key={groupBy}
+          popupId={selectedPopupId}
+          groupBy={groupBy}
+          columns={columns}
+          filterMatch={filterMatch}
+          filterConditions={filterConditions}
+          search={search}
+          valueOrder={groupValueOrder}
+          hiddenOnMobile={hiddenOnMobile}
+        />
+      </div>
+    )
+  }
+
   if (!applications) return <Skeleton className="h-64 w-full" />
 
   return (
@@ -1156,13 +1424,7 @@ function ApplicationsTableContent({
       data={applications.results}
       tableId="applications"
       searchPlaceholder="Search by name or email..."
-      hiddenOnMobile={[
-        "attendees",
-        "rating",
-        "comments",
-        "submitted_at",
-        "referral",
-      ]}
+      hiddenOnMobile={hiddenOnMobile}
       searchValue={search}
       onSearchChange={setSearch}
       onRowClick={(application) =>
@@ -1171,36 +1433,7 @@ function ApplicationsTableContent({
           params: { id: application.id },
         })
       }
-      filterBar={
-        <div className="flex flex-wrap items-center gap-2">
-          <StatusDropdownFilter
-            popupId={selectedPopupId}
-            requiresApplicationFee={popup?.requires_application_fee}
-            selected={statusFilter}
-            onSelect={setStatusFilter}
-          />
-          <ApplicationFilterBuilder
-            statusOptions={
-              popup?.requires_application_fee === false
-                ? APPLICATION_STATUS_OPTIONS.filter(
-                    (opt) => opt.value !== "pending_fee",
-                  )
-                : APPLICATION_STATUS_OPTIONS
-            }
-            customFields={customFilterFields}
-            reviewerOptions={reviewers.map((reviewer) => ({
-              value: reviewer.user_id,
-              label:
-                reviewer.user_full_name ??
-                reviewer.user_email ??
-                reviewer.user_id,
-            }))}
-            match={filterMatch}
-            conditions={filterConditions}
-            onChange={setFilters}
-          />
-        </div>
-      }
+      filterBar={filterBar}
       serverPagination={{
         total: applications.paging.total,
         pagination: pagination,
@@ -1306,6 +1539,11 @@ function Applications() {
 
   const customFilterFields = useMemo(
     () => buildCustomFilterFields(formSchema),
+    [formSchema],
+  )
+
+  const groupByCustomFields = useMemo(
+    () => buildGroupByCustomFields(formSchema),
     [formSchema],
   )
 
@@ -1462,6 +1700,8 @@ function Applications() {
             <ApplicationsTableContent
               customColumns={customColumns}
               customFilterFields={customFilterFields}
+              groupByCustomFields={groupByCustomFields}
+              isSchemaLoaded={!!formSchema}
             />
           </Suspense>
         </QueryErrorBoundary>
