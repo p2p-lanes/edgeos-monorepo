@@ -2566,6 +2566,11 @@ export type ListModel_ProductPublic_ = {
     paging: Paging;
 };
 
+export type ListModel_SavedViewPublic_ = {
+    results: Array<SavedViewPublic>;
+    paging: Paging;
+};
+
 export type ListModel_TaskCommentPublic_ = {
     results: Array<TaskCommentPublic>;
     paging: Paging;
@@ -3550,6 +3555,35 @@ export type ReviewSummary = {
  * Enum is extensible for future types (e.g. waitlist, lottery, registration).
  */
 export type SaleType = 'application' | 'direct';
+
+export type SavedViewCreate = {
+    popup_id: string;
+    entity: string;
+    name: string;
+    config: {
+        [key: string]: unknown;
+    };
+};
+
+export type SavedViewPublic = {
+    id: string;
+    tenant_id: string;
+    popup_id: string;
+    entity: string;
+    name: string;
+    config: {
+        [key: string]: unknown;
+    };
+    created_by: string;
+    created_at: string;
+};
+
+export type SavedViewUpdate = {
+    name?: (string | null);
+    config?: ({
+    [key: string]: unknown;
+} | null);
+};
 
 /**
  * Admin request body for PATCH /applications/{id}/scholarship.
@@ -6630,6 +6664,36 @@ export type ProductsListPortalProductsData = {
 };
 
 export type ProductsListPortalProductsResponse = (ListModel_ProductPublic_);
+
+export type SavedViewsListSavedViewsData = {
+    entity: string;
+    popupId: string;
+    xTenantId?: (string | null);
+};
+
+export type SavedViewsListSavedViewsResponse = (ListModel_SavedViewPublic_);
+
+export type SavedViewsCreateSavedViewData = {
+    requestBody: SavedViewCreate;
+    xTenantId?: (string | null);
+};
+
+export type SavedViewsCreateSavedViewResponse = (SavedViewPublic);
+
+export type SavedViewsUpdateSavedViewData = {
+    requestBody: SavedViewUpdate;
+    viewId: string;
+    xTenantId?: (string | null);
+};
+
+export type SavedViewsUpdateSavedViewResponse = (SavedViewPublic);
+
+export type SavedViewsDeleteSavedViewData = {
+    viewId: string;
+    xTenantId?: (string | null);
+};
+
+export type SavedViewsDeleteSavedViewResponse = (void);
 
 export type TasksReportBugData = {
     requestBody: BugReportCreate;

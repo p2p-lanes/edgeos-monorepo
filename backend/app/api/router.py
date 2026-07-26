@@ -30,6 +30,7 @@ from app.api import (
     popup,
     popup_reviewer,
     product,
+    saved_view,
     task,
     tenant,
     third_party_app,
@@ -71,6 +72,7 @@ api_router.include_router(email_template.router)
 api_router.include_router(email_log.router)
 api_router.include_router(base_field_config.router)
 api_router.include_router(ticketing_step.router)
+api_router.include_router(saved_view.router)
 
 # Approval system resources (registered before application so static paths
 # like /applications/pending-review are matched before /{application_id})
