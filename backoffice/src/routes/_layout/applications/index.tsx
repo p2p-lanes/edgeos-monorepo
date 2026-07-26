@@ -62,6 +62,7 @@ import {
 import { DataTable, SortableHeader } from "@/components/Common/DataTable"
 import { EmptyState } from "@/components/Common/EmptyState"
 import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
+import { SavedViewsMenu } from "@/components/Common/SavedViewsMenu"
 import { StatusBadge } from "@/components/Common/StatusBadge"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
 import { Button } from "@/components/ui/button"
@@ -1162,6 +1163,68 @@ function ApplicationsTableContent({
     [navigate],
   )
 
+  // The saved-view config only captures explicit choices; defaults stay out
+  // so applying a view produces a minimal URL.
+  const savedViewConfig = useMemo(() => {
+    const config: Record<string, unknown> = {}
+    if (searchParams.match === "any" && filterConditions.length) {
+      config.match = "any"
+    }
+    if (filterConditions.length) config.filters = filterConditions
+    if (searchParams.groupBy) config.groupBy = searchParams.groupBy
+    if (searchParams.sortBy) {
+      config.sortBy = searchParams.sortBy
+      config.sortOrder = searchParams.sortOrder
+    }
+    return config
+  }, [
+    searchParams.match,
+    searchParams.groupBy,
+    searchParams.sortBy,
+    searchParams.sortOrder,
+    filterConditions,
+  ])
+
+  // Saved-view configs are team-authored server data: revalidate every field
+  // with the same rules validateSearch applies before touching the URL.
+  const applySavedView = useCallback(
+    (config: Record<string, unknown>) => {
+      const filters = sanitizeFilterConditions(config.filters)
+      const groupByValue =
+        typeof config.groupBy === "string" &&
+        (VALID_GROUP_BY_FIELDS.has(config.groupBy) ||
+          config.groupBy.startsWith("custom."))
+          ? config.groupBy
+          : undefined
+      const sortOrder: "asc" | "desc" | undefined =
+        config.sortOrder === "asc" || config.sortOrder === "desc"
+          ? config.sortOrder
+          : undefined
+      navigate({
+        to: "/applications",
+        search: (prev: Record<string, unknown>) => ({
+          ...prev,
+          status: undefined,
+          reviewerId: undefined,
+          page: 0,
+          match:
+            config.match === "any" && filters.length
+              ? ("any" as const)
+              : undefined,
+          filters: filters.length ? filters : undefined,
+          groupBy: groupByValue,
+          sortBy:
+            typeof config.sortBy === "string" && config.sortBy
+              ? config.sortBy
+              : undefined,
+          sortOrder,
+        }),
+        replace: true,
+      })
+    },
+    [navigate],
+  )
+
   // Grouping needs a selected popup; the counts endpoint is popup-scoped.
   const groupBy =
     selectedPopupId && searchParams.groupBy ? searchParams.groupBy : undefined
@@ -1385,6 +1448,14 @@ function ApplicationsTableContent({
         onChange={setGroupBy}
         customFields={groupByCustomFields}
       />
+      {selectedPopupId && (
+        <SavedViewsMenu
+          popupId={selectedPopupId}
+          entity="applications"
+          currentConfig={savedViewConfig}
+          onApply={applySavedView}
+        />
+      )}
     </div>
   )
 
