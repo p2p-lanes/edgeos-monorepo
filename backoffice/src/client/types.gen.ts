@@ -218,6 +218,16 @@ export type ApplicationFunnel = {
 };
 
 /**
+ * One bucket of GET /applications/group-counts.
+ *
+ * ``value`` is None for applications where the group field is NULL or "".
+ */
+export type ApplicationGroupCount = {
+    value?: (string | null);
+    count: number;
+};
+
+/**
  * How the portal renders the application form for a popup.
  *
  * - single_page: all sections stacked on one page (legacy behavior).
@@ -4519,6 +4529,8 @@ export type ApplicationReviewsUnskipApplicationResponse = (void);
 
 export type ApplicationsListApplicationsData = {
     filters?: (string | null);
+    groupBy?: (string | null);
+    groupValue?: (string | null);
     humanId?: (string | null);
     /**
      * Maximum number of items to return
@@ -4543,6 +4555,16 @@ export type ApplicationsCreateApplicationAdminData = {
 };
 
 export type ApplicationsCreateApplicationAdminResponse = (ApplicationPublic);
+
+export type ApplicationsGetApplicationGroupCountsData = {
+    filters?: (string | null);
+    groupBy: string;
+    popupId: string;
+    search?: (string | null);
+    xTenantId?: (string | null);
+};
+
+export type ApplicationsGetApplicationGroupCountsResponse = (Array<ApplicationGroupCount>);
 
 export type ApplicationsGrantTicketsAdminData = {
     requestBody: AdminGrantTicketsRequest;

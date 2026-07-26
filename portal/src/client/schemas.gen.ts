@@ -1020,6 +1020,32 @@ export const ApplicationFunnelSchema = {
     description: 'Application pipeline as a funnel.'
 } as const;
 
+export const ApplicationGroupCountSchema = {
+    properties: {
+        value: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Value'
+        },
+        count: {
+            type: 'integer',
+            title: 'Count'
+        }
+    },
+    type: 'object',
+    required: ['count'],
+    title: 'ApplicationGroupCount',
+    description: `One bucket of GET /applications/group-counts.
+
+\`\`value\`\` is None for applications where the group field is NULL or "".`
+} as const;
+
 export const ApplicationLayoutSchema = {
     type: 'string',
     enum: ['single_page', 'multi_step'],

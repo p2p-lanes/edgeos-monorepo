@@ -535,6 +535,16 @@ def parse_application_filters(raw: str | None) -> ApplicationFilters | None:
         raise HTTPException(status_code=422, detail=message) from None
 
 
+class ApplicationGroupCount(BaseModel):
+    """One bucket of GET /applications/group-counts.
+
+    ``value`` is None for applications where the group field is NULL or "".
+    """
+
+    value: str | None = None
+    count: int
+
+
 class ScholarshipDecisionRequest(BaseModel):
     """Admin request body for PATCH /applications/{id}/scholarship."""
 

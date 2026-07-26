@@ -15,6 +15,7 @@ from app.api.application.models import (
     ApplicationSnapshots,
 )
 from app.api.application.schemas import (
+    CUSTOM_FIELD_PREFIX,
     VIRTUAL_REVIEWER_FIELDS,
     ApplicationAdminCreate,
     ApplicationCommentCreate,
@@ -188,6 +189,32 @@ def build_application_filter_expression(
     return and_(*expressions)
 
 
+# Fields the group-counts endpoint may group by, split by source table.
+GROUP_BY_APPLICATION_FIELDS = frozenset({"status", "scholarship_status"})
+GROUP_BY_HUMAN_FIELDS = frozenset({"gender", "age"})
+
+
+def _group_by_expression(group_by: str):
+    """Resolve a ``group_by`` key into (SQL expression, needs Humans join).
+
+    ``custom.<name>`` targets custom_fields[<name>]; the name stays a bound
+    parameter through the JSONB accessor, never raw SQL. Unsupported keys
+    raise a user-oriented 422.
+    """
+    if group_by.startswith(CUSTOM_FIELD_PREFIX):
+        name = group_by[len(CUSTOM_FIELD_PREFIX) :]
+        if name:
+            return col(Applications.custom_fields)[name].astext, False
+    elif group_by in GROUP_BY_APPLICATION_FIELDS:
+        return col(getattr(Applications, group_by)), False
+    elif group_by in GROUP_BY_HUMAN_FIELDS:
+        return col(getattr(Humans, group_by)), True
+    raise HTTPException(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        detail=f"Grouping by '{group_by}' is not supported.",
+    )
+
+
 class RedFlaggedHumanError(Exception):
     """Raised when attempting to accept an application from a red-flagged human."""
 
@@ -253,12 +280,26 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         reviewed_by: uuid.UUID | None = None,
         filters: ApplicationFilters | None = None,
         reviewer_id: uuid.UUID | None = None,
+        group_by: str | None = None,
+        group_value: str | None = None,
     ) -> tuple[list[Applications], int]:
         """Find applications by popup_id with optional status filter and eager loading.
 
         ``reviewer_id`` is the calling user's id, used only by the virtual
         per-user filter fields (skipped_by_me, reviewed_by_me).
+
+        ``group_by``/``group_value`` scope the list to one bucket of a
+        grouped view, using the same field whitelist and NULL/empty-string
+        collapsing as ``count_by_group``. The scope is ANDed with everything
+        else, so it stays correct even when ``filters`` uses match=any.
+        ``group_value`` is ignored when ``group_by`` is not set; with
+        ``group_by`` set and no ``group_value`` the NULL bucket is selected.
         """
+        group_expression = None
+        group_needs_human = False
+        if group_by is not None:
+            group_expression, group_needs_human = _group_by_expression(group_by)
+
         base_statement = select(Applications).where(Applications.popup_id == popup_id)
 
         if status_filter:
@@ -266,10 +307,12 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
                 Applications.status == status_filter.value
             )
 
-        # Join Humans once, whether needed by text search, a human-field
-        # filter condition, or both.
-        needs_human_join = bool(search) or bool(
-            filters and filters.references_human_fields()
+        # Join Humans once, whether needed by the group field, text search,
+        # a human-field filter condition, or any combination.
+        needs_human_join = (
+            group_needs_human
+            or bool(search)
+            or bool(filters and filters.references_human_fields())
         )
         if needs_human_join:
             base_statement = base_statement.join(
@@ -294,6 +337,15 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
             )
             if filter_expression is not None:
                 base_statement = base_statement.where(filter_expression)
+
+        if group_expression is not None:
+            # Same bucket shape as count_by_group: NULL and "" collapse into
+            # one None bucket, selected by omitting group_value.
+            bucket = func.nullif(group_expression, "")
+            if group_value is None:
+                base_statement = base_statement.where(bucket.is_(None))
+            else:
+                base_statement = base_statement.where(bucket == group_value)
 
         if reviewed_by:
             has_review = (
@@ -325,6 +377,65 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         results = list(session.exec(statement).all())
 
         return results, total
+
+    def count_by_group(
+        self,
+        session: Session,
+        popup_id: uuid.UUID,
+        group_by: str,
+        search: str | None = None,
+        filters: ApplicationFilters | None = None,
+        reviewer_id: uuid.UUID | None = None,
+    ) -> list[tuple[str | None, int]]:
+        """Count a popup's applications grouped by one field.
+
+        Same base statement as ``find_by_popup`` (popup scope + search +
+        filters), grouped over ``nullif(expr, '')`` so NULL and empty string
+        collapse into one None bucket. Rows come back ordered by count
+        descending. ``reviewer_id`` resolves the virtual per-user filter
+        fields, exactly like the list endpoint.
+        """
+        group_expression, group_needs_human = _group_by_expression(group_by)
+        bucket = func.nullif(group_expression, "")
+
+        statement = (
+            select(bucket, func.count())
+            .select_from(Applications)
+            .where(Applications.popup_id == popup_id)
+        )
+
+        # Join Humans once, whether needed by the group field, text search,
+        # a human-field filter condition, or any combination.
+        needs_human_join = (
+            group_needs_human
+            or bool(search)
+            or bool(filters and filters.references_human_fields())
+        )
+        if needs_human_join:
+            statement = statement.join(
+                Humans,
+                Applications.human_id == Humans.id,  # type: ignore[arg-type]
+            )
+
+        if search:
+            search_term = f"%{search}%"
+            statement = statement.where(
+                or_(
+                    col(Humans.first_name).ilike(search_term),
+                    col(Humans.last_name).ilike(search_term),
+                    col(Humans.email).ilike(search_term),
+                )
+            )
+
+        if filters is not None:
+            filter_expression = build_application_filter_expression(
+                filters, reviewer_id
+            )
+            if filter_expression is not None:
+                statement = statement.where(filter_expression)
+
+        statement = statement.group_by(bucket).order_by(func.count().desc())
+        return list(session.exec(statement).all())
 
     def find_by_status(
         self,
