@@ -30,10 +30,31 @@ const SCHOLARSHIP_STATUS_OPTIONS = [
   { value: "rejected", label: "Rejected" },
 ]
 
+// Base fields configured as selects in the form builder carry fixed
+// options; surface them as a value picker instead of free text.
+function baseFieldDef(
+  key: string,
+  label: string,
+  baseFieldOptions: Record<string, string[]>,
+): FilterFieldDef {
+  const options = baseFieldOptions[key]
+  if (options?.length) {
+    return {
+      key,
+      label,
+      kind: "select",
+      ops: EMPTYABLE_TEXT_OPS,
+      options: options.map((opt) => ({ value: opt, label: opt })),
+    }
+  }
+  return { key, label, kind: "text", ops: EMPTYABLE_TEXT_OPS }
+}
+
 function buildFieldDefs(
   statusOptions: { value: string; label: string }[],
   customFields: CustomFilterField[],
   reviewerOptions: { value: string; label: string }[] = [],
+  baseFieldOptions: Record<string, string[]> = {},
 ): FilterFieldDef[] {
   const fixed: FilterFieldDef[] = [
     {
@@ -82,8 +103,8 @@ function buildFieldDefs(
     { key: "submitted_at", label: "Submitted", kind: "date", ops: DATE_OPS },
     { key: "accepted_at", label: "Accepted", kind: "date", ops: DATE_OPS },
     { key: "referral", label: "Referral", kind: "text", ops: FULL_TEXT_OPS },
-    { key: "gender", label: "Gender", kind: "text", ops: EMPTYABLE_TEXT_OPS },
-    { key: "age", label: "Age", kind: "text", ops: EMPTYABLE_TEXT_OPS },
+    baseFieldDef("gender", "Gender", baseFieldOptions),
+    baseFieldDef("age", "Age", baseFieldOptions),
   ]
   const custom: FilterFieldDef[] = customFields.map((field) => ({
     key: `custom.${field.name}`,
@@ -102,6 +123,7 @@ export function ApplicationFilterBuilder({
   statusOptions,
   customFields,
   reviewerOptions,
+  baseFieldOptions,
   match,
   conditions,
   onChange,
@@ -109,13 +131,19 @@ export function ApplicationFilterBuilder({
   statusOptions: { value: string; label: string }[]
   customFields: CustomFilterField[]
   reviewerOptions?: { value: string; label: string }[]
+  baseFieldOptions?: Record<string, string[]>
   match: FilterMatch
   conditions: FilterCondition[]
   onChange: (match: FilterMatch, conditions: FilterCondition[]) => void
 }) {
   return (
     <FilterBuilder
-      fields={buildFieldDefs(statusOptions, customFields, reviewerOptions)}
+      fields={buildFieldDefs(
+        statusOptions,
+        customFields,
+        reviewerOptions,
+        baseFieldOptions,
+      )}
       match={match}
       conditions={conditions}
       onChange={onChange}

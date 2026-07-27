@@ -93,7 +93,6 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
             "popups",
             "humans",
             "form-fields",
-            "form-fields-schema",
             "approval-strategies",
             "popup-reviewers",
             "application-reviews",
