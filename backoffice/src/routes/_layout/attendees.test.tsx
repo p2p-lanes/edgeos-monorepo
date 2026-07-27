@@ -4,7 +4,7 @@
  * Covers flattenAttendeesForCsv: expands an attendee into one row per purchased
  * ticket (and a single empty-product row when the attendee has none).
  */
-import { describe, expect, it, vi } from "vitest"
+import { beforeEach, describe, expect, it, vi } from "vitest"
 
 vi.mock("@/client", () => ({
   AttendeesService: {
@@ -46,7 +46,81 @@ vi.mock("@/lib/export", () => ({
   exportToCsv: vi.fn(),
 }))
 
-import { flattenAttendeesForCsv } from "@/routes/_layout/attendees"
+import { AttendeesService } from "@/client"
+import {
+  flattenAttendeesForCsv,
+  getAttendeeApiFilters,
+  getAttendeesQueryOptions,
+  validateAttendeesSearch,
+} from "@/routes/_layout/attendees"
+
+describe("attendees application filter", () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it("preserves a valid applicationId from route search", () => {
+    expect(
+      validateAttendeesSearch({ applicationId: "application-1" }),
+    ).toMatchObject({ applicationId: "application-1" })
+    expect(validateAttendeesSearch({ applicationId: "" })).not.toHaveProperty(
+      "applicationId",
+    )
+  })
+
+  it("builds the same active filters used by the table and CSV export", () => {
+    const conditions = [
+      { field: "has_tickets", op: "eq", value: true },
+      { field: "category_id", op: "eq", value: "category-1" },
+    ]
+    expect(
+      getAttendeeApiFilters({
+        search: "Henry",
+        filters: conditions,
+        applicationId: "application-1",
+      }),
+    ).toEqual({
+      search: "Henry",
+      filters: JSON.stringify({ match: "all", conditions }),
+      applicationId: "application-1",
+    })
+  })
+
+  it("folds legacy hasTickets/categoryId params into filter conditions", () => {
+    expect(
+      validateAttendeesSearch({ hasTickets: "true", categoryId: "category-1" }),
+    ).toMatchObject({
+      filters: [
+        { field: "has_tickets", op: "eq", value: true },
+        { field: "category_id", op: "eq", value: "category-1" },
+      ],
+    })
+  })
+
+  it("includes applicationId in the API request and query key", async () => {
+    vi.mocked(AttendeesService.listAttendees).mockResolvedValue({
+      results: [],
+      paging: { limit: 20, offset: 20, total: 0 },
+    })
+    const options = getAttendeesQueryOptions("popup-1", 1, 20, {
+      applicationId: "application-1",
+    })
+
+    await options.queryFn()
+
+    expect(AttendeesService.listAttendees).toHaveBeenCalledWith({
+      skip: 20,
+      limit: 20,
+      popupId: "popup-1",
+      applicationId: "application-1",
+    })
+    expect(options.queryKey).toEqual([
+      "attendees",
+      "popup-1",
+      { page: 1, pageSize: 20, applicationId: "application-1" },
+    ])
+  })
+})
 
 describe("flattenAttendeesForCsv", () => {
   it("returns one row per ticket when attendee has multiple products", () => {

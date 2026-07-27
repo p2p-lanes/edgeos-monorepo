@@ -39,7 +39,6 @@ import {
   type ApplicationStatus,
   ApplicationsService,
   ApprovalStrategiesService,
-  DashboardService,
   FormFieldsService,
   type HumanRating,
   PopupReviewersService,
@@ -53,8 +52,8 @@ import {
   type FilterMatch,
   isCompleteCondition,
   sanitizeFilterConditions,
-} from "@/components/Applications/ApplicationFilterBuilder"
-import { ApplicationsGroupedView } from "@/components/Applications/ApplicationsGroupedView"
+} from "@/components/applications/ApplicationFilterBuilder"
+import { ApplicationsGroupedView } from "@/components/applications/ApplicationsGroupedView"
 import {
   type ApplicationsView,
   ApplicationsViewSwitcher,
@@ -394,110 +393,6 @@ function getApplicationsQueryOptions(
       }),
     queryKey: ["applications", popupId, { page, pageSize, search, filters }],
   }
-}
-
-function useStatusCounts(popupId: string | null) {
-  const { data: stats, isLoading } = useQuery({
-    queryKey: ["dashboard", "stats", popupId],
-    queryFn: () => DashboardService.getDashboardStats({ popupId: popupId! }),
-    enabled: !!popupId,
-  })
-
-  const counts: Partial<Record<ApplicationStatus, number>> = {}
-  if (stats?.applications) {
-    const a = stats.applications
-    counts.draft = a.draft ?? 0
-    counts.pending_fee = a.pending_fee ?? 0
-    counts["in review"] = a.in_review ?? 0
-    counts.accepted = a.accepted ?? 0
-    counts.rejected = a.rejected ?? 0
-    counts.withdrawn = a.withdrawn ?? 0
-  }
-  const total = stats?.applications?.total ?? 0
-
-  return { counts, total, isLoading }
-}
-
-function StatusDropdownFilter({
-  popupId,
-  requiresApplicationFee,
-  selected,
-  onSelect,
-}: {
-  popupId: string | null
-  requiresApplicationFee?: boolean
-  selected: ApplicationStatus | "custom" | undefined
-  onSelect: (value: ApplicationStatus | undefined) => void
-}) {
-  const { counts, total } = useStatusCounts(popupId)
-  const statusOptions =
-    requiresApplicationFee === false
-      ? APPLICATION_STATUS_OPTIONS.filter((opt) => opt.value !== "pending_fee")
-      : APPLICATION_STATUS_OPTIONS
-  // Status combinations built in the filter builder (or statuses outside the
-  // quick options) render as a read-only "Custom" entry.
-  const isCustom =
-    selected === "custom" ||
-    (!!selected && !statusOptions.some((option) => option.value === selected))
-  const selectedOption =
-    selected && !isCustom
-      ? statusOptions.find((option) => option.value === selected)
-      : undefined
-
-  const options = [
-    { value: "all" as const, label: "All", count: total },
-    ...statusOptions.map((opt) => ({
-      value: opt.value,
-      label: opt.label,
-      count: counts[opt.value] ?? 0,
-    })),
-  ]
-
-  const currentLabel = isCustom ? "Custom" : (selectedOption?.label ?? "All")
-  const currentCount = isCustom
-    ? null
-    : selectedOption
-      ? (counts[selectedOption.value] ?? 0)
-      : total
-
-  return (
-    <Select
-      value={isCustom ? "custom" : (selectedOption?.value ?? "all")}
-      onValueChange={(v) =>
-        onSelect(v === "all" ? undefined : (v as ApplicationStatus))
-      }
-    >
-      <SelectTrigger className="h-9 w-[180px]">
-        <SelectValue>
-          {currentLabel}
-          {currentCount !== null ? ` (${currentCount})` : ""}
-        </SelectValue>
-      </SelectTrigger>
-      <SelectContent>
-        {options.map((opt) => (
-          <SelectItem
-            key={opt.value === "all" ? "all" : opt.value}
-            value={opt.value === "all" ? "all" : opt.value}
-          >
-            <span className="flex w-full items-center justify-between gap-4">
-              <span>{opt.label}</span>
-              <span className="text-muted-foreground tabular-nums">
-                {opt.count}
-              </span>
-            </span>
-          </SelectItem>
-        ))}
-        {isCustom && (
-          <SelectItem value="custom" disabled>
-            <span className="flex w-full items-center justify-between gap-4">
-              <span>Custom</span>
-              <span className="text-muted-foreground">via filters</span>
-            </span>
-          </SelectItem>
-        )}
-      </SelectContent>
-    </Select>
-  )
 }
 
 const VALID_STATUSES: Set<string> = new Set([
@@ -915,15 +810,11 @@ const getColumns = (
     header: ({ column }) => <SortableHeader label="Name" column={column} />,
     meta: { label: "Name", toggleable: false, sticky: "left" },
     cell: ({ row }) => (
-      // Name links to the human; the rest of the row opens the application.
-      // Without this, comments is the only path from an application to its human.
-      <Link
-        to="/humans/$id"
-        params={{ id: row.original.human_id }}
-        className="font-medium hover:underline"
-      >
+      // Row click opens the application; the human profile stays reachable
+      // from the detail hero.
+      <span className="font-medium">
         {row.original.human?.first_name} {row.original.human?.last_name}
-      </Link>
+      </span>
     ),
   },
   {
@@ -1082,8 +973,8 @@ function ApplicationsTableContent({
   const { filterMatch, filterConditions, filtersJson } =
     useApplicationsFilterParams()
 
-  // The quick selects are shortcuts over the filter conditions: each maps to
-  // a single "field is X" condition and shows Custom for anything richer.
+  // Derives the single concrete value a filter field is pinned to, or
+  // "custom" for anything richer; used to activate the reviewer vote column.
   const deriveQuickFilter = useCallback(
     (field: string): string | undefined => {
       const matching = filterConditions.filter(
@@ -1102,10 +993,6 @@ function ApplicationsTableContent({
     },
     [filterConditions, filterMatch],
   )
-  const statusFilter = deriveQuickFilter("status") as
-    | ApplicationStatus
-    | "custom"
-    | undefined
   const reviewerFilter = deriveQuickFilter("reviewed_by")
 
   const setFilters = useCallback(
@@ -1127,25 +1014,6 @@ function ApplicationsTableContent({
       })
     },
     [navigate],
-  )
-
-  const upsertQuickFilter = useCallback(
-    (field: string, value: string | undefined) => {
-      const rest = filterConditions.filter(
-        (condition) => condition.field !== field,
-      )
-      setFilters(
-        filterMatch,
-        value ? [...rest, { field, op: "eq", value }] : rest,
-      )
-    },
-    [filterConditions, filterMatch, setFilters],
-  )
-
-  const setStatusFilter = useCallback(
-    (value: ApplicationStatus | undefined) =>
-      upsertQuickFilter("status", value),
-    [upsertQuickFilter],
   )
 
   const hasActiveView = Boolean(
@@ -1447,12 +1315,6 @@ function ApplicationsTableContent({
 
   const filterBar = (
     <div className="flex flex-wrap items-center gap-2">
-      <StatusDropdownFilter
-        popupId={selectedPopupId}
-        requiresApplicationFee={popup?.requires_application_fee}
-        selected={statusFilter}
-        onSelect={setStatusFilter}
-      />
       <ApplicationFilterBuilder
         statusOptions={
           popup?.requires_application_fee === false

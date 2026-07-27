@@ -70,7 +70,14 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
       const slug = tenantData.active_popup_slug
 
       if (pathname === "/") {
-        const rewriteUrl = new URL(`/checkout/${slug}`, request.url)
+        // Carry the query across the rewrite: `new URL(path, base)` resets the
+        // search, so an unqualified path silently drops ?lang=/?utm_*. Losing
+        // ?lang here strips the language before SSR or the client can read it
+        // and the checkout falls back to the popup default_language.
+        const rewriteUrl = new URL(
+          `/checkout/${slug}${request.nextUrl.search}`,
+          request.url,
+        )
         return NextResponse.rewrite(rewriteUrl, {
           request: { headers: requestHeaders },
         })
@@ -88,7 +95,10 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
     } else {
       // No active popup — show Coming Soon page.
       if (pathname === "/") {
-        const rewriteUrl = new URL("/coming-soon", request.url)
+        const rewriteUrl = new URL(
+          `/coming-soon${request.nextUrl.search}`,
+          request.url,
+        )
         return NextResponse.rewrite(rewriteUrl, {
           request: { headers: requestHeaders },
         })

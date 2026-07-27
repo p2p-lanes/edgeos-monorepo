@@ -5,6 +5,7 @@ import {
   Download,
   EllipsisVertical,
   Gift,
+  ListFilter,
   Pencil,
   Users,
   X,
@@ -91,12 +92,39 @@ export function flattenAttendeesForCsv(
   })
 }
 
-function getAttendeesQueryOptions(
+export type AttendeesSearchParams = TableSearchParams & {
+  match?: FilterMatch
+  filters?: FilterCondition[]
+  applicationId?: string
+}
+
+type AttendeeApiFilters = {
+  search?: string
+  filters?: string
+  applicationId?: string
+}
+
+// Single source for the API-level filters, shared by the table query and the
+// CSV export so both always fetch the same subset.
+export function getAttendeeApiFilters(
+  searchParams: AttendeesSearchParams,
+): AttendeeApiFilters {
+  const match = searchParams.match ?? "all"
+  const complete = (searchParams.filters ?? []).filter(isCompleteCondition)
+  return {
+    search: searchParams.search || undefined,
+    filters: complete.length
+      ? JSON.stringify({ match, conditions: complete })
+      : undefined,
+    applicationId: searchParams.applicationId || undefined,
+  }
+}
+
+export function getAttendeesQueryOptions(
   popupId: string | null,
   page: number,
   pageSize: number,
-  search?: string,
-  filters?: string,
+  filters: AttendeeApiFilters,
 ) {
   return {
     queryFn: () =>
@@ -104,44 +132,43 @@ function getAttendeesQueryOptions(
         skip: page * pageSize,
         limit: pageSize,
         popupId: popupId || undefined,
-        search: search || undefined,
-        filters,
+        ...filters,
       }),
-    queryKey: ["attendees", popupId, { page, pageSize, search, filters }],
+    queryKey: ["attendees", popupId, { page, pageSize, ...filters }],
   }
 }
 
-type AttendeesSearchParams = TableSearchParams & {
-  match?: FilterMatch
-  filters?: FilterCondition[]
+export function validateAttendeesSearch(
+  raw: Record<string, unknown>,
+): AttendeesSearchParams {
+  const filters = sanitizeFilterConditions(raw.filters)
+  // Legacy ?hasTickets= and ?categoryId= links fold into filter conditions.
+  if (
+    (raw.hasTickets === true || raw.hasTickets === "true") &&
+    !filters.some((condition) => condition.field === "has_tickets")
+  ) {
+    filters.push({ field: "has_tickets", op: "eq", value: true })
+  }
+  if (
+    typeof raw.categoryId === "string" &&
+    raw.categoryId &&
+    !filters.some((condition) => condition.field === "category_id")
+  ) {
+    filters.push({ field: "category_id", op: "eq", value: raw.categoryId })
+  }
+  return {
+    ...validateTableSearch(raw),
+    ...(raw.match === "any" && filters.length ? { match: "any" as const } : {}),
+    ...(filters.length ? { filters } : {}),
+    ...(typeof raw.applicationId === "string" && raw.applicationId
+      ? { applicationId: raw.applicationId }
+      : {}),
+  }
 }
 
 export const Route = createFileRoute("/_layout/attendees/")({
   component: Attendees,
-  validateSearch: (raw: Record<string, unknown>): AttendeesSearchParams => {
-    const filters = sanitizeFilterConditions(raw.filters)
-    // Legacy ?hasTickets= and ?categoryId= links fold into filter conditions.
-    if (
-      (raw.hasTickets === true || raw.hasTickets === "true") &&
-      !filters.some((condition) => condition.field === "has_tickets")
-    ) {
-      filters.push({ field: "has_tickets", op: "eq", value: true })
-    }
-    if (
-      typeof raw.categoryId === "string" &&
-      raw.categoryId &&
-      !filters.some((condition) => condition.field === "category_id")
-    ) {
-      filters.push({ field: "category_id", op: "eq", value: raw.categoryId })
-    }
-    return {
-      ...validateTableSearch(raw),
-      ...(raw.match === "any" && filters.length
-        ? { match: "any" as const }
-        : {}),
-      ...(filters.length ? { filters } : {}),
-    }
-  },
+  validateSearch: validateAttendeesSearch,
   head: () => ({
     meta: [{ title: "Attendees - EdgeOS" }],
   }),
@@ -156,17 +183,17 @@ function useAttendeesFilterParams() {
     () => searchParams.filters ?? [],
     [searchParams.filters],
   )
-  const filtersJson = useMemo(() => {
-    const complete = filterConditions.filter(isCompleteCondition)
-    return complete.length
-      ? JSON.stringify({ match: filterMatch, conditions: complete })
-      : undefined
-  }, [filterConditions, filterMatch])
+  const apiFilters = useMemo(
+    () => getAttendeeApiFilters(searchParams),
+    [searchParams],
+  )
   return {
     search: searchParams.search ?? "",
     filterMatch,
     filterConditions,
-    filtersJson,
+    filtersJson: apiFilters.filters,
+    applicationId: searchParams.applicationId,
+    apiFilters,
   }
 }
 
@@ -294,8 +321,20 @@ function AttendeesTableContent() {
     searchParams,
     "/attendees",
   )
-  const { filterMatch, filterConditions, filtersJson } =
+  const { filterMatch, filterConditions, applicationId, apiFilters } =
     useAttendeesFilterParams()
+
+  const clearApplicationFilter = useCallback(() => {
+    navigate({
+      to: "/attendees",
+      search: (prev: Record<string, unknown>) => ({
+        ...prev,
+        applicationId: undefined,
+        page: 0,
+      }),
+      replace: true,
+    })
+  }, [navigate])
 
   const setFilters = useCallback(
     (match: FilterMatch, conditions: FilterCondition[]) => {
@@ -411,8 +450,7 @@ function AttendeesTableContent() {
       selectedPopupId,
       pagination.pageIndex,
       pagination.pageSize,
-      search,
-      filtersJson,
+      apiFilters,
     ),
     placeholderData: keepPreviousData,
   })
@@ -435,6 +473,20 @@ function AttendeesTableContent() {
       }
       filterBar={
         <div className="flex flex-wrap items-center gap-2">
+          {applicationId && (
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              className="h-9"
+              onClick={clearApplicationFilter}
+              aria-label="Clear application filter"
+            >
+              <ListFilter className="h-4 w-4" />
+              This application
+              <X className="h-3.5 w-3.5" />
+            </Button>
+          )}
           <FilterBuilder
             fields={fieldDefs}
             match={filterMatch}
@@ -469,11 +521,19 @@ function AttendeesTableContent() {
       }}
       emptyState={
         !search && !filterConditions.length ? (
-          <EmptyState
-            icon={Users}
-            title="No attendees yet"
-            description="Attendees will appear here once applications are approved and check-ins begin."
-          />
+          applicationId ? (
+            <EmptyState
+              icon={Users}
+              title="No attendees for this application"
+              description="Attendee records will appear here after the application is approved."
+            />
+          ) : (
+            <EmptyState
+              icon={Users}
+              title="No attendees yet"
+              description="Attendees will appear here once applications are approved and check-ins begin."
+            />
+          )
         ) : undefined
       }
     />
@@ -481,15 +541,15 @@ function AttendeesTableContent() {
 }
 
 function Attendees() {
-  const { isContextReady } = useWorkspace()
-  const { selectedPopupId } = useWorkspace()
+  const { isContextReady, selectedPopupId } = useWorkspace()
   const { isOperatorOrAbove } = useAuth()
-  const { search, filtersJson } = useAttendeesFilterParams()
+  const { search, filtersJson, applicationId, apiFilters } =
+    useAttendeesFilterParams()
   const [isExporting, setIsExporting] = useState(false)
 
   // Export what the table shows: the same search and filter conditions drive
   // the fetch, just without pagination.
-  const isExportFiltered = Boolean(search || filtersJson)
+  const isExportFiltered = Boolean(search || filtersJson || applicationId)
   const handleExport = async () => {
     if (!selectedPopupId) return
     setIsExporting(true)
@@ -499,8 +559,7 @@ function Attendees() {
           skip,
           limit,
           popupId: selectedPopupId,
-          search: search || undefined,
-          filters: filtersJson,
+          ...apiFilters,
         }),
       )
       const rows = flattenAttendeesForCsv(results as AttendeeListItem[])
@@ -527,7 +586,9 @@ function Attendees() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Attendees</h1>
           <p className="text-muted-foreground">
-            Manage event attendees and check-ins
+            {applicationId
+              ? "Attendees associated with this application"
+              : "Manage event attendees and check-ins"}
           </p>
         </div>
         {isContextReady && (

@@ -21,13 +21,13 @@ import {
   ApplicationsService,
   ApprovalStrategiesService,
   FormFieldsService,
-  PaymentsService,
   type PopupAdmin,
   PopupsService,
   type ReviewDecision,
   type ScholarshipDecisionRequest,
 } from "@/client"
-import { ApplicationCommentThread } from "@/components/Applications/ApplicationCommentThread"
+import { ApplicationCommentThread } from "@/components/applications/ApplicationCommentThread"
+import { ApplicationRelatedRecords } from "@/components/applications/ApplicationRelatedRecords"
 import { StatusBadge } from "@/components/Common/StatusBadge"
 import { HumanRatingBadge } from "@/components/Humans/HumanRatingBadge"
 import { Button } from "@/components/ui/button"
@@ -917,16 +917,6 @@ export function ApplicationDetail({
     queryFn: () => PopupsService.getPopup({ popupId: application.popup_id }),
   })
 
-  const { data: paymentsData } = useQuery({
-    queryKey: ["payments", "by-application", application.id],
-    queryFn: () =>
-      PaymentsService.listPayments({
-        applicationId: application.id,
-        limit: 100,
-      }),
-  })
-  const payments = paymentsData?.results ?? []
-
   const isWeightedVoting = approvalStrategy?.strategy_type === "weighted"
   const canReview = isOperatorOrAbove && application.status === "in review"
   const companions =
@@ -1242,47 +1232,9 @@ export function ApplicationDetail({
           </>
         )}
 
-        {/* Payments — no single-payment detail exists, so link out to the
-          payments table filtered to this application. */}
-        {payments.length > 0 && (
-          <>
-            <Separator />
-            <InlineSection title="Payments">
-              {payments.map((p) => (
-                <div
-                  key={p.id}
-                  className="flex items-center justify-between gap-3 py-3"
-                >
-                  <div className="min-w-0">
-                    <p className="font-mono text-sm">
-                      {Number(p.amount ?? 0).toLocaleString(undefined, {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })}{" "}
-                      {p.currency ?? ""}
-                    </p>
-                    {p.created_at && (
-                      <p className="text-xs text-muted-foreground">
-                        {new Date(p.created_at).toLocaleDateString()}
-                      </p>
-                    )}
-                  </div>
-                  <StatusBadge status={p.status ?? ""} />
-                </div>
-              ))}
-              <div className="pt-1">
-                <Link
-                  to="/payments"
-                  search={{ applicationId: application.id }}
-                  className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
-                >
-                  View in Payments
-                  <ExternalLink className="h-3.5 w-3.5" />
-                </Link>
-              </div>
-            </InlineSection>
-          </>
-        )}
+        <Separator />
+
+        <ApplicationRelatedRecords application={application} />
 
         {/* Mobile review tools — on desktop they live in the sidebar */}
         {hasTools && <div className="space-y-4 lg:hidden">{reviewTools}</div>}
