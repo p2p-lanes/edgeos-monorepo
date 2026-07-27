@@ -2,12 +2,21 @@ import uuid
 from datetime import datetime
 from decimal import Decimal
 from enum import Enum
+from typing import ClassVar
 
 from pydantic import BaseModel, ConfigDict, field_validator, model_validator
+from pydantic import Field as PydanticField
 from sqlalchemy import Integer, Numeric, String, Text
 from sqlalchemy.dialects import postgresql as pg
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlmodel import Column, Field, SQLModel
+
+from app.core.filters import (
+    FilterCondition,
+    FilterField,
+    FilterGroup,
+    parse_filters,
+)
 
 
 class PaymentType(str, Enum):
@@ -40,6 +49,46 @@ class PaymentStatus(str, Enum):
     REJECTED = "rejected"
     EXPIRED = "expired"
     CANCELLED = "cancelled"
+
+
+# Complex list filters (BO payments table), built on the shared engine in
+# app.core.filters. amount_charged is NULL until settlement, hence
+# is_empty/not_empty. payment_type maps the model column (pass purchase vs
+# application fee).
+_PAYMENT_AMOUNT_OPS = frozenset({"eq", "gt", "gte", "lt", "lte"})
+
+PAYMENT_FILTER_FIELDS: dict[str, FilterField] = {
+    "status": FilterField(
+        "select",
+        frozenset({"eq", "neq"}),
+        frozenset(s.value for s in PaymentStatus),
+    ),
+    "source": FilterField("select", frozenset({"eq", "neq"})),
+    "payment_type": FilterField("select", frozenset({"eq", "neq"})),
+    "currency": FilterField("select", frozenset({"eq", "neq"})),
+    "amount": FilterField("numeric", _PAYMENT_AMOUNT_OPS),
+    "amount_charged": FilterField(
+        "numeric", _PAYMENT_AMOUNT_OPS | frozenset({"is_empty", "not_empty"})
+    ),
+    "created_at": FilterField("date", frozenset({"before", "after"})),
+}
+
+
+class PaymentFilterCondition(FilterCondition):
+    """One condition of the payments list filter group."""
+
+    field_registry: ClassVar[dict[str, FilterField]] = PAYMENT_FILTER_FIELDS
+
+
+class PaymentFilters(FilterGroup):
+    """Filter group for the BO payments list."""
+
+    conditions: list[PaymentFilterCondition] = PydanticField(default_factory=list)
+
+
+def parse_payment_filters(raw: str | None) -> PaymentFilters | None:
+    """Parse the ``filters`` query param JSON into PaymentFilters (422 on bad input)."""
+    return parse_filters(raw, PaymentFilters)
 
 
 class PaymentProductBase(SQLModel):

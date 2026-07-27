@@ -63,9 +63,7 @@ class Tenants(TenantBase, table=True):
     trial_expires_at: datetime | None = Field(
         default=None, sa_type=DateTime(timezone=True)
     )
-    suspended_at: datetime | None = Field(
-        default=None, sa_type=DateTime(timezone=True)
-    )
+    suspended_at: datetime | None = Field(default=None, sa_type=DateTime(timezone=True))
     # Idempotency marker for the "2 days left" trial reminder email.
     trial_reminder_sent_at: datetime | None = Field(
         default=None, sa_type=DateTime(timezone=True)

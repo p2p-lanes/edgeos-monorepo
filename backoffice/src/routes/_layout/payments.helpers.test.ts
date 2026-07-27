@@ -9,12 +9,16 @@ import {
 
 describe("payments.helpers", () => {
   it("forwards the server search term in query params and cache key", () => {
+    const filters = JSON.stringify({
+      match: "all",
+      conditions: [{ field: "status", op: "eq", value: "expired" }],
+    })
     const config = buildPaymentsQueryConfig({
       popupId: "popup-123",
       page: 2,
       pageSize: 25,
       search: "Lucia",
-      statusFilter: "expired",
+      filters,
       sortBy: "amount",
       sortOrder: "asc",
     })
@@ -24,7 +28,7 @@ describe("payments.helpers", () => {
       limit: 25,
       popupId: "popup-123",
       search: "Lucia",
-      paymentStatus: "expired",
+      filters,
       sortBy: "amount",
       sortOrder: "asc",
     })
@@ -35,7 +39,7 @@ describe("payments.helpers", () => {
         page: 2,
         pageSize: 25,
         search: "Lucia",
-        statusFilter: "expired",
+        filters,
         sortBy: "amount",
         sortOrder: "asc",
       },

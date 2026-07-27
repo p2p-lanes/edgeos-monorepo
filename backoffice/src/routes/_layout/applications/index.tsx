@@ -10,17 +10,26 @@ import {
   ClipboardList,
   Download,
   EllipsisVertical,
-  ExternalLink,
   Flag,
   ListChecks,
   MessageSquare,
   Plus,
+  Search,
+  SkipForward,
   Star,
   ThumbsDown,
   ThumbsUp,
   Users,
+  X,
 } from "lucide-react"
-import { Suspense, useCallback, useEffect, useMemo, useState } from "react"
+import {
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react"
 
 import {
   type ApiError,
@@ -30,15 +39,21 @@ import {
   type ApplicationStatus,
   ApplicationsService,
   ApprovalStrategiesService,
-  DashboardService,
   FormFieldsService,
   type HumanRating,
-  HumansService,
-  type PopupReviewerPublic,
   PopupReviewersService,
   PopupsService,
   type ReviewDecision,
 } from "@/client"
+import {
+  ApplicationFilterBuilder,
+  type CustomFilterField,
+  type FilterCondition,
+  type FilterMatch,
+  isCompleteCondition,
+  sanitizeFilterConditions,
+} from "@/components/applications/ApplicationFilterBuilder"
+import { ApplicationsGroupedView } from "@/components/applications/ApplicationsGroupedView"
 import {
   type ApplicationsView,
   ApplicationsViewSwitcher,
@@ -46,6 +61,7 @@ import {
 import { DataTable, SortableHeader } from "@/components/Common/DataTable"
 import { EmptyState } from "@/components/Common/EmptyState"
 import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
+import { SavedViewsMenu } from "@/components/Common/SavedViewsMenu"
 import { StatusBadge } from "@/components/Common/StatusBadge"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
 import { Button } from "@/components/ui/button"
@@ -64,6 +80,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { Input } from "@/components/ui/input"
 import { LoadingButton } from "@/components/ui/loading-button"
 import {
   Popover,
@@ -73,7 +90,9 @@ import {
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
@@ -101,9 +120,11 @@ interface ApplicationSchema {
     string,
     {
       label: string
+      short_label?: string
       type?: string
       position?: number
       options?: string[]
+      config?: { is_checkbox?: boolean }
       [key: string]: unknown
     }
   >
@@ -128,12 +149,22 @@ function formatCustomFieldValue(value: unknown, type?: string): string {
     const sig = value as { signature?: string }
     return sig?.signature ? "Signed" : "—"
   }
+  if (type === "image_upload") return "Uploaded"
   if (type === "date" && typeof value === "string") {
     return new Date(value).toLocaleDateString()
   }
   if (Array.isArray(value)) return value.join(", ")
   if (typeof value === "object") return "—"
   return String(value)
+}
+
+// Display-only fields never collect a response, so they have no data to
+// surface as a column. rich_text collects a boolean only in checkbox mode.
+function isDisplayOnlyField(def: {
+  type?: string
+  config?: { is_checkbox?: boolean }
+}): boolean {
+  return def.type === "rich_text" && !def.config?.is_checkbox
 }
 
 // Build one toggleable, hidden-by-default column per custom form-builder
@@ -144,17 +175,25 @@ function buildCustomFieldColumns(
 ): ColumnDef<ApplicationPublic>[] {
   const customFields = formSchema?.custom_fields ?? {}
   return Object.entries(customFields)
+    .filter(([, def]) => !isDisplayOnlyField(def))
     .sort(
       ([, a], [, b]) =>
         (a.position ?? Number.MAX_SAFE_INTEGER) -
         (b.position ?? Number.MAX_SAFE_INTEGER),
     )
     .map(([name, def]) => {
-      const label = def.label || name
+      const label = def.short_label || def.label || name
+      // When a short label names the column, hover still reveals the
+      // full question.
+      const title = def.short_label ? def.label || label : label
       return {
         id: `custom_${name}`,
         accessorFn: (row) => row.custom_fields?.[name],
-        header: label,
+        header: () => (
+          <span className="block max-w-48 truncate" title={title}>
+            {label}
+          </span>
+        ),
         meta: { label, toggleable: true, defaultHidden: true },
         enableSorting: false,
         cell: ({ row }) => (
@@ -180,13 +219,168 @@ const APPLICATION_STATUS_OPTIONS: {
   { value: "rejected", label: "Rejected" },
 ]
 
+// Custom form fields become filterable attributes; select-like fields keep
+// their options so the value input can offer them.
+function buildCustomFilterFields(
+  formSchema?: ApplicationSchema,
+): CustomFilterField[] {
+  const customFields = formSchema?.custom_fields ?? {}
+  return Object.entries(customFields)
+    .filter(([, def]) => !isDisplayOnlyField(def))
+    .sort(
+      ([, a], [, b]) =>
+        (a.position ?? Number.MAX_SAFE_INTEGER) -
+        (b.position ?? Number.MAX_SAFE_INTEGER),
+    )
+    .map(([name, def]) => ({
+      name,
+      label: def.short_label || def.label || name,
+      options: def.options,
+      isSelect:
+        (def.type === "select" || def.type === "multiselect") &&
+        (def.options?.length ?? 0) > 0,
+    }))
+}
+
+/** Custom form-builder field usable as a grouping attribute. */
+interface GroupByField {
+  key: string
+  label: string
+  options?: string[]
+}
+
+const FIXED_GROUP_BY_OPTIONS: { value: string; label: string }[] = [
+  { value: "status", label: "Status" },
+  { value: "scholarship_status", label: "Scholarship status" },
+  { value: "gender", label: "Gender" },
+  { value: "age", label: "Age" },
+]
+
+const VALID_GROUP_BY_FIELDS = new Set(
+  FIXED_GROUP_BY_OPTIONS.map((option) => option.value),
+)
+
+// Only closed-vocabulary custom fields group well; free-text fields have
+// too high a cardinality to produce useful buckets.
+function buildGroupByCustomFields(
+  formSchema?: ApplicationSchema,
+): GroupByField[] {
+  const customFields = formSchema?.custom_fields ?? {}
+  return Object.entries(customFields)
+    .filter(
+      ([, def]) =>
+        def.type === "select" ||
+        def.type === "multiselect" ||
+        def.type === "boolean",
+    )
+    .sort(
+      ([, a], [, b]) =>
+        (a.position ?? Number.MAX_SAFE_INTEGER) -
+        (b.position ?? Number.MAX_SAFE_INTEGER),
+    )
+    .map(([name, def]) => ({
+      key: `custom.${name}`,
+      label: def.short_label || def.label || name,
+      options: def.options,
+    }))
+}
+
+function GroupBySelect({
+  value,
+  onChange,
+  customFields,
+}: {
+  value?: string
+  onChange: (value: string | undefined) => void
+  customFields: GroupByField[]
+}) {
+  const activeLabel =
+    FIXED_GROUP_BY_OPTIONS.find((option) => option.value === value)?.label ??
+    customFields.find((field) => field.key === value)?.label
+  return (
+    <Select
+      value={value ?? "none"}
+      onValueChange={(next) => onChange(next === "none" ? undefined : next)}
+    >
+      <SelectTrigger className="h-9 w-[190px]">
+        <SelectValue>
+          {value ? `Group: ${activeLabel ?? value}` : "Group by"}
+        </SelectValue>
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="none">No grouping</SelectItem>
+        {FIXED_GROUP_BY_OPTIONS.map((option) => (
+          <SelectItem key={option.value} value={option.value}>
+            {option.label}
+          </SelectItem>
+        ))}
+        {customFields.length > 0 && (
+          <SelectGroup>
+            <SelectLabel>Form fields</SelectLabel>
+            {customFields.map((field) => (
+              <SelectItem key={field.key} value={field.key}>
+                {field.label}
+              </SelectItem>
+            ))}
+          </SelectGroup>
+        )}
+      </SelectContent>
+    </Select>
+  )
+}
+
+// Standalone debounced search box for the grouped view, where no single
+// DataTable owns the toolbar. Mirrors the DataTable search behavior.
+function DebouncedSearchInput({
+  value,
+  onChange,
+  placeholder,
+}: {
+  value: string
+  onChange: (value: string) => void
+  placeholder: string
+}) {
+  const [local, setLocal] = useState(value)
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>(null)
+
+  useEffect(() => {
+    setLocal(value)
+  }, [value])
+
+  const handleChange = (next: string) => {
+    setLocal(next)
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(() => onChange(next), 300)
+  }
+
+  return (
+    <div className="relative w-full min-w-0 sm:max-w-xs">
+      <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+      <Input
+        placeholder={placeholder}
+        value={local}
+        onChange={(e) => handleChange(e.target.value)}
+        className="pl-9 pr-8"
+      />
+      {local && (
+        <button
+          type="button"
+          onClick={() => handleChange("")}
+          className="absolute right-2 top-1/2 -translate-y-1/2 rounded-sm p-0.5 text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      )}
+    </div>
+  )
+}
+
 function getApplicationsQueryOptions(
   popupId: string | null,
   page: number,
   pageSize: number,
   search?: string,
-  statusFilter?: ApplicationStatus,
-  reviewedBy?: string,
+  filters?: string,
 ) {
   return {
     queryFn: () =>
@@ -194,147 +388,11 @@ function getApplicationsQueryOptions(
         skip: page * pageSize,
         limit: pageSize,
         popupId: popupId || undefined,
-        reviewedBy: reviewedBy || undefined,
         search: search || undefined,
-        statusFilter: statusFilter || undefined,
+        filters: filters || undefined,
       }),
-    queryKey: [
-      "applications",
-      popupId,
-      { page, pageSize, search, statusFilter, reviewedBy },
-    ],
+    queryKey: ["applications", popupId, { page, pageSize, search, filters }],
   }
-}
-
-function useStatusCounts(popupId: string | null) {
-  const { data: stats, isLoading } = useQuery({
-    queryKey: ["dashboard", "stats", popupId],
-    queryFn: () => DashboardService.getDashboardStats({ popupId: popupId! }),
-    enabled: !!popupId,
-  })
-
-  const counts: Partial<Record<ApplicationStatus, number>> = {}
-  if (stats?.applications) {
-    const a = stats.applications
-    counts.draft = a.draft ?? 0
-    counts.pending_fee = a.pending_fee ?? 0
-    counts["in review"] = a.in_review ?? 0
-    counts.accepted = a.accepted ?? 0
-    counts.rejected = a.rejected ?? 0
-    counts.withdrawn = a.withdrawn ?? 0
-  }
-  const total = stats?.applications?.total ?? 0
-
-  return { counts, total, isLoading }
-}
-
-function StatusDropdownFilter({
-  popupId,
-  requiresApplicationFee,
-  selected,
-  onSelect,
-}: {
-  popupId: string | null
-  requiresApplicationFee?: boolean
-  selected: ApplicationStatus | undefined
-  onSelect: (value: ApplicationStatus | undefined) => void
-}) {
-  const { counts, total } = useStatusCounts(popupId)
-  const statusOptions =
-    requiresApplicationFee === false
-      ? APPLICATION_STATUS_OPTIONS.filter((opt) => opt.value !== "pending_fee")
-      : APPLICATION_STATUS_OPTIONS
-  const selectedOption = selected
-    ? statusOptions.find((option) => option.value === selected)
-    : undefined
-
-  const options = [
-    { value: "all" as const, label: "All", count: total },
-    ...statusOptions.map((opt) => ({
-      value: opt.value,
-      label: opt.label,
-      count: counts[opt.value] ?? 0,
-    })),
-  ]
-
-  const currentLabel = selectedOption?.label ?? "All"
-  const currentCount = selectedOption
-    ? (counts[selectedOption.value] ?? 0)
-    : total
-
-  return (
-    <Select
-      value={selectedOption?.value ?? "all"}
-      onValueChange={(v) =>
-        onSelect(v === "all" ? undefined : (v as ApplicationStatus))
-      }
-    >
-      <SelectTrigger className="h-9 w-[180px]">
-        <SelectValue>
-          {currentLabel} ({currentCount})
-        </SelectValue>
-      </SelectTrigger>
-      <SelectContent>
-        {options.map((opt) => (
-          <SelectItem
-            key={opt.value === "all" ? "all" : opt.value}
-            value={opt.value === "all" ? "all" : opt.value}
-          >
-            <span className="flex w-full items-center justify-between gap-4">
-              <span>{opt.label}</span>
-              <span className="text-muted-foreground tabular-nums">
-                {opt.count}
-              </span>
-            </span>
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
-  )
-}
-
-function ReviewerDropdownFilter({
-  reviewers,
-  selected,
-  onSelect,
-  disabled = false,
-}: {
-  reviewers: PopupReviewerPublic[]
-  selected: string | undefined
-  onSelect: (value: string | undefined) => void
-  disabled?: boolean
-}) {
-  const selectedReviewer = selected
-    ? reviewers.find((reviewer) => reviewer.user_id === selected)
-    : undefined
-
-  const currentLabel = disabled
-    ? "No reviewers"
-    : (selectedReviewer?.user_full_name ??
-      selectedReviewer?.user_email ??
-      "All reviewers")
-
-  return (
-    <Select
-      value={selected ?? "all"}
-      onValueChange={(value) => onSelect(value === "all" ? undefined : value)}
-      disabled={disabled}
-    >
-      <SelectTrigger className="h-9 w-[220px]">
-        <SelectValue>{currentLabel}</SelectValue>
-      </SelectTrigger>
-      <SelectContent>
-        <SelectItem value="all">All reviewers</SelectItem>
-        {reviewers.map((reviewer) => (
-          <SelectItem key={reviewer.id} value={reviewer.user_id}>
-            {reviewer.user_full_name ??
-              reviewer.user_email ??
-              "Unknown reviewer"}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
-  )
 }
 
 const VALID_STATUSES: Set<string> = new Set([
@@ -346,25 +404,73 @@ const VALID_STATUSES: Set<string> = new Set([
 ])
 
 type ApplicationsSearchParams = TableSearchParams & {
-  reviewerId?: string
-  status?: ApplicationStatus
+  match?: FilterMatch
+  filters?: FilterCondition[]
+  groupBy?: string
 }
 
 export const Route = createFileRoute("/_layout/applications/")({
   component: Applications,
-  validateSearch: (raw: Record<string, unknown>): ApplicationsSearchParams => ({
-    ...validateTableSearch(raw),
-    ...(typeof raw.status === "string" && VALID_STATUSES.has(raw.status)
-      ? { status: raw.status as ApplicationStatus }
-      : {}),
-    ...(typeof raw.reviewerId === "string" && raw.reviewerId
-      ? { reviewerId: raw.reviewerId }
-      : {}),
-  }),
+  validateSearch: (raw: Record<string, unknown>): ApplicationsSearchParams => {
+    const filters = sanitizeFilterConditions(raw.filters)
+    // Legacy ?status= and ?reviewerId= links fold into the filter conditions.
+    if (
+      typeof raw.status === "string" &&
+      VALID_STATUSES.has(raw.status) &&
+      !filters.some((condition) => condition.field === "status")
+    ) {
+      filters.push({ field: "status", op: "eq", value: raw.status })
+    }
+    if (
+      typeof raw.reviewerId === "string" &&
+      raw.reviewerId &&
+      !filters.some((condition) => condition.field === "reviewed_by")
+    ) {
+      filters.push({ field: "reviewed_by", op: "eq", value: raw.reviewerId })
+    }
+    const groupBy =
+      typeof raw.groupBy === "string" &&
+      (VALID_GROUP_BY_FIELDS.has(raw.groupBy) ||
+        raw.groupBy.startsWith("custom."))
+        ? raw.groupBy
+        : undefined
+    return {
+      ...validateTableSearch(raw),
+      ...(raw.match === "any" && filters.length
+        ? { match: "any" as const }
+        : {}),
+      ...(filters.length ? { filters } : {}),
+      ...(groupBy ? { groupBy } : {}),
+    }
+  },
   head: () => ({
     meta: [{ title: "Applications - EdgeOS" }],
   }),
 })
+
+// Single source for the filter-related search params, shared by the table
+// and the CSV export so both always query the same subset.
+function useApplicationsFilterParams() {
+  const searchParams = Route.useSearch()
+  const filterMatch = searchParams.match ?? "all"
+  const filterConditions = useMemo(
+    () => searchParams.filters ?? [],
+    [searchParams.filters],
+  )
+  // Rows with a missing value stay in the UI but never reach the request.
+  const filtersJson = useMemo(() => {
+    const complete = filterConditions.filter(isCompleteCondition)
+    return complete.length
+      ? JSON.stringify({ match: filterMatch, conditions: complete })
+      : undefined
+  }, [filterConditions, filterMatch])
+  return {
+    search: searchParams.search ?? "",
+    filterMatch,
+    filterConditions,
+    filtersJson,
+  }
+}
 
 function SubmitReviewDialog({
   application,
@@ -637,11 +743,18 @@ function ReviewsCell({
   )
 }
 
-function CommentsCell({ humanId, count }: { humanId: string; count: number }) {
+function CommentsCell({
+  applicationId,
+  count,
+}: {
+  applicationId: string
+  count: number
+}) {
   const [open, setOpen] = useState(false)
   const { data, isLoading } = useQuery({
-    queryKey: ["human-comments", humanId],
-    queryFn: () => HumansService.listHumanComments({ humanId }),
+    queryKey: ["application-comments", applicationId],
+    queryFn: () =>
+      ApplicationsService.listApplicationComments({ applicationId }),
     enabled: open,
   })
 
@@ -682,16 +795,6 @@ function CommentsCell({ humanId, count }: { humanId: string; count: number }) {
             ))
           )}
         </div>
-        <div className="border-t p-2">
-          <Link
-            to="/humans/$id"
-            params={{ id: humanId }}
-            className="flex items-center gap-1 text-sm font-medium text-primary hover:underline"
-          >
-            View profile
-            <ExternalLink className="h-3.5 w-3.5" />
-          </Link>
-        </div>
       </PopoverContent>
     </Popover>
   )
@@ -707,15 +810,11 @@ const getColumns = (
     header: ({ column }) => <SortableHeader label="Name" column={column} />,
     meta: { label: "Name", toggleable: false, sticky: "left" },
     cell: ({ row }) => (
-      // Name links to the human; the rest of the row opens the application.
-      // Without this, comments is the only path from an application to its human.
-      <Link
-        to="/humans/$id"
-        params={{ id: row.original.human_id }}
-        className="font-medium hover:underline"
-      >
+      // Row click opens the application; the human profile stays reachable
+      // from the detail hero.
+      <span className="font-medium">
         {row.original.human?.first_name} {row.original.human?.last_name}
-      </Link>
+      </span>
     ),
   },
   {
@@ -730,7 +829,24 @@ const getColumns = (
     accessorKey: "status",
     header: ({ column }) => <SortableHeader label="Status" column={column} />,
     meta: { label: "Status", toggleable: true },
-    cell: ({ row }) => <StatusBadge status={row.original.status} />,
+    cell: ({ row }) => (
+      <div className="flex items-center gap-1.5">
+        <StatusBadge status={row.original.status} />
+        {row.original.skipped_by_me && (
+          <span
+            title={
+              row.original.my_skip_reason
+                ? `You skipped this application: ${row.original.my_skip_reason}`
+                : "You skipped this application"
+            }
+            className="inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-xs text-muted-foreground"
+          >
+            <SkipForward className="h-3 w-3" />
+            Skipped
+          </span>
+        )}
+      </div>
+    ),
   },
   {
     id: "reviews",
@@ -751,7 +867,7 @@ const getColumns = (
     enableSorting: false,
     cell: ({ row }) => (
       <CommentsCell
-        humanId={row.original.human_id}
+        applicationId={row.original.id}
         count={row.original.comment_count ?? 0}
       />
     ),
@@ -835,8 +951,14 @@ const getColumns = (
 
 function ApplicationsTableContent({
   customColumns,
+  customFilterFields,
+  groupByCustomFields,
+  isSchemaLoaded,
 }: {
   customColumns: ColumnDef<ApplicationPublic>[]
+  customFilterFields: CustomFilterField[]
+  groupByCustomFields: GroupByField[]
+  isSchemaLoaded: boolean
 }) {
   const { selectedPopupId } = useWorkspace()
   const { isOperatorOrAbove } = useAuth()
@@ -848,16 +970,44 @@ function ApplicationsTableContent({
     searchParams,
     "/applications",
   )
-  const statusFilter = searchParams.status
-  const reviewerId = searchParams.reviewerId
+  const { filterMatch, filterConditions, filtersJson } =
+    useApplicationsFilterParams()
 
-  const setStatusFilter = useCallback(
-    (value: ApplicationStatus | undefined) => {
+  // Derives the single concrete value a filter field is pinned to, or
+  // "custom" for anything richer; used to activate the reviewer vote column.
+  const deriveQuickFilter = useCallback(
+    (field: string): string | undefined => {
+      const matching = filterConditions.filter(
+        (condition) => condition.field === field,
+      )
+      if (matching.length === 0) return undefined
+      const [only] = matching
+      if (
+        matching.length === 1 &&
+        only.op === "eq" &&
+        (filterMatch === "all" || filterConditions.length === 1)
+      ) {
+        return typeof only.value === "string" ? only.value : "custom"
+      }
+      return "custom"
+    },
+    [filterConditions, filterMatch],
+  )
+  const reviewerFilter = deriveQuickFilter("reviewed_by")
+
+  const setFilters = useCallback(
+    (match: FilterMatch, conditions: FilterCondition[]) => {
       navigate({
         to: "/applications",
         search: (prev: Record<string, unknown>) => ({
           ...prev,
-          status: value,
+          // Scrub the legacy params so validateSearch cannot fold them back
+          // into resurrected conditions after the user edits the filters.
+          status: undefined,
+          reviewerId: undefined,
+          match:
+            match === "any" && conditions.length ? ("any" as const) : undefined,
+          filters: conditions.length ? conditions : undefined,
           page: 0,
         }),
         replace: true,
@@ -866,13 +1016,41 @@ function ApplicationsTableContent({
     [navigate],
   )
 
-  const setReviewerFilter = useCallback(
+  const hasActiveView = Boolean(
+    filterConditions.length ||
+      search ||
+      searchParams.groupBy ||
+      searchParams.sortBy,
+  )
+
+  // Back to the pristine list: filters, search, grouping, sorting and the
+  // legacy params all reset in one navigation.
+  const clearView = useCallback(() => {
+    navigate({
+      to: "/applications",
+      search: (prev: Record<string, unknown>) => ({
+        ...prev,
+        status: undefined,
+        reviewerId: undefined,
+        match: undefined,
+        filters: undefined,
+        groupBy: undefined,
+        search: undefined,
+        sortBy: undefined,
+        sortOrder: undefined,
+        page: 0,
+      }),
+      replace: true,
+    })
+  }, [navigate])
+
+  const setGroupBy = useCallback(
     (value: string | undefined) => {
       navigate({
         to: "/applications",
         search: (prev: Record<string, unknown>) => ({
           ...prev,
-          reviewerId: value,
+          groupBy: value,
           page: 0,
         }),
         replace: true,
@@ -880,6 +1058,91 @@ function ApplicationsTableContent({
     },
     [navigate],
   )
+
+  // The saved-view config only captures explicit choices; defaults stay out
+  // so applying a view produces a minimal URL.
+  const savedViewConfig = useMemo(() => {
+    const config: Record<string, unknown> = {}
+    if (searchParams.match === "any" && filterConditions.length) {
+      config.match = "any"
+    }
+    if (filterConditions.length) config.filters = filterConditions
+    if (searchParams.groupBy) config.groupBy = searchParams.groupBy
+    if (searchParams.sortBy) {
+      config.sortBy = searchParams.sortBy
+      config.sortOrder = searchParams.sortOrder
+    }
+    return config
+  }, [
+    searchParams.match,
+    searchParams.groupBy,
+    searchParams.sortBy,
+    searchParams.sortOrder,
+    filterConditions,
+  ])
+
+  // Saved-view configs are team-authored server data: revalidate every field
+  // with the same rules validateSearch applies before touching the URL.
+  const applySavedView = useCallback(
+    (config: Record<string, unknown>) => {
+      const filters = sanitizeFilterConditions(config.filters)
+      const groupByValue =
+        typeof config.groupBy === "string" &&
+        (VALID_GROUP_BY_FIELDS.has(config.groupBy) ||
+          config.groupBy.startsWith("custom."))
+          ? config.groupBy
+          : undefined
+      const sortOrder: "asc" | "desc" | undefined =
+        config.sortOrder === "asc" || config.sortOrder === "desc"
+          ? config.sortOrder
+          : undefined
+      navigate({
+        to: "/applications",
+        search: (prev: Record<string, unknown>) => ({
+          ...prev,
+          status: undefined,
+          reviewerId: undefined,
+          page: 0,
+          match:
+            config.match === "any" && filters.length
+              ? ("any" as const)
+              : undefined,
+          filters: filters.length ? filters : undefined,
+          groupBy: groupByValue,
+          sortBy:
+            typeof config.sortBy === "string" && config.sortBy
+              ? config.sortBy
+              : undefined,
+          sortOrder,
+        }),
+        replace: true,
+      })
+    },
+    [navigate],
+  )
+
+  // Grouping needs a selected popup; the counts endpoint is popup-scoped.
+  const groupBy =
+    selectedPopupId && searchParams.groupBy ? searchParams.groupBy : undefined
+
+  // Drop custom group fields that no longer exist in the schema (e.g. after
+  // switching gatherings).
+  useEffect(() => {
+    if (!isSchemaLoaded || !groupBy?.startsWith("custom.")) return
+    if (!groupByCustomFields.some((field) => field.key === groupBy)) {
+      setGroupBy(undefined)
+    }
+  }, [isSchemaLoaded, groupBy, groupByCustomFields, setGroupBy])
+
+  const groupValueOrder = useMemo(() => {
+    if (groupBy === "status") {
+      return APPLICATION_STATUS_OPTIONS.map((option) => option.value)
+    }
+    if (groupBy?.startsWith("custom.")) {
+      return groupByCustomFields.find((field) => field.key === groupBy)?.options
+    }
+    return undefined
+  }, [groupBy, groupByCustomFields])
 
   const { data: applications } = useQuery({
     ...getApplicationsQueryOptions(
@@ -887,10 +1150,11 @@ function ApplicationsTableContent({
       pagination.pageIndex,
       pagination.pageSize,
       search,
-      statusFilter,
-      reviewerId,
+      filtersJson,
     ),
     placeholderData: keepPreviousData,
+    // The grouped view fetches its own per-group pages instead.
+    enabled: !groupBy,
   })
 
   const { data: popupReviewers } = useQuery({
@@ -917,34 +1181,52 @@ function ApplicationsTableContent({
   })
 
   useEffect(() => {
-    if (
-      popup?.requires_application_fee === false &&
-      statusFilter === "pending_fee"
-    ) {
-      setStatusFilter(undefined)
+    if (popup?.requires_application_fee !== false) return
+    const hasPendingFee = filterConditions.some(
+      (condition) =>
+        condition.field === "status" && condition.value === "pending_fee",
+    )
+    if (hasPendingFee) {
+      setFilters(
+        filterMatch,
+        filterConditions.filter(
+          (condition) =>
+            !(
+              condition.field === "status" && condition.value === "pending_fee"
+            ),
+        ),
+      )
     }
-  }, [popup?.requires_application_fee, setStatusFilter, statusFilter])
+  }, [
+    popup?.requires_application_fee,
+    filterConditions,
+    filterMatch,
+    setFilters,
+  ])
 
   const reviewers = popupReviewers?.results ?? []
 
+  // Drop reviewer conditions that reference reviewers outside the current
+  // popup (e.g. after switching gatherings).
   useEffect(() => {
-    if (!reviewerId) return
-    if (!selectedPopupId) {
-      setReviewerFilter(undefined)
-      return
-    }
-    if (
-      popupReviewers &&
-      !reviewers.some((reviewer) => reviewer.user_id === reviewerId)
-    ) {
-      setReviewerFilter(undefined)
+    if (!popupReviewers) return
+    const isInvalid = (condition: FilterCondition) =>
+      condition.field === "reviewed_by" &&
+      (!selectedPopupId ||
+        !reviewers.some((reviewer) => reviewer.user_id === condition.value))
+    if (filterConditions.some(isInvalid)) {
+      setFilters(
+        filterMatch,
+        filterConditions.filter((condition) => !isInvalid(condition)),
+      )
     }
   }, [
     popupReviewers,
-    reviewerId,
     reviewers,
     selectedPopupId,
-    setReviewerFilter,
+    filterConditions,
+    filterMatch,
+    setFilters,
   ])
 
   const bulkReviewMutation = useMutation({
@@ -1016,8 +1298,94 @@ function ApplicationsTableContent({
   })
 
   const isWeightedVoting = approvalStrategy?.strategy_type === "weighted"
-  const columns = getColumns(isWeightedVoting, !!reviewerId, customColumns)
+  const columns = getColumns(
+    isWeightedVoting,
+    !!reviewerFilter && reviewerFilter !== "custom",
+    customColumns,
+  )
   const canBulkReview = isOperatorOrAbove && !isWeightedVoting
+
+  const hiddenOnMobile = [
+    "attendees",
+    "rating",
+    "comments",
+    "submitted_at",
+    "referral",
+  ]
+
+  const filterBar = (
+    <div className="flex flex-wrap items-center gap-2">
+      <ApplicationFilterBuilder
+        statusOptions={
+          popup?.requires_application_fee === false
+            ? APPLICATION_STATUS_OPTIONS.filter(
+                (opt) => opt.value !== "pending_fee",
+              )
+            : APPLICATION_STATUS_OPTIONS
+        }
+        customFields={customFilterFields}
+        reviewerOptions={reviewers.map((reviewer) => ({
+          value: reviewer.user_id,
+          label:
+            reviewer.user_full_name ?? reviewer.user_email ?? reviewer.user_id,
+        }))}
+        match={filterMatch}
+        conditions={filterConditions}
+        onChange={setFilters}
+      />
+      <GroupBySelect
+        value={searchParams.groupBy}
+        onChange={setGroupBy}
+        customFields={groupByCustomFields}
+      />
+      {selectedPopupId && (
+        <SavedViewsMenu
+          popupId={selectedPopupId}
+          entity="applications"
+          currentConfig={savedViewConfig}
+          onApply={applySavedView}
+        />
+      )}
+      {hasActiveView && (
+        <Button
+          variant="ghost"
+          className="h-9 text-muted-foreground"
+          onClick={clearView}
+        >
+          <X className="h-4 w-4" />
+          Clear
+        </Button>
+      )}
+    </div>
+  )
+
+  if (groupBy && selectedPopupId) {
+    return (
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
+          <div className="flex min-w-0 flex-1 items-center gap-3">
+            <DebouncedSearchInput
+              value={search}
+              onChange={setSearch}
+              placeholder="Search by name or email..."
+            />
+            <div className="flex min-w-0 flex-1 items-center">{filterBar}</div>
+          </div>
+        </div>
+        <ApplicationsGroupedView
+          key={groupBy}
+          popupId={selectedPopupId}
+          groupBy={groupBy}
+          columns={columns}
+          filterMatch={filterMatch}
+          filterConditions={filterConditions}
+          search={search}
+          valueOrder={groupValueOrder}
+          hiddenOnMobile={hiddenOnMobile}
+        />
+      </div>
+    )
+  }
 
   if (!applications) return <Skeleton className="h-64 w-full" />
 
@@ -1027,13 +1395,7 @@ function ApplicationsTableContent({
       data={applications.results}
       tableId="applications"
       searchPlaceholder="Search by name or email..."
-      hiddenOnMobile={[
-        "attendees",
-        "rating",
-        "comments",
-        "submitted_at",
-        "referral",
-      ]}
+      hiddenOnMobile={hiddenOnMobile}
       searchValue={search}
       onSearchChange={setSearch}
       onRowClick={(application) =>
@@ -1042,24 +1404,7 @@ function ApplicationsTableContent({
           params: { id: application.id },
         })
       }
-      filterBar={
-        <div className="flex flex-wrap items-center gap-2">
-          <StatusDropdownFilter
-            popupId={selectedPopupId}
-            requiresApplicationFee={popup?.requires_application_fee}
-            selected={statusFilter}
-            onSelect={setStatusFilter}
-          />
-          {selectedPopupId ? (
-            <ReviewerDropdownFilter
-              reviewers={reviewers}
-              selected={reviewerId}
-              onSelect={setReviewerFilter}
-              disabled={reviewers.length === 0}
-            />
-          ) : null}
-        </div>
-      }
+      filterBar={filterBar}
       serverPagination={{
         total: applications.paging.total,
         pagination: pagination,
@@ -1137,6 +1482,8 @@ function AddApplicationButton() {
 function Applications() {
   const { isOperatorOrAbove, isSuperadmin } = useAuth()
   const { isContextReady, selectedPopupId } = useWorkspace()
+  const { search, filtersJson } = useApplicationsFilterParams()
+  const { showSuccessToast, showErrorToast } = useCustomToast()
   const [isExporting, setIsExporting] = useState(false)
   const [view, setView] = useState<ApplicationsView>(readStoredApplicationsView)
 
@@ -1161,6 +1508,19 @@ function Applications() {
     [formSchema],
   )
 
+  const customFilterFields = useMemo(
+    () => buildCustomFilterFields(formSchema),
+    [formSchema],
+  )
+
+  const groupByCustomFields = useMemo(
+    () => buildGroupByCustomFields(formSchema),
+    [formSchema],
+  )
+
+  // Export what the table shows: the same search, reviewer and filter
+  // conditions drive the fetch, just without pagination.
+  const isExportFiltered = Boolean(search || filtersJson)
   const handleExport = async () => {
     if (!selectedPopupId) return
     setIsExporting(true)
@@ -1170,8 +1530,19 @@ function Applications() {
           skip,
           limit,
           popupId: selectedPopupId,
+          search: search || undefined,
+          filters: filtersJson,
         }),
       )
+
+      if (results.length === 0) {
+        showErrorToast(
+          isExportFiltered
+            ? "No applications match the current filters"
+            : "There are no applications to export",
+        )
+        return
+      }
 
       const baseColumns = [
         { key: "human.email", label: "Email" },
@@ -1204,15 +1575,22 @@ function Applications() {
       // Try to match each data key to the current schema for label
       // and position; fall back to a formatted version of the key.
       const customColumns = [...seenKeys]
+        .filter((name) => {
+          const schemaDef = schemaLookup[name]
+          return !schemaDef || !isDisplayOnlyField(schemaDef)
+        })
         .map((name) => {
           const schemaDef = schemaLookup[name] as
-            | { label?: string; position?: number }
+            | { label?: string; short_label?: string; position?: number }
             | undefined
           return {
             key: `custom_fields.${name}`,
             label:
-              schemaDef?.label ??
-              name.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
+              schemaDef?.short_label ||
+              (schemaDef?.label ??
+                name
+                  .replace(/_/g, " ")
+                  .replace(/\b\w/g, (c) => c.toUpperCase())),
             position: schemaDef?.position ?? Number.MAX_SAFE_INTEGER,
           }
         })
@@ -1220,9 +1598,12 @@ function Applications() {
         .map(({ key, label }) => ({ key, label }))
 
       exportToCsv(
-        "applications",
+        isExportFiltered ? "applications-filtered" : "applications",
         results as unknown as Record<string, unknown>[],
         [...baseColumns, ...customColumns],
+      )
+      showSuccessToast(
+        `Exported ${results.length} application${results.length === 1 ? "" : "s"}`,
       )
     } finally {
       setIsExporting(false)
@@ -1265,9 +1646,18 @@ function Applications() {
               variant="outline"
               onClick={handleExport}
               disabled={isExporting}
+              title={
+                isExportFiltered
+                  ? "Exports the applications matching the current filters"
+                  : "Exports all applications for this gathering"
+              }
             >
               <Download className="mr-2 h-4 w-4" />
-              {isExporting ? "Exporting..." : "Export CSV"}
+              {isExporting
+                ? "Exporting..."
+                : isExportFiltered
+                  ? "Export filtered CSV"
+                  : "Export CSV"}
             </Button>
           )}
           {isSuperadmin && isContextReady && <AddApplicationButton />}
@@ -1278,7 +1668,12 @@ function Applications() {
       ) : (
         <QueryErrorBoundary>
           <Suspense fallback={<Skeleton className="h-64 w-full" />}>
-            <ApplicationsTableContent customColumns={customColumns} />
+            <ApplicationsTableContent
+              customColumns={customColumns}
+              customFilterFields={customFilterFields}
+              groupByCustomFields={groupByCustomFields}
+              isSchemaLoaded={!!formSchema}
+            />
           </Suspense>
         </QueryErrorBoundary>
       )}

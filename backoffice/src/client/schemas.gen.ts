@@ -691,6 +691,105 @@ If email is provided and human doesn't exist, a new Human record is created.
 Companions (spouse/kids) can be added during initial submission.`
 } as const;
 
+export const ApplicationCommentCreateSchema = {
+    properties: {
+        body: {
+            type: 'string',
+            minLength: 1,
+            title: 'Body'
+        }
+    },
+    type: 'object',
+    required: ['body'],
+    title: 'ApplicationCommentCreate'
+} as const;
+
+export const ApplicationCommentPublicSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        application_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Application Id'
+        },
+        author_user_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Author User Id'
+        },
+        author_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Author Name'
+        },
+        author_email: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Author Email'
+        },
+        body: {
+            type: 'string',
+            title: 'Body'
+        },
+        created_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Created At'
+        },
+        edited_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Edited At'
+        }
+    },
+    type: 'object',
+    required: ['id', 'application_id', 'body', 'created_at'],
+    title: 'ApplicationCommentPublic'
+} as const;
+
+export const ApplicationCommentUpdateSchema = {
+    properties: {
+        body: {
+            type: 'string',
+            minLength: 1,
+            title: 'Body'
+        }
+    },
+    type: 'object',
+    required: ['body'],
+    title: 'ApplicationCommentUpdate'
+} as const;
+
 export const ApplicationCreateSchema = {
     properties: {
         popup_id: {
@@ -919,6 +1018,32 @@ export const ApplicationFunnelSchema = {
     type: 'object',
     title: 'ApplicationFunnel',
     description: 'Application pipeline as a funnel.'
+} as const;
+
+export const ApplicationGroupCountSchema = {
+    properties: {
+        value: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Value'
+        },
+        count: {
+            type: 'integer',
+            title: 'Count'
+        }
+    },
+    type: 'object',
+    required: ['count'],
+    title: 'ApplicationGroupCount',
+    description: `One bucket of GET /applications/group-counts.
+
+\`\`value\`\` is None for applications where the group field is NULL or "".`
 } as const;
 
 export const ApplicationLayoutSchema = {
@@ -1188,6 +1313,22 @@ export const ApplicationPublicSchema = {
             type: 'integer',
             title: 'Comment Count',
             default: 0
+        },
+        skipped_by_me: {
+            type: 'boolean',
+            title: 'Skipped By Me',
+            default: false
+        },
+        my_skip_reason: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'My Skip Reason'
         }
     },
     type: 'object',
@@ -1306,6 +1447,77 @@ export const ApplicationReviewPublicSchema = {
     required: ['id', 'application_id', 'reviewer_id', 'tenant_id', 'decision'],
     title: 'ApplicationReviewPublic',
     description: 'ApplicationReview schema for API responses.'
+} as const;
+
+export const ApplicationReviewSkipCreateSchema = {
+    properties: {
+        reason: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Reason'
+        }
+    },
+    type: 'object',
+    title: 'ApplicationReviewSkipCreate',
+    description: 'Schema for skipping (passing on) an application.'
+} as const;
+
+export const ApplicationReviewSkipPublicSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        application_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Application Id'
+        },
+        reviewer_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Reviewer Id'
+        },
+        tenant_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Tenant Id'
+        },
+        reason: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Reason'
+        },
+        created_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Created At'
+        }
+    },
+    type: 'object',
+    required: ['id', 'application_id', 'reviewer_id', 'tenant_id'],
+    title: 'ApplicationReviewSkipPublic',
+    description: 'ApplicationReviewSkip schema for API responses.'
 } as const;
 
 export const ApplicationReviewerVoteSchema = {
@@ -5451,6 +5663,112 @@ export const DistributionItemSchema = {
     description: 'Single slice in a distribution chart.'
 } as const;
 
+export const EmailLogPublicSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        tenant_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Tenant Id'
+        },
+        popup_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Popup Id'
+        },
+        template_type: {
+            type: 'string',
+            title: 'Template Type'
+        },
+        to_email: {
+            type: 'string',
+            title: 'To Email'
+        },
+        application_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Application Id'
+        },
+        payment_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Payment Id'
+        },
+        human_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Human Id'
+        },
+        subject: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Subject'
+        },
+        status: {
+            type: 'string',
+            title: 'Status'
+        },
+        error: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Error'
+        },
+        created_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Created At'
+        }
+    },
+    type: 'object',
+    required: ['id', 'tenant_id', 'template_type', 'to_email', 'status', 'created_at'],
+    title: 'EmailLogPublic',
+    description: 'A single email log entry returned to the backoffice.'
+} as const;
+
 export const EmailTemplateCreateSchema = {
     properties: {
         popup_id: {
@@ -5578,7 +5896,7 @@ export const EmailTemplatePublicSchema = {
 
 export const EmailTemplateTypeSchema = {
     type: 'string',
-    enum: ['login_code_user', 'login_code_human', 'application_received', 'application_accepted', 'application_rejected', 'application_accepted_with_discount', 'application_accepted_with_incentive', 'application_accepted_scholarship_rejected', 'payment_confirmed', 'abandoned_cart', 'edit_passes_confirmed', 'event_invitation', 'event_updated', 'event_cancelled', 'event_rsvp_cancelled', 'event_approval_approved', 'event_approval_rejected', 'check_in_pass'],
+    enum: ['login_code_user', 'login_code_human', 'application_received', 'application_accepted', 'application_rejected', 'application_accepted_with_discount', 'application_accepted_with_incentive', 'application_accepted_scholarship_rejected', 'payment_confirmed', 'abandoned_cart', 'purchase_reminder', 'abandoned_application', 'edit_passes_confirmed', 'event_invitation', 'event_updated', 'event_cancelled', 'event_rsvp_cancelled', 'event_approval_approved', 'event_approval_rejected', 'check_in_pass'],
     title: 'EmailTemplateType'
 } as const;
 
@@ -8312,6 +8630,17 @@ export const FormFieldCreateSchema = {
             type: 'string',
             title: 'Label'
         },
+        short_label: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Short Label'
+        },
         field_type: {
             type: 'string',
             title: 'Field Type',
@@ -8451,6 +8780,17 @@ export const FormFieldPublicSchema = {
         label: {
             type: 'string',
             title: 'Label'
+        },
+        short_label: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Short Label'
         },
         field_type: {
             type: 'string',
@@ -8624,6 +8964,17 @@ export const FormFieldUpdateSchema = {
                 }
             ],
             title: 'Label'
+        },
+        short_label: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Short Label'
         },
         field_type: {
             anyOf: [
@@ -10435,6 +10786,18 @@ export const HumanEnrichmentFactCreateSchema = {
         source: {
             '$ref': '#/components/schemas/EnrichmentSource'
         },
+        source_label: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 200
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Source Label'
+        },
         evidence: {
             anyOf: [
                 {
@@ -10499,7 +10862,7 @@ export const HumanEnrichmentFactPublicSchema = {
         source: {
             '$ref': '#/components/schemas/EnrichmentSource'
         },
-        evidence: {
+        source_label: {
             anyOf: [
                 {
                     type: 'string'
@@ -10508,7 +10871,7 @@ export const HumanEnrichmentFactPublicSchema = {
                     type: 'null'
                 }
             ],
-            title: 'Evidence'
+            title: 'Source Label'
         },
         confidence: {
             anyOf: [
@@ -10520,18 +10883,6 @@ export const HumanEnrichmentFactPublicSchema = {
                 }
             ],
             title: 'Confidence'
-        },
-        raw: {
-            anyOf: [
-                {
-                    additionalProperties: true,
-                    type: 'object'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Raw'
         },
         created_at: {
             type: 'string',
@@ -11137,6 +11488,24 @@ export const ListModel_AbandonedCartPublic_Schema = {
     title: 'ListModel[AbandonedCartPublic]'
 } as const;
 
+export const ListModel_ApplicationCommentPublic_Schema = {
+    properties: {
+        results: {
+            items: {
+                '$ref': '#/components/schemas/ApplicationCommentPublic'
+            },
+            type: 'array',
+            title: 'Results'
+        },
+        paging: {
+            '$ref': '#/components/schemas/Paging'
+        }
+    },
+    type: 'object',
+    required: ['results', 'paging'],
+    title: 'ListModel[ApplicationCommentPublic]'
+} as const;
+
 export const ListModel_ApplicationPublic_Schema = {
     properties: {
         results: {
@@ -11297,6 +11666,24 @@ export const ListModel_CouponPublic_Schema = {
     type: 'object',
     required: ['results', 'paging'],
     title: 'ListModel[CouponPublic]'
+} as const;
+
+export const ListModel_EmailLogPublic_Schema = {
+    properties: {
+        results: {
+            items: {
+                '$ref': '#/components/schemas/EmailLogPublic'
+            },
+            type: 'array',
+            title: 'Results'
+        },
+        paging: {
+            '$ref': '#/components/schemas/Paging'
+        }
+    },
+    type: 'object',
+    required: ['results', 'paging'],
+    title: 'ListModel[EmailLogPublic]'
 } as const;
 
 export const ListModel_EmailTemplatePublic_Schema = {
@@ -11585,6 +11972,24 @@ export const ListModel_ProductPublic_Schema = {
     type: 'object',
     required: ['results', 'paging'],
     title: 'ListModel[ProductPublic]'
+} as const;
+
+export const ListModel_SavedViewPublic_Schema = {
+    properties: {
+        results: {
+            items: {
+                '$ref': '#/components/schemas/SavedViewPublic'
+            },
+            type: 'array',
+            title: 'Results'
+        },
+        paging: {
+            '$ref': '#/components/schemas/Paging'
+        }
+    },
+    type: 'object',
+    required: ['results', 'paging'],
+    title: 'ListModel[SavedViewPublic]'
 } as const;
 
 export const ListModel_TaskCommentPublic_Schema = {
@@ -13539,6 +13944,105 @@ export const PopupAdminSchema = {
             title: 'Installments Interval Count',
             default: 1
         },
+        abandoned_cart_delay_days: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Abandoned Cart Delay Days'
+        },
+        abandoned_cart_repeat_days: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Abandoned Cart Repeat Days'
+        },
+        abandoned_cart_max_count: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Abandoned Cart Max Count'
+        },
+        purchase_reminder_delay_days: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Purchase Reminder Delay Days'
+        },
+        purchase_reminder_repeat_days: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Purchase Reminder Repeat Days'
+        },
+        purchase_reminder_max_count: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Purchase Reminder Max Count'
+        },
+        abandoned_application_delay_days: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Abandoned Application Delay Days'
+        },
+        abandoned_application_repeat_days: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Abandoned Application Repeat Days'
+        },
+        abandoned_application_max_count: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Abandoned Application Max Count'
+        },
         id: {
             type: 'string',
             format: 'uuid',
@@ -14028,6 +14532,105 @@ export const PopupCreateSchema = {
                 }
             ],
             title: 'Checkin Pass Lead Days'
+        },
+        abandoned_cart_delay_days: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Abandoned Cart Delay Days'
+        },
+        abandoned_cart_repeat_days: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Abandoned Cart Repeat Days'
+        },
+        abandoned_cart_max_count: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Abandoned Cart Max Count'
+        },
+        purchase_reminder_delay_days: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Purchase Reminder Delay Days'
+        },
+        purchase_reminder_repeat_days: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Purchase Reminder Repeat Days'
+        },
+        purchase_reminder_max_count: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Purchase Reminder Max Count'
+        },
+        abandoned_application_delay_days: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Abandoned Application Delay Days'
+        },
+        abandoned_application_repeat_days: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Abandoned Application Repeat Days'
+        },
+        abandoned_application_max_count: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Abandoned Application Max Count'
         }
     },
     type: 'object',
@@ -15097,6 +15700,105 @@ export const PopupUpdateSchema = {
                 }
             ],
             title: 'Checkin Pass Lead Days'
+        },
+        abandoned_cart_delay_days: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Abandoned Cart Delay Days'
+        },
+        abandoned_cart_repeat_days: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Abandoned Cart Repeat Days'
+        },
+        abandoned_cart_max_count: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Abandoned Cart Max Count'
+        },
+        purchase_reminder_delay_days: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Purchase Reminder Delay Days'
+        },
+        purchase_reminder_repeat_days: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Purchase Reminder Repeat Days'
+        },
+        purchase_reminder_max_count: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Purchase Reminder Max Count'
+        },
+        abandoned_application_delay_days: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Abandoned Application Delay Days'
+        },
+        abandoned_application_repeat_days: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Abandoned Application Repeat Days'
+        },
+        abandoned_application_max_count: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Abandoned Application Max Count'
         }
     },
     additionalProperties: false,
@@ -16751,6 +17453,108 @@ export const SaleTypeSchema = {
 - application: traditional application-based flow (approval required).
 - direct: direct purchase by a logged-in Human, no application.
 Enum is extensible for future types (e.g. waitlist, lottery, registration).`
+} as const;
+
+export const SavedViewCreateSchema = {
+    properties: {
+        popup_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Popup Id'
+        },
+        entity: {
+            type: 'string',
+            title: 'Entity'
+        },
+        name: {
+            type: 'string',
+            title: 'Name'
+        },
+        config: {
+            additionalProperties: true,
+            type: 'object',
+            title: 'Config'
+        }
+    },
+    type: 'object',
+    required: ['popup_id', 'entity', 'name', 'config'],
+    title: 'SavedViewCreate'
+} as const;
+
+export const SavedViewPublicSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        tenant_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Tenant Id'
+        },
+        popup_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Popup Id'
+        },
+        entity: {
+            type: 'string',
+            title: 'Entity'
+        },
+        name: {
+            type: 'string',
+            title: 'Name'
+        },
+        config: {
+            additionalProperties: true,
+            type: 'object',
+            title: 'Config'
+        },
+        created_by: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Created By'
+        },
+        created_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Created At'
+        }
+    },
+    type: 'object',
+    required: ['id', 'tenant_id', 'popup_id', 'entity', 'name', 'config', 'created_by', 'created_at'],
+    title: 'SavedViewPublic'
+} as const;
+
+export const SavedViewUpdateSchema = {
+    properties: {
+        name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Name'
+        },
+        config: {
+            anyOf: [
+                {
+                    additionalProperties: true,
+                    type: 'object'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Config'
+        }
+    },
+    type: 'object',
+    title: 'SavedViewUpdate'
 } as const;
 
 export const ScholarshipDecisionRequestSchema = {

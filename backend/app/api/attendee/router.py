@@ -18,6 +18,7 @@ from app.api.attendee.schemas import (
     TicketProduct,
     TicketProductSnapshot,
     TicketPublic,
+    parse_attendee_filters,
 )
 from app.api.audit_log.actor import actor_from_user
 from app.api.check_in.crud import (
@@ -569,6 +570,7 @@ async def list_attendees(
     search: str | None = None,
     has_tickets: bool | None = None,
     category_id: uuid.UUID | None = None,
+    filters: str | None = None,
     skip: PaginationSkip = 0,
     limit: PaginationLimit = 100,
 ) -> ListModel[AttendeeListItem]:
@@ -580,7 +582,13 @@ async def list_attendees(
 
     has_tickets (only honored on the popup_id path) keeps attendees with at
     least one purchased/granted ticket when True, those without when False.
+
+    ``filters`` is a JSON filter group (only honored on the popup_id path):
+    ``{"match": "all"|"any", "conditions": [{"field", "op", "value"}]}``.
+    It is combined (AND) with the legacy search/has_tickets/category_id
+    params. ``has_tickets`` is also available as a virtual filter field.
     """
+    parsed_filters = parse_attendee_filters(filters)
     if application_id:
         attendees, total = crud.attendees_crud.find_by_application(
             db, application_id, skip=skip, limit=limit
@@ -594,6 +602,7 @@ async def list_attendees(
             search=search,
             has_tickets=has_tickets,
             category_id=category_id,
+            filters=parsed_filters,
         )
     elif email:
         attendees, total = crud.attendees_crud.find_by_email(

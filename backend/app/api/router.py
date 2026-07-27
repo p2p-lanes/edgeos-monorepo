@@ -16,6 +16,7 @@ from app.api import (
     checkout,
     coupon,
     dashboard,
+    email_log,
     email_template,
     event,
     event_participant,
@@ -29,6 +30,7 @@ from app.api import (
     popup,
     popup_reviewer,
     product,
+    saved_view,
     task,
     tenant,
     third_party_app,
@@ -67,8 +69,10 @@ api_router.include_router(group.router)
 api_router.include_router(form_section.router)
 api_router.include_router(form_field.router)
 api_router.include_router(email_template.router)
+api_router.include_router(email_log.router)
 api_router.include_router(base_field_config.router)
 api_router.include_router(ticketing_step.router)
+api_router.include_router(saved_view.router)
 
 # Approval system resources (registered before application so static paths
 # like /applications/pending-review are matched before /{application_id})

@@ -271,16 +271,9 @@ class FormFieldsCRUD(BaseCRUD[FormFields, FormFieldCreate, FormFieldUpdate]):
         # were rendered — restrict required validation to that subset.
         express_section_keys: set[str] = set()
         if is_express_checkout:
-            from app.api.base_field_config.constants import BASE_FIELD_DEFINITIONS
-            from app.api.base_field_config.crud import base_field_configs_crud
-
-            base_configs = base_field_configs_crud.find_by_popup(session, popup_id)
-            for config in base_configs:
-                definition = BASE_FIELD_DEFINITIONS.get(config.field_name)
-                if not definition:
-                    continue
-                if _is_express_checkout_base_field(config.field_name, definition):
-                    express_section_keys.add(_section_key(config.section_id))
+            express_section_keys = self.get_express_checkout_section_keys(
+                session, popup_id
+            )
 
         errors: list[str] = []
 
@@ -400,6 +393,66 @@ class FormFieldsCRUD(BaseCRUD[FormFields, FormFieldCreate, FormFieldUpdate]):
 
         return len(errors) == 0, errors
 
+    def get_express_checkout_section_keys(
+        self, session: Session, popup_id: uuid.UUID
+    ) -> set[str]:
+        """Section keys the portal /groups Express Checkout mini-form renders.
+
+        A section is rendered when it contains at least one Express Checkout
+        base field (mirrors ``getCheckoutMiniFormSchema`` in the portal).
+        """
+        from app.api.base_field_config.constants import BASE_FIELD_DEFINITIONS
+        from app.api.base_field_config.crud import base_field_configs_crud
+
+        section_keys: set[str] = set()
+        base_configs = base_field_configs_crud.find_by_popup(session, popup_id)
+        for config in base_configs:
+            definition = BASE_FIELD_DEFINITIONS.get(config.field_name)
+            if not definition:
+                continue
+            if _is_express_checkout_base_field(config.field_name, definition):
+                section_keys.add(_section_key(config.section_id))
+        return section_keys
+
+    def get_portal_rendered_field_names(
+        self,
+        session: Session,
+        popup_id: uuid.UUID,
+        is_express_checkout: bool = False,
+    ) -> set[str]:
+        """Names of custom fields the portal form currently renders.
+
+        Mirrors ``build_schema_for_popup`` visibility: fields in hidden
+        sections are excluded. When ``is_express_checkout`` is True, the set
+        is further restricted to the sections the Express Checkout mini-form
+        renders. Stored answers outside this set (deleted, renamed, or hidden
+        fields) are never part of a portal payload, so update paths must
+        preserve them instead of treating their absence as a cleared value.
+        """
+        from app.api.form_section.crud import form_sections_crud
+
+        fields, _ = self.find_by_popup(session, popup_id, skip=0, limit=1000)
+        sections, _ = form_sections_crud.find_by_popup(session, popup_id, limit=None)
+        hidden_section_ids = {s.id for s in sections if s.hidden}
+
+        express_section_keys: set[str] | None = None
+        if is_express_checkout:
+            express_section_keys = self.get_express_checkout_section_keys(
+                session, popup_id
+            )
+
+        names: set[str] = set()
+        for field in fields:
+            if field.section_id and field.section_id in hidden_section_ids:
+                continue
+            if (
+                express_section_keys is not None
+                and _section_key(field.section_id) not in express_section_keys
+            ):
+                continue
+            names.add(field.name)
+        return names
+
     def build_schema_for_popup(
         self, session: Session, popup_id: uuid.UUID
     ) -> dict[str, Any]:
@@ -486,6 +539,8 @@ class FormFieldsCRUD(BaseCRUD[FormFields, FormFieldCreate, FormFieldUpdate]):
                 "min_date": field.min_date,
                 "max_date": field.max_date,
             }
+            if field.short_label:
+                custom_entry["short_label"] = field.short_label
             if field.options:
                 custom_entry["options"] = field.options
             if field.placeholder:

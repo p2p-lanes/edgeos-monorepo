@@ -19,12 +19,6 @@ export const Route = createFileRoute("/_layout/email-templates/")({
   }),
 })
 
-const CATEGORY_COLORS: Record<string, string> = {
-  Auth: "bg-info-soft text-info",
-  Application: "bg-chart-3/15 text-chart-3",
-  Payment: "bg-success-soft text-success",
-}
-
 export function TemplateList() {
   const { selectedPopupId, effectiveTenantId } = useWorkspace()
 
@@ -47,64 +41,96 @@ export function TemplateList() {
 
   if (!types) return <Skeleton className="h-64 w-full" />
 
-  const tenantCustomTypeSet = new Set(
-    tenantTemplates?.results?.map((t) => t.template_type) ?? [],
+  const tenantCustomByType = new Map(
+    tenantTemplates?.results?.map((t) => [t.template_type, t]) ?? [],
   )
-  const popupCustomTypeSet = new Set(
-    popupTemplates?.results?.map((t) => t.template_type) ?? [],
+  const popupCustomByType = new Map(
+    popupTemplates?.results?.map((t) => [t.template_type, t]) ?? [],
   )
 
+  // Group by category, preserving the backend metadata order.
+  const categories: string[] = []
+  const byCategory = new Map<string, typeof types>()
+  for (const tmpl of types) {
+    const group = byCategory.get(tmpl.category)
+    if (group) {
+      group.push(tmpl)
+    } else {
+      categories.push(tmpl.category)
+      byCategory.set(tmpl.category, [tmpl])
+    }
+  }
+
   return (
-    <div className="divide-y rounded-md border">
-      {types.map((tmpl) => {
-        const requiresPopup = tmpl.scope === "popup"
-        const hasCustom = requiresPopup
-          ? popupCustomTypeSet.has(tmpl.type)
-          : tenantCustomTypeSet.has(tmpl.type)
-        return (
-          <div
-            key={tmpl.type}
-            className="flex items-center justify-between gap-4 px-4 py-3"
-          >
-            <div className="flex min-w-0 flex-1 items-center gap-3">
-              <div className="min-w-0 flex-1">
-                <p className="truncate font-medium text-sm">{tmpl.label}</p>
-                <p className="truncate text-muted-foreground text-xs">
-                  {tmpl.description}
-                </p>
-              </div>
-            </div>
-            <div className="flex shrink-0 items-center gap-2">
-              <span
-                className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${CATEGORY_COLORS[tmpl.category] ?? ""}`}
-              >
-                {tmpl.category}
-              </span>
-              {hasCustom ? (
-                <Badge variant="default">Custom</Badge>
-              ) : (
-                <Badge variant="secondary">Default</Badge>
-              )}
-              {requiresPopup && !selectedPopupId ? (
-                <Button variant="ghost" size="sm" disabled>
-                  <Pencil className="mr-1.5 h-3.5 w-3.5" />
-                  Select gathering to edit
-                </Button>
-              ) : (
-                <Button variant="ghost" size="sm" asChild>
-                  <Link
-                    to="/email-templates/$type/edit"
-                    params={{ type: tmpl.type }}
-                  >
-                    <Pencil className="mr-1.5 h-3.5 w-3.5" />
-                    Edit
-                  </Link>
-                </Button>
-              )}
-            </div>
+    <div className="space-y-6">
+      {categories.map((category) => (
+        <div key={category} className="space-y-1">
+          <h3 className="px-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+            {category}
+          </h3>
+          <div className="divide-y rounded-md border">
+            {(byCategory.get(category) ?? []).map((tmpl) => {
+              const requiresPopup = tmpl.scope === "popup"
+              // Without a gathering selected we cannot know whether a
+              // popup-scoped template is customized, so show no badge.
+              const customUnknown = requiresPopup && !selectedPopupId
+              const custom = requiresPopup
+                ? popupCustomByType.get(tmpl.type)
+                : tenantCustomByType.get(tmpl.type)
+              return (
+                <div
+                  key={tmpl.type}
+                  className="flex items-center justify-between gap-4 px-4 py-3"
+                >
+                  <div className="flex min-w-0 flex-1 items-center gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-medium text-sm">
+                        {tmpl.label}
+                      </p>
+                      <p className="truncate text-muted-foreground text-xs">
+                        {tmpl.description}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2">
+                    {!customUnknown &&
+                      (custom ? (
+                        custom.is_active ? (
+                          <Badge variant="default">Custom</Badge>
+                        ) : (
+                          <Badge
+                            variant="outline"
+                            className="border-transparent bg-warning-soft text-warning"
+                          >
+                            Custom - inactive
+                          </Badge>
+                        )
+                      ) : (
+                        <Badge variant="secondary">Default</Badge>
+                      ))}
+                    {customUnknown ? (
+                      <Button variant="ghost" size="sm" disabled>
+                        <Pencil className="mr-1.5 h-3.5 w-3.5" />
+                        Select gathering to edit
+                      </Button>
+                    ) : (
+                      <Button variant="ghost" size="sm" asChild>
+                        <Link
+                          to="/email-templates/$type/edit"
+                          params={{ type: tmpl.type }}
+                        >
+                          <Pencil className="mr-1.5 h-3.5 w-3.5" />
+                          Edit
+                        </Link>
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
           </div>
-        )
-      })}
+        </div>
+      ))}
     </div>
   )
 }
