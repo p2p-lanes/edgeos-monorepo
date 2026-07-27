@@ -28,6 +28,7 @@ from app.api.payment.schemas import (
     SimpleFIPaymentInfo,
     SimpleFIPaymentRequest,
     SimpleFIWebhookPayload,
+    parse_payment_filters,
 )
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
 from app.core.dependencies.users import (
@@ -348,12 +349,19 @@ async def list_payments(
     external_id: str | None = None,
     payment_status: PaymentStatus | None = None,
     search: str | None = None,
+    filters: str | None = None,
     sort_by: str | None = None,
     sort_order: Literal["asc", "desc"] = "desc",
     skip: PaginationSkip = 0,
     limit: PaginationLimit = 100,
 ) -> ListModel[PaymentPublic]:
-    """List payments with optional filters (BO only)."""
+    """List payments with optional filters (BO only).
+
+    ``filters`` is a JSON filter group (only honored on the popup_id path):
+    ``{"match": "all"|"any", "conditions": [{"field", "op", "value"}]}``.
+    It is combined (AND) with the legacy payment_status/search params.
+    """
+    parsed_filters = parse_payment_filters(filters)
     if popup_id:
         payments, total = payments_crud.find_by_popup(
             db,
@@ -364,6 +372,7 @@ async def list_payments(
             search=search,
             sort_by=sort_by,
             sort_order=sort_order,
+            filters=parsed_filters,
         )
     else:
         filters = PaymentFilter(

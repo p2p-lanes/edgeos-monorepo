@@ -4,7 +4,7 @@ from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 
 from fastapi import HTTPException, status
-from sqlalchemy import and_, desc, exists, or_
+from sqlalchemy import desc, exists, or_
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.orm import selectinload
 from sqlmodel import Session, col, func, select
@@ -38,6 +38,7 @@ from app.api.attendee_category.models import AttendeeCategories
 from app.api.human.models import Humans
 from app.api.human.schemas import HumanCreate, HumanUpdate
 from app.api.shared.crud import BaseCRUD
+from app.core.filters import build_filter_expression, text_condition_expression
 
 if TYPE_CHECKING:
     from app.api.human.models import Humans
@@ -75,38 +76,16 @@ def _is_draft_status(status_value: object) -> bool:
     return getattr(status_value, "value", status_value) == ApplicationStatus.DRAFT.value
 
 
-def _escape_like(value: str) -> str:
-    """Escape LIKE wildcards so user input matches literally."""
-    return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
-
-
-def _text_condition_expression(column, op: str, value):
-    """Boolean expression for a nullable text column.
-
-    eq is exact; contains is case-insensitive; negative ops (neq,
-    not_contains) also match NULL/missing values; is_empty means NULL or "".
-    """
-    if op == "eq":
-        return column == value
-    if op == "neq":
-        return or_(column.is_(None), column != value)
-    if op == "contains":
-        return column.ilike(f"%{_escape_like(str(value))}%", escape="\\")
-    if op == "not_contains":
-        return or_(
-            column.is_(None),
-            ~column.ilike(f"%{_escape_like(str(value))}%", escape="\\"),
-        )
-    if op == "is_empty":
-        return or_(column.is_(None), column == "")
-    return and_(column.is_not(None), column != "")
-
-
 def _filter_condition_expression(
     condition: ApplicationFilterCondition,
     reviewer_id: uuid.UUID | None = None,
 ):
-    """Map one validated filter condition to a SQLAlchemy boolean expression."""
+    """Application-specific conditions; None delegates to the shared engine.
+
+    Handles the virtual reviewer fields, the reviewed_by EXISTS, custom.*
+    JSONB accessors, status, and the Humans-join fields. Standard columns
+    (dates, text, booleans) fall through to the engine defaults.
+    """
     if condition.field in VIRTUAL_REVIEWER_FIELDS:
         # Same EXISTS shape as find_pending_review, scoped to the current user.
         model = (
@@ -134,31 +113,18 @@ def _filter_condition_expression(
     if custom_name is not None:
         # JSONB accessor keeps the field name a bound parameter, never raw SQL.
         column = col(Applications.custom_fields)[custom_name].astext
-        return _text_condition_expression(column, condition.op, condition.value)
+        return text_condition_expression(column, condition.op, condition.value)
 
     if condition.field == "status":
         if condition.op == "eq":
             return Applications.status == condition.value
         return Applications.status != condition.value
 
-    if condition.field == "scholarship_request":
-        return col(Applications.scholarship_request) == condition.value
-
-    if condition.field in ("submitted_at", "accepted_at"):
-        column = col(getattr(Applications, condition.field))
-        if condition.op == "before":
-            return func.date(column) < condition.date_value
-        if condition.op == "after":
-            return func.date(column) > condition.date_value
-        if condition.op == "is_empty":
-            return column.is_(None)
-        return column.is_not(None)
-
     if condition.field in ("gender", "age"):
         column = col(getattr(Humans, condition.field))
-    else:
-        column = col(getattr(Applications, condition.field))
-    return _text_condition_expression(column, condition.op, condition.value)
+        return text_condition_expression(column, condition.op, condition.value)
+
+    return None
 
 
 def build_application_filter_expression(
@@ -179,14 +145,11 @@ def build_application_filter_expression(
                         f"Filtering by '{condition.field}' requires a signed-in user."
                     ),
                 )
-    expressions = [
-        _filter_condition_expression(c, reviewer_id) for c in filters.conditions
-    ]
-    if not expressions:
-        return None
-    if filters.match == "any":
-        return or_(*expressions)
-    return and_(*expressions)
+    return build_filter_expression(
+        filters,
+        Applications,
+        condition_override=lambda c: _filter_condition_expression(c, reviewer_id),
+    )
 
 
 # Fields the group-counts endpoint may group by, split by source table.
