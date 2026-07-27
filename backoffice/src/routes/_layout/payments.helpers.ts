@@ -1,15 +1,11 @@
-import type {
-  PaymentProductResponse,
-  PaymentPublic,
-  PaymentStatus,
-} from "@/client"
+import type { PaymentProductResponse, PaymentPublic } from "@/client"
 
 interface PaymentsQueryInput {
   popupId: string | null
   page: number
   pageSize: number
   search: string
-  statusFilter?: PaymentStatus
+  filters?: string
   sortBy?: string
   sortOrder?: "asc" | "desc"
   applicationId?: string | null
@@ -39,7 +35,7 @@ export function buildPaymentsQueryConfig({
   page,
   pageSize,
   search,
-  statusFilter,
+  filters,
   sortBy,
   sortOrder,
   applicationId,
@@ -56,7 +52,7 @@ export function buildPaymentsQueryConfig({
       popupId: applicationId ? undefined : popupId || undefined,
       applicationId: applicationId || undefined,
       search: normalizedSearch || undefined,
-      paymentStatus: statusFilter || undefined,
+      filters: filters || undefined,
       sortBy: sortBy || undefined,
       sortOrder: sortBy ? (sortOrder ?? "desc") : undefined,
     },
@@ -67,7 +63,7 @@ export function buildPaymentsQueryConfig({
         page,
         pageSize,
         search: normalizedSearch,
-        statusFilter,
+        filters,
         sortBy,
         sortOrder,
         applicationId: applicationId || undefined,

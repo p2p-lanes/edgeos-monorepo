@@ -1475,6 +1475,11 @@ export class AttendeesService {
      *
      * has_tickets (only honored on the popup_id path) keeps attendees with at
      * least one purchased/granted ticket when True, those without when False.
+     *
+     * ``filters`` is a JSON filter group (only honored on the popup_id path):
+     * ``{"match": "all"|"any", "conditions": [{"field", "op", "value"}]}``.
+     * It is combined (AND) with the legacy search/has_tickets/category_id
+     * params. ``has_tickets`` is also available as a virtual filter field.
      * @param data The data for the request.
      * @param data.applicationId
      * @param data.popupId
@@ -1482,6 +1487,7 @@ export class AttendeesService {
      * @param data.search
      * @param data.hasTickets
      * @param data.categoryId
+     * @param data.filters
      * @param data.skip Number of items to skip
      * @param data.limit Maximum number of items to return
      * @param data.xTenantId
@@ -1502,6 +1508,7 @@ export class AttendeesService {
                 search: data.search,
                 has_tickets: data.hasTickets,
                 category_id: data.categoryId,
+                filters: data.filters,
                 skip: data.skip,
                 limit: data.limit
             },
@@ -5742,6 +5749,7 @@ export class HumansService {
      * @param data.rating
      * @param data.hasEnrichedProfile
      * @param data.enrichmentQuery
+     * @param data.filters
      * @param data.skip Number of items to skip
      * @param data.limit Maximum number of items to return
      * @param data.xTenantId
@@ -5767,6 +5775,7 @@ export class HumansService {
                 rating: data.rating,
                 has_enriched_profile: data.hasEnrichedProfile,
                 enrichment_query: data.enrichmentQuery,
+                filters: data.filters,
                 skip: data.skip,
                 limit: data.limit
             },
@@ -6235,12 +6244,17 @@ export class PaymentsService {
     /**
      * List Payments
      * List payments with optional filters (BO only).
+     *
+     * ``filters`` is a JSON filter group (only honored on the popup_id path):
+     * ``{"match": "all"|"any", "conditions": [{"field", "op", "value"}]}``.
+     * It is combined (AND) with the legacy payment_status/search params.
      * @param data The data for the request.
      * @param data.popupId
      * @param data.applicationId
      * @param data.externalId
      * @param data.paymentStatus
      * @param data.search
+     * @param data.filters
      * @param data.sortBy
      * @param data.sortOrder
      * @param data.skip Number of items to skip
@@ -6262,6 +6276,7 @@ export class PaymentsService {
                 external_id: data.externalId,
                 payment_status: data.paymentStatus,
                 search: data.search,
+                filters: data.filters,
                 sort_by: data.sortBy,
                 sort_order: data.sortOrder,
                 skip: data.skip,

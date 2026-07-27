@@ -158,13 +158,13 @@ class TestSavedViewsValidation:
         popup = _make_popup(db, tenant_a)
         admin = _make_user(db, tenant_a, UserRole.ADMIN)
 
-        response = _create(client, admin, tenant_a, popup, entity="attendees")
+        response = _create(client, admin, tenant_a, popup, entity="humans")
         assert response.status_code == 422, response.text
         assert (
             response.json()["detail"] == "Saved views are not available for this list."
         )
 
-        listed = _list(client, admin, tenant_a, popup, entity="attendees")
+        listed = _list(client, admin, tenant_a, popup, entity="humans")
         assert listed.status_code == 422, listed.text
         assert listed.json()["detail"] == "Saved views are not available for this list."
 

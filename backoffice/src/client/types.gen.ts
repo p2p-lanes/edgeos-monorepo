@@ -4874,6 +4874,7 @@ export type AttendeesListAttendeesData = {
     applicationId?: (string | null);
     categoryId?: (string | null);
     email?: (string | null);
+    filters?: (string | null);
     hasTickets?: (boolean | null);
     /**
      * Maximum number of items to return
@@ -6196,6 +6197,7 @@ export type HumansListHumansData = {
     age?: (string | null);
     email?: (string | null);
     enrichmentQuery?: (string | null);
+    filters?: (string | null);
     gender?: (string | null);
     hasEnrichedProfile?: (boolean | null);
     incompleteApplication?: boolean;
@@ -6355,6 +6357,7 @@ export type HumansCreateHumanEnrichmentFactResponse = (HumanEnrichmentFactPublic
 export type PaymentsListPaymentsData = {
     applicationId?: (string | null);
     externalId?: (string | null);
+    filters?: (string | null);
     /**
      * Maximum number of items to return
      */

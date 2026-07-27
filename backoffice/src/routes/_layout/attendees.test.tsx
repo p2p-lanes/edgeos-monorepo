@@ -69,18 +69,31 @@ describe("attendees application filter", () => {
   })
 
   it("builds the same active filters used by the table and CSV export", () => {
+    const conditions = [
+      { field: "has_tickets", op: "eq", value: true },
+      { field: "category_id", op: "eq", value: "category-1" },
+    ]
     expect(
       getAttendeeApiFilters({
         search: "Henry",
-        hasTickets: true,
-        categoryId: "category-1",
+        filters: conditions,
         applicationId: "application-1",
       }),
     ).toEqual({
       search: "Henry",
-      hasTickets: true,
-      categoryId: "category-1",
+      filters: JSON.stringify({ match: "all", conditions }),
       applicationId: "application-1",
+    })
+  })
+
+  it("folds legacy hasTickets/categoryId params into filter conditions", () => {
+    expect(
+      validateAttendeesSearch({ hasTickets: "true", categoryId: "category-1" }),
+    ).toMatchObject({
+      filters: [
+        { field: "has_tickets", op: "eq", value: true },
+        { field: "category_id", op: "eq", value: "category-1" },
+      ],
     })
   })
 

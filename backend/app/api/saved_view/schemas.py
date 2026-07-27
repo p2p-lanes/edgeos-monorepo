@@ -4,7 +4,7 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict
 
 # Lists that support saved views. Grows as more backoffice lists adopt them.
-SAVED_VIEW_ENTITIES = frozenset({"applications"})
+SAVED_VIEW_ENTITIES = frozenset({"applications", "attendees", "payments"})
 
 MAX_SAVED_VIEW_NAME_LENGTH = 100
 MAX_SAVED_VIEW_CONFIG_CHARS = 10000

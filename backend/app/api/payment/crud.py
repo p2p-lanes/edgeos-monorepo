@@ -31,6 +31,7 @@ from app.api.payment.models import PaymentProducts, Payments
 from app.api.payment.schemas import (
     PaymentCreate,
     PaymentFilter,
+    PaymentFilters,
     PaymentPreview,
     PaymentProductRequest,
     PaymentSource,
@@ -41,6 +42,7 @@ from app.api.product.models import Products
 from app.api.product.product_state import ProductSaleState, derive_product_state
 from app.api.product.schemas import ProductPublic
 from app.api.shared.crud import BaseCRUD
+from app.core.filters import build_filter_expression
 from app.utils.checkout_signing import (
     append_query_params,
     build_signed_redirect_url,
@@ -1590,15 +1592,24 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         search: str | None = None,
         sort_by: str | None = None,
         sort_order: str = "desc",
+        filters: PaymentFilters | None = None,
     ) -> tuple[list[Payments], int]:
         """Find payments by popup_id via the denormalized popup_id column.
 
         Covers both application-based payments (popup_id backfilled) and
         direct-sale payments (popup_id set at creation, no application_id).
+
+        ``filters`` is a validated PaymentFilters group compiled to one
+        boolean expression and ANDed with the legacy params.
         """
         statement = select(Payments).where(Payments.popup_id == popup_id)
         if status_filter:
             statement = statement.where(Payments.status == status_filter.value)
+
+        if filters is not None:
+            filter_expression = build_filter_expression(filters, Payments)
+            if filter_expression is not None:
+                statement = statement.where(filter_expression)
 
         normalized_search = search.strip() if search else ""
         if normalized_search:
