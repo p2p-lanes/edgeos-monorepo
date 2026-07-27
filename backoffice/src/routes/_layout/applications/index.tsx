@@ -915,15 +915,11 @@ const getColumns = (
     header: ({ column }) => <SortableHeader label="Name" column={column} />,
     meta: { label: "Name", toggleable: false, sticky: "left" },
     cell: ({ row }) => (
-      // Name links to the human; the rest of the row opens the application.
-      // Without this, comments is the only path from an application to its human.
-      <Link
-        to="/humans/$id"
-        params={{ id: row.original.human_id }}
-        className="font-medium hover:underline"
-      >
+      // Row click opens the application; the human profile stays reachable
+      // from the detail hero.
+      <span className="font-medium">
         {row.original.human?.first_name} {row.original.human?.last_name}
-      </Link>
+      </span>
     ),
   },
   {
