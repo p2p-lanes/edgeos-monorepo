@@ -5749,6 +5749,7 @@ export class HumansService {
      * @param data.rating
      * @param data.hasEnrichedProfile
      * @param data.enrichmentQuery
+     * @param data.filters
      * @param data.skip Number of items to skip
      * @param data.limit Maximum number of items to return
      * @param data.xTenantId
@@ -5774,6 +5775,7 @@ export class HumansService {
                 rating: data.rating,
                 has_enriched_profile: data.hasEnrichedProfile,
                 enrichment_query: data.enrichmentQuery,
+                filters: data.filters,
                 skip: data.skip,
                 limit: data.limit
             },

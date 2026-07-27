@@ -26,6 +26,7 @@ from app.api.human.schemas import (
     HumanProfileUpdate,
     HumanPublic,
     HumanUpdate,
+    parse_human_filters,
 )
 from app.api.shared.enums import HumanRating, UserRole
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
@@ -64,9 +65,11 @@ async def list_humans(
     rating: HumanRating | None = None,
     has_enriched_profile: bool | None = None,
     enrichment_query: str | None = None,
+    filters: str | None = None,
     skip: PaginationSkip = 0,
     limit: PaginationLimit = 100,
 ) -> ListModel[HumanPublic]:
+    human_filters = parse_human_filters(filters)
     if incomplete_application:
         if popup_id is None:
             raise HTTPException(
@@ -79,6 +82,7 @@ async def list_humans(
             limit=limit,
             search=search,
             popup_id=popup_id,
+            filters=human_filters,
         )
     else:
         humans, total = crud.find_filtered(
@@ -94,6 +98,7 @@ async def list_humans(
             rating=rating.value if rating else None,
             has_enriched_profile=has_enriched_profile,
             enrichment_query=enrichment_query,
+            filters=human_filters,
         )
 
     return ListModel[HumanPublic](

@@ -6197,6 +6197,7 @@ export type HumansListHumansData = {
     age?: (string | null);
     email?: (string | null);
     enrichmentQuery?: (string | null);
+    filters?: (string | null);
     gender?: (string | null);
     hasEnrichedProfile?: (boolean | null);
     incompleteApplication?: boolean;
