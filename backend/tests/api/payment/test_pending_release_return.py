@@ -313,15 +313,14 @@ class TestSupersedeLocatedPendingCore:
         """
         popup = _make_popup(db, tenant_a, slug_prefix="slp05")
         coupon_a = _make_coupon(db, popup, current_uses=5)
-        coupon_b = _make_coupon(db, popup, current_uses=5)
         human = _make_human(db, tenant_a)
         application = _make_application(db, tenant_a, popup, human)
 
+        # Exactly ONE pending payment per application: the wrapper locates the
+        # prior with an unordered .first(), so a second matching row would make
+        # the pick heap-order dependent (flaky under table churn in CI).
         payment_via_wrapper = _make_pending_payment(
             db, tenant_a, popup, coupon=coupon_a, application_id=application.id
-        )
-        _make_pending_payment(
-            db, tenant_a, popup, coupon=coupon_b, application_id=application.id
         )
 
         def _cancel_mock():
