@@ -1,7 +1,15 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query"
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router"
 import type { ColumnDef } from "@tanstack/react-table"
-import { Download, EllipsisVertical, Gift, Pencil, Users } from "lucide-react"
+import {
+  Download,
+  EllipsisVertical,
+  Gift,
+  ListFilter,
+  Pencil,
+  Users,
+  X,
+} from "lucide-react"
 import { Suspense, useState } from "react"
 
 import {
@@ -82,13 +90,35 @@ export function flattenAttendeesForCsv(
   })
 }
 
-function getAttendeesQueryOptions(
+export type AttendeesSearchParams = TableSearchParams & {
+  hasTickets?: boolean
+  categoryId?: string
+  applicationId?: string
+}
+
+type AttendeeApiFilters = {
+  search?: string
+  hasTickets?: boolean
+  categoryId?: string
+  applicationId?: string
+}
+
+export function getAttendeeApiFilters(
+  searchParams: AttendeesSearchParams,
+): AttendeeApiFilters {
+  return {
+    search: searchParams.search || undefined,
+    hasTickets: searchParams.hasTickets || undefined,
+    categoryId: searchParams.categoryId || undefined,
+    applicationId: searchParams.applicationId || undefined,
+  }
+}
+
+export function getAttendeesQueryOptions(
   popupId: string | null,
   page: number,
   pageSize: number,
-  search?: string,
-  hasTickets?: boolean,
-  categoryId?: string,
+  filters: AttendeeApiFilters,
 ) {
   return {
     queryFn: () =>
@@ -96,26 +126,16 @@ function getAttendeesQueryOptions(
         skip: page * pageSize,
         limit: pageSize,
         popupId: popupId || undefined,
-        search: search || undefined,
-        hasTickets: hasTickets || undefined,
-        categoryId: categoryId || undefined,
+        ...filters,
       }),
-    queryKey: [
-      "attendees",
-      popupId,
-      { page, pageSize, search, hasTickets, categoryId },
-    ],
+    queryKey: ["attendees", popupId, { page, pageSize, ...filters }],
   }
 }
 
-type AttendeesSearchParams = TableSearchParams & {
-  hasTickets?: boolean
-  categoryId?: string
-}
-
-export const Route = createFileRoute("/_layout/attendees/")({
-  component: Attendees,
-  validateSearch: (raw: Record<string, unknown>): AttendeesSearchParams => ({
+export function validateAttendeesSearch(
+  raw: Record<string, unknown>,
+): AttendeesSearchParams {
+  return {
     ...validateTableSearch(raw),
     // Accept both the boolean (default JSON search serialization) and the
     // "true" string so the param round-trips regardless of how it was encoded.
@@ -125,7 +145,15 @@ export const Route = createFileRoute("/_layout/attendees/")({
     ...(typeof raw.categoryId === "string" && raw.categoryId
       ? { categoryId: raw.categoryId }
       : {}),
-  }),
+    ...(typeof raw.applicationId === "string" && raw.applicationId
+      ? { applicationId: raw.applicationId }
+      : {}),
+  }
+}
+
+export const Route = createFileRoute("/_layout/attendees/")({
+  component: Attendees,
+  validateSearch: validateAttendeesSearch,
   head: () => ({
     meta: [{ title: "Attendees - EdgeOS" }],
   }),
@@ -227,6 +255,19 @@ function AttendeesTableContent() {
   )
   const hasTickets = searchParams.hasTickets ?? false
   const categoryId = searchParams.categoryId
+  const applicationId = searchParams.applicationId
+
+  const clearApplicationFilter = () => {
+    navigate({
+      to: "/attendees",
+      search: (prev: Record<string, unknown>) => ({
+        ...prev,
+        applicationId: undefined,
+        page: 0,
+      }),
+      replace: true,
+    })
+  }
 
   const setHasTickets = (value: boolean) => {
     navigate({
@@ -269,9 +310,7 @@ function AttendeesTableContent() {
       selectedPopupId,
       pagination.pageIndex,
       pagination.pageSize,
-      search,
-      hasTickets,
-      categoryId,
+      getAttendeeApiFilters(searchParams),
     ),
     placeholderData: keepPreviousData,
   })
@@ -294,6 +333,20 @@ function AttendeesTableContent() {
       }
       filterBar={
         <div className="flex flex-wrap items-center gap-3">
+          {applicationId && (
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              className="h-9"
+              onClick={clearApplicationFilter}
+              aria-label="Clear application filter"
+            >
+              <ListFilter className="h-4 w-4" />
+              This application
+              <X className="h-3.5 w-3.5" />
+            </Button>
+          )}
           <Select
             value={categoryId ?? "all"}
             onValueChange={(v) => setCategory(v === "all" ? undefined : v)}
@@ -331,7 +384,13 @@ function AttendeesTableContent() {
         onPaginationChange: setPagination,
       }}
       emptyState={
-        !search && !hasTickets && !categoryId ? (
+        applicationId && !search && !hasTickets && !categoryId ? (
+          <EmptyState
+            icon={Users}
+            title="No attendees for this application"
+            description="Attendee records will appear here after the application is approved."
+          />
+        ) : !search && !hasTickets && !categoryId ? (
           <EmptyState
             icon={Users}
             title="No attendees yet"
@@ -344,9 +403,9 @@ function AttendeesTableContent() {
 }
 
 function Attendees() {
-  const { isContextReady } = useWorkspace()
-  const { selectedPopupId } = useWorkspace()
+  const { isContextReady, selectedPopupId } = useWorkspace()
   const { isOperatorOrAbove } = useAuth()
+  const routeSearch = Route.useSearch()
   const [isExporting, setIsExporting] = useState(false)
 
   const handleExport = async () => {
@@ -358,6 +417,7 @@ function Attendees() {
           skip,
           limit,
           popupId: selectedPopupId,
+          ...getAttendeeApiFilters(routeSearch),
         }),
       )
       const rows = flattenAttendeesForCsv(results as AttendeeListItem[])
@@ -380,7 +440,9 @@ function Attendees() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Attendees</h1>
           <p className="text-muted-foreground">
-            Manage event attendees and check-ins
+            {routeSearch.applicationId
+              ? "Attendees associated with this application"
+              : "Manage event attendees and check-ins"}
           </p>
         </div>
         {isContextReady && (

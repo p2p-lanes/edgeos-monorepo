@@ -9,7 +9,7 @@ import {
   type FilterCondition,
   type FilterMatch,
   isCompleteCondition,
-} from "@/components/Applications/ApplicationFilterBuilder"
+} from "@/components/applications/ApplicationFilterBuilder"
 import { DataTable } from "@/components/Common/DataTable"
 import { StatusBadge } from "@/components/Common/StatusBadge"
 import { Skeleton } from "@/components/ui/skeleton"
