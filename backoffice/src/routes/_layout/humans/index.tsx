@@ -1,8 +1,8 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query"
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router"
 import type { ColumnDef } from "@tanstack/react-table"
-import { AlertCircle, Plus, Users, X } from "lucide-react"
-import { Suspense, useCallback, useMemo } from "react"
+import { AlertCircle, Download, Plus, Users, X } from "lucide-react"
+import { Suspense, useCallback, useMemo, useState } from "react"
 
 import { type HumanPublic, type HumanRating, HumansService } from "@/client"
 import { DataTable, SortableHeader } from "@/components/Common/DataTable"
@@ -36,6 +36,7 @@ import {
   useTableSearchParams,
   validateTableSearch,
 } from "@/hooks/useTableSearchParams"
+import { exportToCsv, fetchAllPages } from "@/lib/export"
 import {
   HUMAN_APPLICATION_FILTER,
   type HumansApplicationFilter,
@@ -111,6 +112,29 @@ function getHumansQueryOptions(
     ],
   }
 }
+
+// Mirrors the table's data: profile scalars plus the rating badge value.
+function flattenHumansForCsv(humans: HumanPublic[]) {
+  return humans.map((human) => ({
+    name: `${human.first_name ?? ""} ${human.last_name ?? ""}`.trim(),
+    email: human.email,
+    telegram: human.telegram ?? "",
+    gender: human.gender ?? "",
+    age: human.age ?? "",
+    residence: human.residence ?? "",
+    rating: human.rating ?? "unrated",
+  }))
+}
+
+const HUMAN_CSV_COLUMNS = [
+  { key: "name", label: "Name" },
+  { key: "email", label: "Email" },
+  { key: "telegram", label: "Telegram" },
+  { key: "gender", label: "Gender" },
+  { key: "age", label: "Age" },
+  { key: "residence", label: "Residence" },
+  { key: "rating", label: "Rating" },
+]
 
 export const Route = createFileRoute("/_layout/humans/")({
   component: Humans,
@@ -367,8 +391,44 @@ function AddHumanButton() {
 }
 
 function Humans() {
-  const { needsTenantSelection, isContextReady } = useWorkspace()
+  const { needsTenantSelection, isContextReady, selectedPopupId } =
+    useWorkspace()
   const { isSuperadmin } = useAuth()
+  const searchParams = Route.useSearch()
+  const { filtersJson } = useHumansFilterParams()
+  const [isExporting, setIsExporting] = useState(false)
+
+  const search = searchParams.search || undefined
+  const applicationFilter =
+    searchParams.applicationFilter ?? HUMAN_APPLICATION_FILTER.ALL
+  const isIncomplete = applicationFilter === HUMAN_APPLICATION_FILTER.INCOMPLETE
+
+  // Export what the table shows: the same search and filter conditions drive
+  // the fetch, just without pagination.
+  const isExportFiltered = Boolean(search || filtersJson || isIncomplete)
+  const handleExport = async () => {
+    if (isIncomplete && !selectedPopupId) return
+    setIsExporting(true)
+    try {
+      const results = await fetchAllPages((skip, limit) =>
+        HumansService.listHumans({
+          skip,
+          limit,
+          search,
+          incompleteApplication: isIncomplete ? true : undefined,
+          popupId: isIncomplete ? (selectedPopupId ?? undefined) : undefined,
+          filters: filtersJson,
+        }),
+      )
+      exportToCsv(
+        isExportFiltered ? "humans-filtered" : "humans",
+        flattenHumansForCsv(results),
+        HUMAN_CSV_COLUMNS,
+      )
+    } finally {
+      setIsExporting(false)
+    }
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -388,7 +448,28 @@ function Humans() {
             End-users who interact with your gatherings
           </p>
         </div>
-        {isSuperadmin && isContextReady && <AddHumanButton />}
+        {isContextReady && (
+          <div className="flex items-center gap-2">
+            {isSuperadmin && <AddHumanButton />}
+            <Button
+              variant="outline"
+              onClick={handleExport}
+              disabled={isExporting}
+              title={
+                isExportFiltered
+                  ? "Exports the humans matching the current filters"
+                  : "Exports all humans"
+              }
+            >
+              <Download className="mr-2 h-4 w-4" />
+              {isExporting
+                ? "Exporting..."
+                : isExportFiltered
+                  ? "Export filtered CSV"
+                  : "Export CSV"}
+            </Button>
+          </div>
+        )}
       </div>
       {!needsTenantSelection && <HumansTable />}
     </div>
