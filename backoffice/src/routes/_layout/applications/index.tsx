@@ -116,6 +116,14 @@ import { createErrorHandler } from "@/utils"
 
 /** Schema shape returned by FormFieldsService.getApplicationSchema */
 interface ApplicationSchema {
+  base_fields?: Record<
+    string,
+    {
+      type?: string
+      options?: string[]
+      [key: string]: unknown
+    }
+  >
   custom_fields: Record<
     string,
     {
@@ -219,6 +227,16 @@ const APPLICATION_STATUS_OPTIONS: {
   { value: "rejected", label: "Rejected" },
 ]
 
+// Field types whose answers come from a closed option list. All of them
+// store the selected option string(s), so filters can match exact values.
+const OPTION_FIELD_TYPES = new Set([
+  "select",
+  "select_cards",
+  "radio",
+  "multiselect",
+  "multiselect_detailed",
+])
+
 // Custom form fields become filterable attributes; select-like fields keep
 // their options so the value input can offer them.
 function buildCustomFilterFields(
@@ -237,9 +255,22 @@ function buildCustomFilterFields(
       label: def.short_label || def.label || name,
       options: def.options,
       isSelect:
-        (def.type === "select" || def.type === "multiselect") &&
+        OPTION_FIELD_TYPES.has(def.type ?? "") &&
         (def.options?.length ?? 0) > 0,
     }))
+}
+
+// Base fields with fixed options (e.g. gender configured as a select in the
+// form builder) feed the matching filters a value picker.
+function buildBaseFieldOptions(
+  formSchema?: ApplicationSchema,
+): Record<string, string[]> {
+  const baseFields = formSchema?.base_fields ?? {}
+  return Object.fromEntries(
+    Object.entries(baseFields)
+      .filter(([, def]) => (def.options?.length ?? 0) > 0)
+      .map(([name, def]) => [name, def.options as string[]]),
+  )
 }
 
 /** Custom form-builder field usable as a grouping attribute. */
@@ -269,9 +300,7 @@ function buildGroupByCustomFields(
   return Object.entries(customFields)
     .filter(
       ([, def]) =>
-        def.type === "select" ||
-        def.type === "multiselect" ||
-        def.type === "boolean",
+        OPTION_FIELD_TYPES.has(def.type ?? "") || def.type === "boolean",
     )
     .sort(
       ([, a], [, b]) =>
@@ -952,11 +981,13 @@ const getColumns = (
 function ApplicationsTableContent({
   customColumns,
   customFilterFields,
+  baseFieldOptions,
   groupByCustomFields,
   isSchemaLoaded,
 }: {
   customColumns: ColumnDef<ApplicationPublic>[]
   customFilterFields: CustomFilterField[]
+  baseFieldOptions: Record<string, string[]>
   groupByCustomFields: GroupByField[]
   isSchemaLoaded: boolean
 }) {
@@ -1324,6 +1355,7 @@ function ApplicationsTableContent({
             : APPLICATION_STATUS_OPTIONS
         }
         customFields={customFilterFields}
+        baseFieldOptions={baseFieldOptions}
         reviewerOptions={reviewers.map((reviewer) => ({
           value: reviewer.user_id,
           label:
@@ -1493,7 +1525,7 @@ function Applications() {
   }, [])
 
   const { data: formSchema } = useQuery({
-    queryKey: ["form-fields-schema", selectedPopupId],
+    queryKey: ["form-fields", "schema", selectedPopupId],
     queryFn: async () => {
       const result = await FormFieldsService.getApplicationSchema({
         popupId: selectedPopupId!,
@@ -1510,6 +1542,11 @@ function Applications() {
 
   const customFilterFields = useMemo(
     () => buildCustomFilterFields(formSchema),
+    [formSchema],
+  )
+
+  const baseFieldOptions = useMemo(
+    () => buildBaseFieldOptions(formSchema),
     [formSchema],
   )
 
@@ -1671,6 +1708,7 @@ function Applications() {
             <ApplicationsTableContent
               customColumns={customColumns}
               customFilterFields={customFilterFields}
+              baseFieldOptions={baseFieldOptions}
               groupByCustomFields={groupByCustomFields}
               isSchemaLoaded={!!formSchema}
             />

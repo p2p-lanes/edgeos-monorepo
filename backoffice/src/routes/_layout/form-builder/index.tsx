@@ -309,6 +309,7 @@ function FormBuilderContent({ popupId }: { popupId: string }) {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["form-sections"] })
+      queryClient.invalidateQueries({ queryKey: ["form-fields"] })
     },
     onError: createErrorHandler(showErrorToast),
   })
@@ -329,6 +330,7 @@ function FormBuilderContent({ popupId }: { popupId: string }) {
     onSuccess: () => {
       showSuccessToast("Section deleted")
       queryClient.invalidateQueries({ queryKey: ["form-sections"] })
+      queryClient.invalidateQueries({ queryKey: ["form-fields"] })
     },
     onError: createErrorHandler(showErrorToast),
   })

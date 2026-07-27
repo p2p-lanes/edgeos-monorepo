@@ -80,7 +80,7 @@ export function ApplicationForm({ onSuccess }: ApplicationFormProps) {
     isLoading: schemaLoading,
     isError: _schemaError,
   } = useQuery({
-    queryKey: ["form-fields-schema", selectedPopupId],
+    queryKey: ["form-fields", "schema", selectedPopupId],
     queryFn: async () => {
       if (!selectedPopupId) return null
       const result = await FormFieldsService.getApplicationSchema({
