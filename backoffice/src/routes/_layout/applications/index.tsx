@@ -1148,6 +1148,34 @@ function ApplicationsTableContent({
     [upsertQuickFilter],
   )
 
+  const hasActiveView = Boolean(
+    filterConditions.length ||
+      search ||
+      searchParams.groupBy ||
+      searchParams.sortBy,
+  )
+
+  // Back to the pristine list: filters, search, grouping, sorting and the
+  // legacy params all reset in one navigation.
+  const clearView = useCallback(() => {
+    navigate({
+      to: "/applications",
+      search: (prev: Record<string, unknown>) => ({
+        ...prev,
+        status: undefined,
+        reviewerId: undefined,
+        match: undefined,
+        filters: undefined,
+        groupBy: undefined,
+        search: undefined,
+        sortBy: undefined,
+        sortOrder: undefined,
+        page: 0,
+      }),
+      replace: true,
+    })
+  }, [navigate])
+
   const setGroupBy = useCallback(
     (value: string | undefined) => {
       navigate({
@@ -1455,6 +1483,16 @@ function ApplicationsTableContent({
           currentConfig={savedViewConfig}
           onApply={applySavedView}
         />
+      )}
+      {hasActiveView && (
+        <Button
+          variant="ghost"
+          className="h-9 text-muted-foreground"
+          onClick={clearView}
+        >
+          <X className="h-4 w-4" />
+          Clear
+        </Button>
       )}
     </div>
   )
