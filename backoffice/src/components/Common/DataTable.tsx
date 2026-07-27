@@ -117,6 +117,12 @@ interface DataTableProps<TData, TValue> {
   bulkActions?: (selectedRows: TData[]) => ReactNode
   hiddenOnMobile?: string[]
   tableId?: string
+  /**
+   * Suppress the built-in toolbar (search, filter bar, column toggle) while
+   * keeping the tableId-based column visibility preferences. Useful when
+   * several tables share one external toolbar, as in grouped views.
+   */
+  hideToolbar?: boolean
   renderSubComponent?: (props: { row: Row<TData> }) => ReactNode
   /**
    * Called when a row is clicked. Clicks that originate inside buttons,
@@ -186,6 +192,7 @@ export function DataTable<TData, TValue>({
   bulkActions,
   hiddenOnMobile,
   tableId,
+  hideToolbar,
   renderSubComponent,
   onRowClick,
 }: DataTableProps<TData, TValue>) {
@@ -350,7 +357,7 @@ export function DataTable<TData, TValue>({
     }
   }
 
-  const hasToolbar = onSearchChange || tableId || filterBar
+  const hasToolbar = !hideToolbar && (onSearchChange || tableId || filterBar)
 
   return (
     <div className="flex flex-col gap-4">

@@ -20,6 +20,7 @@ from app.api.application.schemas import (
     ApplicationCommentPublic,
     ApplicationCommentUpdate,
     ApplicationCreate,
+    ApplicationGroupCount,
     ApplicationPublic,
     ApplicationReviewerVote,
     ApplicationStatus,
@@ -199,6 +200,8 @@ async def list_applications(
     status_filter: ApplicationStatus | None = None,
     search: str | None = None,
     filters: str | None = None,
+    group_by: str | None = None,
+    group_value: str | None = None,
     skip: PaginationSkip = 0,
     limit: PaginationLimit = 100,
 ) -> ListModel[ApplicationPublic]:
@@ -212,6 +215,13 @@ async def list_applications(
     resolve against the calling user's own skips and reviews. The
     ``reviewed_by`` field (ops ``eq``/``neq``, reviewer user id as UUID
     string) matches applications reviewed (or not) by that reviewer.
+
+    ``group_by``/``group_value`` scope the list to one bucket of a grouped
+    view (same whitelist and NULL/empty collapsing as the group-counts
+    endpoint). The scope is ANDed with everything else, so it stays correct
+    even when ``filters`` uses match=any. With ``group_by`` set and no
+    ``group_value``, the NULL bucket is returned; ``group_value`` without
+    ``group_by`` is ignored.
     """
     parsed_filters = parse_application_filters(filters)
     if popup_id:
@@ -225,6 +235,8 @@ async def list_applications(
             reviewed_by=reviewed_by,
             filters=parsed_filters,
             reviewer_id=getattr(current_user, "id", None),
+            group_by=group_by,
+            group_value=group_value,
         )
     elif human_id:
         applications, total = crud.applications_crud.find_by_human(
@@ -296,6 +308,36 @@ async def list_applications(
         results=results,
         paging=Paging(offset=skip, limit=limit, total=total),
     )
+
+
+# NOTE: declared before /{application_id} so "group-counts" is never
+# captured as an application id.
+@router.get("/group-counts", response_model=list[ApplicationGroupCount])
+async def get_application_group_counts(
+    db: AdminOrApiKeySession_ApplicationsRead,
+    current_user: AdminOrApiKey_ApplicationsRead,
+    popup_id: uuid.UUID,
+    group_by: str,
+    filters: str | None = None,
+    search: str | None = None,
+) -> list[ApplicationGroupCount]:
+    """Count a popup's applications grouped by one field (BO only).
+
+    ``group_by`` accepts ``status``, ``scholarship_status``, ``gender``,
+    ``age``, or ``custom.<field_name>``. ``filters`` and ``search`` behave
+    exactly like the list endpoint. NULL and empty values share one bucket
+    with ``value: null``; rows are ordered by count descending.
+    """
+    parsed_filters = parse_application_filters(filters)
+    rows = crud.applications_crud.count_by_group(
+        db,
+        popup_id=popup_id,
+        group_by=group_by,
+        search=search,
+        filters=parsed_filters,
+        reviewer_id=getattr(current_user, "id", None),
+    )
+    return [ApplicationGroupCount(value=value, count=count) for value, count in rows]
 
 
 @router.post("", response_model=ApplicationPublic, status_code=status.HTTP_201_CREATED)

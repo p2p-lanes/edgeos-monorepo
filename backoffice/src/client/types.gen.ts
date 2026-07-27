@@ -218,6 +218,16 @@ export type ApplicationFunnel = {
 };
 
 /**
+ * One bucket of GET /applications/group-counts.
+ *
+ * ``value`` is None for applications where the group field is NULL or "".
+ */
+export type ApplicationGroupCount = {
+    value?: (string | null);
+    count: number;
+};
+
+/**
  * How the portal renders the application form for a popup.
  *
  * - single_page: all sections stacked on one page (legacy behavior).
@@ -2556,6 +2566,11 @@ export type ListModel_ProductPublic_ = {
     paging: Paging;
 };
 
+export type ListModel_SavedViewPublic_ = {
+    results: Array<SavedViewPublic>;
+    paging: Paging;
+};
+
 export type ListModel_TaskCommentPublic_ = {
     results: Array<TaskCommentPublic>;
     paging: Paging;
@@ -3541,6 +3556,35 @@ export type ReviewSummary = {
  */
 export type SaleType = 'application' | 'direct';
 
+export type SavedViewCreate = {
+    popup_id: string;
+    entity: string;
+    name: string;
+    config: {
+        [key: string]: unknown;
+    };
+};
+
+export type SavedViewPublic = {
+    id: string;
+    tenant_id: string;
+    popup_id: string;
+    entity: string;
+    name: string;
+    config: {
+        [key: string]: unknown;
+    };
+    created_by: string;
+    created_at: string;
+};
+
+export type SavedViewUpdate = {
+    name?: (string | null);
+    config?: ({
+    [key: string]: unknown;
+} | null);
+};
+
 /**
  * Admin request body for PATCH /applications/{id}/scholarship.
  */
@@ -4519,6 +4563,8 @@ export type ApplicationReviewsUnskipApplicationResponse = (void);
 
 export type ApplicationsListApplicationsData = {
     filters?: (string | null);
+    groupBy?: (string | null);
+    groupValue?: (string | null);
     humanId?: (string | null);
     /**
      * Maximum number of items to return
@@ -4543,6 +4589,16 @@ export type ApplicationsCreateApplicationAdminData = {
 };
 
 export type ApplicationsCreateApplicationAdminResponse = (ApplicationPublic);
+
+export type ApplicationsGetApplicationGroupCountsData = {
+    filters?: (string | null);
+    groupBy: string;
+    popupId: string;
+    search?: (string | null);
+    xTenantId?: (string | null);
+};
+
+export type ApplicationsGetApplicationGroupCountsResponse = (Array<ApplicationGroupCount>);
 
 export type ApplicationsGrantTicketsAdminData = {
     requestBody: AdminGrantTicketsRequest;
@@ -6608,6 +6664,36 @@ export type ProductsListPortalProductsData = {
 };
 
 export type ProductsListPortalProductsResponse = (ListModel_ProductPublic_);
+
+export type SavedViewsListSavedViewsData = {
+    entity: string;
+    popupId: string;
+    xTenantId?: (string | null);
+};
+
+export type SavedViewsListSavedViewsResponse = (ListModel_SavedViewPublic_);
+
+export type SavedViewsCreateSavedViewData = {
+    requestBody: SavedViewCreate;
+    xTenantId?: (string | null);
+};
+
+export type SavedViewsCreateSavedViewResponse = (SavedViewPublic);
+
+export type SavedViewsUpdateSavedViewData = {
+    requestBody: SavedViewUpdate;
+    viewId: string;
+    xTenantId?: (string | null);
+};
+
+export type SavedViewsUpdateSavedViewResponse = (SavedViewPublic);
+
+export type SavedViewsDeleteSavedViewData = {
+    viewId: string;
+    xTenantId?: (string | null);
+};
+
+export type SavedViewsDeleteSavedViewResponse = (void);
 
 export type TasksReportBugData = {
     requestBody: BugReportCreate;

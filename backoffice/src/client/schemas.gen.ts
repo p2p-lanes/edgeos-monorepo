@@ -1020,6 +1020,32 @@ export const ApplicationFunnelSchema = {
     description: 'Application pipeline as a funnel.'
 } as const;
 
+export const ApplicationGroupCountSchema = {
+    properties: {
+        value: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Value'
+        },
+        count: {
+            type: 'integer',
+            title: 'Count'
+        }
+    },
+    type: 'object',
+    required: ['count'],
+    title: 'ApplicationGroupCount',
+    description: `One bucket of GET /applications/group-counts.
+
+\`\`value\`\` is None for applications where the group field is NULL or "".`
+} as const;
+
 export const ApplicationLayoutSchema = {
     type: 'string',
     enum: ['single_page', 'multi_step'],
@@ -11948,6 +11974,24 @@ export const ListModel_ProductPublic_Schema = {
     title: 'ListModel[ProductPublic]'
 } as const;
 
+export const ListModel_SavedViewPublic_Schema = {
+    properties: {
+        results: {
+            items: {
+                '$ref': '#/components/schemas/SavedViewPublic'
+            },
+            type: 'array',
+            title: 'Results'
+        },
+        paging: {
+            '$ref': '#/components/schemas/Paging'
+        }
+    },
+    type: 'object',
+    required: ['results', 'paging'],
+    title: 'ListModel[SavedViewPublic]'
+} as const;
+
 export const ListModel_TaskCommentPublic_Schema = {
     properties: {
         results: {
@@ -17409,6 +17453,108 @@ export const SaleTypeSchema = {
 - application: traditional application-based flow (approval required).
 - direct: direct purchase by a logged-in Human, no application.
 Enum is extensible for future types (e.g. waitlist, lottery, registration).`
+} as const;
+
+export const SavedViewCreateSchema = {
+    properties: {
+        popup_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Popup Id'
+        },
+        entity: {
+            type: 'string',
+            title: 'Entity'
+        },
+        name: {
+            type: 'string',
+            title: 'Name'
+        },
+        config: {
+            additionalProperties: true,
+            type: 'object',
+            title: 'Config'
+        }
+    },
+    type: 'object',
+    required: ['popup_id', 'entity', 'name', 'config'],
+    title: 'SavedViewCreate'
+} as const;
+
+export const SavedViewPublicSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        tenant_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Tenant Id'
+        },
+        popup_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Popup Id'
+        },
+        entity: {
+            type: 'string',
+            title: 'Entity'
+        },
+        name: {
+            type: 'string',
+            title: 'Name'
+        },
+        config: {
+            additionalProperties: true,
+            type: 'object',
+            title: 'Config'
+        },
+        created_by: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Created By'
+        },
+        created_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Created At'
+        }
+    },
+    type: 'object',
+    required: ['id', 'tenant_id', 'popup_id', 'entity', 'name', 'config', 'created_by', 'created_at'],
+    title: 'SavedViewPublic'
+} as const;
+
+export const SavedViewUpdateSchema = {
+    properties: {
+        name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Name'
+        },
+        config: {
+            anyOf: [
+                {
+                    additionalProperties: true,
+                    type: 'object'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Config'
+        }
+    },
+    type: 'object',
+    title: 'SavedViewUpdate'
 } as const;
 
 export const ScholarshipDecisionRequestSchema = {
