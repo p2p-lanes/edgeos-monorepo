@@ -186,6 +186,33 @@ class TestHumanListFilters:
         )
         assert _ids(response) == {str(plain.id)}
 
+    def test_enriched_profile_contains_escapes_like_wildcards(
+        self, db: Session, tenant_a: Tenants, client: TestClient
+    ) -> None:
+        marker = _marker()
+        admin = _make_admin(db, tenant_a)
+        literal = _make_human(
+            db,
+            tenant_a,
+            marker,
+            enriched_profile={"headline": "Works 100% remote"},
+        )
+        _make_human(
+            db,
+            tenant_a,
+            marker,
+            enriched_profile={"headline": "Works 100 days remote"},
+        )
+
+        response = _list(
+            client,
+            admin,
+            tenant_a,
+            marker,
+            _one("enriched_profile", "contains", "100% remote"),
+        )
+        assert _ids(response) == {str(literal.id)}
+
     def test_match_all_vs_any(
         self, db: Session, tenant_a: Tenants, client: TestClient
     ) -> None:

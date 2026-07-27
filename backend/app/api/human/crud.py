@@ -19,7 +19,7 @@ from app.api.human.schemas import (
 )
 from app.api.product.schemas import CATEGORY_TICKET, TicketDuration
 from app.api.shared.crud import BaseCRUD
-from app.core.filters import build_filter_expression
+from app.core.filters import build_filter_expression, escape_like
 
 
 def _human_condition_expression(condition: HumanFilterCondition):
@@ -36,8 +36,10 @@ def _human_condition_expression(condition: HumanFilterCondition):
             return missing
         if condition.op == "not_empty":
             return ~missing
-        # Same JSONB cast-to-text match as the legacy enrichment_query param.
-        matches = cast(enriched_col, Text).ilike(f"%{condition.value}%")
+        # JSONB cast-to-text match; wildcards escaped so input matches literally.
+        matches = cast(enriched_col, Text).ilike(
+            f"%{escape_like(str(condition.value))}%", escape="\\"
+        )
         if condition.op == "contains":
             return matches
         return or_(missing, ~matches)
