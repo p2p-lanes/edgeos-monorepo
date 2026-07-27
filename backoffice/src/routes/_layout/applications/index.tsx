@@ -52,8 +52,8 @@ import {
   type FilterMatch,
   isCompleteCondition,
   sanitizeFilterConditions,
-} from "@/components/Applications/ApplicationFilterBuilder"
-import { ApplicationsGroupedView } from "@/components/Applications/ApplicationsGroupedView"
+} from "@/components/applications/ApplicationFilterBuilder"
+import { ApplicationsGroupedView } from "@/components/applications/ApplicationsGroupedView"
 import {
   type ApplicationsView,
   ApplicationsViewSwitcher,
