@@ -885,7 +885,7 @@ export function ApplicationDetail({
   const { isAdmin, isOperatorOrAbove } = useAuth()
 
   const { data: schema } = useQuery({
-    queryKey: ["form-fields-schema", application.popup_id],
+    queryKey: ["form-fields", "schema", application.popup_id],
     queryFn: async () => {
       const result = await FormFieldsService.getApplicationSchema({
         popupId: application.popup_id,

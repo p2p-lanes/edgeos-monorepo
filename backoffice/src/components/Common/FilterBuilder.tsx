@@ -65,13 +65,14 @@ export const FULL_TEXT_OPS = [
   "not_empty",
 ]
 
+// New and reset rows start without a value so an incomplete condition
+// never filters anything; the user must pick the value explicitly.
 function defaultValueFor(
   def: FilterFieldDef,
   op: string,
 ): FilterCondition["value"] {
   if (NO_VALUE_OPS.has(op)) return null
-  if (def.kind === "boolean") return true
-  if (def.kind === "select") return def.options?.[0]?.value ?? ""
+  if (def.kind === "boolean") return null
   return ""
 }
 
@@ -152,13 +153,15 @@ function ConditionValueInput({
   if (NO_VALUE_OPS.has(condition.op)) return null
 
   if (def.kind === "boolean") {
+    const current =
+      typeof condition.value === "boolean" ? String(condition.value) : undefined
     return (
       <Select
-        value={condition.value === false ? "false" : "true"}
+        value={current}
         onValueChange={(v) => onValueChange(v === "true")}
       >
         <SelectTrigger className="h-8 flex-1">
-          <SelectValue />
+          <SelectValue placeholder="Value" />
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="true">Yes</SelectItem>
