@@ -43,7 +43,14 @@ export const queryKeys = {
     portal: (popupId: string) => ["form-schema", "portal", popupId] as const,
   },
   checkout: {
-    runtime: (slug: string) => ["checkout", "runtime", slug] as const,
+    // The runtime payload is translated server-side from Accept-Language, so
+    // the language is part of the cache identity. Omitting `lang` yields the
+    // language-agnostic prefix, which still matches every language's entry for
+    // invalidation.
+    runtime: (slug: string, lang?: string | null) =>
+      lang
+        ? (["checkout", "runtime", slug, lang] as const)
+        : (["checkout", "runtime", slug] as const),
     coupon: (slug: string, code: string) =>
       ["checkout", "coupon", slug, code] as const,
   },
