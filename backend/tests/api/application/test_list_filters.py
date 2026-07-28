@@ -45,6 +45,10 @@ def _make_application(
     referral: str | None = None,
     submitted_at: datetime | None = None,
     gender: str | None = None,
+    residence: str | None = None,
+    rating: str | None = None,
+    scholarship_request: bool = False,
+    scholarship_video_url: str | None = None,
 ) -> Applications:
     human = Humans(
         tenant_id=tenant.id,
@@ -52,6 +56,8 @@ def _make_application(
         first_name="Filters",
         last_name="Applicant",
         gender=gender,
+        residence=residence,
+        **({"rating": rating} if rating is not None else {}),
     )
     db.add(human)
     db.flush()
@@ -64,6 +70,8 @@ def _make_application(
         custom_fields=custom_fields or {},
         referral=referral,
         submitted_at=submitted_at,
+        scholarship_request=scholarship_request,
+        scholarship_video_url=scholarship_video_url,
     )
     db.add(application)
     db.commit()
@@ -310,6 +318,82 @@ class TestApplicationListFilters:
             search="Filters",
         )
         assert _ids(response) == {str(match.id)}
+
+    def test_residence_eq_and_contains(
+        self, db: Session, tenant_a: Tenants, client: TestClient
+    ) -> None:
+        # residence lives on Humans; eq is exact, contains is case-insensitive.
+        popup = _make_popup(db, tenant_a)
+        admin = _make_admin(db, tenant_a)
+        exact = _make_application(db, tenant_a, popup, residence="Argentina")
+        partial = _make_application(
+            db, tenant_a, popup, residence="Buenos Aires, Argentina"
+        )
+        _make_application(db, tenant_a, popup, residence="Lisbon, Portugal")
+
+        response = _list(
+            client, admin, tenant_a, popup, _one("residence", "eq", "Argentina")
+        )
+        assert _ids(response) == {str(exact.id)}
+
+        response = _list(
+            client, admin, tenant_a, popup, _one("residence", "contains", "argentina")
+        )
+        assert _ids(response) == {str(exact.id), str(partial.id)}
+
+    def test_rating_eq_and_neq(
+        self, db: Session, tenant_a: Tenants, client: TestClient
+    ) -> None:
+        # rating lives on Humans and defaults to "unrated" (never NULL).
+        popup = _make_popup(db, tenant_a)
+        admin = _make_admin(db, tenant_a)
+        flagged = _make_application(db, tenant_a, popup, rating="red_flag")
+        unrated = _make_application(db, tenant_a, popup)
+
+        response = _list(
+            client, admin, tenant_a, popup, _one("rating", "eq", "red_flag")
+        )
+        assert _ids(response) == {str(flagged.id)}
+
+        response = _list(
+            client, admin, tenant_a, popup, _one("rating", "neq", "red_flag")
+        )
+        assert _ids(response) == {str(unrated.id)}
+
+        response = _list(
+            client, admin, tenant_a, popup, _one("rating", "eq", "not-a-rating")
+        )
+        assert response.status_code == 422
+
+    def test_scholarship_video_is_empty(
+        self, db: Session, tenant_a: Tenants, client: TestClient
+    ) -> None:
+        # Scholarship requests without a video are incomplete submissions.
+        popup = _make_popup(db, tenant_a)
+        admin = _make_admin(db, tenant_a)
+        incomplete = _make_application(db, tenant_a, popup, scholarship_request=True)
+        _make_application(
+            db,
+            tenant_a,
+            popup,
+            scholarship_request=True,
+            scholarship_video_url="https://example.com/video",
+        )
+
+        response = _list(
+            client,
+            admin,
+            tenant_a,
+            popup,
+            {
+                "match": "all",
+                "conditions": [
+                    {"field": "scholarship_request", "op": "eq", "value": True},
+                    {"field": "scholarship_video_url", "op": "is_empty", "value": None},
+                ],
+            },
+        )
+        assert _ids(response) == {str(incomplete.id)}
 
     def test_empty_conditions_is_noop(
         self, db: Session, tenant_a: Tenants, client: TestClient

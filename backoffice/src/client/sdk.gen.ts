@@ -394,10 +394,11 @@ export class ApplicationsService {
      *
      * ``group_by``/``group_value`` scope the list to one bucket of a grouped
      * view (same whitelist and NULL/empty collapsing as the group-counts
-     * endpoint). The scope is ANDed with everything else, so it stays correct
-     * even when ``filters`` uses match=any. With ``group_by`` set and no
-     * ``group_value``, the NULL bucket is returned; ``group_value`` without
-     * ``group_by`` is ignored.
+     * endpoint); ``sub_group_by``/``sub_group_value`` narrow it to one
+     * subgroup bucket. Scopes are ANDed with everything else, so they stay
+     * correct even when ``filters`` uses match=any. With a group field set and
+     * no value, the NULL bucket is returned; a value without its field is
+     * ignored.
      * @param data The data for the request.
      * @param data.popupId
      * @param data.humanId
@@ -407,6 +408,8 @@ export class ApplicationsService {
      * @param data.filters
      * @param data.groupBy
      * @param data.groupValue
+     * @param data.subGroupBy
+     * @param data.subGroupValue
      * @param data.skip Number of items to skip
      * @param data.limit Maximum number of items to return
      * @param data.xTenantId
@@ -429,6 +432,8 @@ export class ApplicationsService {
                 filters: data.filters,
                 group_by: data.groupBy,
                 group_value: data.groupValue,
+                sub_group_by: data.subGroupBy,
+                sub_group_value: data.subGroupValue,
                 skip: data.skip,
                 limit: data.limit
             },
@@ -473,11 +478,18 @@ export class ApplicationsService {
      * ``age``, or ``custom.<field_name>``. ``filters`` and ``search`` behave
      * exactly like the list endpoint. NULL and empty values share one bucket
      * with ``value: null``; rows are ordered by count descending.
+     *
+     * ``parent_group_by``/``parent_group_value`` scope the counts to one
+     * bucket of an outer grouped view (subgrouped views count within each
+     * expanded parent group). With ``parent_group_by`` set and no value, the
+     * parent NULL bucket is used.
      * @param data The data for the request.
      * @param data.popupId
      * @param data.groupBy
      * @param data.filters
      * @param data.search
+     * @param data.parentGroupBy
+     * @param data.parentGroupValue
      * @param data.xTenantId
      * @returns ApplicationGroupCount Successful Response
      * @throws ApiError
@@ -493,7 +505,9 @@ export class ApplicationsService {
                 popup_id: data.popupId,
                 group_by: data.groupBy,
                 filters: data.filters,
-                search: data.search
+                search: data.search,
+                parent_group_by: data.parentGroupBy,
+                parent_group_value: data.parentGroupValue
             },
             errors: {
                 422: 'Validation Error'
