@@ -7961,6 +7961,7 @@ export class TenantsService {
      * List Tenants
      * @param data The data for the request.
      * @param data.search
+     * @param data.includeDeleted
      * @param data.skip Number of items to skip
      * @param data.limit Maximum number of items to return
      * @returns ListModel_TenantPublic_ Successful Response
@@ -7972,6 +7973,7 @@ export class TenantsService {
             url: '/api/v1/tenants',
             query: {
                 search: data.search,
+                include_deleted: data.includeDeleted,
                 skip: data.skip,
                 limit: data.limit
             },

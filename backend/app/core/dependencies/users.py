@@ -254,6 +254,24 @@ def get_current_tenant(
 CurrentTenant = Annotated["TenantPublic", Depends(get_current_tenant)]
 
 
+def require_active_tenant(db: Session, tenant_id: uuid.UUID) -> None:
+    """Reject tenant-scoped access to a deleted organization.
+
+    Soft-deleting a tenant also revokes its PostgreSQL credentials, so without
+    this guard the request fails later with a misleading "credentials not
+    configured" error instead of saying the organization is gone.
+    """
+    from app.api.tenant.models import Tenants
+
+    tenant = db.get(Tenants, tenant_id)
+
+    if tenant is None or tenant.deleted:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="This organization is no longer available",
+        )
+
+
 def get_tenant_session(
     current_user: CurrentUser,
     db: SessionDep,
@@ -276,6 +294,8 @@ def get_tenant_session(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Invalid tenant ID format",
             )
+
+        require_active_tenant(db, tenant_id)
 
         cached_cred = tenant_connection_manager.get_credential(
             db, tenant_id, CredentialType.CRUD
@@ -303,6 +323,8 @@ def get_tenant_session(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="User has no tenant assigned",
         )
+
+    require_active_tenant(db, current_user.tenant_id)
 
     credential_type = (
         CredentialType.READONLY
@@ -562,6 +584,8 @@ def get_admin_or_api_key_tenant_session(scope: ApiKeyScope):
                     detail="API key has no tenant context.",
                 )
 
+            require_active_tenant(db, tenant_id)
+
             cached_cred = tenant_connection_manager.get_credential(
                 db, tenant_id, CredentialType.CRUD
             )
@@ -655,6 +679,8 @@ def get_check_in_or_api_key_tenant_session(scope: ApiKeyScope):
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail="API key has no tenant context.",
                 )
+
+            require_active_tenant(db, tenant_id)
 
             cached_cred = tenant_connection_manager.get_credential(
                 db, tenant_id, CredentialType.CRUD
