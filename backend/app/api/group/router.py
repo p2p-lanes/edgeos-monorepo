@@ -955,6 +955,7 @@ async def resolve_group_slug(
             inviter_name = creator.full_name or creator.email
 
         preview = InvitePublicPreview(
+            id=invite.id,
             popup_id=invite.popup_id,
             token=invite.token,
             inviter_name=inviter_name,
@@ -1016,6 +1017,7 @@ async def canonical_invite_forward(
         inviter_name = creator.full_name or creator.email
 
     return InvitePublicPreview(
+        id=invite.id,
         popup_id=invite.popup_id,
         token=invite.token,
         inviter_name=inviter_name,
