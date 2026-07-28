@@ -164,11 +164,20 @@ async def list_tenants(
     db: SessionDep,
     _: CurrentSuperadmin,
     search: str | None = None,
+    include_deleted: bool = False,
     skip: PaginationSkip = 0,
     limit: PaginationLimit = 100,
 ) -> ListModel[TenantPublic]:
+    # Deleted organizations are hidden by default: they have no database
+    # credentials left, so offering them as a selectable context only leads to
+    # failing requests. Admin listings opt in to see them.
     tenants, total = crud.find(
-        db, skip=skip, limit=limit, search=search, search_fields=["name"]
+        db,
+        skip=skip,
+        limit=limit,
+        search=search,
+        search_fields=["name"],
+        deleted=None if include_deleted else False,
     )
 
     return ListModel[TenantPublic](

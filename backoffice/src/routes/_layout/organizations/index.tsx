@@ -28,6 +28,9 @@ function getTenantsQueryOptions(
         skip: page * pageSize,
         limit: pageSize,
         search: search || undefined,
+        // Admin listing keeps deleted organizations visible for auditing;
+        // every other surface only offers selectable ones.
+        includeDeleted: true,
       }),
     queryKey: ["tenants", { page, pageSize, search }],
   }
