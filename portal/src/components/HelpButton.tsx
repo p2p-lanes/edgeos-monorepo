@@ -14,17 +14,17 @@ import { useTenant } from "@/providers/tenantProvider"
 
 /**
  * Floating help button shown on every portal page. Opens a small popover that
- * lets the visitor email support. The destination is the tenant's configured
- * `sender_email`; when the tenant has no address the button is not rendered.
- * Must be mounted inside both `CityProvider` and `TenantProvider` (see
- * `Providers.tsx`).
+ * lets the visitor email support. Both the button and its destination are
+ * configured per organization in the backoffice: it renders only when the
+ * tenant has `help_enabled` and a `help_email`. Must be mounted inside both
+ * `CityProvider` and `TenantProvider` (see `Providers.tsx`).
  */
 const HelpButton = () => {
   const { t } = useTranslation()
   const { tenant } = useTenant()
   const { getCity } = useCityProvider()
 
-  const email = tenant?.sender_email?.trim()
+  const email = tenant?.help_enabled ? tenant.help_email?.trim() : undefined
   if (!email) {
     return null
   }

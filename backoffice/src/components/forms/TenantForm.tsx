@@ -5,6 +5,7 @@ import {
   Check,
   Copy,
   Globe,
+  HelpCircle,
   Image,
   Info,
   Lock,
@@ -174,6 +175,8 @@ export function TenantForm({ defaultValues, onSuccess }: TenantFormProps) {
       meta_capi_access_token: "",
       ga_tracking_enabled: defaultValues?.ga_tracking_enabled ?? false,
       ga_measurement_id: defaultValues?.ga_measurement_id ?? "",
+      help_enabled: defaultValues?.help_enabled ?? false,
+      help_email: defaultValues?.help_email ?? "",
       smtp_host: defaultValues?.smtp_host ?? "",
       smtp_port: defaultValues?.smtp_port ?? 587,
       smtp_user: defaultValues?.smtp_user ?? "",
@@ -199,6 +202,8 @@ export function TenantForm({ defaultValues, onSuccess }: TenantFormProps) {
           meta_pixel_id: value.meta_pixel_id || null,
           ga_tracking_enabled: value.ga_tracking_enabled,
           ga_measurement_id: value.ga_measurement_id || null,
+          help_enabled: value.help_enabled,
+          help_email: value.help_email || null,
           smtp_host: smtpHost || null,
           smtp_port: value.smtp_port || null,
           smtp_user: smtpUser || null,
@@ -233,6 +238,8 @@ export function TenantForm({ defaultValues, onSuccess }: TenantFormProps) {
           meta_pixel_id: value.meta_pixel_id || undefined,
           ga_tracking_enabled: value.ga_tracking_enabled,
           ga_measurement_id: value.ga_measurement_id || undefined,
+          help_enabled: value.help_enabled,
+          help_email: value.help_email || undefined,
           smtp_host: smtpHost || undefined,
           smtp_port: value.smtp_port || undefined,
           smtp_user: smtpUser || undefined,
@@ -899,6 +906,65 @@ export function TenantForm({ defaultValues, onSuccess }: TenantFormProps) {
               </LoadingButton>
             </InlineRow>
           )}
+        </InlineSection>
+
+        <Separator />
+
+        {/* Portal Help Button */}
+        <InlineSection title="Portal Help Button">
+          <form.Field name="help_enabled">
+            {(field) => (
+              <InlineRow
+                icon={<HelpCircle className="h-4 w-4 text-muted-foreground" />}
+                label="Help Button"
+                description="Show a floating help button on every portal page."
+              >
+                <Switch
+                  id="help_enabled"
+                  aria-label="Help Button"
+                  checked={field.state.value}
+                  onCheckedChange={field.handleChange}
+                />
+              </InlineRow>
+            )}
+          </form.Field>
+
+          <form.Field
+            name="help_email"
+            validators={{
+              onBlur: ({ value, fieldApi }) => {
+                const enabled = fieldApi.form.getFieldValue("help_enabled")
+                if (enabled && !value)
+                  return "Help email is required when the help button is enabled"
+                if (value && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+                  return "Invalid email address"
+                }
+                return undefined
+              },
+            }}
+          >
+            {(field) => (
+              <div>
+                <InlineRow
+                  icon={
+                    <HelpCircle className="h-4 w-4 text-muted-foreground" />
+                  }
+                  label="Help Email"
+                  description="Where portal help requests are sent."
+                >
+                  <Input
+                    placeholder="support@acme.com"
+                    type="email"
+                    value={field.state.value}
+                    onBlur={field.handleBlur}
+                    onChange={(e) => field.handleChange(e.target.value)}
+                    className="max-w-xs text-sm"
+                  />
+                </InlineRow>
+                <FieldError errors={field.state.meta.errors} />
+              </div>
+            )}
+          </form.Field>
         </InlineSection>
 
         <Separator />
