@@ -5,7 +5,7 @@ import {
   useQueryClient,
 } from "@tanstack/react-query"
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router"
-import type { ColumnDef } from "@tanstack/react-table"
+import type { ColumnDef, VisibilityState } from "@tanstack/react-table"
 import {
   ClipboardList,
   Download,
@@ -107,6 +107,12 @@ import {
 import { useWorkspace } from "@/contexts/WorkspaceContext"
 import useAuth from "@/hooks/useAuth"
 import useCustomToast from "@/hooks/useCustomToast"
+import {
+  applyUserColumnOrder,
+  columnDefId,
+  orderableColumnIds,
+  useTableColumnPrefs,
+} from "@/hooks/useTableColumnPrefs"
 import {
   type TableSearchParams,
   useTableSearchParams,
@@ -1213,80 +1219,9 @@ function ApplicationsTableContent({
     [navigate],
   )
 
-  // The saved-view config only captures explicit choices; defaults stay out
-  // so applying a view produces a minimal URL.
-  const savedViewConfig = useMemo(() => {
-    const config: Record<string, unknown> = {}
-    if (searchParams.match === "any" && filterConditions.length) {
-      config.match = "any"
-    }
-    if (filterConditions.length) config.filters = filterConditions
-    if (searchParams.groupBy) config.groupBy = searchParams.groupBy
-    if (searchParams.groupBy && searchParams.subGroupBy) {
-      config.subGroupBy = searchParams.subGroupBy
-    }
-    if (searchParams.sortBy) {
-      config.sortBy = searchParams.sortBy
-      config.sortOrder = searchParams.sortOrder
-    }
-    return config
-  }, [
-    searchParams.match,
-    searchParams.groupBy,
-    searchParams.subGroupBy,
-    searchParams.sortBy,
-    searchParams.sortOrder,
-    filterConditions,
-  ])
-
-  // Saved-view configs are team-authored server data: revalidate every field
-  // with the same rules validateSearch applies before touching the URL.
-  const applySavedView = useCallback(
-    (config: Record<string, unknown>) => {
-      const filters = sanitizeFilterConditions(config.filters)
-      const groupByValue =
-        typeof config.groupBy === "string" &&
-        (VALID_GROUP_BY_FIELDS.has(config.groupBy) ||
-          config.groupBy.startsWith("custom."))
-          ? config.groupBy
-          : undefined
-      const subGroupByValue =
-        groupByValue &&
-        typeof config.subGroupBy === "string" &&
-        config.subGroupBy !== groupByValue &&
-        (VALID_GROUP_BY_FIELDS.has(config.subGroupBy) ||
-          config.subGroupBy.startsWith("custom."))
-          ? config.subGroupBy
-          : undefined
-      const sortOrder: "asc" | "desc" | undefined =
-        config.sortOrder === "asc" || config.sortOrder === "desc"
-          ? config.sortOrder
-          : undefined
-      navigate({
-        to: "/applications",
-        search: (prev: Record<string, unknown>) => ({
-          ...prev,
-          status: undefined,
-          reviewerId: undefined,
-          page: 0,
-          match:
-            config.match === "any" && filters.length
-              ? ("any" as const)
-              : undefined,
-          filters: filters.length ? filters : undefined,
-          groupBy: groupByValue,
-          subGroupBy: subGroupByValue,
-          sortBy:
-            typeof config.sortBy === "string" && config.sortBy
-              ? config.sortBy
-              : undefined,
-          sortOrder,
-        }),
-        replace: true,
-      })
-    },
-    [navigate],
-  )
+  // Column visibility and order live here (not inside DataTable) so saved
+  // views can capture and restore them, shared with the grouped view tables.
+  const columnPrefs = useTableColumnPrefs("applications")
 
   // Grouping needs a selected popup; the counts endpoint is popup-scoped.
   const groupBy =
@@ -1494,12 +1429,129 @@ function ApplicationsTableContent({
   })
 
   const isWeightedVoting = approvalStrategy?.strategy_type === "weighted"
-  const columns = getColumns(
-    isWeightedVoting,
-    !!reviewerFilter && reviewerFilter !== "custom",
-    customColumns,
+  const showReviewerDecision = !!reviewerFilter && reviewerFilter !== "custom"
+  const columns = useMemo(
+    () => getColumns(isWeightedVoting, showReviewerDecision, customColumns),
+    [isWeightedVoting, showReviewerDecision, customColumns],
   )
   const canBulkReview = isOperatorOrAbove && !isWeightedVoting
+
+  // Every toggleable column id, independent of which conditional columns are
+  // currently rendered, so applying a view can also hide the missing ones.
+  const allToggleableIds = useMemo(
+    () => orderableColumnIds(getColumns(true, true, customColumns)),
+    [customColumns],
+  )
+
+  // Ids of the columns currently on screen, in their visual order.
+  const visibleColumnIds = useMemo(() => {
+    const orderable = columns.filter(
+      (col) => col.meta?.toggleable !== false && col.meta?.label,
+    )
+    const byId = new Map(orderable.map((col) => [columnDefId(col), col]))
+    return applyUserColumnOrder(
+      orderableColumnIds(columns),
+      columnPrefs.order,
+    ).filter((id) => {
+      const pref = columnPrefs.visibility[id]
+      if (pref !== undefined) return pref
+      return !byId.get(id)?.meta?.defaultHidden
+    })
+  }, [columns, columnPrefs.order, columnPrefs.visibility])
+
+  // The saved-view config only captures explicit choices; defaults stay out
+  // so applying a view produces a minimal URL. Columns are captured only
+  // once the user diverged from the default set or order.
+  const savedViewConfig = useMemo(() => {
+    const config: Record<string, unknown> = {}
+    if (searchParams.match === "any" && filterConditions.length) {
+      config.match = "any"
+    }
+    if (filterConditions.length) config.filters = filterConditions
+    if (searchParams.groupBy) config.groupBy = searchParams.groupBy
+    if (searchParams.groupBy && searchParams.subGroupBy) {
+      config.subGroupBy = searchParams.subGroupBy
+    }
+    if (searchParams.sortBy) {
+      config.sortBy = searchParams.sortBy
+      config.sortOrder = searchParams.sortOrder
+    }
+    if (columnPrefs.isCustomized) config.columns = visibleColumnIds
+    return config
+  }, [
+    searchParams.match,
+    searchParams.groupBy,
+    searchParams.subGroupBy,
+    searchParams.sortBy,
+    searchParams.sortOrder,
+    filterConditions,
+    columnPrefs.isCustomized,
+    visibleColumnIds,
+  ])
+
+  // Saved-view configs are team-authored server data: revalidate every field
+  // with the same rules validateSearch applies before touching the URL.
+  const applySavedView = useCallback(
+    (config: Record<string, unknown>) => {
+      const filters = sanitizeFilterConditions(config.filters)
+      const groupByValue =
+        typeof config.groupBy === "string" &&
+        (VALID_GROUP_BY_FIELDS.has(config.groupBy) ||
+          config.groupBy.startsWith("custom."))
+          ? config.groupBy
+          : undefined
+      const subGroupByValue =
+        groupByValue &&
+        typeof config.subGroupBy === "string" &&
+        config.subGroupBy !== groupByValue &&
+        (VALID_GROUP_BY_FIELDS.has(config.subGroupBy) ||
+          config.subGroupBy.startsWith("custom."))
+          ? config.subGroupBy
+          : undefined
+      const sortOrder: "asc" | "desc" | undefined =
+        config.sortOrder === "asc" || config.sortOrder === "desc"
+          ? config.sortOrder
+          : undefined
+      // Views saved without columns leave the current columns untouched.
+      if (Array.isArray(config.columns)) {
+        const savedColumns = config.columns.filter(
+          (id): id is string =>
+            typeof id === "string" && allToggleableIds.includes(id),
+        )
+        if (savedColumns.length) {
+          columnPrefs.setOrder(savedColumns)
+          const visibility: VisibilityState = {}
+          for (const id of allToggleableIds) {
+            visibility[id] = savedColumns.includes(id)
+          }
+          columnPrefs.setVisibility(visibility)
+        }
+      }
+      navigate({
+        to: "/applications",
+        search: (prev: Record<string, unknown>) => ({
+          ...prev,
+          status: undefined,
+          reviewerId: undefined,
+          page: 0,
+          match:
+            config.match === "any" && filters.length
+              ? ("any" as const)
+              : undefined,
+          filters: filters.length ? filters : undefined,
+          groupBy: groupByValue,
+          subGroupBy: subGroupByValue,
+          sortBy:
+            typeof config.sortBy === "string" && config.sortBy
+              ? config.sortBy
+              : undefined,
+          sortOrder,
+        }),
+        replace: true,
+      })
+    },
+    [navigate, allToggleableIds, columnPrefs],
+  )
 
   const hiddenOnMobile = [
     "attendees",
@@ -1583,6 +1635,7 @@ function ApplicationsTableContent({
           valueOrder={groupValueOrder}
           subValueOrder={subGroupValueOrder}
           hiddenOnMobile={hiddenOnMobile}
+          columnPrefs={columnPrefs}
         />
       </div>
     )
@@ -1595,6 +1648,7 @@ function ApplicationsTableContent({
       columns={columns}
       data={applications.results}
       tableId="applications"
+      columnPrefs={columnPrefs}
       searchPlaceholder="Search by name or email..."
       hiddenOnMobile={hiddenOnMobile}
       searchValue={search}
