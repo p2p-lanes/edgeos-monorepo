@@ -18875,6 +18875,24 @@ export const TenantAnonymousPublicSchema = {
             ],
             title: 'Ga Measurement Id'
         },
+        help_enabled: {
+            type: 'boolean',
+            title: 'Help Enabled',
+            default: false
+        },
+        help_email: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 255,
+                    format: 'email'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Help Email'
+        },
         id: {
             type: 'string',
             format: 'uuid',
@@ -18998,6 +19016,23 @@ export const TenantCreateSchema = {
                 }
             ],
             title: 'Ga Measurement Id'
+        },
+        help_enabled: {
+            type: 'boolean',
+            title: 'Help Enabled',
+            default: false
+        },
+        help_email: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'email'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Help Email'
         },
         smtp_host: {
             anyOf: [
@@ -19231,6 +19266,24 @@ export const TenantPublicSchema = {
                 }
             ],
             title: 'Ga Measurement Id'
+        },
+        help_enabled: {
+            type: 'boolean',
+            title: 'Help Enabled',
+            default: false
+        },
+        help_email: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 255,
+                    format: 'email'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Help Email'
         },
         id: {
             type: 'string',
@@ -19541,6 +19594,29 @@ export const TenantUpdateSchema = {
                 }
             ],
             title: 'Ga Measurement Id'
+        },
+        help_enabled: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Help Enabled'
+        },
+        help_email: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'email'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Help Email'
         },
         smtp_host: {
             anyOf: [

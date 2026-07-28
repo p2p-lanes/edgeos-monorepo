@@ -332,12 +332,37 @@ async def update_tenant(
                 ),
             )
 
+    # 7b. Merged-state validation for the portal help button.
+    # The schema validator only sees the payload, so it cannot judge
+    # PATCH {"help_enabled": true} against a row that has no help_email, nor
+    # PATCH {"help_email": null} against a row that already has help enabled.
+    effective_help_enabled = (
+        tenant_in.help_enabled
+        if tenant_in.help_enabled is not None
+        else tenant.help_enabled
+    )
+    effective_help_email = (
+        tenant_in.help_email
+        if "help_email" in tenant_in.model_fields_set
+        else tenant.help_email
+    )
+    if effective_help_enabled and not (effective_help_email or "").strip():
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                "help_enabled requires a help_email. Set a help email before "
+                "enabling the portal help button."
+            ),
+        )
+
     # 8. Snapshot old domain and fields for cache invalidation after update
     old_domain = tenant.custom_domain
     old_landing_mode = tenant.landing_mode
     old_custom_domain_active = tenant.custom_domain_active
     old_meta_tracking_enabled = tenant.meta_tracking_enabled
     old_meta_pixel_id = tenant.meta_pixel_id
+    old_help_enabled = tenant.help_enabled
+    old_help_email = tenant.help_email
 
     # CDN image ingestion: rewrite external image URLs to CDN before commit.
     # Pattern B (async hook). Fail-open: any per-URL failure keeps the original URL.
@@ -410,6 +435,8 @@ async def update_tenant(
     new_custom_domain_active = updated.custom_domain_active
     new_meta_tracking_enabled = updated.meta_tracking_enabled
     new_meta_pixel_id = updated.meta_pixel_id
+    new_help_enabled = updated.help_enabled
+    new_help_email = updated.help_email
 
     domains_to_invalidate: set[str] = set()
 
@@ -429,6 +456,12 @@ async def update_tenant(
     if (
         new_meta_tracking_enabled != old_meta_tracking_enabled
         or new_meta_pixel_id != old_meta_pixel_id
+    ) and new_domain:
+        domains_to_invalidate.add(new_domain)
+
+    # Invalidate current domain when the public help-button config changes.
+    if (
+        new_help_enabled != old_help_enabled or new_help_email != old_help_email
     ) and new_domain:
         domains_to_invalidate.add(new_domain)
 
