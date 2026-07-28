@@ -19,9 +19,10 @@
 import { type CSSProperties, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { getCheckoutSchemaSections } from "@/app/checkout/types"
+import type { TicketingStepPublic } from "@/client"
 import { useCheckout } from "@/providers/checkoutProvider"
 import type { FormFieldSchema } from "@/types/form-schema"
-import { SectionShell } from "./SectionShell"
+import { SectionShell, shellCopy } from "./SectionShell"
 
 /** Curated WhatsApp country list. Rendered as TEXT ("AR +54") — no flag
  *  emojis (they don't render on Chrome/Windows, a known repo gotcha). */
@@ -67,6 +68,15 @@ function asString(value: unknown): string {
   return typeof value === "string" ? value : ""
 }
 
+/** Example text the mockup shows in the three structural fields. A skin may
+ *  suggest how to fill a field it knows by name, but never overrides copy the
+ *  organizer authored — a configured `placeholder` always wins. */
+const PLACEHOLDER_KEY_BY_FIELD: Record<string, string> = {
+  email: "checkout.amanita.buyer_placeholder_email",
+  first_name: "checkout.amanita.buyer_placeholder_first_name",
+  last_name: "checkout.amanita.buyer_placeholder_last_name",
+}
+
 /** Split an E.164 number into a supported country + national digits.
  *  Longest-dial-first so "+598…" reads as UY, not US ("+1") by prefix luck. */
 function splitE164(value: string): { country: string; national: string } {
@@ -85,13 +95,6 @@ function splitE164(value: string): { country: string; national: string } {
 function dialFor(code: string): string {
   return WA_COUNTRIES.find((c) => c.code === code)?.dial ?? "54"
 }
-
-/** getCheckoutSchemaSections parks fields that carry no section_id — the
- *  structural email/first_name/last_name — in this synthetic group and titles
- *  it with a hardcoded "Personal information". That title is a portal
- *  artifact, not the organizer's, and printing it next to their own section
- *  showed the heading twice. Only real sections get to name themselves. */
-const SYNTHETIC_SECTION_ID = "_unsectioned_base"
 
 type FieldEntry = { name: string; field: FormFieldSchema }
 
@@ -139,6 +142,9 @@ function AmanitaField({
   const id = `ck-${name}`
   const label = field.label
   const hasError = !!error
+  const placeholderKey = PLACEHOLDER_KEY_BY_FIELD[name]
+  const placeholder =
+    field.placeholder ?? (placeholderKey ? t(placeholderKey) : undefined)
 
   if (field.type === "phone") {
     const { country, national } = splitE164(asString(value))
@@ -148,35 +154,53 @@ function AmanitaField({
           {label}
         </label>
         <div className="mt-1.5 flex gap-2">
-          <select
-            aria-label={t("checkout.amanita.whatsapp_country_aria")}
-            autoComplete="tel-country-code"
-            value={country}
-            onChange={(e) =>
-              onChange(name, `+${dialFor(e.target.value)}${national}`)
-            }
-            className="shrink-0 rounded-xl border px-3 py-3 text-sm font-medium text-deep outline-none transition-shadow focus:ring-2 focus:ring-accent"
-            style={{
-              backgroundColor: "#faf6ef",
-              borderColor: "rgba(4,34,49,0.18)",
-            }}
-          >
-            {WA_COUNTRIES.map((c) => (
-              <option key={c.code} value={c.code}>
-                {c.code} +{c.dial}
-              </option>
-            ))}
-          </select>
+          <div className="relative shrink-0">
+            <select
+              aria-label={t("checkout.amanita.whatsapp_country_aria")}
+              autoComplete="tel-country-code"
+              value={country}
+              onChange={(e) =>
+                onChange(name, `+${dialFor(e.target.value)}${national}`)
+              }
+              className="appearance-none rounded-xl border py-3 pl-3 pr-8 text-sm font-medium text-deep outline-none transition-shadow focus:ring-2 focus:ring-accent"
+              style={{
+                backgroundColor: "#faf6ef",
+                borderColor: "rgba(4,34,49,0.18)",
+              }}
+            >
+              {WA_COUNTRIES.map((c) => (
+                <option key={c.code} value={c.code}>
+                  {c.code} +{c.dial}
+                </option>
+              ))}
+            </select>
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-deep"
+            >
+              <path d="m6 9 6 6 6-6" />
+            </svg>
+          </div>
           <input
             id={id}
             type="tel"
             inputMode="numeric"
             autoComplete="tel-national"
-            placeholder={field.placeholder ?? undefined}
+            maxLength={15}
+            placeholder={placeholder}
             value={national}
-            onChange={(e) =>
-              onChange(name, `+${dialFor(country)}${e.target.value}`)
-            }
+            onChange={(e) => {
+              // Keep the national part digits-only and within E.164's length —
+              // a `tel` input still accepts letters, so filter here.
+              const digits = e.target.value.replace(/\D/g, "").slice(0, 15)
+              onChange(name, `+${dialFor(country)}${digits}`)
+            }}
             aria-invalid={hasError || undefined}
             className="w-full min-w-0 rounded-xl border px-4 py-3 text-deep outline-none transition-shadow focus:ring-2 focus:ring-accent"
             style={FIELD_INPUT_STYLE(hasError)}
@@ -279,7 +303,7 @@ function AmanitaField({
                 ? "family-name"
                 : undefined
         }
-        placeholder={field.placeholder ?? undefined}
+        placeholder={placeholder}
         value={asString(value)}
         onChange={(e) => onChange(name, e.target.value)}
         aria-invalid={hasError || undefined}
@@ -291,7 +315,14 @@ function AmanitaField({
   )
 }
 
-export default function AmanitaBuyerStep() {
+export default function AmanitaBuyerStep({
+  stepConfig,
+}: {
+  /** The organizer's buyer step, when one is configured — it names this
+   *  section. Optional: a popup with no buyer step row still collects the
+   *  schema's fields, so the skin's own copy stands in. */
+  stepConfig?: TicketingStepPublic | null
+}) {
   const { t } = useTranslation()
   const {
     buyerValues,
@@ -320,21 +351,18 @@ export default function AmanitaBuyerStep() {
   // what blocks Pay can never disagree.
   const invalidFields = new Set(getBuyerInvalidFields())
 
-  // With a single organizer section — the normal open-ticketing shape — its
-  // heading leads the whole card, so the structural fields sitting in the
-  // synthetic group read as part of it instead of as an untitled orphan
-  // block. Several sections keep their headings in place, where they still
-  // tell the shopper what changed.
-  const realSections = sections.filter((s) => s.id !== SYNTHETIC_SECTION_ID)
-  const hoistedTitle =
-    realSections.length === 1 ? realSections[0].title : undefined
+  const copy = shellCopy(stepConfig, {
+    kicker: t("checkout.amanita.buyer_kicker"),
+    title: t("checkout.amanita.buyer_title"),
+    intro: t("checkout.amanita.buyer_intro"),
+  })
 
   return (
     <SectionShell
       gem="flourish"
-      kicker={t("checkout.amanita.buyer_kicker")}
-      title={t("checkout.amanita.buyer_title")}
-      intro={t("checkout.amanita.buyer_intro")}
+      kicker={copy.kicker}
+      title={copy.title}
+      intro={copy.intro}
     >
       <div
         className="rounded-2xl bg-cream p-6 text-left md:p-8"
@@ -359,21 +387,12 @@ export default function AmanitaBuyerStep() {
           </p>
         </div>
 
-        {hoistedTitle ? (
-          <h3 className="mt-6 font-condensed text-sm font-medium uppercase tracking-[0.14em] text-primary">
-            {hoistedTitle}
-          </h3>
-        ) : null}
-
+        {/* The step already leads with its own title, so the buyer sections
+            stay unlabelled — the synthetic base group and any single
+            configured section both read as one block instead of printing a
+            redundant "Personal information" heading. */}
         {sections.map((section) => (
           <div key={section.id} className="mt-6 flex flex-col gap-5">
-            {!hoistedTitle &&
-            section.id !== SYNTHETIC_SECTION_ID &&
-            section.title ? (
-              <h3 className="font-condensed text-sm font-medium uppercase tracking-[0.14em] text-primary">
-                {section.title}
-              </h3>
-            ) : null}
             {toRows(section.fields).map((row) => {
               const renderField = ({ name, field }: FieldEntry) => {
                 const error =

@@ -34,9 +34,13 @@ function asString(value: unknown): string | undefined {
 
 function asStringList(value: unknown): string[] {
   if (!Array.isArray(value)) return []
-  return value
-    .map((v) => (typeof v === "string" ? v.trim() : ""))
-    .filter((v) => v !== "")
+  return [
+    ...new Set(
+      value
+        .map((v) => (typeof v === "string" ? v.trim() : ""))
+        .filter((v) => v !== ""),
+    ),
+  ]
 }
 
 function parseEnrichedProfile(
@@ -78,51 +82,12 @@ function linkLabel(url: string): string {
   }
 }
 
-/** The two Telegram groups we enriched from — for a human-readable source label. */
-const TELEGRAM_GROUPS: Record<string, string> = {
-  "2944565963": "Edge City Patagonia 2025",
-  "3980048315": "Edge Esmeralda 2026",
-}
-
-/**
- * Provenance facts were written by two passes with different `evidence` shapes:
- * a proper `https://t.me/c/<chat>/<msg>` deep link, and a bare `<chat>:<msg>`
- * (which the browser resolves as a relative path → 404). Normalize both to a
- * valid Telegram deep link, preferring the structured `raw` payload when present.
- */
-function factEvidence(f: {
-  evidence?: string | null
-  raw?: { [key: string]: unknown } | null
-}): { href: string; label: string } | null {
-  let chat: string | undefined
-  let msg: string | undefined
-
-  const raw = f.raw
-  if (raw && typeof raw === "object") {
-    if (raw.chat_id != null) chat = String(raw.chat_id)
-    if (raw.message_id != null) msg = String(raw.message_id)
-  }
-
-  const ev = f.evidence?.trim()
-  if (ev) {
-    if (/^https?:\/\//i.test(ev)) {
-      const m = ev.match(/t\.me\/c\/(\d+)\/(\d+)/)
-      const label =
-        m && TELEGRAM_GROUPS[m[1]] ? TELEGRAM_GROUPS[m[1]] : "Telegram"
-      return { href: ev, label }
-    }
-    const m = ev.match(/^(\d+):(\d+)$/)
-    if (m) {
-      chat = chat ?? m[1]
-      msg = msg ?? m[2]
-    }
-  }
-
-  if (chat && msg) {
-    const label = TELEGRAM_GROUPS[chat] ?? "Telegram"
-    return { href: `https://t.me/c/${chat}/${msg}`, label }
-  }
-  return null
+/** "Nov 2025" style label for when a fact was recorded. */
+function factDate(iso: string): string {
+  const d = new Date(iso)
+  return Number.isNaN(d.getTime())
+    ? ""
+    : d.toLocaleDateString(undefined, { month: "short", year: "numeric" })
 }
 
 function BadgeRow({ label, values }: { label: string; values: string[] }) {
@@ -183,20 +148,11 @@ function EnrichmentFacts({ humanId }: { humanId: string }) {
                 </Badge>
               </div>
               <p className="mt-1 text-foreground/80">{f.value}</p>
-              {(() => {
-                const ev = factEvidence(f)
-                return ev ? (
-                  <a
-                    href={ev.href}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="mt-1 inline-flex items-center gap-1 text-primary underline"
-                  >
-                    <ExternalLink className="h-3 w-3" />
-                    {ev.label}
-                  </a>
-                ) : null
-              })()}
+              <p className="mt-1 text-muted-foreground">
+                {[f.source_label, factDate(f.created_at)]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </p>
             </div>
           ))
         )}
@@ -251,7 +207,7 @@ export function EnrichedProfileCard({ human }: { human: HumanPublic }) {
               <BadgeRow label="Interests" values={profile.interests} />
               <BadgeRow label="Topics" values={profile.topics} />
               {profile.links.length > 0 && (
-                <div className="space-y-1">
+                <div className="min-w-0 space-y-1">
                   <p className="text-xs font-medium text-muted-foreground">
                     Links
                   </p>
@@ -262,9 +218,9 @@ export function EnrichedProfileCard({ human }: { human: HumanPublic }) {
                         href={url.includes("://") ? url : `https://${url}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 text-sm text-primary underline"
+                        className="inline-flex items-start gap-1 text-sm text-primary underline [overflow-wrap:anywhere]"
                       >
-                        <ExternalLink className="h-3 w-3 shrink-0" />
+                        <ExternalLink className="mt-1 h-3 w-3 shrink-0" />
                         {linkLabel(url)}
                       </a>
                     ))}

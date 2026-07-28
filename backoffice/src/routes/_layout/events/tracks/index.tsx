@@ -118,7 +118,7 @@ function TracksTableContent() {
           <EmptyState
             icon={ListTree}
             title="No tracks yet"
-            description="Create the first track for this pop-up."
+            description="Create the first track for this gathering."
             action={
               <Button asChild>
                 <Link to="/events/tracks/new">
@@ -143,7 +143,7 @@ function TracksPage() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Tracks</h1>
           <p className="text-muted-foreground">
-            Group events into topic-based tracks for the selected pop-up
+            Group events into topic-based tracks for the selected gathering
           </p>
         </div>
         {selectedPopupId && (

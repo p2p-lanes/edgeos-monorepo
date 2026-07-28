@@ -30,6 +30,7 @@ from app.api.payment.models import PaymentProducts, Payments
 from app.api.payment.schemas import (
     PaymentCreate,
     PaymentFilter,
+    PaymentFilters,
     PaymentPreview,
     PaymentProductRequest,
     PaymentSource,
@@ -40,6 +41,7 @@ from app.api.product.models import Products
 from app.api.product.product_state import ProductSaleState, derive_product_state
 from app.api.product.schemas import ProductPublic
 from app.api.shared.crud import BaseCRUD
+from app.core.filters import build_filter_expression
 from app.utils.checkout_signing import (
     append_query_params,
     build_signed_redirect_url,
@@ -595,11 +597,13 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         form_data: dict[str, Any],
     ) -> None:
         """Validate required custom buyer fields. form_data is keyed by raw field name; base fields (email/first_name/last_name) live top-level on BuyerInfo and are validated by Pydantic."""
+        # Hidden sections are never rendered in the checkout, so their fields
+        # can't be required here.
         required_field_names = {
             field.name
             for section in popup.form_sections
             for field in section.form_fields
-            if section.kind == "standard" and field.required
+            if section.kind == "standard" and not section.hidden and field.required
         }
 
         missing = [
@@ -1587,15 +1591,24 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         search: str | None = None,
         sort_by: str | None = None,
         sort_order: str = "desc",
+        filters: PaymentFilters | None = None,
     ) -> tuple[list[Payments], int]:
         """Find payments by popup_id via the denormalized popup_id column.
 
         Covers both application-based payments (popup_id backfilled) and
         direct-sale payments (popup_id set at creation, no application_id).
+
+        ``filters`` is a validated PaymentFilters group compiled to one
+        boolean expression and ANDed with the legacy params.
         """
         statement = select(Payments).where(Payments.popup_id == popup_id)
         if status_filter:
             statement = statement.where(Payments.status == status_filter.value)
+
+        if filters is not None:
+            filter_expression = build_filter_expression(filters, Payments)
+            if filter_expression is not None:
+                statement = statement.where(filter_expression)
 
         normalized_search = search.strip() if search else ""
         if normalized_search:
@@ -2613,20 +2626,21 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
 
         return payment, preview
 
-    def _direct_buyer_email(self, session: Session, payment: Payments) -> str | None:
-        """Resolve the buyer email for a direct-sale payment via its attendee.
+    def _direct_buyer_human_id(
+        self, session: Session, payment: Payments
+    ) -> uuid.UUID | None:
+        """Resolve the buyer's human_id for a direct-sale payment via its attendee.
 
-        Direct-sale payments have no application; the buyer is the human behind
-        the (single) attendee on the payment's product snapshot. Used to clear
-        the anonymous open-checkout cart keyed by that email.
+        Used to clear the open-checkout cart, which is now keyed by (human, popup)
+        like the authenticated portal cart.
         """
         snapshot = payment.products_snapshot
         if not snapshot:
             return None
         attendee = session.get(Attendees, snapshot[0].attendee_id)
-        if attendee is None or attendee.human is None:
+        if attendee is None:
             return None
-        return attendee.human.email
+        return attendee.human_id
 
     def approve_payment(
         self,
@@ -2697,10 +2711,12 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                     popup_id=payment.application.popup_id,
                 )
             elif payment.popup_id:
-                buyer_email = self._direct_buyer_email(session, payment)
-                if buyer_email:
-                    carts_crud.delete_anonymous_by_email_popup(
-                        session, buyer_email, payment.popup_id
+                buyer_human_id = self._direct_buyer_human_id(session, payment)
+                if buyer_human_id:
+                    carts_crud.delete_by_human_popup(
+                        session,
+                        human_id=buyer_human_id,
+                        popup_id=payment.popup_id,
                     )
 
             # Single atomic commit for the entire operation
@@ -2963,7 +2979,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         2. The popup has an open_checkout_signing_secret.
         3. HMAC signature is valid for the given cid and secret.
         4. The referenced cart belongs to this popup (popup_id match built into
-           carts_crud.find_anonymous_by_id_popup).
+           carts_crud.find_by_id_popup).
         5. The cart's email matches the buyer email (case-insensitive).
 
         A valid token for a different email or a different popup is always invalid.
@@ -2977,7 +2993,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             return False
         from app.api.cart.crud import carts_crud as _carts_crud  # noqa: PLC0415
 
-        cart = _carts_crud.find_anonymous_by_id_popup(session, cid, popup.id)
+        cart = _carts_crud.find_by_id_popup(session, cid, popup.id)
         if cart is None:
             return False
         cart_email: str = getattr(cart, "email", None) or ""

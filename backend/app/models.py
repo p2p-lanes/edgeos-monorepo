@@ -46,6 +46,10 @@ from app.api.check_in.schemas import CheckInPayload, CheckInPublic
 from app.api.coupon.models import Coupons
 from app.api.coupon.schemas import CouponCreate, CouponPublic, CouponUpdate
 
+# Email log (append-only dispatch history)
+from app.api.email_log.models import EmailLogs
+from app.api.email_log.schemas import EmailLogPublic, EmailLogStatus
+
 # Email templates
 from app.api.email_template.models import EmailTemplates
 from app.api.email_template.schemas import (
@@ -149,6 +153,9 @@ from app.api.track.models import Tracks
 from app.api.track.schemas import TrackCreate, TrackPublic, TrackUpdate
 from app.api.translation.models import Translations
 from app.api.translation.schemas import TranslationCreate, TranslationPublic
+
+# Self-serve trials
+from app.api.trial.models import PendingTrials
 from app.api.user.models import Users
 from app.api.user.schemas import UserCreate, UserPublic, UserUpdate
 
@@ -169,6 +176,8 @@ __all__ = [
     "ApiKeyPublic",
     # Auth
     "PendingHumans",
+    # Self-serve trials
+    "PendingTrials",
     # Core models
     "Humans",
     "HumanCreate",
@@ -205,6 +214,10 @@ __all__ = [
     "TaskUpdate",
     "TaskPublic",
     "TaskDetailPublic",
+    # Email log
+    "EmailLogs",
+    "EmailLogPublic",
+    "EmailLogStatus",
     # Email templates
     "EmailTemplates",
     "EmailTemplateCreate",

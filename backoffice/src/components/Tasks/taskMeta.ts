@@ -78,6 +78,6 @@ export const TASK_VISIBILITIES: TaskVisibility[] = [
 
 export const VISIBILITY_LABELS: Record<TaskVisibility, string> = {
   internal: "Internal (superadmins)",
-  universal: "Universal (all tenants)",
-  tenant: "Tenant",
+  universal: "Universal (all organizations)",
+  tenant: "Organization",
 }

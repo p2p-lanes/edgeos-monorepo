@@ -39,7 +39,9 @@ export function ExpandPreviewDialog({
               ...(cssVars as React.CSSProperties),
               backgroundColor: "var(--background)",
               color: "var(--body)",
-              fontFamily: "system-ui, sans-serif",
+              // Same typeface the real portal uses (Geist, bundled by the
+              // backoffice as --font-sans) — see ThemePreview/index.tsx.
+              fontFamily: "var(--font-sans)",
               fontSize: fontBaseSize || "16px",
             }}
           >

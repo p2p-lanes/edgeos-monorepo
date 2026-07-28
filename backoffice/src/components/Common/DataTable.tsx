@@ -72,7 +72,19 @@ declare module "@tanstack/react-table" {
     label?: string
     toggleable?: boolean
     defaultHidden?: boolean
+    /**
+     * Pin the column to an edge so it stays visible while the table scrolls
+     * horizontally. Use for a leading identity column ("left") and a trailing
+     * actions column ("right") on wide tables with many columns.
+     */
+    sticky?: "left" | "right"
   }
+}
+
+function stickyColumnClassName(sticky?: "left" | "right"): string | undefined {
+  if (sticky === "left") return "sticky left-0 z-20 bg-background"
+  if (sticky === "right") return "sticky right-0 z-20 bg-background"
+  return undefined
 }
 
 interface PaginationState {
@@ -105,6 +117,12 @@ interface DataTableProps<TData, TValue> {
   bulkActions?: (selectedRows: TData[]) => ReactNode
   hiddenOnMobile?: string[]
   tableId?: string
+  /**
+   * Suppress the built-in toolbar (search, filter bar, column toggle) while
+   * keeping the tableId-based column visibility preferences. Useful when
+   * several tables share one external toolbar, as in grouped views.
+   */
+  hideToolbar?: boolean
   renderSubComponent?: (props: { row: Row<TData> }) => ReactNode
   /**
    * Called when a row is clicked. Clicks that originate inside buttons,
@@ -174,6 +192,7 @@ export function DataTable<TData, TValue>({
   bulkActions,
   hiddenOnMobile,
   tableId,
+  hideToolbar,
   renderSubComponent,
   onRowClick,
 }: DataTableProps<TData, TValue>) {
@@ -338,7 +357,7 @@ export function DataTable<TData, TValue>({
     }
   }
 
-  const hasToolbar = onSearchChange || tableId || filterBar
+  const hasToolbar = !hideToolbar && (onSearchChange || tableId || filterBar)
 
   return (
     <div className="flex flex-col gap-4">
@@ -390,7 +409,10 @@ export function DataTable<TData, TValue>({
                   <p>Toggle columns</p>
                 </TooltipContent>
               </Tooltip>
-              <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuContent
+                align="end"
+                className="max-h-[70vh] w-56 overflow-y-auto"
+              >
                 <DropdownMenuLabel>Toggle columns</DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 {table
@@ -406,7 +428,12 @@ export function DataTable<TData, TValue>({
                       checked={col.getIsVisible()}
                       onCheckedChange={(value) => col.toggleVisibility(!!value)}
                     >
-                      {col.columnDef.meta?.label}
+                      <span
+                        className="truncate"
+                        title={col.columnDef.meta?.label}
+                      >
+                        {col.columnDef.meta?.label}
+                      </span>
                     </DropdownMenuCheckboxItem>
                   ))}
               </DropdownMenuContent>
@@ -433,7 +460,12 @@ export function DataTable<TData, TValue>({
               <TableRow key={headerGroup.id} className="hover:bg-transparent">
                 {headerGroup.headers.map((header) => {
                   return (
-                    <TableHead key={header.id}>
+                    <TableHead
+                      key={header.id}
+                      className={stickyColumnClassName(
+                        header.column.columnDef.meta?.sticky,
+                      )}
+                    >
                       {header.isPlaceholder
                         ? null
                         : flexRender(
@@ -478,7 +510,12 @@ export function DataTable<TData, TValue>({
                       onClick={clickable ? handleClick : undefined}
                     >
                       {row.getVisibleCells().map((cell) => (
-                        <TableCell key={cell.id}>
+                        <TableCell
+                          key={cell.id}
+                          className={stickyColumnClassName(
+                            cell.column.columnDef.meta?.sticky,
+                          )}
+                        >
                           {flexRender(
                             cell.column.columnDef.cell,
                             cell.getContext(),

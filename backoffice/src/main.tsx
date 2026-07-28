@@ -72,7 +72,9 @@ const TanStackRouterDevtools = import.meta.env.PROD
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
+    {/* Light by default: matches the edgeos.world paper aesthetic so product
+        screenshots/videos stay on-brand. Stored preference still wins. */}
+    <ThemeProvider defaultTheme="light" storageKey="vite-ui-theme">
       <QueryClientProvider client={queryClient}>
         <RouterProvider router={router} />
         <Suspense>

@@ -4,9 +4,10 @@
  * allActiveProducts to cart selection hooks.
  */
 import { renderHook } from "@testing-library/react"
-import type { ReactNode } from "react"
+import type { ComponentProps, ReactNode } from "react"
 import { describe, expect, it, vi } from "vitest"
 import type { TicketingStepPublic } from "@/client"
+import type { ApplicationFormSchema } from "@/types/form-schema"
 import type { ProductsPass } from "@/types/Products"
 import { CheckoutProvider, useCheckout } from "./checkoutProvider"
 
@@ -55,8 +56,10 @@ vi.mock("@tanstack/react-query", () => ({
     isPending: false,
   }),
 }))
+// `i18n` and not just `t`: usePaymentSubmit reads i18n.language, so a mock
+// without it throws before any assertion runs.
 vi.mock("react-i18next", () => ({
-  useTranslation: () => ({ t: (k: string) => k }),
+  useTranslation: () => ({ t: (k: string) => k, i18n: { language: "en" } }),
 }))
 vi.mock("next/navigation", () => ({
   useRouter: () => ({
@@ -113,6 +116,7 @@ function makeProduct(
 function makeWrapper(
   steps: TicketingStepPublic[],
   products: ProductsPass[],
+  extraProps: Partial<ComponentProps<typeof CheckoutProvider>> = {},
 ): ({ children }: { children: ReactNode }) => ReactNode {
   return function Wrapper({ children }: { children: ReactNode }) {
     return (
@@ -120,12 +124,84 @@ function makeWrapper(
         configuredStepsOverride={steps}
         productsOverride={products}
         cartPersistenceEnabled={false}
+        {...extraProps}
       >
         {children}
       </CheckoutProvider>
     ) as ReactNode
   }
 }
+
+// The provider used to synthesize a buyer step whenever an open-ticketing
+// popup carried no `buyer` row, which meant the step could not be left out:
+// it showed up in checkout no matter what the step config said. It's an
+// ordinary configured step now — these pin that the config is the only source.
+describe("checkoutProvider — the buyer step comes from the step config", () => {
+  const BUYER_SCHEMA = {
+    base_fields: {
+      email: { type: "email", label: "Email", required: true, position: 0 },
+    },
+    custom_fields: {},
+    sections: [],
+  } as unknown as ApplicationFormSchema
+
+  // Exactly the conditions that used to trigger the synthesis.
+  const OPEN_TICKETING = {
+    buyerFormSchema: BUYER_SCHEMA,
+    submitMode: "open-ticketing" as const,
+  }
+
+  it("adds no buyer step when the config has none", () => {
+    const steps = [
+      makeStep({ id: "s1", step_type: "tickets" }),
+      makeStep({ id: "s2", step_type: "confirm" }),
+    ]
+
+    const { result } = renderHook(() => useCheckout(), {
+      wrapper: makeWrapper(steps, [], OPEN_TICKETING),
+    })
+
+    expect(result.current.stepConfigs.map((s) => s.step_type)).toEqual([
+      "tickets",
+      "confirm",
+    ])
+    expect(result.current.availableSteps).not.toContain("buyer")
+  })
+
+  // Without a step to send them to, nothing may claim the shopper left
+  // something unfilled — that bounce had nowhere to land.
+  it("reports no incomplete step when no buyer step is configured", () => {
+    const steps = [makeStep({ id: "s1", step_type: "tickets" })]
+
+    const { result } = renderHook(() => useCheckout(), {
+      wrapper: makeWrapper(steps, [], OPEN_TICKETING),
+    })
+
+    expect(result.current.findFirstIncompleteStep()).toBeNull()
+  })
+
+  // The funnel walks the configs in the order the API sends them, so the
+  // position the organizer chose is the position the shopper walks.
+  it("keeps a configured buyer step, in the organizer's order", () => {
+    const steps = [
+      makeStep({ id: "s1", step_type: "tickets" }),
+      makeStep({ id: "s2", step_type: "buyer" }),
+      makeStep({ id: "s3", step_type: "confirm" }),
+    ]
+
+    const { result } = renderHook(() => useCheckout(), {
+      wrapper: makeWrapper(steps, [], OPEN_TICKETING),
+    })
+
+    expect(result.current.availableSteps).toEqual([
+      "passes",
+      "buyer",
+      "confirm",
+    ])
+    // Its empty form is still what gates payment.
+    expect(result.current.findFirstIncompleteStep()).toBe("buyer")
+  })
+})
 
 describe("checkoutProvider — step-aware product wiring", () => {
   it("exposes productsByStepId from useStepProductResolver on context", () => {

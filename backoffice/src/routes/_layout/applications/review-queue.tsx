@@ -30,14 +30,15 @@ function ReviewQueuePage() {
       ApplicationReviewsService.listPendingReviews({
         popupId: selectedPopupId || undefined,
         skip: 0,
-        limit: 100,
+        limit: 1000,
       }),
     enabled: isContextReady && isOperatorOrAbove,
   })
 
   const applications = (pendingData?.results ??
     []) as unknown as ApplicationPublic[]
-  const total = applications.length
+  const loaded = applications.length
+  const total = pendingData?.paging?.total ?? loaded
   const current = applications[currentIndex]
 
   if (!isContextReady || !isOperatorOrAbove) {
@@ -46,7 +47,7 @@ function ReviewQueuePage() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Review Queue</h1>
           <p className="text-muted-foreground">
-            Select a popup and sign in as admin to review applications
+            Select a gathering and sign in as admin to review applications
           </p>
         </div>
       </div>
@@ -102,7 +103,7 @@ function ReviewQueuePage() {
   const handleReviewed = () => {
     queryClient.invalidateQueries({ queryKey: ["pending-reviews"] })
     queryClient.invalidateQueries({ queryKey: ["applications"] })
-    setCurrentIndex((i) => Math.min(i, total - 2 < 0 ? 0 : total - 2))
+    setCurrentIndex((i) => Math.min(i, loaded - 2 < 0 ? 0 : loaded - 2))
   }
 
   return (
@@ -145,8 +146,8 @@ function ReviewQueuePage() {
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => setCurrentIndex((i) => Math.min(total - 1, i + 1))}
-          disabled={currentIndex >= total - 1}
+          onClick={() => setCurrentIndex((i) => Math.min(loaded - 1, i + 1))}
+          disabled={currentIndex >= loaded - 1}
         >
           Next
           <ArrowRight className="ml-1 h-4 w-4" />

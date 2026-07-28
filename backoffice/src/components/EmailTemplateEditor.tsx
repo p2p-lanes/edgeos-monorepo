@@ -569,9 +569,9 @@ export function EmailTemplateEditor({
           <DialogHeader>
             <DialogTitle>Send Test Email</DialogTitle>
             <DialogDescription>
-              Send a test email to verify layout and styling. Popup variables
-              will be filled with real data when popup scope is required; other
-              variables will show as placeholders.
+              Send a test email to verify layout and styling. Gathering
+              variables will be filled with real data when gathering scope is
+              required; other variables will show as placeholders.
             </DialogDescription>
           </DialogHeader>
           <div>

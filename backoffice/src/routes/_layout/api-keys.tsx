@@ -168,7 +168,7 @@ function RevealKeyDialog({
         </DialogHeader>
         <div className="space-y-3">
           <div className="flex items-center gap-2 rounded-md border bg-muted p-3">
-            <AlertTriangle className="h-4 w-4 shrink-0 text-amber-500" />
+            <AlertTriangle className="h-4 w-4 shrink-0 text-warning" />
             <p className="text-xs text-muted-foreground">
               Copy the key below and store it securely. Once you close this
               dialog, the key is gone from this interface.

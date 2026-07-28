@@ -21,24 +21,24 @@ function dotClass(item: HumanActivityItem): string {
   if (item.kind === "rating.changed") {
     switch (item.rating) {
       case "red_flag":
-        return "bg-red-500"
+        return "bg-destructive"
       case "orange_flag":
-        return "bg-orange-500"
+        return "bg-warning"
       case "green_flag":
-        return "bg-green-500"
+        return "bg-success"
       case "star":
-        return "bg-yellow-400"
+        return "bg-info"
       default:
         return "bg-muted-foreground"
     }
   }
   switch (item.kind) {
     case "payment.completed":
-      return "bg-green-500"
+      return "bg-success"
     case "application.accepted":
-      return "bg-blue-500"
+      return "bg-info"
     case "comment.added":
-      return "bg-sky-500"
+      return "bg-chart-3"
     default:
       return "bg-muted-foreground"
   }

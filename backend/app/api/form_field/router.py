@@ -6,6 +6,7 @@ from fastapi import APIRouter, Header, HTTPException, status
 from app.api.base_field_config.constants import BASE_FIELD_DEFINITIONS
 from app.api.base_field_config.crud import (
     base_field_configs_crud,
+    ensure_base_field_update_allowed,
     field_applies_to_popup,
 )
 from app.api.base_field_config.models import BaseFieldConfigs
@@ -334,10 +335,23 @@ async def update_form_field(
     field = crud.form_fields_crud.get(db, field_id)
 
     if field:
-        # NOTE: field.name is a stable internal key generated once at creation.
-        # It MUST NOT change when the label is edited — existing application
-        # custom_fields reference this key and renaming it would silently break
-        # the link to all previously submitted data.
+        # NOTE: field.name regenerates on label edits only while the key is
+        # still unused (no submitted answers, no ticketing step references).
+        # After first use it is frozen forever — application custom_fields and
+        # step visibility conditions are keyed by it.
+        new_label = field_in.label
+        if (
+            "label" in field_in.model_fields_set
+            and new_label
+            and new_label != field.label
+            and crud._slugify(new_label) != field.name
+            and not crud.form_fields_crud.is_field_name_in_use(
+                db, field.name, field.popup_id
+            )
+        ):
+            field.name = crud.form_fields_crud.generate_field_name(
+                db, new_label, field.popup_id, exclude_id=field.id
+            )
         updated = crud.form_fields_crud.update(db, field, field_in)
         return _to_public(updated)
 
@@ -358,37 +372,10 @@ async def update_form_field(
             k: getattr(field_in, k) for k in field_in.model_fields_set & configurable
         }
 
-        # Non-removable elementals (first_name, last_name) cannot be made optional.
-        definition = BASE_FIELD_DEFINITIONS.get(base_config.field_name, {})
-        if (
-            not definition.get("removable", True)
-            and "required" in update_data
-            and update_data["required"] is False
-        ):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Field '{base_config.field_name}' is required and cannot be made optional",
-            )
-
-        # `field_type` is only writeable on base configs whose catalog entry
-        # whitelists alternatives — and only to a value inside that whitelist.
-        allowed_field_types = definition.get("allowed_field_types")
         if "field_type" in field_in.model_fields_set:
-            if not allowed_field_types:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Field '{base_config.field_name}' does not allow type overrides",
-                )
-            new_type = field_in.field_type
-            if new_type is not None and new_type not in allowed_field_types:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=(
-                        f"Field type '{new_type}' is not allowed for "
-                        f"'{base_config.field_name}'"
-                    ),
-                )
-            update_data["field_type"] = new_type
+            update_data["field_type"] = field_in.field_type
+
+        ensure_base_field_update_allowed(base_config, update_data)
 
         config_update = BaseFieldConfigUpdate(**update_data)
         updated_config = base_field_configs_crud.update(db, base_config, config_update)

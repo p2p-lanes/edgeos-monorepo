@@ -11,12 +11,48 @@ from app.api.human.models import HumanComment, HumanEnrichmentFact, Humans
 from app.api.human.schemas import (
     HumanCreate,
     HumanEnrichmentFactCreate,
+    HumanFilterCondition,
+    HumanFilters,
     HumanProfileStats,
     HumanProfileStatsPopup,
     HumanUpdate,
 )
 from app.api.product.schemas import CATEGORY_TICKET, TicketDuration
 from app.api.shared.crud import BaseCRUD
+from app.core.filters import build_filter_expression, escape_like
+
+
+def _human_condition_expression(condition: HumanFilterCondition):
+    """Human-specific conditions; None delegates to the shared engine."""
+    if condition.field == "enriched_profile":
+        enriched_col = col(Humans.enriched_profile)
+        # ORM-created rows persist JSON null instead of SQL NULL, so "never
+        # enriched" must match both.
+        missing = or_(
+            enriched_col.is_(None),
+            func.jsonb_typeof(enriched_col) == "null",
+        )
+        if condition.op == "is_empty":
+            return missing
+        if condition.op == "not_empty":
+            return ~missing
+        # JSONB cast-to-text match; wildcards escaped so input matches literally.
+        matches = cast(enriched_col, Text).ilike(
+            f"%{escape_like(str(condition.value))}%", escape="\\"
+        )
+        if condition.op == "contains":
+            return matches
+        return or_(missing, ~matches)
+    return None
+
+
+def build_human_filter_expression(filters: HumanFilters):
+    """Combine the filter group into one boolean expression (None when empty)."""
+    return build_filter_expression(
+        filters,
+        Humans,
+        condition_override=_human_condition_expression,
+    )
 
 
 class HardDeleteSummary(TypedDict):
@@ -195,10 +231,12 @@ class HumansCRUD(BaseCRUD[Humans, HumanCreate, HumanUpdate]):
         limit: int = 100,
         search: str | None = None,
         popup_id: uuid.UUID | None = None,
+        filters: HumanFilters | None = None,
     ) -> tuple[list[Humans], int]:
         """Find humans with at least one draft application.
 
         If popup_id is provided, only draft applications for that popup are considered.
+        ``filters`` is a validated HumanFilters group ANDed with the rest.
         """
         from app.api.application.models import Applications
 
@@ -213,6 +251,11 @@ class HumansCRUD(BaseCRUD[Humans, HumanCreate, HumanUpdate]):
             )
 
         statement = select(Humans).where(has_draft_application)
+
+        if filters is not None:
+            filter_expression = build_human_filter_expression(filters)
+            if filter_expression is not None:
+                statement = statement.where(filter_expression)
 
         if search:
             search_term = f"%{search}%"
@@ -245,6 +288,7 @@ class HumansCRUD(BaseCRUD[Humans, HumanCreate, HumanUpdate]):
         rating: str | None = None,
         has_enriched_profile: bool | None = None,
         enrichment_query: str | None = None,
+        filters: HumanFilters | None = None,
     ) -> tuple[list[Humans], int]:
         """List humans with optional per-field filters (backoffice).
 
@@ -259,8 +303,16 @@ class HumansCRUD(BaseCRUD[Humans, HumanCreate, HumanUpdate]):
         ``enrichment_query`` matches a substring anywhere inside that JSONB
         (headline, bio, org, role, tags, interests, topics…) by casting it to
         text — handy for finding everyone tagged "AI" or based in a city.
+
+        ``filters`` is a validated HumanFilters group compiled to one boolean
+        expression and ANDed with the legacy params above.
         """
         statement = select(Humans)
+
+        if filters is not None:
+            filter_expression = build_human_filter_expression(filters)
+            if filter_expression is not None:
+                statement = statement.where(filter_expression)
 
         if search:
             term = f"%{search}%"
@@ -527,6 +579,25 @@ class HumansCRUD(BaseCRUD[Humans, HumanCreate, HumanUpdate]):
         )
         return list(session.exec(statement).all())
 
+    def count_active_comments_by_humans(
+        self, session: Session, human_ids: list[uuid.UUID]
+    ) -> dict[uuid.UUID, int]:
+        """Return a map of human_id -> non-deleted comment count.
+
+        Single grouped query so callers listing many humans avoid N+1.
+        """
+        if not human_ids:
+            return {}
+        statement = (
+            select(HumanComment.human_id, func.count())
+            .where(
+                col(HumanComment.human_id).in_(human_ids),
+                col(HumanComment.deleted_at).is_(None),
+            )
+            .group_by(col(HumanComment.human_id))
+        )
+        return dict(session.exec(statement).all())
+
     def list_enrichment_facts(
         self, session: Session, human_id: uuid.UUID
     ) -> list[HumanEnrichmentFact]:
@@ -555,6 +626,7 @@ class HumansCRUD(BaseCRUD[Humans, HumanCreate, HumanUpdate]):
             field=fact_in.field,
             value=fact_in.value,
             source=fact_in.source.value,
+            source_label=fact_in.source_label,
             evidence=fact_in.evidence,
             confidence=fact_in.confidence,
             raw=fact_in.raw,

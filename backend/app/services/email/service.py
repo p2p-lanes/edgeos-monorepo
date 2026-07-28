@@ -20,6 +20,7 @@ from app.api.email_template.schemas import EmailTemplateType
 from app.core.config import settings
 from app.services.email.templates import (
     TEMPLATE_TYPE_TO_FILE,
+    AbandonedApplicationContext,
     AbandonedCartContext,
     ApplicationAcceptedContext,
     ApplicationAcceptedScholarshipRejectedContext,
@@ -39,7 +40,11 @@ from app.services.email.templates import (
     LoginCodeHumanContext,
     LoginCodeUserContext,
     PaymentConfirmedContext,
+    PurchaseReminderContext,
     SilentUndefined,
+    TrialEndedContext,
+    TrialReminderContext,
+    TrialWelcomeContext,
     coerce_email_template_type,
     get_template_scope,
     log_missing_template_variables,
@@ -355,9 +360,123 @@ class EmailService:
         ical_method: str = "REQUEST",
         tenant_id: uuid.UUID | None = None,
         db_session: Session | None = None,
+        template_type: EmailTemplateType | str | None = None,
+        popup_id: uuid.UUID | None = None,
+        application_id: uuid.UUID | None = None,
+        payment_id: uuid.UUID | None = None,
+        human_id: uuid.UUID | None = None,
     ) -> bool:
+        """Send an email via SMTP and record the attempt in ``email_logs``.
+
+        Delivery is delegated to ``_deliver_smtp``; the outcome (sent/failed)
+        is then written to the append-only email log via ``_record_email_log``.
+        The log context params (``template_type``, ``popup_id`` and the entity
+        ids) drive that record and default to ``None`` for callers that don't
+        need logging. See ``_deliver_smtp`` for the delivery argument reference.
+
+        Returns:
+            True if email was sent successfully, False otherwise
         """
-        Send an email via SMTP.
+        success, error = await self._deliver_smtp(
+            to=to,
+            subject=subject,
+            html_content=html_content,
+            text_content=text_content,
+            from_address=from_address,
+            from_name=from_name,
+            attachments=attachments,
+            ical_body=ical_body,
+            ical_method=ical_method,
+            tenant_id=tenant_id,
+            db_session=db_session,
+        )
+
+        self._record_email_log(
+            tenant_id=tenant_id,
+            to=to,
+            subject=subject,
+            success=success,
+            error=error,
+            template_type=template_type,
+            popup_id=popup_id,
+            application_id=application_id,
+            payment_id=payment_id,
+            human_id=human_id,
+        )
+
+        return success
+
+    def _record_email_log(
+        self,
+        *,
+        tenant_id: uuid.UUID | None,
+        to: str | list[str],
+        subject: str | None,
+        success: bool,
+        error: str | None,
+        template_type: EmailTemplateType | str | None,
+        popup_id: uuid.UUID | None,
+        application_id: uuid.UUID | None,
+        payment_id: uuid.UUID | None,
+        human_id: uuid.UUID | None,
+    ) -> None:
+        """Append the send outcome to ``email_logs`` in an isolated session.
+
+        Runs on the privileged engine (RLS bypass) and commits on its own, so
+        the audit row is durable regardless of the caller's transaction and
+        never entangles with it. Best effort: a logging failure is swallowed so
+        it can never change the email result. Skipped when there is no tenant
+        or template context to attribute the row to (e.g. global trial emails).
+        """
+        if tenant_id is None or template_type is None:
+            return
+
+        recipient = to[0] if isinstance(to, list) else to
+        if not recipient:
+            return
+
+        try:
+            from sqlmodel import Session
+
+            from app.api.email_log.crud import email_logs_crud
+            from app.api.email_log.schemas import EmailLogStatus
+            from app.core.db import engine
+
+            status = EmailLogStatus.SENT if success else EmailLogStatus.FAILED
+            with Session(engine) as log_session:
+                email_logs_crud.create(
+                    log_session,
+                    tenant_id=tenant_id,
+                    template_type=str(template_type),
+                    to_email=recipient,
+                    status=status,
+                    popup_id=popup_id,
+                    application_id=application_id,
+                    payment_id=payment_id,
+                    human_id=human_id,
+                    subject=subject,
+                    error=error,
+                )
+                log_session.commit()
+        except Exception as e:
+            logger.error(f"Failed to record email log: {e}")
+
+    async def _deliver_smtp(
+        self,
+        to: str | list[str],
+        subject: str,
+        html_content: str,
+        text_content: str | None = None,
+        from_address: str | None = None,
+        from_name: str | None = None,
+        attachments: list[EmailAttachment] | None = None,
+        ical_body: str | None = None,
+        ical_method: str = "REQUEST",
+        tenant_id: uuid.UUID | None = None,
+        db_session: Session | None = None,
+    ) -> tuple[bool, str | None]:
+        """
+        Deliver an email via SMTP.
 
         Args:
             to: Recipient email address(es)
@@ -373,21 +492,23 @@ class EmailService:
             ical_method: iTIP method for the calendar part (REQUEST / CANCEL).
 
         Returns:
-            True if email was sent successfully, False otherwise
+            Tuple of (success, error_detail); error_detail is None on success.
         """
         try:
             smtp_config = self._resolve_smtp_config(tenant_id, db_session)
             if not smtp_config:
-                logger.error("No SMTP configuration available for email delivery")
-                return False
+                msg = "No SMTP configuration available for email delivery"
+                logger.error(msg)
+                return False, msg
 
             # Use tenant-specific email config or fall back to global settings
             sender_email = from_address or settings.SENDER_EMAIL
             sender_name = from_name or settings.SENDER_NAME
 
             if not sender_email:
-                logger.error("No from address configured (neither tenant nor global)")
-                return False
+                msg = "No from address configured (neither tenant nor global)"
+                logger.error(msg)
+                return False, msg
 
             # Build the text/html alternative part. When we have an iTIP body
             # we also embed it as a peer alternative; Gmail/Apple Mail pick it
@@ -457,14 +578,14 @@ class EmailService:
             logger.info(
                 f"Email sent successfully to {recipients} via {smtp_config.source} SMTP"
             )
-            return True
+            return True, None
 
         except aiosmtplib.SMTPException as e:
             logger.error(f"SMTP error sending email to {to}: {e}")
-            return False
+            return False, str(e)
         except Exception as e:
             logger.error(f"Unexpected error sending email to {to}: {e}")
-            return False
+            return False, str(e)
 
     async def send_template_email(
         self,
@@ -544,6 +665,58 @@ class EmailService:
             tenant_id=tenant_id,
             from_address=from_address,
             from_name=from_name,
+            db_session=db_session,
+        )
+
+    async def send_trial_welcome(
+        self,
+        to: str,
+        subject: str,
+        context: TrialWelcomeContext,
+        db_session: Session | None = None,
+    ) -> bool:
+        """Send the trial welcome email (onboarding checklist).
+
+        Always delivered via the global SMTP fallback — the freshly created
+        trial tenant has no SMTP of its own.
+        """
+        return await self.send_template_email(
+            to=to,
+            subject=subject,
+            template_name=EmailTemplates.TRIAL_WELCOME,
+            context=context.model_dump(exclude_none=True),
+            db_session=db_session,
+        )
+
+    async def send_trial_reminder(
+        self,
+        to: str,
+        subject: str,
+        context: TrialReminderContext,
+        db_session: Session | None = None,
+    ) -> bool:
+        """Send the '2 days left' trial reminder email (global SMTP)."""
+        return await self.send_template_email(
+            to=to,
+            subject=subject,
+            template_name=EmailTemplates.TRIAL_REMINDER,
+            context=context.model_dump(exclude_none=True),
+            db_session=db_session,
+        )
+
+    async def send_trial_ended(
+        self,
+        to: str,
+        subject: str,
+        context: TrialEndedContext,
+        db_session: Session | None = None,
+    ) -> bool:
+        """Send the trial-ended notice when a tenant is suspended (global SMTP)."""
+        return await self.send_template_email(
+            to=to,
+            subject=subject,
+            template_name=EmailTemplates.TRIAL_ENDED,
+            context=context.model_dump(exclude_none=True),
             db_session=db_session,
         )
 
@@ -720,6 +893,9 @@ class EmailService:
         from_name: str | None = None,
         popup_id: uuid.UUID | None = None,
         db_session: Session | None = None,
+        application_id: uuid.UUID | None = None,
+        payment_id: uuid.UUID | None = None,
+        human_id: uuid.UUID | None = None,
     ) -> bool:
         """Send abandoned cart email."""
         return await self._send_with_fallback(
@@ -732,6 +908,63 @@ class EmailService:
             from_name=from_name,
             popup_id=popup_id,
             db_session=db_session,
+            application_id=application_id,
+            payment_id=payment_id,
+            human_id=human_id,
+        )
+
+    async def send_purchase_reminder(
+        self,
+        to: str,
+        subject: str,
+        context: PurchaseReminderContext,
+        from_address: str | None = None,
+        from_name: str | None = None,
+        popup_id: uuid.UUID | None = None,
+        db_session: Session | None = None,
+        application_id: uuid.UUID | None = None,
+        human_id: uuid.UUID | None = None,
+    ) -> bool:
+        """Send purchase reminder email to an accepted applicant."""
+        return await self._send_with_fallback(
+            to=to,
+            subject=subject,
+            template_type=EmailTemplateType.PURCHASE_REMINDER,
+            template_name=EmailTemplates.PURCHASE_REMINDER,
+            context=context.model_dump(exclude_none=True),
+            from_address=from_address,
+            from_name=from_name,
+            popup_id=popup_id,
+            db_session=db_session,
+            application_id=application_id,
+            human_id=human_id,
+        )
+
+    async def send_abandoned_application(
+        self,
+        to: str,
+        subject: str,
+        context: AbandonedApplicationContext,
+        from_address: str | None = None,
+        from_name: str | None = None,
+        popup_id: uuid.UUID | None = None,
+        db_session: Session | None = None,
+        application_id: uuid.UUID | None = None,
+        human_id: uuid.UUID | None = None,
+    ) -> bool:
+        """Send abandoned application email to nudge a draft application."""
+        return await self._send_with_fallback(
+            to=to,
+            subject=subject,
+            template_type=EmailTemplateType.ABANDONED_APPLICATION,
+            template_name=EmailTemplates.ABANDONED_APPLICATION,
+            context=context.model_dump(exclude_none=True),
+            from_address=from_address,
+            from_name=from_name,
+            popup_id=popup_id,
+            db_session=db_session,
+            application_id=application_id,
+            human_id=human_id,
         )
 
     async def send_edit_passes_confirmed(
@@ -959,6 +1192,9 @@ class EmailService:
         attachments: list[EmailAttachment] | None = None,
         ical_body: str | None = None,
         ical_method: str = "REQUEST",
+        application_id: uuid.UUID | None = None,
+        payment_id: uuid.UUID | None = None,
+        human_id: uuid.UUID | None = None,
     ) -> bool:
         """Send email using DB custom template if available, else file-based fallback."""
         try:
@@ -992,6 +1228,11 @@ class EmailService:
                 ical_method=ical_method,
                 tenant_id=resolved_tenant_id,
                 db_session=db_session,
+                template_type=template_type,
+                popup_id=popup_id,
+                application_id=application_id,
+                payment_id=payment_id,
+                human_id=human_id,
             )
 
         except Exception as e:

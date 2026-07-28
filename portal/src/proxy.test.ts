@@ -108,6 +108,21 @@ describe("checkout mode with active popup", () => {
     expect(result.url.pathname).toBe("/checkout/summer-fest")
   })
 
+  it("M-1b: preserves the query string when rewriting / to /checkout/summer-fest", async () => {
+    // A ?lang= deep link lands on the custom-domain root. Dropping the query
+    // here strips the language before SSR and the client ever see it, so the
+    // checkout silently falls back to the popup default_language.
+    const req = makeRequest(
+      "https://tickets.example.com/?lang=en&utm_source=newsletter",
+      "tickets.example.com",
+    )
+    const result = (await proxy(req)) as unknown as { type: string; url: URL }
+
+    expect(result.type).toBe("rewrite")
+    expect(result.url.pathname).toBe("/checkout/summer-fest")
+    expect(result.url.search).toBe("?lang=en&utm_source=newsletter")
+  })
+
   it("M-2: rewrites /thank-you to /checkout/summer-fest/thank-you preserving query", async () => {
     const req = makeRequest(
       "https://tickets.example.com/thank-you?payment_id=42",
@@ -157,6 +172,18 @@ describe("checkout mode with no active popup", () => {
 
     expect(result.type).toBe("rewrite")
     expect(result.url.pathname).toBe("/coming-soon")
+  })
+
+  it("M-3b: preserves the query string when rewriting / to /coming-soon", async () => {
+    const req = makeRequest(
+      "https://tickets.example.com/?lang=en",
+      "tickets.example.com",
+    )
+    const result = (await proxy(req)) as unknown as { type: string; url: URL }
+
+    expect(result.type).toBe("rewrite")
+    expect(result.url.pathname).toBe("/coming-soon")
+    expect(result.url.search).toBe("?lang=en")
   })
 
   it("passes through non-root paths in no-popup checkout mode", async () => {

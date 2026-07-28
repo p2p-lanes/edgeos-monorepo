@@ -794,8 +794,8 @@ def test_ingest_template_config_hero_replaces_image_urls() -> None:
                 {
                     "date_logo_url": "https://ext.com/logo-fecha.webp",
                     "edition_url": "https://ext.com/tercera-edicion.webp",
-                    "bullet_icon_url": "https://ext.com/star.svg",
                     "divider_url": "https://ext.com/divider-1-dark.webp",
+                    "bullet_icon_url": "https://ext.com/star.svg",
                     "headline": "4 días de música, arte, yoga y talleres",
                     "bullets": ["+10 escenarios"],
                 },
@@ -806,8 +806,10 @@ def test_ingest_template_config_hero_replaces_image_urls() -> None:
     assert result is not None
     assert result["date_logo_url"] == cdn_url
     assert result["edition_url"] == cdn_url
-    assert result["bullet_icon_url"] == cdn_url
     assert result["divider_url"] == cdn_url
+    # The bullet ornament now belongs to the skin, so a leftover URL from an
+    # older config is passed through untouched rather than ingested.
+    assert result["bullet_icon_url"] == "https://ext.com/star.svg"
     # Absent optional image field is not invented.
     assert "logo_url" not in result
     # Non-image fields are preserved verbatim.
@@ -824,7 +826,7 @@ def test_ingest_template_config_hero_without_images_is_noop() -> None:
         with patch.object(svc, "ingest_url", new=mock):
             config = await svc.ingest_template_config(
                 "hero",
-                {"headline": "Solo texto", "logo_url": ""},
+                {"headline": "Solo texto", "date_logo_url": ""},
                 TENANT_ID,
             )
         return config, mock
@@ -832,7 +834,7 @@ def test_ingest_template_config_hero_without_images_is_noop() -> None:
     result, mock = asyncio.run(_run())
     assert result is not None
     assert result["headline"] == "Solo texto"
-    assert result["logo_url"] == ""
+    assert result["date_logo_url"] == ""
     mock.assert_not_awaited()
 
 

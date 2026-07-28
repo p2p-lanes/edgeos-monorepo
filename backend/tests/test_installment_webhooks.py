@@ -1,12 +1,14 @@
 """Unit tests for the PR 3 installment webhook hardening.
 
-Three behaviors under test:
+Four behaviors under test:
   1. ``_handle_installment_plan_cancelled`` restores stock (and revokes products
      when applicable) — closing the stock-leak gap.
   2. ``_handle_installment_payment`` dedupes by ``external_payment_id`` even
      when the redis-backed fingerprint cache miss-cycles.
   3. ``_handle_installment_plan_activated`` is idempotent against duplicate
      deliveries and warns on a divergent ``number_of_installments``.
+  4. Payment confirmation is sent when the first installment approves the
+     payment, not when the installment plan completes.
 
 The handlers are exercised in isolation via monkey-patching the module-level
 ``payments_crud``; the fakes are intentionally minimal so the test states what
@@ -21,6 +23,7 @@ from app.api.payment.router import (
     _handle_installment_payment,
     _handle_installment_plan_activated,
     _handle_installment_plan_cancelled,
+    _handle_installment_plan_completed,
 )
 from app.api.payment.schemas import (
     PaymentStatus,
@@ -195,7 +198,7 @@ def test_cancel_already_cancelled_plan_is_idempotent(monkeypatch) -> None:
 
 
 # ----------------------------------------------------------------------------
-# _handle_installment_payment dedupe
+# _handle_installment_payment confirmation and dedupe
 # ----------------------------------------------------------------------------
 
 
@@ -232,6 +235,102 @@ def _make_installment_payload(
             },
         }
     )
+
+
+def test_first_installment_sends_confirmation_after_commit(monkeypatch) -> None:
+    plan_id = "plan-confirm-1"
+    payment = SimpleNamespace(
+        id="payment-confirm-1",
+        external_id=plan_id,
+        status=PaymentStatus.PENDING.value,
+        tenant_id="tenant-x",
+        installments=[],
+        installments_paid=0,
+        installments_total=6,
+        amount_charged=None,
+        source="SimpleFI",
+    )
+    db = FakeDBSession()
+    email_calls: list[object] = []
+
+    class FakePaymentsCRUD:
+        def get_by_external_id(self, _db, _ext_id):
+            return payment
+
+        def approve_payment(self, _db, _payment_id, **_kwargs):
+            payment.status = PaymentStatus.APPROVED.value
+            return payment
+
+    async def fake_send_email(approved_payment, *, db_session):
+        assert db.committed == 1
+        assert db_session is db
+        email_calls.append(approved_payment)
+
+    monkeypatch.setattr(payment_router_module, "payments_crud", FakePaymentsCRUD())
+    monkeypatch.setattr(
+        payment_router_module,
+        "_send_payment_confirmed_email_best_effort",
+        fake_send_email,
+    )
+    monkeypatch.setattr(
+        payment_router_module, "_schedule_meta_capi_purchase", lambda _payment: None
+    )
+
+    result = asyncio.run(
+        _handle_installment_payment(
+            _make_installment_payload(plan_id, "pr-confirm-1"),
+            db,
+            FakeWebhookCache(),
+        )
+    )
+
+    assert result == {"message": "Installment payment recorded"}
+    assert payment.status == PaymentStatus.APPROVED.value
+    assert payment.installments_paid == 1
+    assert email_calls == [payment]
+
+
+def test_later_installment_does_not_send_confirmation(monkeypatch) -> None:
+    plan_id = "plan-confirm-later"
+    payment = SimpleNamespace(
+        id="payment-confirm-later",
+        external_id=plan_id,
+        status=PaymentStatus.APPROVED.value,
+        tenant_id="tenant-x",
+        installments=[SimpleNamespace(external_payment_id="pr-confirm-first")],
+        installments_paid=1,
+        installments_total=6,
+        amount_charged=100,
+        source="Stripe",
+    )
+
+    class FakePaymentsCRUD:
+        def get_by_external_id(self, _db, _ext_id):
+            return payment
+
+        def approve_payment(self, *_args, **_kwargs):
+            raise AssertionError("must not re-approve a later installment")
+
+    async def fail_send_email(*_args, **_kwargs):
+        raise AssertionError("must not resend confirmation for a later installment")
+
+    monkeypatch.setattr(payment_router_module, "payments_crud", FakePaymentsCRUD())
+    monkeypatch.setattr(
+        payment_router_module,
+        "_send_payment_confirmed_email_best_effort",
+        fail_send_email,
+    )
+
+    result = asyncio.run(
+        _handle_installment_payment(
+            _make_installment_payload(plan_id, "pr-confirm-second"),
+            FakeDBSession(),
+            FakeWebhookCache(),
+        )
+    )
+
+    assert result == {"message": "Installment payment recorded"}
+    assert payment.installments_paid == 2
 
 
 def test_installment_payment_dedupes_by_external_payment_id(monkeypatch) -> None:
@@ -284,6 +383,112 @@ def test_installment_payment_dedupes_by_external_payment_id(monkeypatch) -> None
     assert payment.installments_paid == 1
     # No commit needed because we returned early before any writes
     assert db.committed == 0
+
+
+# ----------------------------------------------------------------------------
+# _handle_installment_plan_completed confirmation fallback
+# ----------------------------------------------------------------------------
+
+
+def _make_completed_payload(plan_id: str, paid_count: int = 6) -> dict:
+    return {
+        "id": "evt-completed-1",
+        "event_type": "installment_plan_completed",
+        "entity_type": "installment_plan",
+        "entity_id": plan_id,
+        "data": {
+            "installment_plan": {
+                "id": plan_id,
+                "status": "completed",
+                "paid_installments_count": paid_count,
+                "number_of_installments": paid_count,
+                "user_email": "buyer@example.com",
+            }
+        },
+    }
+
+
+def test_completed_plan_does_not_resend_confirmation(monkeypatch) -> None:
+    plan_id = "plan-completed-approved"
+    payment = SimpleNamespace(
+        id="payment-completed-approved",
+        external_id=plan_id,
+        status=PaymentStatus.APPROVED.value,
+        is_installment_plan=True,
+        installments_paid=5,
+    )
+
+    class FakePaymentsCRUD:
+        def get_by_external_id(self, _db, _ext_id):
+            return payment
+
+    async def fail_send_email(*_args, **_kwargs):
+        raise AssertionError("must not resend confirmation when the plan completes")
+
+    monkeypatch.setattr(payment_router_module, "payments_crud", FakePaymentsCRUD())
+    monkeypatch.setattr(
+        payment_router_module,
+        "_send_payment_confirmed_email_best_effort",
+        fail_send_email,
+    )
+    db = FakeDBSession()
+
+    result = asyncio.run(
+        _handle_installment_plan_completed(
+            _make_completed_payload(plan_id), db, FakeWebhookCache()
+        )
+    )
+
+    assert result == {"message": "Installment plan completed - count synced"}
+    assert payment.installments_paid == 6
+    assert db.committed == 1
+
+
+def test_completed_plan_still_confirms_when_it_approves_payment(monkeypatch) -> None:
+    plan_id = "plan-completed-pending"
+    payment = SimpleNamespace(
+        id="payment-completed-pending",
+        external_id=plan_id,
+        status=PaymentStatus.PENDING.value,
+        is_installment_plan=True,
+        installments_paid=0,
+    )
+    email_calls: list[object] = []
+
+    class FakePaymentsCRUD:
+        def get_by_external_id(self, _db, _ext_id):
+            return payment
+
+        def approve_payment(self, db, _payment_id):
+            payment.status = PaymentStatus.APPROVED.value
+            db.commit()
+            return payment
+
+    async def fake_send_email(approved_payment, *, db_session):
+        assert db_session is db
+        email_calls.append(approved_payment)
+
+    monkeypatch.setattr(payment_router_module, "payments_crud", FakePaymentsCRUD())
+    monkeypatch.setattr(
+        payment_router_module,
+        "_send_payment_confirmed_email_best_effort",
+        fake_send_email,
+    )
+    monkeypatch.setattr(
+        payment_router_module, "_schedule_meta_capi_purchase", lambda _payment: None
+    )
+    db = FakeDBSession()
+
+    result = asyncio.run(
+        _handle_installment_plan_completed(
+            _make_completed_payload(plan_id), db, FakeWebhookCache()
+        )
+    )
+
+    assert result == {"message": "Installment plan payment approved successfully"}
+    assert payment.status == PaymentStatus.APPROVED.value
+    assert payment.installments_paid == 6
+    assert email_calls == [payment]
 
 
 # ----------------------------------------------------------------------------

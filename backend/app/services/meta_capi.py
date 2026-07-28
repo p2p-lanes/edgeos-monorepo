@@ -10,6 +10,7 @@ from typing import Any
 import httpx
 from loguru import logger
 
+from app.api.product.schemas import CATEGORY_TICKET
 from app.utils.encryption import decrypt
 
 META_GRAPH_API_VERSION = "v21.0"
@@ -48,6 +49,14 @@ def prepare_purchase_event(
     if resolved_popup is None:
         logger.warning(
             "Skipping Meta CAPI Purchase: popup missing event_id={} payment_id={}",
+            _purchase_event_id(payment),
+            str(getattr(payment, "id", "")),
+        )
+        return None
+
+    if not _has_ticket_product(payment):
+        logger.info(
+            "Skipping Meta CAPI Purchase: no ticket products event_id={} payment_id={}",
             _purchase_event_id(payment),
             str(getattr(payment, "id", "")),
         )
@@ -364,6 +373,7 @@ def _payment_product_snapshot(item: Any) -> SimpleNamespace:
         effective_unit_price=getattr(item, "effective_unit_price", None),
         product_price=getattr(item, "product_price", Decimal("0")),
         product_name=getattr(item, "product_name", "") or "",
+        product_category=getattr(item, "product_category", "") or "",
         attendee=None,
     )
 
@@ -425,6 +435,14 @@ def _custom_data(
     if include_order_id:
         custom_data["order_id"] = str(getattr(payment, "id", ""))
     return custom_data
+
+
+def _has_ticket_product(payment: Any) -> bool:
+    for item in getattr(payment, "products_snapshot", None) or []:
+        category = (getattr(item, "product_category", "") or "").strip().lower()
+        if category == CATEGORY_TICKET:
+            return True
+    return False
 
 
 def _contents(payment: Any) -> list[dict[str, Any]]:

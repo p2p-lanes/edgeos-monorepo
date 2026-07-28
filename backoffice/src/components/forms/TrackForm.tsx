@@ -168,7 +168,7 @@ export function TrackForm({ defaultValues, onSuccess }: TrackFormProps) {
       }
 
       if (!selectedPopupId) {
-        showErrorToast("Select a pop-up first")
+        showErrorToast("Select a gathering first")
         return
       }
 

@@ -16,6 +16,7 @@ from app.api import (
     checkout,
     coupon,
     dashboard,
+    email_log,
     email_template,
     event,
     event_participant,
@@ -31,12 +32,14 @@ from app.api import (
     popup_reviewer,
     product,
     referral,
+    saved_view,
     task,
     tenant,
     third_party_app,
     ticketing_step,
     track,
     translation,
+    trial,
     upload,
     user,
 )
@@ -50,6 +53,7 @@ api_router = APIRouter()
 api_router.include_router(user.router)
 api_router.include_router(auth.router)
 api_router.include_router(tenant.router)
+api_router.include_router(trial.router)
 api_router.include_router(human.router)
 api_router.include_router(api_key.router)
 api_router.include_router(admin_api_key.router)
@@ -73,8 +77,10 @@ api_router.include_router(referral.admin_router)
 api_router.include_router(form_section.router)
 api_router.include_router(form_field.router)
 api_router.include_router(email_template.router)
+api_router.include_router(email_log.router)
 api_router.include_router(base_field_config.router)
 api_router.include_router(ticketing_step.router)
+api_router.include_router(saved_view.router)
 
 # Approval system resources (registered before application so static paths
 # like /applications/pending-review are matched before /{application_id})

@@ -1,8 +1,16 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query"
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router"
 import type { ColumnDef } from "@tanstack/react-table"
-import { Download, EllipsisVertical, Gift, Pencil, Users } from "lucide-react"
-import { Suspense, useState } from "react"
+import {
+  Download,
+  EllipsisVertical,
+  Gift,
+  ListFilter,
+  Pencil,
+  Users,
+  X,
+} from "lucide-react"
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react"
 
 import {
   AttendeeCategoriesService,
@@ -12,7 +20,18 @@ import {
 import { ProductsCell } from "@/components/Attendees/ProductsCell"
 import { DataTable, SortableHeader } from "@/components/Common/DataTable"
 import { EmptyState } from "@/components/Common/EmptyState"
+import {
+  EMPTYABLE_TEXT_OPS,
+  FilterBuilder,
+  type FilterCondition,
+  type FilterFieldDef,
+  type FilterMatch,
+  FULL_TEXT_OPS,
+  isCompleteCondition,
+  sanitizeFilterConditions,
+} from "@/components/Common/FilterBuilder"
 import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
+import { SavedViewsMenu } from "@/components/Common/SavedViewsMenu"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -22,16 +41,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Label } from "@/components/ui/label"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Switch } from "@/components/ui/switch"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
 import useAuth from "@/hooks/useAuth"
 import {
@@ -82,13 +92,39 @@ export function flattenAttendeesForCsv(
   })
 }
 
-function getAttendeesQueryOptions(
+export type AttendeesSearchParams = TableSearchParams & {
+  match?: FilterMatch
+  filters?: FilterCondition[]
+  applicationId?: string
+}
+
+type AttendeeApiFilters = {
+  search?: string
+  filters?: string
+  applicationId?: string
+}
+
+// Single source for the API-level filters, shared by the table query and the
+// CSV export so both always fetch the same subset.
+export function getAttendeeApiFilters(
+  searchParams: AttendeesSearchParams,
+): AttendeeApiFilters {
+  const match = searchParams.match ?? "all"
+  const complete = (searchParams.filters ?? []).filter(isCompleteCondition)
+  return {
+    search: searchParams.search || undefined,
+    filters: complete.length
+      ? JSON.stringify({ match, conditions: complete })
+      : undefined,
+    applicationId: searchParams.applicationId || undefined,
+  }
+}
+
+export function getAttendeesQueryOptions(
   popupId: string | null,
   page: number,
   pageSize: number,
-  search?: string,
-  hasTickets?: boolean,
-  categoryId?: string,
+  filters: AttendeeApiFilters,
 ) {
   return {
     queryFn: () =>
@@ -96,40 +132,100 @@ function getAttendeesQueryOptions(
         skip: page * pageSize,
         limit: pageSize,
         popupId: popupId || undefined,
-        search: search || undefined,
-        hasTickets: hasTickets || undefined,
-        categoryId: categoryId || undefined,
+        ...filters,
       }),
-    queryKey: [
-      "attendees",
-      popupId,
-      { page, pageSize, search, hasTickets, categoryId },
-    ],
+    queryKey: ["attendees", popupId, { page, pageSize, ...filters }],
   }
 }
 
-type AttendeesSearchParams = TableSearchParams & {
-  hasTickets?: boolean
-  categoryId?: string
+export function validateAttendeesSearch(
+  raw: Record<string, unknown>,
+): AttendeesSearchParams {
+  const filters = sanitizeFilterConditions(raw.filters)
+  // Legacy ?hasTickets= and ?categoryId= links fold into filter conditions.
+  if (
+    (raw.hasTickets === true || raw.hasTickets === "true") &&
+    !filters.some((condition) => condition.field === "has_tickets")
+  ) {
+    filters.push({ field: "has_tickets", op: "eq", value: true })
+  }
+  if (
+    typeof raw.categoryId === "string" &&
+    raw.categoryId &&
+    !filters.some((condition) => condition.field === "category_id")
+  ) {
+    filters.push({ field: "category_id", op: "eq", value: raw.categoryId })
+  }
+  return {
+    ...validateTableSearch(raw),
+    ...(raw.match === "any" && filters.length ? { match: "any" as const } : {}),
+    ...(filters.length ? { filters } : {}),
+    ...(typeof raw.applicationId === "string" && raw.applicationId
+      ? { applicationId: raw.applicationId }
+      : {}),
+  }
 }
 
 export const Route = createFileRoute("/_layout/attendees/")({
   component: Attendees,
-  validateSearch: (raw: Record<string, unknown>): AttendeesSearchParams => ({
-    ...validateTableSearch(raw),
-    // Accept both the boolean (default JSON search serialization) and the
-    // "true" string so the param round-trips regardless of how it was encoded.
-    ...(raw.hasTickets === true || raw.hasTickets === "true"
-      ? { hasTickets: true }
-      : {}),
-    ...(typeof raw.categoryId === "string" && raw.categoryId
-      ? { categoryId: raw.categoryId }
-      : {}),
-  }),
+  validateSearch: validateAttendeesSearch,
   head: () => ({
     meta: [{ title: "Attendees - EdgeOS" }],
   }),
 })
+
+// Single source for the filter-related search params, shared by the table
+// and the CSV export so both always query the same subset.
+function useAttendeesFilterParams() {
+  const searchParams = Route.useSearch()
+  const filterMatch = searchParams.match ?? "all"
+  const filterConditions = useMemo(
+    () => searchParams.filters ?? [],
+    [searchParams.filters],
+  )
+  const apiFilters = useMemo(
+    () => getAttendeeApiFilters(searchParams),
+    [searchParams],
+  )
+  return {
+    search: searchParams.search ?? "",
+    filterMatch,
+    filterConditions,
+    filtersJson: apiFilters.filters,
+    applicationId: searchParams.applicationId,
+    apiFilters,
+  }
+}
+
+const ATTENDEE_DATE_OPS = ["before", "after"]
+
+function buildAttendeeFieldDefs(
+  categoryOptions: { value: string; label: string }[],
+): FilterFieldDef[] {
+  return [
+    { key: "name", label: "Name", kind: "text", ops: FULL_TEXT_OPS },
+    { key: "email", label: "Email", kind: "text", ops: FULL_TEXT_OPS },
+    ...(categoryOptions.length
+      ? [
+          {
+            key: "category_id",
+            label: "Category",
+            kind: "select",
+            ops: ["eq", "neq"],
+            options: categoryOptions,
+          } satisfies FilterFieldDef,
+        ]
+      : []),
+    { key: "gender", label: "Gender", kind: "text", ops: EMPTYABLE_TEXT_OPS },
+    {
+      key: "created_at",
+      label: "Created",
+      kind: "date",
+      ops: ATTENDEE_DATE_OPS,
+    },
+    { key: "has_tickets", label: "Has tickets", kind: "boolean", ops: ["eq"] },
+  ]
+}
 
 function AttendeeActionsMenu({ attendee }: { attendee: AttendeeListItem }) {
   const navigate = useNavigate()
@@ -225,34 +321,93 @@ function AttendeesTableContent() {
     searchParams,
     "/attendees",
   )
-  const hasTickets = searchParams.hasTickets ?? false
-  const categoryId = searchParams.categoryId
+  const { filterMatch, filterConditions, applicationId, apiFilters } =
+    useAttendeesFilterParams()
 
-  const setHasTickets = (value: boolean) => {
+  const clearApplicationFilter = useCallback(() => {
     navigate({
       to: "/attendees",
       search: (prev: Record<string, unknown>) => ({
         ...prev,
-        hasTickets: value || undefined,
+        applicationId: undefined,
         page: 0,
       }),
       replace: true,
     })
-  }
+  }, [navigate])
 
-  // The category filter resets to the first page so the server pagination
-  // stays consistent.
-  const setCategory = (value: string | undefined) => {
+  const setFilters = useCallback(
+    (match: FilterMatch, conditions: FilterCondition[]) => {
+      navigate({
+        to: "/attendees",
+        search: (prev: Record<string, unknown>) => ({
+          ...prev,
+          // Scrub the legacy params so validateSearch cannot fold them back
+          // into resurrected conditions after the user edits the filters.
+          hasTickets: undefined,
+          categoryId: undefined,
+          match:
+            match === "any" && conditions.length ? ("any" as const) : undefined,
+          filters: conditions.length ? conditions : undefined,
+          page: 0,
+        }),
+        replace: true,
+      })
+    },
+    [navigate],
+  )
+
+  const hasActiveView = Boolean(filterConditions.length || search)
+
+  const clearView = useCallback(() => {
     navigate({
       to: "/attendees",
       search: (prev: Record<string, unknown>) => ({
         ...prev,
-        categoryId: value || undefined,
+        hasTickets: undefined,
+        categoryId: undefined,
+        match: undefined,
+        filters: undefined,
+        search: undefined,
         page: 0,
       }),
       replace: true,
     })
-  }
+  }, [navigate])
+
+  const savedViewConfig = useMemo(() => {
+    const config: Record<string, unknown> = {}
+    if (filterMatch === "any" && filterConditions.length) config.match = "any"
+    if (filterConditions.length) config.filters = filterConditions
+    if (search) config.search = search
+    return config
+  }, [filterMatch, filterConditions, search])
+
+  const applySavedView = useCallback(
+    (config: Record<string, unknown>) => {
+      const filters = sanitizeFilterConditions(config.filters)
+      navigate({
+        to: "/attendees",
+        search: (prev: Record<string, unknown>) => ({
+          ...prev,
+          hasTickets: undefined,
+          categoryId: undefined,
+          page: 0,
+          match:
+            config.match === "any" && filters.length
+              ? ("any" as const)
+              : undefined,
+          filters: filters.length ? filters : undefined,
+          search:
+            typeof config.search === "string" && config.search
+              ? config.search
+              : undefined,
+        }),
+        replace: true,
+      })
+    },
+    [navigate],
+  )
 
   const { data: categoriesData } = useQuery({
     queryKey: ["attendee-categories", selectedPopupId],
@@ -264,14 +419,38 @@ function AttendeesTableContent() {
   })
   const categories = categoriesData?.results ?? []
 
+  // Drop category conditions that reference categories outside the current
+  // popup (e.g. after switching gatherings).
+  useEffect(() => {
+    if (!categoriesData) return
+    const isInvalid = (condition: FilterCondition) =>
+      condition.field === "category_id" &&
+      !categories.some((category) => category.id === condition.value)
+    if (filterConditions.some(isInvalid)) {
+      setFilters(
+        filterMatch,
+        filterConditions.filter((condition) => !isInvalid(condition)),
+      )
+    }
+  }, [categoriesData, categories, filterConditions, filterMatch, setFilters])
+
+  const fieldDefs = useMemo(
+    () =>
+      buildAttendeeFieldDefs(
+        categories.map((category) => ({
+          value: category.id,
+          label: category.key,
+        })),
+      ),
+    [categories],
+  )
+
   const { data: attendees } = useQuery({
     ...getAttendeesQueryOptions(
       selectedPopupId,
       pagination.pageIndex,
       pagination.pageSize,
-      search,
-      hasTickets,
-      categoryId,
+      apiFilters,
     ),
     placeholderData: keepPreviousData,
   })
@@ -293,36 +472,46 @@ function AttendeesTableContent() {
         })
       }
       filterBar={
-        <div className="flex flex-wrap items-center gap-3">
-          <Select
-            value={categoryId ?? "all"}
-            onValueChange={(v) => setCategory(v === "all" ? undefined : v)}
-          >
-            <SelectTrigger className="h-9 w-44">
-              <SelectValue placeholder="Category" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All categories</SelectItem>
-              {categories.map((c) => (
-                <SelectItem key={c.id} value={c.id}>
-                  {c.key}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <div className="flex items-center gap-2">
-            <Switch
-              id="attendees-has-tickets"
-              checked={hasTickets}
-              onCheckedChange={(checked) => setHasTickets(checked === true)}
-            />
-            <Label
-              htmlFor="attendees-has-tickets"
-              className="whitespace-nowrap text-sm font-normal text-muted-foreground"
+        <div className="flex flex-wrap items-center gap-2">
+          {applicationId && (
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              className="h-9"
+              onClick={clearApplicationFilter}
+              aria-label="Clear application filter"
             >
-              With tickets only
-            </Label>
-          </div>
+              <ListFilter className="h-4 w-4" />
+              This application
+              <X className="h-3.5 w-3.5" />
+            </Button>
+          )}
+          <FilterBuilder
+            fields={fieldDefs}
+            match={filterMatch}
+            conditions={filterConditions}
+            onChange={setFilters}
+            emptyMessage="No filters applied. Add a filter to narrow down attendees."
+          />
+          {selectedPopupId && (
+            <SavedViewsMenu
+              popupId={selectedPopupId}
+              entity="attendees"
+              currentConfig={savedViewConfig}
+              onApply={applySavedView}
+            />
+          )}
+          {hasActiveView && (
+            <Button
+              variant="ghost"
+              className="h-9 text-muted-foreground"
+              onClick={clearView}
+            >
+              <X className="h-4 w-4" />
+              Clear
+            </Button>
+          )}
         </div>
       }
       serverPagination={{
@@ -331,12 +520,20 @@ function AttendeesTableContent() {
         onPaginationChange: setPagination,
       }}
       emptyState={
-        !search && !hasTickets && !categoryId ? (
-          <EmptyState
-            icon={Users}
-            title="No attendees yet"
-            description="Attendees will appear here once applications are approved and check-ins begin."
-          />
+        !search && !filterConditions.length ? (
+          applicationId ? (
+            <EmptyState
+              icon={Users}
+              title="No attendees for this application"
+              description="Attendee records will appear here after the application is approved."
+            />
+          ) : (
+            <EmptyState
+              icon={Users}
+              title="No attendees yet"
+              description="Attendees will appear here once applications are approved and check-ins begin."
+            />
+          )
         ) : undefined
       }
     />
@@ -344,11 +541,15 @@ function AttendeesTableContent() {
 }
 
 function Attendees() {
-  const { isContextReady } = useWorkspace()
-  const { selectedPopupId } = useWorkspace()
+  const { isContextReady, selectedPopupId } = useWorkspace()
   const { isOperatorOrAbove } = useAuth()
+  const { search, filtersJson, applicationId, apiFilters } =
+    useAttendeesFilterParams()
   const [isExporting, setIsExporting] = useState(false)
 
+  // Export what the table shows: the same search and filter conditions drive
+  // the fetch, just without pagination.
+  const isExportFiltered = Boolean(search || filtersJson || applicationId)
   const handleExport = async () => {
     if (!selectedPopupId) return
     setIsExporting(true)
@@ -358,17 +559,22 @@ function Attendees() {
           skip,
           limit,
           popupId: selectedPopupId,
+          ...apiFilters,
         }),
       )
       const rows = flattenAttendeesForCsv(results as AttendeeListItem[])
-      exportToCsv("attendees", rows as unknown as Record<string, unknown>[], [
-        { key: "name", label: "Name" },
-        { key: "email", label: "Email" },
-        { key: "category", label: "Category" },
-        { key: "gender", label: "Gender" },
-        { key: "age_group", label: "Age group" },
-        { key: "product_id", label: "Product ID" },
-      ])
+      exportToCsv(
+        isExportFiltered ? "attendees-filtered" : "attendees",
+        rows as unknown as Record<string, unknown>[],
+        [
+          { key: "name", label: "Name" },
+          { key: "email", label: "Email" },
+          { key: "category", label: "Category" },
+          { key: "gender", label: "Gender" },
+          { key: "age_group", label: "Age group" },
+          { key: "product_id", label: "Product ID" },
+        ],
+      )
     } finally {
       setIsExporting(false)
     }
@@ -380,7 +586,9 @@ function Attendees() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Attendees</h1>
           <p className="text-muted-foreground">
-            Manage event attendees and check-ins
+            {applicationId
+              ? "Attendees associated with this application"
+              : "Manage event attendees and check-ins"}
           </p>
         </div>
         {isContextReady && (
@@ -400,9 +608,18 @@ function Attendees() {
               variant="outline"
               onClick={handleExport}
               disabled={isExporting}
+              title={
+                isExportFiltered
+                  ? "Exports the attendees matching the current filters"
+                  : "Exports all attendees for this gathering"
+              }
             >
               <Download className="mr-2 h-4 w-4" />
-              {isExporting ? "Exporting..." : "Export CSV"}
+              {isExporting
+                ? "Exporting..."
+                : isExportFiltered
+                  ? "Export filtered CSV"
+                  : "Export CSV"}
             </Button>
           </div>
         )}

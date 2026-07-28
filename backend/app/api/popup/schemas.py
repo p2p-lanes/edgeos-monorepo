@@ -86,6 +86,39 @@ def validate_popup_installments_config(
         )
 
 
+# Automatic reminder types, one config block per type on the popup. Each value
+# equals the EmailTemplateType it dispatches, so the column prefix maps 1:1 to
+# the template_type recorded in email_logs.
+REMINDER_TYPES = ("abandoned_cart", "purchase_reminder", "abandoned_application")
+
+
+def validate_reminder_config(
+    reminder_label: str,
+    delay_days: int | None,
+    repeat_days: int | None,
+    max_count: int | None,
+) -> None:
+    """Validate one automatic-reminder cadence block.
+
+    ``delay_days`` is the master switch: null disables the reminder entirely.
+    Any value that is set must be a positive number of days/sends, and the
+    repeat/cap cadence is only meaningful once ``delay_days`` turns the
+    reminder on.
+    """
+    for name, value in (
+        (f"{reminder_label}_delay_days", delay_days),
+        (f"{reminder_label}_repeat_days", repeat_days),
+        (f"{reminder_label}_max_count", max_count),
+    ):
+        if value is not None and value <= 0:
+            raise ValueError(f"{name} must be a positive number")
+    if delay_days is None and (repeat_days is not None or max_count is not None):
+        raise ValueError(
+            f"{reminder_label}_delay_days is required to enable the "
+            f"{reminder_label} reminder before setting its repeat/max cadence"
+        )
+
+
 ALLOWED_CURRENCIES = ("USD", "ARS", "EUR")
 
 
@@ -279,6 +312,23 @@ class PopupBase(SQLModel):
         default=1,
         sa_column=Column(Integer, nullable=False, server_default="1"),
     )
+    # --- Automatic reminder cadence (read by the reminder dispatch cron) ---
+    # One block per reminder type. `_delay_days` is the switch: null disables
+    # the reminder; a positive value is the number of days after the triggering
+    # condition (cart abandoned / application accepted without purchase /
+    # application left in draft) before the FIRST send. `_repeat_days` re-sends
+    # every N days after that (null = single send); `_max_count` caps the total
+    # number of sends. Cadence and cap are enforced by the job against the
+    # email_logs history, so no reminder-tracking state lives on the popup.
+    abandoned_cart_delay_days: int | None = Field(default=None, nullable=True)
+    abandoned_cart_repeat_days: int | None = Field(default=None, nullable=True)
+    abandoned_cart_max_count: int | None = Field(default=None, nullable=True)
+    purchase_reminder_delay_days: int | None = Field(default=None, nullable=True)
+    purchase_reminder_repeat_days: int | None = Field(default=None, nullable=True)
+    purchase_reminder_max_count: int | None = Field(default=None, nullable=True)
+    abandoned_application_delay_days: int | None = Field(default=None, nullable=True)
+    abandoned_application_repeat_days: int | None = Field(default=None, nullable=True)
+    abandoned_application_max_count: int | None = Field(default=None, nullable=True)
 
     @field_validator("currency")
     @classmethod
@@ -339,6 +389,15 @@ class PopupCreate(SQLModel):
     installments_interval: InstallmentInterval = InstallmentInterval.month
     installments_interval_count: int = 1
     checkin_pass_lead_days: int | None = None
+    abandoned_cart_delay_days: int | None = None
+    abandoned_cart_repeat_days: int | None = None
+    abandoned_cart_max_count: int | None = None
+    purchase_reminder_delay_days: int | None = None
+    purchase_reminder_repeat_days: int | None = None
+    purchase_reminder_max_count: int | None = None
+    abandoned_application_delay_days: int | None = None
+    abandoned_application_repeat_days: int | None = None
+    abandoned_application_max_count: int | None = None
 
     @field_validator("currency")
     @classmethod
@@ -378,6 +437,24 @@ class PopupCreate(SQLModel):
             self.installments_max,
             self.installments_deadline,
             self.installments_interval_count,
+        )
+        validate_reminder_config(
+            "abandoned_cart",
+            self.abandoned_cart_delay_days,
+            self.abandoned_cart_repeat_days,
+            self.abandoned_cart_max_count,
+        )
+        validate_reminder_config(
+            "purchase_reminder",
+            self.purchase_reminder_delay_days,
+            self.purchase_reminder_repeat_days,
+            self.purchase_reminder_max_count,
+        )
+        validate_reminder_config(
+            "abandoned_application",
+            self.abandoned_application_delay_days,
+            self.abandoned_application_repeat_days,
+            self.abandoned_application_max_count,
         )
         return self
 
@@ -438,11 +515,19 @@ class PopupUpdate(SQLModel):
     installments_interval: InstallmentInterval | None = None
     installments_interval_count: int | None = None
     checkin_pass_lead_days: int | None = None
-    # groups-rework popup feature flags
     invites_enabled: bool | None = None
     referrals_enabled: bool | None = None
     group_private_events_enabled: bool | None = None
     max_referrals_per_attendee: int | None = None
+    abandoned_cart_delay_days: int | None = None
+    abandoned_cart_repeat_days: int | None = None
+    abandoned_cart_max_count: int | None = None
+    purchase_reminder_delay_days: int | None = None
+    purchase_reminder_repeat_days: int | None = None
+    purchase_reminder_max_count: int | None = None
+    abandoned_application_delay_days: int | None = None
+    abandoned_application_repeat_days: int | None = None
+    abandoned_application_max_count: int | None = None
 
     @field_validator("currency")
     @classmethod
@@ -468,6 +553,26 @@ class PopupUpdate(SQLModel):
             raise ValueError(
                 "max_referrals_per_attendee must be a positive integer or null (unlimited)"
             )
+        return value
+
+    @field_validator(
+        "abandoned_cart_delay_days",
+        "abandoned_cart_repeat_days",
+        "abandoned_cart_max_count",
+        "purchase_reminder_delay_days",
+        "purchase_reminder_repeat_days",
+        "purchase_reminder_max_count",
+        "abandoned_application_delay_days",
+        "abandoned_application_repeat_days",
+        "abandoned_application_max_count",
+    )
+    @classmethod
+    def validate_reminder_positive(cls, value: int | None) -> int | None:
+        # Partial updates can't cross-validate delay-vs-cadence without the
+        # persisted row; the dispatcher treats a null delay as "off" regardless,
+        # so here we only guard positivity. Full coherence is enforced on create.
+        if value is not None and value <= 0:
+            raise ValueError("reminder day/count values must be positive")
         return value
 
     @model_validator(mode="after")

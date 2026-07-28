@@ -12,12 +12,37 @@ from sqlmodel import Session, func, select
 from app.api.attendee.models import AttendeeProducts, Attendees
 from app.api.attendee.schemas import (
     AttendeeCreate,
+    AttendeeFilterCondition,
+    AttendeeFilters,
     AttendeeTicketMetadataUpdate,
     AttendeeUpdate,
 )
 from app.api.audit_log.actor import AuditActor
 from app.api.audit_log.constants import AuditAction, AuditEntityType
 from app.api.shared.crud import BaseCRUD
+from app.core.filters import build_filter_expression
+
+
+def _attendee_condition_expression(condition: AttendeeFilterCondition):
+    """Attendee-specific conditions; None delegates to the shared engine."""
+    if condition.field == "has_tickets":
+        # Same correlated EXISTS as the legacy has_tickets query param.
+        ticket_exists = (
+            select(AttendeeProducts.id)
+            .where(AttendeeProducts.attendee_id == Attendees.id)
+            .exists()
+        )
+        return ticket_exists if condition.value else ~ticket_exists
+    return None
+
+
+def build_attendee_filter_expression(filters: AttendeeFilters):
+    """Combine the filter group into one boolean expression (None when empty)."""
+    return build_filter_expression(
+        filters,
+        Attendees,
+        condition_override=_attendee_condition_expression,
+    )
 
 
 def generate_check_in_code(prefix: str = "") -> str:
@@ -133,6 +158,7 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
         search: str | None = None,
         has_tickets: bool | None = None,
         category_id: uuid.UUID | None = None,
+        filters: AttendeeFilters | None = None,
     ) -> tuple[list[Attendees], int]:
         """Find attendees by popup_id with eager loading.
 
@@ -144,8 +170,16 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
         AttendeeProducts row (a purchased/granted ticket): True keeps only
         attendees with tickets, False only those without, None disables the
         filter. Uses a correlated EXISTS so it does not multiply rows.
+
+        ``filters`` is a validated AttendeeFilters group compiled to one
+        boolean expression and ANDed with the legacy params.
         """
         base_statement = select(Attendees).where(Attendees.popup_id == popup_id)
+
+        if filters is not None:
+            filter_expression = build_attendee_filter_expression(filters)
+            if filter_expression is not None:
+                base_statement = base_statement.where(filter_expression)
 
         if search:
             search_term = f"%{search}%"
@@ -213,6 +247,10 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
         Check-in codes live on AttendeeProducts (one per purchased ticket) and
         are created when the product is purchased, not when the attendee is.
         """
+        from app.services.trial_limits import enforce_trial_attendee_cap
+
+        enforce_trial_attendee_cap(session, tenant_id)
+
         # If email provided but no human_id, try to find matching Human
         if email and not human_id:
             human_id = self._find_human_id_by_email(session, email, tenant_id)
@@ -330,6 +368,9 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
         Check-in codes live on AttendeeProducts (one per purchased ticket).
         """
         from app.api.attendee_category.crud import attendee_categories_crud
+        from app.services.trial_limits import enforce_trial_attendee_cap
+
+        enforce_trial_attendee_cap(session, tenant_id)
 
         main_cat = attendee_categories_crud.get_primary_for_popup(session, popup_id)
         attendee = Attendees(
@@ -369,6 +410,9 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
             return existing
 
         from app.api.attendee_category.crud import attendee_categories_crud
+        from app.services.trial_limits import enforce_trial_attendee_cap
+
+        enforce_trial_attendee_cap(session, tenant_id)
 
         main_cat = attendee_categories_crud.get_primary_for_popup(session, popup_id)
         attendee = Attendees(

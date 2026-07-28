@@ -34,7 +34,7 @@ import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
-import { toKey } from "./SortableSectionCard"
+import { toKey } from "./sections/sectionTypes"
 import type { TemplateConfigProps } from "./types"
 
 // ---------------------------------------------------------------------------
@@ -805,9 +805,9 @@ export function MealPlanSelectConfig({
   return (
     <div className="flex flex-col gap-5">
       {noMealPlanProducts && (
-        <div className="rounded-lg border border-dashed border-amber-500/40 bg-amber-50 dark:bg-amber-950/20 p-3 flex items-start gap-2">
-          <Utensils className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
-          <div className="text-xs text-amber-900 dark:text-amber-100">
+        <div className="rounded-lg border border-dashed border-warning/25 bg-warning-soft p-3 flex items-start gap-2">
+          <Utensils className="h-4 w-4 text-warning shrink-0 mt-0.5" />
+          <div className="text-xs text-warning">
             <p className="font-medium">No meal-plan products yet</p>
             <p className="mt-0.5">
               Create meal-plan products first in Products &rarr; New Product

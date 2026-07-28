@@ -81,6 +81,13 @@ export default function CartFooter({
   // use it when provided to avoid letting users skip required steps.
   const positionStep = (activeSectionId ?? currentStep) as CheckoutStep
   const isConfirmStep = positionStep === "confirm" || isLastSection
+  // The service fee only shows from the confirm step on, so before it the
+  // footer reads as a products-only "Subtotal" and the fee is neither listed
+  // nor folded into the headline number.
+  const deferServiceFee = !isConfirmStep && summary.contributionSubtotal > 0
+  const footerTotal = deferServiceFee
+    ? summary.grandTotal - summary.contributionSubtotal
+    : summary.grandTotal
   const isBuyerStep = positionStep === ("buyer" as CheckoutStep)
   const currentIndex = availableSteps.indexOf(positionStep)
   // First step is whatever sits at index 0 of the configured step order
@@ -235,7 +242,7 @@ export default function CartFooter({
         )}
       >
         <div className="px-4 py-4 overflow-y-auto max-h-[calc(60vh-80px)]">
-          <CartItemList />
+          <CartItemList showServiceFee={isConfirmStep} />
         </div>
       </div>
 
@@ -272,7 +279,11 @@ export default function CartFooter({
               <div className="flex flex-col items-start min-w-0 overflow-hidden">
                 <div className="flex items-center gap-1.5">
                   <span className="text-[10px] lg:text-xs text-checkout-bottom-bar-text/60 uppercase tracking-wider font-medium">
-                    {isEditing ? t("checkout.to_pay") : t("common.total")}
+                    {isEditing
+                      ? t("checkout.to_pay")
+                      : deferServiceFee
+                        ? t("openCheckout.summary_subtotal")
+                        : t("common.total")}
                   </span>
                   {cartUiEnabled &&
                     hasItems &&
@@ -283,7 +294,7 @@ export default function CartFooter({
                     ))}
                 </div>
                 <span className="text-lg lg:text-2xl font-bold text-checkout-bottom-bar-text truncate max-w-full">
-                  {formatCurrency(summary.grandTotal)}
+                  {formatCurrency(footerTotal)}
                 </span>
                 {summary.creditApplied > 0 && (
                   <span className="text-[10px] lg:text-xs text-orange-400 font-medium">

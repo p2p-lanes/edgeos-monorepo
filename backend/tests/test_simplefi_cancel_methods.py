@@ -492,6 +492,27 @@ def test_get_installment_plan_status_handles_flat_payload(monkeypatch) -> None:
     result = client.get_installment_plan_status("plan-2")
     assert result.id == "plan-2"
     assert result.status == "active"
+    # Absent in the payload → None (the sweeper treats that as zero cuotas).
+    assert result.paid_installments_count is None
+
+
+def test_get_installment_plan_status_parses_paid_installments_count(
+    monkeypatch,
+) -> None:
+    """paid_installments_count is the sweeper's approve signal, so it must be parsed."""
+    _stub_make_request(
+        monkeypatch,
+        {
+            "installment_plan": {
+                "id": "plan-3",
+                "status": "active",
+                "paid_installments_count": 1,
+            }
+        },
+    )
+    client = SimpleFIClient("fake-key")
+    result = client.get_installment_plan_status("plan-3")
+    assert result.paid_installments_count == 1
 
 
 # ---------------------------------------------------------------------------

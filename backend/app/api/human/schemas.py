@@ -1,11 +1,58 @@
 import uuid
 from datetime import datetime
+from typing import ClassVar
 
 from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import Field as PydanticField
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlmodel import Column, DateTime, Field, SQLModel
 
 from app.api.shared.enums import EnrichmentSource, HumanRating
+from app.core.filters import (
+    TEXT_OPS,
+    FilterCondition,
+    FilterField,
+    FilterGroup,
+    parse_filters,
+)
+
+# Complex list filters (BO humans table), built on the shared engine in
+# app.core.filters. enriched_profile is virtual: JSONB cast-to-text match.
+HUMAN_FILTER_FIELDS: dict[str, FilterField] = {
+    "email": FilterField("text", frozenset({"eq", "neq", "contains", "not_contains"})),
+    "first_name": FilterField("text", TEXT_OPS),
+    "last_name": FilterField("text", TEXT_OPS),
+    "telegram": FilterField("text", TEXT_OPS),
+    "gender": FilterField("text", TEXT_OPS),
+    "age": FilterField("text", TEXT_OPS),
+    "residence": FilterField("text", TEXT_OPS),
+    "rating": FilterField(
+        "select",
+        frozenset({"eq", "neq"}),
+        frozenset(r.value for r in HumanRating),
+    ),
+    "enriched_profile": FilterField(
+        "text",
+        frozenset({"contains", "not_contains", "is_empty", "not_empty"}),
+    ),
+}
+
+
+class HumanFilterCondition(FilterCondition):
+    """One condition of the humans list filter group."""
+
+    field_registry: ClassVar[dict[str, FilterField]] = HUMAN_FILTER_FIELDS
+
+
+class HumanFilters(FilterGroup):
+    """Filter group for the BO humans list."""
+
+    conditions: list[HumanFilterCondition] = PydanticField(default_factory=list)
+
+
+def parse_human_filters(raw: str | None) -> HumanFilters | None:
+    """Parse the ``filters`` query param JSON into HumanFilters (422 on bad input)."""
+    return parse_filters(raw, HumanFilters)
 
 
 class HumanBase(SQLModel):
@@ -237,7 +284,8 @@ class HumanEnrichmentFactCreate(BaseModel):
     field: str = Field(min_length=1, max_length=100)
     value: str = Field(min_length=1)
     source: EnrichmentSource
-    evidence: str | None = None  # permalink / event id / org URL
+    source_label: str | None = Field(default=None, max_length=200)
+    evidence: str | None = None  # permalink / event id / org URL (internal)
     confidence: float | None = None  # 0..1, optional
     raw: dict | None = None  # structured payload (msg/chat/event ids)
 
@@ -248,9 +296,8 @@ class HumanEnrichmentFactPublic(BaseModel):
     field: str
     value: str
     source: EnrichmentSource
-    evidence: str | None = None
+    source_label: str | None = None
     confidence: float | None = None
-    raw: dict | None = None
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)

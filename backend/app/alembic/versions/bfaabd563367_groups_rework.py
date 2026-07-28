@@ -26,7 +26,7 @@ from app.alembic.utils import (
 )
 
 revision: str = "bfaabd563367"
-down_revision: str | Sequence[str] | None = "d4f7b2a9c1e6"
+down_revision: str | Sequence[str] | None = "a7f2c9e4b183"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

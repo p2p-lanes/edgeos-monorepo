@@ -1,13 +1,5 @@
+import { closestCenter, DndContext } from "@dnd-kit/core"
 import {
-  closestCenter,
-  DndContext,
-  type DragEndEvent,
-  PointerSensor,
-  useSensor,
-  useSensors,
-} from "@dnd-kit/core"
-import {
-  arrayMove,
   SortableContext,
   useSortable,
   verticalListSortingStrategy,
@@ -31,6 +23,7 @@ import { Separator } from "@/components/ui/separator"
 import { useFileUpload } from "@/hooks/useFileUpload"
 import { cn } from "@/lib/utils"
 import type { TemplateConfigProps } from "./types"
+import { useListReorder } from "./useListReorder"
 
 // ---------------------------------------------------------------------------
 // Types
@@ -387,13 +380,15 @@ export function ImageGalleryConfig({ config, onChange }: TemplateConfigProps) {
   const variant = (config?.variant as string) || "carousel"
   const images = parseImages(config)
 
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
-  )
-
   const updateImages = (updated: GalleryImage[]) => {
     onChange({ ...config, images: updated })
   }
+
+  const { sensors, handleDragEnd } = useListReorder(
+    images,
+    updateImages,
+    (img) => img.id,
+  )
 
   const handleAddImage = (url: string) => {
     const newImage: GalleryImage = {
@@ -412,17 +407,6 @@ export function ImageGalleryConfig({ config, onChange }: TemplateConfigProps) {
 
   const handleDeleteImage = (id: string) => {
     updateImages(images.filter((img) => img.id !== id))
-  }
-
-  const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event
-    if (!over || active.id === over.id) return
-
-    const oldIndex = images.findIndex((img) => img.id === active.id)
-    const newIndex = images.findIndex((img) => img.id === over.id)
-    if (oldIndex === -1 || newIndex === -1) return
-
-    updateImages(arrayMove(images, oldIndex, newIndex))
   }
 
   return (

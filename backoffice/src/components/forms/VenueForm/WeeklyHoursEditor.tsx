@@ -98,8 +98,8 @@ function SlotRow({ slot, canRemove, onChange, onRemove }: SlotRowProps) {
           onChange={(v) => onChange({ close_time: v })}
         />
         {hasOverride && slot.booking_mode && (
-          <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-900 dark:bg-amber-900/40 dark:text-amber-100">
-            <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+          <span className="inline-flex items-center gap-1 rounded-full bg-warning-soft px-2 py-0.5 text-xs text-warning">
+            <span className="h-1.5 w-1.5 rounded-full bg-warning" />
             {BOOKING_MODE_LABELS[slot.booking_mode]}
           </span>
         )}

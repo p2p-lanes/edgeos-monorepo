@@ -90,6 +90,9 @@ def client(
         # (tenant_role lacks SELECT on users); same testcontainer redirection
         # needed so the list endpoint works without a real localhost Postgres.
         patch("app.api.check_in.router.engine", test_engine),
+        # trial_limits resolves tenant trial status via the main engine
+        # (tenant_role lacks SELECT on tenants); same redirection.
+        patch("app.services.trial_limits.engine", test_engine),
     ):
         with TestClient(application) as c:
             yield c

@@ -3,9 +3,13 @@ from datetime import UTC, datetime
 
 from sqlmodel import Session, func, select
 
-from app.api.application_review.models import ApplicationReviews
+from app.api.application_review.models import (
+    ApplicationReviews,
+    ApplicationReviewSkips,
+)
 from app.api.application_review.schemas import (
     ApplicationReviewCreate,
+    ApplicationReviewSkipCreate,
     ApplicationReviewUpdate,
     ReviewDecision,
 )
@@ -215,3 +219,91 @@ class ApplicationReviewsCRUD(
 
 
 application_reviews_crud = ApplicationReviewsCRUD()
+
+
+class ApplicationReviewSkipsCRUD(
+    BaseCRUD[
+        ApplicationReviewSkips, ApplicationReviewSkipCreate, ApplicationReviewSkipCreate
+    ]
+):
+    """CRUD operations for per-reviewer application skips."""
+
+    def __init__(self) -> None:
+        super().__init__(ApplicationReviewSkips)
+
+    def get_by_application_reviewer(
+        self, session: Session, application_id: uuid.UUID, reviewer_id: uuid.UUID
+    ) -> ApplicationReviewSkips | None:
+        """Get a reviewer's skip for an application, if any."""
+        statement = select(ApplicationReviewSkips).where(
+            ApplicationReviewSkips.application_id == application_id,
+            ApplicationReviewSkips.reviewer_id == reviewer_id,
+        )
+        return session.exec(statement).first()
+
+    def get_skip_reasons_by_application(
+        self,
+        session: Session,
+        application_ids: list[uuid.UUID],
+        reviewer_id: uuid.UUID,
+    ) -> dict[uuid.UUID, str | None]:
+        """Map application_id -> skip reason for this reviewer's skips.
+
+        Single query so callers listing many applications avoid N+1.
+        Membership means "skipped"; the reason may be None.
+        """
+        if not application_ids:
+            return {}
+        statement = select(
+            ApplicationReviewSkips.application_id, ApplicationReviewSkips.reason
+        ).where(
+            ApplicationReviewSkips.reviewer_id == reviewer_id,
+            ApplicationReviewSkips.application_id.in_(application_ids),
+        )
+        return dict(session.exec(statement).all())
+
+    def upsert_skip(
+        self,
+        session: Session,
+        application_id: uuid.UUID,
+        reviewer_id: uuid.UUID,
+        tenant_id: uuid.UUID,
+        skip_in: ApplicationReviewSkipCreate,
+    ) -> ApplicationReviewSkips:
+        """Create the skip, or update its reason if it already exists."""
+        existing = self.get_by_application_reviewer(
+            session, application_id, reviewer_id
+        )
+        if existing:
+            existing.reason = skip_in.reason
+            session.add(existing)
+            session.commit()
+            session.refresh(existing)
+            return existing
+
+        db_obj = ApplicationReviewSkips(
+            application_id=application_id,
+            reviewer_id=reviewer_id,
+            tenant_id=tenant_id,
+            reason=skip_in.reason,
+        )
+        session.add(db_obj)
+        session.commit()
+        session.refresh(db_obj)
+        return db_obj
+
+    def delete_skip(
+        self, session: Session, application_id: uuid.UUID, reviewer_id: uuid.UUID
+    ) -> bool:
+        """Remove a reviewer's skip (un-skip). Returns whether a row was deleted."""
+        existing = self.get_by_application_reviewer(
+            session, application_id, reviewer_id
+        )
+        if not existing:
+            return False
+        session.delete(existing)
+        session.commit()
+        return True
+
+
+application_review_skips_crud = ApplicationReviewSkipsCRUD()

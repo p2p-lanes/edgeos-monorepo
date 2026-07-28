@@ -185,7 +185,10 @@ def runtime_for_slug(
                     key=lambda f: f.position,
                 ),
             )
+            # Hidden sections (and their fields) are never surfaced to the
+            # anonymous checkout, mirroring build_schema_for_popup.
             for sec in sections
+            if not sec.hidden
         ],
         ticketing_steps=[_step(step) for step in ticketing_steps],
         attendee_categories=[

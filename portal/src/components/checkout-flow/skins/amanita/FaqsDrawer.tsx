@@ -3,81 +3,26 @@
 /**
  * Amanita skin — global FAQs drawer (Task 10).
  *
- * Ported from checkout-amanita/codigo/checkout/sections.tsx (`FaqsDrawer` +
- * `FaqList`). In the mockup the drawer read a hardcoded `FAQS` constant; here
- * it's driven by the checkout's own `faqs`-template step data — the caller
+ * Ported from checkout-amanita/codigo/checkout/sections.tsx (`FaqsDrawer`). In
+ * the mockup the drawer read a hardcoded `FAQS` constant; here it's driven by
+ * the checkout's own `faqs`-template step data — the caller
  * (StepperCheckoutFlow) passes `items` sourced from that step's
  * `template_config.items`, `{question, answer}[]` (the same shape
  * VariantFaqs.tsx already parses for the default skin's inline rendering).
+ *
+ * The accordion itself lives in ./FaqList — the mockup shares it with the
+ * per-step questions rendered under a step's products (AmanitaStepFaqs).
  *
  * A11y ported VERBATIM from the mockup: `role="dialog"` + `aria-modal`, a
  * focus trap that cycles Tab/Shift+Tab within the panel, Escape closes,
  * body-scroll lock while open, a 44×44 (h-11/w-11) close button, and focus
  * returns to whatever had focus before opening (the "FAQs" pill) on close.
  */
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useRef } from "react"
 import { useTranslation } from "react-i18next"
-import { GoldStar } from "./GoldStar"
+import FaqList, { type FaqItem } from "./FaqList"
 
-export interface FaqDrawerItem {
-  question: string
-  answer: string
-}
-
-/** Accordion shared by the drawer's FAQ list — 1:1 port of the mockup's
- *  `FaqList` (renamed `q`/`a` -> `question`/`answer` to match this repo's
- *  `template_config.items` shape). */
-function FaqList({ items }: { items: FaqDrawerItem[] }) {
-  const [open, setOpen] = useState<number | null>(0)
-  return (
-    <div className="flex flex-col gap-3">
-      {items.map((faq, i) => {
-        const isOpen = open === i
-        return (
-          <div
-            key={`${faq.question}-${i}`}
-            className="rounded-2xl border border-white/10"
-            style={{ backgroundColor: "rgba(255,255,255,0.04)" }}
-          >
-            <button
-              type="button"
-              onClick={() => setOpen(isOpen ? null : i)}
-              aria-expanded={isOpen}
-              className="flex w-full items-center justify-between gap-3 px-5 py-4 text-left"
-            >
-              <span className="flex items-center gap-3">
-                <GoldStar className="h-3 w-3" />
-                <span className="text-sm font-semibold text-cream md:text-base">
-                  {faq.question}
-                </span>
-              </span>
-              <svg
-                aria-hidden="true"
-                viewBox="0 0 24 24"
-                className={`h-4 w-4 shrink-0 text-sand transition-transform ${isOpen ? "rotate-180" : ""}`}
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="m6 9 6 6 6-6" />
-              </svg>
-            </button>
-            {isOpen && (
-              <p
-                className="px-5 pb-5 pl-[3.15rem] text-left text-sm leading-relaxed"
-                style={{ color: "rgba(241,235,227,0.75)" }}
-              >
-                {faq.answer}
-              </p>
-            )}
-          </div>
-        )
-      })}
-    </div>
-  )
-}
+export type FaqDrawerItem = FaqItem
 
 export default function FaqsDrawer({
   open,

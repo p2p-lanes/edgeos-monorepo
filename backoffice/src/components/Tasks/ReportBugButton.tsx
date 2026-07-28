@@ -114,10 +114,13 @@ export function ReportBugButton() {
       }}
     >
       <DialogTrigger asChild>
+        {/* The sidebar is dark navy in both themes, so the outline variant's
+            theme-dependent bg/border (white in light mode) is overridden with
+            sidebar tokens to keep the button legible either way. */}
         <Button
           variant="outline"
           size="sm"
-          className="w-full justify-start group-data-[collapsible=icon]:justify-center"
+          className="w-full justify-start border-sidebar-border bg-transparent text-sidebar-foreground shadow-none hover:bg-sidebar-accent hover:text-sidebar-accent-foreground dark:border-sidebar-border dark:bg-transparent dark:hover:bg-sidebar-accent group-data-[collapsible=icon]:justify-center"
         >
           <Bug className="h-4 w-4 group-data-[collapsible=icon]:mr-0 sm:mr-2" />
           <span className="group-data-[collapsible=icon]:hidden">

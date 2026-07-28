@@ -545,7 +545,7 @@ function VenuesPage() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Venues</h1>
           <p className="text-muted-foreground">
-            Manage event venues for the selected pop-up
+            Manage event venues for the selected gathering
           </p>
         </div>
         {selectedPopupId && (

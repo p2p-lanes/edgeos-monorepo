@@ -35,6 +35,7 @@ from app.api.checkout.schemas import (
     OpenTicketingPurchaseResponse,
     PendingReleaseOpenRequest,
 )
+from app.api.human.crud import humans_crud
 from app.api.payment.crud import payments_crud
 from app.api.payment.router import (
     _extract_meta_attribution,
@@ -268,18 +269,26 @@ async def upsert_open_cart(
     db: SessionDep,
     tenant: PublicTenant,
 ) -> OpenCartPublic:
-    """Save (create or replace) the anonymous open-checkout cart for an email.
+    """Save (create or replace) the open-checkout cart for an email.
 
-    Fully public (no JWT), keyed by (popup, email). Returns a signed
+    Fully public (no JWT). The email is resolved to a human so the cart is keyed
+    by (human, popup) — the same key as the authenticated portal cart — and a
+    buyer never ends up with two carts for the same popup. Returns a signed
     `restore_token` when the popup configures an open_checkout_signing_secret so
     the client can later rebuild the cart cross-device. Rate-limited 30/min/IP.
     """
     popup = get_open_ticketing_popup(db, slug, tenant.id)
-    cart = carts_crud.upsert_anonymous(
+    # Normalize before resolving the human: SQLModel skips the HumanBase email
+    # validator on table inserts, so find_or_create is case-sensitive and a
+    # differently-cased email would otherwise spawn a second human and cart.
+    email = cart_in.email.lower()
+    human = humans_crud.find_or_create(db, email=email, tenant_id=tenant.id)
+    cart = carts_crud.upsert_open_cart(
         db,
         tenant_id=tenant.id,
         popup_id=popup.id,
-        email=cart_in.email,
+        human_id=human.id,
+        email=email,
         items=cart_in.items,
     )
     secret = popup.open_checkout_signing_secret
@@ -316,7 +325,7 @@ async def restore_open_cart(
     if not verify_cart_restore_token(str(cid), sig, secret):
         raise HTTPException(status_code=403, detail="Invalid cart link")
 
-    cart = carts_crud.find_anonymous_by_id_popup(db, cid, popup.id)
+    cart = carts_crud.find_by_id_popup(db, cid, popup.id)
     if cart is None:
         raise HTTPException(status_code=404, detail="Cart not found")
     return _to_open_cart_public(cart, restore_token=sig)

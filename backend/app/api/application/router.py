@@ -10,13 +10,19 @@ from fastapi.responses import Response
 from loguru import logger
 
 from app.api.application import crud
+from app.api.application.models import ApplicationComment
 from app.api.application.schemas import (
     AdminGrantTicketsRequest,
     AdminGrantTicketsResponse,
     ApplicantParticipation,
     ApplicationAdminCreate,
+    ApplicationCommentCreate,
+    ApplicationCommentPublic,
+    ApplicationCommentUpdate,
     ApplicationCreate,
+    ApplicationGroupCount,
     ApplicationPublic,
+    ApplicationReviewerVote,
     ApplicationStatus,
     ApplicationUpdate,
     AttendeeInfo,
@@ -31,8 +37,12 @@ from app.api.application.schemas import (
     ParticipationResponse,
     PopupAccessResponse,
     ScholarshipDecisionRequest,
+    parse_application_filters,
 )
-from app.api.application_review.crud import application_reviews_crud
+from app.api.application_review.crud import (
+    application_review_skips_crud,
+    application_reviews_crud,
+)
 from app.api.attendee.schemas import (
     AttendeeCreate,
     AttendeePublic,
@@ -49,7 +59,11 @@ from app.core.dependencies.users import (
     AdminOrApiKeySession_ApplicationsWrite,
     CurrentAdmin,
     CurrentHuman,
+    CurrentOperator,
+    CurrentUser,
     HumanTenantSession,
+    SessionDep,
+    TenantSession,
     needs,
 )
 from app.services.email_helpers import send_application_status_email
@@ -60,10 +74,36 @@ router = APIRouter(prefix="/applications", tags=["applications"])
 portal_router = APIRouter(prefix="/portal", tags=["portal"])
 
 
+def _get_reviewer_identities(
+    control_db,
+    reviewer_ids: list[uuid.UUID],
+) -> dict[uuid.UUID, tuple[str | None, str | None]]:
+    """Fetch reviewer (full_name, email) via the control-plane session.
+
+    Reviewers are Users, which live in the main DB (not the tenant DB), so we
+    read them through the main-engine session (``control_db``), not the tenant
+    session. One batched query for the whole page.
+    """
+    if not reviewer_ids:
+        return {}
+
+    from sqlmodel import select
+
+    from app.api.user.models import Users
+
+    id_col = Users.id  # ty:ignore[invalid-assignment]
+    users = control_db.exec(select(Users).where(id_col.in_(reviewer_ids))).all()
+    return {user.id: (user.full_name, user.email) for user in users}
+
+
 def _build_application_public(
     application,
     review_decision=None,
     referred_by_name=None,
+    reviewers=None,
+    comment_count=0,
+    skipped_by_me=False,
+    my_skip_reason: str | None = None,
 ) -> ApplicationPublic:
     """Build ApplicationPublic with attendees and products."""
     from app.api.attendee.schemas import AttendeeProductPublic
@@ -144,6 +184,11 @@ def _build_application_public(
         attendees=attendees,
         red_flag=application.red_flag,
         review_decision=review_decision,
+        review_count=len(reviewers) if reviewers is not None else 0,
+        reviewers=reviewers or [],
+        comment_count=comment_count,
+        skipped_by_me=skipped_by_me,
+        my_skip_reason=my_skip_reason,
     )
     return app_public
 
@@ -151,16 +196,38 @@ def _build_application_public(
 @router.get("", response_model=ListModel[ApplicationPublic])
 async def list_applications(
     db: AdminOrApiKeySession_ApplicationsRead,
-    _: AdminOrApiKey_ApplicationsRead,
+    current_user: AdminOrApiKey_ApplicationsRead,
+    control_db: SessionDep,
     popup_id: uuid.UUID | None = None,
     human_id: uuid.UUID | None = None,
     reviewed_by: uuid.UUID | None = None,
     status_filter: ApplicationStatus | None = None,
     search: str | None = None,
+    filters: str | None = None,
+    group_by: str | None = None,
+    group_value: str | None = None,
     skip: PaginationSkip = 0,
     limit: PaginationLimit = 100,
 ) -> ListModel[ApplicationPublic]:
-    """List applications with optional filters (BO only)."""
+    """List applications with optional filters (BO only).
+
+    ``filters`` is a JSON filter group:
+    ``{"match": "all"|"any", "conditions": [{"field", "op", "value"}]}``.
+    It only applies to the popup_id listing and is combined (AND) with the
+    legacy status_filter/search/reviewed_by params. The virtual fields
+    ``skipped_by_me`` and ``reviewed_by_me`` (op ``eq``, boolean value)
+    resolve against the calling user's own skips and reviews. The
+    ``reviewed_by`` field (ops ``eq``/``neq``, reviewer user id as UUID
+    string) matches applications reviewed (or not) by that reviewer.
+
+    ``group_by``/``group_value`` scope the list to one bucket of a grouped
+    view (same whitelist and NULL/empty collapsing as the group-counts
+    endpoint). The scope is ANDed with everything else, so it stays correct
+    even when ``filters`` uses match=any. With ``group_by`` set and no
+    ``group_value``, the NULL bucket is returned; ``group_value`` without
+    ``group_by`` is ignored.
+    """
+    parsed_filters = parse_application_filters(filters)
     if popup_id:
         applications, total = crud.applications_crud.find_by_popup(
             db,
@@ -170,6 +237,10 @@ async def list_applications(
             status_filter=status_filter,
             search=search,
             reviewed_by=reviewed_by,
+            filters=parsed_filters,
+            reviewer_id=getattr(current_user, "id", None),
+            group_by=group_by,
+            group_value=group_value,
         )
     elif human_id:
         applications, total = crud.applications_crud.find_by_human(
@@ -188,10 +259,51 @@ async def list_applications(
         else {}
     )
 
+    # Reviewer names live in the main DB; comment counts on the human (tenant
+    # DB). Resolve both in one batched query each to keep the list N+1-free.
+    reviewer_identities = _get_reviewer_identities(
+        control_db,
+        list(
+            {r.reviewer_id for application in applications for r in application.reviews}
+        ),
+    )
+    # Application comments are tenant-scoped (RLS), read through the same tenant
+    # session as the applications. One batched query keeps the list N+1-free.
+    comment_counts = crud.applications_crud.count_active_comments_by_applications(
+        db, [application.id for application in applications]
+    )
+
+    # Current user's own skips for this page; API keys resolve to a user too,
+    # so the id is always present — guard anyway for identity-less callers.
+    current_user_id = getattr(current_user, "id", None)
+    skip_reasons = (
+        application_review_skips_crud.get_skip_reasons_by_application(
+            db, [application.id for application in applications], current_user_id
+        )
+        if current_user_id
+        else {}
+    )
+
     results = [
         _build_application_public(
             application,
             review_decision=review_decisions.get(application.id),
+            reviewers=[
+                ApplicationReviewerVote(
+                    reviewer_id=r.reviewer_id,
+                    reviewer_full_name=reviewer_identities.get(
+                        r.reviewer_id, (None, None)
+                    )[0],
+                    reviewer_email=reviewer_identities.get(r.reviewer_id, (None, None))[
+                        1
+                    ],
+                    decision=r.decision,
+                )
+                for r in application.reviews
+            ],
+            comment_count=comment_counts.get(application.id, 0),
+            skipped_by_me=application.id in skip_reasons,
+            my_skip_reason=skip_reasons.get(application.id),
         )
         for application in applications
     ]
@@ -200,6 +312,36 @@ async def list_applications(
         results=results,
         paging=Paging(offset=skip, limit=limit, total=total),
     )
+
+
+# NOTE: declared before /{application_id} so "group-counts" is never
+# captured as an application id.
+@router.get("/group-counts", response_model=list[ApplicationGroupCount])
+async def get_application_group_counts(
+    db: AdminOrApiKeySession_ApplicationsRead,
+    current_user: AdminOrApiKey_ApplicationsRead,
+    popup_id: uuid.UUID,
+    group_by: str,
+    filters: str | None = None,
+    search: str | None = None,
+) -> list[ApplicationGroupCount]:
+    """Count a popup's applications grouped by one field (BO only).
+
+    ``group_by`` accepts ``status``, ``scholarship_status``, ``gender``,
+    ``age``, or ``custom.<field_name>``. ``filters`` and ``search`` behave
+    exactly like the list endpoint. NULL and empty values share one bucket
+    with ``value: null``; rows are ordered by count descending.
+    """
+    parsed_filters = parse_application_filters(filters)
+    rows = crud.applications_crud.count_by_group(
+        db,
+        popup_id=popup_id,
+        group_by=group_by,
+        search=search,
+        filters=parsed_filters,
+        reviewer_id=getattr(current_user, "id", None),
+    )
+    return [ApplicationGroupCount(value=value, count=count) for value, count in rows]
 
 
 @router.post("", response_model=ApplicationPublic, status_code=status.HTTP_201_CREATED)
@@ -540,7 +682,7 @@ async def grant_tickets_admin(
 async def get_application(
     application_id: uuid.UUID,
     db: AdminOrApiKeySession_ApplicationsRead,
-    _: AdminOrApiKey_ApplicationsRead,
+    current_user: AdminOrApiKey_ApplicationsRead,
 ) -> ApplicationPublic:
     """Get a single application (BO only)."""
     application = crud.applications_crud.get(db, application_id)
@@ -567,7 +709,23 @@ async def get_application(
                     or referrer.email
                 )
 
-    return _build_application_public(application, referred_by_name=referred_by_name)
+    comment_count = len(crud.applications_crud.list_comments(db, application_id))
+
+    current_user_id = getattr(current_user, "id", None)
+    my_skip = (
+        application_review_skips_crud.get_by_application_reviewer(
+            db, application_id, current_user_id
+        )
+        if current_user_id
+        else None
+    )
+    return _build_application_public(
+        application,
+        referred_by_name=referred_by_name,
+        comment_count=comment_count,
+        skipped_by_me=my_skip is not None,
+        my_skip_reason=my_skip.reason if my_skip else None,
+    )
 
 
 @router.post(
@@ -596,6 +754,12 @@ async def grant_application_credit(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Application not found",
+        )
+
+    if application.status != ApplicationStatus.ACCEPTED.value:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Credit can only be granted to an accepted application.",
         )
 
     new_balance = adjust_application_credit(
@@ -1020,6 +1184,23 @@ async def update_my_application(
     }
     profile_update = {k: v for k, v in update_data.items() if k in profile_fields}
     app_update = {k: v for k, v in update_data.items() if k not in profile_fields}
+
+    # Enforce form validation before any state is applied: submits (and edits
+    # of already-submitted applications) validate the merged state with full
+    # required checks; draft saves only type-check provided values.
+    resolved_custom_fields = crud.applications_crud.validate_portal_update(
+        db, application, update_data
+    )
+
+    # Store exactly what was validated: incoming custom_fields replace the
+    # stored answers for every field the current form renders (the portal
+    # sends the full form state, so an absent key means "cleared"), while
+    # answers the form no longer renders are preserved.
+    if "custom_fields" in app_update:
+        if app_update["custom_fields"] is None:
+            del app_update["custom_fields"]
+        elif resolved_custom_fields is not None:
+            app_update["custom_fields"] = resolved_custom_fields
 
     # Update human profile if needed
     if profile_update:
@@ -1501,6 +1682,130 @@ async def review_scholarship(
         )
 
     return _build_application_public(application)
+
+
+# ---------------------------------------------------------------------------
+# Comments — a shared review thread on an application. Any operator reads and
+# adds; the author edits their own; the author or a superadmin soft-deletes.
+# Scoped to the caller's tenant (superadmin bypass). Mirrors human comments.
+# ---------------------------------------------------------------------------
+def _get_application_in_tenant_or_404(db, application_id: uuid.UUID, current_user):  # noqa: ANN001
+    """Load an application or 404, hiding applications outside the caller's tenant."""
+    application = crud.applications_crud.get(db, application_id)
+    if not application or (
+        current_user.role != UserRole.SUPERADMIN
+        and application.tenant_id != current_user.tenant_id
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Application not found",
+        )
+    return application
+
+
+@router.get(
+    "/{application_id}/comments",
+    response_model=ListModel[ApplicationCommentPublic],
+)
+async def list_application_comments(
+    application_id: uuid.UUID,
+    db: TenantSession,
+    current_user: CurrentUser,
+) -> ListModel[ApplicationCommentPublic]:
+    """List an application's comments, oldest first."""
+    _get_application_in_tenant_or_404(db, application_id, current_user)
+    comments = crud.applications_crud.list_comments(db, application_id)
+    return ListModel[ApplicationCommentPublic](
+        results=[ApplicationCommentPublic.model_validate(c) for c in comments],
+        paging=Paging(offset=0, limit=len(comments), total=len(comments)),
+    )
+
+
+@router.post(
+    "/{application_id}/comments",
+    response_model=ApplicationCommentPublic,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_application_comment(
+    application_id: uuid.UUID,
+    comment_in: ApplicationCommentCreate,
+    db: TenantSession,
+    current_user: CurrentOperator,
+) -> ApplicationCommentPublic:
+    """Add a comment to an application."""
+    application = _get_application_in_tenant_or_404(db, application_id, current_user)
+    comment = crud.applications_crud.create_comment(
+        db,
+        application,
+        comment_in,
+        author_user_id=current_user.id,
+        author_name=current_user.full_name,
+        author_email=current_user.email,
+    )
+    return ApplicationCommentPublic.model_validate(comment)
+
+
+@router.put(
+    "/{application_id}/comments/{comment_id}",
+    response_model=ApplicationCommentPublic,
+)
+async def update_application_comment(
+    application_id: uuid.UUID,
+    comment_id: uuid.UUID,
+    comment_in: ApplicationCommentUpdate,
+    db: TenantSession,
+    current_user: CurrentOperator,
+) -> ApplicationCommentPublic:
+    """Edit your own comment."""
+    _get_application_in_tenant_or_404(db, application_id, current_user)
+    comment = db.get(ApplicationComment, comment_id)
+    if (
+        not comment
+        or comment.application_id != application_id
+        or comment.deleted_at is not None
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Comment not found"
+        )
+    if comment.author_user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can only edit your own comments",
+        )
+    comment = crud.applications_crud.update_comment(db, comment, comment_in)
+    return ApplicationCommentPublic.model_validate(comment)
+
+
+@router.delete(
+    "/{application_id}/comments/{comment_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def delete_application_comment(
+    application_id: uuid.UUID,
+    comment_id: uuid.UUID,
+    db: TenantSession,
+    current_user: CurrentOperator,
+) -> None:
+    """Soft-delete a comment: the author, or any superadmin. Row is preserved."""
+    _get_application_in_tenant_or_404(db, application_id, current_user)
+    comment = db.get(ApplicationComment, comment_id)
+    if (
+        not comment
+        or comment.application_id != application_id
+        or comment.deleted_at is not None
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Comment not found"
+        )
+    if (
+        current_user.role != UserRole.SUPERADMIN
+        and comment.author_user_id != current_user.id
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can only delete your own comments",
+        )
+    crud.applications_crud.soft_delete_comment(db, comment)
 
 
 # ---------------------------------------------------------------------------

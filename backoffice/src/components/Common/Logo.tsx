@@ -7,8 +7,6 @@ import { useOptionalWorkspace } from "@/contexts/WorkspaceContext"
 import useAuth from "@/hooks/useAuth"
 import { cn } from "@/lib/utils"
 
-import favicon from "/assets/images/favicon.png"
-
 interface LogoProps {
   variant?: "full" | "icon" | "responsive"
   className?: string
@@ -39,23 +37,22 @@ export function Logo({
 
   const altText = tenant?.name || "EdgeOS"
 
-  // Default EdgeOS logo: PNG icon + text
+  // Default EdgeOS logo: wordmark matching the marketing site navbar —
+  // display font, tight tracking, "OS" in the EdgeOS accent blue.
   const DefaultFullLogo = ({
     className: logoClassName,
   }: {
     className?: string
   }) => (
-    <div className={cn("flex items-center gap-2", logoClassName)}>
-      <img src={favicon} alt={altText} className="size-8 object-contain" />
-      <span
-        className={cn(
-          "text-xl font-semibold",
-          isDark ? "text-slate-50" : "text-slate-900",
-        )}
-      >
-        EdgeOS
-      </span>
-    </div>
+    <span
+      className={cn(
+        "font-display inline-flex items-center text-xl font-bold tracking-tight text-white",
+        logoClassName,
+      )}
+    >
+      Edge
+      <span className="text-[#2d62ff]">OS</span>
+    </span>
   )
 
   const DefaultIconLogo = ({
@@ -63,11 +60,16 @@ export function Logo({
   }: {
     className?: string
   }) => (
-    <img
-      src={favicon}
-      alt={altText}
-      className={cn("size-10 object-contain", iconClassName)}
-    />
+    <span
+      role="img"
+      aria-label={altText}
+      className={cn(
+        "font-display flex size-10 items-center justify-center rounded-lg bg-[#2d62ff] text-lg font-bold text-white",
+        iconClassName,
+      )}
+    >
+      E
+    </span>
   )
 
   // Tenant full logo: logo image + tenant name

@@ -63,6 +63,25 @@ class ApplicationReviewPublic(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class ApplicationReviewSkipCreate(BaseModel):
+    """Schema for skipping (passing on) an application."""
+
+    reason: str | None = None
+
+
+class ApplicationReviewSkipPublic(BaseModel):
+    """ApplicationReviewSkip schema for API responses."""
+
+    id: uuid.UUID
+    application_id: uuid.UUID
+    reviewer_id: uuid.UUID
+    tenant_id: uuid.UUID
+    reason: str | None = None
+    created_at: datetime | None = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class ReviewSummary(BaseModel):
     """Summary of reviews for an application."""
 

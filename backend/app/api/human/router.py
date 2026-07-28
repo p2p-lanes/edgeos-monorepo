@@ -26,6 +26,7 @@ from app.api.human.schemas import (
     HumanProfileUpdate,
     HumanPublic,
     HumanUpdate,
+    parse_human_filters,
 )
 from app.api.shared.enums import HumanRating, UserRole
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
@@ -36,6 +37,7 @@ from app.core.dependencies.users import (
     AdminOrApiKeySession_HumansWrite,
     CurrentAdmin,
     CurrentHuman,
+    CurrentOperator,
     CurrentSuperadmin,
     CurrentUser,
     HumanTenantSession,
@@ -63,9 +65,11 @@ async def list_humans(
     rating: HumanRating | None = None,
     has_enriched_profile: bool | None = None,
     enrichment_query: str | None = None,
+    filters: str | None = None,
     skip: PaginationSkip = 0,
     limit: PaginationLimit = 100,
 ) -> ListModel[HumanPublic]:
+    human_filters = parse_human_filters(filters)
     if incomplete_application:
         if popup_id is None:
             raise HTTPException(
@@ -78,6 +82,7 @@ async def list_humans(
             limit=limit,
             search=search,
             popup_id=popup_id,
+            filters=human_filters,
         )
     else:
         humans, total = crud.find_filtered(
@@ -93,6 +98,7 @@ async def list_humans(
             rating=rating.value if rating else None,
             has_enriched_profile=has_enriched_profile,
             enrichment_query=enrichment_query,
+            filters=human_filters,
         )
 
     return ListModel[HumanPublic](
@@ -378,7 +384,6 @@ async def delete_human(
 async def get_human_activity(
     human_id: uuid.UUID,
     db: TenantSession,
-    control_db: SessionDep,
     _current_user: CurrentAdmin,
     skip: PaginationSkip = 0,
     limit: PaginationLimit = 50,
@@ -386,19 +391,15 @@ async def get_human_activity(
     """Aggregate a human's full activity timeline (admin-only).
 
     Built on read from applications, payments, attendees, manual notes, rating
-    changes and comments. RLS on the TenantSession scopes the tenant-owned
-    sources; comments live in a global table with no RLS, so they are read via
-    the privileged `control_db` (the RLS check above already proved tenant
-    ownership of this human).
+    changes and comments. Every source, comments included, is now tenant-scoped
+    by RLS on the TenantSession.
     """
     if not crud.get(db, human_id):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Human not found",
         )
-    items, total = build_human_activity(
-        db, control_db, human_id, skip=skip, limit=limit
-    )
+    items, total = build_human_activity(db, human_id, skip=skip, limit=limit)
     return ListModel[HumanActivityItem](
         results=items,
         paging=Paging(offset=skip, limit=limit, total=total),
@@ -485,7 +486,7 @@ def _get_human_in_tenant_or_404(db, human_id: uuid.UUID, current_user):  # noqa:
 @router.get("/{human_id}/comments", response_model=ListModel[HumanCommentPublic])
 async def list_human_comments(
     human_id: uuid.UUID,
-    db: SessionDep,
+    db: TenantSession,
     current_user: CurrentUser,
 ) -> ListModel[HumanCommentPublic]:
     """List a human's comments, oldest first."""
@@ -505,12 +506,13 @@ async def list_human_comments(
 async def create_human_comment(
     human_id: uuid.UUID,
     comment_in: HumanCommentCreate,
-    db: SessionDep,
-    current_user: CurrentUser,
+    db: TenantSession,
+    current_user: CurrentOperator,
 ) -> HumanCommentPublic:
     """Add a comment to a human."""
-    _get_human_in_tenant_or_404(db, human_id, current_user)
+    human = _get_human_in_tenant_or_404(db, human_id, current_user)
     comment = HumanComment(
+        tenant_id=human.tenant_id,
         human_id=human_id,
         author_user_id=current_user.id,
         author_name=current_user.full_name,
@@ -528,8 +530,8 @@ async def update_human_comment(
     human_id: uuid.UUID,
     comment_id: uuid.UUID,
     comment_in: HumanCommentUpdate,
-    db: SessionDep,
-    current_user: CurrentUser,
+    db: TenantSession,
+    current_user: CurrentOperator,
 ) -> HumanCommentPublic:
     """Edit your own comment."""
     _get_human_in_tenant_or_404(db, human_id, current_user)
@@ -558,8 +560,8 @@ async def update_human_comment(
 async def delete_human_comment(
     human_id: uuid.UUID,
     comment_id: uuid.UUID,
-    db: SessionDep,
-    current_user: CurrentUser,
+    db: TenantSession,
+    current_user: CurrentOperator,
 ) -> None:
     """Soft-delete a comment: the author, or any superadmin. Row is preserved."""
     _get_human_in_tenant_or_404(db, human_id, current_user)

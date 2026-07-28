@@ -80,7 +80,7 @@ export function ApplicationForm({ onSuccess }: ApplicationFormProps) {
     isLoading: schemaLoading,
     isError: _schemaError,
   } = useQuery({
-    queryKey: ["form-fields-schema", selectedPopupId],
+    queryKey: ["form-fields", "schema", selectedPopupId],
     queryFn: async () => {
       if (!selectedPopupId) return null
       const result = await FormFieldsService.getApplicationSchema({
@@ -150,7 +150,7 @@ export function ApplicationForm({ onSuccess }: ApplicationFormProps) {
     },
     onSubmit: ({ value }) => {
       if (!selectedPopupId) {
-        showErrorToast("Please select a popup first")
+        showErrorToast("Please select a gathering first")
         return
       }
 

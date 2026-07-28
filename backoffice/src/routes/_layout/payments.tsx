@@ -8,32 +8,35 @@ import {
   Download,
   FileText,
   Loader2,
+  X,
 } from "lucide-react"
-import { Fragment, Suspense, useCallback, useState } from "react"
+import { Fragment, Suspense, useCallback, useMemo, useState } from "react"
 import { toast } from "sonner"
 
 import {
-  DashboardService,
   OpenAPI,
   type PaymentPublic,
+  type PaymentSource,
   type PaymentStatus,
   PaymentsService,
   PopupsService,
 } from "@/client"
 import { DataTable, SortableHeader } from "@/components/Common/DataTable"
 import { EmptyState } from "@/components/Common/EmptyState"
+import {
+  FilterBuilder,
+  type FilterCondition,
+  type FilterFieldDef,
+  type FilterMatch,
+  isCompleteCondition,
+  sanitizeFilterConditions,
+} from "@/components/Common/FilterBuilder"
 import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
+import { SavedViewsMenu } from "@/components/Common/SavedViewsMenu"
 import { StatusBadge } from "@/components/Common/StatusBadge"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
 import {
@@ -55,18 +58,20 @@ function getPaymentsQueryOptions(
   page: number,
   pageSize: number,
   search: string,
-  statusFilter?: PaymentStatus,
+  filters?: string,
   sortBy?: string,
   sortOrder?: "asc" | "desc",
+  applicationId?: string | null,
 ) {
   const queryConfig = buildPaymentsQueryConfig({
     popupId,
     page,
     pageSize,
     search,
-    statusFilter,
+    filters,
     sortBy,
     sortOrder,
+    applicationId,
   })
 
   return {
@@ -83,84 +88,53 @@ const PAYMENT_STATUS_OPTIONS: { value: PaymentStatus; label: string }[] = [
   { value: "cancelled", label: "Cancelled" },
 ]
 
-function usePaymentStatusCounts(popupId: string | null) {
-  const { data: stats } = useQuery({
-    queryKey: ["dashboard", "stats", popupId],
-    queryFn: () => DashboardService.getDashboardStats({ popupId: popupId! }),
-    enabled: !!popupId,
-  })
+const PAYMENT_SOURCE_OPTIONS: { value: PaymentSource; label: string }[] = [
+  { value: "SimpleFI", label: "SimpleFI" },
+  { value: "Stripe", label: "Stripe" },
+  { value: "MercadoPago", label: "MercadoPago" },
+  { value: "Crypto", label: "Crypto" },
+]
 
-  const counts: Partial<Record<PaymentStatus, number>> = {}
-  if (stats?.payments) {
-    const payments = stats.payments
-    counts.pending = payments.pending ?? 0
-    counts.approved = payments.approved ?? 0
-    counts.rejected = payments.rejected ?? 0
-    counts.expired = payments.expired ?? 0
-    counts.cancelled = payments.cancelled ?? 0
-  }
+const PAYMENT_TYPE_OPTIONS = [
+  { value: "pass_purchase", label: "Pass purchase" },
+  { value: "application_fee", label: "Application fee" },
+]
 
-  return { counts, total: stats?.payments?.total ?? 0 }
-}
+const AMOUNT_OPS = ["eq", "gt", "gte", "lt", "lte"]
+const PAYMENT_DATE_OPS = ["before", "after"]
 
-function StatusDropdownFilter({
-  popupId,
-  selected,
-  onSelect,
-}: {
-  popupId: string | null
-  selected: PaymentStatus | undefined
-  onSelect: (value: PaymentStatus | undefined) => void
-}) {
-  const { counts, total } = usePaymentStatusCounts(popupId)
-  const selectedOption = selected
-    ? PAYMENT_STATUS_OPTIONS.find((option) => option.value === selected)
-    : undefined
-
-  const options = [
-    { value: "all" as const, label: "All", count: total },
-    ...PAYMENT_STATUS_OPTIONS.map((option) => ({
-      value: option.value,
-      label: option.label,
-      count: counts[option.value] ?? 0,
-    })),
-  ]
-
-  const currentLabel = selectedOption?.label ?? "All"
-  const currentCount = selectedOption
-    ? (counts[selectedOption.value] ?? 0)
-    : total
-
-  return (
-    <Select
-      value={selectedOption?.value ?? "all"}
-      onValueChange={(value) =>
-        onSelect(value === "all" ? undefined : (value as PaymentStatus))
-      }
-    >
-      <SelectTrigger className="h-9 w-[180px]">
-        <SelectValue>
-          {currentLabel} ({currentCount})
-        </SelectValue>
-      </SelectTrigger>
-      <SelectContent>
-        {options.map((option) => (
-          <SelectItem
-            key={option.value === "all" ? "all" : option.value}
-            value={option.value === "all" ? "all" : option.value}
-          >
-            <span className="flex w-full items-center justify-between gap-4">
-              <span>{option.label}</span>
-              <span className="text-muted-foreground tabular-nums">
-                {option.count}
-              </span>
-            </span>
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
-  )
-}
+const PAYMENT_FIELD_DEFS: FilterFieldDef[] = [
+  {
+    key: "status",
+    label: "Status",
+    kind: "select",
+    ops: ["eq", "neq"],
+    options: PAYMENT_STATUS_OPTIONS,
+  },
+  {
+    key: "source",
+    label: "Source",
+    kind: "select",
+    ops: ["eq", "neq"],
+    options: PAYMENT_SOURCE_OPTIONS,
+  },
+  {
+    key: "payment_type",
+    label: "Type",
+    kind: "select",
+    ops: ["eq", "neq"],
+    options: PAYMENT_TYPE_OPTIONS,
+  },
+  { key: "currency", label: "Currency", kind: "text", ops: ["eq", "neq"] },
+  { key: "amount", label: "Amount", kind: "number", ops: AMOUNT_OPS },
+  {
+    key: "amount_charged",
+    label: "Charged",
+    kind: "number",
+    ops: [...AMOUNT_OPS, "is_empty", "not_empty"],
+  },
+  { key: "created_at", label: "Date", kind: "date", ops: PAYMENT_DATE_OPS },
+]
 
 const VALID_PAYMENT_STATUSES: Set<string> = new Set([
   "pending",
@@ -171,21 +145,61 @@ const VALID_PAYMENT_STATUSES: Set<string> = new Set([
 ])
 
 type PaymentsSearchParams = TableSearchParams & {
-  status?: PaymentStatus
+  match?: FilterMatch
+  filters?: FilterCondition[]
+  applicationId?: string
 }
 
 export const Route = createFileRoute("/_layout/payments")({
   component: Payments,
-  validateSearch: (raw: Record<string, unknown>): PaymentsSearchParams => ({
-    ...validateTableSearch(raw),
-    ...(typeof raw.status === "string" && VALID_PAYMENT_STATUSES.has(raw.status)
-      ? { status: raw.status as PaymentStatus }
-      : {}),
-  }),
+  validateSearch: (raw: Record<string, unknown>): PaymentsSearchParams => {
+    const filters = sanitizeFilterConditions(raw.filters)
+    // Legacy ?status= links fold into the filter conditions.
+    if (
+      typeof raw.status === "string" &&
+      VALID_PAYMENT_STATUSES.has(raw.status) &&
+      !filters.some((condition) => condition.field === "status")
+    ) {
+      filters.push({ field: "status", op: "eq", value: raw.status })
+    }
+    return {
+      ...validateTableSearch(raw),
+      ...(raw.match === "any" && filters.length
+        ? { match: "any" as const }
+        : {}),
+      ...(filters.length ? { filters } : {}),
+      ...(typeof raw.applicationId === "string" && raw.applicationId
+        ? { applicationId: raw.applicationId }
+        : {}),
+    }
+  },
   head: () => ({
     meta: [{ title: "Payments - EdgeOS" }],
   }),
 })
+
+// Single source for the filter-related search params, shared by the table
+// and the CSV export so both always query the same subset.
+function usePaymentsFilterParams() {
+  const searchParams = Route.useSearch()
+  const filterMatch = searchParams.match ?? "all"
+  const filterConditions = useMemo(
+    () => searchParams.filters ?? [],
+    [searchParams.filters],
+  )
+  const filtersJson = useMemo(() => {
+    const complete = filterConditions.filter(isCompleteCondition)
+    return complete.length
+      ? JSON.stringify({ match: filterMatch, conditions: complete })
+      : undefined
+  }, [filterConditions, filterMatch])
+  return {
+    search: searchParams.search ?? "",
+    filterMatch,
+    filterConditions,
+    filtersJson,
+  }
+}
 
 async function downloadInvoicePdf(paymentId: string): Promise<void> {
   const token =
@@ -318,7 +332,7 @@ function getColumns(hasInvoice: boolean): ColumnDef<PaymentPublic>[] {
             </span>
             {showReason && adj ? (
               <span
-                className={`text-xs ${adj.isDiscount ? "text-green-600" : "text-amber-600"}`}
+                className={`text-xs ${adj.isDiscount ? "text-success" : "text-warning"}`}
               >
                 adjustment {adj.isDiscount ? "−" : "+"}
                 {adj.pct}%
@@ -580,7 +594,7 @@ function PaymentSubRow({ row }: { row: Row<PaymentPublic> }) {
               >
                 {discountLabel}
               </td>
-              <td className="py-0.5 pl-4 text-right font-mono tabular-nums text-green-600">
+              <td className="py-0.5 pl-4 text-right font-mono tabular-nums text-success">
                 -${discountAmount.toFixed(2)}
               </td>
             </tr>
@@ -630,7 +644,7 @@ function PaymentSubRow({ row }: { row: Row<PaymentPublic> }) {
                   {railAdj.pct}%)
                 </td>
                 <td
-                  className={`py-0.5 pl-4 text-right font-mono tabular-nums ${railAdj.isDiscount ? "text-green-600" : "text-amber-600"}`}
+                  className={`py-0.5 pl-4 text-right font-mono tabular-nums ${railAdj.isDiscount ? "text-success" : "text-warning"}`}
                 >
                   {railAdj.isDiscount ? "−" : "+"}$
                   {Math.abs(railAdj.delta).toFixed(2)}
@@ -673,7 +687,102 @@ function PaymentsTableContent() {
   const searchParams = Route.useSearch()
   const { search, pagination, sorting, setSearch, setPagination, setSorting } =
     useTableSearchParams(searchParams, "/payments")
-  const statusFilter = searchParams.status
+  const { filterMatch, filterConditions, filtersJson } =
+    usePaymentsFilterParams()
+  const applicationId = searchParams.applicationId
+
+  const setFilters = useCallback(
+    (match: FilterMatch, conditions: FilterCondition[]) => {
+      navigate({
+        to: "/payments",
+        search: (prev: Record<string, unknown>) => ({
+          ...prev,
+          // Scrub the legacy param so validateSearch cannot fold it back
+          // into a resurrected condition after the user edits the filters.
+          status: undefined,
+          match:
+            match === "any" && conditions.length ? ("any" as const) : undefined,
+          filters: conditions.length ? conditions : undefined,
+          page: 0,
+        }),
+        replace: true,
+      })
+    },
+    [navigate],
+  )
+
+  const hasActiveView = Boolean(
+    filterConditions.length || search || searchParams.sortBy,
+  )
+
+  const clearView = useCallback(() => {
+    navigate({
+      to: "/payments",
+      search: (prev: Record<string, unknown>) => ({
+        ...prev,
+        status: undefined,
+        match: undefined,
+        filters: undefined,
+        search: undefined,
+        sortBy: undefined,
+        sortOrder: undefined,
+        page: 0,
+      }),
+      replace: true,
+    })
+  }, [navigate])
+
+  const savedViewConfig = useMemo(() => {
+    const config: Record<string, unknown> = {}
+    if (filterMatch === "any" && filterConditions.length) config.match = "any"
+    if (filterConditions.length) config.filters = filterConditions
+    if (search) config.search = search
+    if (searchParams.sortBy) {
+      config.sortBy = searchParams.sortBy
+      config.sortOrder = searchParams.sortOrder
+    }
+    return config
+  }, [
+    filterMatch,
+    filterConditions,
+    search,
+    searchParams.sortBy,
+    searchParams.sortOrder,
+  ])
+
+  const applySavedView = useCallback(
+    (config: Record<string, unknown>) => {
+      const filters = sanitizeFilterConditions(config.filters)
+      const sortOrder: "asc" | "desc" | undefined =
+        config.sortOrder === "asc" || config.sortOrder === "desc"
+          ? config.sortOrder
+          : undefined
+      navigate({
+        to: "/payments",
+        search: (prev: Record<string, unknown>) => ({
+          ...prev,
+          status: undefined,
+          page: 0,
+          match:
+            config.match === "any" && filters.length
+              ? ("any" as const)
+              : undefined,
+          filters: filters.length ? filters : undefined,
+          search:
+            typeof config.search === "string" && config.search
+              ? config.search
+              : undefined,
+          sortBy:
+            typeof config.sortBy === "string" && config.sortBy
+              ? config.sortBy
+              : undefined,
+          sortOrder,
+        }),
+        replace: true,
+      })
+    },
+    [navigate],
+  )
 
   const { data: payments } = useQuery({
     ...getPaymentsQueryOptions(
@@ -681,9 +790,10 @@ function PaymentsTableContent() {
       pagination.pageIndex,
       pagination.pageSize,
       search,
-      statusFilter,
+      filtersJson,
       sorting[0]?.id,
       sorting[0]?.desc ? "desc" : "asc",
+      applicationId,
     ),
     placeholderData: keepPreviousData,
   })
@@ -734,21 +844,60 @@ function PaymentsTableContent() {
         onPaginationChange: setPagination,
       }}
       filterBar={
-        <StatusDropdownFilter
-          popupId={selectedPopupId}
-          selected={statusFilter}
-          onSelect={(value) => {
-            navigate({
-              to: "/payments",
-              search: (prev) => ({ ...prev, status: value, page: 0 }),
-              replace: true,
-            })
-          }}
-        />
+        <div className="flex flex-wrap items-center gap-2">
+          <FilterBuilder
+            fields={PAYMENT_FIELD_DEFS}
+            match={filterMatch}
+            conditions={filterConditions}
+            onChange={setFilters}
+            emptyMessage="No filters applied. Add a filter to narrow down payments."
+          />
+          {selectedPopupId && (
+            <SavedViewsMenu
+              popupId={selectedPopupId}
+              entity="payments"
+              currentConfig={savedViewConfig}
+              onApply={applySavedView}
+            />
+          )}
+          {hasActiveView && (
+            <Button
+              variant="ghost"
+              className="h-9 text-muted-foreground"
+              onClick={clearView}
+            >
+              <X className="h-4 w-4" />
+              Clear
+            </Button>
+          )}
+          {applicationId && (
+            <Badge variant="secondary" className="gap-1 py-1 pl-2.5 pr-1">
+              Application
+              <button
+                type="button"
+                aria-label="Clear application filter"
+                onClick={() =>
+                  navigate({
+                    to: "/payments",
+                    search: {
+                      ...searchParams,
+                      applicationId: undefined,
+                      page: 0,
+                    },
+                    replace: true,
+                  })
+                }
+                className="rounded-sm p-0.5 transition-colors hover:bg-foreground/10"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </Badge>
+          )}
+        </div>
       }
       renderSubComponent={PaymentSubRow}
       emptyState={
-        !search ? (
+        !search && !filterConditions.length ? (
           <EmptyState
             icon={CreditCard}
             title="No payments yet"
@@ -762,8 +911,13 @@ function PaymentsTableContent() {
 
 function Payments() {
   const { isContextReady, selectedPopupId } = useWorkspace()
+  const searchParams = Route.useSearch()
+  const { search, filtersJson } = usePaymentsFilterParams()
   const [isExporting, setIsExporting] = useState(false)
 
+  // Export what the table shows: the same search, filters and sort drive the
+  // fetch, just without pagination.
+  const isExportFiltered = Boolean(search || filtersJson)
   const handleExport = async () => {
     if (!selectedPopupId) return
     setIsExporting(true)
@@ -773,21 +927,31 @@ function Payments() {
           skip,
           limit,
           popupId: selectedPopupId,
+          search: search.trim() || undefined,
+          filters: filtersJson,
+          sortBy: searchParams.sortBy || undefined,
+          sortOrder: searchParams.sortBy
+            ? (searchParams.sortOrder ?? "desc")
+            : undefined,
         }),
       )
-      exportToCsv("payments", results as unknown as Record<string, unknown>[], [
-        { key: "amount", label: "Amount" },
-        { key: "currency", label: "Currency" },
-        { key: "status", label: "Status" },
-        { key: "source", label: "Source" },
-        { key: "is_installment_plan", label: "Installment Plan" },
-        { key: "installments_paid", label: "Installments Paid" },
-        { key: "installments_total", label: "Installments Total" },
-        { key: "insurance_amount", label: "Insurance" },
-        { key: "contribution_amount", label: "Contribution" },
-        { key: "coupon_code", label: "Coupon" },
-        { key: "created_at", label: "Date", type: "date" },
-      ])
+      exportToCsv(
+        isExportFiltered ? "payments-filtered" : "payments",
+        results as unknown as Record<string, unknown>[],
+        [
+          { key: "amount", label: "Amount" },
+          { key: "currency", label: "Currency" },
+          { key: "status", label: "Status" },
+          { key: "source", label: "Source" },
+          { key: "is_installment_plan", label: "Installment Plan" },
+          { key: "installments_paid", label: "Installments Paid" },
+          { key: "installments_total", label: "Installments Total" },
+          { key: "insurance_amount", label: "Insurance" },
+          { key: "contribution_amount", label: "Contribution" },
+          { key: "coupon_code", label: "Coupon" },
+          { key: "created_at", label: "Date", type: "date" },
+        ],
+      )
     } finally {
       setIsExporting(false)
     }
@@ -807,9 +971,18 @@ function Payments() {
             variant="outline"
             onClick={handleExport}
             disabled={isExporting}
+            title={
+              isExportFiltered
+                ? "Exports the payments matching the current filters"
+                : "Exports all payments for this gathering"
+            }
           >
             <Download className="mr-2 h-4 w-4" />
-            {isExporting ? "Exporting..." : "Export CSV"}
+            {isExporting
+              ? "Exporting..."
+              : isExportFiltered
+                ? "Export filtered CSV"
+                : "Export CSV"}
           </Button>
         )}
       </div>

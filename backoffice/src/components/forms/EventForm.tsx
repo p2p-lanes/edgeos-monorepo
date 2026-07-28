@@ -417,7 +417,7 @@ export function EventForm({
         return
       }
       if (!selectedPopupId) {
-        showErrorToast("Select a pop-up first")
+        showErrorToast("Select a gathering first")
         return
       }
 
@@ -1615,7 +1615,7 @@ export function EventForm({
           description={
             popup?.name
               ? `Name shown to participants on the event page. Leave blank to use "${popup.name}".`
-              : "Name shown to participants on the event page. Leave blank to use the pop-up name."
+              : "Name shown to participants on the event page. Leave blank to use the gathering name."
           }
         >
           <form.Field name="host_display_name">

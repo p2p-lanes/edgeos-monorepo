@@ -30,6 +30,11 @@ from app.utils.encryption import encrypt
 
 router = APIRouter(prefix="/tenants", tags=["tenants"])
 
+# Machine-readable detail (and domain-cache sentinel) for suspended tenants.
+# Kept equal to app.api.auth.crud.TRIAL_ENDED_DETAIL so every surface returns
+# the same shape: 403 {"detail": "trial_ended"}.
+TRIAL_ENDED_SENTINEL = "trial_ended"
+
 
 def _smtp_password_configured_after_payload(
     current_encrypted: str | None,
@@ -89,12 +94,17 @@ async def get_tenant_by_domain(
     avoid leaking which domains are registered (spec NFR2).
     No authentication required — used by portal middleware on every request.
     """
-    # Cache-first: hit returns JSON or the "null" sentinel (cached 404)
+    # Cache-first: hit returns JSON or a sentinel ("null" = cached 404,
+    # "trial_ended" = cached suspension)
     cached = domain_cache.get(domain)
     if cached is not None:
         if cached == "null":
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail="Not found"
+            )
+        if cached == TRIAL_ENDED_SENTINEL:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN, detail=TRIAL_ENDED_SENTINEL
             )
         return TenantAnonymousPublic.model_validate_json(cached)
 
@@ -103,6 +113,15 @@ async def get_tenant_by_domain(
     if tenant is None:
         domain_cache.set(domain, "null")
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
+
+    # Suspended tenant (expired trial): the portal shows a "trial ended" screen.
+    # Distinct from 404 so the frontend can tell "unknown host" from
+    # "known but paused". Data and credentials remain intact.
+    if tenant.suspended_at is not None:
+        domain_cache.set(domain, TRIAL_ENDED_SENTINEL)
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail=TRIAL_ENDED_SENTINEL
+        )
 
     result = TenantAnonymousPublic.model_validate(tenant)
 
@@ -132,6 +151,11 @@ async def get_tenant_by_slug(
             detail="Tenant not found",
         )
 
+    if tenant.suspended_at is not None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail=TRIAL_ENDED_SENTINEL
+        )
+
     return TenantAnonymousPublic.model_validate(tenant)
 
 
@@ -140,11 +164,20 @@ async def list_tenants(
     db: SessionDep,
     _: CurrentSuperadmin,
     search: str | None = None,
+    include_deleted: bool = False,
     skip: PaginationSkip = 0,
     limit: PaginationLimit = 100,
 ) -> ListModel[TenantPublic]:
+    # Deleted organizations are hidden by default: they have no database
+    # credentials left, so offering them as a selectable context only leads to
+    # failing requests. Admin listings opt in to see them.
     tenants, total = crud.find(
-        db, skip=skip, limit=limit, search=search, search_fields=["name"]
+        db,
+        skip=skip,
+        limit=limit,
+        search=search,
+        search_fields=["name"],
+        deleted=None if include_deleted else False,
     )
 
     return ListModel[TenantPublic](
@@ -308,12 +341,37 @@ async def update_tenant(
                 ),
             )
 
+    # 7b. Merged-state validation for the portal help button.
+    # The schema validator only sees the payload, so it cannot judge
+    # PATCH {"help_enabled": true} against a row that has no help_email, nor
+    # PATCH {"help_email": null} against a row that already has help enabled.
+    effective_help_enabled = (
+        tenant_in.help_enabled
+        if tenant_in.help_enabled is not None
+        else tenant.help_enabled
+    )
+    effective_help_email = (
+        tenant_in.help_email
+        if "help_email" in tenant_in.model_fields_set
+        else tenant.help_email
+    )
+    if effective_help_enabled and not (effective_help_email or "").strip():
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                "help_enabled requires a help_email. Set a help email before "
+                "enabling the portal help button."
+            ),
+        )
+
     # 8. Snapshot old domain and fields for cache invalidation after update
     old_domain = tenant.custom_domain
     old_landing_mode = tenant.landing_mode
     old_custom_domain_active = tenant.custom_domain_active
     old_meta_tracking_enabled = tenant.meta_tracking_enabled
     old_meta_pixel_id = tenant.meta_pixel_id
+    old_help_enabled = tenant.help_enabled
+    old_help_email = tenant.help_email
 
     # CDN image ingestion: rewrite external image URLs to CDN before commit.
     # Pattern B (async hook). Fail-open: any per-URL failure keeps the original URL.
@@ -386,6 +444,8 @@ async def update_tenant(
     new_custom_domain_active = updated.custom_domain_active
     new_meta_tracking_enabled = updated.meta_tracking_enabled
     new_meta_pixel_id = updated.meta_pixel_id
+    new_help_enabled = updated.help_enabled
+    new_help_email = updated.help_email
 
     domains_to_invalidate: set[str] = set()
 
@@ -405,6 +465,12 @@ async def update_tenant(
     if (
         new_meta_tracking_enabled != old_meta_tracking_enabled
         or new_meta_pixel_id != old_meta_pixel_id
+    ) and new_domain:
+        domains_to_invalidate.add(new_domain)
+
+    # Invalidate current domain when the public help-button config changes.
+    if (
+        new_help_enabled != old_help_enabled or new_help_email != old_help_email
     ) and new_domain:
         domains_to_invalidate.add(new_domain)
 

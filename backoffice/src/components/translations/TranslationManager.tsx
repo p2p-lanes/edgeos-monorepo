@@ -227,7 +227,7 @@ function LanguageTab({
         <div className="h-1.5 max-w-[160px] flex-1 overflow-hidden rounded-full bg-muted">
           <div
             className={`h-full rounded-full transition-all ${
-              isComplete ? "bg-green-600" : "bg-primary"
+              isComplete ? "bg-success" : "bg-primary"
             }`}
             style={{
               width: `${totalCount ? (doneCount / totalCount) * 100 : 0}%`,

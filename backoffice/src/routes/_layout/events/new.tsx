@@ -71,7 +71,7 @@ function NewEventPage() {
   return (
     <FormPageLayout
       title="Create Event"
-      description="Add a new event to this pop-up"
+      description="Add a new event to this gathering"
       backTo="/events"
     >
       {selectedPopupId ? (

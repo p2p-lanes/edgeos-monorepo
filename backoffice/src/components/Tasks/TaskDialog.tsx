@@ -206,7 +206,7 @@ export function TaskDialog({ open, onOpenChange, taskId }: TaskDialogProps) {
       return
     }
     if (form.visibility === "tenant" && !form.target_tenant_id) {
-      showErrorToast("Pick a tenant for tenant-scoped visibility")
+      showErrorToast("Pick an organization for organization-scoped visibility")
       return
     }
     if (isEdit) updateMutation.mutate()
@@ -438,7 +438,7 @@ export function TaskDialog({ open, onOpenChange, taskId }: TaskDialogProps) {
 
             {isSuperadmin && form.visibility === "tenant" && (
               <div className="space-y-2">
-                <Label>Tenant</Label>
+                <Label>Organization</Label>
                 <Select
                   value={form.target_tenant_id || NONE}
                   onValueChange={(v) =>
@@ -447,7 +447,7 @@ export function TaskDialog({ open, onOpenChange, taskId }: TaskDialogProps) {
                   disabled={readOnly}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select a tenant" />
+                    <SelectValue placeholder="Select an organization" />
                   </SelectTrigger>
                   <SelectContent>
                     {tenants.map((t) => (

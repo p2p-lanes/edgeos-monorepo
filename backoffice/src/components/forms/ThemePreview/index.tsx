@@ -138,10 +138,10 @@ export function ThemePreview({
             ...(cssVars as React.CSSProperties),
             backgroundColor: "var(--background)",
             color: "var(--body)",
-            // The portal uses Geist; the backoffice doesn't load it. Falling
-            // back to system-ui keeps proportions reasonable without extra
-            // network requests for a preview-only surface.
-            fontFamily: "system-ui, sans-serif",
+            // The portal renders in Geist; the backoffice bundles the same
+            // typeface (@fontsource-variable/geist) as --font-sans, so the
+            // preview matches production typography at zero extra cost.
+            fontFamily: "var(--font-sans)",
             fontSize: fontBaseSize || "16px",
           }}
         >

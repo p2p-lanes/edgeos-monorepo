@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+
+{% block title %}2 days left in your trial{% endblock %}
+
+{% block content %}
+<h1>2 days left in your trial</h1>
+
+<p>Hi,</p>
+
+<p>
+    Your {{ project_name }} trial for <strong>{{ gathering_name }}</strong> ends on
+    <strong>{{ expires_on }}</strong>.
+</p>
+
+<p>
+    After that date your workspace will be paused. Nothing gets deleted — your
+    gathering, forms, and data stay exactly as you left them — but your team
+    will not be able to sign in until the account is upgraded.
+</p>
+
+<p>
+    To keep going, reply to this email and we will set you up.
+</p>
+
+<div style="text-align: center; margin: 30px 0;">
+    {% set button_url = backoffice_url %}
+    {% set button_text = "Open your backoffice" %}
+    {% include 'components/button.html' with context %}
+</div>
+
+<p>
+    Best regards,<br>
+    The {{ project_name }} Team
+</p>
+{% endblock %}

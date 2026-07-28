@@ -77,9 +77,7 @@ async def preview_invite(
         from app.api.application.crud import applications_crud
 
         already_redeemed = (
-            applications_crud.get_by_human_popup(
-                db, current_human.id, invite.popup_id
-            )
+            applications_crud.get_by_human_popup(db, current_human.id, invite.popup_id)
             is not None
         )
 

@@ -25,15 +25,20 @@ import useAuth from "@/hooks/useAuth"
 interface UserInfoProps {
   fullName?: string
   email?: string
+  emailClassName?: string
 }
 
-function UserInfo({ fullName, email }: UserInfoProps) {
+function UserInfo({
+  fullName,
+  email,
+  emailClassName = "text-muted-foreground",
+}: UserInfoProps) {
   return (
     <div className="flex items-center gap-2.5 w-full min-w-0 group-data-[collapsible=icon]:justify-center">
       <UserIcon className="size-4 shrink-0" />
       <div className="flex flex-col items-start min-w-0 group-data-[collapsible=icon]:hidden">
         <p className="text-sm font-medium truncate w-full">{fullName}</p>
-        <p className="text-xs text-muted-foreground truncate w-full">{email}</p>
+        <p className={`text-xs ${emailClassName} truncate w-full`}>{email}</p>
       </div>
     </div>
   )
@@ -64,8 +69,12 @@ export function User({ user }: { user: any }) {
               className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
               data-testid="user-menu"
             >
-              <UserInfo fullName={user?.full_name} email={user?.email} />
-              <ChevronsUpDown className="ml-auto size-4 text-muted-foreground group-data-[collapsible=icon]:hidden" />
+              <UserInfo
+                fullName={user?.full_name}
+                email={user?.email}
+                emailClassName="text-sidebar-foreground/70"
+              />
+              <ChevronsUpDown className="ml-auto size-4 text-sidebar-foreground/70 group-data-[collapsible=icon]:hidden" />
             </SidebarMenuButton>
           </DropdownMenuTrigger>
           <DropdownMenuContent

@@ -141,7 +141,7 @@ export function ReviewersManager({
       <SectionShell
         variant={variant}
         title="Reviewers"
-        description="Users who can review and approve applications for this popup"
+        description="Users who can review and approve applications for this gathering"
         action={
           !readOnly && availableUsers.length > 0 ? (
             <Button

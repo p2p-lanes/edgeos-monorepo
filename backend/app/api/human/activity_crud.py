@@ -165,7 +165,6 @@ def comment_to_item(comment: "HumanComment") -> HumanActivityItem:
 
 def build_human_activity(
     session: Session,
-    control_session: Session,
     human_id: uuid.UUID,
     *,
     skip: int,
@@ -176,11 +175,8 @@ def build_human_activity(
     Returns ``(items[skip : skip + limit], total)`` where ``total`` is the
     exact count across all sources.
 
-    Most sources are read through the RLS-scoped ``session``. Comments are the
-    exception: ``human_comments`` is a global table with no tenant RLS or grants
-    (it is reached only through the privileged engine), so it is read through
-    ``control_session`` instead. The caller must already have verified the human
-    belongs to the tenant before calling this.
+    Every source, comments included, is read through the RLS-scoped
+    ``session``; ``human_comments`` is now a tenant-scoped table.
     """
     # Imported lazily to avoid a circular import: the human router (which loads
     # this module) is imported while application.models is still initializing.
@@ -310,14 +306,13 @@ def build_human_activity(
         else:
             items.append(note_log_to_item(log))
 
-    # 5. Comments — the global `human_comments` table has no tenant RLS/grants,
-    # so it is read through the privileged `control_session`. Soft-deleted
+    # 5. Comments — tenant-scoped, read through the RLS `session`. Soft-deleted
     # comments are already filtered out by `list_comments`.
     from app.api.human.crud import humans_crud
 
     items.extend(
         comment_to_item(comment)
-        for comment in humans_crud.list_comments(control_session, human_id)
+        for comment in humans_crud.list_comments(session, human_id)
     )
 
     # 6. Popup labels — one query for all referenced popups (avoid N+1).

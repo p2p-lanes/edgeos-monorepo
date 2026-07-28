@@ -2,9 +2,14 @@ import uuid
 from datetime import datetime
 from decimal import Decimal
 from enum import Enum, StrEnum
-from typing import Literal
+from typing import ClassVar, Literal
 
-from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    field_validator,
+)
+from pydantic import Field as PydanticField
 from sqlalchemy import Boolean, Numeric, String, Text
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlmodel import Column, DateTime, Field, SQLModel
@@ -12,6 +17,15 @@ from sqlmodel import Column, DateTime, Field, SQLModel
 from app.api.application_review.schemas import ReviewDecision
 from app.api.attendee.schemas import AttendeePublic
 from app.api.human.schemas import HumanPublic
+from app.core.filters import (
+    DATE_OPS,
+    ENUMISH_OPS,
+    TEXT_OPS,
+    FilterCondition,
+    FilterField,
+    FilterGroup,
+    parse_filters,
+)
 
 
 class ApplicationStatus(str, Enum):
@@ -126,6 +140,17 @@ class ApplicationBase(SQLModel):
     )
 
 
+class ApplicationReviewerVote(BaseModel):
+    """Compact reviewer + decision pair for the applications list."""
+
+    reviewer_id: uuid.UUID
+    reviewer_full_name: str | None = None
+    reviewer_email: str | None = None
+    decision: ReviewDecision
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class ApplicationPublic(BaseModel):
     """Application schema for API responses."""
 
@@ -173,6 +198,40 @@ class ApplicationPublic(BaseModel):
     # Computed fields
     red_flag: bool = False
     review_decision: ReviewDecision | None = None
+
+    # Review + comment summary for the applications list
+    review_count: int = 0
+    reviewers: list[ApplicationReviewerVote] = []
+    comment_count: int = 0
+    # Current reviewer's own skip state; populated in the list, detail, and
+    # review-queue paths.
+    skipped_by_me: bool = False
+    my_skip_reason: str | None = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+# --------------------------------------------------------------------------- #
+# Comments — shared review thread on an application; mirrors human comments.
+# Separate from ApplicationReviews.notes (which belongs to a single vote).
+# --------------------------------------------------------------------------- #
+class ApplicationCommentCreate(BaseModel):
+    body: str = PydanticField(min_length=1)
+
+
+class ApplicationCommentUpdate(BaseModel):
+    body: str = PydanticField(min_length=1)
+
+
+class ApplicationCommentPublic(BaseModel):
+    id: uuid.UUID
+    application_id: uuid.UUID
+    author_user_id: uuid.UUID | None = None
+    author_name: str | None = None
+    author_email: str | None = None
+    body: str
+    created_at: datetime
+    edited_at: datetime | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -358,6 +417,114 @@ class ApplicationFilter(BaseModel):
     status: ApplicationStatus | None = None
     email: str | None = None
     scholarship_status: str | None = None
+
+
+# Complex list filters (BO applications table), built on the shared engine
+# in app.core.filters. `custom.<name>` targets custom_fields[<name>].
+# Text eq/neq are exact (case-sensitive); contains/not_contains are
+# case-insensitive. is_empty matches NULL or empty string.
+APPLICATION_FILTER_FIELDS: dict[str, FilterField] = {
+    "status": FilterField(
+        "select",
+        frozenset({"eq", "neq"}),
+        frozenset(s.value for s in ApplicationStatus),
+    ),
+    "scholarship_request": FilterField("boolean", frozenset({"eq"})),
+    "scholarship_status": FilterField("select", ENUMISH_OPS),
+    "submitted_at": FilterField("date", DATE_OPS),
+    "accepted_at": FilterField("date", DATE_OPS),
+    "referral": FilterField("text", TEXT_OPS),
+    "gender": FilterField("select", ENUMISH_OPS),
+    "age": FilterField("select", ENUMISH_OPS),
+    "skipped_by_me": FilterField("boolean", frozenset({"eq"})),
+    "reviewed_by_me": FilterField("boolean", frozenset({"eq"})),
+    "reviewed_by": FilterField("uuid", frozenset({"eq", "neq"})),
+}
+# Backwards-compat operator map derived from the registry.
+APPLICATION_FILTER_FIELD_OPS: dict[str, set[str]] = {
+    name: set(spec.ops) for name, spec in APPLICATION_FILTER_FIELDS.items()
+}
+# Virtual fields resolved against the calling user's own review/skip rows.
+VIRTUAL_REVIEWER_FIELDS = frozenset({"skipped_by_me", "reviewed_by_me"})
+CUSTOM_FIELD_PREFIX = "custom."
+_CUSTOM_FIELD_SPEC = FilterField("text", TEXT_OPS)
+
+
+class ApplicationFilterCondition(FilterCondition):
+    """One condition of the applications list filter group."""
+
+    value: str | bool | None = None
+
+    field_registry: ClassVar[dict[str, FilterField]] = APPLICATION_FILTER_FIELDS
+
+    @classmethod
+    def resolve_field(cls, name: str) -> FilterField:
+        if name.startswith(CUSTOM_FIELD_PREFIX):
+            if not name[len(CUSTOM_FIELD_PREFIX) :]:
+                raise ValueError("Custom field name is missing.")
+            return _CUSTOM_FIELD_SPEC
+        return super().resolve_field(name)
+
+    def validate_value(self, spec: FilterField) -> None:
+        # Entity-specific messages kept from the pre-engine validator.
+        if self.field == "status":
+            if self.value not in (spec.values or frozenset()):
+                raise ValueError("Invalid status value.")
+            return
+        if self.field == "scholarship_request":
+            if not isinstance(self.value, bool):
+                raise ValueError("Scholarship request filter needs true or false.")
+            return
+        if self.field == "reviewed_by":
+            if not isinstance(self.value, str):
+                raise ValueError("Filter 'reviewed_by' needs a valid reviewer.")
+            try:
+                uuid.UUID(self.value)
+            except ValueError:
+                raise ValueError(
+                    "Filter 'reviewed_by' needs a valid reviewer."
+                ) from None
+            return
+        super().validate_value(spec)
+
+    @property
+    def custom_field_name(self) -> str | None:
+        """Custom field key when this condition targets custom_fields."""
+        if self.field.startswith(CUSTOM_FIELD_PREFIX):
+            return self.field[len(CUSTOM_FIELD_PREFIX) :]
+        return None
+
+
+class ApplicationFilters(FilterGroup):
+    """Filter group for the BO applications list.
+
+    ``match`` combines conditions with AND ("all") or OR ("any").
+    """
+
+    conditions: list[ApplicationFilterCondition] = PydanticField(default_factory=list)
+
+    def references_human_fields(self) -> bool:
+        """True when any condition targets a Humans column (needs join)."""
+        return any(c.field in ("gender", "age") for c in self.conditions)
+
+
+def parse_application_filters(raw: str | None) -> ApplicationFilters | None:
+    """Parse the ``filters`` query param JSON into ApplicationFilters.
+
+    Raises HTTPException 422 with a user-oriented message when the JSON is
+    malformed or a condition uses an unsupported field, operator, or value.
+    """
+    return parse_filters(raw, ApplicationFilters)
+
+
+class ApplicationGroupCount(BaseModel):
+    """One bucket of GET /applications/group-counts.
+
+    ``value`` is None for applications where the group field is NULL or "".
+    """
+
+    value: str | None = None
+    count: int
 
 
 class ScholarshipDecisionRequest(BaseModel):

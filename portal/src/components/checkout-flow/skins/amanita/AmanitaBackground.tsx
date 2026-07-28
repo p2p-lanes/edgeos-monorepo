@@ -14,10 +14,18 @@ import { Stars } from "./Stars"
  * only ever fetches the one matching source, so this is both simpler and
  * avoids the double download — a legitimate use of raw `<img>` for a
  * decorative, full-bleed, art-directed background image.
+ *
+ * `pointer-events-none` is load-bearing, not tidying: the checkout scrolls in
+ * `CheckoutPageClient`'s `main.h-svh.overflow-y-auto`, but a fixed element's
+ * scroll chain starts at the viewport, not at the overflow ancestor it happens
+ * to sit in — and the document itself doesn't scroll. Hit-testable, this layer
+ * swallows the wheel everywhere it isn't covered by the content column, so the
+ * page only scrolls with the cursor over the cards. The sibling non-amanita
+ * backgrounds dodge this by painting at `-z-10`, behind the scroller's own box.
  */
 export function AmanitaBackground() {
   return (
-    <div aria-hidden className="fixed inset-0 z-0">
+    <div aria-hidden className="pointer-events-none fixed inset-0 z-0">
       <picture>
         <source
           media="(max-width: 767px)"

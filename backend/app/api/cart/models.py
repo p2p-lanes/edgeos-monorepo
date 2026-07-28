@@ -2,7 +2,7 @@ import uuid
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Index, UniqueConstraint, text
+from sqlalchemy import UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlmodel import Column, DateTime, Field, Relationship, func
 
@@ -18,18 +18,9 @@ class Carts(CartBase, table=True):
     """Cart model - persists checkout state per human per popup."""
 
     __table_args__ = (
+        # Open-checkout and authenticated carts are both keyed by (human, popup),
+        # so a buyer has a single cart per popup across both flows.
         UniqueConstraint("human_id", "popup_id", name="uq_cart_human_popup"),
-        # One anonymous cart per (tenant, popup, email). Partial so it only
-        # applies to open-checkout carts (human_id IS NULL) and never collides
-        # with authenticated carts, which leave email NULL.
-        Index(
-            "uq_cart_tenant_popup_email",
-            "tenant_id",
-            "popup_id",
-            "email",
-            unique=True,
-            postgresql_where=text("human_id IS NULL"),
-        ),
     )
 
     id: uuid.UUID = Field(

@@ -28,12 +28,14 @@ const CREDENTIAL_META: Record<
 > = {
   crud: {
     label: "CRUD (read/write)",
-    description: "Used by admin sessions. Row-level scoped to this tenant.",
+    description:
+      "Used by admin sessions. Row-level scoped to this organization.",
     Icon: KeyRound,
   },
   readonly: {
     label: "Read-only",
-    description: "Used by viewer sessions. SELECT-only, scoped to this tenant.",
+    description:
+      "Used by viewer sessions. SELECT-only, scoped to this organization.",
     Icon: ShieldCheck,
   },
 }
@@ -145,8 +147,8 @@ export function TenantCredentialsSection({
       <div className="py-3">
         <Alert>
           <AlertDescription>
-            Direct database credentials for this tenant. Use only for support,
-            migrations, or audits.
+            Direct database credentials for this organization. Use only for
+            support, migrations, or audits.
           </AlertDescription>
         </Alert>
       </div>
@@ -174,8 +176,8 @@ export function TenantCredentialsSection({
         <div className="py-3">
           <Alert variant="destructive">
             <AlertDescription>
-              No credentials configured for this tenant yet. Credentials are
-              generated on first tenant connection.
+              No credentials configured for this organization yet. Credentials
+              are generated on first connection.
             </AlertDescription>
           </Alert>
         </div>
@@ -234,9 +236,9 @@ export function TenantCredentialsSection({
                       )}
                     />
                     <p className="text-xs text-muted-foreground">
-                      Read-only PostgreSQL URL scoped to this tenant. Scope is
-                      enforced by the database, so the holder of this URL cannot
-                      read other tenants' data. Append{" "}
+                      Read-only PostgreSQL URL scoped to this organization.
+                      Scope is enforced by the database, so the holder of this
+                      URL cannot read other organizations' data. Append{" "}
                       <code className="rounded bg-muted px-1 py-0.5 text-[10px] font-mono">
                         ?sslmode=require
                       </code>{" "}

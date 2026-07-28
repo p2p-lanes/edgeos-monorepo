@@ -47,6 +47,7 @@ def test_prepare_purchase_event_includes_popup_purchase_metadata() -> None:
         effective_unit_price=None,
         product_price=Decimal("12.50"),
         product_name="Weekend Pass",
+        product_category="ticket",
         attendee=attendee,
     )
     payment = SimpleNamespace(
@@ -118,6 +119,43 @@ def test_prepare_purchase_event_includes_popup_purchase_metadata() -> None:
     assert "Lovelace" not in serialized_payload
     assert DUMMY_ACCESS_TOKEN not in serialized_payload
     assert DUMMY_ACCESS_TOKEN not in serialized_event
+
+
+def test_prepare_purchase_event_skips_when_no_ticket_products() -> None:
+    payment = SimpleNamespace(
+        id=uuid4(),
+        amount=Decimal("40.00"),
+        amount_charged=None,
+        currency="USD",
+        products_snapshot=[
+            SimpleNamespace(
+                product_id=uuid4(),
+                quantity=1,
+                effective_unit_price=None,
+                product_price=Decimal("40.00"),
+                product_name="Travel Insurance",
+                product_category="other",
+                attendee=None,
+            )
+        ],
+        application=None,
+        buyer_email="buyer@example.com",
+        buyer_name="Ada Lovelace",
+        buyer_snapshot=None,
+    )
+    popup = SimpleNamespace(
+        id=uuid4(),
+        slug="summer-popup",
+        name="Summer Popup",
+        currency="USD",
+    )
+    tenant = SimpleNamespace(
+        meta_tracking_enabled=True,
+        meta_pixel_id="123456789",
+        meta_capi_access_token_encrypted=encrypt(DUMMY_ACCESS_TOKEN),
+    )
+
+    assert prepare_purchase_event(tenant, payment, popup) is None
 
 
 def test_prepare_initiate_checkout_event_uses_payment_currency_without_order_id() -> (

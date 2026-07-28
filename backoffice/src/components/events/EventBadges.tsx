@@ -7,9 +7,8 @@ const statusColors: Record<string, string> = {
   published: "bg-primary/10 text-primary",
   draft: "bg-muted text-muted-foreground",
   cancelled: "bg-destructive/10 text-destructive",
-  pending_approval:
-    "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200",
-  rejected: "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-200",
+  pending_approval: "bg-warning-soft text-warning",
+  rejected: "bg-destructive-soft text-destructive",
 }
 
 const statusLabels: Record<string, string> = {
@@ -27,16 +26,14 @@ const visibilityConfig: Record<
   private: {
     label: "Private",
     icon: Lock,
-    className:
-      "border-red-300 text-red-700 bg-red-50 dark:border-red-700 dark:text-red-300 dark:bg-red-950/30",
-    iconColor: "text-red-600 dark:text-red-400",
+    className: "border-destructive/25 text-destructive bg-destructive-soft",
+    iconColor: "text-destructive",
   },
   unlisted: {
     label: "Unlisted",
     icon: EyeOff,
-    className:
-      "border-amber-300 text-amber-700 bg-amber-50 dark:border-amber-700 dark:text-amber-300 dark:bg-amber-950/30",
-    iconColor: "text-amber-600 dark:text-amber-400",
+    className: "border-warning/25 text-warning bg-warning-soft",
+    iconColor: "text-warning",
   },
   public: {
     label: "Public",

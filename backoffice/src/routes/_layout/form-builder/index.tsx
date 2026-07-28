@@ -309,6 +309,7 @@ function FormBuilderContent({ popupId }: { popupId: string }) {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["form-sections"] })
+      queryClient.invalidateQueries({ queryKey: ["form-fields"] })
     },
     onError: createErrorHandler(showErrorToast),
   })
@@ -329,6 +330,7 @@ function FormBuilderContent({ popupId }: { popupId: string }) {
     onSuccess: () => {
       showSuccessToast("Section deleted")
       queryClient.invalidateQueries({ queryKey: ["form-sections"] })
+      queryClient.invalidateQueries({ queryKey: ["form-fields"] })
     },
     onError: createErrorHandler(showErrorToast),
   })
@@ -768,12 +770,12 @@ function FormBuilderContent({ popupId }: { popupId: string }) {
           <DialogHeader>
             <DialogTitle>
               {deleteTarget && isSpecialField(deleteTarget)
-                ? "Remove from this popup"
+                ? "Remove from this gathering"
                 : "Delete Form Field"}
             </DialogTitle>
             <DialogDescription>
               {deleteTarget && isSpecialField(deleteTarget)
-                ? `"${deleteTarget.label}" will no longer be asked on this popup. The field stays in the catalog and can be added back later.`
+                ? `"${deleteTarget.label}" will no longer be asked on this gathering. The field stays in the catalog and can be added back later.`
                 : `Are you sure you want to delete "${deleteTarget?.label}"? Applications may lose their stored data for this field. This action cannot be undone.`}
             </DialogDescription>
           </DialogHeader>

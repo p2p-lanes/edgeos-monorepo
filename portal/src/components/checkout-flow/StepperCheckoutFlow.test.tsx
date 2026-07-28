@@ -29,6 +29,8 @@ vi.mock("next/font/google", () => ({
   Quicksand: () => ({ variable: "--font-amanita-sans" }),
 }))
 
+let amanitaConfirmProps: Record<string, unknown> | null = null
+
 vi.mock("@/providers/checkoutProvider", () => ({
   useCheckout: () => ({
     availableSteps: availableStepsOverride ?? ["passes", "confirm"],
@@ -85,6 +87,15 @@ vi.mock("./skins/amanita/AmanitaBuyerStep", () => ({
 vi.mock("./skins/amanita/AmanitaCatalogSection", () => ({
   default: () => <div>amanita-catalog</div>,
 }))
+// Captured rather than rendered for real: what matters at this seam is which
+// props the bar hands down, and the real section needs a provider surface this
+// suite deliberately doesn't mock.
+vi.mock("./skins/amanita/AmanitaConfirmSection", () => ({
+  default: (props: Record<string, unknown>) => {
+    amanitaConfirmProps = props
+    return <div>amanita-confirm</div>
+  },
+}))
 vi.mock("./steps/ConfirmStep", () => ({
   default: () => <div>confirm-step</div>,
 }))
@@ -102,6 +113,7 @@ describe("StepperCheckoutFlow", () => {
     stepConfigsOverride = null
     hasAnyCartItemsOverride = null
     buyerCompleteOverride = null
+    amanitaConfirmProps = null
     markBuyerFieldsTouched.mockClear()
     triggerCheckoutToast.mockClear()
     dismissCheckoutToast.mockClear()
@@ -198,6 +210,32 @@ describe("StepperCheckoutFlow", () => {
     await waitFor(() => expect(submitPayment).toHaveBeenCalledTimes(1))
   })
 
+  // Direction arrows on the bar's two buttons. They're decoration, so they are
+  // asserted on the DOM rather than through the accessible name — which they
+  // must leave alone, since the rest of this suite finds these buttons by it.
+  describe("bottom-bar arrows", () => {
+    it("points Back left and the forward CTA right", () => {
+      const { container } = render(<StepperCheckoutFlow />)
+      fireEvent.click(screen.getByTestId("stepper-next")) // → confirm (last)
+
+      const back = screen.getByRole("button", { name: "common.back" })
+      expect(back.querySelector(".lucide-arrow-left")).toBeTruthy()
+      expect(
+        screen.getByTestId("stepper-next").querySelector(".lucide-arrow-right"),
+      ).toBeTruthy()
+      expect(container.querySelector(".lucide-arrow-left")).toBeTruthy()
+    })
+
+    it("keeps the arrows out of the buttons' accessible names", () => {
+      render(<StepperCheckoutFlow />)
+      // An <svg> contributes no text, so the label is all that's left — this
+      // is what keeps `getByRole({ name })` working across the suite.
+      expect(screen.getByTestId("stepper-next").textContent?.trim()).toBe(
+        "Review & Confirm",
+      )
+    })
+  })
+
   describe("skin", () => {
     const AMANITA_CITY = {
       terms_and_conditions_url: null,
@@ -256,6 +294,30 @@ describe("StepperCheckoutFlow", () => {
       expect(bar.style.background).toContain("linear-gradient")
     })
 
+    /* The amanita chrome is `fixed`, and a fixed element scroll-chains to the
+       viewport rather than to the page's `overflow-y-auto` scroller — so any
+       hit-testable full-bleed layer swallows the wheel across the strip it
+       covers. The gradient bar has to stay transparent to the pointer, with
+       `-auto` restored on the pills. Same contract as the bottom bar's. */
+    it("lets the wheel through the amanita nav gradient while its controls stay clickable", () => {
+      cityOverride = AMANITA_CITY
+      stepConfigsOverride = [PASSES_STEP_CONFIG]
+      const { container } = render(
+        <StepperCheckoutFlow
+          navExtraContent={<button type="button">language</button>}
+        />,
+      )
+
+      const nav = container.querySelector('nav[aria-label="Checkout sections"]')
+      const bar = nav?.parentElement as HTMLElement
+      expect(bar.classList.contains("pointer-events-none")).toBe(true)
+      expect(nav?.classList.contains("pointer-events-auto")).toBe(true)
+      // The language switcher lives in the bar but outside the <nav>, so it
+      // needs its own opt-in — it was briefly unclickable without one.
+      const extra = screen.getByText("language").parentElement as HTMLElement
+      expect(extra.classList.contains("pointer-events-auto")).toBe(true)
+    })
+
     it("keeps the default skin's nav bar full-width with its own background", () => {
       stepConfigsOverride = [PASSES_STEP_CONFIG]
       const { container } = render(<StepperCheckoutFlow />)
@@ -279,6 +341,19 @@ describe("StepperCheckoutFlow", () => {
       // The gem-frame primary must be gone — classList matches whole tokens,
       // so this does not trip on the `btn-ornate-2` above.
       expect(cta.classList.contains("btn-ornate")).toBe(false)
+    })
+
+    /* The card's CTA pays for the same order as the bar's, so the two must
+       read the same. They drifted once already — "Confirmar compra" in the
+       card against "Pagar" in the bar — because the card derived its own. */
+    it("hands the confirm card the bar's own pay label", () => {
+      cityOverride = AMANITA_CITY
+      render(<StepperCheckoutFlow />)
+      fireEvent.click(screen.getByTestId("stepper-next")) // → confirm (last)
+
+      const bar = screen.getByTestId("stepper-next")
+      expect(amanitaConfirmProps?.payLabel).toBe("checkout.actions.pay")
+      expect(bar.textContent).toContain(amanitaConfirmProps?.payLabel)
     })
 
     it("omits the generic header for amanita steps that render their own", () => {
@@ -590,6 +665,66 @@ describe("StepperCheckoutFlow", () => {
 
       expect(screen.getByText("dynamic-step")).toBeTruthy()
       expect(screen.queryByText("amanita-catalog")).toBeNull()
+    })
+  })
+
+  // The organizer names this button on the confirm step. The string arrives
+  // already translated — the backend overlays the shopper's language onto
+  // `template_config` before it reaches the client — so there is nothing to
+  // translate here; an authored label simply wins over the built-in wording.
+  describe("organizer-authored pay label", () => {
+    const AMANITA_CITY = {
+      terms_and_conditions_url: null,
+      theme_config: { checkout_skin: "amanita" },
+    }
+    const confirmStep = (templateConfig: unknown) => ({
+      id: "confirm-config-1",
+      step_type: "confirm",
+      title: "Review & Confirm",
+      template: null,
+      template_config: templateConfig,
+    })
+
+    it("puts the confirm step's cta_label on both pay buttons", () => {
+      cityOverride = AMANITA_CITY
+      stepConfigsOverride = [confirmStep({ cta_label: "Comprar ya" })]
+      render(<StepperCheckoutFlow />)
+      fireEvent.click(screen.getByTestId("stepper-next")) // → confirm (last)
+
+      expect(screen.getByTestId("stepper-next").textContent).toBe("Comprar ya")
+      expect(amanitaConfirmProps?.payLabel).toBe("Comprar ya")
+    })
+
+    it("falls back to the built-in wording when the organizer wrote none", () => {
+      stepConfigsOverride = [confirmStep({ cta_label: "   " })]
+      render(<StepperCheckoutFlow />)
+      fireEvent.click(screen.getByTestId("stepper-next")) // → confirm (last)
+
+      expect(screen.getByTestId("stepper-next").textContent).toBe(
+        "checkout.actions.pay",
+      )
+    })
+
+    /* Read from the confirm step, not whichever is active — otherwise the
+       label would change as the shopper moves through the funnel. The hero
+       already puts its own `cta_label` on the bar for its own step. */
+    it("ignores another step's cta_label", () => {
+      stepConfigsOverride = [
+        {
+          id: "passes-config-2",
+          step_type: "passes",
+          title: "Select Your Passes",
+          template: "catalog",
+          template_config: { cta_label: "Ver Entradas" },
+        },
+        confirmStep(null),
+      ]
+      render(<StepperCheckoutFlow />)
+      fireEvent.click(screen.getByTestId("stepper-next")) // → confirm (last)
+
+      expect(screen.getByTestId("stepper-next").textContent).toBe(
+        "checkout.actions.pay",
+      )
     })
   })
 })

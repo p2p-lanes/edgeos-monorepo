@@ -235,7 +235,7 @@ export function VenueForm({ defaultValues, onSuccess }: VenueFormProps) {
     onSubmit: ({ value }) => {
       if (readOnly) return
       if (!selectedPopupId && !isEdit) {
-        showErrorToast("Select a pop-up first")
+        showErrorToast("Select a gathering first")
         return
       }
       const coords = parseGoogleMapsUrl(value.google_maps_link)

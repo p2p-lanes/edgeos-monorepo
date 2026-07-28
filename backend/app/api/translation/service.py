@@ -11,7 +11,7 @@ TRANSLATABLE_FIELDS: dict[str, list[str]] = {
     "group": ["name", "description", "welcome_message"],
     "form_field": ["label", "placeholder", "help_text", "options"],
     "form_section": ["label", "description"],
-    "ticketing_step": ["title", "description"],
+    "ticketing_step": ["title", "description", "watermark"],
 }
 
 
@@ -127,6 +127,7 @@ _TEXT_LEAF_KEYS = frozenset(
         # `headline` is the largest text on the page, so leaving them out made
         # a "translated" checkout still open in the source language.
         "headline",
+        "edition",
         "date_badge",
         "cta_label",
         "cta_hint",

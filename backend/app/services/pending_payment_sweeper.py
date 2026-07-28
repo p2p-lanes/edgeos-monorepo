@@ -3,10 +3,19 @@
 Finds PENDING SimpleFi payments older than the configured staleness threshold
 and reconciles them with the current SimpleFi status:
 
-  - approved / active / completed  → approve path (``_reconcile_approved``)
-  - terminal (cancelled/expired/refunded) → ``update_status(EXPIRED)``
-  - still pending on SimpleFi      → skip (retried next run)
-  - status fetch fails             → skip + log (retried next run)
+  - one-shot request approved              → approve path (``_reconcile_approved``)
+  - installment plan with a charged cuota  → approve path (``_reconcile_approved``)
+  - terminal (cancelled/expired/refunded)  → ``update_status(EXPIRED)``
+  - still pending on SimpleFi               → skip (retried next run)
+  - status fetch fails                      → skip + log (retried next run)
+
+For installment plans the approve gate is ``paid_installments_count >= 1`` (or a
+``completed`` plan), NOT the ``active`` status: an activated plan can still have
+zero installments charged.  Our Payment row represents only the first cuota, so
+approving on ``active`` alone would assign products before any money cleared.
+
+The sweeper never sends a confirmation email; it only reconciles state.  Email
+delivery stays owned by the webhook path.
 
 Popup with no ``simplefi_api_key`` → expire locally (``expired_orphaned``
 action); same policy as ``supersede_pending_payments`` in ADR-2.  These are
@@ -27,9 +36,6 @@ from sqlmodel import Session
 from app.api.payment.crud import payments_crud
 from app.api.payment.models import Payments
 from app.api.payment.schemas import PaymentStatus
-from app.services.payment_notifications import (
-    _send_payment_confirmed_email,
-)
 from app.services.simplefi import get_simplefi_client
 
 # Session-level advisory lock key — must be distinct from every other job's
@@ -39,7 +45,10 @@ SWEEP_ADVISORY_LOCK_KEY = 7384925163
 
 # SimpleFi statuses that indicate the provider already cancelled the payment.
 _TERMINAL_STATUSES = frozenset({"canceled", "cancelled", "expired", "refunded"})
-# SimpleFi statuses that mean the buyer actually paid.
+# SimpleFi statuses that mean a one-shot payment request was actually paid.
+# Installment plans do NOT use this set — they gate on paid_installments_count
+# (see _reconcile_candidate), because "active" means "plan activated", not
+# "first cuota charged".
 _APPROVED_STATUSES = frozenset({"approved", "active", "completed"})
 
 
@@ -49,8 +58,7 @@ async def _reconcile_candidate(session: Session, payment: Payments) -> str:
     Returns a string action token for summary counters:
     - ``"expired"``              — SimpleFi-confirmed terminal, holds released
     - ``"expired_orphaned"``     — no API key to check; expired locally
-    - ``"approved_reconciled"``  — payment approved, confirmation email sent
-    - ``"approved_email_failed"``— payment approved, but email dispatch failed
+    - ``"approved_reconciled"``  — payment approved (no email sent by the sweeper)
     - ``"skipped_still_pending"``— SimpleFi still shows pending, try next run
     - ``"skipped_error"``        — SimpleFi call failed, try next run
 
@@ -107,26 +115,22 @@ async def _reconcile_candidate(session: Session, payment: Payments) -> str:
 
     normalized = status_resp.status.lower().strip()
 
-    if normalized in _APPROVED_STATUSES:
+    if payment.is_installment_plan:
+        # For a plan our Payment row represents only the first cuota. "active"
+        # means the plan was activated, not that a cuota cleared, so gate on
+        # paid_installments_count instead: >= 1 means the buyer paid at least
+        # the first installment. A "completed" plan is paid by definition.
+        paid_count = status_resp.paid_installments_count or 0
+        buyer_paid = normalized == "completed" or paid_count >= 1
+    else:
+        buyer_paid = normalized in _APPROVED_STATUSES
+
+    if buyer_paid:
         # SimpleFi shows the buyer paid.  Idempotently approve and issue
-        # tickets; send confirmation email best-effort (the webhook may have
-        # been lost, leaving the buyer without email or products).
-        approved_payment = payments_crud._reconcile_approved(session, payment)
-        # Use _send_payment_confirmed_email directly (not the _best_effort
-        # wrapper) so we can detect and count email failures in the summary
-        # without hiding them from ops.  A failed email does NOT affect
-        # the payment's approved status.
-        try:
-            await _send_payment_confirmed_email(approved_payment, db_session=session)
-        except Exception:
-            logger.warning(
-                "sweeper: email dispatch failed payment={} tenant={} popup={}; "
-                "payment is approved",
-                payment.id,
-                payment.tenant_id,
-                payment.popup_id,
-            )
-            return "approved_email_failed"
+        # tickets (the webhook may have been lost, leaving the buyer without
+        # products).  The sweeper does NOT send a confirmation email — that
+        # stays owned by the webhook path.
+        payments_crud._reconcile_approved(session, payment)
         logger.info(
             "sweeper: payment={} tenant={} action=approved_reconciled simplefi_status={}",
             payment.id,
@@ -180,7 +184,6 @@ async def _run_sweep(
         "expired": 0,
         "expired_orphaned": 0,
         "approved_reconciled": 0,
-        "email_failures": 0,
         "skipped": 0,
         "failures": 0,
     }
@@ -194,12 +197,6 @@ async def _run_sweep(
                 summary["expired_orphaned"] = int(summary["expired_orphaned"]) + 1
             elif action == "approved_reconciled":
                 summary["approved_reconciled"] = int(summary["approved_reconciled"]) + 1
-            elif action == "approved_email_failed":
-                # Payment WAS approved — count as reconciled AND track email failure.
-                # Do NOT count in "failures" (that counter is for unexpected errors
-                # that prevented the reconciliation from completing).
-                summary["approved_reconciled"] = int(summary["approved_reconciled"]) + 1
-                summary["email_failures"] = int(summary["email_failures"]) + 1
             else:
                 # "skipped_still_pending", "skipped_error"
                 summary["skipped"] = int(summary["skipped"]) + 1
@@ -223,12 +220,11 @@ async def _run_sweep(
 
     logger.info(
         "sweeper: run complete candidates={} expired={} expired_orphaned={} "
-        "approved_reconciled={} email_failures={} skipped={} failures={}",
+        "approved_reconciled={} skipped={} failures={}",
         summary["candidates"],
         summary["expired"],
         summary["expired_orphaned"],
         summary["approved_reconciled"],
-        summary["email_failures"],
         summary["skipped"],
         summary["failures"],
     )
@@ -252,8 +248,7 @@ async def sweep_pending_payments(
     during the run.
 
     Returns a summary dict with keys: ``status``, ``candidates``, ``expired``,
-    ``expired_orphaned``, ``approved_reconciled``, ``email_failures``,
-    ``skipped``, ``failures``.
+    ``expired_orphaned``, ``approved_reconciled``, ``skipped``, ``failures``.
     """
     lock_conn = session.get_bind().connect()
     try:

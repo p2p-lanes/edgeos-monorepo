@@ -97,7 +97,7 @@ function RevealKeyDialog({
         </DialogHeader>
         <div className="space-y-3">
           <div className="flex items-center gap-2 rounded-md border bg-muted p-3">
-            <AlertTriangle className="h-4 w-4 shrink-0 text-amber-500" />
+            <AlertTriangle className="h-4 w-4 shrink-0 text-warning" />
             <p className="text-xs text-muted-foreground">
               Store this key securely. Anyone with it can authenticate portal
               users under this tenant. Rotate immediately if compromised.
@@ -464,8 +464,8 @@ function EditAppDialog({
 
             {(legacyTokenScopes.length > 0 ||
               legacyApiKeyScopes.length > 0) && (
-              <div className="flex items-start gap-2 rounded-md border border-amber-500/50 bg-amber-500/10 p-3">
-                <AlertTriangle className="h-4 w-4 shrink-0 text-amber-500 mt-0.5" />
+              <div className="flex items-start gap-2 rounded-md border border-warning/25 bg-warning-soft p-3">
+                <AlertTriangle className="h-4 w-4 shrink-0 text-warning mt-0.5" />
                 <div className="text-xs text-muted-foreground space-y-1">
                   <p className="font-medium text-foreground">
                     Legacy scopes will be removed on save.
@@ -483,8 +483,8 @@ function EditAppDialog({
             )}
 
             {isExpandingScopes && (
-              <div className="flex items-start gap-2 rounded-md border border-amber-500/50 bg-amber-500/10 p-3">
-                <AlertTriangle className="h-4 w-4 shrink-0 text-amber-500 mt-0.5" />
+              <div className="flex items-start gap-2 rounded-md border border-warning/25 bg-warning-soft p-3">
+                <AlertTriangle className="h-4 w-4 shrink-0 text-warning mt-0.5" />
                 <div className="text-xs text-muted-foreground space-y-1">
                   <p className="font-medium text-foreground">
                     You are broadening this app's permissions.

@@ -417,7 +417,7 @@ export function CsvImportDialog<
 
         {/* ---- Missing columns warning ---- */}
         {step === "preview" && missingColumns.length > 0 && (
-          <div className="flex items-center gap-2 rounded-md border border-yellow-500/50 bg-yellow-500/10 px-3 py-2 text-sm text-yellow-700 dark:text-yellow-400">
+          <div className="flex items-center gap-2 rounded-md border border-warning/25 bg-warning-soft px-3 py-2 text-sm text-warning">
             <AlertTriangle className="h-4 w-4 shrink-0" />
             <span>
               Missing columns in CSV:{" "}

@@ -11,7 +11,9 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session, select
 
+from app.api.cart.crud import carts_crud
 from app.api.cart.models import Carts
+from app.api.human.crud import humans_crud
 from app.api.popup.models import Popups
 from app.api.product.models import Products
 from app.api.shared.enums import SaleType
@@ -101,10 +103,52 @@ def test_upsert_open_cart_creates_cart_and_returns_restore_token(
     assert body["restore_token"] == build_cart_restore_token(body["id"], "s3cr3t")
 
     cart = db.exec(
-        select(Carts).where(Carts.popup_id == popup.id, Carts.human_id.is_(None))
+        select(Carts).where(Carts.popup_id == popup.id, Carts.human_id.is_not(None))
     ).first()
     assert cart is not None
     assert cart.email == "buyer@test.com"
+    # The cart is linked to the human resolved from the email, so it shares the
+    # (human, popup) key with the authenticated portal cart.
+    human = humans_crud.find_or_create(
+        db, email="buyer@test.com", tenant_id=tenant_a.id
+    )
+    assert cart.human_id == human.id
+
+
+def test_open_cart_converges_with_authenticated_cart(
+    client: TestClient,
+    db: Session,
+    tenant_a: Tenants,
+) -> None:
+    """Portal and open-checkout carts for the same email+popup are ONE cart.
+
+    A person who has an authenticated portal cart and then saves an
+    open-checkout cart for the same popup must not end up with two rows, so the
+    future cart-recovery email job never mails them twice.
+    """
+    popup = _make_popup(db, tenant_a, slug_prefix="converge", signing_secret="s3cr3t")
+    product = _make_product(db, popup)
+    db.commit()
+
+    # Authenticated portal cart first (keyed by human).
+    human = humans_crud.find_or_create(
+        db, email="buyer@test.com", tenant_id=tenant_a.id
+    )
+    portal_cart = carts_crud.get_or_create(
+        db, human_id=human.id, popup_id=popup.id, tenant_id=tenant_a.id
+    )
+
+    # Then the open-checkout upsert for the same email resolves to that cart.
+    response = client.put(
+        f"/api/v1/checkout/{popup.slug}/cart",
+        json={"email": "buyer@test.com", "items": _items(product, promo_code="A")},
+        headers={"X-Tenant-Id": str(tenant_a.id)},
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["id"] == str(portal_cart.id)
+
+    carts = list(db.exec(select(Carts).where(Carts.popup_id == popup.id)).all())
+    assert len(carts) == 1
 
 
 def test_upsert_open_cart_without_secret_has_null_restore_token(
@@ -152,7 +196,7 @@ def test_upsert_open_cart_is_idempotent_per_email(
 
     carts = list(
         db.exec(
-            select(Carts).where(Carts.popup_id == popup.id, Carts.human_id.is_(None))
+            select(Carts).where(Carts.popup_id == popup.id, Carts.human_id.is_not(None))
         ).all()
     )
     assert len(carts) == 1
@@ -188,7 +232,7 @@ def test_upsert_open_cart_email_is_case_insensitive(
 
     carts = list(
         db.exec(
-            select(Carts).where(Carts.popup_id == popup.id, Carts.human_id.is_(None))
+            select(Carts).where(Carts.popup_id == popup.id, Carts.human_id.is_not(None))
         ).all()
     )
     assert len(carts) == 1

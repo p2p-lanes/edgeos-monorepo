@@ -1,12 +1,50 @@
 import uuid
 from datetime import datetime
+from typing import ClassVar
 
 from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import Field as PydanticField
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PgUUID
 from sqlmodel import Column, DateTime, Field, SQLModel
 
 from app.api.product.schemas import ProductWithQuantity
+from app.core.filters import (
+    ENUMISH_OPS,
+    TEXT_OPS,
+    FilterCondition,
+    FilterField,
+    FilterGroup,
+    parse_filters,
+)
+
+# Complex list filters (BO attendees table), built on the shared engine in
+# app.core.filters. has_tickets is virtual: EXISTS on attendee_products.
+ATTENDEE_FILTER_FIELDS: dict[str, FilterField] = {
+    "name": FilterField("text", TEXT_OPS),
+    "email": FilterField("text", TEXT_OPS),
+    "category_id": FilterField("uuid", frozenset({"eq", "neq"})),
+    "gender": FilterField("select", ENUMISH_OPS),
+    "created_at": FilterField("date", frozenset({"before", "after"})),
+    "has_tickets": FilterField("boolean", frozenset({"eq"})),
+}
+
+
+class AttendeeFilterCondition(FilterCondition):
+    """One condition of the attendees list filter group."""
+
+    field_registry: ClassVar[dict[str, FilterField]] = ATTENDEE_FILTER_FIELDS
+
+
+class AttendeeFilters(FilterGroup):
+    """Filter group for the BO attendees list."""
+
+    conditions: list[AttendeeFilterCondition] = PydanticField(default_factory=list)
+
+
+def parse_attendee_filters(raw: str | None) -> AttendeeFilters | None:
+    """Parse the ``filters`` query param JSON into AttendeeFilters (422 on bad input)."""
+    return parse_filters(raw, AttendeeFilters)
 
 
 class AttendeeBase(SQLModel):

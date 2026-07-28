@@ -27,6 +27,9 @@ from app.services.email.templates import (
     PaymentAttendeeItem,
     PaymentConfirmedContext,
     PaymentProductItem,
+    TrialEndedContext,
+    TrialReminderContext,
+    TrialWelcomeContext,
 )
 
 __all__ = [
@@ -37,6 +40,10 @@ __all__ = [
     # Auth contexts
     "LoginCodeUserContext",
     "LoginCodeHumanContext",
+    # Trial contexts
+    "TrialWelcomeContext",
+    "TrialReminderContext",
+    "TrialEndedContext",
     # Application contexts
     "ApplicationReceivedContext",
     "ApplicationAcceptedContext",

@@ -28,6 +28,7 @@ from app.api.payment.schemas import (
     SimpleFIPaymentInfo,
     SimpleFIPaymentRequest,
     SimpleFIWebhookPayload,
+    parse_payment_filters,
 )
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
 from app.core.dependencies.users import (
@@ -348,12 +349,19 @@ async def list_payments(
     external_id: str | None = None,
     payment_status: PaymentStatus | None = None,
     search: str | None = None,
+    filters: str | None = None,
     sort_by: str | None = None,
     sort_order: Literal["asc", "desc"] = "desc",
     skip: PaginationSkip = 0,
     limit: PaginationLimit = 100,
 ) -> ListModel[PaymentPublic]:
-    """List payments with optional filters (BO only)."""
+    """List payments with optional filters (BO only).
+
+    ``filters`` is a JSON filter group (only honored on the popup_id path):
+    ``{"match": "all"|"any", "conditions": [{"field", "op", "value"}]}``.
+    It is combined (AND) with the legacy payment_status/search params.
+    """
+    parsed_filters = parse_payment_filters(filters)
     if popup_id:
         payments, total = payments_crud.find_by_popup(
             db,
@@ -364,6 +372,7 @@ async def list_payments(
             search=search,
             sort_by=sort_by,
             sort_order=sort_order,
+            filters=parsed_filters,
         )
     else:
         filters = PaymentFilter(
@@ -1294,6 +1303,7 @@ async def _handle_installment_payment(
 
     # First installment: approve payment to assign products
     is_first_installment = (payment.installments_paid or 0) == 0
+    payment_approved = False
     if is_first_installment and payment.status != "approved":
         payment = payments_crud.approve_payment(
             db,
@@ -1302,12 +1312,16 @@ async def _handle_installment_payment(
             rate=settlement_rate,
             source=source,
         )
+        payment_approved = True
         _schedule_meta_capi_purchase(payment)
         logger.info("First installment received - payment {} approved", payment.id)
 
     # Increment installments_paid
     payment.installments_paid = (payment.installments_paid or 0) + 1
     db.commit()
+
+    if payment_approved:
+        await _send_payment_confirmed_email_best_effort(payment, db_session=db)
 
     logger.info(
         "Installment %s recorded for payment %s (paid: %s/%s)",
@@ -1356,14 +1370,14 @@ async def _handle_installment_plan_completed(
 
     installment_plan = payload.data.installment_plan
 
-    # Idempotent: if already approved, sync installments_paid and send email
+    # Idempotent: if already approved, only sync installments_paid. The
+    # confirmation email was sent when the first installment approved payment.
     if payment.status == "approved":
         logger.info(
             "Payment %s already approved, syncing installments_paid", payment.id
         )
         payment.installments_paid = installment_plan.paid_installments_count
         db.commit()
-        await _send_payment_confirmed_email_best_effort(payment, db_session=db)
         return {"message": "Installment plan completed - count synced"}
 
     # Edge case: plan completed but payment not approved

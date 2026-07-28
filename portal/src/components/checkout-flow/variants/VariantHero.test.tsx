@@ -74,27 +74,37 @@ describe("VariantHero", () => {
     expect(CONTENT_ONLY_TEMPLATES.has("hero")).toBe(true)
   })
 
-  it("renders the bullet ornament from config as a masked span", () => {
+  it("gives every bullet the skin's ornament hook, unconfigured", () => {
+    const { container } = renderVariant({
+      bullets: ["+200 artistas y facilitadores", "+10 escenarios"],
+    })
+
+    const ornaments = container.querySelectorAll("li > span.ck-hero-bullet")
+    expect(ornaments.length).toBe(2)
+    // Artwork and tint live in the skin's CSS: no inline mask, no config field.
+    expect((ornaments[0] as HTMLElement).style.maskImage).toBe("")
+  })
+
+  it("ignores a stale bullet_icon_url left in an older config", () => {
     const { container } = renderVariant({
       bullets: ["+10 escenarios"],
       bullet_icon_url: "/checkout-skins/amanita/ornaments/star.svg",
     })
 
-    const bullet = container.querySelector("li > span[aria-hidden]")
-    expect(bullet).toBeTruthy()
-    const style = (bullet as HTMLElement).style
-    expect(style.maskImage).toContain(
-      "/checkout-skins/amanita/ornaments/star.svg",
-    )
-    // Tint comes from the skin, never a hardcoded brand hex.
-    expect(style.backgroundColor).toBe("var(--hero-bullet-color, currentColor)")
+    expect(container.innerHTML).not.toContain("star.svg")
+    expect(screen.getByText("+10 escenarios")).toBeTruthy()
   })
 
-  it("omits the bullet ornament when no bullet_icon_url is configured", () => {
-    const { container } = renderVariant({ bullets: ["+10 escenarios"] })
+  it("opens on the wordmark: a stale logo_url renders no brand mark", () => {
+    const { container } = renderVariant({
+      logo_url: "/checkout-skins/amanita/logo-hongo.webp",
+      date_logo_url: "/checkout-skins/amanita/logo-fecha.webp",
+      headline: "4 días de música, arte, yoga y talleres",
+    })
 
-    expect(container.querySelector("li > span[aria-hidden]")).toBeNull()
-    expect(screen.getByText("+10 escenarios")).toBeTruthy()
+    const images = container.querySelectorAll("img")
+    expect(images.length).toBe(1)
+    expect(images[0].getAttribute("src")).toContain("logo-fecha")
   })
 
   it("renders the divider ornament from config alongside the subtitle", () => {

@@ -12,7 +12,10 @@ import {
 } from "react"
 import { useTranslation } from "react-i18next"
 import { SUPPORTED_LANGUAGES } from "@/i18n/config"
-import { LANGUAGE_STORAGE_KEY } from "@/lib/language-storage"
+import {
+  LANGUAGE_STORAGE_KEY,
+  setActiveRequestLanguage,
+} from "@/lib/language-storage"
 import { CityContext } from "./cityProvider"
 
 // Bumped from "portal_language": prior versions auto-wrote on every render,
@@ -90,6 +93,10 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname()
   const queryClient = useQueryClient()
   const prevLanguageRef = useRef<string | null>(null)
+  // Holds a language chosen via setLanguage while its ?lang navigation is
+  // still in flight, so the resolver effect doesn't bounce back to the old
+  // URL value before the navigation lands.
+  const pendingLanguageRef = useRef<string | null>(null)
   const popup = cityContext?.getCity() ?? null
   const supportedLanguages = getAllowedLanguages(
     popup?.supported_languages,
@@ -106,6 +113,17 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
       searchParams.get("lang"),
       supportedLanguages,
     )
+    // setLanguage applies the choice immediately and then syncs ?lang. Until
+    // that navigation lands the URL still carries the previous language, so
+    // ignore it while a pending choice is outstanding — otherwise the resolver
+    // reverts to the old value for the duration of the navigation round-trip.
+    if (pendingLanguageRef.current) {
+      if (urlLanguage === pendingLanguageRef.current) {
+        pendingLanguageRef.current = null
+      } else {
+        return
+      }
+    }
     // An explicit ?lang= is a user choice made on the referring site (same
     // class as the manual selector), so persist it: the language must survive
     // in-session navigations that drop the query param, e.g. returning from
@@ -142,6 +160,10 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
       i18n.changeLanguage(currentLanguage)
     }
     document.documentElement.lang = currentLanguage
+    // Mirror the on-screen language for the API client interceptor before the
+    // refetch below fires, so dynamic content reloads in the new language even
+    // though the ?lang navigation is still in flight.
+    setActiveRequestLanguage(currentLanguage)
 
     // Invalidate all queries when language actually changes (not on mount)
     if (
@@ -159,10 +181,12 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
     if (typeof window !== "undefined") {
       localStorage.setItem(STORAGE_KEY, resolvedLanguage)
     }
-    // The URL is the single source of truth: write ?lang and let the resolver
-    // effect apply it. Setting state here too would let the effect briefly
-    // revert to the stale ?lang before the navigation lands. This also keeps
-    // the selected language forwardable in the URL.
+    // Apply immediately so the UI switches on click instead of waiting for the
+    // navigation round-trip. The ?lang write below only keeps the choice
+    // forwardable in the URL and persistent across navigations; pendingLanguageRef
+    // stops the resolver effect from reverting to the stale ?lang until it lands.
+    pendingLanguageRef.current = resolvedLanguage
+    setCurrentLanguage(resolvedLanguage)
     const params = new URLSearchParams(searchParams.toString())
     params.set("lang", resolvedLanguage)
     router.replace(`${pathname}?${params.toString()}`, { scroll: false })

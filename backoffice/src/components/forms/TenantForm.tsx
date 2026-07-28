@@ -5,6 +5,7 @@ import {
   Check,
   Copy,
   Globe,
+  HelpCircle,
   Image,
   Info,
   Lock,
@@ -174,6 +175,8 @@ export function TenantForm({ defaultValues, onSuccess }: TenantFormProps) {
       meta_capi_access_token: "",
       ga_tracking_enabled: defaultValues?.ga_tracking_enabled ?? false,
       ga_measurement_id: defaultValues?.ga_measurement_id ?? "",
+      help_enabled: defaultValues?.help_enabled ?? false,
+      help_email: defaultValues?.help_email ?? "",
       smtp_host: defaultValues?.smtp_host ?? "",
       smtp_port: defaultValues?.smtp_port ?? 587,
       smtp_user: defaultValues?.smtp_user ?? "",
@@ -199,6 +202,8 @@ export function TenantForm({ defaultValues, onSuccess }: TenantFormProps) {
           meta_pixel_id: value.meta_pixel_id || null,
           ga_tracking_enabled: value.ga_tracking_enabled,
           ga_measurement_id: value.ga_measurement_id || null,
+          help_enabled: value.help_enabled,
+          help_email: value.help_email || null,
           smtp_host: smtpHost || null,
           smtp_port: value.smtp_port || null,
           smtp_user: smtpUser || null,
@@ -233,6 +238,8 @@ export function TenantForm({ defaultValues, onSuccess }: TenantFormProps) {
           meta_pixel_id: value.meta_pixel_id || undefined,
           ga_tracking_enabled: value.ga_tracking_enabled,
           ga_measurement_id: value.ga_measurement_id || undefined,
+          help_enabled: value.help_enabled,
+          help_email: value.help_email || undefined,
           smtp_host: smtpHost || undefined,
           smtp_port: value.smtp_port || undefined,
           smtp_user: smtpUser || undefined,
@@ -363,7 +370,7 @@ export function TenantForm({ defaultValues, onSuccess }: TenantFormProps) {
               <InlineRow
                 icon={<Megaphone className="h-4 w-4 text-muted-foreground" />}
                 label="Meta Pixel"
-                description="Load the tenant's Meta Pixel on the portal and checkout."
+                description="Load the organization's Meta Pixel on the portal and checkout."
               >
                 <Switch
                   id="meta_tracking_enabled"
@@ -395,7 +402,7 @@ export function TenantForm({ defaultValues, onSuccess }: TenantFormProps) {
                 <InlineRow
                   icon={<Megaphone className="h-4 w-4 text-muted-foreground" />}
                   label="Meta Pixel ID"
-                  description="Shared by all popups in this organization."
+                  description="Shared by all gatherings in this organization."
                 >
                   <Input
                     placeholder="123456789012345"
@@ -450,7 +457,7 @@ export function TenantForm({ defaultValues, onSuccess }: TenantFormProps) {
               <InlineRow
                 icon={<Megaphone className="h-4 w-4 text-muted-foreground" />}
                 label="Google Analytics"
-                description="Load the tenant's Google Analytics on the portal and checkout."
+                description="Load the organization's Google Analytics on the portal and checkout."
               >
                 <Switch
                   id="ga_tracking_enabled"
@@ -482,7 +489,7 @@ export function TenantForm({ defaultValues, onSuccess }: TenantFormProps) {
                 <InlineRow
                   icon={<Megaphone className="h-4 w-4 text-muted-foreground" />}
                   label="Measurement ID"
-                  description="Shared by all popups in this organization."
+                  description="Shared by all gatherings in this organization."
                 >
                   <Input
                     placeholder="G-XXXXXXXXXX"
@@ -543,8 +550,8 @@ export function TenantForm({ defaultValues, onSuccess }: TenantFormProps) {
                           <Badge
                             className={
                               isActive
-                                ? "bg-green-100 text-green-800 border-green-200"
-                                : "bg-yellow-100 text-yellow-800 border-yellow-200"
+                                ? "bg-success-soft text-success border-success/25"
+                                : "bg-warning-soft text-warning border-warning/25"
                             }
                             variant="outline"
                           >
@@ -573,9 +580,9 @@ export function TenantForm({ defaultValues, onSuccess }: TenantFormProps) {
             </form.Field>
 
             {/* Persistent SSL / DNS warning */}
-            <Alert className="border-yellow-200 bg-yellow-50 text-yellow-900 mt-2">
-              <Info className="h-4 w-4 text-yellow-600" />
-              <AlertDescription className="text-yellow-800 space-y-2">
+            <Alert className="border-warning/25 bg-warning-soft text-warning mt-2">
+              <Info className="h-4 w-4 text-warning" />
+              <AlertDescription className="text-warning space-y-2">
                 <p>
                   This domain requires SSL and DNS configuration before it
                   becomes active. Contact support to activate once DNS is
@@ -583,17 +590,15 @@ export function TenantForm({ defaultValues, onSuccess }: TenantFormProps) {
                 </p>
                 {cnameTarget && (
                   <div className="flex items-center gap-2">
-                    <span className="text-xs text-yellow-700">
-                      CNAME target:
-                    </span>
-                    <code className="rounded bg-yellow-100 px-2 py-0.5 text-xs font-mono text-yellow-900 border border-yellow-200">
+                    <span className="text-xs text-warning">CNAME target:</span>
+                    <code className="rounded bg-warning/10 px-2 py-0.5 text-xs font-mono text-warning border border-warning/25">
                       {cnameTarget}
                     </code>
                     <Button
                       type="button"
                       variant="ghost"
                       size="icon"
-                      className="h-6 w-6 text-yellow-700 hover:text-yellow-900 hover:bg-yellow-100"
+                      className="h-6 w-6 text-warning/80 hover:text-warning hover:bg-warning/10"
                       onClick={copyToClipboard}
                     >
                       {copied ? (
@@ -641,15 +646,16 @@ export function TenantForm({ defaultValues, onSuccess }: TenantFormProps) {
                       </InlineRow>
 
                       {showMultiPopupWarning && (
-                        <Alert className="border-orange-200 bg-orange-50 text-orange-900 mt-2">
-                          <Info className="h-4 w-4 text-orange-600" />
-                          <AlertDescription className="text-orange-800">
-                            This tenant has more than one active popup. Only one
-                            will be used as the landing checkout — the one with
-                            the earliest start date. Make sure the intended
-                            popup is a <strong>direct-sale popup</strong>.
-                            Application-type popups are not eligible and will
-                            show a Coming Soon page instead.
+                        <Alert className="border-warning/25 bg-warning-soft text-warning mt-2">
+                          <Info className="h-4 w-4 text-warning" />
+                          <AlertDescription className="text-warning">
+                            This tenant has more than one active gathering. Only
+                            one will be used as the landing checkout — the one
+                            with the earliest start date. Make sure the intended
+                            gathering is a{" "}
+                            <strong>direct-sale gathering</strong>.
+                            Application-type gatherings are not eligible and
+                            will show a Coming Soon page instead.
                           </AlertDescription>
                         </Alert>
                       )}
@@ -900,6 +906,65 @@ export function TenantForm({ defaultValues, onSuccess }: TenantFormProps) {
               </LoadingButton>
             </InlineRow>
           )}
+        </InlineSection>
+
+        <Separator />
+
+        {/* Portal Help Button */}
+        <InlineSection title="Portal Help Button">
+          <form.Field name="help_enabled">
+            {(field) => (
+              <InlineRow
+                icon={<HelpCircle className="h-4 w-4 text-muted-foreground" />}
+                label="Help Button"
+                description="Show a floating help button on every portal page."
+              >
+                <Switch
+                  id="help_enabled"
+                  aria-label="Help Button"
+                  checked={field.state.value}
+                  onCheckedChange={field.handleChange}
+                />
+              </InlineRow>
+            )}
+          </form.Field>
+
+          <form.Field
+            name="help_email"
+            validators={{
+              onBlur: ({ value, fieldApi }) => {
+                const enabled = fieldApi.form.getFieldValue("help_enabled")
+                if (enabled && !value)
+                  return "Help email is required when the help button is enabled"
+                if (value && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+                  return "Invalid email address"
+                }
+                return undefined
+              },
+            }}
+          >
+            {(field) => (
+              <div>
+                <InlineRow
+                  icon={
+                    <HelpCircle className="h-4 w-4 text-muted-foreground" />
+                  }
+                  label="Help Email"
+                  description="Where portal help requests are sent."
+                >
+                  <Input
+                    placeholder="support@acme.com"
+                    type="email"
+                    value={field.state.value}
+                    onBlur={field.handleBlur}
+                    onChange={(e) => field.handleChange(e.target.value)}
+                    className="max-w-xs text-sm"
+                  />
+                </InlineRow>
+                <FieldError errors={field.state.meta.errors} />
+              </div>
+            )}
+          </form.Field>
         </InlineSection>
 
         <Separator />

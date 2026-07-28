@@ -59,7 +59,7 @@ export const Route = createFileRoute("/_layout/popups/")({
   component: Popups,
   validateSearch: validateTableSearch,
   head: () => ({
-    meta: [{ title: "Pop-ups - EdgeOS" }],
+    meta: [{ title: "Gatherings - EdgeOS" }],
   }),
 })
 
@@ -68,7 +68,7 @@ function AddPopupButton() {
     <Button asChild>
       <Link to="/popups/new">
         <Plus className="mr-2 h-4 w-4" />
-        Add Pop-up
+        Add Gathering
       </Link>
     </Button>
   )
@@ -85,7 +85,7 @@ function PopupActionsMenu({ popup }: { popup: PopupAdmin }) {
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" aria-label="Pop-up actions">
+        <Button variant="ghost" size="icon" aria-label="Gathering actions">
           <EllipsisVertical className="h-4 w-4" />
         </Button>
       </DropdownMenuTrigger>
@@ -129,7 +129,7 @@ function SaleTypeBadge({ saleType }: { saleType: SaleType | undefined }) {
     return (
       <Badge
         variant="outline"
-        className="border-amber-300 bg-amber-100 text-amber-800 dark:border-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+        className="border-warning/25 bg-warning-soft text-warning"
       >
         Direct
       </Badge>
@@ -225,13 +225,13 @@ function PopupsTableContent() {
         !search ? (
           <EmptyState
             icon={CalendarDays}
-            title="No pop-ups yet"
-            description="Create your first pop-up to start managing them."
+            title="No gatherings yet"
+            description="Create your first gathering to start managing them."
             action={
               <Button asChild>
                 <Link to="/popups/new">
                   <Plus className="mr-2 h-4 w-4" />
-                  Add Pop-up
+                  Add Gathering
                 </Link>
               </Button>
             }
@@ -264,17 +264,18 @@ function Popups() {
       {needsTenantSelection && (
         <Alert>
           <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Select a tenant</AlertTitle>
+          <AlertTitle>Select an organization</AlertTitle>
           <AlertDescription>
-            Please select a tenant from the sidebar to view and manage pop-ups.
+            Please select an organization from the sidebar to view and manage
+            gatherings.
           </AlertDescription>
         </Alert>
       )}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Pop-ups</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Gatherings</h1>
           <p className="text-muted-foreground">
-            Manage your pop-ups and their configurations
+            Manage your gatherings and their configurations
           </p>
         </div>
         {canManagePopups && <AddPopupButton />}

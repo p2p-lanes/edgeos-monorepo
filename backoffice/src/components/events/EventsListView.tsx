@@ -185,7 +185,7 @@ export function EventsListView({
                   className={cn(
                     "relative rounded-xl border bg-card hover:shadow-md transition-shadow",
                     isHighlighted &&
-                      "border-2 border-amber-400 bg-amber-50 dark:bg-amber-950/30",
+                      "border-2 border-warning/25 bg-warning-soft",
                   )}
                 >
                   <button
@@ -241,7 +241,7 @@ export function EventsListView({
                           </div>
                         )}
                         {event.track_title && (
-                          <div className="flex items-center gap-1.5 text-xs font-medium text-violet-700 dark:text-violet-300 mt-0.5">
+                          <div className="flex items-center gap-1.5 text-xs font-medium text-chart-3 mt-0.5">
                             <Layers className="h-3 w-3" />
                             <span className="truncate">
                               {event.track_title}

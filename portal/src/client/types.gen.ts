@@ -173,6 +173,25 @@ export type ApplicationAdminCreate = {
     group_id?: (string | null);
 };
 
+export type ApplicationCommentCreate = {
+    body: string;
+};
+
+export type ApplicationCommentPublic = {
+    id: string;
+    application_id: string;
+    author_user_id?: (string | null);
+    author_name?: (string | null);
+    author_email?: (string | null);
+    body: string;
+    created_at: string;
+    edited_at?: (string | null);
+};
+
+export type ApplicationCommentUpdate = {
+    body: string;
+};
+
 /**
  * Application schema for creation.
  *
@@ -223,6 +242,16 @@ export type ApplicationFunnel = {
 };
 
 /**
+ * One bucket of GET /applications/group-counts.
+ *
+ * ``value`` is None for applications where the group field is NULL or "".
+ */
+export type ApplicationGroupCount = {
+    value?: (string | null);
+    count: number;
+};
+
+/**
  * How the portal renders the application form for a popup.
  *
  * - single_page: all sections stacked on one page (legacy behavior).
@@ -268,6 +297,11 @@ export type ApplicationPublic = {
     attendees?: Array<AttendeePublic>;
     red_flag?: boolean;
     review_decision?: (ReviewDecision | null);
+    review_count?: number;
+    reviewers?: Array<ApplicationReviewerVote>;
+    comment_count?: number;
+    skipped_by_me?: boolean;
+    my_skip_reason?: (string | null);
 };
 
 /**
@@ -276,6 +310,16 @@ export type ApplicationPublic = {
 export type ApplicationReviewCreate = {
     decision: ReviewDecision;
     notes?: (string | null);
+};
+
+/**
+ * Compact reviewer + decision pair for the applications list.
+ */
+export type ApplicationReviewerVote = {
+    reviewer_id: string;
+    reviewer_full_name?: (string | null);
+    reviewer_email?: (string | null);
+    decision: ReviewDecision;
 };
 
 /**
@@ -292,6 +336,25 @@ export type ApplicationReviewPublic = {
     updated_at?: (string | null);
     reviewer_email?: (string | null);
     reviewer_full_name?: (string | null);
+};
+
+/**
+ * Schema for skipping (passing on) an application.
+ */
+export type ApplicationReviewSkipCreate = {
+    reason?: (string | null);
+};
+
+/**
+ * ApplicationReviewSkip schema for API responses.
+ */
+export type ApplicationReviewSkipPublic = {
+    id: string;
+    application_id: string;
+    reviewer_id: string;
+    tenant_id: string;
+    reason?: (string | null);
+    created_at?: (string | null);
 };
 
 /**
@@ -1297,6 +1360,24 @@ export type DistributionItem = {
     percentage?: string;
 };
 
+/**
+ * A single email log entry returned to the backoffice.
+ */
+export type EmailLogPublic = {
+    id: string;
+    tenant_id: string;
+    popup_id?: (string | null);
+    template_type: string;
+    to_email: string;
+    application_id?: (string | null);
+    payment_id?: (string | null);
+    human_id?: (string | null);
+    subject?: (string | null);
+    status: string;
+    error?: (string | null);
+    created_at: string;
+};
+
 export type EmailTemplateCreate = {
     popup_id?: (string | null);
     template_type: string;
@@ -1318,7 +1399,7 @@ export type EmailTemplatePublic = {
     updated_at?: (string | null);
 };
 
-export type EmailTemplateType = 'login_code_user' | 'login_code_human' | 'application_received' | 'application_accepted' | 'application_rejected' | 'application_accepted_with_discount' | 'application_accepted_with_incentive' | 'application_accepted_scholarship_rejected' | 'payment_confirmed' | 'abandoned_cart' | 'edit_passes_confirmed' | 'event_invitation' | 'event_updated' | 'event_cancelled' | 'event_rsvp_cancelled' | 'event_approval_approved' | 'event_approval_rejected' | 'check_in_pass';
+export type EmailTemplateType = 'login_code_user' | 'login_code_human' | 'application_received' | 'application_accepted' | 'application_rejected' | 'application_accepted_with_discount' | 'application_accepted_with_incentive' | 'application_accepted_scholarship_rejected' | 'payment_confirmed' | 'abandoned_cart' | 'purchase_reminder' | 'abandoned_application' | 'edit_passes_confirmed' | 'event_invitation' | 'event_updated' | 'event_cancelled' | 'event_rsvp_cancelled' | 'event_approval_approved' | 'event_approval_rejected' | 'check_in_pass';
 
 export type EmailTemplateUpdate = {
     subject?: (string | null);
@@ -1839,6 +1920,7 @@ export type EventVisibility = 'public' | 'private' | 'unlisted';
 export type FormFieldCreate = {
     popup_id: string;
     label: string;
+    short_label?: (string | null);
     field_type?: string;
     section_id?: (string | null);
     position?: number;
@@ -1860,6 +1942,7 @@ export type FormFieldPublic = {
     popup_id: string;
     name: string;
     label: string;
+    short_label?: (string | null);
     field_type: string;
     section_id?: (string | null);
     section_label?: (string | null);
@@ -1882,6 +1965,7 @@ export type FormFieldPublic = {
 
 export type FormFieldUpdate = {
     label?: (string | null);
+    short_label?: (string | null);
     field_type?: (string | null);
     section_id?: (string | null);
     position?: (number | null);
@@ -2279,6 +2363,7 @@ export type HumanEnrichmentFactCreate = {
     field: string;
     value: string;
     source: EnrichmentSource;
+    source_label?: (string | null);
     evidence?: (string | null);
     confidence?: (number | null);
     raw?: ({
@@ -2292,11 +2377,8 @@ export type HumanEnrichmentFactPublic = {
     field: string;
     value: string;
     source: EnrichmentSource;
-    evidence?: (string | null);
+    source_label?: (string | null);
     confidence?: (number | null);
-    raw?: ({
-    [key: string]: unknown;
-} | null);
     created_at: string;
 };
 
@@ -2534,6 +2616,11 @@ export type ListModel_AbandonedCartPublic_ = {
     paging: Paging;
 };
 
+export type ListModel_ApplicationCommentPublic_ = {
+    results: Array<ApplicationCommentPublic>;
+    paging: Paging;
+};
+
 export type ListModel_ApplicationPublic_ = {
     results: Array<ApplicationPublic>;
     paging: Paging;
@@ -2576,6 +2663,11 @@ export type ListModel_CheckInListItem_ = {
 
 export type ListModel_CouponPublic_ = {
     results: Array<CouponPublic>;
+    paging: Paging;
+};
+
+export type ListModel_EmailLogPublic_ = {
+    results: Array<EmailLogPublic>;
     paging: Paging;
 };
 
@@ -2671,6 +2763,11 @@ export type ListModel_ProductPublic_ = {
 
 export type ListModel_ReferralPublic_ = {
     results: Array<ReferralPublic>;
+    paging: Paging;
+};
+
+export type ListModel_SavedViewPublic_ = {
+    results: Array<SavedViewPublic>;
     paging: Paging;
 };
 
@@ -3148,6 +3245,15 @@ export type PopupAdmin = {
     installments_max?: (number | null);
     installments_interval?: InstallmentInterval;
     installments_interval_count?: number;
+    abandoned_cart_delay_days?: (number | null);
+    abandoned_cart_repeat_days?: (number | null);
+    abandoned_cart_max_count?: (number | null);
+    purchase_reminder_delay_days?: (number | null);
+    purchase_reminder_repeat_days?: (number | null);
+    purchase_reminder_max_count?: (number | null);
+    abandoned_application_delay_days?: (number | null);
+    abandoned_application_repeat_days?: (number | null);
+    abandoned_application_max_count?: (number | null);
     id: string;
 };
 
@@ -3206,6 +3312,15 @@ export type PopupCreate = {
     installments_interval?: InstallmentInterval;
     installments_interval_count?: number;
     checkin_pass_lead_days?: (number | null);
+    abandoned_cart_delay_days?: (number | null);
+    abandoned_cart_repeat_days?: (number | null);
+    abandoned_cart_max_count?: (number | null);
+    purchase_reminder_delay_days?: (number | null);
+    purchase_reminder_repeat_days?: (number | null);
+    purchase_reminder_max_count?: (number | null);
+    abandoned_application_delay_days?: (number | null);
+    abandoned_application_repeat_days?: (number | null);
+    abandoned_application_max_count?: (number | null);
 };
 
 /**
@@ -3354,6 +3469,15 @@ export type PopupUpdate = {
     referrals_enabled?: (boolean | null);
     group_private_events_enabled?: (boolean | null);
     max_referrals_per_attendee?: (number | null);
+    abandoned_cart_delay_days?: (number | null);
+    abandoned_cart_repeat_days?: (number | null);
+    abandoned_cart_max_count?: (number | null);
+    purchase_reminder_delay_days?: (number | null);
+    purchase_reminder_repeat_days?: (number | null);
+    purchase_reminder_max_count?: (number | null);
+    abandoned_application_delay_days?: (number | null);
+    abandoned_application_repeat_days?: (number | null);
+    abandoned_application_max_count?: (number | null);
 };
 
 /**
@@ -3762,6 +3886,35 @@ export type ReviewSummary = {
  */
 export type SaleType = 'application' | 'direct';
 
+export type SavedViewCreate = {
+    popup_id: string;
+    entity: string;
+    name: string;
+    config: {
+        [key: string]: unknown;
+    };
+};
+
+export type SavedViewPublic = {
+    id: string;
+    tenant_id: string;
+    popup_id: string;
+    entity: string;
+    name: string;
+    config: {
+        [key: string]: unknown;
+    };
+    created_by: string;
+    created_at: string;
+};
+
+export type SavedViewUpdate = {
+    name?: (string | null);
+    config?: ({
+    [key: string]: unknown;
+} | null);
+};
+
 /**
  * Admin request body for PATCH /applications/{id}/scholarship.
  */
@@ -4015,6 +4168,8 @@ export type TenantAnonymousPublic = {
     meta_pixel_id?: (string | null);
     ga_tracking_enabled?: boolean;
     ga_measurement_id?: (string | null);
+    help_enabled?: boolean;
+    help_email?: (string | null);
     id: string;
     active_popup_slug?: (string | null);
 };
@@ -4031,6 +4186,8 @@ export type TenantCreate = {
     meta_pixel_id?: (string | null);
     ga_tracking_enabled?: boolean;
     ga_measurement_id?: (string | null);
+    help_enabled?: boolean;
+    help_email?: (string | null);
     smtp_host?: (string | null);
     smtp_port?: (number | null);
     smtp_user?: (string | null);
@@ -4062,8 +4219,13 @@ export type TenantPublic = {
     meta_pixel_id?: (string | null);
     ga_tracking_enabled?: boolean;
     ga_measurement_id?: (string | null);
+    help_enabled?: boolean;
+    help_email?: (string | null);
     id: string;
     meta_capi_configured?: boolean;
+    is_trial?: boolean;
+    trial_expires_at?: (string | null);
+    suspended_at?: (string | null);
     smtp_host?: (string | null);
     smtp_port?: (number | null);
     smtp_user?: (string | null);
@@ -4097,6 +4259,8 @@ export type TenantUpdate = {
     meta_capi_access_token?: (string | null);
     ga_tracking_enabled?: (boolean | null);
     ga_measurement_id?: (string | null);
+    help_enabled?: (boolean | null);
+    help_email?: (string | null);
     smtp_host?: (string | null);
     smtp_port?: (number | null);
     smtp_user?: (string | null);
@@ -4371,6 +4535,42 @@ export type TranslationPublic = {
     };
     created_at?: (string | null);
     updated_at?: (string | null);
+};
+
+export type TrialCodeSentResponse = {
+    message: string;
+    email: string;
+    expires_in_minutes: number;
+};
+
+/**
+ * Body for POST /trials — start a self-serve trial signup.
+ */
+export type TrialCreate = {
+    gathering_name: string;
+    email: string;
+};
+
+/**
+ * Returned by POST /trials/verify on successful provisioning.
+ *
+ * access_token has the same shape as /auth/user/authenticate (user JWT),
+ * so the frontend can store it and land directly in the backoffice.
+ */
+export type TrialProvisionedResponse = {
+    access_token: string;
+    token_type?: string;
+    tenant_id: string;
+    popup_id: string;
+    backoffice_url: string;
+};
+
+/**
+ * Body for POST /trials/verify — redeem the emailed OTP.
+ */
+export type TrialVerify = {
+    email: string;
+    code: string;
 };
 
 /**
@@ -4684,7 +4884,25 @@ export type ApplicationReviewsListMyReviewsData = {
 
 export type ApplicationReviewsListMyReviewsResponse = (ListModel_ApplicationReviewPublic_);
 
+export type ApplicationReviewsSkipApplicationData = {
+    applicationId: string;
+    requestBody: ApplicationReviewSkipCreate;
+    xTenantId?: (string | null);
+};
+
+export type ApplicationReviewsSkipApplicationResponse = (ApplicationReviewSkipPublic);
+
+export type ApplicationReviewsUnskipApplicationData = {
+    applicationId: string;
+    xTenantId?: (string | null);
+};
+
+export type ApplicationReviewsUnskipApplicationResponse = (void);
+
 export type ApplicationsListApplicationsData = {
+    filters?: (string | null);
+    groupBy?: (string | null);
+    groupValue?: (string | null);
     humanId?: (string | null);
     /**
      * Maximum number of items to return
@@ -4709,6 +4927,16 @@ export type ApplicationsCreateApplicationAdminData = {
 };
 
 export type ApplicationsCreateApplicationAdminResponse = (ApplicationPublic);
+
+export type ApplicationsGetApplicationGroupCountsData = {
+    filters?: (string | null);
+    groupBy: string;
+    popupId: string;
+    search?: (string | null);
+    xTenantId?: (string | null);
+};
+
+export type ApplicationsGetApplicationGroupCountsResponse = (Array<ApplicationGroupCount>);
 
 export type ApplicationsGrantTicketsAdminData = {
     requestBody: AdminGrantTicketsRequest;
@@ -4836,6 +5064,38 @@ export type ApplicationsReviewScholarshipData = {
 
 export type ApplicationsReviewScholarshipResponse = (ApplicationPublic);
 
+export type ApplicationsListApplicationCommentsData = {
+    applicationId: string;
+    xTenantId?: (string | null);
+};
+
+export type ApplicationsListApplicationCommentsResponse = (ListModel_ApplicationCommentPublic_);
+
+export type ApplicationsCreateApplicationCommentData = {
+    applicationId: string;
+    requestBody: ApplicationCommentCreate;
+    xTenantId?: (string | null);
+};
+
+export type ApplicationsCreateApplicationCommentResponse = (ApplicationCommentPublic);
+
+export type ApplicationsUpdateApplicationCommentData = {
+    applicationId: string;
+    commentId: string;
+    requestBody: ApplicationCommentUpdate;
+    xTenantId?: (string | null);
+};
+
+export type ApplicationsUpdateApplicationCommentResponse = (ApplicationCommentPublic);
+
+export type ApplicationsDeleteApplicationCommentData = {
+    applicationId: string;
+    commentId: string;
+    xTenantId?: (string | null);
+};
+
+export type ApplicationsDeleteApplicationCommentResponse = (void);
+
 export type ApprovalStrategiesGetApprovalStrategyData = {
     popupId: string;
     xTenantId?: (string | null);
@@ -4952,6 +5212,7 @@ export type AttendeesListAttendeesData = {
     applicationId?: (string | null);
     categoryId?: (string | null);
     email?: (string | null);
+    filters?: (string | null);
     hasTickets?: (boolean | null);
     /**
      * Maximum number of items to return
@@ -5320,6 +5581,24 @@ export type DashboardGetEnrichedDashboardData = {
 };
 
 export type DashboardGetEnrichedDashboardResponse = (EnrichedDashboardStats);
+
+export type EmailLogsListEmailLogsData = {
+    /**
+     * Maximum number of items to return
+     */
+    limit?: number;
+    popupId?: (string | null);
+    search?: (string | null);
+    /**
+     * Number of items to skip
+     */
+    skip?: number;
+    status?: (string | null);
+    templateType?: (string | null);
+    xTenantId?: (string | null);
+};
+
+export type EmailLogsListEmailLogsResponse = (ListModel_EmailLogPublic_);
 
 export type EmailTemplatesListTemplateTypesResponse = (Array<TemplateTypeInfo>);
 
@@ -6287,6 +6566,7 @@ export type HumansListHumansData = {
     age?: (string | null);
     email?: (string | null);
     enrichmentQuery?: (string | null);
+    filters?: (string | null);
     gender?: (string | null);
     hasEnrichedProfile?: (boolean | null);
     incompleteApplication?: boolean;
@@ -6400,6 +6680,7 @@ export type HumansListHumanApiKeysResponse = (Array<ApiKeyPublic>);
 
 export type HumansListHumanCommentsData = {
     humanId: string;
+    xTenantId?: (string | null);
 };
 
 export type HumansListHumanCommentsResponse = (ListModel_HumanCommentPublic_);
@@ -6407,6 +6688,7 @@ export type HumansListHumanCommentsResponse = (ListModel_HumanCommentPublic_);
 export type HumansCreateHumanCommentData = {
     humanId: string;
     requestBody: HumanCommentCreate;
+    xTenantId?: (string | null);
 };
 
 export type HumansCreateHumanCommentResponse = (HumanCommentPublic);
@@ -6415,6 +6697,7 @@ export type HumansUpdateHumanCommentData = {
     commentId: string;
     humanId: string;
     requestBody: HumanCommentUpdate;
+    xTenantId?: (string | null);
 };
 
 export type HumansUpdateHumanCommentResponse = (HumanCommentPublic);
@@ -6422,6 +6705,7 @@ export type HumansUpdateHumanCommentResponse = (HumanCommentPublic);
 export type HumansDeleteHumanCommentData = {
     commentId: string;
     humanId: string;
+    xTenantId?: (string | null);
 };
 
 export type HumansDeleteHumanCommentResponse = (void);
@@ -6495,6 +6779,7 @@ export type InvitesDeleteInviteResponse = (void);
 export type PaymentsListPaymentsData = {
     applicationId?: (string | null);
     externalId?: (string | null);
+    filters?: (string | null);
     /**
      * Maximum number of items to return
      */
@@ -6884,6 +7169,36 @@ export type ReferralsUpdateReferralAdminData = {
 
 export type ReferralsUpdateReferralAdminResponse = (ReferralPublic);
 
+export type SavedViewsListSavedViewsData = {
+    entity: string;
+    popupId: string;
+    xTenantId?: (string | null);
+};
+
+export type SavedViewsListSavedViewsResponse = (ListModel_SavedViewPublic_);
+
+export type SavedViewsCreateSavedViewData = {
+    requestBody: SavedViewCreate;
+    xTenantId?: (string | null);
+};
+
+export type SavedViewsCreateSavedViewResponse = (SavedViewPublic);
+
+export type SavedViewsUpdateSavedViewData = {
+    requestBody: SavedViewUpdate;
+    viewId: string;
+    xTenantId?: (string | null);
+};
+
+export type SavedViewsUpdateSavedViewResponse = (SavedViewPublic);
+
+export type SavedViewsDeleteSavedViewData = {
+    viewId: string;
+    xTenantId?: (string | null);
+};
+
+export type SavedViewsDeleteSavedViewResponse = (void);
+
 export type TasksReportBugData = {
     requestBody: BugReportCreate;
 };
@@ -7012,6 +7327,7 @@ export type TenantsGetTenantBySlugData = {
 export type TenantsGetTenantBySlugResponse = (TenantAnonymousPublic);
 
 export type TenantsListTenantsData = {
+    includeDeleted?: boolean;
     /**
      * Maximum number of items to return
      */
@@ -7310,6 +7626,18 @@ export type TranslationsDeleteTranslationData = {
 };
 
 export type TranslationsDeleteTranslationResponse = (void);
+
+export type TrialsCreateTrialData = {
+    requestBody: TrialCreate;
+};
+
+export type TrialsCreateTrialResponse = (TrialCodeSentResponse);
+
+export type TrialsVerifyTrialData = {
+    requestBody: TrialVerify;
+};
+
+export type TrialsVerifyTrialResponse = (TrialProvisionedResponse);
 
 export type UploadsGetPresignedUploadUrlData = {
     requestBody: PresignedUrlRequest;

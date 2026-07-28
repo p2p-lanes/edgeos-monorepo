@@ -15,6 +15,8 @@ import { Route as LayoutIndexRouteImport } from './routes/_layout/index'
 import { Route as LayoutThirdPartyAppsRouteImport } from './routes/_layout/third-party-apps'
 import { Route as LayoutSettingsRouteImport } from './routes/_layout/settings'
 import { Route as LayoutPaymentsRouteImport } from './routes/_layout/payments'
+import { Route as LayoutOnboardingRouteImport } from './routes/_layout/onboarding'
+import { Route as LayoutEmailLogsRouteImport } from './routes/_layout/email-logs'
 import { Route as LayoutCheckInRouteImport } from './routes/_layout/check-in'
 import { Route as LayoutApiKeysRouteImport } from './routes/_layout/api-keys'
 import { Route as LayoutActivityRouteImport } from './routes/_layout/activity'
@@ -42,6 +44,7 @@ import { Route as LayoutPopupsNewRouteImport } from './routes/_layout/popups/new
 import { Route as LayoutOrganizationsNewRouteImport } from './routes/_layout/organizations/new'
 import { Route as LayoutInvitesNewRouteImport } from './routes/_layout/invites/new'
 import { Route as LayoutHumansNewRouteImport } from './routes/_layout/humans/new'
+import { Route as LayoutHumansIdRouteImport } from './routes/_layout/humans/$id'
 import { Route as LayoutGroupsNewRouteImport } from './routes/_layout/groups/new'
 import { Route as LayoutFormBuilderNewRouteImport } from './routes/_layout/form-builder/new'
 import { Route as LayoutEventsSettingsRouteImport } from './routes/_layout/events/settings'
@@ -63,7 +66,6 @@ import { Route as LayoutPopupsIdEditRouteImport } from './routes/_layout/popups/
 import { Route as LayoutPopupsIdBulkGrantRouteImport } from './routes/_layout/popups/$id.bulk-grant'
 import { Route as LayoutOrganizationsIdEditRouteImport } from './routes/_layout/organizations/$id.edit'
 import { Route as LayoutInvitesInviteIdEditRouteImport } from './routes/_layout/invites/$inviteId/edit'
-import { Route as LayoutHumansIdEditRouteImport } from './routes/_layout/humans/$id.edit'
 import { Route as LayoutGroupsIdEditRouteImport } from './routes/_layout/groups/$id.edit'
 import { Route as LayoutFormBuilderSectionsNewRouteImport } from './routes/_layout/form-builder/sections/new'
 import { Route as LayoutFormBuilderIdEditRouteImport } from './routes/_layout/form-builder/$id.edit'
@@ -105,6 +107,16 @@ const LayoutSettingsRoute = LayoutSettingsRouteImport.update({
 const LayoutPaymentsRoute = LayoutPaymentsRouteImport.update({
   id: '/payments',
   path: '/payments',
+  getParentRoute: () => LayoutRoute,
+} as any)
+const LayoutOnboardingRoute = LayoutOnboardingRouteImport.update({
+  id: '/onboarding',
+  path: '/onboarding',
+  getParentRoute: () => LayoutRoute,
+} as any)
+const LayoutEmailLogsRoute = LayoutEmailLogsRouteImport.update({
+  id: '/email-logs',
+  path: '/email-logs',
   getParentRoute: () => LayoutRoute,
 } as any)
 const LayoutCheckInRoute = LayoutCheckInRouteImport.update({
@@ -246,6 +258,11 @@ const LayoutHumansNewRoute = LayoutHumansNewRouteImport.update({
   path: '/humans/new',
   getParentRoute: () => LayoutRoute,
 } as any)
+const LayoutHumansIdRoute = LayoutHumansIdRouteImport.update({
+  id: '/humans/$id',
+  path: '/humans/$id',
+  getParentRoute: () => LayoutRoute,
+} as any)
 const LayoutGroupsNewRoute = LayoutGroupsNewRouteImport.update({
   id: '/groups/new',
   path: '/groups/new',
@@ -356,11 +373,6 @@ const LayoutInvitesInviteIdEditRoute =
     path: '/invites/$inviteId/edit',
     getParentRoute: () => LayoutRoute,
   } as any)
-const LayoutHumansIdEditRoute = LayoutHumansIdEditRouteImport.update({
-  id: '/humans/$id/edit',
-  path: '/humans/$id/edit',
-  getParentRoute: () => LayoutRoute,
-} as any)
 const LayoutGroupsIdEditRoute = LayoutGroupsIdEditRouteImport.update({
   id: '/groups/$id/edit',
   path: '/groups/$id/edit',
@@ -440,6 +452,8 @@ export interface FileRoutesByFullPath {
   '/activity': typeof LayoutActivityRoute
   '/api-keys': typeof LayoutApiKeysRoute
   '/check-in': typeof LayoutCheckInRoute
+  '/email-logs': typeof LayoutEmailLogsRoute
+  '/onboarding': typeof LayoutOnboardingRoute
   '/payments': typeof LayoutPaymentsRoute
   '/settings': typeof LayoutSettingsRoute
   '/third-party-apps': typeof LayoutThirdPartyAppsRoute
@@ -456,6 +470,7 @@ export interface FileRoutesByFullPath {
   '/events/settings': typeof LayoutEventsSettingsRoute
   '/form-builder/new': typeof LayoutFormBuilderNewRoute
   '/groups/new': typeof LayoutGroupsNewRoute
+  '/humans/$id': typeof LayoutHumansIdRoute
   '/humans/new': typeof LayoutHumansNewRoute
   '/invites/new': typeof LayoutInvitesNewRoute
   '/organizations/new': typeof LayoutOrganizationsNewRoute
@@ -488,7 +503,6 @@ export interface FileRoutesByFullPath {
   '/form-builder/$id/edit': typeof LayoutFormBuilderIdEditRoute
   '/form-builder/sections/new': typeof LayoutFormBuilderSectionsNewRoute
   '/groups/$id/edit': typeof LayoutGroupsIdEditRoute
-  '/humans/$id/edit': typeof LayoutHumansIdEditRoute
   '/invites/$inviteId/edit': typeof LayoutInvitesInviteIdEditRoute
   '/organizations/$id/edit': typeof LayoutOrganizationsIdEditRoute
   '/popups/$id/bulk-grant': typeof LayoutPopupsIdBulkGrantRoute
@@ -508,6 +522,8 @@ export interface FileRoutesByTo {
   '/activity': typeof LayoutActivityRoute
   '/api-keys': typeof LayoutApiKeysRoute
   '/check-in': typeof LayoutCheckInRoute
+  '/email-logs': typeof LayoutEmailLogsRoute
+  '/onboarding': typeof LayoutOnboardingRoute
   '/payments': typeof LayoutPaymentsRoute
   '/settings': typeof LayoutSettingsRoute
   '/third-party-apps': typeof LayoutThirdPartyAppsRoute
@@ -525,6 +541,7 @@ export interface FileRoutesByTo {
   '/events/settings': typeof LayoutEventsSettingsRoute
   '/form-builder/new': typeof LayoutFormBuilderNewRoute
   '/groups/new': typeof LayoutGroupsNewRoute
+  '/humans/$id': typeof LayoutHumansIdRoute
   '/humans/new': typeof LayoutHumansNewRoute
   '/invites/new': typeof LayoutInvitesNewRoute
   '/organizations/new': typeof LayoutOrganizationsNewRoute
@@ -557,7 +574,6 @@ export interface FileRoutesByTo {
   '/form-builder/$id/edit': typeof LayoutFormBuilderIdEditRoute
   '/form-builder/sections/new': typeof LayoutFormBuilderSectionsNewRoute
   '/groups/$id/edit': typeof LayoutGroupsIdEditRoute
-  '/humans/$id/edit': typeof LayoutHumansIdEditRoute
   '/invites/$inviteId/edit': typeof LayoutInvitesInviteIdEditRoute
   '/organizations/$id/edit': typeof LayoutOrganizationsIdEditRoute
   '/popups/$id/bulk-grant': typeof LayoutPopupsIdBulkGrantRoute
@@ -579,6 +595,8 @@ export interface FileRoutesById {
   '/_layout/activity': typeof LayoutActivityRoute
   '/_layout/api-keys': typeof LayoutApiKeysRoute
   '/_layout/check-in': typeof LayoutCheckInRoute
+  '/_layout/email-logs': typeof LayoutEmailLogsRoute
+  '/_layout/onboarding': typeof LayoutOnboardingRoute
   '/_layout/payments': typeof LayoutPaymentsRoute
   '/_layout/settings': typeof LayoutSettingsRoute
   '/_layout/third-party-apps': typeof LayoutThirdPartyAppsRoute
@@ -596,6 +614,7 @@ export interface FileRoutesById {
   '/_layout/events/settings': typeof LayoutEventsSettingsRoute
   '/_layout/form-builder/new': typeof LayoutFormBuilderNewRoute
   '/_layout/groups/new': typeof LayoutGroupsNewRoute
+  '/_layout/humans/$id': typeof LayoutHumansIdRoute
   '/_layout/humans/new': typeof LayoutHumansNewRoute
   '/_layout/invites/new': typeof LayoutInvitesNewRoute
   '/_layout/organizations/new': typeof LayoutOrganizationsNewRoute
@@ -628,7 +647,6 @@ export interface FileRoutesById {
   '/_layout/form-builder/$id/edit': typeof LayoutFormBuilderIdEditRoute
   '/_layout/form-builder/sections/new': typeof LayoutFormBuilderSectionsNewRoute
   '/_layout/groups/$id/edit': typeof LayoutGroupsIdEditRoute
-  '/_layout/humans/$id/edit': typeof LayoutHumansIdEditRoute
   '/_layout/invites/$inviteId/edit': typeof LayoutInvitesInviteIdEditRoute
   '/_layout/organizations/$id/edit': typeof LayoutOrganizationsIdEditRoute
   '/_layout/popups/$id/bulk-grant': typeof LayoutPopupsIdBulkGrantRoute
@@ -651,6 +669,8 @@ export interface FileRouteTypes {
     | '/activity'
     | '/api-keys'
     | '/check-in'
+    | '/email-logs'
+    | '/onboarding'
     | '/payments'
     | '/settings'
     | '/third-party-apps'
@@ -667,6 +687,7 @@ export interface FileRouteTypes {
     | '/events/settings'
     | '/form-builder/new'
     | '/groups/new'
+    | '/humans/$id'
     | '/humans/new'
     | '/invites/new'
     | '/organizations/new'
@@ -699,7 +720,6 @@ export interface FileRouteTypes {
     | '/form-builder/$id/edit'
     | '/form-builder/sections/new'
     | '/groups/$id/edit'
-    | '/humans/$id/edit'
     | '/invites/$inviteId/edit'
     | '/organizations/$id/edit'
     | '/popups/$id/bulk-grant'
@@ -719,6 +739,8 @@ export interface FileRouteTypes {
     | '/activity'
     | '/api-keys'
     | '/check-in'
+    | '/email-logs'
+    | '/onboarding'
     | '/payments'
     | '/settings'
     | '/third-party-apps'
@@ -736,6 +758,7 @@ export interface FileRouteTypes {
     | '/events/settings'
     | '/form-builder/new'
     | '/groups/new'
+    | '/humans/$id'
     | '/humans/new'
     | '/invites/new'
     | '/organizations/new'
@@ -768,7 +791,6 @@ export interface FileRouteTypes {
     | '/form-builder/$id/edit'
     | '/form-builder/sections/new'
     | '/groups/$id/edit'
-    | '/humans/$id/edit'
     | '/invites/$inviteId/edit'
     | '/organizations/$id/edit'
     | '/popups/$id/bulk-grant'
@@ -789,6 +811,8 @@ export interface FileRouteTypes {
     | '/_layout/activity'
     | '/_layout/api-keys'
     | '/_layout/check-in'
+    | '/_layout/email-logs'
+    | '/_layout/onboarding'
     | '/_layout/payments'
     | '/_layout/settings'
     | '/_layout/third-party-apps'
@@ -806,6 +830,7 @@ export interface FileRouteTypes {
     | '/_layout/events/settings'
     | '/_layout/form-builder/new'
     | '/_layout/groups/new'
+    | '/_layout/humans/$id'
     | '/_layout/humans/new'
     | '/_layout/invites/new'
     | '/_layout/organizations/new'
@@ -838,7 +863,6 @@ export interface FileRouteTypes {
     | '/_layout/form-builder/$id/edit'
     | '/_layout/form-builder/sections/new'
     | '/_layout/groups/$id/edit'
-    | '/_layout/humans/$id/edit'
     | '/_layout/invites/$inviteId/edit'
     | '/_layout/organizations/$id/edit'
     | '/_layout/popups/$id/bulk-grant'
@@ -900,6 +924,20 @@ declare module '@tanstack/react-router' {
       path: '/payments'
       fullPath: '/payments'
       preLoaderRoute: typeof LayoutPaymentsRouteImport
+      parentRoute: typeof LayoutRoute
+    }
+    '/_layout/onboarding': {
+      id: '/_layout/onboarding'
+      path: '/onboarding'
+      fullPath: '/onboarding'
+      preLoaderRoute: typeof LayoutOnboardingRouteImport
+      parentRoute: typeof LayoutRoute
+    }
+    '/_layout/email-logs': {
+      id: '/_layout/email-logs'
+      path: '/email-logs'
+      fullPath: '/email-logs'
+      preLoaderRoute: typeof LayoutEmailLogsRouteImport
       parentRoute: typeof LayoutRoute
     }
     '/_layout/check-in': {
@@ -1091,6 +1129,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LayoutHumansNewRouteImport
       parentRoute: typeof LayoutRoute
     }
+    '/_layout/humans/$id': {
+      id: '/_layout/humans/$id'
+      path: '/humans/$id'
+      fullPath: '/humans/$id'
+      preLoaderRoute: typeof LayoutHumansIdRouteImport
+      parentRoute: typeof LayoutRoute
+    }
     '/_layout/groups/new': {
       id: '/_layout/groups/new'
       path: '/groups/new'
@@ -1238,13 +1283,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LayoutInvitesInviteIdEditRouteImport
       parentRoute: typeof LayoutRoute
     }
-    '/_layout/humans/$id/edit': {
-      id: '/_layout/humans/$id/edit'
-      path: '/humans/$id/edit'
-      fullPath: '/humans/$id/edit'
-      preLoaderRoute: typeof LayoutHumansIdEditRouteImport
-      parentRoute: typeof LayoutRoute
-    }
     '/_layout/groups/$id/edit': {
       id: '/_layout/groups/$id/edit'
       path: '/groups/$id/edit'
@@ -1344,6 +1382,8 @@ interface LayoutRouteChildren {
   LayoutActivityRoute: typeof LayoutActivityRoute
   LayoutApiKeysRoute: typeof LayoutApiKeysRoute
   LayoutCheckInRoute: typeof LayoutCheckInRoute
+  LayoutEmailLogsRoute: typeof LayoutEmailLogsRoute
+  LayoutOnboardingRoute: typeof LayoutOnboardingRoute
   LayoutPaymentsRoute: typeof LayoutPaymentsRoute
   LayoutSettingsRoute: typeof LayoutSettingsRoute
   LayoutThirdPartyAppsRoute: typeof LayoutThirdPartyAppsRoute
@@ -1361,6 +1401,7 @@ interface LayoutRouteChildren {
   LayoutEventsSettingsRoute: typeof LayoutEventsSettingsRoute
   LayoutFormBuilderNewRoute: typeof LayoutFormBuilderNewRoute
   LayoutGroupsNewRoute: typeof LayoutGroupsNewRoute
+  LayoutHumansIdRoute: typeof LayoutHumansIdRoute
   LayoutHumansNewRoute: typeof LayoutHumansNewRoute
   LayoutInvitesNewRoute: typeof LayoutInvitesNewRoute
   LayoutOrganizationsNewRoute: typeof LayoutOrganizationsNewRoute
@@ -1393,7 +1434,6 @@ interface LayoutRouteChildren {
   LayoutFormBuilderIdEditRoute: typeof LayoutFormBuilderIdEditRoute
   LayoutFormBuilderSectionsNewRoute: typeof LayoutFormBuilderSectionsNewRoute
   LayoutGroupsIdEditRoute: typeof LayoutGroupsIdEditRoute
-  LayoutHumansIdEditRoute: typeof LayoutHumansIdEditRoute
   LayoutInvitesInviteIdEditRoute: typeof LayoutInvitesInviteIdEditRoute
   LayoutOrganizationsIdEditRoute: typeof LayoutOrganizationsIdEditRoute
   LayoutPopupsIdBulkGrantRoute: typeof LayoutPopupsIdBulkGrantRoute
@@ -1413,6 +1453,8 @@ const LayoutRouteChildren: LayoutRouteChildren = {
   LayoutActivityRoute: LayoutActivityRoute,
   LayoutApiKeysRoute: LayoutApiKeysRoute,
   LayoutCheckInRoute: LayoutCheckInRoute,
+  LayoutEmailLogsRoute: LayoutEmailLogsRoute,
+  LayoutOnboardingRoute: LayoutOnboardingRoute,
   LayoutPaymentsRoute: LayoutPaymentsRoute,
   LayoutSettingsRoute: LayoutSettingsRoute,
   LayoutThirdPartyAppsRoute: LayoutThirdPartyAppsRoute,
@@ -1430,6 +1472,7 @@ const LayoutRouteChildren: LayoutRouteChildren = {
   LayoutEventsSettingsRoute: LayoutEventsSettingsRoute,
   LayoutFormBuilderNewRoute: LayoutFormBuilderNewRoute,
   LayoutGroupsNewRoute: LayoutGroupsNewRoute,
+  LayoutHumansIdRoute: LayoutHumansIdRoute,
   LayoutHumansNewRoute: LayoutHumansNewRoute,
   LayoutInvitesNewRoute: LayoutInvitesNewRoute,
   LayoutOrganizationsNewRoute: LayoutOrganizationsNewRoute,
@@ -1462,7 +1505,6 @@ const LayoutRouteChildren: LayoutRouteChildren = {
   LayoutFormBuilderIdEditRoute: LayoutFormBuilderIdEditRoute,
   LayoutFormBuilderSectionsNewRoute: LayoutFormBuilderSectionsNewRoute,
   LayoutGroupsIdEditRoute: LayoutGroupsIdEditRoute,
-  LayoutHumansIdEditRoute: LayoutHumansIdEditRoute,
   LayoutInvitesInviteIdEditRoute: LayoutInvitesInviteIdEditRoute,
   LayoutOrganizationsIdEditRoute: LayoutOrganizationsIdEditRoute,
   LayoutPopupsIdBulkGrantRoute: LayoutPopupsIdBulkGrantRoute,

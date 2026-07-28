@@ -63,6 +63,7 @@ export function FieldConfigPanel({
 
   const [localValues, setLocalValues] = useState({
     label: "",
+    short_label: "",
     field_type: "text",
     placeholder: "",
     help_text: "",
@@ -77,6 +78,7 @@ export function FieldConfigPanel({
   useEffect(() => {
     setLocalValues({
       label: field.label,
+      short_label: field.short_label ?? "",
       field_type: field.field_type,
       placeholder: field.placeholder ?? "",
       help_text: field.help_text ?? "",
@@ -141,6 +143,11 @@ export function FieldConfigPanel({
     // Elementals cannot change required; everyone else can.
     if (!isElemental) {
       requestBody.required = localValues.required
+    }
+
+    // Custom fields only — explicit null clears a previously saved value.
+    if (!isProtected) {
+      requestBody.short_label = localValues.short_label.trim() || null
     }
 
     // Protected (base) fields have a fixed type defined by the catalog, unless
@@ -208,6 +215,23 @@ export function FieldConfigPanel({
             onChange={(e) => handleChange("label", e.target.value)}
             placeholder="Field label"
           />
+          <p className="text-xs text-muted-foreground">Key: {field.name}</p>
+        </div>
+      )}
+
+      {showLabelAndHelpText && !isProtected && (
+        <div className="space-y-2">
+          <Label htmlFor="config-short-label">Column name</Label>
+          <Input
+            id="config-short-label"
+            value={localValues.short_label}
+            onChange={(e) => handleChange("short_label", e.target.value)}
+            placeholder="Optional short name"
+          />
+          <p className="text-xs text-muted-foreground">
+            Short name shown as the column header in the applications table.
+            Defaults to the label.
+          </p>
         </div>
       )}
 
@@ -634,7 +658,7 @@ function DetailedMinMaxInputs({
         </div>
       </div>
       {minGreaterThanMax && (
-        <p className="text-xs text-red-500">
+        <p className="text-xs text-destructive">
           Min selections must be ≤ max selections.
         </p>
       )}

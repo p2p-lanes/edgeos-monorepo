@@ -51,19 +51,39 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     },
   )
 
-  // Fetch tenants for superadmin auto-selection
+  // Fetch selectable tenants for superadmins. The endpoint excludes deleted
+  // organizations, so this list also tells us whether a persisted selection is
+  // still valid.
   const { data: tenants, isError: _tenantsError } = useQuery({
     queryKey: ["tenants"],
     queryFn: () => TenantsService.listTenants({ skip: 0, limit: 100 }),
-    enabled: isSuperadmin && !selectedTenantId,
+    enabled: isSuperadmin,
   })
 
-  // Auto-select first tenant for superadmins
+  // Auto-select the first tenant, and drop a selection that is no longer available
   useEffect(() => {
-    if (isSuperadmin && !selectedTenantId && tenants?.results?.length) {
-      const firstTenantId = tenants.results[0].id
-      setSelectedTenantIdState(firstTenantId)
-      localStorage.setItem(TENANT_STORAGE_KEY, firstTenantId)
+    if (!isSuperadmin || !tenants) return
+
+    const available = tenants.results
+    const isStale = selectedTenantId
+      ? !available.some((tenant) => tenant.id === selectedTenantId)
+      : true
+
+    // A truncated page cannot prove a selection is gone — only the first 100
+    // organizations were fetched.
+    const isTruncated = tenants.paging.total > available.length
+    if (!isStale || (selectedTenantId && isTruncated)) return
+
+    const nextTenantId = available[0]?.id ?? null
+    if (nextTenantId === selectedTenantId) return
+
+    setSelectedTenantIdState(nextTenantId)
+    setSelectedPopupIdState(null)
+    localStorage.removeItem(POPUP_STORAGE_KEY)
+    if (nextTenantId) {
+      localStorage.setItem(TENANT_STORAGE_KEY, nextTenantId)
+    } else {
+      localStorage.removeItem(TENANT_STORAGE_KEY)
     }
   }, [isSuperadmin, selectedTenantId, tenants])
 
@@ -93,7 +113,6 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
             "popups",
             "humans",
             "form-fields",
-            "form-fields-schema",
             "approval-strategies",
             "popup-reviewers",
             "application-reviews",

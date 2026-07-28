@@ -3,10 +3,15 @@ import uuid
 from fastapi import APIRouter, HTTPException, status
 from sqlmodel import select
 
-from app.api.application_review.crud import application_reviews_crud
+from app.api.application_review.crud import (
+    application_review_skips_crud,
+    application_reviews_crud,
+)
 from app.api.application_review.schemas import (
     ApplicationReviewCreate,
     ApplicationReviewPublic,
+    ApplicationReviewSkipCreate,
+    ApplicationReviewSkipPublic,
     ReviewDecision,
     ReviewSummary,
 )
@@ -276,8 +281,19 @@ async def list_pending_reviews(
         limit=limit,
     )
 
+    skip_reasons = application_review_skips_crud.get_skip_reasons_by_application(
+        db, [a.id for a in pending_apps], current_user.id
+    )
+
     return ListModel(
-        results=[_build_application_public(a) for a in pending_apps],
+        results=[
+            _build_application_public(
+                a,
+                skipped_by_me=a.id in skip_reasons,
+                my_skip_reason=skip_reasons.get(a.id),
+            )
+            for a in pending_apps
+        ],
         paging=Paging(offset=skip, limit=limit, total=total),
     )
 
@@ -299,3 +315,64 @@ async def list_my_reviews(
         results=[_review_to_public(r) for r in reviews],
         paging=Paging(offset=skip, limit=limit, total=total),
     )
+
+
+@router.post(
+    "/{application_id}/skip",
+    response_model=ApplicationReviewSkipPublic,
+    status_code=status.HTTP_201_CREATED,
+)
+async def skip_application(
+    application_id: uuid.UUID,
+    skip_in: ApplicationReviewSkipCreate,
+    db: TenantSession,
+    current_user: CurrentOperator,
+) -> ApplicationReviewSkipPublic:
+    """Skip an application: drop it from your own pending queue without voting.
+
+    Idempotent — skipping again updates the reason. Never affects the tally.
+    """
+    from app.api.application.crud import applications_crud
+
+    application = applications_crud.get(db, application_id)
+    if not application:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Application not found",
+        )
+
+    tenant_id = current_user.tenant_id
+    if current_user.role == UserRole.SUPERADMIN:
+        tenant_id = application.tenant_id
+    if not tenant_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User has no tenant assigned",
+        )
+
+    skip = application_review_skips_crud.upsert_skip(
+        db, application_id, current_user.id, tenant_id, skip_in
+    )
+    return ApplicationReviewSkipPublic.model_validate(skip)
+
+
+@router.delete(
+    "/{application_id}/skip",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def unskip_application(
+    application_id: uuid.UUID,
+    db: TenantSession,
+    current_user: CurrentOperator,
+) -> None:
+    """Un-skip an application: return it to your pending queue."""
+    from app.api.application.crud import applications_crud
+
+    application = applications_crud.get(db, application_id)
+    if not application:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Application not found",
+        )
+
+    application_review_skips_crud.delete_skip(db, application_id, current_user.id)

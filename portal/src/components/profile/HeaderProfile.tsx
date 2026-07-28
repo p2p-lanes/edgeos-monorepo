@@ -1,5 +1,4 @@
-import { LogOut, Medal, Newspaper } from "lucide-react"
-import { useRouter } from "next/navigation"
+import { LogOut, Newspaper } from "lucide-react"
 import { useState } from "react"
 import { useTranslation } from "react-i18next"
 import InvoiceModal from "@/app/portal/[popupSlug]/passes/components/common/InvoiceModal"
@@ -11,7 +10,6 @@ import { Button } from "../ui/button"
 
 const HeaderProfile = () => {
   const { t } = useTranslation()
-  const router = useRouter()
   const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false)
   const { logout } = useAuth()
   const { tenant } = useTenant()
@@ -34,14 +32,6 @@ const HeaderProfile = () => {
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          <Button
-            variant="outline"
-            className="text-foreground border-border bg-transparent"
-            onClick={() => router.push("/portal/poaps")}
-          >
-            <Medal className="mr-2 size-4" />
-            {t("profile.my_collectibles")}
-          </Button>
           {hasInvoiceFields && (
             <>
               <Button
