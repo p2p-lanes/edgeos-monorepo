@@ -55,6 +55,22 @@ class TenantBase(SQLModel):
     meta_pixel_id: str | None = Field(default=None, max_length=64)
     ga_tracking_enabled: bool = False
     ga_measurement_id: str | None = Field(default=None, max_length=64)
+    help_enabled: bool = False
+    help_email: EmailStr | None = Field(default=None, max_length=255)
+
+
+def _validate_help_settings(help_enabled: bool | None, help_email: str | None) -> None:
+    """Reject a help button that is on but has nowhere to send mail.
+
+    Only meaningful when both values represent the *effective* state. Callers
+    holding a partial payload (``TenantUpdate``) must merge against the DB row
+    first — see the router's merged-state check.
+    """
+    if help_enabled and not (help_email or "").strip():
+        raise ValueError(
+            "help_enabled requires a help_email. "
+            "Set a help email before enabling the portal help button."
+        )
 
 
 class TenantCreate(SQLModel):
@@ -69,6 +85,8 @@ class TenantCreate(SQLModel):
     meta_pixel_id: str | None = Field(default=None, max_length=64)
     ga_tracking_enabled: bool = False
     ga_measurement_id: str | None = Field(default=None, max_length=64)
+    help_enabled: bool = False
+    help_email: EmailStr | None = None
     smtp_host: str | None = Field(default=None, max_length=255)
     smtp_port: int | None = 587
     smtp_user: str | None = Field(default=None, max_length=255)
@@ -99,6 +117,12 @@ class TenantCreate(SQLModel):
         )
         return self
 
+    @model_validator(mode="after")
+    def validate_help(self) -> Self:
+        # Create carries the complete state, so this is the definitive check.
+        _validate_help_settings(self.help_enabled, self.help_email)
+        return self
+
 
 class TenantUpdate(SQLModel):
     name: str | None = None
@@ -115,6 +139,8 @@ class TenantUpdate(SQLModel):
     meta_capi_access_token: str | None = Field(default=None, exclude=True)
     ga_tracking_enabled: bool | None = None
     ga_measurement_id: str | None = Field(default=None, max_length=64)
+    help_enabled: bool | None = None
+    help_email: EmailStr | None = None
     smtp_host: str | None = Field(default=None, max_length=255)
     smtp_port: int | None = None
     smtp_user: str | None = Field(default=None, max_length=255)
@@ -147,6 +173,25 @@ class TenantUpdate(SQLModel):
         _validate_smtp_common(
             self.smtp_host, self.smtp_port, self.smtp_tls, self.smtp_ssl
         )
+        return self
+
+    @model_validator(mode="after")
+    def validate_help(self) -> Self:
+        """Reject enabling the help button while clearing its address.
+
+        Payload-level only. ``None`` means "unchanged", so a payload that just
+        flips ``help_enabled`` on cannot be judged here — the router performs
+        the definitive merged-state check against the DB row.
+        """
+        if (
+            self.help_enabled is True
+            and "help_email" in self.model_fields_set
+            and self.help_email is None
+        ):
+            raise ValueError(
+                "help_enabled requires a help_email. "
+                "Set a help email before enabling the portal help button."
+            )
         return self
 
     @model_validator(mode="after")
