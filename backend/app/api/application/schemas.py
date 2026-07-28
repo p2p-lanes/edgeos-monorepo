@@ -17,6 +17,7 @@ from sqlmodel import Column, DateTime, Field, SQLModel
 from app.api.application_review.schemas import ReviewDecision
 from app.api.attendee.schemas import AttendeePublic
 from app.api.human.schemas import HumanPublic
+from app.api.shared.enums import HumanRating
 from app.core.filters import (
     DATE_OPS,
     ENUMISH_OPS,
@@ -419,6 +420,15 @@ APPLICATION_FILTER_FIELDS: dict[str, FilterField] = {
     "referral": FilterField("text", TEXT_OPS),
     "gender": FilterField("select", ENUMISH_OPS),
     "age": FilterField("select", ENUMISH_OPS),
+    "residence": FilterField("text", TEXT_OPS),
+    "telegram": FilterField("text", TEXT_OPS),
+    # rating defaults to "unrated", never NULL, so empty ops don't apply.
+    "rating": FilterField(
+        "select",
+        frozenset({"eq", "neq"}),
+        frozenset(r.value for r in HumanRating),
+    ),
+    "scholarship_video_url": FilterField("text", TEXT_OPS),
     "skipped_by_me": FilterField("boolean", frozenset({"eq"})),
     "reviewed_by_me": FilterField("boolean", frozenset({"eq"})),
     "reviewed_by": FilterField("uuid", frozenset({"eq", "neq"})),
@@ -429,6 +439,8 @@ APPLICATION_FILTER_FIELD_OPS: dict[str, set[str]] = {
 }
 # Virtual fields resolved against the calling user's own review/skip rows.
 VIRTUAL_REVIEWER_FIELDS = frozenset({"skipped_by_me", "reviewed_by_me"})
+# Fields stored on the Humans row; filtering by them needs the join.
+HUMAN_FILTER_FIELDS = frozenset({"gender", "age", "residence", "telegram", "rating"})
 CUSTOM_FIELD_PREFIX = "custom."
 _CUSTOM_FIELD_SPEC = FilterField("text", TEXT_OPS)
 
@@ -488,7 +500,7 @@ class ApplicationFilters(FilterGroup):
 
     def references_human_fields(self) -> bool:
         """True when any condition targets a Humans column (needs join)."""
-        return any(c.field in ("gender", "age") for c in self.conditions)
+        return any(c.field in HUMAN_FILTER_FIELDS for c in self.conditions)
 
 
 def parse_application_filters(raw: str | None) -> ApplicationFilters | None:

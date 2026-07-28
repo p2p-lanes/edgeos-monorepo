@@ -6,6 +6,7 @@ import {
   type FilterMatch,
   FULL_TEXT_OPS,
 } from "@/components/Common/FilterBuilder"
+import { RATING_OPTIONS } from "@/components/Humans/humanFields"
 
 export {
   type FilterCondition,
@@ -36,6 +37,7 @@ function baseFieldDef(
   key: string,
   label: string,
   baseFieldOptions: Record<string, string[]>,
+  textOps: string[] = EMPTYABLE_TEXT_OPS,
 ): FilterFieldDef {
   const options = baseFieldOptions[key]
   if (options?.length) {
@@ -47,7 +49,7 @@ function baseFieldDef(
       options: options.map((opt) => ({ value: opt, label: opt })),
     }
   }
-  return { key, label, kind: "text", ops: EMPTYABLE_TEXT_OPS }
+  return { key, label, kind: "text", ops: textOps }
 }
 
 function buildFieldDefs(
@@ -78,6 +80,22 @@ function buildFieldDefs(
       options: SCHOLARSHIP_STATUS_OPTIONS,
     },
     {
+      key: "scholarship_video_url",
+      label: "Scholarship video",
+      kind: "text",
+      ops: FULL_TEXT_OPS,
+    },
+    {
+      key: "rating",
+      label: "Rating",
+      kind: "select",
+      ops: ["eq", "neq"],
+      options: RATING_OPTIONS.map((opt) => ({
+        value: opt.value,
+        label: opt.label,
+      })),
+    },
+    {
       key: "skipped_by_me",
       label: "Skipped by me",
       kind: "boolean",
@@ -105,6 +123,8 @@ function buildFieldDefs(
     { key: "referral", label: "Referral", kind: "text", ops: FULL_TEXT_OPS },
     baseFieldDef("gender", "Gender", baseFieldOptions),
     baseFieldDef("age", "Age", baseFieldOptions),
+    baseFieldDef("residence", "Residence", baseFieldOptions, FULL_TEXT_OPS),
+    { key: "telegram", label: "Telegram", kind: "text", ops: FULL_TEXT_OPS },
   ]
   const custom: FilterFieldDef[] = customFields.map((field) => ({
     key: `custom.${field.name}`,
