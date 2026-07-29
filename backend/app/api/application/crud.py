@@ -1013,9 +1013,6 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         # Inline the uses increment (mirror referral pattern) so all writes
         # commit in a single transaction boundary via the session.commit() below.
         if _invite is not None:
-            if _invite.discount_percentage:
-                application.discount_percentage = _invite.discount_percentage
-                session.add(application)
             _invite.current_uses += 1
             if _invite.used_at is None:
                 _invite.used_at = datetime.now(UTC)

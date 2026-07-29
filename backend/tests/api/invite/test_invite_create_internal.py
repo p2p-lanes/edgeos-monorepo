@@ -156,7 +156,11 @@ class TestInviteCreateInternalFlags:
         assert resp.status_code in (200, 201), resp.json()
         body = resp.json()
         assert body["status"] == ApplicationStatus.ACCEPTED.value
-        assert Decimal(str(body["discount_percentage"])) == Decimal("25")
+        # The invite discount is NOT copied onto the application —
+        # application.discount_percentage is scholarship-only. The payment
+        # path reads the invite live (see test_link_discounts.py).
+        assert body["invite_id"] == str(invite.id)
+        assert body["discount_percentage"] is None
 
     def test_invite_increments_current_uses(
         self,

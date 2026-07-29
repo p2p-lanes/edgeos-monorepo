@@ -239,9 +239,9 @@ async def redeem_invite(
         else:
             application.status = ApplicationStatus.REJECTED.value
 
-    if invite.discount_percentage:
-        application.discount_percentage = invite.discount_percentage
-
+    # Invite discount is NOT copied onto application.discount_percentage —
+    # that column is scholarship-only. The payment path reads the invite row
+    # live via application.invite_id (see payment/crud._apply_discounts).
     db.add(application)
     db.commit()
     db.refresh(application)

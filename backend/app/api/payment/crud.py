@@ -1934,7 +1934,53 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 response.coupon_code = coupon.code
                 response.discount_value = coupon_discount
 
-        # Check scholarship discount (third competitor — best-of-three)
+        # Check invite discount — read live from the invite row, same as the
+        # group branch. application.discount_percentage is scholarship-only;
+        # invite discounts must not ride on that column.
+        if application.invite_id:
+            from app.api.invite.crud import invites_crud
+
+            invite = invites_crud.get(session, application.invite_id)
+            if invite and invite.discount_percentage:
+                invite_discount = Decimal(str(invite.discount_percentage))
+                discounted_amount, discounted_credit_applied = _calculate_price(
+                    standard_amount=standard_amount,
+                    non_discountable_amount=non_discountable_amount,
+                    discount_value=invite_discount,
+                    application=application,
+                    edit_passes=obj.edit_passes,
+                )
+                if discounted_amount < response.amount:
+                    response.amount = discounted_amount
+                    response.credit_applied = discounted_credit_applied
+                    response.discount_value = invite_discount
+                    response.coupon_id = None
+                    response.coupon_code = None
+                    response.group_id = None
+
+        # Check referral discount — read live; a disabled referral grants nothing.
+        if application.referral_id:
+            from app.api.referral.crud import referrals_crud
+
+            referral = referrals_crud.get(session, application.referral_id)
+            if referral and not referral.is_disabled and referral.discount_percentage:
+                referral_discount = Decimal(str(referral.discount_percentage))
+                discounted_amount, discounted_credit_applied = _calculate_price(
+                    standard_amount=standard_amount,
+                    non_discountable_amount=non_discountable_amount,
+                    discount_value=referral_discount,
+                    application=application,
+                    edit_passes=obj.edit_passes,
+                )
+                if discounted_amount < response.amount:
+                    response.amount = discounted_amount
+                    response.credit_applied = discounted_credit_applied
+                    response.discount_value = referral_discount
+                    response.coupon_id = None
+                    response.coupon_code = None
+                    response.group_id = None
+
+        # Check scholarship discount (last competitor — best-of-N)
         if (
             application.scholarship_status == ScholarshipStatus.APPROVED.value
             and application.discount_percentage
