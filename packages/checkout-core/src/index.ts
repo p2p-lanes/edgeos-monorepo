@@ -7,6 +7,7 @@ export {
   type CheckoutClientOptions,
   createCheckoutClient,
 } from "./client"
+export * from "./form"
 export * from "./order"
 export * from "./selection"
 export * from "./steps"
@@ -20,3 +21,9 @@ export type {
 } from "./transport/types"
 export type * from "./types/api"
 export type { CheckoutStep } from "./types/checkout"
+export type {
+  ApplicationFormSchema,
+  FormFieldSchema,
+  FormFieldType,
+  MultiSelectDetailedConfig,
+} from "./types/form"
