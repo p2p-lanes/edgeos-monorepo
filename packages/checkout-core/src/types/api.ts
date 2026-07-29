@@ -42,15 +42,39 @@ export interface CheckoutRuntimeProduct {
   insurance_eligible?: boolean
 }
 
-// The popup / buyer_form / ticketing_steps shapes are large and only consumed
-// by later tasks (step derivation, form building). They are kept as opaque
-// records here and refined in `src/steps/` and `src/form/` (Plan 2 Tasks
-// 2.3 / 2.6) so the transport client can stay decoupled from those modules.
+/**
+ * One configured checkout step (mirrors `TicketingStepPublic`). `step_type`
+ * drives structural behavior; `product_category` maps products into the step;
+ * `template` selects the renderer variant.
+ */
+export interface TicketingStep {
+  id: string
+  tenant_id: string
+  popup_id: string
+  step_type: string
+  title: string
+  description?: string | null
+  order?: number
+  is_enabled?: boolean
+  protected?: boolean
+  product_category?: string | null
+  template?: string | null
+  template_config?: Record<string, unknown> | null
+  watermark?: string | null
+  show_title?: boolean
+  show_watermark?: boolean
+  show_in_navbar?: boolean
+  emoji?: string | null
+}
+
+// The popup / buyer_form shapes are large and only consumed by later tasks
+// (form building). They are kept as opaque records here and refined in
+// `src/form/` (Plan 2 Task 2.6) so the transport client stays decoupled.
 export interface CheckoutRuntimeResponse {
   popup: Record<string, unknown>
   products: CheckoutRuntimeProduct[]
   buyer_form: Array<Record<string, unknown>>
-  ticketing_steps: Array<Record<string, unknown>>
+  ticketing_steps: TicketingStep[]
   attendee_categories?: Array<Record<string, unknown>>
   form_schema?: Record<string, unknown> | null
 }

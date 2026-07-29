@@ -7,6 +7,7 @@ export {
   type CheckoutClientOptions,
   createCheckoutClient,
 } from "./client"
+export * from "./steps"
 export { CheckoutApiError } from "./transport/errors"
 export { createFetchTransport } from "./transport/fetchTransport"
 export type {
@@ -16,3 +17,4 @@ export type {
   Transport,
 } from "./transport/types"
 export type * from "./types/api"
+export type { CheckoutStep } from "./types/checkout"
