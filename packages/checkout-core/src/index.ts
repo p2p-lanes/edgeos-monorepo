@@ -7,6 +7,7 @@ export {
   type CheckoutClientOptions,
   createCheckoutClient,
 } from "./client"
+export * from "./analytics"
 export * from "./cart"
 export * from "./form"
 export * from "./order"
