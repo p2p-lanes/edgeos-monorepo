@@ -426,6 +426,21 @@ class TestInvitePreview:
         assert body["is_email_restricted"] is True
         assert "recipient_email" not in body
 
+    def test_preview_gated_when_invites_disabled(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+        admin_user_tenant_a: Users,
+    ) -> None:
+        """popup.invites_enabled=False → existing invite links stop resolving (410)."""
+        popup = _make_popup(db, tenant_a, invites_enabled=False)
+        tok = f"gated-{uuid.uuid4().hex[:12]}"
+        _make_invite(db, popup, admin_user_tenant_a, token=tok)
+
+        resp = client.get(f"/api/v1/invites/redeem/{tok}")
+        assert resp.status_code == 410, resp.json()
+
     def test_preview_no_email_restriction_when_no_recipient(
         self,
         client: TestClient,

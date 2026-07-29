@@ -86,7 +86,14 @@ async def preview_invite(
         from app.api.popup.crud import popups_crud
         from app.api.popup.guards import ensure_popup_link_active
 
-        ensure_popup_link_active(popups_crud.get(db, invite.popup_id))
+        popup = popups_crud.get(db, invite.popup_id)
+        ensure_popup_link_active(popup)
+        if popup is not None and not popup.invites_enabled:
+            raise HTTPException(
+                status_code=status.HTTP_410_GONE,
+                detail="Invites are not enabled for this event",
+                headers={"Cache-Control": "no-store"},
+            )
         invites_crud.validate_for_redemption(invite)
 
     # Resolve inviter_name from the created_by user (explicit fetch — avoid lazy load)
