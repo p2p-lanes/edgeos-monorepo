@@ -169,16 +169,47 @@ export interface CouponValidatePublicResponse {
 }
 
 // --- PUT / GET /checkout/{slug}/cart --------------------------------------
-// The cart JSONB is a rich per-step structure; only `promo_code`, `insurance`
-// and `current_step` are read at the transport level. Selection modules (Task
-// 2.4) own the item shapes, so the cart state is left as an open record here.
+// The cart JSONB persisted by the anonymous cart endpoints. Mirrors
+// `backend/app/api/cart/schemas.py` (CartState). Note the backend model drops
+// unknown fields, so only these are round-tripped server-side.
+
+export interface CartItemPass {
+  attendee_id: string
+  product_id: string
+  quantity: number
+}
+
+export interface CartItemHousing {
+  product_id: string
+  check_in: string
+  check_out: string
+}
+
+export interface CartItemMerch {
+  product_id: string
+  quantity: number
+}
+
+export interface CartItemPatron {
+  product_id: string
+  amount: number
+  is_custom_amount: boolean
+}
+
+export interface CartItemMealPlan {
+  attendee_id: string
+  product_id: string
+  daily_choices?: Record<string, string> | null
+  dietary_restriction?: string | null
+  special_request?: string | null
+}
 
 export interface CartState {
-  passes?: Array<Record<string, unknown>>
-  housing?: Record<string, unknown> | null
-  merch?: Array<Record<string, unknown>>
-  patron?: Record<string, unknown> | null
-  meal_plans?: Array<Record<string, unknown>>
+  passes?: CartItemPass[]
+  housing?: CartItemHousing | null
+  merch?: CartItemMerch[]
+  patron?: CartItemPatron | null
+  meal_plans?: CartItemMealPlan[]
   promo_code?: string | null
   insurance?: boolean
   current_step?: string | null
