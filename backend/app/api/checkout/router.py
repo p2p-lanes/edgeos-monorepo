@@ -29,6 +29,8 @@ from app.api.checkout.crud import (
     share_meta_for_slug,
 )
 from app.api.checkout.schemas import (
+    CheckoutPreviewRequest,
+    CheckoutPreviewResponse,
     CheckoutRuntimeResponse,
     CheckoutShareMeta,
     OpenTicketingPurchaseCreate,
@@ -121,6 +123,28 @@ async def get_runtime(
     Rate-limited 120/min/IP.
     """
     return runtime_for_slug(db, slug, tenant.id, parse_accept_language(accept_language))
+
+
+@router.post(
+    "/{slug}/preview",
+    response_model=CheckoutPreviewResponse,
+    dependencies=[
+        Depends(RateLimit(limit=60, window_sec=60, key_prefix="rl:checkout-preview")),
+    ],
+)
+async def preview_open_ticketing(
+    slug: str,
+    request_in: CheckoutPreviewRequest,
+    db: SessionDep,
+    tenant: PublicTenant,
+) -> CheckoutPreviewResponse:
+    """Return a server-computed price breakdown for an anonymous cart.
+
+    Authoritative for display; identical math to POST /purchase. No side effects.
+    Rate-limited 60/min/IP.
+    """
+    popup = get_open_ticketing_popup(db, slug, tenant.id)
+    return payments_crud.preview_open_ticketing(db, request_in, popup)
 
 
 @router.get(
