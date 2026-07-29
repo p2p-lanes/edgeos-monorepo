@@ -30,6 +30,7 @@ from app.api import (
     popup,
     popup_reviewer,
     product,
+    publishable_key,
     saved_view,
     task,
     tenant,
@@ -64,6 +65,7 @@ api_router.include_router(attendee_category.router)
 
 # Popup-related resources
 api_router.include_router(product.router)
+api_router.include_router(publishable_key.router)
 api_router.include_router(coupon.router)
 api_router.include_router(group.router)
 api_router.include_router(form_section.router)
