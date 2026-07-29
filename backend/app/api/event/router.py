@@ -121,7 +121,21 @@ def _validate_group_event_rules(
             ),
         )
 
-    # Validator 2: enable_private_events gate
+    # Validator 2a: popup-level feature flag. Gates the CREATE path only —
+    # existing group-scoped events keep their read-side opacity regardless.
+    from app.api.popup.crud import popups_crud
+
+    popup = popups_crud.get(db, popup_id)
+    if popup is not None and not popup.group_private_events_enabled:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                "Group-private events are not enabled for this event. "
+                "An admin must enable them in the event settings first."
+            ),
+        )
+
+    # Validator 2b: enable_private_events gate
     from app.api.group.crud import groups_crud
 
     group = groups_crud.get(db, group_id)

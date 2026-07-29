@@ -196,6 +196,26 @@ class TestGroupIdInSchemas:
         assert data["group_id"] == str(group.id)
         assert data["visibility"] == "private"
 
+    def test_popup_flag_off_rejects_group_event_creation(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+        admin_user_tenant_a: Users,
+    ) -> None:
+        """popup.group_private_events_enabled=False → 422 even if the group opts in."""
+        popup = _make_popup(db, tenant_a, group_private_events_enabled=False)
+        group = _make_group(db, tenant_a, popup, enable_private_events=True)
+
+        payload = _event_payload(popup.id, visibility="private", group_id=group.id)
+        resp = client.post(
+            ADMIN_EVENTS_URL,
+            json=payload,
+            headers=_auth(_admin_token(admin_user_tenant_a)),
+        )
+        assert resp.status_code == 422, resp.json()
+        assert "not enabled" in str(resp.json()).lower()
+
     def test_group_id_on_public_event_rejected_by_schema(
         self,
         client: TestClient,
