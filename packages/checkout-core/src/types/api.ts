@@ -97,17 +97,28 @@ export interface CheckoutPreviewLine {
   product_id: string
   quantity: number
   unit_price: Money
+  /** Gross line total (unit_price × quantity), BEFORE any coupon discount. */
   line_total: Money
   discountable: boolean
 }
 
-/** Authoritative server-computed price breakdown (no side effects). */
+/**
+ * Authoritative server-computed price breakdown (no side effects).
+ *
+ * Gotcha (verified by the backend SDK contract test): `discountable_amount` is
+ * the discountable portion AFTER the coupon is applied — NOT the pre-discount
+ * subtotal. To show "you saved X", read `discount_amount`. Per-line
+ * `line_total` values remain gross (pre-discount). `total` is what the buyer is
+ * charged and equals the amount /purchase returns for identical inputs.
+ */
 export interface CheckoutPreviewResponse {
   lines: CheckoutPreviewLine[]
+  /** Discountable portion AFTER discount (net), not the gross subtotal. */
   discountable_amount: Money
   non_discountable_amount: Money
   coupon_code?: string | null
   discount_value?: Money | null
+  /** Amount saved by the coupon (gross discountable − net discountable). */
   discount_amount: Money
   post_discount_amount: Money
   insurance_amount: Money
