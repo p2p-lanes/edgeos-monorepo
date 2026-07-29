@@ -17,7 +17,11 @@ from app.api.audit_log.crud import audit_logs_crud
 from app.api.human.models import Humans
 
 if TYPE_CHECKING:
-    from app.api.checkout.schemas import OpenTicketingPurchaseCreate
+    from app.api.checkout.schemas import (
+        CheckoutPreviewRequest,
+        CheckoutPreviewResponse,
+        OpenTicketingPurchaseCreate,
+    )
     from app.api.group.models import Groups
     from app.api.human.models import Humans
     from app.api.popup.models import Popups
@@ -832,6 +836,78 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         self._add_products_to_attendees(session, products, payment_id=payment.id)
         session.flush()
         return payment
+
+    def preview_open_ticketing(
+        self,
+        session: Session,
+        obj: "CheckoutPreviewRequest",
+        popup: "Popups",
+    ) -> "CheckoutPreviewResponse":
+        """Compute the authoritative price breakdown without creating anything.
+
+        Same product validation (membership + sale window) and same money math
+        as ``create_open_ticketing_payment``; no side effects.
+        """
+        from app.api.checkout.schemas import (
+            CheckoutPreviewLine,
+            CheckoutPreviewResponse,
+        )
+
+        product_ids = [line.product_id for line in obj.products]
+        products_statement = select(Products).where(
+            Products.id.in_(product_ids),  # type: ignore[attr-defined]
+            Products.popup_id == popup.id,
+            Products.is_active == True,  # noqa: E712
+            Products.deleted_at.is_(None),  # type: ignore[attr-defined]
+        )
+        valid_products = list(session.exec(products_statement).all())
+        if {p.id for p in valid_products} != set(product_ids):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Some products are not available or inactive",
+            )
+        for product in valid_products:
+            state = derive_product_state(ProductPublic.model_validate(product))
+            if state != ProductSaleState.on_sale:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=(
+                        f"Product '{product.name}' is not on sale "
+                        f"(state: {state.value})"
+                    ),
+                )
+
+        products_map = {p.id: p for p in valid_products}
+        amounts = compute_open_ticketing_amounts(
+            session,
+            popup,
+            products_map,
+            obj.products,
+            coupon_code=obj.coupon_code,
+            insurance=obj.insurance,
+        )
+        return CheckoutPreviewResponse(
+            lines=[
+                CheckoutPreviewLine(
+                    product_id=line.product_id,
+                    quantity=line.quantity,
+                    unit_price=line.unit_price,
+                    line_total=line.line_total,
+                    discountable=line.discountable,
+                )
+                for line in amounts.lines
+            ],
+            discountable_amount=amounts.discountable_amount,
+            non_discountable_amount=amounts.non_discountable_amount,
+            coupon_code=amounts.coupon_code,
+            discount_value=amounts.discount_value,
+            discount_amount=amounts.discount_amount,
+            post_discount_amount=amounts.post_discount_amount,
+            insurance_amount=amounts.insurance_amount,
+            contribution_amount=amounts.contribution_amount,
+            total=amounts.total_amount,
+            currency=amounts.currency,
+        )
 
     def create_open_ticketing_payment(
         self,
