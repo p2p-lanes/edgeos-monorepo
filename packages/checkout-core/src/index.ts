@@ -1,6 +1,13 @@
 // @edgeos/checkout-core — framework-agnostic headless checkout engine.
-// Public surface grows as modules land (see
-// docs/superpowers/plans/2026-07-29-headless-checkout-sdk-CONTINUATION.md, Plan 2).
+//
+// Public surface (Plan 2 complete). The React adapter (@edgeos/checkout-react,
+// Plan 3) and any custom checkout UI consume ONLY what is exported here:
+//   - createCheckoutStore   — the orchestration brain (subscribe/getState/actions)
+//   - createCheckoutClient / createFetchTransport — the API boundary
+//   - selection / steps / order / pricing / cart / form — pure building blocks
+//   - analytics bus + Meta Pixel / GA adapters
+//   - all public types (API contract, form schema, checkout step)
+// Zero React imports live in this package.
 
 export {
   type CheckoutClient,
