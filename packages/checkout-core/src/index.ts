@@ -14,6 +14,7 @@ export * from "./order"
 export * from "./pricing"
 export * from "./selection"
 export * from "./steps"
+export * from "./store"
 export { CheckoutApiError } from "./transport/errors"
 export { createFetchTransport } from "./transport/fetchTransport"
 export type {
