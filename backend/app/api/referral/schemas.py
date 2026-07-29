@@ -64,6 +64,7 @@ class ReferralAdminUpdate(BaseModel):
     max_uses: int | None = None
     discount_percentage: Decimal | None = None
     auto_approve: bool | None = None
+    is_disabled: bool | None = None
 
     @field_validator("max_uses")
     @classmethod
@@ -89,6 +90,7 @@ class ReferralPublic(BaseModel):
     code: str
     discount_percentage: Decimal
     auto_approve: bool
+    is_disabled: bool = False
     max_uses: int | None = None
     current_uses: int
     expires_at: datetime | None = None

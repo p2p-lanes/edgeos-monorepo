@@ -175,12 +175,20 @@ class ReferralsCRUD(BaseCRUD[Referrals, ReferralCreate, ReferralUpdate]):
     def validate_for_use(self, referral: Referrals) -> None:
         """Enforce use-limit and expiry guards (spec: REQ-GR-010).
 
-        1. Expiration → 410 Gone
-        2. Use limit  → 410 Gone
+        1. Admin-disabled → 410 Gone
+        2. Expiration → 410 Gone
+        3. Use limit  → 410 Gone
         """
         now = datetime.now(UTC)
 
-        # Step 1: expiration
+        # Step 1: admin force-disable
+        if referral.is_disabled:
+            raise HTTPException(
+                status_code=status.HTTP_410_GONE,
+                detail="This referral link is no longer active",
+            )
+
+        # Step 2: expiration
         if referral.expires_at is not None and referral.expires_at < now:
             raise HTTPException(
                 status_code=status.HTTP_410_GONE,

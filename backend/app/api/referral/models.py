@@ -46,6 +46,9 @@ class Referrals(SQLModel, table=True):
         ),
     )
     auto_approve: bool = Field(default=False)
+    # Admin force-disable: a disabled referral stops granting access and
+    # discounts immediately, without deleting its attribution history.
+    is_disabled: bool = Field(default=False)
     max_uses: int | None = Field(default=None, nullable=True)
     current_uses: int = Field(default=0)
     expires_at: datetime | None = Field(

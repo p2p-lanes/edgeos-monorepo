@@ -18423,6 +18423,17 @@ export const ReferralAdminUpdateSchema = {
                 }
             ],
             title: 'Auto Approve'
+        },
+        is_disabled: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Is Disabled'
         }
     },
     type: 'object',
@@ -18513,6 +18524,11 @@ export const ReferralPublicSchema = {
         auto_approve: {
             type: 'boolean',
             title: 'Auto Approve'
+        },
+        is_disabled: {
+            type: 'boolean',
+            title: 'Is Disabled',
+            default: false
         },
         max_uses: {
             anyOf: [

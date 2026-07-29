@@ -129,6 +129,7 @@ def _make_referral(
     auto_approve: bool = False,
     discount_percentage: Decimal = Decimal("0"),
     expires_at: datetime | None = None,
+    is_disabled: bool = False,
 ) -> Referrals:
     ref_code = code or f"ref-{uuid.uuid4().hex[:12]}"
     ref = Referrals(
@@ -141,6 +142,7 @@ def _make_referral(
         auto_approve=auto_approve,
         discount_percentage=discount_percentage,
         expires_at=expires_at,
+        is_disabled=is_disabled,
     )
     db.add(ref)
     db.commit()
@@ -459,6 +461,36 @@ class TestReferralPublicLookup:
         resp = client.get(f"/api/v1/referrals/r/{code}")
         assert resp.status_code == 410, resp.json()
 
+    def test_disabled_referral_returns_410(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+    ) -> None:
+        """Admin-disabled referral → 410 Gone on the public preview."""
+        popup = _make_popup(db, tenant_a)
+        human = _make_human(db, tenant_a)
+        code = f"dis-{uuid.uuid4().hex[:12]}"
+        _make_referral(db, popup, human, code=code, is_disabled=True)
+
+        resp = client.get(f"/api/v1/referrals/r/{code}")
+        assert resp.status_code == 410, resp.json()
+
+    def test_referrals_flag_off_returns_410(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+    ) -> None:
+        """popup.referrals_enabled=False → existing links stop resolving (410)."""
+        popup = _make_popup(db, tenant_a, referrals_enabled=False)
+        human = _make_human(db, tenant_a)
+        code = f"floff-{uuid.uuid4().hex[:12]}"
+        _make_referral(db, popup, human, code=code)
+
+        resp = client.get(f"/api/v1/referrals/r/{code}")
+        assert resp.status_code == 410, resp.json()
+
 
 # ---------------------------------------------------------------------------
 # Admin moderation — GET/PATCH /admin/referrals
@@ -493,6 +525,39 @@ class TestReferralAdminCRUD:
         body = resp.json()
         assert "results" in body
         assert body["paging"]["total"] >= 2
+
+    def test_admin_can_disable_and_reenable(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+        admin_user_tenant_a: Users,
+    ) -> None:
+        """Admin PATCH is_disabled kills the public link; re-enable restores it."""
+        popup = _make_popup(db, tenant_a)
+        human = _make_human(db, tenant_a)
+        code = f"kill-{uuid.uuid4().hex[:8]}"
+        ref = _make_referral(db, popup, human, code=code)
+        atk = _admin_token(admin_user_tenant_a)
+        headers = {**_auth(atk), "X-Tenant-Id": str(tenant_a.id)}
+
+        resp = client.patch(
+            f"/api/v1/admin/referrals/{ref.id}",
+            json={"is_disabled": True},
+            headers=headers,
+        )
+        assert resp.status_code == 200, resp.json()
+        assert resp.json()["is_disabled"] is True
+
+        assert client.get(f"/api/v1/referrals/r/{code}").status_code == 410
+
+        resp = client.patch(
+            f"/api/v1/admin/referrals/{ref.id}",
+            json={"is_disabled": False},
+            headers=headers,
+        )
+        assert resp.status_code == 200, resp.json()
+        assert client.get(f"/api/v1/referrals/r/{code}").status_code == 200
 
     def test_admin_can_update_discount_and_auto_approve(
         self,

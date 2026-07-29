@@ -30,6 +30,7 @@ function ReferralRow({
     current_uses: number
     max_uses?: number | null
     expires_at?: string | null
+    is_disabled?: boolean
   }
   onDeleted: () => void
 }) {
@@ -68,7 +69,14 @@ function ReferralRow({
       <div className="flex items-center gap-3 min-w-0">
         <Link2 className="h-4 w-4 text-muted-foreground shrink-0" />
         <div className="min-w-0">
-          <p className="text-sm font-medium truncate">{referral.code}</p>
+          <p className="text-sm font-medium truncate">
+            {referral.code}
+            {referral.is_disabled && (
+              <span className="ml-2 rounded bg-destructive/10 px-1.5 py-0.5 text-xs font-medium text-destructive">
+                {t("referrals.disabled_badge")}
+              </span>
+            )}
+          </p>
           <p className="text-xs text-muted-foreground">
             {t("referrals.discount_label")}: {discountLabel} &middot;{" "}
             {t("referrals.uses_label")}:{" "}

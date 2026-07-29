@@ -569,7 +569,8 @@
     "preview_apply_button": "立即申请",
     "preview_login_required_title": "请登录以申请",
     "preview_login_required_description": "您需要登录才能通过此推荐链接申请。",
-    "one_link_notice": "您已有一个推荐链接。每位参与者只有一个链接，请分享给他人以邀请他们加入。"
+    "one_link_notice": "您已有一个推荐链接。每位参与者只有一个链接，请分享给他人以邀请他们加入。",
+    "disabled_badge": "已停用"
   },
   "invite": {
     "loading": "Loading invite...",

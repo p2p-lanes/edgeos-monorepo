@@ -6,6 +6,7 @@ import { Suspense } from "react"
 
 import { type ReferralPublic, ReferralsService } from "@/client"
 import { DataTable, SortableHeader } from "@/components/Common/DataTable"
+import { Badge } from "@/components/ui/badge"
 import { EmptyState } from "@/components/Common/EmptyState"
 import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
@@ -45,7 +46,12 @@ const columns: ColumnDef<ReferralPublic>[] = [
     accessorKey: "code",
     header: ({ column }) => <SortableHeader label="Code" column={column} />,
     cell: ({ row }) => (
-      <span className="font-mono text-sm">{row.original.code}</span>
+      <span className="inline-flex items-center gap-2">
+        <span className="font-mono text-sm">{row.original.code}</span>
+        {row.original.is_disabled && (
+          <Badge variant="destructive">Disabled</Badge>
+        )}
+      </span>
     ),
   },
   {

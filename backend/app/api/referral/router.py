@@ -217,7 +217,23 @@ async def get_referral_preview(
     from app.api.popup.crud import popups_crud
     from app.api.popup.guards import ensure_popup_link_active
 
-    ensure_popup_link_active(popups_crud.get(db, referral.popup_id))
+    popup = popups_crud.get(db, referral.popup_id)
+    ensure_popup_link_active(popup)
+
+    # Hard guards: feature flag off or admin-disabled link. Unlike expiry/use
+    # limits these are not informational states the portal can render around.
+    if popup is not None and not popup.referrals_enabled:
+        raise HTTPException(
+            status_code=status.HTTP_410_GONE,
+            detail="Referral links are not enabled for this event",
+            headers={"Cache-Control": "no-store"},
+        )
+    if referral.is_disabled:
+        raise HTTPException(
+            status_code=status.HTTP_410_GONE,
+            detail="This referral link is no longer active",
+            headers={"Cache-Control": "no-store"},
+        )
 
     # Surface guard state but do NOT raise — let the portal decide how to present
     # (the apply endpoint enforces hard errors; preview is informational only).

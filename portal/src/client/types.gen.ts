@@ -3772,6 +3772,7 @@ export type ReferralAdminUpdate = {
     max_uses?: (number | null);
     discount_percentage?: (number | string | null);
     auto_approve?: (boolean | null);
+    is_disabled?: (boolean | null);
 };
 
 /**
@@ -3798,6 +3799,7 @@ export type ReferralPublic = {
     code: string;
     discount_percentage: string;
     auto_approve: boolean;
+    is_disabled?: boolean;
     max_uses?: (number | null);
     current_uses: number;
     expires_at?: (string | null);

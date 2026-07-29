@@ -5,7 +5,7 @@ import {
   useSuspenseQuery,
 } from "@tanstack/react-query"
 import { createFileRoute, useNavigate } from "@tanstack/react-router"
-import { Calendar, Hash, Percent, ShieldCheck } from "lucide-react"
+import { Ban, Calendar, Hash, Percent, ShieldCheck } from "lucide-react"
 import { Suspense } from "react"
 import { type ReferralAdminUpdate, ReferralsService } from "@/client"
 import { FormPageLayout } from "@/components/Common/FormPageLayout"
@@ -84,6 +84,7 @@ function EditReferralContent({ referralId }: { referralId: string }) {
       max_uses: referral.max_uses?.toString() ?? "",
       expires_at: formatDateForInput(referral.expires_at),
       auto_approve: referral.auto_approve ?? false,
+      is_disabled: referral.is_disabled ?? false,
     },
     onSubmit: ({ value }) => {
       if (readOnly) return
@@ -92,6 +93,7 @@ function EditReferralContent({ referralId }: { referralId: string }) {
         max_uses: value.max_uses ? Number(value.max_uses) : null,
         expires_at: toUTCDate(value.expires_at),
         auto_approve: value.auto_approve,
+        is_disabled: value.is_disabled,
       })
     },
   })
@@ -200,6 +202,23 @@ function EditReferralContent({ referralId }: { referralId: string }) {
               >
                 <Switch
                   id="referral_auto_approve"
+                  checked={field.state.value}
+                  onCheckedChange={(checked) => field.handleChange(checked)}
+                  disabled={readOnly}
+                />
+              </InlineRow>
+            )}
+          </form.Field>
+
+          <form.Field name="is_disabled">
+            {(field) => (
+              <InlineRow
+                icon={<Ban className="h-4 w-4 text-muted-foreground" />}
+                label="Disabled"
+                description="A disabled referral link stops granting access and discounts immediately"
+              >
+                <Switch
+                  id="referral_is_disabled"
                   checked={field.state.value}
                   onCheckedChange={(checked) => field.handleChange(checked)}
                   disabled={readOnly}

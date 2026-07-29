@@ -642,7 +642,8 @@
     "preview_apply_button": "Apply now",
     "preview_login_required_title": "Sign in to apply",
     "preview_login_required_description": "You need to be signed in to apply via this referral link.",
-    "one_link_notice": "You already have a referral link. Each attendee gets one link — share it to invite others."
+    "one_link_notice": "You already have a referral link. Each attendee gets one link — share it to invite others.",
+    "disabled_badge": "Disabled"
   },
   "invite": {
     "loading": "Loading invite...",
