@@ -5,6 +5,7 @@ packages:
   - packages/shared-form-ui
   - packages/shared-events
   - packages/checkout-core
+  - packages/checkout-react
 
 onlyBuiltDependencies:
   - '@swc/core'
