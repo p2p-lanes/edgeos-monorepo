@@ -1,8 +1,8 @@
 """Regression tests: a deleted organization must not stay available.
 
 Two surfaces are covered:
-- GET /tenants hides deleted organizations unless include_deleted is requested,
-  so they never show up as a selectable context.
+- GET /tenants never returns deleted organizations, so they never show up as a
+  selectable context or in the admin listing.
 - Tenant-scoped requests carrying a deleted X-Tenant-Id fail with an explicit
   "no longer available" 404 instead of the misleading credentials error raised
   once soft-delete revoked the tenant's database credentials.
@@ -36,7 +36,7 @@ def deleted_tenant(db: Session) -> Generator[Tenants, None, None]:
     db.commit()
 
 
-def test_list_tenants_hides_deleted_by_default(
+def test_list_tenants_never_returns_deleted(
     client: TestClient,
     superadmin_token: str,
     deleted_tenant: Tenants,
@@ -52,20 +52,46 @@ def test_list_tenants_hides_deleted_by_default(
     assert str(deleted_tenant.id) not in ids
 
 
-def test_list_tenants_includes_deleted_when_requested(
+def test_get_deleted_tenant_returns_404(
     client: TestClient,
     superadmin_token: str,
     deleted_tenant: Tenants,
 ) -> None:
     response = client.get(
-        "/api/v1/tenants",
+        f"/api/v1/tenants/{deleted_tenant.id}",
         headers={"Authorization": f"Bearer {superadmin_token}"},
-        params={"limit": 100, "include_deleted": True},
     )
 
-    assert response.status_code == 200
-    ids = [t["id"] for t in response.json()["results"]]
-    assert str(deleted_tenant.id) in ids
+    assert response.status_code == 404
+    assert response.json()["detail"] == "This organization is no longer available"
+
+
+def test_patch_deleted_tenant_returns_404(
+    client: TestClient,
+    superadmin_token: str,
+    deleted_tenant: Tenants,
+) -> None:
+    response = client.patch(
+        f"/api/v1/tenants/{deleted_tenant.id}",
+        headers={"Authorization": f"Bearer {superadmin_token}"},
+        json={"name": "Should Not Update"},
+    )
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "This organization is no longer available"
+
+
+def test_delete_already_deleted_tenant_returns_404(
+    client: TestClient,
+    superadmin_token: str,
+    deleted_tenant: Tenants,
+) -> None:
+    response = client.delete(
+        f"/api/v1/tenants/{deleted_tenant.id}",
+        headers={"Authorization": f"Bearer {superadmin_token}"},
+    )
+
+    assert response.status_code == 404
 
 
 def test_tenant_scoped_request_rejects_deleted_tenant(
