@@ -9,6 +9,7 @@ export {
 } from "./client"
 export * from "./form"
 export * from "./order"
+export * from "./pricing"
 export * from "./selection"
 export * from "./steps"
 export { CheckoutApiError } from "./transport/errors"
