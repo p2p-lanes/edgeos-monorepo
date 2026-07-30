@@ -25,9 +25,9 @@ const STEPS: Step[] = [
   { id: "continuar", label: "Continue", icon: Check },
 ]
 
-// Replica del navbar sticky del checkout real: strip de pills con icono + label
-// para cada step del flujo. La pill activa usa los colores del badge, las
-// inactivas usan las variantes disabled derivadas por color-mix.
+// Replica of the real checkout's sticky navbar: a strip of pills with icon +
+// label for each step of the flow. The active pill uses the badge colors, the
+// inactive ones use the disabled variants derived via color-mix.
 export function PreviewCheckoutTopBar() {
   const { highlightedKeys } = usePreview()
   const isHl = makeIsHl(highlightedKeys)

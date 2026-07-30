@@ -87,7 +87,7 @@ function EditHumanContent({ humanId }: { humanId: string }) {
   return (
     <Tabs defaultValue="details" className="space-y-6">
       <TabsList>
-        <TabsTrigger value="details">Detalles</TabsTrigger>
+        <TabsTrigger value="details">Details</TabsTrigger>
         <TabsTrigger value="activity">Activity</TabsTrigger>
       </TabsList>
 
