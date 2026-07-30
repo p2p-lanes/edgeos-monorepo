@@ -227,3 +227,23 @@ def test_sdk_purchase_rejected_when_origin_not_allowed(
         },
     )
     assert resp.status_code == 403, resp.text
+
+
+def test_cors_preflight_allows_publishable_key_header(client: TestClient) -> None:
+    """The browser sends a CORS preflight for the custom publishable-key header.
+
+    It must be in the CORS allow_headers list or every cross-origin request from
+    an external checkout is blocked before it reaches the API. Regression guard
+    for the header being added to the auth path but not to CORS.
+    """
+    resp = client.options(
+        "/api/v1/checkout/any/preview",
+        headers={
+            "Origin": "http://localhost:5173",
+            "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": "x-edgeos-publishable-key",
+        },
+    )
+    assert resp.status_code == 200, resp.text
+    allowed = resp.headers.get("access-control-allow-headers", "").lower()
+    assert "x-edgeos-publishable-key" in allowed
