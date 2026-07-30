@@ -3,8 +3,8 @@ import { cn } from "@/lib/utils"
 import { usePreview } from "./PreviewContext"
 import { makeIsHl, ringIf } from "./ring"
 
-// Replica del bottom bar flotante del checkout: botón "Volver" con flecha a la
-// izquierda, total en el medio y botón "Continuar" a la derecha.
+// Replica of the checkout's floating bottom bar: "Back" button with arrow on
+// the left, total in the middle and "Continue" button on the right.
 export function PreviewCheckoutBottomBar() {
   const { highlightedKeys } = usePreview()
   const isHl = makeIsHl(highlightedKeys)

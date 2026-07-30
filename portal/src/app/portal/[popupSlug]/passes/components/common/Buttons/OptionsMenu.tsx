@@ -20,12 +20,12 @@ const OptionsMenu = ({
   const [isOpen, setIsOpen] = useState(false)
 
   const handleEdit = () => {
-    setIsOpen(false) // Cerrar el dropdown antes de ejecutar la acción
+    setIsOpen(false) // Close the dropdown before running the action
     onEdit()
   }
 
   const handleDelete = () => {
-    setIsOpen(false) // Cerrar el dropdown antes de ejecutar la acción
+    setIsOpen(false) // Close the dropdown before running the action
     onDelete?.()
   }
 

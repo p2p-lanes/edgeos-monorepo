@@ -56,29 +56,29 @@ const TEXT_FIELDS = [
   {
     key: "edition",
     label: "Edition",
-    placeholder: "Tercera edición: El Portal",
+    placeholder: "Edition name or theme",
   },
   {
     key: "headline",
     label: "Headline",
-    placeholder: "4 días de música, arte, yoga y talleres",
+    placeholder: "Main headline describing the event",
   },
   {
     key: "subtitle",
     label: "Subtitle",
-    placeholder: "Una celebración de amor, apertura y conexión",
+    placeholder: "Short supporting tagline",
   },
   {
     key: "date_badge",
     label: "Date badge",
-    placeholder: "Experiencia Extendida — 17, 18 y 19 de noviembre",
+    placeholder: "Event dates or edition badge",
   },
   {
     key: "cta_hint",
     label: "Bottom bar hint",
-    placeholder: "Elegí tu entrada para comenzar",
+    placeholder: "Short hint shown above the button",
   },
-  { key: "cta_label", label: "Bottom bar CTA", placeholder: "Ver Entradas →" },
+  { key: "cta_label", label: "Bottom bar CTA", placeholder: "Button text" },
 ] as const
 
 function parseBullets(config: Record<string, unknown> | null): string[] {

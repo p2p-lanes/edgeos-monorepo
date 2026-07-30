@@ -63,24 +63,24 @@ const PaginationControls = ({
     totalItems,
   )
 
-  // Generar array de páginas a mostrar
+  // Build the array of pages to display
   const getPageNumbers = () => {
     const pages = []
-    // Siempre mostrar la primera página
+    // Always show the first page
     pages.push(1)
 
-    // Calcular rango de páginas alrededor de la página actual
+    // Compute the page range around the current page
     const startPage = Math.max(2, currentPage - 1)
     const endPage = Math.min(totalPages - 1, currentPage + 1)
 
-    // Ajustar para mostrar 3 páginas siempre que sea posible
+    // Adjust to show 3 pages whenever possible
     if (startPage > 2) pages.push(-1) // Ellipsis
     for (let i = startPage; i <= endPage; i++) {
       pages.push(i)
     }
     if (endPage < totalPages - 1) pages.push(-2) // Ellipsis
 
-    // Siempre mostrar la última página si hay más de una
+    // Always show the last page if there is more than one
     if (totalPages > 1) pages.push(totalPages)
 
     return pages
