@@ -11,7 +11,7 @@ class PublishableKeyCreate(BaseModel):
 
 class PublishableKeyPublic(BaseModel):
     id: uuid.UUID
-    popup_id: uuid.UUID
+    popup_id: uuid.UUID | None = None
     name: str
     key_prefix: str
     allowed_origins: list[str]

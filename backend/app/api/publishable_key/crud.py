@@ -30,9 +30,9 @@ def create_publishable_key(
     session: Session,
     *,
     tenant_id: uuid.UUID,
-    popup_id: uuid.UUID,
     name: str,
     allowed_origins: list[str],
+    popup_id: uuid.UUID | None = None,
 ) -> tuple[PopupPublishableKeys, str]:
     raw = generate_raw_publishable_key()
     row = PopupPublishableKeys(
