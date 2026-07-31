@@ -1,9 +1,9 @@
 import type { PreviewTab } from "./types"
 
-// LEGACY 1:1 mapping color_key -> CSS variable. Mantenido para referencia y
-// compatibilidad. La fuente de verdad para aplicar colores es ahora
-// `themeExpand.ts` (ahí viven las nuevas keys + el fan-out + las legacy).
-// MUST stay in sync con portal/src/providers/themeProvider.tsx.
+// LEGACY 1:1 mapping color_key -> CSS variable. Kept for reference and
+// compatibility. The source of truth for applying colors is now
+// `themeExpand.ts` (home of the new keys + the fan-out + the legacy ones).
+// MUST stay in sync with portal/src/providers/themeProvider.tsx.
 export const CSS_VAR_MAP: Record<string, string> = {
   background: "--background",
   foreground: "--foreground",

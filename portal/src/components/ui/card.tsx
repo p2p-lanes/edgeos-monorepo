@@ -75,14 +75,14 @@ CardFooter.displayName = "CardFooter"
 
 type AnimationType = "entry" | "hover" | "exit"
 
-// Propiedades para nuestro componente CardAnimation
+// Props for our CardAnimation component
 interface CardAnimationProps
   extends React.ComponentPropsWithoutRef<typeof Card> {
   anim?: AnimationType
   duration?: number
 }
 
-// Variantes de animación
+// Animation variants
 const variants: Record<AnimationType, Variants> = {
   entry: {
     initial: { opacity: 0, y: 20 },

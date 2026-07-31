@@ -6,10 +6,10 @@ export function ringIf(active: boolean): string {
     : ""
 }
 
-// Resuelve highlight cruzado: los componentes del preview chequean por las
-// keys legacy (ej. "heading", "primary"), pero el usuario puede estar
-// hovereando una key nueva (ej. "title_color"). Este helper hace que el
-// hover sobre la key nueva también ilumine los componentes asociados.
+// Resolves cross-highlighting: preview components check against the legacy
+// keys (e.g. "heading", "primary"), but the user may be hovering a new key
+// (e.g. "title_color"). This helper makes hovering the new key also light
+// up the associated components.
 export function makeIsHl(highlightedKeys: Set<string>) {
   return (...keys: string[]) =>
     keys.some((k) => {

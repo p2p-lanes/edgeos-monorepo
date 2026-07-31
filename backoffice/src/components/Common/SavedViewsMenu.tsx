@@ -188,8 +188,8 @@ export function SavedViewsMenu({
             <DialogHeader>
               <DialogTitle>Save current view</DialogTitle>
               <DialogDescription>
-                Saves the current filters, grouping and sorting so the whole
-                team can reuse them.
+                Saves the current list setup, including filters, columns,
+                grouping and sorting, so the whole team can reuse it.
               </DialogDescription>
             </DialogHeader>
             <div className="flex flex-col gap-2">

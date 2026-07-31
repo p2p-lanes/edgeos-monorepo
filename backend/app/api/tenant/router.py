@@ -164,20 +164,18 @@ async def list_tenants(
     db: SessionDep,
     _: CurrentSuperadmin,
     search: str | None = None,
-    include_deleted: bool = False,
     skip: PaginationSkip = 0,
     limit: PaginationLimit = 100,
 ) -> ListModel[TenantPublic]:
-    # Deleted organizations are hidden by default: they have no database
-    # credentials left, so offering them as a selectable context only leads to
-    # failing requests. Admin listings opt in to see them.
+    # Deleted organizations are never listed: their database credentials are
+    # revoked on delete, so nothing can be done with them anymore.
     tenants, total = crud.find(
         db,
         skip=skip,
         limit=limit,
         search=search,
         search_fields=["name"],
-        deleted=None if include_deleted else False,
+        deleted=False,
     )
 
     return ListModel[TenantPublic](
@@ -209,6 +207,12 @@ async def get_tenant(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Tenant not found",
+        )
+
+    if tenant.deleted:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="This organization is no longer available",
         )
 
     return TenantPublic.model_validate(tenant)
@@ -271,6 +275,12 @@ async def update_tenant(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Tenant not found",
+        )
+
+    if tenant.deleted:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="This organization is no longer available",
         )
 
     # 3. ADMIN cannot set custom_domain_active (only SUPERADMIN may)
@@ -492,7 +502,7 @@ async def delete_tenant(
 ) -> None:
     tenant = crud.get(db, tenant_id)
 
-    if tenant is None:
+    if tenant is None or tenant.deleted:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Tenant not found",

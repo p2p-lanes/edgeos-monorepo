@@ -47,21 +47,21 @@ const QRcode = ({
 
     const img = new Image()
     img.onload = () => {
-      // Factor de escala para aumentar el tamaño de la imagen
+      // Scale factor to enlarge the image
       const scaleFactor = 3
 
-      // Aumentamos el tamaño del canvas según el factor de escala
+      // Enlarge the canvas according to the scale factor
       canvas.width = img.width * scaleFactor
       canvas.height = img.height * scaleFactor
 
       const ctx = canvas.getContext("2d")
       if (!ctx) return
 
-      // Configuramos calidad de renderizado
+      // Configure rendering quality
       ctx.imageSmoothingEnabled = true
       ctx.imageSmoothingQuality = "high"
 
-      // Dibujamos la imagen escalada (los últimos 4 parámetros son: x, y, width, height)
+      // Draw the scaled image (the last 4 parameters are: x, y, width, height)
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
 
       DOMURL.revokeObjectURL(svgUrl)
