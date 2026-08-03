@@ -85,14 +85,10 @@ export function createCheckoutClient(
 }
 
 function buildDefaultTransport(config: CheckoutClientOptions): Transport {
-  const baseUrl = "baseUrl" in config ? config.baseUrl : undefined
-  if (!baseUrl) {
-    throw new Error(
-      "createCheckoutClient: config.baseUrl is required when no transport is provided.",
-    )
-  }
+  // baseUrl is optional — createFetchTransport falls back to the EdgeOS
+  // production API (DEFAULT_BASE_URL) when it isn't provided.
   return createFetchTransport({
-    baseUrl,
+    baseUrl: config.baseUrl,
     slug: config.slug,
     publishableKey: config.publishableKey,
     fetch: config.fetch,

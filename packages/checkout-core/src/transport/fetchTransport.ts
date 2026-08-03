@@ -3,12 +3,20 @@ import type { CheckoutClientConfig, Transport } from "./types"
 
 const PUBLISHABLE_KEY_HEADER = "X-EdgeOS-Publishable-Key"
 
+/**
+ * EdgeOS production API root. Used when no `baseUrl` is supplied, so a client
+ * only needs their slug + publishable key. Override `baseUrl` for dev/staging
+ * (e.g. a local `http://localhost:8000/api/v1`) or a self-hosted proxy.
+ */
+export const DEFAULT_BASE_URL = "https://api.edgeos.world/api/v1"
+
 function joinUrl(baseUrl: string, path: string): string {
   return `${baseUrl.replace(/\/+$/, "")}/${path.replace(/^\/+/, "")}`
 }
 
 /** Default fetch-based Transport. Injects the publishable key header when set. */
 export function createFetchTransport(config: CheckoutClientConfig): Transport {
+  const baseUrl = config.baseUrl ?? DEFAULT_BASE_URL
   const fetchImpl = config.fetch ?? globalThis.fetch
   if (typeof fetchImpl !== "function") {
     throw new Error(
@@ -31,7 +39,7 @@ export function createFetchTransport(config: CheckoutClientConfig): Transport {
         headers[PUBLISHABLE_KEY_HEADER] = config.publishableKey
       }
 
-      const res = await fetchImpl(joinUrl(config.baseUrl, path), {
+      const res = await fetchImpl(joinUrl(baseUrl, path), {
         method,
         headers,
         body: body === undefined ? undefined : JSON.stringify(body),

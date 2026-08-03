@@ -19,8 +19,12 @@ export interface Transport {
 }
 
 export interface CheckoutClientConfig {
-  /** API root including version prefix, e.g. "https://api.example.com/api/v1". */
-  baseUrl: string
+  /**
+   * API root including version prefix, e.g. "https://api.example.com/api/v1".
+   * Optional — defaults to the EdgeOS production API ({@link DEFAULT_BASE_URL}).
+   * Override only for a non-prod environment or a self-hosted proxy.
+   */
+  baseUrl?: string
   /** Popup slug — the checkout these calls target. */
   slug: string
   /** Browser-safe per-popup publishable key (pk_live_…), sent as a header. */

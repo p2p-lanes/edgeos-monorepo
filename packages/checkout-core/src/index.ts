@@ -23,7 +23,7 @@ export * from "./selection"
 export * from "./steps"
 export * from "./store"
 export { CheckoutApiError } from "./transport/errors"
-export { createFetchTransport } from "./transport/fetchTransport"
+export { createFetchTransport, DEFAULT_BASE_URL } from "./transport/fetchTransport"
 export type {
   CheckoutClientConfig,
   HttpMethod,
