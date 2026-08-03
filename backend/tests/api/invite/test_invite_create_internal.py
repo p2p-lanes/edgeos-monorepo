@@ -343,12 +343,17 @@ class TestInviteCreateInternalGuards:
     ) -> None:
         """Invite restricted to different email → 403 Forbidden."""
         popup = _make_popup(db, tenant_a)
-        human = _make_human(db, tenant_a, email="alice@test.com")
+        # Unique emails: the shared session-scoped DB means fixed literals
+        # collide with humans created by earlier test files.
+        human = _make_human(
+            db, tenant_a, email=f"applicant-{uuid.uuid4().hex[:8]}@test.com"
+        )
         restricted_invite = _make_invite(
             db,
             popup,
             admin_user_tenant_a,
-            recipient_email="bob@test.com",  # different from human's email
+            # Any email different from the applicant's triggers the mismatch guard
+            recipient_email=f"restricted-{uuid.uuid4().hex[:8]}@test.com",
         )
         tok = _human_token(human)
 
