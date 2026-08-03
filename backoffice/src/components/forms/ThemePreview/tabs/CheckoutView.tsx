@@ -5,9 +5,9 @@ import { PreviewCheckoutTopBar } from "../parts/PreviewCheckoutTopBar"
 import { useDisplayEvent, usePreview } from "../parts/PreviewContext"
 import { makeIsHl, ringIf } from "../parts/ring"
 
-// Replica del flujo de Pases del checkout real: background image fullscreen,
-// navbar sticky con pills de steps, una sola card con el header del tenant y
-// la sección "Experiencias" con un producto, y bottom bar flotante.
+// Replica of the real checkout's Passes flow: fullscreen background image,
+// sticky navbar with step pills, a single card with the tenant header and
+// an "Experiences" section with one product, plus the floating bottom bar.
 export function CheckoutView() {
   const { highlightedKeys, event } = usePreview()
   const display = useDisplayEvent()

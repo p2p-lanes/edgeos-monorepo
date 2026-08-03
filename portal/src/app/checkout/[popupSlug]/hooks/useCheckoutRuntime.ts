@@ -11,12 +11,20 @@ import { queryKeys } from "@/lib/query-keys"
 export function useCheckoutRuntime(
   slug: string,
   opts?: {
+    /**
+     * Language the request will carry (see `resolveRequestLanguage`). Part of
+     * the key because the response is translated: without it the server render's
+     * payload stays "fresh" under the same key for the whole staleTime, so a
+     * visitor whose stored language differs from the one SSR used keeps seeing
+     * the wrong language until an unrelated refetch happens to fire.
+     */
+    language?: string | null
     initialData?: CheckoutRuntimeResponse
     initialDataUpdatedAt?: number
   },
 ) {
   return useQuery({
-    queryKey: queryKeys.checkout.runtime(slug),
+    queryKey: queryKeys.checkout.runtime(slug, opts?.language),
     queryFn: () => CheckoutService.getRuntime({ slug }),
     enabled: slug.length > 0,
     staleTime: 30_000,
