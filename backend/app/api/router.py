@@ -32,6 +32,7 @@ from app.api import (
     popup_reviewer,
     product,
     referral,
+    sales_flow,
     saved_view,
     task,
     tenant,
@@ -70,6 +71,7 @@ api_router.include_router(product.router)
 api_router.include_router(coupon.router)
 api_router.include_router(group.router)
 api_router.include_router(group_portal_router)
+api_router.include_router(sales_flow.router)
 api_router.include_router(invite.router)
 api_router.include_router(referral.portal_router)
 api_router.include_router(referral.public_router)
