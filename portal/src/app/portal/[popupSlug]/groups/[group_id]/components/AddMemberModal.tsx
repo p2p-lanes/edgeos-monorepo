@@ -54,7 +54,7 @@ const MemberFormModal = ({
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  // Cargar datos del miembro si estamos en modo edición
+  // Load the member data when in edit mode
   useEffect(() => {
     if (member) {
       setFormData({
@@ -116,7 +116,7 @@ const MemberFormModal = ({
     setIsSubmitting(true)
 
     try {
-      // Convertir campos vacíos a null
+      // Convert empty fields to null
       const processedData = Object.entries(formData).reduce(
         (acc, [key, value]) => {
           acc[key as keyof FormData] =

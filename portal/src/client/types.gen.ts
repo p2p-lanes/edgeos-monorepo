@@ -4918,6 +4918,8 @@ export type ApplicationsListApplicationsData = {
      */
     skip?: number;
     statusFilter?: (ApplicationStatus | null);
+    subGroupBy?: (string | null);
+    subGroupValue?: (string | null);
     xTenantId?: (string | null);
 };
 
@@ -4933,6 +4935,8 @@ export type ApplicationsCreateApplicationAdminResponse = (ApplicationPublic);
 export type ApplicationsGetApplicationGroupCountsData = {
     filters?: (string | null);
     groupBy: string;
+    parentGroupBy?: (string | null);
+    parentGroupValue?: (string | null);
     popupId: string;
     search?: (string | null);
     xTenantId?: (string | null);
@@ -7329,7 +7333,6 @@ export type TenantsGetTenantBySlugData = {
 export type TenantsGetTenantBySlugResponse = (TenantAnonymousPublic);
 
 export type TenantsListTenantsData = {
-    includeDeleted?: boolean;
     /**
      * Maximum number of items to return
      */

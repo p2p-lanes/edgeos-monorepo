@@ -16,6 +16,7 @@ from app.api.application.models import (
 )
 from app.api.application.schemas import (
     CUSTOM_FIELD_PREFIX,
+    HUMAN_FILTER_FIELDS,
     VIRTUAL_REVIEWER_FIELDS,
     ApplicationAdminCreate,
     ApplicationCommentCreate,
@@ -120,7 +121,7 @@ def _filter_condition_expression(
             return Applications.status == condition.value
         return Applications.status != condition.value
 
-    if condition.field in ("gender", "age"):
+    if condition.field in HUMAN_FILTER_FIELDS:
         column = col(getattr(Humans, condition.field))
         return text_condition_expression(column, condition.op, condition.value)
 
@@ -176,6 +177,18 @@ def _group_by_expression(group_by: str):
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
         detail=f"Grouping by '{group_by}' is not supported.",
     )
+
+
+def _group_scope_clause(group_by: str, group_value: str | None):
+    """Boolean clause selecting one bucket of a grouped view.
+
+    Same NULL/empty-string collapsing as ``count_by_group``: omitting the
+    value selects the NULL bucket. Returns (clause, needs Humans join).
+    """
+    expression, needs_human = _group_by_expression(group_by)
+    bucket = func.nullif(expression, "")
+    clause = bucket.is_(None) if group_value is None else bucket == group_value
+    return clause, needs_human
 
 
 class RedFlaggedHumanError(Exception):
@@ -245,6 +258,8 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         reviewer_id: uuid.UUID | None = None,
         group_by: str | None = None,
         group_value: str | None = None,
+        sub_group_by: str | None = None,
+        sub_group_value: str | None = None,
     ) -> tuple[list[Applications], int]:
         """Find applications by popup_id with optional status filter and eager loading.
 
@@ -253,15 +268,25 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
 
         ``group_by``/``group_value`` scope the list to one bucket of a
         grouped view, using the same field whitelist and NULL/empty-string
-        collapsing as ``count_by_group``. The scope is ANDed with everything
-        else, so it stays correct even when ``filters`` uses match=any.
-        ``group_value`` is ignored when ``group_by`` is not set; with
-        ``group_by`` set and no ``group_value`` the NULL bucket is selected.
+        collapsing as ``count_by_group``; ``sub_group_by``/``sub_group_value``
+        narrow it further to one subgroup bucket. Scopes are ANDed with
+        everything else, so they stay correct even when ``filters`` uses
+        match=any. A value is ignored when its field is not set; with a
+        field set and no value the NULL bucket is selected.
         """
-        group_expression = None
-        group_needs_human = False
-        if group_by is not None:
-            group_expression, group_needs_human = _group_by_expression(group_by)
+        # Each grouped-view scope becomes a plain WHERE clause; either may
+        # require the Humans join.
+        scope_clauses = []
+        scopes_need_human = False
+        for scope_field, scope_value in (
+            (group_by, group_value),
+            (sub_group_by, sub_group_value),
+        ):
+            if scope_field is None:
+                continue
+            clause, needs_human = _group_scope_clause(scope_field, scope_value)
+            scope_clauses.append(clause)
+            scopes_need_human = scopes_need_human or needs_human
 
         base_statement = select(Applications).where(Applications.popup_id == popup_id)
 
@@ -270,10 +295,10 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
                 Applications.status == status_filter.value
             )
 
-        # Join Humans once, whether needed by the group field, text search,
+        # Join Humans once, whether needed by a group scope, text search,
         # a human-field filter condition, or any combination.
         needs_human_join = (
-            group_needs_human
+            scopes_need_human
             or bool(search)
             or bool(filters and filters.references_human_fields())
         )
@@ -301,14 +326,8 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
             if filter_expression is not None:
                 base_statement = base_statement.where(filter_expression)
 
-        if group_expression is not None:
-            # Same bucket shape as count_by_group: NULL and "" collapse into
-            # one None bucket, selected by omitting group_value.
-            bucket = func.nullif(group_expression, "")
-            if group_value is None:
-                base_statement = base_statement.where(bucket.is_(None))
-            else:
-                base_statement = base_statement.where(bucket == group_value)
+        for clause in scope_clauses:
+            base_statement = base_statement.where(clause)
 
         if reviewed_by:
             has_review = (
@@ -349,6 +368,8 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         search: str | None = None,
         filters: ApplicationFilters | None = None,
         reviewer_id: uuid.UUID | None = None,
+        parent_group_by: str | None = None,
+        parent_group_value: str | None = None,
     ) -> list[tuple[str | None, int]]:
         """Count a popup's applications grouped by one field.
 
@@ -357,20 +378,34 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         collapse into one None bucket. Rows come back ordered by count
         descending. ``reviewer_id`` resolves the virtual per-user filter
         fields, exactly like the list endpoint.
+
+        ``parent_group_by``/``parent_group_value`` scope the counts to one
+        bucket of an outer grouped view, so a subgrouped view can count
+        within each expanded parent group.
         """
         group_expression, group_needs_human = _group_by_expression(group_by)
         bucket = func.nullif(group_expression, "")
+
+        parent_clause = None
+        parent_needs_human = False
+        if parent_group_by is not None:
+            parent_clause, parent_needs_human = _group_scope_clause(
+                parent_group_by, parent_group_value
+            )
 
         statement = (
             select(bucket, func.count())
             .select_from(Applications)
             .where(Applications.popup_id == popup_id)
         )
+        if parent_clause is not None:
+            statement = statement.where(parent_clause)
 
         # Join Humans once, whether needed by the group field, text search,
         # a human-field filter condition, or any combination.
         needs_human_join = (
             group_needs_human
+            or parent_needs_human
             or bool(search)
             or bool(filters and filters.references_human_fields())
         )

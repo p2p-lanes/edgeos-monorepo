@@ -584,7 +584,7 @@ async def delete_human_comment(
 
 
 # --------------------------------------------------------------------------- #
-# Enrichment facts — the append-only provenance bitácora behind a human's
+# Enrichment facts — the append-only provenance logbook behind a human's
 # curated `enriched_profile`. The Rich Profiles agent (a claude.ai routine
 # logged in as the "Claude" superadmin) POSTs one row per atomic fact it
 # extracts from a source (Telegram, custom fields, events, org deep-dive) and

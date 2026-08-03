@@ -18,7 +18,7 @@ const TransitionScreen = ({
   const { t } = useTranslation()
   const [dots, setDots] = useState(".")
 
-  // Efecto para animar los puntos suspensivos
+  // Effect that animates the trailing dots
   useEffect(() => {
     if (!isPending) return
 

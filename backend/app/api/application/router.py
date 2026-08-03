@@ -206,6 +206,8 @@ async def list_applications(
     filters: str | None = None,
     group_by: str | None = None,
     group_value: str | None = None,
+    sub_group_by: str | None = None,
+    sub_group_value: str | None = None,
     skip: PaginationSkip = 0,
     limit: PaginationLimit = 100,
 ) -> ListModel[ApplicationPublic]:
@@ -222,11 +224,17 @@ async def list_applications(
 
     ``group_by``/``group_value`` scope the list to one bucket of a grouped
     view (same whitelist and NULL/empty collapsing as the group-counts
-    endpoint). The scope is ANDed with everything else, so it stays correct
-    even when ``filters`` uses match=any. With ``group_by`` set and no
-    ``group_value``, the NULL bucket is returned; ``group_value`` without
-    ``group_by`` is ignored.
+    endpoint); ``sub_group_by``/``sub_group_value`` narrow it to one
+    subgroup bucket. Scopes are ANDed with everything else, so they stay
+    correct even when ``filters`` uses match=any. With a group field set and
+    no value, the NULL bucket is returned; a value without its field is
+    ignored.
     """
+    if sub_group_by is not None and sub_group_by == group_by:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="The subgroup field must be different from the group field.",
+        )
     parsed_filters = parse_application_filters(filters)
     if popup_id:
         applications, total = crud.applications_crud.find_by_popup(
@@ -241,6 +249,8 @@ async def list_applications(
             reviewer_id=getattr(current_user, "id", None),
             group_by=group_by,
             group_value=group_value,
+            sub_group_by=sub_group_by,
+            sub_group_value=sub_group_value,
         )
     elif human_id:
         applications, total = crud.applications_crud.find_by_human(
@@ -324,6 +334,8 @@ async def get_application_group_counts(
     group_by: str,
     filters: str | None = None,
     search: str | None = None,
+    parent_group_by: str | None = None,
+    parent_group_value: str | None = None,
 ) -> list[ApplicationGroupCount]:
     """Count a popup's applications grouped by one field (BO only).
 
@@ -331,7 +343,17 @@ async def get_application_group_counts(
     ``age``, or ``custom.<field_name>``. ``filters`` and ``search`` behave
     exactly like the list endpoint. NULL and empty values share one bucket
     with ``value: null``; rows are ordered by count descending.
+
+    ``parent_group_by``/``parent_group_value`` scope the counts to one
+    bucket of an outer grouped view (subgrouped views count within each
+    expanded parent group). With ``parent_group_by`` set and no value, the
+    parent NULL bucket is used.
     """
+    if parent_group_by is not None and parent_group_by == group_by:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="The subgroup field must be different from the group field.",
+        )
     parsed_filters = parse_application_filters(filters)
     rows = crud.applications_crud.count_by_group(
         db,
@@ -340,6 +362,8 @@ async def get_application_group_counts(
         search=search,
         filters=parsed_filters,
         reviewer_id=getattr(current_user, "id", None),
+        parent_group_by=parent_group_by,
+        parent_group_value=parent_group_value,
     )
     return [ApplicationGroupCount(value=value, count=count) for value, count in rows]
 

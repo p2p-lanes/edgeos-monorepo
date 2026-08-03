@@ -2,12 +2,12 @@ const validateVideoUrl = (
   videoUrl: string | boolean | string[] | string[][] | null,
   fields?: Set<string> | null,
 ) => {
-  // Si videoUrl tiene un valor, considerarlo válido
-  // Si fields existe, verificar también que video_url esté en los campos
+  // If videoUrl has a value, consider it valid
+  // If fields exists, also check that video_url is among the fields
   const hasValue = String(videoUrl)?.length > 0
   const fieldExists = fields ? fields?.has("video_url") : true
 
-  return hasValue || !fieldExists // Devuelve true si tiene valor o si el campo no existe
+  return hasValue || !fieldExists // Returns true if it has a value or the field does not exist
 }
 
 export { validateVideoUrl }

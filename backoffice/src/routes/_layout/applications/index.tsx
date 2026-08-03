@@ -5,7 +5,7 @@ import {
   useQueryClient,
 } from "@tanstack/react-query"
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router"
-import type { ColumnDef } from "@tanstack/react-table"
+import type { ColumnDef, VisibilityState } from "@tanstack/react-table"
 import {
   ClipboardList,
   Download,
@@ -14,11 +14,13 @@ import {
   ListChecks,
   MessageSquare,
   Plus,
+  Rows3,
   Search,
   SkipForward,
   Star,
   ThumbsDown,
   ThumbsUp,
+  Trash2,
   Users,
   X,
 } from "lucide-react"
@@ -105,6 +107,12 @@ import {
 import { useWorkspace } from "@/contexts/WorkspaceContext"
 import useAuth from "@/hooks/useAuth"
 import useCustomToast from "@/hooks/useCustomToast"
+import {
+  applyUserColumnOrder,
+  columnDefId,
+  orderableColumnIds,
+  useTableColumnPrefs,
+} from "@/hooks/useTableColumnPrefs"
 import {
   type TableSearchParams,
   useTableSearchParams,
@@ -314,47 +322,133 @@ function buildGroupByCustomFields(
     }))
 }
 
-function GroupBySelect({
+// One row of the group popover: field picker plus a remove button.
+function GroupFieldSelect({
   value,
   onChange,
   customFields,
+  excludeKey,
+  placeholder,
 }: {
   value?: string
-  onChange: (value: string | undefined) => void
+  onChange: (value: string) => void
   customFields: GroupByField[]
+  excludeKey?: string
+  placeholder: string
 }) {
-  const activeLabel =
-    FIXED_GROUP_BY_OPTIONS.find((option) => option.value === value)?.label ??
-    customFields.find((field) => field.key === value)?.label
   return (
-    <Select
-      value={value ?? "none"}
-      onValueChange={(next) => onChange(next === "none" ? undefined : next)}
-    >
-      <SelectTrigger className="h-9 w-[190px]">
-        <SelectValue>
-          {value ? `Group: ${activeLabel ?? value}` : "Group by"}
-        </SelectValue>
+    <Select value={value} onValueChange={onChange}>
+      <SelectTrigger className="h-8 flex-1">
+        <SelectValue placeholder={placeholder} />
       </SelectTrigger>
       <SelectContent>
-        <SelectItem value="none">No grouping</SelectItem>
-        {FIXED_GROUP_BY_OPTIONS.map((option) => (
+        {FIXED_GROUP_BY_OPTIONS.filter(
+          (option) => option.value !== excludeKey,
+        ).map((option) => (
           <SelectItem key={option.value} value={option.value}>
             {option.label}
           </SelectItem>
         ))}
-        {customFields.length > 0 && (
+        {customFields.some((field) => field.key !== excludeKey) && (
           <SelectGroup>
             <SelectLabel>Form fields</SelectLabel>
-            {customFields.map((field) => (
-              <SelectItem key={field.key} value={field.key}>
-                {field.label}
-              </SelectItem>
-            ))}
+            {customFields
+              .filter((field) => field.key !== excludeKey)
+              .map((field) => (
+                <SelectItem key={field.key} value={field.key}>
+                  {field.label}
+                </SelectItem>
+              ))}
           </SelectGroup>
         )}
       </SelectContent>
     </Select>
+  )
+}
+
+function GroupByControl({
+  groupBy,
+  subGroupBy,
+  onChangeGroupBy,
+  onChangeSubGroupBy,
+  customFields,
+}: {
+  groupBy?: string
+  subGroupBy?: string
+  onChangeGroupBy: (value: string | undefined) => void
+  onChangeSubGroupBy: (value: string | undefined) => void
+  customFields: GroupByField[]
+}) {
+  const activeCount = (groupBy ? 1 : 0) + (subGroupBy ? 1 : 0)
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button variant="outline" className="h-9">
+          <Rows3 className="mr-2 h-4 w-4" />
+          Group by
+          {activeCount > 0 && (
+            <span className="ml-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary/10 px-1.5 text-xs font-medium text-primary tabular-nums">
+              {activeCount}
+            </span>
+          )}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-[320px] p-3">
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center gap-2">
+            <GroupFieldSelect
+              value={groupBy}
+              onChange={onChangeGroupBy}
+              customFields={customFields}
+              excludeKey={subGroupBy}
+              placeholder="Group by field"
+            />
+            {groupBy && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 shrink-0 text-muted-foreground"
+                aria-label="Remove grouping"
+                onClick={() => onChangeGroupBy(undefined)}
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+          {groupBy && subGroupBy && (
+            <div className="flex items-center gap-2">
+              <GroupFieldSelect
+                value={subGroupBy}
+                onChange={onChangeSubGroupBy}
+                customFields={customFields}
+                excludeKey={groupBy}
+                placeholder="Subgroup field"
+              />
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 shrink-0 text-muted-foreground"
+                aria-label="Remove subgroup"
+                onClick={() => onChangeSubGroupBy(undefined)}
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
+          {groupBy && !subGroupBy && (
+            <div className="flex items-center gap-2">
+              <GroupFieldSelect
+                value={undefined}
+                onChange={onChangeSubGroupBy}
+                customFields={customFields}
+                excludeKey={groupBy}
+                placeholder="Add subgroup..."
+              />
+            </div>
+          )}
+        </div>
+      </PopoverContent>
+    </Popover>
   )
 }
 
@@ -436,6 +530,7 @@ type ApplicationsSearchParams = TableSearchParams & {
   match?: FilterMatch
   filters?: FilterCondition[]
   groupBy?: string
+  subGroupBy?: string
 }
 
 export const Route = createFileRoute("/_layout/applications/")({
@@ -463,6 +558,16 @@ export const Route = createFileRoute("/_layout/applications/")({
         raw.groupBy.startsWith("custom."))
         ? raw.groupBy
         : undefined
+    // One optional subgroup level; it needs a primary group and a
+    // different field.
+    const subGroupBy =
+      groupBy &&
+      typeof raw.subGroupBy === "string" &&
+      raw.subGroupBy !== groupBy &&
+      (VALID_GROUP_BY_FIELDS.has(raw.subGroupBy) ||
+        raw.subGroupBy.startsWith("custom."))
+        ? raw.subGroupBy
+        : undefined
     return {
       ...validateTableSearch(raw),
       ...(raw.match === "any" && filters.length
@@ -470,6 +575,7 @@ export const Route = createFileRoute("/_layout/applications/")({
         : {}),
       ...(filters.length ? { filters } : {}),
       ...(groupBy ? { groupBy } : {}),
+      ...(subGroupBy ? { subGroupBy } : {}),
     }
   },
   head: () => ({
@@ -1066,6 +1172,7 @@ function ApplicationsTableContent({
         match: undefined,
         filters: undefined,
         groupBy: undefined,
+        subGroupBy: undefined,
         search: undefined,
         sortBy: undefined,
         sortOrder: undefined,
@@ -1082,6 +1189,12 @@ function ApplicationsTableContent({
         search: (prev: Record<string, unknown>) => ({
           ...prev,
           groupBy: value,
+          // The subgroup only makes sense under a primary group and must
+          // stay a different field.
+          subGroupBy:
+            value && prev.subGroupBy !== value
+              ? (prev.subGroupBy as string | undefined)
+              : undefined,
           page: 0,
         }),
         replace: true,
@@ -1090,61 +1203,15 @@ function ApplicationsTableContent({
     [navigate],
   )
 
-  // The saved-view config only captures explicit choices; defaults stay out
-  // so applying a view produces a minimal URL.
-  const savedViewConfig = useMemo(() => {
-    const config: Record<string, unknown> = {}
-    if (searchParams.match === "any" && filterConditions.length) {
-      config.match = "any"
-    }
-    if (filterConditions.length) config.filters = filterConditions
-    if (searchParams.groupBy) config.groupBy = searchParams.groupBy
-    if (searchParams.sortBy) {
-      config.sortBy = searchParams.sortBy
-      config.sortOrder = searchParams.sortOrder
-    }
-    return config
-  }, [
-    searchParams.match,
-    searchParams.groupBy,
-    searchParams.sortBy,
-    searchParams.sortOrder,
-    filterConditions,
-  ])
-
-  // Saved-view configs are team-authored server data: revalidate every field
-  // with the same rules validateSearch applies before touching the URL.
-  const applySavedView = useCallback(
-    (config: Record<string, unknown>) => {
-      const filters = sanitizeFilterConditions(config.filters)
-      const groupByValue =
-        typeof config.groupBy === "string" &&
-        (VALID_GROUP_BY_FIELDS.has(config.groupBy) ||
-          config.groupBy.startsWith("custom."))
-          ? config.groupBy
-          : undefined
-      const sortOrder: "asc" | "desc" | undefined =
-        config.sortOrder === "asc" || config.sortOrder === "desc"
-          ? config.sortOrder
-          : undefined
+  const setSubGroupBy = useCallback(
+    (value: string | undefined) => {
       navigate({
         to: "/applications",
         search: (prev: Record<string, unknown>) => ({
           ...prev,
-          status: undefined,
-          reviewerId: undefined,
+          subGroupBy:
+            prev.groupBy && value !== prev.groupBy ? value : undefined,
           page: 0,
-          match:
-            config.match === "any" && filters.length
-              ? ("any" as const)
-              : undefined,
-          filters: filters.length ? filters : undefined,
-          groupBy: groupByValue,
-          sortBy:
-            typeof config.sortBy === "string" && config.sortBy
-              ? config.sortBy
-              : undefined,
-          sortOrder,
         }),
         replace: true,
       })
@@ -1152,28 +1219,61 @@ function ApplicationsTableContent({
     [navigate],
   )
 
+  // Column visibility and order live here (not inside DataTable) so saved
+  // views can capture and restore them, shared with the grouped view tables.
+  const columnPrefs = useTableColumnPrefs("applications")
+
   // Grouping needs a selected popup; the counts endpoint is popup-scoped.
   const groupBy =
     selectedPopupId && searchParams.groupBy ? searchParams.groupBy : undefined
+  const subGroupBy = groupBy ? searchParams.subGroupBy : undefined
 
   // Drop custom group fields that no longer exist in the schema (e.g. after
   // switching gatherings).
   useEffect(() => {
-    if (!isSchemaLoaded || !groupBy?.startsWith("custom.")) return
-    if (!groupByCustomFields.some((field) => field.key === groupBy)) {
+    if (!isSchemaLoaded) return
+    if (
+      groupBy?.startsWith("custom.") &&
+      !groupByCustomFields.some((field) => field.key === groupBy)
+    ) {
       setGroupBy(undefined)
+      return
     }
-  }, [isSchemaLoaded, groupBy, groupByCustomFields, setGroupBy])
+    if (
+      subGroupBy?.startsWith("custom.") &&
+      !groupByCustomFields.some((field) => field.key === subGroupBy)
+    ) {
+      setSubGroupBy(undefined)
+    }
+  }, [
+    isSchemaLoaded,
+    groupBy,
+    subGroupBy,
+    groupByCustomFields,
+    setGroupBy,
+    setSubGroupBy,
+  ])
 
-  const groupValueOrder = useMemo(() => {
-    if (groupBy === "status") {
-      return APPLICATION_STATUS_OPTIONS.map((option) => option.value)
-    }
-    if (groupBy?.startsWith("custom.")) {
-      return groupByCustomFields.find((field) => field.key === groupBy)?.options
-    }
-    return undefined
-  }, [groupBy, groupByCustomFields])
+  const groupValueOrderFor = useCallback(
+    (field: string | undefined) => {
+      if (field === "status") {
+        return APPLICATION_STATUS_OPTIONS.map((option) => option.value)
+      }
+      if (field?.startsWith("custom.")) {
+        return groupByCustomFields.find((item) => item.key === field)?.options
+      }
+      return undefined
+    },
+    [groupByCustomFields],
+  )
+  const groupValueOrder = useMemo(
+    () => groupValueOrderFor(groupBy),
+    [groupBy, groupValueOrderFor],
+  )
+  const subGroupValueOrder = useMemo(
+    () => groupValueOrderFor(subGroupBy),
+    [subGroupBy, groupValueOrderFor],
+  )
 
   const { data: applications } = useQuery({
     ...getApplicationsQueryOptions(
@@ -1329,12 +1429,129 @@ function ApplicationsTableContent({
   })
 
   const isWeightedVoting = approvalStrategy?.strategy_type === "weighted"
-  const columns = getColumns(
-    isWeightedVoting,
-    !!reviewerFilter && reviewerFilter !== "custom",
-    customColumns,
+  const showReviewerDecision = !!reviewerFilter && reviewerFilter !== "custom"
+  const columns = useMemo(
+    () => getColumns(isWeightedVoting, showReviewerDecision, customColumns),
+    [isWeightedVoting, showReviewerDecision, customColumns],
   )
   const canBulkReview = isOperatorOrAbove && !isWeightedVoting
+
+  // Every toggleable column id, independent of which conditional columns are
+  // currently rendered, so applying a view can also hide the missing ones.
+  const allToggleableIds = useMemo(
+    () => orderableColumnIds(getColumns(true, true, customColumns)),
+    [customColumns],
+  )
+
+  // Ids of the columns currently on screen, in their visual order.
+  const visibleColumnIds = useMemo(() => {
+    const orderable = columns.filter(
+      (col) => col.meta?.toggleable !== false && col.meta?.label,
+    )
+    const byId = new Map(orderable.map((col) => [columnDefId(col), col]))
+    return applyUserColumnOrder(
+      orderableColumnIds(columns),
+      columnPrefs.order,
+    ).filter((id) => {
+      const pref = columnPrefs.visibility[id]
+      if (pref !== undefined) return pref
+      return !byId.get(id)?.meta?.defaultHidden
+    })
+  }, [columns, columnPrefs.order, columnPrefs.visibility])
+
+  // The saved-view config only captures explicit choices; defaults stay out
+  // so applying a view produces a minimal URL. Columns are captured only
+  // once the user diverged from the default set or order.
+  const savedViewConfig = useMemo(() => {
+    const config: Record<string, unknown> = {}
+    if (searchParams.match === "any" && filterConditions.length) {
+      config.match = "any"
+    }
+    if (filterConditions.length) config.filters = filterConditions
+    if (searchParams.groupBy) config.groupBy = searchParams.groupBy
+    if (searchParams.groupBy && searchParams.subGroupBy) {
+      config.subGroupBy = searchParams.subGroupBy
+    }
+    if (searchParams.sortBy) {
+      config.sortBy = searchParams.sortBy
+      config.sortOrder = searchParams.sortOrder
+    }
+    if (columnPrefs.isCustomized) config.columns = visibleColumnIds
+    return config
+  }, [
+    searchParams.match,
+    searchParams.groupBy,
+    searchParams.subGroupBy,
+    searchParams.sortBy,
+    searchParams.sortOrder,
+    filterConditions,
+    columnPrefs.isCustomized,
+    visibleColumnIds,
+  ])
+
+  // Saved-view configs are team-authored server data: revalidate every field
+  // with the same rules validateSearch applies before touching the URL.
+  const applySavedView = useCallback(
+    (config: Record<string, unknown>) => {
+      const filters = sanitizeFilterConditions(config.filters)
+      const groupByValue =
+        typeof config.groupBy === "string" &&
+        (VALID_GROUP_BY_FIELDS.has(config.groupBy) ||
+          config.groupBy.startsWith("custom."))
+          ? config.groupBy
+          : undefined
+      const subGroupByValue =
+        groupByValue &&
+        typeof config.subGroupBy === "string" &&
+        config.subGroupBy !== groupByValue &&
+        (VALID_GROUP_BY_FIELDS.has(config.subGroupBy) ||
+          config.subGroupBy.startsWith("custom."))
+          ? config.subGroupBy
+          : undefined
+      const sortOrder: "asc" | "desc" | undefined =
+        config.sortOrder === "asc" || config.sortOrder === "desc"
+          ? config.sortOrder
+          : undefined
+      // Views saved without columns leave the current columns untouched.
+      if (Array.isArray(config.columns)) {
+        const savedColumns = config.columns.filter(
+          (id): id is string =>
+            typeof id === "string" && allToggleableIds.includes(id),
+        )
+        if (savedColumns.length) {
+          columnPrefs.setOrder(savedColumns)
+          const visibility: VisibilityState = {}
+          for (const id of allToggleableIds) {
+            visibility[id] = savedColumns.includes(id)
+          }
+          columnPrefs.setVisibility(visibility)
+        }
+      }
+      navigate({
+        to: "/applications",
+        search: (prev: Record<string, unknown>) => ({
+          ...prev,
+          status: undefined,
+          reviewerId: undefined,
+          page: 0,
+          match:
+            config.match === "any" && filters.length
+              ? ("any" as const)
+              : undefined,
+          filters: filters.length ? filters : undefined,
+          groupBy: groupByValue,
+          subGroupBy: subGroupByValue,
+          sortBy:
+            typeof config.sortBy === "string" && config.sortBy
+              ? config.sortBy
+              : undefined,
+          sortOrder,
+        }),
+        replace: true,
+      })
+    },
+    [navigate, allToggleableIds, columnPrefs],
+  )
 
   const hiddenOnMobile = [
     "attendees",
@@ -1365,9 +1582,11 @@ function ApplicationsTableContent({
         conditions={filterConditions}
         onChange={setFilters}
       />
-      <GroupBySelect
-        value={searchParams.groupBy}
-        onChange={setGroupBy}
+      <GroupByControl
+        groupBy={searchParams.groupBy}
+        subGroupBy={searchParams.subGroupBy}
+        onChangeGroupBy={setGroupBy}
+        onChangeSubGroupBy={setSubGroupBy}
         customFields={groupByCustomFields}
       />
       {selectedPopupId && (
@@ -1405,15 +1624,18 @@ function ApplicationsTableContent({
           </div>
         </div>
         <ApplicationsGroupedView
-          key={groupBy}
+          key={`${groupBy}|${subGroupBy ?? ""}`}
           popupId={selectedPopupId}
           groupBy={groupBy}
+          subGroupBy={subGroupBy}
           columns={columns}
           filterMatch={filterMatch}
           filterConditions={filterConditions}
           search={search}
           valueOrder={groupValueOrder}
+          subValueOrder={subGroupValueOrder}
           hiddenOnMobile={hiddenOnMobile}
+          columnPrefs={columnPrefs}
         />
       </div>
     )
@@ -1426,6 +1648,7 @@ function ApplicationsTableContent({
       columns={columns}
       data={applications.results}
       tableId="applications"
+      columnPrefs={columnPrefs}
       searchPlaceholder="Search by name or email..."
       hiddenOnMobile={hiddenOnMobile}
       searchValue={search}

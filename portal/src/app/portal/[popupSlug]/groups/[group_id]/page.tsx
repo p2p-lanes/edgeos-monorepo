@@ -9,7 +9,7 @@ import MembersList from "./components/MembersList"
 import SearchBar from "./components/SearchBar"
 import TeamHeader from "./components/TeamHeader"
 
-// Componente principal de la página de grupos
+// Main component for the groups page
 const GroupPage = () => {
   const { group_id } = useParams() as { group_id: string }
   const { group, loading, error, refetch } = useGetGroup(group_id)
@@ -18,13 +18,13 @@ const GroupPage = () => {
   const [currentPage, setCurrentPage] = useState(1)
   const membersPerPage = 10
 
-  // Filtrado de miembros basado en el término de búsqueda (nombre o email)
+  // Filter members based on the search term (name or email)
   const filteredMembers = group?.members
     ? group.members.filter((member) => {
         const term = searchTerm.toLowerCase().trim()
         if (!term) return true
 
-        // Buscar en nombre completo, primer nombre, apellido y email
+        // Search across first name, last name, and email
         return (
           member.first_name?.toLowerCase().includes(term) ||
           member.last_name?.toLowerCase().includes(term) ||
@@ -33,7 +33,7 @@ const GroupPage = () => {
       })
     : []
 
-  // Lógica de paginación
+  // Pagination logic
   const indexOfLastMember = currentPage * membersPerPage
   const indexOfFirstMember = indexOfLastMember - membersPerPage
   const currentMembers = filteredMembers.slice(
@@ -42,12 +42,12 @@ const GroupPage = () => {
   )
   const totalPages = Math.ceil(filteredMembers.length / membersPerPage)
 
-  // Manejo del cambio de página
+  // Handle page changes
   const handlePageChange = (page: number) => {
     setCurrentPage(page)
   }
 
-  // Reset a la primera página cuando cambia el término de búsqueda
+  // Reset to the first page when the search term changes
   useEffect(() => {
     setCurrentPage(1)
   }, [])

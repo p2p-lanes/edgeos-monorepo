@@ -25,12 +25,12 @@ const MemberItem = ({ member, onMemberUpdated, isLeader }: MemberItemProps) => {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
 
   const handleEditClick = (e: React.MouseEvent) => {
-    e.stopPropagation() // Evitar que se expanda/colapse al hacer clic en editar
+    e.stopPropagation() // Prevent expand/collapse when clicking edit
     setIsEditModalOpen(true)
   }
 
   const handleDeleteClick = (e: React.MouseEvent) => {
-    e.stopPropagation() // Evitar que se expanda/colapse al hacer clic en eliminar
+    e.stopPropagation() // Prevent expand/collapse when clicking delete
     setIsDeleteModalOpen(true)
   }
 
@@ -45,7 +45,7 @@ const MemberItem = ({ member, onMemberUpdated, isLeader }: MemberItemProps) => {
   const handleUpdateSuccess = () => {
     handleModalClose()
 
-    // Llamar a la función de actualización pasada desde el componente padre
+    // Call the refresh function passed from the parent component
     if (onMemberUpdated) {
       onMemberUpdated()
     }
@@ -54,7 +54,7 @@ const MemberItem = ({ member, onMemberUpdated, isLeader }: MemberItemProps) => {
   const handleDeleteSuccess = () => {
     handleDeleteModalClose()
 
-    // Llamar a la función de actualización pasada desde el componente padre
+    // Call the refresh function passed from the parent component
     if (onMemberUpdated) {
       onMemberUpdated()
     }
@@ -101,7 +101,7 @@ const MemberItem = ({ member, onMemberUpdated, isLeader }: MemberItemProps) => {
           >
             <div className="px-6 pb-6 pt-2">
               <div className="grid grid-cols-2 gap-4">
-                {/* Columna izquierda con información personal */}
+                {/* Left column with personal information */}
                 <div className="space-y-4">
                   <DetailItem label="GENDER" value={member.gender || ""} />
 
@@ -115,7 +115,7 @@ const MemberItem = ({ member, onMemberUpdated, isLeader }: MemberItemProps) => {
                   <DetailItem label="TELEGRAM" value={member.telegram || ""} />
                 </div>
 
-                {/* Columna derecha con PASSES */}
+                {/* Right column with PASSES */}
                 <div className="space-y-4">
                   <DetailItem
                     label="ORGANIZATION"
@@ -169,7 +169,7 @@ const MemberItem = ({ member, onMemberUpdated, isLeader }: MemberItemProps) => {
         )}
       </AnimatePresence>
 
-      {/* Modal para editar miembro */}
+      {/* Modal for editing a member */}
       <MemberFormModal
         open={isEditModalOpen}
         onClose={handleModalClose}
@@ -177,7 +177,7 @@ const MemberItem = ({ member, onMemberUpdated, isLeader }: MemberItemProps) => {
         onSuccess={handleUpdateSuccess}
       />
 
-      {/* Modal para confirmar eliminación */}
+      {/* Modal for confirming deletion */}
       <ConfirmDeleteModal
         open={isDeleteModalOpen}
         onClose={handleDeleteModalClose}
