@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query"
 import type { AttendeeWithOriginPublic } from "@/client"
 import { AttendeesService } from "@/client"
+import useAuth from "@/hooks/useAuth"
 import { queryKeys } from "@/lib/query-keys"
 
 /**
@@ -11,9 +12,14 @@ import { queryKeys } from "@/lib/query-keys"
  * discriminator field.
  *
  * The query is disabled when `popupId` is null/undefined so callers can
- * safely invoke this hook before the city context is available.
+ * safely invoke this hook before the city context is available. It is also
+ * disabled when there is no authenticated human — the `/attendees/my/...`
+ * endpoint requires auth, so firing it for anonymous users (e.g. on the public
+ * /r, /invite, /groups checkout pages) would only produce a 401. Once the user
+ * authenticates inline (OTP), `user` becomes set and the query enables itself.
  */
 export function useHumanAttendeesQuery(popupId: string | null | undefined) {
+  const { user } = useAuth()
   return useQuery({
     queryKey: queryKeys.attendees.byHumanPopup(popupId ?? ""),
     queryFn: async (): Promise<AttendeeWithOriginPublic[]> => {
@@ -22,7 +28,7 @@ export function useHumanAttendeesQuery(popupId: string | null | undefined) {
       })
       return result.results
     },
-    enabled: popupId != null && popupId !== "",
+    enabled: popupId != null && popupId !== "" && !!user,
   })
 }
 
