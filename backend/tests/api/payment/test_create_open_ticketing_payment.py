@@ -50,6 +50,7 @@ def _make_popup(
         status="active",
         simplefi_api_key="simplefi_test_key",
         currency="USD",
+        allows_coupons=True,
         contribution_enabled=contribution_enabled,
         contribution_percentage=Decimal(contribution_percentage)
         if contribution_percentage

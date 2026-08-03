@@ -1,9 +1,8 @@
 """Tests for HumansCRUD.hard_delete_cascade and DELETE /humans/{id}.
 
 Covers admin/superadmin hard delete with full cascade across applications,
-attendees, payments, products, carts, group memberships, and ambassador-owned
-groups. Tenant admins are restricted to their own tenant; superadmins are
-cross-tenant.
+attendees, payments, products, carts, and group memberships. Tenant admins are
+restricted to their own tenant; superadmins are cross-tenant.
 """
 
 import uuid
@@ -54,7 +53,6 @@ def test_cascade_removes_minimal_human(db: Session, tenant_a: Tenants) -> None:
     summary = humans_crud.hard_delete_cascade(db, human_id)
 
     assert summary["applications"] == 0
-    assert summary["ambassador_groups"] == 0
     assert db.get(Humans, human_id) is None
 
 
@@ -216,8 +214,8 @@ def test_cascade_removes_carts(
 def test_cascade_removes_group_memberships(
     db: Session, tenant_a: Tenants, popup_tenant_a: Popups
 ) -> None:
-    """Human as a non-ambassador member/leader — the group survives, links die."""
-    ambassador = _make_human(db, tenant_a.id, "amb")
+    """Human as a member/leader — the group survives, only the links die."""
+    other_human = _make_human(db, tenant_a.id, "other")
     member = _make_human(db, tenant_a.id, "member")
 
     group = Groups(
@@ -226,7 +224,6 @@ def test_cascade_removes_group_memberships(
         popup_id=popup_tenant_a.id,
         name="G",
         slug=f"group-{uuid.uuid4().hex[:6]}",
-        ambassador_id=ambassador.id,
     )
     db.add(group)
     db.flush()
@@ -238,41 +235,9 @@ def test_cascade_removes_group_memberships(
     summary = humans_crud.hard_delete_cascade(db, member.id)
 
     assert summary["group_memberships"] == 2
-    assert summary["ambassador_groups"] == 0
+    # Admin-managed group survives — deleting a member/leader never drops it.
     assert db.get(Groups, group_id) is not None
-    # Ambassador human untouched.
-    assert db.get(Humans, ambassador.id) is not None
-
-
-def test_cascade_drops_ambassador_owned_groups(
-    db: Session, tenant_a: Tenants, popup_tenant_a: Popups
-) -> None:
-    """Ambassador delete cascades to the group + its members/leaders."""
-    ambassador = _make_human(db, tenant_a.id, "ambdrop")
-    other_member = _make_human(db, tenant_a.id, "stays")
-
-    group = Groups(
-        id=uuid.uuid4(),
-        tenant_id=tenant_a.id,
-        popup_id=popup_tenant_a.id,
-        name="AmbG",
-        slug=f"ambg-{uuid.uuid4().hex[:6]}",
-        ambassador_id=ambassador.id,
-    )
-    db.add(group)
-    db.flush()
-    db.add(
-        GroupMembers(group_id=group.id, human_id=other_member.id, tenant_id=tenant_a.id)
-    )
-    db.commit()
-    group_id = group.id
-
-    summary = humans_crud.hard_delete_cascade(db, ambassador.id)
-
-    assert summary["ambassador_groups"] == 1
-    assert db.get(Groups, group_id) is None
-    # Other member's human row must survive — only their group_members link died.
-    assert db.get(Humans, other_member.id) is not None
+    assert db.get(Humans, other_human.id) is not None
     assert (
         db.exec(select(GroupMembers).where(GroupMembers.group_id == group_id)).first()
         is None
@@ -372,6 +337,5 @@ def test_http_delete_succeeds_for_superadmin(
     assert resp.status_code == 200, resp.text
     body = resp.json()
     assert body["applications"] == 0
-    assert body["ambassador_groups"] == 0
     db.expire_all()
     assert db.get(Humans, human_id) is None

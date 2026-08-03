@@ -282,6 +282,22 @@ class PopupBase(SQLModel):
         default=False,
         sa_column=Column(Boolean, nullable=False, server_default="false"),
     )
+    # Groups-rework: per-popup feature flags for invite/referral/group-private-events
+    invites_enabled: bool = Field(
+        default=False,
+        sa_column=Column(Boolean, nullable=False, server_default="false"),
+    )
+    referrals_enabled: bool = Field(
+        default=False,
+        sa_column=Column(Boolean, nullable=False, server_default="false"),
+    )
+    group_private_events_enabled: bool = Field(
+        default=False,
+        sa_column=Column(Boolean, nullable=False, server_default="false"),
+    )
+    # Per-attendee referral limit: max_uses applied to each referral link.
+    # null = unlimited. Default 10.
+    max_referrals_per_attendee: int | None = Field(default=10, nullable=True)
     installments_enabled: bool = Field(
         default=False,
         sa_column=Column(Boolean, nullable=False, server_default="false"),
@@ -499,6 +515,10 @@ class PopupUpdate(SQLModel):
     installments_interval: InstallmentInterval | None = None
     installments_interval_count: int | None = None
     checkin_pass_lead_days: int | None = None
+    invites_enabled: bool | None = None
+    referrals_enabled: bool | None = None
+    group_private_events_enabled: bool | None = None
+    max_referrals_per_attendee: int | None = None
     abandoned_cart_delay_days: int | None = None
     abandoned_cart_repeat_days: int | None = None
     abandoned_cart_max_count: int | None = None
@@ -524,6 +544,15 @@ class PopupUpdate(SQLModel):
     def validate_checkin_pass_lead_days(cls, value: int | None) -> int | None:
         if value is not None and value <= 0:
             raise ValueError("checkin_pass_lead_days must be a positive number of days")
+        return value
+
+    @field_validator("max_referrals_per_attendee")
+    @classmethod
+    def validate_max_referrals_per_attendee(cls, value: int | None) -> int | None:
+        if value is not None and value < 1:
+            raise ValueError(
+                "max_referrals_per_attendee must be a positive integer or null (unlimited)"
+            )
         return value
 
     @field_validator(
@@ -628,6 +657,11 @@ class PopupPublic(SQLModel):
     events_enabled: bool = True
     show_attendee_directory: bool = False
     edit_passes_enabled: bool = False
+    # groups-rework feature flags (portal needs these to gate nav/UI)
+    invites_enabled: bool = False
+    referrals_enabled: bool = False
+    group_private_events_enabled: bool = False
+    max_referrals_per_attendee: int | None = 10
     installments_enabled: bool = False
     installments_deadline: datetime | None = None
     installments_max: int | None = None
