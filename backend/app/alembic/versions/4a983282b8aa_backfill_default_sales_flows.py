@@ -11,12 +11,11 @@ a silent behavior change the design explicitly rejects.
 
 `type` is copied from `popups.sale_type` (both enums share the
 'application'/'direct' values; sales_flows.type additionally allows
-'upsale', unused here). `slug` is the fixed literal 'default', de-collided
-against the reserved-slug set (thank-you, success) the same way the
-runtime API validator (`validate_flow_slug`) rejects them — defensive,
-since 'default' never collides with either reserved value today, but kept
-in sync with the validator so a future change to the default slug (or the
-reserved set) can't silently produce an unreachable flow.
+'upsale', unused here). `slug` starts from the literal 'default', de-collided
+per popup against the reserved-slug set (thank-you, success) and that
+popup's existing sales_flows slugs — unlike the runtime API validator
+(`validate_flow_slug`), which rejects a colliding slug with a 422, the
+migration renames deterministically instead of aborting.
 
 Idempotent: only inserts a default flow for popups that don't already have
 one (`is_default = true`), so re-running this migration (or running it
@@ -54,22 +53,29 @@ DEFAULT_FLOW_NAME = "Default"
 
 
 def resolve_default_flow_slug(
-    candidate: str, reserved: frozenset[str] = RESERVED_FLOW_SLUGS
+    candidate: str,
+    taken: frozenset[str] = frozenset(),
+    reserved: frozenset[str] = RESERVED_FLOW_SLUGS,
 ) -> str:
-    """Deterministically de-collide a candidate slug against reserved slugs.
+    """Deterministically de-collide a candidate slug against reserved and
+    already-taken slugs (`taken` must be scoped to a single popup).
 
-    Pure function (no I/O) so the de-collision rule is unit-testable without
-    a database. Never triggers for the literal "default" today, but keeps
-    the migration correct if the default slug literal or the reserved set
-    ever changes.
+    Pure function (no I/O). Tries the candidate, then "{candidate}-flow",
+    then "-flow-2", "-flow-3", ... until one is free of both sets.
     """
-    return f"{candidate}-flow" if candidate in reserved else candidate
+    blocked = reserved | taken
+    if candidate not in blocked:
+        return candidate
+    suffixed = f"{candidate}-flow"
+    n = 2
+    while suffixed in blocked:
+        suffixed = f"{candidate}-flow-{n}"
+        n += 1
+    return suffixed
 
 
 def upgrade() -> None:
     conn = op.get_bind()
-
-    slug = resolve_default_flow_slug(DEFAULT_FLOW_SLUG)
 
     popups_needing_default = conn.execute(
         sa.text(
@@ -82,13 +88,25 @@ def upgrade() -> None:
     ).all()
 
     for popup_id, tenant_id, sale_type in popups_needing_default:
+        taken_slugs = frozenset(
+            row[0]
+            for row in conn.execute(
+                sa.text(
+                    "SELECT slug FROM sales_flows WHERE popup_id = :popup_id"
+                ).bindparams(popup_id=popup_id)
+            ).all()
+        )
+        slug = resolve_default_flow_slug(DEFAULT_FLOW_SLUG, taken=taken_slugs)
+
         conn.execute(
             sa.text(
                 "INSERT INTO sales_flows "
                 "(id, tenant_id, popup_id, type, slug, name, visibility, "
                 'is_default, "order", reviewers_mode, identity_mode) '
-                "VALUES (gen_random_uuid(), :tenant_id, :popup_id, :sale_type, "
-                ":slug, :name, 'portal_listed', true, 0, 'inherit', 'portal_auth')"
+                "SELECT gen_random_uuid(), :tenant_id, :popup_id, :sale_type, "
+                ":slug, :name, 'portal_listed', true, 0, 'inherit', 'portal_auth' "
+                "WHERE NOT EXISTS (SELECT 1 FROM sales_flows f "
+                "WHERE f.popup_id = :popup_id AND f.is_default = true)"
             ).bindparams(
                 tenant_id=tenant_id,
                 popup_id=popup_id,

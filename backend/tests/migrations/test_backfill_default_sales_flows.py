@@ -135,6 +135,15 @@ def test_resolve_default_flow_slug_reserved_collision_is_deconflicted() -> None:
     assert module.resolve_default_flow_slug("success") == "success-flow"
 
 
+def test_resolve_default_flow_slug_taken_collision_is_deconflicted() -> None:
+    module = _load_migration_module()
+    fn = module.resolve_default_flow_slug
+    assert fn("default", taken=frozenset({"default"})) == "default-flow"
+    assert (
+        fn("default", taken=frozenset({"default", "default-flow"})) == "default-flow-2"
+    )
+
+
 # ---------------------------------------------------------------------------
 # Scenario: backfill DML semantics against real Postgres (scoped, seeded rows)
 # ---------------------------------------------------------------------------
@@ -275,6 +284,61 @@ class TestBackfillDefaultSalesFlowsDML:
         finally:
             _cleanup_popup(db, popup_id)
 
+    def test_backfill_deconflicts_slug_when_default_taken_by_nondefault_flow(
+        self, db: Session, tenant_a: Tenants
+    ) -> None:
+        """res-001: a pre-existing NON-default flow slugged 'default' must
+        not abort the migration on uq_sales_flows_popup_slug."""
+        module = _load_migration_module()
+        popup_id = _insert_popup(db, tenant_a.id, sale_type="application")
+        try:
+            db.exec(
+                text(
+                    "INSERT INTO sales_flows "
+                    "(id, tenant_id, popup_id, type, slug, name, visibility, "
+                    'is_default, "order", reviewers_mode, identity_mode) '
+                    "VALUES (:id, :tid, :pid, 'application', 'default', "
+                    "'Conflicting', 'portal_listed', false, 0, 'inherit', 'portal_auth')"
+                ).bindparams(id=uuid.uuid4(), tid=tenant_a.id, pid=popup_id)
+            )
+            db.commit()
+
+            taken = frozenset(
+                row[0]
+                for row in db.exec(
+                    text(
+                        "SELECT slug FROM sales_flows WHERE popup_id = :pid"
+                    ).bindparams(pid=popup_id)
+                ).all()
+            )
+            slug = module.resolve_default_flow_slug(
+                module.DEFAULT_FLOW_SLUG, taken=taken
+            )
+            db.exec(
+                text(
+                    "INSERT INTO sales_flows "
+                    "(id, tenant_id, popup_id, type, slug, name, visibility, "
+                    'is_default, "order", reviewers_mode, identity_mode) '
+                    "SELECT gen_random_uuid(), :tid, :pid, 'application', :slug, "
+                    "'Default', 'portal_listed', true, 0, 'inherit', 'portal_auth' "
+                    "WHERE NOT EXISTS (SELECT 1 FROM sales_flows f "
+                    "WHERE f.popup_id = :pid AND f.is_default = true)"
+                ).bindparams(tid=tenant_a.id, pid=popup_id, slug=slug)
+            )
+            db.commit()
+
+            rows = db.exec(
+                text(
+                    "SELECT slug, is_default FROM sales_flows WHERE popup_id = :pid"
+                ).bindparams(pid=popup_id)
+            ).all()
+            assert {r[0]: r[1] for r in rows} == {
+                "default": False,
+                "default-flow": True,
+            }
+        finally:
+            _cleanup_popup(db, popup_id)
+
     def test_g1_verification_query_detects_orphan_then_zero(
         self, db: Session, tenant_a: Tenants
     ) -> None:
@@ -358,11 +422,14 @@ class TestBackfillMigrationModule:
         mock_bind = MagicMock()
         select_needing_default = MagicMock()
         select_needing_default.all.return_value = [(popup_id, tenant_id, "direct")]
+        select_taken_slugs = MagicMock()
+        select_taken_slugs.all.return_value = []
         insert_result = MagicMock()
         orphan_check = MagicMock()
         orphan_check.scalar.return_value = 0
         mock_bind.execute.side_effect = [
             select_needing_default,
+            select_taken_slugs,
             insert_result,
             orphan_check,
         ]
@@ -372,10 +439,11 @@ class TestBackfillMigrationModule:
 
             module.upgrade()
 
-        assert mock_bind.execute.call_count == 3, (
-            "Expected SELECT-needing-default, INSERT, and invariant SELECT"
+        assert mock_bind.execute.call_count == 4, (
+            "Expected SELECT-needing-default, SELECT-taken-slugs, INSERT, "
+            "and invariant SELECT"
         )
-        insert_call_sql = str(mock_bind.execute.call_args_list[1].args[0])
+        insert_call_sql = str(mock_bind.execute.call_args_list[2].args[0])
         assert "INSERT INTO sales_flows" in insert_call_sql
 
     def test_downgrade_is_a_verified_noop(self) -> None:
