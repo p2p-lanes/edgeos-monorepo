@@ -153,6 +153,14 @@ function ViewApplicationContent({ applicationId }: { applicationId: string }) {
                 <p>{new Date(application.accepted_at).toLocaleDateString()}</p>
               </div>
             )}
+            {application.referred_by_name && (
+              <div>
+                <span className="text-xs uppercase tracking-wider">
+                  Referred by
+                </span>
+                <p>{application.referred_by_name}</p>
+              </div>
+            )}
           </div>
 
           {/* Stepper */}
