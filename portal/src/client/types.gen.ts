@@ -2766,6 +2766,11 @@ export type ListModel_ReferralPublic_ = {
     paging: Paging;
 };
 
+export type ListModel_SalesFlowPublic_ = {
+    results: Array<SalesFlowPublic>;
+    paging: Paging;
+};
+
 export type ListModel_SavedViewPublic_ = {
     results: Array<SavedViewPublic>;
     paging: Paging;
@@ -3878,6 +3883,131 @@ export type ReviewSummary = {
     weighted_score?: (number | null);
     reviews: Array<ApplicationReviewPublic>;
 };
+
+/**
+ * Sales flow creation payload (BO). tenant_id is derived server-side.
+ */
+export type SalesFlowCreate = {
+    popup_id: string;
+    type?: SalesFlowType;
+    slug: string;
+    name: string;
+    visibility?: SalesFlowVisibility;
+    is_default?: boolean;
+    order?: number;
+    reviewers_mode?: SalesFlowReviewersMode;
+    identity_mode?: SalesFlowIdentityMode;
+    application_layout?: (ApplicationLayout | null);
+    requires_application_fee?: (boolean | null);
+    application_fee_amount?: (number | string | null);
+    allows_scholarship?: (boolean | null);
+    allows_incentive?: (boolean | null);
+    allows_coupons?: (boolean | null);
+    open_checkout_success_url?: (string | null);
+    open_checkout_cancel_url?: (string | null);
+    open_checkout_signing_secret?: (string | null);
+    abandoned_cart_delay_days?: (number | null);
+    abandoned_cart_repeat_days?: (number | null);
+    abandoned_cart_max_count?: (number | null);
+    purchase_reminder_delay_days?: (number | null);
+    purchase_reminder_repeat_days?: (number | null);
+    purchase_reminder_max_count?: (number | null);
+    abandoned_application_delay_days?: (number | null);
+    abandoned_application_repeat_days?: (number | null);
+    abandoned_application_max_count?: (number | null);
+};
+
+/**
+ * portal_auth is the only implemented mode in v1; anonymous is reserved
+ * for a future ticket-code lookup flow (spec: upsale-flow).
+ */
+export type SalesFlowIdentityMode = 'portal_auth' | 'anonymous';
+
+/**
+ * Sales flow schema for API responses.
+ */
+export type SalesFlowPublic = {
+    tenant_id: string;
+    popup_id: string;
+    type?: SalesFlowType;
+    slug: string;
+    name: string;
+    visibility?: SalesFlowVisibility;
+    is_default?: boolean;
+    order?: number;
+    reviewers_mode?: SalesFlowReviewersMode;
+    identity_mode?: SalesFlowIdentityMode;
+    status?: (string | null);
+    application_layout?: (ApplicationLayout | null);
+    requires_application_fee?: (boolean | null);
+    application_fee_amount?: (string | null);
+    allows_scholarship?: (boolean | null);
+    allows_incentive?: (boolean | null);
+    allows_coupons?: (boolean | null);
+    open_checkout_success_url?: (string | null);
+    open_checkout_cancel_url?: (string | null);
+    open_checkout_signing_secret?: (string | null);
+    abandoned_cart_delay_days?: (number | null);
+    abandoned_cart_repeat_days?: (number | null);
+    abandoned_cart_max_count?: (number | null);
+    purchase_reminder_delay_days?: (number | null);
+    purchase_reminder_repeat_days?: (number | null);
+    purchase_reminder_max_count?: (number | null);
+    abandoned_application_delay_days?: (number | null);
+    abandoned_application_repeat_days?: (number | null);
+    abandoned_application_max_count?: (number | null);
+    id: string;
+    created_at?: (string | null);
+    updated_at?: (string | null);
+};
+
+/**
+ * Whether a flow uses the popup-level reviewer list or its own (D4).
+ */
+export type SalesFlowReviewersMode = 'inherit' | 'override';
+
+/**
+ * Sale model of a flow. Mirrors PopupBase.sale_type plus 'upsale'.
+ */
+export type SalesFlowType = 'application' | 'direct' | 'upsale';
+
+/**
+ * Partial update payload (BO). Only provided fields are applied.
+ */
+export type SalesFlowUpdate = {
+    type?: (SalesFlowType | null);
+    slug?: (string | null);
+    name?: (string | null);
+    visibility?: (SalesFlowVisibility | null);
+    is_default?: (boolean | null);
+    order?: (number | null);
+    reviewers_mode?: (SalesFlowReviewersMode | null);
+    identity_mode?: (SalesFlowIdentityMode | null);
+    application_layout?: (ApplicationLayout | null);
+    requires_application_fee?: (boolean | null);
+    application_fee_amount?: (number | string | null);
+    allows_scholarship?: (boolean | null);
+    allows_incentive?: (boolean | null);
+    allows_coupons?: (boolean | null);
+    open_checkout_success_url?: (string | null);
+    open_checkout_cancel_url?: (string | null);
+    open_checkout_signing_secret?: (string | null);
+    abandoned_cart_delay_days?: (number | null);
+    abandoned_cart_repeat_days?: (number | null);
+    abandoned_cart_max_count?: (number | null);
+    purchase_reminder_delay_days?: (number | null);
+    purchase_reminder_repeat_days?: (number | null);
+    purchase_reminder_max_count?: (number | null);
+    abandoned_application_delay_days?: (number | null);
+    abandoned_application_repeat_days?: (number | null);
+    abandoned_application_max_count?: (number | null);
+};
+
+/**
+ * Listing-only switch (Design D-URL): never affects access, only whether
+ * the flow appears in the portal's flow listing for its popup.
+ */
+export type SalesFlowVisibility = 'portal_listed' | 'direct_url_only';
 
 /**
  * Popup sale model.
@@ -7174,6 +7304,50 @@ export type ReferralsUpdateReferralAdminData = {
 };
 
 export type ReferralsUpdateReferralAdminResponse = (ReferralPublic);
+
+export type SalesFlowsListSalesFlowsData = {
+    /**
+     * Maximum number of items to return
+     */
+    limit?: number;
+    popupId: string;
+    /**
+     * Number of items to skip
+     */
+    skip?: number;
+    xTenantId?: (string | null);
+};
+
+export type SalesFlowsListSalesFlowsResponse = (ListModel_SalesFlowPublic_);
+
+export type SalesFlowsCreateSalesFlowData = {
+    requestBody: SalesFlowCreate;
+    xTenantId?: (string | null);
+};
+
+export type SalesFlowsCreateSalesFlowResponse = (SalesFlowPublic);
+
+export type SalesFlowsGetSalesFlowData = {
+    flowId: string;
+    xTenantId?: (string | null);
+};
+
+export type SalesFlowsGetSalesFlowResponse = (SalesFlowPublic);
+
+export type SalesFlowsUpdateSalesFlowData = {
+    flowId: string;
+    requestBody: SalesFlowUpdate;
+    xTenantId?: (string | null);
+};
+
+export type SalesFlowsUpdateSalesFlowResponse = (SalesFlowPublic);
+
+export type SalesFlowsDeleteSalesFlowData = {
+    flowId: string;
+    xTenantId?: (string | null);
+};
+
+export type SalesFlowsDeleteSalesFlowResponse = (void);
 
 export type SavedViewsListSavedViewsData = {
     entity: string;

@@ -12679,6 +12679,24 @@ export const ListModel_ReferralPublic_Schema = {
     title: 'ListModel[ReferralPublic]'
 } as const;
 
+export const ListModel_SalesFlowPublic_Schema = {
+    properties: {
+        results: {
+            items: {
+                '$ref': '#/components/schemas/SalesFlowPublic'
+            },
+            type: 'array',
+            title: 'Results'
+        },
+        paging: {
+            '$ref': '#/components/schemas/Paging'
+        }
+    },
+    type: 'object',
+    required: ['results', 'paging'],
+    title: 'ListModel[SalesFlowPublic]'
+} as const;
+
 export const ListModel_SavedViewPublic_Schema = {
     properties: {
         results: {
@@ -18814,6 +18832,869 @@ export const SaleTypeSchema = {
 - application: traditional application-based flow (approval required).
 - direct: direct purchase by a logged-in Human, no application.
 Enum is extensible for future types (e.g. waitlist, lottery, registration).`
+} as const;
+
+export const SalesFlowCreateSchema = {
+    properties: {
+        popup_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Popup Id'
+        },
+        type: {
+            '$ref': '#/components/schemas/SalesFlowType',
+            default: 'application'
+        },
+        slug: {
+            type: 'string',
+            title: 'Slug'
+        },
+        name: {
+            type: 'string',
+            title: 'Name'
+        },
+        visibility: {
+            '$ref': '#/components/schemas/SalesFlowVisibility',
+            default: 'portal_listed'
+        },
+        is_default: {
+            type: 'boolean',
+            title: 'Is Default',
+            default: false
+        },
+        order: {
+            type: 'integer',
+            title: 'Order',
+            default: 0
+        },
+        reviewers_mode: {
+            '$ref': '#/components/schemas/SalesFlowReviewersMode',
+            default: 'inherit'
+        },
+        identity_mode: {
+            '$ref': '#/components/schemas/SalesFlowIdentityMode',
+            default: 'portal_auth'
+        },
+        application_layout: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/ApplicationLayout'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        requires_application_fee: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Requires Application Fee'
+        },
+        application_fee_amount: {
+            anyOf: [
+                {
+                    type: 'number'
+                },
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Application Fee Amount'
+        },
+        allows_scholarship: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Allows Scholarship'
+        },
+        allows_incentive: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Allows Incentive'
+        },
+        allows_coupons: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Allows Coupons'
+        },
+        open_checkout_success_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Open Checkout Success Url'
+        },
+        open_checkout_cancel_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Open Checkout Cancel Url'
+        },
+        open_checkout_signing_secret: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Open Checkout Signing Secret'
+        },
+        abandoned_cart_delay_days: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Abandoned Cart Delay Days'
+        },
+        abandoned_cart_repeat_days: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Abandoned Cart Repeat Days'
+        },
+        abandoned_cart_max_count: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Abandoned Cart Max Count'
+        },
+        purchase_reminder_delay_days: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Purchase Reminder Delay Days'
+        },
+        purchase_reminder_repeat_days: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Purchase Reminder Repeat Days'
+        },
+        purchase_reminder_max_count: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Purchase Reminder Max Count'
+        },
+        abandoned_application_delay_days: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Abandoned Application Delay Days'
+        },
+        abandoned_application_repeat_days: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Abandoned Application Repeat Days'
+        },
+        abandoned_application_max_count: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Abandoned Application Max Count'
+        }
+    },
+    type: 'object',
+    required: ['popup_id', 'slug', 'name'],
+    title: 'SalesFlowCreate',
+    description: 'Sales flow creation payload (BO). tenant_id is derived server-side.'
+} as const;
+
+export const SalesFlowIdentityModeSchema = {
+    type: 'string',
+    enum: ['portal_auth', 'anonymous'],
+    title: 'SalesFlowIdentityMode',
+    description: `portal_auth is the only implemented mode in v1; anonymous is reserved
+for a future ticket-code lookup flow (spec: upsale-flow).`
+} as const;
+
+export const SalesFlowPublicSchema = {
+    properties: {
+        tenant_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Tenant Id'
+        },
+        popup_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Popup Id'
+        },
+        type: {
+            '$ref': '#/components/schemas/SalesFlowType',
+            default: 'application'
+        },
+        slug: {
+            type: 'string',
+            title: 'Slug'
+        },
+        name: {
+            type: 'string',
+            title: 'Name'
+        },
+        visibility: {
+            '$ref': '#/components/schemas/SalesFlowVisibility',
+            default: 'portal_listed'
+        },
+        is_default: {
+            type: 'boolean',
+            title: 'Is Default',
+            default: false
+        },
+        order: {
+            type: 'integer',
+            title: 'Order',
+            default: 0
+        },
+        reviewers_mode: {
+            '$ref': '#/components/schemas/SalesFlowReviewersMode',
+            default: 'inherit'
+        },
+        identity_mode: {
+            '$ref': '#/components/schemas/SalesFlowIdentityMode',
+            default: 'portal_auth'
+        },
+        status: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Status'
+        },
+        application_layout: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/ApplicationLayout'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        requires_application_fee: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Requires Application Fee'
+        },
+        application_fee_amount: {
+            anyOf: [
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Application Fee Amount'
+        },
+        allows_scholarship: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Allows Scholarship'
+        },
+        allows_incentive: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Allows Incentive'
+        },
+        allows_coupons: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Allows Coupons'
+        },
+        open_checkout_success_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Open Checkout Success Url'
+        },
+        open_checkout_cancel_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Open Checkout Cancel Url'
+        },
+        open_checkout_signing_secret: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Open Checkout Signing Secret'
+        },
+        abandoned_cart_delay_days: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Abandoned Cart Delay Days'
+        },
+        abandoned_cart_repeat_days: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Abandoned Cart Repeat Days'
+        },
+        abandoned_cart_max_count: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Abandoned Cart Max Count'
+        },
+        purchase_reminder_delay_days: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Purchase Reminder Delay Days'
+        },
+        purchase_reminder_repeat_days: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Purchase Reminder Repeat Days'
+        },
+        purchase_reminder_max_count: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Purchase Reminder Max Count'
+        },
+        abandoned_application_delay_days: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Abandoned Application Delay Days'
+        },
+        abandoned_application_repeat_days: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Abandoned Application Repeat Days'
+        },
+        abandoned_application_max_count: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Abandoned Application Max Count'
+        },
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        created_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Created At'
+        },
+        updated_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Updated At'
+        }
+    },
+    type: 'object',
+    required: ['tenant_id', 'popup_id', 'slug', 'name', 'id'],
+    title: 'SalesFlowPublic',
+    description: 'Sales flow schema for API responses.'
+} as const;
+
+export const SalesFlowReviewersModeSchema = {
+    type: 'string',
+    enum: ['inherit', 'override'],
+    title: 'SalesFlowReviewersMode',
+    description: 'Whether a flow uses the popup-level reviewer list or its own (D4).'
+} as const;
+
+export const SalesFlowTypeSchema = {
+    type: 'string',
+    enum: ['application', 'direct', 'upsale'],
+    title: 'SalesFlowType',
+    description: "Sale model of a flow. Mirrors PopupBase.sale_type plus 'upsale'."
+} as const;
+
+export const SalesFlowUpdateSchema = {
+    properties: {
+        type: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/SalesFlowType'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        slug: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Slug'
+        },
+        name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Name'
+        },
+        visibility: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/SalesFlowVisibility'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        is_default: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Is Default'
+        },
+        order: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Order'
+        },
+        reviewers_mode: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/SalesFlowReviewersMode'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        identity_mode: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/SalesFlowIdentityMode'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        application_layout: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/ApplicationLayout'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        requires_application_fee: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Requires Application Fee'
+        },
+        application_fee_amount: {
+            anyOf: [
+                {
+                    type: 'number'
+                },
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Application Fee Amount'
+        },
+        allows_scholarship: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Allows Scholarship'
+        },
+        allows_incentive: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Allows Incentive'
+        },
+        allows_coupons: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Allows Coupons'
+        },
+        open_checkout_success_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Open Checkout Success Url'
+        },
+        open_checkout_cancel_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Open Checkout Cancel Url'
+        },
+        open_checkout_signing_secret: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Open Checkout Signing Secret'
+        },
+        abandoned_cart_delay_days: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Abandoned Cart Delay Days'
+        },
+        abandoned_cart_repeat_days: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Abandoned Cart Repeat Days'
+        },
+        abandoned_cart_max_count: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Abandoned Cart Max Count'
+        },
+        purchase_reminder_delay_days: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Purchase Reminder Delay Days'
+        },
+        purchase_reminder_repeat_days: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Purchase Reminder Repeat Days'
+        },
+        purchase_reminder_max_count: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Purchase Reminder Max Count'
+        },
+        abandoned_application_delay_days: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Abandoned Application Delay Days'
+        },
+        abandoned_application_repeat_days: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Abandoned Application Repeat Days'
+        },
+        abandoned_application_max_count: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Abandoned Application Max Count'
+        }
+    },
+    type: 'object',
+    title: 'SalesFlowUpdate',
+    description: 'Partial update payload (BO). Only provided fields are applied.'
+} as const;
+
+export const SalesFlowVisibilitySchema = {
+    type: 'string',
+    enum: ['portal_listed', 'direct_url_only'],
+    title: 'SalesFlowVisibility',
+    description: `Listing-only switch (Design D-URL): never affects access, only whether
+the flow appears in the portal's flow listing for its popup.`
 } as const;
 
 export const SavedViewCreateSchema = {
