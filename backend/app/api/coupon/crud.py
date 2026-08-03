@@ -63,6 +63,13 @@ class CouponsCRUD(BaseCRUD[Coupons, CouponCreate, CouponUpdate]):
                 detail="This endpoint is only available for direct-sale popups",
             )
 
+        if not popup.allows_coupons:
+            # Uniform error — don't reveal that coupons exist but are disabled
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=_PUBLIC_COUPON_ERROR,
+            )
+
         # Attempt coupon lookup — any failure → uniform 400
         coupon = self.get_by_code(session, code, popup.id)
         if coupon is None:
@@ -120,8 +127,18 @@ class CouponsCRUD(BaseCRUD[Coupons, CouponCreate, CouponUpdate]):
         Validate a coupon code and return it if valid.
 
         Raises:
-            HTTPException: If coupon is invalid, expired, or maxed out.
+            HTTPException: If coupons are disabled for the popup, or the coupon
+            is invalid, expired, or maxed out.
         """
+        from app.api.popup.models import Popups
+
+        popup = session.get(Popups, popup_id)
+        if popup is not None and not popup.allows_coupons:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Coupons are not enabled for this event",
+            )
+
         coupon = self.get_by_code(session, code, popup_id)
 
         if not coupon:

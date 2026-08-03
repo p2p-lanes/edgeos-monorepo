@@ -2,6 +2,11 @@ import type { TenantPublic } from "@/client"
 
 const PORTAL_DOMAIN = import.meta.env.VITE_PORTAL_DOMAIN ?? ""
 
+/** http for localhost dev domains, https otherwise. */
+function schemeFor(host: string): string {
+  return host.includes("localhost") ? "http" : "https"
+}
+
 /**
  * The portal's root domain for the current environment. Tenants live at
  * `{slug}.{root}` (e.g. `demo.dev.edgeos.world`, `edgecity.edgeos.world`).
@@ -36,7 +41,7 @@ export function getPortalBaseUrl(
 ): string | null {
   if (!tenant) return null
   if (tenant.custom_domain_active && tenant.custom_domain) {
-    return `https://${tenant.custom_domain}`
+    return `${schemeFor(tenant.custom_domain)}://${tenant.custom_domain}`
   }
   const root = getPortalRootDomain()
   if (tenant.slug && root) {
@@ -63,4 +68,8 @@ export function getSelfCheckInUrl(baseUrl: string, popupSlug: string) {
 
 export function getGroupPortalUrl(baseUrl: string, groupSlug: string) {
   return `${baseUrl}/groups/${groupSlug}`
+}
+
+export function getInvitePortalUrl(baseUrl: string, token: string) {
+  return `${baseUrl}/invite/${token}`
 }

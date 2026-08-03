@@ -645,5 +645,17 @@ async def authenticate_human(
     if linked_count > 0:
         logger.info(f"Linked {linked_count} existing attendee(s) to new human: {email}")
 
+    # Whitelist auto-join: if this email was whitelisted to any group (e.g. a
+    # leader invited it before signup), add the new human to those groups.
+    # Best-effort — a failure here must never block authentication.
+    from app.api.human.crud import resolve_whitelist_memberships
+
+    try:
+        resolve_whitelist_memberships(session, human)
+    except Exception:
+        logger.exception(
+            "Whitelist resolution failed for human {} — signup continues", human.id
+        )
+
     logger.info(f"Human created and authenticated successfully: {email}")
     return human

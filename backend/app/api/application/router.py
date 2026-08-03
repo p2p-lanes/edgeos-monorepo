@@ -99,6 +99,7 @@ def _get_reviewer_identities(
 def _build_application_public(
     application,
     review_decision=None,
+    referred_by_name=None,
     reviewers=None,
     comment_count=0,
     skipped_by_me=False,
@@ -158,6 +159,9 @@ def _build_application_public(
         human_id=application.human_id,
         group_id=application.group_id,
         referral=application.referral,
+        invite_id=application.invite_id,
+        referral_id=application.referral_id,
+        referred_by_name=referred_by_name,
         info_not_shared=application.info_not_shared or [],
         status=application.status,
         custom_fields=application.custom_fields or {},
@@ -713,6 +717,22 @@ async def get_application(
             detail="Application not found",
         )
 
+    # Resolve the referrer's display name (referral_id → referral →
+    # referrer_human_id → human) so the BO can show "Referred by ...".
+    referred_by_name = None
+    if application.referral_id:
+        from app.api.human.models import Humans
+        from app.api.referral.models import Referrals
+
+        referral = db.get(Referrals, application.referral_id)
+        if referral:
+            referrer = db.get(Humans, referral.referrer_human_id)
+            if referrer:
+                referred_by_name = (
+                    f"{referrer.first_name or ''} {referrer.last_name or ''}".strip()
+                    or referrer.email
+                )
+
     comment_count = len(crud.applications_crud.list_comments(db, application_id))
 
     current_user_id = getattr(current_user, "id", None)
@@ -725,6 +745,7 @@ async def get_application(
     )
     return _build_application_public(
         application,
+        referred_by_name=referred_by_name,
         comment_count=comment_count,
         skipped_by_me=my_skip is not None,
         my_skip_reason=my_skip.reason if my_skip else None,

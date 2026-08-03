@@ -1,6 +1,7 @@
 import uuid
 from datetime import datetime
 from decimal import Decimal
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, field_validator
 from sqlalchemy import Numeric, Text
@@ -20,10 +21,10 @@ class GroupBase(SQLModel):
     )
     max_members: int | None = Field(default=None, nullable=True)
     welcome_message: str | None = Field(default=None, nullable=True, sa_type=Text())
-    is_ambassador_group: bool = Field(default=False)
-    ambassador_id: uuid.UUID | None = Field(
-        default=None, foreign_key="humans.id", nullable=True, index=True
-    )
+    # Groups-rework: explicit behaviour flags replacing implicit bool(group_id) logic
+    auto_approve_applications: bool = Field(default=False)
+    express_checkout: bool = Field(default=False)
+    enable_private_events: bool = Field(default=False)
 
 
 class GroupPublic(GroupBase):
@@ -48,8 +49,6 @@ class GroupCreate(BaseModel):
     discount_percentage: Decimal = Decimal("0")
     max_members: int | None = None
     welcome_message: str | None = None
-    is_ambassador_group: bool = False
-    ambassador_id: uuid.UUID | None = None
     whitelisted_emails: list[str] | None = None  # List of email strings to whitelist
 
     @field_validator("discount_percentage")
@@ -79,9 +78,11 @@ class GroupAdminUpdate(BaseModel):
     discount_percentage: Decimal | None = None
     max_members: int | None = None
     welcome_message: str | None = None
-    is_ambassador_group: bool | None = None
-    ambassador_id: uuid.UUID | None = None
     whitelisted_emails: list[str] | None = None  # List of email strings to whitelist
+    # Groups-rework: explicit behaviour flags (T-gr-020)
+    auto_approve_applications: bool | None = None
+    express_checkout: bool | None = None
+    enable_private_events: bool | None = None
 
 
 class GroupWhitelistedEmailPublic(BaseModel):
@@ -115,6 +116,26 @@ class GroupMemberCreate(BaseModel):
         if not v or not v.strip():
             raise ValueError("This field cannot be empty")
         return v.strip()
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+
+class GroupMemberInvite(BaseModel):
+    """Schema for inviting a member to a group by email (Portal leader).
+
+    Only the email is needed: an existing human is added using their own
+    profile (never overwritten); an unregistered email is whitelisted.
+    """
+
+    email: str
+
+    @field_validator("email")
+    @classmethod
+    def clean_email(cls, v: str) -> str:
+        cleaned = v.lower().strip()
+        if not cleaned:
+            raise ValueError("Email cannot be empty")
+        return cleaned
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
@@ -163,6 +184,7 @@ class GroupMemberPublic(BaseModel):
     role: str | None = None
     gender: str | None = None
     local_resident: bool | None = None
+    is_leader: bool = False
     products: list = []  # List of ProductPublic
 
     model_config = ConfigDict(from_attributes=True)
@@ -175,10 +197,35 @@ class GroupMemberBatchResult(GroupMemberPublic):
     err_msg: str | None = None
 
 
+class AddMemberResult(BaseModel):
+    """Result of a leader adding a member by email (Portal).
+
+    - status="added": the email belonged to an existing human, now a member.
+    - status="invited": the email is not registered yet, so it was whitelisted.
+      The human auto-joins the group when they sign up.
+    """
+
+    status: Literal["added", "invited"]
+    email: str
+    member: GroupMemberPublic | None = None
+
+
+class MyGroupPublic(GroupPublic):
+    """Group public schema augmented with the viewer's role (portal)."""
+
+    is_leader: bool = False
+
+
 class GroupWithMembers(GroupPublic):
     """Group with members list."""
 
     members: list[GroupMemberPublic] = []
+
+
+class MyGroupWithMembers(GroupWithMembers):
+    """Group with members and viewer role (portal detail)."""
+
+    is_leader: bool = False
 
 
 class GroupLeaderBase(SQLModel):
@@ -197,6 +244,18 @@ class GroupMembersBase(SQLModel):
     human_id: uuid.UUID = Field(foreign_key="humans.id", primary_key=True, index=True)
 
 
+class AddMemberByApplicationRequest(BaseModel):
+    """Request body for POST /groups/{id}/members/by-application."""
+
+    application_id: uuid.UUID
+
+
+class GroupLeaderAssign(BaseModel):
+    """Request body for POST /groups/{id}/leaders (BO admin)."""
+
+    human_id: uuid.UUID
+
+
 class GroupProductsBase(SQLModel):
     """Base schema for group products link table."""
 
@@ -205,3 +264,28 @@ class GroupProductsBase(SQLModel):
     product_id: uuid.UUID = Field(
         foreign_key="products.id", primary_key=True, index=True
     )
+
+
+class GroupSlugResolution(BaseModel):
+    """Response for GET /api/v1/portal/groups/{slug} — URL compat resolver.
+
+    Design: Decision 1e — same-shape response with kind discriminator.
+    Spec: REQ-GR-027 (slug resolver fallback to invites), REQ-GR-028 (canonical endpoint).
+
+    Resolution order:
+      1. groups_crud.get_by_slug → kind="group"
+      2. invites_crud.get_by_token → kind="invite"
+      3. 404
+
+    Caller (portal) branches once on kind. When kind="invite", the portal
+    redirects to /invite/{token} for canonical redemption flow.
+
+    invite field is typed as dict to avoid a circular schema import at module load;
+    the router populates it from InvitePublicPreview.model_dump().
+    """
+
+    kind: str  # "group" | "invite"
+    group: GroupPublic | None = None
+    invite: dict | None = None  # serialized InvitePublicPreview when kind="invite"
+
+    model_config = ConfigDict(from_attributes=True)

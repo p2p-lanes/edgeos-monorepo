@@ -430,6 +430,7 @@ def popup_tenant_a_summer_fest(db: Session, tenant_a: Tenants) -> Popups:
             tenant_id=tenant_a.id,
             sale_type=SaleType.direct,
             status=PopupStatus.active,
+            allows_coupons=True,
         )
         db.add(popup)
         db.commit()
@@ -452,6 +453,7 @@ def popup_tenant_b_summer_fest(db: Session, tenant_b: Tenants) -> Popups:
             tenant_id=tenant_b.id,
             sale_type=SaleType.direct,
             status=PopupStatus.active,
+            allows_coupons=True,
         )
         db.add(popup)
         db.commit()

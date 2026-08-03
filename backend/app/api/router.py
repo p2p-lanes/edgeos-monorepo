@@ -26,10 +26,12 @@ from app.api import (
     form_section,
     group,
     human,
+    invite,
     payment,
     popup,
     popup_reviewer,
     product,
+    referral,
     saved_view,
     task,
     tenant,
@@ -43,6 +45,7 @@ from app.api import (
 )
 from app.api.application.router import portal_router
 from app.api.check_in import router as check_in_router
+from app.api.group.router import portal_router as group_portal_router
 
 api_router = APIRouter()
 
@@ -66,6 +69,11 @@ api_router.include_router(attendee_category.router)
 api_router.include_router(product.router)
 api_router.include_router(coupon.router)
 api_router.include_router(group.router)
+api_router.include_router(group_portal_router)
+api_router.include_router(invite.router)
+api_router.include_router(referral.portal_router)
+api_router.include_router(referral.public_router)
+api_router.include_router(referral.admin_router)
 api_router.include_router(form_section.router)
 api_router.include_router(form_field.router)
 api_router.include_router(email_template.router)

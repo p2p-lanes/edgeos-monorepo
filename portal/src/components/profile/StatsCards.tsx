@@ -1,4 +1,4 @@
-import { Calendar1, MapPinned, Speech } from "lucide-react"
+import { Calendar1, MapPinned } from "lucide-react"
 import type { HumanProfileStats } from "@/client"
 import { useTenant } from "@/providers/tenantProvider"
 import { Card } from "../ui/card"
@@ -20,7 +20,7 @@ const StatsCards = ({ stats, isLoading }: StatsCardsProps) => {
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
       <Card className="p-6">
         <div className="flex items-center justify-between">
           <div>
@@ -49,18 +49,6 @@ const StatsCards = ({ stats, isLoading }: StatsCardsProps) => {
           </div>
           <div className="w-12 h-12 bg-blue-500/20 rounded-lg flex items-center justify-center">
             <Calendar1 className="w-6 h-6 text-blue-500" />
-          </div>
-        </div>
-      </Card>
-
-      <Card className="p-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm text-muted-foreground mb-1">Referrals</p>
-            <p className="text-3xl font-bold text-foreground">—</p>
-          </div>
-          <div className="w-12 h-12 bg-purple-500/20 rounded-lg flex items-center justify-center">
-            <Speech className="w-6 h-6 text-purple-500" />
           </div>
         </div>
       </Card>
