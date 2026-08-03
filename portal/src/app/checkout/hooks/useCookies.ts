@@ -3,7 +3,7 @@
 import Cookies from "js-cookie"
 
 const COOKIE_NAME = "user_form_data_checkout_edge"
-const COOKIE_EXPIRY = 7 // días
+const COOKIE_EXPIRY = 7 // days
 
 const useCookies = () => {
   const getCookie = () => {

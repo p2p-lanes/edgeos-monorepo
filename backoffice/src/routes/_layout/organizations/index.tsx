@@ -8,7 +8,6 @@ import { type TenantPublic, TenantsService } from "@/client"
 import { DataTable, SortableHeader } from "@/components/Common/DataTable"
 import { EmptyState } from "@/components/Common/EmptyState"
 import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
-import { StatusBadge } from "@/components/Common/StatusBadge"
 import { Button } from "@/components/ui/button"
 
 import { Skeleton } from "@/components/ui/skeleton"
@@ -28,9 +27,6 @@ function getTenantsQueryOptions(
         skip: page * pageSize,
         limit: pageSize,
         search: search || undefined,
-        // Admin listing keeps deleted organizations visible for auditing;
-        // every other surface only offers selectable ones.
-        includeDeleted: true,
       }),
     queryKey: ["tenants", { page, pageSize, search }],
   }
@@ -70,13 +66,6 @@ const columns: ColumnDef<TenantPublic>[] = [
       </span>
     ),
   },
-  {
-    accessorKey: "deleted",
-    header: "Status",
-    cell: ({ row }) => (
-      <StatusBadge status={row.original.deleted ? "deleted" : "active"} />
-    ),
-  },
 ]
 
 function TenantsTableContent() {
@@ -103,7 +92,7 @@ function TenantsTableContent() {
       columns={columns}
       data={tenants.results}
       searchPlaceholder="Search by name..."
-      hiddenOnMobile={["sender_email", "deleted"]}
+      hiddenOnMobile={["sender_email"]}
       searchValue={search}
       onSearchChange={setSearch}
       onRowClick={(tenant) =>

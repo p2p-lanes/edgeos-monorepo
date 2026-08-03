@@ -40,7 +40,7 @@ export function ConfirmStepFields({
                 cta_label: e.target.value || undefined,
               })
             }
-            placeholder="Pagar"
+            placeholder="Pay"
           />
           <p className="text-xs text-muted-foreground">
             Shown on both the bottom bar's button and the one inside the confirm

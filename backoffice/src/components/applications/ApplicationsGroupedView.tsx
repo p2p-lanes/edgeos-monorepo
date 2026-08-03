@@ -17,6 +17,7 @@ import {
 import { DataTable } from "@/components/Common/DataTable"
 import { StatusBadge } from "@/components/Common/StatusBadge"
 import { Skeleton } from "@/components/ui/skeleton"
+import type { TableColumnPrefs } from "@/hooks/useTableColumnPrefs"
 import { cn } from "@/lib/utils"
 
 const EMPTY_GROUP_KEY = "__empty__"
@@ -94,6 +95,7 @@ interface ApplicationsGroupedViewProps {
   valueOrder?: string[]
   subValueOrder?: string[]
   hiddenOnMobile?: string[]
+  columnPrefs?: TableColumnPrefs
 }
 
 export function ApplicationsGroupedView({
@@ -107,6 +109,7 @@ export function ApplicationsGroupedView({
   valueOrder,
   subValueOrder,
   hiddenOnMobile,
+  columnPrefs,
 }: ApplicationsGroupedViewProps) {
   const completeConditions = useMemo(
     () => filterConditions.filter(isCompleteCondition),
@@ -200,6 +203,7 @@ export function ApplicationsGroupedView({
                     search={search}
                     subValueOrder={subValueOrder}
                     hiddenOnMobile={hiddenOnMobile}
+                    columnPrefs={columnPrefs}
                   />
                 ) : (
                   /* Remount on filter/search edits so the page index cannot
@@ -214,6 +218,7 @@ export function ApplicationsGroupedView({
                     completeConditions={completeConditions}
                     search={search}
                     hiddenOnMobile={hiddenOnMobile}
+                    columnPrefs={columnPrefs}
                   />
                 )}
               </div>
@@ -239,6 +244,7 @@ function SubGroupsList({
   search,
   subValueOrder,
   hiddenOnMobile,
+  columnPrefs,
 }: {
   popupId: string
   groupBy: string
@@ -251,6 +257,7 @@ function SubGroupsList({
   search: string
   subValueOrder?: string[]
   hiddenOnMobile?: string[]
+  columnPrefs?: TableColumnPrefs
 }) {
   const {
     data: counts,
@@ -326,6 +333,7 @@ function SubGroupsList({
                   completeConditions={completeConditions}
                   search={search}
                   hiddenOnMobile={hiddenOnMobile}
+                  columnPrefs={columnPrefs}
                 />
               </div>
             )}
@@ -347,6 +355,7 @@ function GroupRowsTable({
   completeConditions,
   search,
   hiddenOnMobile,
+  columnPrefs,
 }: {
   popupId: string
   groupBy: string
@@ -358,6 +367,7 @@ function GroupRowsTable({
   completeConditions: FilterCondition[]
   search: string
   hiddenOnMobile?: string[]
+  columnPrefs?: TableColumnPrefs
 }) {
   const navigate = useNavigate()
   const [pagination, setPagination] = useState({
@@ -412,6 +422,7 @@ function GroupRowsTable({
       columns={columns}
       data={applications.results}
       tableId="applications"
+      columnPrefs={columnPrefs}
       hideToolbar
       hiddenOnMobile={hiddenOnMobile}
       onRowClick={(application) =>

@@ -1,4 +1,4 @@
-// Componente para mostrar un detalle del miembro
+// Component that displays a single member detail
 const DetailItem = ({ label, value }: { label: string; value: string }) => (
   <div>
     <p className="text-xs text-gray-500 uppercase font-medium">{label}</p>

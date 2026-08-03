@@ -1,4 +1,20 @@
 import {
+  closestCenter,
+  DndContext,
+  type DragEndEvent,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core"
+import {
+  arrayMove,
+  SortableContext,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable"
+import { CSS } from "@dnd-kit/utilities"
+import {
+  type Column,
   type ColumnDef,
   type ExpandedState,
   flexRender,
@@ -9,6 +25,7 @@ import {
   type Row,
   type RowSelectionState,
   type SortingState,
+  type Table as TanstackTable,
   useReactTable,
   type VisibilityState,
 } from "@tanstack/react-table"
@@ -21,13 +38,13 @@ import {
   ChevronsLeft,
   ChevronsRight,
   Columns3,
+  GripVertical,
   Search,
   X,
 } from "lucide-react"
 import {
   Fragment,
   type ReactNode,
-  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -35,15 +52,13 @@ import {
 } from "react"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
-import {
-  DropdownMenu,
-  DropdownMenuCheckboxItem,
-  DropdownMenuContent,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
 import {
   Select,
   SelectContent,
@@ -51,6 +66,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { Switch } from "@/components/ui/switch"
 import {
   Table,
   TableBody,
@@ -65,6 +81,13 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { useIsMobile } from "@/hooks/useMobile"
+import {
+  applyUserColumnOrder,
+  columnDefId,
+  type TableColumnPrefs,
+  useTableColumnPrefs,
+} from "@/hooks/useTableColumnPrefs"
+import { cn } from "@/lib/utils"
 
 declare module "@tanstack/react-table" {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -118,6 +141,12 @@ interface DataTableProps<TData, TValue> {
   hiddenOnMobile?: string[]
   tableId?: string
   /**
+   * Externally-owned column visibility and order state. Lets a page share
+   * the preferences across several DataTable instances or feed them into
+   * saved views. Defaults to internal tableId-persisted state.
+   */
+  columnPrefs?: TableColumnPrefs
+  /**
    * Suppress the built-in toolbar (search, filter bar, column toggle) while
    * keeping the tableId-based column visibility preferences. Useful when
    * several tables share one external toolbar, as in grouped views.
@@ -131,19 +160,6 @@ interface DataTableProps<TData, TValue> {
    * working without needing `stopPropagation` everywhere.
    */
   onRowClick?: (row: TData) => void
-}
-
-function loadColumnVisibility(tableId: string): VisibilityState {
-  try {
-    const raw = localStorage.getItem(`table-columns-${tableId}`)
-    return raw ? JSON.parse(raw) : {}
-  } catch {
-    return {}
-  }
-}
-
-function saveColumnVisibility(tableId: string, state: VisibilityState) {
-  localStorage.setItem(`table-columns-${tableId}`, JSON.stringify(state))
 }
 
 function SortableHeader({
@@ -178,6 +194,175 @@ function SortableHeader({
 
 export { SortableHeader }
 
+/**
+ * Column settings menu: search, toggle visibility with a switch, and drag
+ * the handle to reorder. Hidden columns keep their slot so they come back
+ * where they were left.
+ */
+function ColumnPrefsMenu<TData>({
+  table,
+  prefs,
+}: {
+  table: TanstackTable<TData>
+  prefs: TableColumnPrefs
+}) {
+  const [query, setQuery] = useState("")
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+  )
+
+  const orderableColumns = table
+    .getAllLeafColumns()
+    .filter(
+      (col) =>
+        col.columnDef.meta?.toggleable !== false && col.columnDef.meta?.label,
+    )
+  const orderedIds = applyUserColumnOrder(
+    orderableColumns.map((col) => col.id),
+    prefs.order,
+  )
+  const rank = new Map(orderedIds.map((id, index) => [id, index]))
+  const orderedColumns = [...orderableColumns].sort(
+    (a, b) => (rank.get(a.id) ?? 0) - (rank.get(b.id) ?? 0),
+  )
+
+  const search = query.trim().toLowerCase()
+  const visibleRows = search
+    ? orderedColumns.filter((col) =>
+        col.columnDef.meta?.label?.toLowerCase().includes(search),
+      )
+    : orderedColumns
+  // Reordering a filtered list is ambiguous; drag only on the full list.
+  const dndEnabled = !search
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    if (!event.over || event.active.id === event.over.id) return
+    const oldIndex = orderedIds.indexOf(String(event.active.id))
+    const newIndex = orderedIds.indexOf(String(event.over.id))
+    if (oldIndex === -1 || newIndex === -1) return
+    prefs.setOrder(arrayMove(orderedIds, oldIndex, newIndex))
+  }
+
+  return (
+    <Popover>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <PopoverTrigger asChild>
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-9 w-9 shrink-0"
+              aria-label="Columns"
+            >
+              <Columns3 className="h-4 w-4" />
+            </Button>
+          </PopoverTrigger>
+        </TooltipTrigger>
+        <TooltipContent side="bottom">
+          <p>Columns</p>
+        </TooltipContent>
+      </Tooltip>
+      <PopoverContent align="end" className="w-64 p-0">
+        <div className="border-b p-2">
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Search columns..."
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              className="h-8 pl-8 text-sm"
+            />
+          </div>
+        </div>
+        <div className="max-h-[60vh] overflow-y-auto p-1">
+          {visibleRows.length === 0 ? (
+            <p className="px-2 py-3 text-center text-sm text-muted-foreground">
+              No columns found.
+            </p>
+          ) : (
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
+            >
+              <SortableContext
+                items={visibleRows.map((col) => col.id)}
+                strategy={verticalListSortingStrategy}
+              >
+                {visibleRows.map((col) => (
+                  <ColumnPrefsRow
+                    key={col.id}
+                    column={col}
+                    dndEnabled={dndEnabled}
+                  />
+                ))}
+              </SortableContext>
+            </DndContext>
+          )}
+        </div>
+      </PopoverContent>
+    </Popover>
+  )
+}
+
+function ColumnPrefsRow<TData>({
+  column,
+  dndEnabled,
+}: {
+  column: Column<TData, unknown>
+  dndEnabled: boolean
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: column.id, disabled: !dndEnabled })
+  const label = column.columnDef.meta?.label ?? column.id
+  const switchId = `column-toggle-${column.id}`
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={{ transform: CSS.Translate.toString(transform), transition }}
+      className={cn(
+        "flex items-center gap-2 rounded-sm px-1.5 py-1 hover:bg-muted",
+        isDragging && "relative z-10 bg-background shadow-md",
+      )}
+    >
+      <button
+        type="button"
+        aria-label={`Drag to reorder ${label}`}
+        disabled={!dndEnabled}
+        className={cn(
+          "flex h-6 w-5 shrink-0 items-center justify-center rounded-sm text-muted-foreground/40 transition-colors",
+          dndEnabled
+            ? "cursor-grab hover:text-muted-foreground active:cursor-grabbing"
+            : "opacity-30",
+        )}
+        {...attributes}
+        {...listeners}
+      >
+        <GripVertical className="h-3.5 w-3.5" />
+      </button>
+      <Label
+        htmlFor={switchId}
+        className="min-w-0 flex-1 cursor-pointer truncate text-sm font-normal"
+        title={label}
+      >
+        {label}
+      </Label>
+      <Switch
+        id={switchId}
+        checked={column.getIsVisible()}
+        onCheckedChange={(value) => column.toggleVisibility(!!value)}
+      />
+    </div>
+  )
+}
+
 export function DataTable<TData, TValue>({
   columns,
   data,
@@ -192,6 +377,7 @@ export function DataTable<TData, TValue>({
   bulkActions,
   hiddenOnMobile,
   tableId,
+  columnPrefs,
   hideToolbar,
   renderSubComponent,
   onRowClick,
@@ -227,29 +413,16 @@ export function DataTable<TData, TValue>({
     }, 300)
   }
 
-  // User column visibility preferences (persisted in localStorage)
-  const [userVisibility, setUserVisibility] = useState<VisibilityState>(() =>
-    tableId ? loadColumnVisibility(tableId) : {},
-  )
-
-  const handleColumnVisibilityChange = useCallback(
-    (
-      updater: VisibilityState | ((prev: VisibilityState) => VisibilityState),
-    ) => {
-      setUserVisibility((prev) => {
-        const next = typeof updater === "function" ? updater(prev) : updater
-        if (tableId) saveColumnVisibility(tableId, next)
-        return next
-      })
-    },
-    [tableId],
-  )
+  // User column preferences (persisted in localStorage), unless the caller
+  // owns them via the columnPrefs prop.
+  const internalPrefs = useTableColumnPrefs(tableId)
+  const prefs = columnPrefs ?? internalPrefs
 
   // Merge: defaultHidden from meta → user preferences → mobile overrides (highest priority)
   const columnVisibility = useMemo<VisibilityState>(() => {
     const defaultHidden: VisibilityState = {}
     for (const col of columns) {
-      const id = "accessorKey" in col ? String(col.accessorKey) : col.id
+      const id = columnDefId(col)
       if (id && col.meta?.defaultHidden) {
         defaultHidden[id] = false
       }
@@ -262,8 +435,8 @@ export function DataTable<TData, TValue>({
       }
     }
 
-    return { ...defaultHidden, ...userVisibility, ...mobileOverrides }
-  }, [columns, isMobile, hiddenOnMobile, userVisibility])
+    return { ...defaultHidden, ...prefs.visibility, ...mobileOverrides }
+  }, [columns, isMobile, hiddenOnMobile, prefs.visibility])
 
   const allColumns = useMemo(() => {
     if (!selectable) return columns
@@ -291,6 +464,25 @@ export function DataTable<TData, TValue>({
     return [selectColumn, ...columns]
   }, [columns, selectable])
 
+  // Full column order for the table: fixed columns (select, sticky identity,
+  // actions) keep their slots, the user-orderable ones follow the saved order.
+  const columnOrder = useMemo(() => {
+    const entries = allColumns.map((col) => ({
+      id: columnDefId(col),
+      orderable: col.meta?.toggleable !== false && !!col.meta?.label,
+    }))
+    const orderableIds = entries
+      .filter((entry) => entry.orderable && entry.id)
+      .map((entry) => entry.id as string)
+    const sorted = applyUserColumnOrder(orderableIds, prefs.order)
+    let cursor = 0
+    return entries
+      .map((entry) =>
+        entry.orderable && entry.id ? sorted[cursor++] : entry.id,
+      )
+      .filter((id): id is string => !!id)
+  }, [allColumns, prefs.order])
+
   const isServerPaginated = !!serverPagination
 
   const table = useReactTable({
@@ -308,13 +500,14 @@ export function DataTable<TData, TValue>({
       getRowCanExpand: () => true,
     }),
     onSortingChange: handleSortingChange,
-    ...(tableId && { onColumnVisibilityChange: handleColumnVisibilityChange }),
+    onColumnVisibilityChange: prefs.setVisibility,
     ...(selectable && {
       onRowSelectionChange: setRowSelection,
     }),
     state: {
       sorting,
       columnVisibility,
+      columnOrder,
       ...(renderSubComponent && { expanded }),
       ...(selectable && { rowSelection }),
       ...(isServerPaginated && {
@@ -390,55 +583,7 @@ export function DataTable<TData, TValue>({
               </div>
             )}
           </div>
-          {tableId && (
-            <DropdownMenu>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      className="h-9 w-9 shrink-0"
-                      aria-label="Toggle columns"
-                    >
-                      <Columns3 className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                </TooltipTrigger>
-                <TooltipContent side="bottom">
-                  <p>Toggle columns</p>
-                </TooltipContent>
-              </Tooltip>
-              <DropdownMenuContent
-                align="end"
-                className="max-h-[70vh] w-56 overflow-y-auto"
-              >
-                <DropdownMenuLabel>Toggle columns</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                {table
-                  .getAllColumns()
-                  .filter(
-                    (col) =>
-                      col.columnDef.meta?.toggleable !== false &&
-                      col.columnDef.meta?.label,
-                  )
-                  .map((col) => (
-                    <DropdownMenuCheckboxItem
-                      key={col.id}
-                      checked={col.getIsVisible()}
-                      onCheckedChange={(value) => col.toggleVisibility(!!value)}
-                    >
-                      <span
-                        className="truncate"
-                        title={col.columnDef.meta?.label}
-                      >
-                        {col.columnDef.meta?.label}
-                      </span>
-                    </DropdownMenuCheckboxItem>
-                  ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
+          {tableId && <ColumnPrefsMenu table={table} prefs={prefs} />}
         </div>
       )}
 

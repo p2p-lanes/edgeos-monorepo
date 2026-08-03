@@ -189,7 +189,7 @@ const AttendeeTicket = ({
         })
       }
     } catch (_error) {
-      // El error ya se maneja en useAttendee con toast, solo aseguramos que el modal se cierre
+      // The error is already handled in useAttendee with a toast; we only make sure the modal closes
     } finally {
       handleCloseModal()
     }

@@ -6838,7 +6838,6 @@ export type TenantsGetTenantBySlugData = {
 export type TenantsGetTenantBySlugResponse = (TenantAnonymousPublic);
 
 export type TenantsListTenantsData = {
-    includeDeleted?: boolean;
     /**
      * Maximum number of items to return
      */
