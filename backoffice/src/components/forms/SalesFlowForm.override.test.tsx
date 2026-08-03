@@ -5,7 +5,7 @@
  * relies on (`src/lib/salesFlowOverrides.ts`) was TDD'd RED-first with its
  * own unit tests. This component test verifies the wiring around that pure
  * logic (badge rendering, toggle reveal, submit payload) and was written
- * after the component, approval-style — full component composition made a
+ * after the component, approval-style - full component composition made a
  * genuine RED-first cycle impractical (the component doesn't exist until
  * its JSX exists). It still asserts real, non-trivial production behavior.
  */
@@ -57,6 +57,8 @@ const POPUP_BASE = {
   slug: "test-popup",
   tenant_id: "tenant-1",
   allows_scholarship: true,
+  application_fee_amount: null,
+  open_checkout_signing_secret: "test-signing-secret-value",
 }
 
 const FLOW_BASE = {
@@ -72,6 +74,8 @@ const FLOW_BASE = {
   reviewers_mode: "inherit" as const,
   identity_mode: "portal_auth" as const,
   allows_scholarship: null,
+  application_fee_amount: null,
+  open_checkout_signing_secret: null,
 }
 
 function makeWrapper() {
@@ -86,7 +90,7 @@ function makeWrapper() {
   )
 }
 
-describe("SalesFlowForm — Class-B override wiring (design D1)", () => {
+describe("SalesFlowForm - Class-B override wiring (design D1)", () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockGetPopup.mockResolvedValue(
@@ -139,7 +143,45 @@ describe("SalesFlowForm — Class-B override wiring (design D1)", () => {
     await user.click(screen.getByTestId("override-allows_scholarship"))
     const toggle = screen.getAllByRole("switch").at(-1)
     expect(toggle).toBeDefined()
+    // The popup value is true, so the override control seeds to true on
+    // reveal; this click flips it off, so the override sent is false.
     await user.click(toggle as HTMLElement)
+
+    await user.click(screen.getByRole("button", { name: /save changes/i }))
+
+    await waitFor(() => {
+      expect(mockUpdateSalesFlow).toHaveBeenCalledWith(
+        expect.objectContaining({
+          flowId: "flow-1",
+          requestBody: expect.objectContaining({ allows_scholarship: false }),
+        }),
+      )
+    })
+  })
+
+  it("seeds a boolean override from the popup value and keeps it on save without toggling", async () => {
+    const user = userEvent.setup()
+    mockUpdateSalesFlow.mockResolvedValue(
+      FLOW_BASE as Awaited<
+        ReturnType<typeof SalesFlowsService.updateSalesFlow>
+      >,
+    )
+
+    render(
+      <SalesFlowForm
+        popupId="popup-1"
+        defaultValues={
+          FLOW_BASE as Awaited<
+            ReturnType<typeof SalesFlowsService.getSalesFlow>
+          >
+        }
+        onSuccess={vi.fn()}
+      />,
+      { wrapper: makeWrapper() },
+    )
+
+    await waitFor(() => screen.getByTestId("override-allows_scholarship"))
+    await user.click(screen.getByTestId("override-allows_scholarship"))
 
     await user.click(screen.getByRole("button", { name: /save changes/i }))
 
@@ -151,5 +193,80 @@ describe("SalesFlowForm — Class-B override wiring (design D1)", () => {
         }),
       )
     })
+  })
+
+  it("sends null for an overridden currency field left untouched", async () => {
+    const user = userEvent.setup()
+    mockUpdateSalesFlow.mockResolvedValue(
+      FLOW_BASE as Awaited<
+        ReturnType<typeof SalesFlowsService.updateSalesFlow>
+      >,
+    )
+
+    render(
+      <SalesFlowForm
+        popupId="popup-1"
+        defaultValues={
+          FLOW_BASE as Awaited<
+            ReturnType<typeof SalesFlowsService.getSalesFlow>
+          >
+        }
+        onSuccess={vi.fn()}
+      />,
+      { wrapper: makeWrapper() },
+    )
+
+    await waitFor(() => screen.getByTestId("override-application_fee_amount"))
+    await user.click(screen.getByTestId("override-application_fee_amount"))
+
+    await user.click(screen.getByRole("button", { name: /save changes/i }))
+
+    await waitFor(() => {
+      expect(mockUpdateSalesFlow).toHaveBeenCalledWith(
+        expect.objectContaining({
+          flowId: "flow-1",
+          requestBody: expect.objectContaining({
+            application_fee_amount: null,
+          }),
+        }),
+      )
+    })
+  })
+
+  it("never renders the signing secret value and edits it as a password field", async () => {
+    const user = userEvent.setup()
+
+    render(
+      <SalesFlowForm
+        popupId="popup-1"
+        defaultValues={
+          FLOW_BASE as Awaited<
+            ReturnType<typeof SalesFlowsService.getSalesFlow>
+          >
+        }
+        onSuccess={vi.fn()}
+      />,
+      { wrapper: makeWrapper() },
+    )
+
+    await waitFor(() =>
+      expect(
+        screen.getByText(/inherited from event: configured/i),
+      ).toBeInTheDocument(),
+    )
+    expect(
+      screen.queryByText(POPUP_BASE.open_checkout_signing_secret),
+    ).not.toBeInTheDocument()
+
+    await user.click(
+      screen.getByTestId("override-open_checkout_signing_secret"),
+    )
+
+    // Revealing the override renders a password input, not plain text, so
+    // the browser masks it visually even though the field is now editable.
+    expect(document.querySelector('input[type="password"]')).toBeInTheDocument()
+    expect(document.querySelector('input[type="text"]')?.value).not.toBe(
+      POPUP_BASE.open_checkout_signing_secret,
+    )
   })
 })

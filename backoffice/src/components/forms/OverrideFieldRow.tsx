@@ -18,6 +18,7 @@ export type OverrideFieldKind =
   | "currency"
   | "text"
   | "select"
+  | "secret"
 
 interface OverrideFieldRowProps {
   fieldKey: string
@@ -42,6 +43,7 @@ function formatPopupValue(
   }
   if (kind === "boolean") return popupValue ? "On" : "Off"
   if (kind === "currency") return `$${popupValue}`
+  if (kind === "secret") return "Configured"
   return String(popupValue)
 }
 
@@ -104,6 +106,15 @@ export function OverrideFieldRow({
             {kind === "text" && (
               <Input
                 type="text"
+                value={value}
+                onChange={(e) => onValueChange(e.target.value)}
+                disabled={readOnly}
+                className="w-56 text-sm"
+              />
+            )}
+            {kind === "secret" && (
+              <Input
+                type="password"
                 value={value}
                 onChange={(e) => onValueChange(e.target.value)}
                 disabled={readOnly}

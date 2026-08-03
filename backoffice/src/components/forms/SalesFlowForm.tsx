@@ -106,7 +106,7 @@ const OVERRIDE_SECTIONS: { title: string; fields: OverrideFieldConfig[] }[] = [
       {
         key: "open_checkout_signing_secret",
         label: "Signing Secret",
-        kind: "text",
+        kind: "secret",
       },
     ],
   },
@@ -115,47 +115,47 @@ const OVERRIDE_SECTIONS: { title: string; fields: OverrideFieldConfig[] }[] = [
     fields: [
       {
         key: "abandoned_cart_delay_days",
-        label: "Abandoned Cart — Delay (days)",
+        label: "Abandoned Cart Delay (days)",
         kind: "number",
       },
       {
         key: "abandoned_cart_repeat_days",
-        label: "Abandoned Cart — Repeat (days)",
+        label: "Abandoned Cart Repeat (days)",
         kind: "number",
       },
       {
         key: "abandoned_cart_max_count",
-        label: "Abandoned Cart — Max Count",
+        label: "Abandoned Cart Max Count",
         kind: "number",
       },
       {
         key: "purchase_reminder_delay_days",
-        label: "Purchase Reminder — Delay (days)",
+        label: "Purchase Reminder Delay (days)",
         kind: "number",
       },
       {
         key: "purchase_reminder_repeat_days",
-        label: "Purchase Reminder — Repeat (days)",
+        label: "Purchase Reminder Repeat (days)",
         kind: "number",
       },
       {
         key: "purchase_reminder_max_count",
-        label: "Purchase Reminder — Max Count",
+        label: "Purchase Reminder Max Count",
         kind: "number",
       },
       {
         key: "abandoned_application_delay_days",
-        label: "Abandoned Application — Delay (days)",
+        label: "Abandoned Application Delay (days)",
         kind: "number",
       },
       {
         key: "abandoned_application_repeat_days",
-        label: "Abandoned Application — Repeat (days)",
+        label: "Abandoned Application Repeat (days)",
         kind: "number",
       },
       {
         key: "abandoned_application_max_count",
-        label: "Abandoned Application — Max Count",
+        label: "Abandoned Application Max Count",
         kind: "number",
       },
     ],
@@ -180,12 +180,31 @@ function draftFromRaw(
   return { mode, value: String(raw) }
 }
 
+/**
+ * Value to seed the draft with when a field switches from inherit to
+ * override: the popup's current value, so the control starts in sync with
+ * what the flow was already inheriting instead of silently resetting to a
+ * falsy default (booleans in particular must seed from the popup's actual
+ * true/false, not always false).
+ */
+function seedDraftValue(
+  kind: OverrideFieldKind,
+  popupValue: string | number | boolean | null | undefined,
+): string {
+  if (popupValue === null || popupValue === undefined) {
+    return kind === "boolean" ? "false" : ""
+  }
+  if (kind === "boolean") return String(Boolean(popupValue))
+  return String(popupValue)
+}
+
 function parseDraftValue(
   kind: OverrideFieldKind,
   draft: string,
 ): string | number | boolean | null {
   if (kind === "boolean") return draft === "true"
-  if (kind === "number") return draft === "" ? null : Number(draft)
+  if (draft === "") return null
+  if (kind === "number" || kind === "currency") return Number(draft)
   return draft
 }
 
@@ -507,6 +526,7 @@ export function SalesFlowForm({
                 >
                   {(field) => {
                     const draft = field.state.value as unknown as OverrideDraft
+                    const popupValue = popup?.[fieldConfig.key] as never
                     return (
                       <OverrideFieldRow
                         fieldKey={fieldConfig.key}
@@ -514,11 +534,17 @@ export function SalesFlowForm({
                         description={fieldConfig.description}
                         kind={fieldConfig.kind}
                         options={fieldConfig.options}
-                        popupValue={popup?.[fieldConfig.key] as never}
+                        popupValue={popupValue}
                         mode={draft.mode}
                         value={draft.value}
                         onModeChange={(mode) =>
-                          field.handleChange({ ...draft, mode } as never)
+                          field.handleChange({
+                            mode,
+                            value:
+                              mode === "override"
+                                ? seedDraftValue(fieldConfig.kind, popupValue)
+                                : draft.value,
+                          } as never)
                         }
                         onValueChange={(value) =>
                           field.handleChange({ ...draft, value } as never)
