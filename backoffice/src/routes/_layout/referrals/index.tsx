@@ -6,10 +6,10 @@ import { Suspense } from "react"
 
 import { type ReferralPublic, ReferralsService } from "@/client"
 import { DataTable, SortableHeader } from "@/components/Common/DataTable"
-import { Badge } from "@/components/ui/badge"
 import { EmptyState } from "@/components/Common/EmptyState"
 import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
+import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
 import {
