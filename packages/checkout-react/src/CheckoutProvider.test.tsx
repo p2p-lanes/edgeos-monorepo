@@ -3,9 +3,10 @@ import type {
   Transport,
 } from "@edgeos/checkout-core"
 import { act, render, renderHook, screen, waitFor } from "@testing-library/react"
-import type { ReactNode } from "react"
+import { type ReactNode, StrictMode } from "react"
 import { describe, expect, it, vi } from "vitest"
 import { CheckoutProvider } from "./CheckoutProvider"
+import { useCheckoutStore } from "./context"
 import { useCheckout, useCart, usePreview } from "./hooks"
 
 function runtime(): CheckoutRuntimeResponse {
@@ -84,6 +85,39 @@ describe("CheckoutProvider + hooks", () => {
     act(() => result.current.cart.setQuantity("p1", 1))
     await waitFor(() => expect(result.current.preview.total).toBe("200"))
     expect(result.current.preview.status).toBe("success")
+  })
+
+  it("never exposes a disposed store, and preview stays live, under StrictMode", async () => {
+    // StrictMode mounts→unmounts→mounts in dev, which disposes the internally
+    // built store. The provider must rebuild it so the subtree always sees a
+    // live store and preview keeps updating (the blank-total regression).
+    const disposedSeen: boolean[] = []
+    function Probe() {
+      disposedSeen.push(useCheckoutStore().isDisposed())
+      const cart = useCart()
+      const preview = usePreview()
+      return (
+        <>
+          <button type="button" onClick={() => cart.setQuantity("p1", 1)}>
+            add
+          </button>
+          <output>{preview.total ?? "none"}</output>
+        </>
+      )
+    }
+    render(
+      <StrictMode>
+        <CheckoutProvider slug="demo" transport={fakeTransport()} initialRuntime={runtime()}>
+          <Probe />
+        </CheckoutProvider>
+      </StrictMode>,
+    )
+    await waitFor(() => expect(screen.getByText("none")).toBeDefined())
+    // The store handed to the subtree is never a disposed one.
+    expect(disposedSeen.every((d) => d === false)).toBe(true)
+
+    act(() => screen.getByText("add").click())
+    await waitFor(() => expect(screen.getByText("200")).toBeDefined())
   })
 
   it("throws when a hook is used outside the provider", () => {

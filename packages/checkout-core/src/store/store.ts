@@ -104,6 +104,8 @@ export interface CheckoutStore {
   previousStep(): void
   submit(): Promise<SubmitResult>
   dispose(): void
+  /** True once dispose() has run. A disposed store must be rebuilt, not reused. */
+  isDisposed(): boolean
 }
 
 function toAnalyticsPopup(popup: Record<string, unknown>): AnalyticsPopup {
@@ -131,6 +133,7 @@ export function createCheckoutStore(
 ): CheckoutStore {
   const { client, analytics } = config
   const listeners = new Set<(state: CheckoutStoreState) => void>()
+  let disposed = false
 
   const pricing: PricingDriver = createPricingDriver({
     client,
@@ -365,9 +368,14 @@ export function createCheckoutStore(
       }
     },
     dispose() {
+      if (disposed) return
+      disposed = true
       pricing.dispose()
       cart.dispose()
       listeners.clear()
+    },
+    isDisposed() {
+      return disposed
     },
   }
 }

@@ -7,7 +7,7 @@ import {
   createCheckoutStore,
   type Transport,
 } from "@edgeos/checkout-core"
-import { type ReactNode, useEffect, useRef } from "react"
+import { type ReactNode, useEffect, useReducer, useRef } from "react"
 import { CheckoutStoreContext } from "./context"
 
 export interface CheckoutProviderProps {
@@ -54,9 +54,10 @@ function buildStore(props: CheckoutProviderProps): CheckoutStore {
 export function CheckoutProvider(props: CheckoutProviderProps) {
   const { children, autoLoad = true } = props
 
-  // Build the store exactly once. When `store` is supplied we adopt it.
+  // Build the store lazily. When `store` is supplied we adopt it.
   const ownedRef = useRef(false)
   const storeRef = useRef<CheckoutStore | null>(null)
+  const [, forceRerender] = useReducer((n: number) => n + 1, 0)
   if (storeRef.current === null) {
     if (props.store) {
       storeRef.current = props.store
@@ -66,19 +67,32 @@ export function CheckoutProvider(props: CheckoutProviderProps) {
       ownedRef.current = true
     }
   }
-  const store = storeRef.current
 
   useEffect(() => {
+    // React StrictMode (and any real remount) runs cleanup→setup on the SAME
+    // component instance, preserving refs. Our cleanup disposes an
+    // internally-built store, tearing down its pricing/cart subscriptions — so
+    // on the second setup `storeRef.current` points at a disposed store whose
+    // async /preview responses would land on dead wiring (blank total, no cart).
+    // Rebuild a fresh store before loading so the subtree always sees a live one.
+    // StrictMode is the default in Vite/Next dev, so this must be handled here.
+    if (ownedRef.current && storeRef.current?.isDisposed()) {
+      storeRef.current = buildStore(props)
+      forceRerender()
+    }
+    const store = storeRef.current
+    if (!store) return
     if (autoLoad) void store.load()
     return () => {
       if (ownedRef.current) store.dispose()
     }
-    // Mount-once: the store identity is stable for the provider's lifetime, so
-    // an empty dependency array is intentional (load on mount, dispose on unmount).
+    // Mount-once: rebuild-if-disposed above handles the StrictMode remount, so an
+    // empty dependency array is intentional (load on mount, dispose on unmount).
+    // biome-ignore lint/correctness/useExhaustiveDependencies: mount-once by design
   }, [])
 
   return (
-    <CheckoutStoreContext.Provider value={store}>
+    <CheckoutStoreContext.Provider value={storeRef.current}>
       {children}
     </CheckoutStoreContext.Provider>
   )

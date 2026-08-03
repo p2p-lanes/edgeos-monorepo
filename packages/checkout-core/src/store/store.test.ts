@@ -130,6 +130,38 @@ describe("createCheckoutStore", () => {
     )
   })
 
+  it("dispose() is idempotent and reflected by isDisposed()", () => {
+    const store = createCheckoutStore({ client: mockClient(), runtime: runtime() })
+    expect(store.isDisposed()).toBe(false)
+    store.dispose()
+    expect(store.isDisposed()).toBe(true)
+    // Second dispose must be a safe no-op (StrictMode can dispose twice).
+    expect(() => store.dispose()).not.toThrow()
+  })
+
+  it("a disposed store stops propagating preview updates (why reuse must rebuild)", async () => {
+    // This is the mechanism behind the StrictMode blank-total bug: the provider
+    // must NOT reuse a disposed store, because its pricing subscription is dead —
+    // the /preview call still fires but its result never reaches store state.
+    const client = mockClient()
+    const store = createCheckoutStore({
+      client,
+      runtime: runtime(),
+      pricingDebounceMs: 100,
+    })
+    await store.load()
+
+    store.dispose()
+    ;(client.preview as ReturnType<typeof vi.fn>).mockClear()
+
+    store.setQuantity("p1", 1)
+    await vi.advanceTimersByTimeAsync(100)
+
+    // Store state is frozen after dispose — preview never lands, even if the
+    // pricing driver were to fire. The consumer would see a blank total forever.
+    expect(store.getState().pricing.preview).toBeNull()
+  })
+
   it("gates steps behind selection and buyer completeness", async () => {
     const store = createCheckoutStore({ client: mockClient(), runtime: runtime() })
     await store.load()
