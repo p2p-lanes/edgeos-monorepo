@@ -1,8 +1,5 @@
 import { OpenAPI } from "@/client"
-import {
-  getActiveRequestLanguage,
-  LANGUAGE_STORAGE_KEY,
-} from "@/lib/language-storage"
+import { resolveRequestLanguage } from "@/lib/language-storage"
 
 if (!process.env.NEXT_PUBLIC_API_URL) {
   throw new Error("NEXT_PUBLIC_API_URL is not configured")
@@ -37,12 +34,10 @@ OpenAPI.interceptors.request.use((config) => {
   // (reading only localStorage raced the provider's write and dropped the
   // header on the first runtime request). The backend overlay is
   // default-agnostic, so an unsupported value simply returns the source.
-  const params = new URLSearchParams(window.location.search)
-  const language =
-    getActiveRequestLanguage() ||
-    params.get("lang") ||
-    params.get("locale") ||
-    localStorage.getItem(LANGUAGE_STORAGE_KEY)
+  //
+  // Shared with the language-dependent query keys via `resolveRequestLanguage`
+  // so a cached response is always labelled with the language it was fetched in.
+  const language = resolveRequestLanguage()
   if (language) {
     config.headers = { ...config.headers, "Accept-Language": language }
   }
