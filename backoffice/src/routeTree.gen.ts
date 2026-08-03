@@ -24,6 +24,7 @@ import { Route as LayoutAbandonedCartsRouteImport } from './routes/_layout/aband
 import { Route as LayoutTicketingStepsIndexRouteImport } from './routes/_layout/ticketing-steps/index'
 import { Route as LayoutThemeIndexRouteImport } from './routes/_layout/theme/index'
 import { Route as LayoutTasksIndexRouteImport } from './routes/_layout/tasks/index'
+import { Route as LayoutSalesFlowsIndexRouteImport } from './routes/_layout/sales-flows/index'
 import { Route as LayoutReferralsIndexRouteImport } from './routes/_layout/referrals/index'
 import { Route as LayoutProductsIndexRouteImport } from './routes/_layout/products/index'
 import { Route as LayoutPopupsIndexRouteImport } from './routes/_layout/popups/index'
@@ -39,6 +40,7 @@ import { Route as LayoutAttendeesIndexRouteImport } from './routes/_layout/atten
 import { Route as LayoutApplicationsIndexRouteImport } from './routes/_layout/applications/index'
 import { Route as LayoutAdminIndexRouteImport } from './routes/_layout/admin/index'
 import { Route as LayoutTicketingStepsStepIdRouteImport } from './routes/_layout/ticketing-steps/$stepId'
+import { Route as LayoutSalesFlowsNewRouteImport } from './routes/_layout/sales-flows/new'
 import { Route as LayoutProductsNewRouteImport } from './routes/_layout/products/new'
 import { Route as LayoutPopupsNewRouteImport } from './routes/_layout/popups/new'
 import { Route as LayoutOrganizationsNewRouteImport } from './routes/_layout/organizations/new'
@@ -60,6 +62,7 @@ import { Route as LayoutApplicationsIdRouteImport } from './routes/_layout/appli
 import { Route as LayoutAdminNewRouteImport } from './routes/_layout/admin/new'
 import { Route as LayoutEventsVenuesIndexRouteImport } from './routes/_layout/events/venues/index'
 import { Route as LayoutEventsTracksIndexRouteImport } from './routes/_layout/events/tracks/index'
+import { Route as LayoutSalesFlowsIdEditRouteImport } from './routes/_layout/sales-flows/$id.edit'
 import { Route as LayoutReferralsReferralIdEditRouteImport } from './routes/_layout/referrals/$referralId/edit'
 import { Route as LayoutProductsIdEditRouteImport } from './routes/_layout/products/$id.edit'
 import { Route as LayoutPopupsIdEditRouteImport } from './routes/_layout/popups/$id.edit'
@@ -155,6 +158,11 @@ const LayoutTasksIndexRoute = LayoutTasksIndexRouteImport.update({
   path: '/tasks/',
   getParentRoute: () => LayoutRoute,
 } as any)
+const LayoutSalesFlowsIndexRoute = LayoutSalesFlowsIndexRouteImport.update({
+  id: '/sales-flows/',
+  path: '/sales-flows/',
+  getParentRoute: () => LayoutRoute,
+} as any)
 const LayoutReferralsIndexRoute = LayoutReferralsIndexRouteImport.update({
   id: '/referrals/',
   path: '/referrals/',
@@ -233,6 +241,11 @@ const LayoutTicketingStepsStepIdRoute =
     path: '/ticketing-steps/$stepId',
     getParentRoute: () => LayoutRoute,
   } as any)
+const LayoutSalesFlowsNewRoute = LayoutSalesFlowsNewRouteImport.update({
+  id: '/sales-flows/new',
+  path: '/sales-flows/new',
+  getParentRoute: () => LayoutRoute,
+} as any)
 const LayoutProductsNewRoute = LayoutProductsNewRouteImport.update({
   id: '/products/new',
   path: '/products/new',
@@ -338,6 +351,11 @@ const LayoutEventsVenuesIndexRoute = LayoutEventsVenuesIndexRouteImport.update({
 const LayoutEventsTracksIndexRoute = LayoutEventsTracksIndexRouteImport.update({
   id: '/events/tracks/',
   path: '/events/tracks/',
+  getParentRoute: () => LayoutRoute,
+} as any)
+const LayoutSalesFlowsIdEditRoute = LayoutSalesFlowsIdEditRouteImport.update({
+  id: '/sales-flows/$id/edit',
+  path: '/sales-flows/$id/edit',
   getParentRoute: () => LayoutRoute,
 } as any)
 const LayoutReferralsReferralIdEditRoute =
@@ -476,6 +494,7 @@ export interface FileRoutesByFullPath {
   '/organizations/new': typeof LayoutOrganizationsNewRoute
   '/popups/new': typeof LayoutPopupsNewRoute
   '/products/new': typeof LayoutProductsNewRoute
+  '/sales-flows/new': typeof LayoutSalesFlowsNewRoute
   '/ticketing-steps/$stepId': typeof LayoutTicketingStepsStepIdRoute
   '/admin/': typeof LayoutAdminIndexRoute
   '/applications/': typeof LayoutApplicationsIndexRoute
@@ -491,6 +510,7 @@ export interface FileRoutesByFullPath {
   '/popups/': typeof LayoutPopupsIndexRoute
   '/products/': typeof LayoutProductsIndexRoute
   '/referrals/': typeof LayoutReferralsIndexRoute
+  '/sales-flows/': typeof LayoutSalesFlowsIndexRoute
   '/tasks/': typeof LayoutTasksIndexRoute
   '/theme/': typeof LayoutThemeIndexRoute
   '/ticketing-steps/': typeof LayoutTicketingStepsIndexRoute
@@ -509,6 +529,7 @@ export interface FileRoutesByFullPath {
   '/popups/$id/edit': typeof LayoutPopupsIdEditRoute
   '/products/$id/edit': typeof LayoutProductsIdEditRoute
   '/referrals/$referralId/edit': typeof LayoutReferralsReferralIdEditRoute
+  '/sales-flows/$id/edit': typeof LayoutSalesFlowsIdEditRoute
   '/events/tracks/': typeof LayoutEventsTracksIndexRoute
   '/events/venues/': typeof LayoutEventsVenuesIndexRoute
   '/events/tracks/$trackId/edit': typeof LayoutEventsTracksTrackIdEditRoute
@@ -547,6 +568,7 @@ export interface FileRoutesByTo {
   '/organizations/new': typeof LayoutOrganizationsNewRoute
   '/popups/new': typeof LayoutPopupsNewRoute
   '/products/new': typeof LayoutProductsNewRoute
+  '/sales-flows/new': typeof LayoutSalesFlowsNewRoute
   '/ticketing-steps/$stepId': typeof LayoutTicketingStepsStepIdRoute
   '/admin': typeof LayoutAdminIndexRoute
   '/applications': typeof LayoutApplicationsIndexRoute
@@ -562,6 +584,7 @@ export interface FileRoutesByTo {
   '/popups': typeof LayoutPopupsIndexRoute
   '/products': typeof LayoutProductsIndexRoute
   '/referrals': typeof LayoutReferralsIndexRoute
+  '/sales-flows': typeof LayoutSalesFlowsIndexRoute
   '/tasks': typeof LayoutTasksIndexRoute
   '/theme': typeof LayoutThemeIndexRoute
   '/ticketing-steps': typeof LayoutTicketingStepsIndexRoute
@@ -580,6 +603,7 @@ export interface FileRoutesByTo {
   '/popups/$id/edit': typeof LayoutPopupsIdEditRoute
   '/products/$id/edit': typeof LayoutProductsIdEditRoute
   '/referrals/$referralId/edit': typeof LayoutReferralsReferralIdEditRoute
+  '/sales-flows/$id/edit': typeof LayoutSalesFlowsIdEditRoute
   '/events/tracks': typeof LayoutEventsTracksIndexRoute
   '/events/venues': typeof LayoutEventsVenuesIndexRoute
   '/events/tracks/$trackId/edit': typeof LayoutEventsTracksTrackIdEditRoute
@@ -620,6 +644,7 @@ export interface FileRoutesById {
   '/_layout/organizations/new': typeof LayoutOrganizationsNewRoute
   '/_layout/popups/new': typeof LayoutPopupsNewRoute
   '/_layout/products/new': typeof LayoutProductsNewRoute
+  '/_layout/sales-flows/new': typeof LayoutSalesFlowsNewRoute
   '/_layout/ticketing-steps/$stepId': typeof LayoutTicketingStepsStepIdRoute
   '/_layout/admin/': typeof LayoutAdminIndexRoute
   '/_layout/applications/': typeof LayoutApplicationsIndexRoute
@@ -635,6 +660,7 @@ export interface FileRoutesById {
   '/_layout/popups/': typeof LayoutPopupsIndexRoute
   '/_layout/products/': typeof LayoutProductsIndexRoute
   '/_layout/referrals/': typeof LayoutReferralsIndexRoute
+  '/_layout/sales-flows/': typeof LayoutSalesFlowsIndexRoute
   '/_layout/tasks/': typeof LayoutTasksIndexRoute
   '/_layout/theme/': typeof LayoutThemeIndexRoute
   '/_layout/ticketing-steps/': typeof LayoutTicketingStepsIndexRoute
@@ -653,6 +679,7 @@ export interface FileRoutesById {
   '/_layout/popups/$id/edit': typeof LayoutPopupsIdEditRoute
   '/_layout/products/$id/edit': typeof LayoutProductsIdEditRoute
   '/_layout/referrals/$referralId/edit': typeof LayoutReferralsReferralIdEditRoute
+  '/_layout/sales-flows/$id/edit': typeof LayoutSalesFlowsIdEditRoute
   '/_layout/events/tracks/': typeof LayoutEventsTracksIndexRoute
   '/_layout/events/venues/': typeof LayoutEventsVenuesIndexRoute
   '/_layout/events/tracks/$trackId/edit': typeof LayoutEventsTracksTrackIdEditRoute
@@ -693,6 +720,7 @@ export interface FileRouteTypes {
     | '/organizations/new'
     | '/popups/new'
     | '/products/new'
+    | '/sales-flows/new'
     | '/ticketing-steps/$stepId'
     | '/admin/'
     | '/applications/'
@@ -708,6 +736,7 @@ export interface FileRouteTypes {
     | '/popups/'
     | '/products/'
     | '/referrals/'
+    | '/sales-flows/'
     | '/tasks/'
     | '/theme/'
     | '/ticketing-steps/'
@@ -726,6 +755,7 @@ export interface FileRouteTypes {
     | '/popups/$id/edit'
     | '/products/$id/edit'
     | '/referrals/$referralId/edit'
+    | '/sales-flows/$id/edit'
     | '/events/tracks/'
     | '/events/venues/'
     | '/events/tracks/$trackId/edit'
@@ -764,6 +794,7 @@ export interface FileRouteTypes {
     | '/organizations/new'
     | '/popups/new'
     | '/products/new'
+    | '/sales-flows/new'
     | '/ticketing-steps/$stepId'
     | '/admin'
     | '/applications'
@@ -779,6 +810,7 @@ export interface FileRouteTypes {
     | '/popups'
     | '/products'
     | '/referrals'
+    | '/sales-flows'
     | '/tasks'
     | '/theme'
     | '/ticketing-steps'
@@ -797,6 +829,7 @@ export interface FileRouteTypes {
     | '/popups/$id/edit'
     | '/products/$id/edit'
     | '/referrals/$referralId/edit'
+    | '/sales-flows/$id/edit'
     | '/events/tracks'
     | '/events/venues'
     | '/events/tracks/$trackId/edit'
@@ -836,6 +869,7 @@ export interface FileRouteTypes {
     | '/_layout/organizations/new'
     | '/_layout/popups/new'
     | '/_layout/products/new'
+    | '/_layout/sales-flows/new'
     | '/_layout/ticketing-steps/$stepId'
     | '/_layout/admin/'
     | '/_layout/applications/'
@@ -851,6 +885,7 @@ export interface FileRouteTypes {
     | '/_layout/popups/'
     | '/_layout/products/'
     | '/_layout/referrals/'
+    | '/_layout/sales-flows/'
     | '/_layout/tasks/'
     | '/_layout/theme/'
     | '/_layout/ticketing-steps/'
@@ -869,6 +904,7 @@ export interface FileRouteTypes {
     | '/_layout/popups/$id/edit'
     | '/_layout/products/$id/edit'
     | '/_layout/referrals/$referralId/edit'
+    | '/_layout/sales-flows/$id/edit'
     | '/_layout/events/tracks/'
     | '/_layout/events/venues/'
     | '/_layout/events/tracks/$trackId/edit'
@@ -989,6 +1025,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LayoutTasksIndexRouteImport
       parentRoute: typeof LayoutRoute
     }
+    '/_layout/sales-flows/': {
+      id: '/_layout/sales-flows/'
+      path: '/sales-flows'
+      fullPath: '/sales-flows/'
+      preLoaderRoute: typeof LayoutSalesFlowsIndexRouteImport
+      parentRoute: typeof LayoutRoute
+    }
     '/_layout/referrals/': {
       id: '/_layout/referrals/'
       path: '/referrals'
@@ -1092,6 +1135,13 @@ declare module '@tanstack/react-router' {
       path: '/ticketing-steps/$stepId'
       fullPath: '/ticketing-steps/$stepId'
       preLoaderRoute: typeof LayoutTicketingStepsStepIdRouteImport
+      parentRoute: typeof LayoutRoute
+    }
+    '/_layout/sales-flows/new': {
+      id: '/_layout/sales-flows/new'
+      path: '/sales-flows/new'
+      fullPath: '/sales-flows/new'
+      preLoaderRoute: typeof LayoutSalesFlowsNewRouteImport
       parentRoute: typeof LayoutRoute
     }
     '/_layout/products/new': {
@@ -1239,6 +1289,13 @@ declare module '@tanstack/react-router' {
       path: '/events/tracks'
       fullPath: '/events/tracks/'
       preLoaderRoute: typeof LayoutEventsTracksIndexRouteImport
+      parentRoute: typeof LayoutRoute
+    }
+    '/_layout/sales-flows/$id/edit': {
+      id: '/_layout/sales-flows/$id/edit'
+      path: '/sales-flows/$id/edit'
+      fullPath: '/sales-flows/$id/edit'
+      preLoaderRoute: typeof LayoutSalesFlowsIdEditRouteImport
       parentRoute: typeof LayoutRoute
     }
     '/_layout/referrals/$referralId/edit': {
@@ -1407,6 +1464,7 @@ interface LayoutRouteChildren {
   LayoutOrganizationsNewRoute: typeof LayoutOrganizationsNewRoute
   LayoutPopupsNewRoute: typeof LayoutPopupsNewRoute
   LayoutProductsNewRoute: typeof LayoutProductsNewRoute
+  LayoutSalesFlowsNewRoute: typeof LayoutSalesFlowsNewRoute
   LayoutTicketingStepsStepIdRoute: typeof LayoutTicketingStepsStepIdRoute
   LayoutAdminIndexRoute: typeof LayoutAdminIndexRoute
   LayoutApplicationsIndexRoute: typeof LayoutApplicationsIndexRoute
@@ -1422,6 +1480,7 @@ interface LayoutRouteChildren {
   LayoutPopupsIndexRoute: typeof LayoutPopupsIndexRoute
   LayoutProductsIndexRoute: typeof LayoutProductsIndexRoute
   LayoutReferralsIndexRoute: typeof LayoutReferralsIndexRoute
+  LayoutSalesFlowsIndexRoute: typeof LayoutSalesFlowsIndexRoute
   LayoutTasksIndexRoute: typeof LayoutTasksIndexRoute
   LayoutThemeIndexRoute: typeof LayoutThemeIndexRoute
   LayoutTicketingStepsIndexRoute: typeof LayoutTicketingStepsIndexRoute
@@ -1440,6 +1499,7 @@ interface LayoutRouteChildren {
   LayoutPopupsIdEditRoute: typeof LayoutPopupsIdEditRoute
   LayoutProductsIdEditRoute: typeof LayoutProductsIdEditRoute
   LayoutReferralsReferralIdEditRoute: typeof LayoutReferralsReferralIdEditRoute
+  LayoutSalesFlowsIdEditRoute: typeof LayoutSalesFlowsIdEditRoute
   LayoutEventsTracksIndexRoute: typeof LayoutEventsTracksIndexRoute
   LayoutEventsVenuesIndexRoute: typeof LayoutEventsVenuesIndexRoute
   LayoutEventsTracksTrackIdEditRoute: typeof LayoutEventsTracksTrackIdEditRoute
@@ -1478,6 +1538,7 @@ const LayoutRouteChildren: LayoutRouteChildren = {
   LayoutOrganizationsNewRoute: LayoutOrganizationsNewRoute,
   LayoutPopupsNewRoute: LayoutPopupsNewRoute,
   LayoutProductsNewRoute: LayoutProductsNewRoute,
+  LayoutSalesFlowsNewRoute: LayoutSalesFlowsNewRoute,
   LayoutTicketingStepsStepIdRoute: LayoutTicketingStepsStepIdRoute,
   LayoutAdminIndexRoute: LayoutAdminIndexRoute,
   LayoutApplicationsIndexRoute: LayoutApplicationsIndexRoute,
@@ -1493,6 +1554,7 @@ const LayoutRouteChildren: LayoutRouteChildren = {
   LayoutPopupsIndexRoute: LayoutPopupsIndexRoute,
   LayoutProductsIndexRoute: LayoutProductsIndexRoute,
   LayoutReferralsIndexRoute: LayoutReferralsIndexRoute,
+  LayoutSalesFlowsIndexRoute: LayoutSalesFlowsIndexRoute,
   LayoutTasksIndexRoute: LayoutTasksIndexRoute,
   LayoutThemeIndexRoute: LayoutThemeIndexRoute,
   LayoutTicketingStepsIndexRoute: LayoutTicketingStepsIndexRoute,
@@ -1511,6 +1573,7 @@ const LayoutRouteChildren: LayoutRouteChildren = {
   LayoutPopupsIdEditRoute: LayoutPopupsIdEditRoute,
   LayoutProductsIdEditRoute: LayoutProductsIdEditRoute,
   LayoutReferralsReferralIdEditRoute: LayoutReferralsReferralIdEditRoute,
+  LayoutSalesFlowsIdEditRoute: LayoutSalesFlowsIdEditRoute,
   LayoutEventsTracksIndexRoute: LayoutEventsTracksIndexRoute,
   LayoutEventsVenuesIndexRoute: LayoutEventsVenuesIndexRoute,
   LayoutEventsTracksTrackIdEditRoute: LayoutEventsTracksTrackIdEditRoute,
