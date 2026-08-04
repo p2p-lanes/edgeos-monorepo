@@ -27,7 +27,7 @@ class PopupReviewersCRUD(
     ) -> PopupReviewers | None:
         """Get reviewer at a specific tier (sdd/sales-flows D4).
 
-        `flow_id=None` -> the popup-shared tier (`flow_id IS NULL`);
+        `flow_id=None` -> the popup-shared tier (`sales_flow_id IS NULL`);
         `flow_id=<uuid>` -> that flow's own tier.
         """
         statement = select(PopupReviewers).where(
@@ -35,9 +35,9 @@ class PopupReviewersCRUD(
             PopupReviewers.user_id == user_id,
         )
         if flow_id is not None:
-            statement = statement.where(PopupReviewers.flow_id == flow_id)
+            statement = statement.where(PopupReviewers.sales_flow_id == flow_id)
         else:
-            statement = statement.where(PopupReviewers.flow_id.is_(None))  # type: ignore[union-attr]
+            statement = statement.where(PopupReviewers.sales_flow_id.is_(None))  # type: ignore[union-attr]
         return session.exec(statement).first()
 
     def resolve_for_flow(
@@ -63,13 +63,13 @@ class PopupReviewersCRUD(
             flow = sales_flows_crud.get(session, flow_id)
             if flow and flow.reviewers_mode == SalesFlowReviewersMode.override:
                 statement = select(PopupReviewers).where(
-                    PopupReviewers.flow_id == flow_id
+                    PopupReviewers.sales_flow_id == flow_id
                 )
                 return list(session.exec(statement).all())
 
         statement = select(PopupReviewers).where(
             PopupReviewers.popup_id == popup_id,
-            PopupReviewers.flow_id.is_(None),  # type: ignore[union-attr]
+            PopupReviewers.sales_flow_id.is_(None),  # type: ignore[union-attr]
         )
         return list(session.exec(statement).all())
 
@@ -82,7 +82,7 @@ class PopupReviewersCRUD(
         count = session.exec(
             select(func.count())
             .select_from(PopupReviewers)
-            .where(PopupReviewers.flow_id == flow_id)
+            .where(PopupReviewers.sales_flow_id == flow_id)
         ).one()
         return count > 0
 
@@ -93,8 +93,8 @@ class PopupReviewersCRUD(
         skip: int = 0,
         limit: int = 100,
     ) -> tuple[list[PopupReviewers], int]:
-        """Find all reviewers for a popup, regardless of `flow_id` tier
-        (admin/legacy surface, sdd/sales-flows slice 7 — see
+        """Find all reviewers for a popup, regardless of `sales_flow_id`
+        tier (admin/legacy surface, sdd/sales-flows slice 7 — see
         `resolve_for_flow` for the flow-aware read path)."""
         statement = select(PopupReviewers).where(PopupReviewers.popup_id == popup_id)
 
@@ -113,11 +113,11 @@ class PopupReviewersCRUD(
         skip: int = 0,
         limit: int = 100,
     ) -> tuple[list[PopupReviewers], int]:
-        """Popup-shared tier only (`flow_id IS NULL`), paginated — the
+        """Popup-shared tier only (`sales_flow_id IS NULL`), paginated — the
         exact reviewer list every popup had before sdd/sales-flows D4."""
         statement = select(PopupReviewers).where(
             PopupReviewers.popup_id == popup_id,
-            PopupReviewers.flow_id.is_(None),  # type: ignore[union-attr]
+            PopupReviewers.sales_flow_id.is_(None),  # type: ignore[union-attr]
         )
 
         count_statement = select(func.count()).select_from(statement.subquery())
@@ -158,13 +158,13 @@ class PopupReviewersCRUD(
         reviewer_in: PopupReviewerCreate,
     ) -> PopupReviewers:
         """Add a reviewer to a popup, or to one specific flow of that popup
-        when `reviewer_in.flow_id` is set (sdd/sales-flows D4). Adding a
-        flow-tier reviewer switches that flow's `reviewers_mode` to
+        when `reviewer_in.sales_flow_id` is set (sdd/sales-flows D4). Adding
+        a flow-tier reviewer switches that flow's `reviewers_mode` to
         'override' (CRUD invariant, enforced here — not in SQL)."""
         db_obj = PopupReviewers(
             popup_id=popup_id,
             tenant_id=tenant_id,
-            flow_id=reviewer_in.flow_id,
+            sales_flow_id=reviewer_in.sales_flow_id,
             user_id=reviewer_in.user_id,
             is_required=reviewer_in.is_required,
             weight_multiplier=reviewer_in.weight_multiplier,
@@ -172,11 +172,11 @@ class PopupReviewersCRUD(
         session.add(db_obj)
         session.flush()
 
-        if reviewer_in.flow_id is not None:
+        if reviewer_in.sales_flow_id is not None:
             from app.api.sales_flow.crud import sales_flows_crud
 
             sales_flows_crud.ensure_reviewers_override(
-                session, reviewer_in.flow_id, commit=False
+                session, reviewer_in.sales_flow_id, commit=False
             )
 
         session.commit()
@@ -189,7 +189,7 @@ class PopupReviewersCRUD(
         (sdd/sales-flows D4 CRUD invariant — clearing the override falls
         back to the popup-shared tier). Row delete and mode flip commit
         together (rel-001: no window where one persists without the other)."""
-        flow_id = reviewer.flow_id
+        flow_id = reviewer.sales_flow_id
         session.delete(reviewer)
         session.flush()
 
@@ -197,7 +197,7 @@ class PopupReviewersCRUD(
             remaining = session.exec(
                 select(func.count())
                 .select_from(PopupReviewers)
-                .where(PopupReviewers.flow_id == flow_id)
+                .where(PopupReviewers.sales_flow_id == flow_id)
             ).one()
             if remaining == 0:
                 from app.api.sales_flow.crud import sales_flows_crud

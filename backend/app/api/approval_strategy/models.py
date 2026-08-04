@@ -14,8 +14,9 @@ if TYPE_CHECKING:
 
 
 class ApprovalStrategies(ApprovalStrategyBase, table=True):
-    """Approval strategy for a popup, or — when `flow_id` is set — for one
-    specific sales flow of that popup only (sdd/sales-flows slice 7).
+    """Approval strategy for a popup, or — when `sales_flow_id` is set —
+    for one specific sales flow of that popup only (sdd/sales-flows
+    slice 7).
 
     Defines the rules for reviewing and accepting applications.
     `uq_approval_strategy_flow` covers flow-owned rows;
@@ -27,15 +28,15 @@ class ApprovalStrategies(ApprovalStrategyBase, table=True):
     __table_args__ = (
         Index(
             "uq_approval_strategy_flow",
-            "flow_id",
+            "sales_flow_id",
             unique=True,
-            postgresql_where=text("flow_id IS NOT NULL"),
+            postgresql_where=text("sales_flow_id IS NOT NULL"),
         ),
         Index(
             "uq_approval_strategy_popup_shared",
             "popup_id",
             unique=True,
-            postgresql_where=text("flow_id IS NULL"),
+            postgresql_where=text("sales_flow_id IS NULL"),
         ),
     )
 

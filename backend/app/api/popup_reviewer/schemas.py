@@ -18,7 +18,7 @@ class PopupReviewerBase(SQLModel):
     # tier (the reviewer list every flow inherits by default), non-NULL =
     # owned exclusively by that flow — only meaningful once the flow's
     # `reviewers_mode` is 'override'. Mirrors FormFieldBase.sales_flow_id.
-    flow_id: uuid.UUID | None = Field(
+    sales_flow_id: uuid.UUID | None = Field(
         default=None, foreign_key="sales_flows.id", nullable=True, index=True
     )
 
@@ -32,13 +32,13 @@ class PopupReviewerBase(SQLModel):
 class PopupReviewerCreate(BaseModel):
     """Schema for adding a reviewer to a popup.
 
-    `flow_id` omitted (None) adds a popup-shared reviewer; providing it adds
-    a reviewer scoped exclusively to that flow (sdd/sales-flows D4) and
-    switches the flow's `reviewers_mode` to 'override'.
+    `sales_flow_id` omitted (None) adds a popup-shared reviewer; providing
+    it adds a reviewer scoped exclusively to that flow (sdd/sales-flows D4)
+    and switches the flow's `reviewers_mode` to 'override'.
     """
 
     user_id: uuid.UUID
-    flow_id: uuid.UUID | None = None
+    sales_flow_id: uuid.UUID | None = None
     is_required: bool = False
     weight_multiplier: float = 1.0
 
@@ -57,7 +57,7 @@ class PopupReviewerPublic(BaseModel):
     popup_id: uuid.UUID
     user_id: uuid.UUID
     tenant_id: uuid.UUID
-    flow_id: uuid.UUID | None = None
+    sales_flow_id: uuid.UUID | None = None
     is_required: bool
     weight_multiplier: float
     created_at: datetime | None = None

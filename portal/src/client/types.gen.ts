@@ -420,7 +420,7 @@ export type ApprovalStrategyPublic = {
     id: string;
     popup_id: string;
     tenant_id: string;
-    flow_id?: (string | null);
+    sales_flow_id?: (string | null);
     strategy_type: ApprovalStrategyType;
     required_approvals: number;
     accept_threshold: number;
@@ -3390,13 +3390,13 @@ export type PopupPublic = {
 /**
  * Schema for adding a reviewer to a popup.
  *
- * `flow_id` omitted (None) adds a popup-shared reviewer; providing it adds
- * a reviewer scoped exclusively to that flow (sdd/sales-flows D4) and
- * switches the flow's `reviewers_mode` to 'override'.
+ * `sales_flow_id` omitted (None) adds a popup-shared reviewer; providing
+ * it adds a reviewer scoped exclusively to that flow (sdd/sales-flows D4)
+ * and switches the flow's `reviewers_mode` to 'override'.
  */
 export type PopupReviewerCreate = {
     user_id: string;
-    flow_id?: (string | null);
+    sales_flow_id?: (string | null);
     is_required?: boolean;
     weight_multiplier?: number;
 };
@@ -3409,7 +3409,7 @@ export type PopupReviewerPublic = {
     popup_id: string;
     user_id: string;
     tenant_id: string;
-    flow_id?: (string | null);
+    sales_flow_id?: (string | null);
     is_required: boolean;
     weight_multiplier: number;
     created_at?: (string | null);
@@ -7042,12 +7042,12 @@ export type PaymentsSimplefiWebhookResponse = ({
 });
 
 export type PopupReviewersListReviewersData = {
-    flowId?: (string | null);
     /**
      * Maximum number of items to return
      */
     limit?: number;
     popupId: string;
+    salesFlowId?: (string | null);
     /**
      * Number of items to skip
      */
@@ -7066,9 +7066,9 @@ export type PopupReviewersAddReviewerData = {
 export type PopupReviewersAddReviewerResponse = (PopupReviewerPublic);
 
 export type PopupReviewersUpdateReviewerData = {
-    flowId?: (string | null);
     popupId: string;
     requestBody: PopupReviewerUpdate;
+    salesFlowId?: (string | null);
     userId: string;
     xTenantId?: (string | null);
 };
@@ -7076,8 +7076,8 @@ export type PopupReviewersUpdateReviewerData = {
 export type PopupReviewersUpdateReviewerResponse = (PopupReviewerPublic);
 
 export type PopupReviewersRemoveReviewerData = {
-    flowId?: (string | null);
     popupId: string;
+    salesFlowId?: (string | null);
     userId: string;
     xTenantId?: (string | null);
 };

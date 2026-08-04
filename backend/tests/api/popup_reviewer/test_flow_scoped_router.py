@@ -1,7 +1,7 @@
 """HTTP-level tests for the flow-aware `/popups/{popup_id}/reviewers`
 endpoints (sdd/sales-flows slice 7, D4). CRUD-level resolution/invariant
 behavior is covered by `test_flow_scoped_reviewers.py` — these tests cover
-the router's own wiring: `flow_id` query/body param plumbing and the
+the router's own wiring: `sales_flow_id` query/body param plumbing and the
 cross-popup flow validation (`_get_flow_or_404`).
 """
 
@@ -68,12 +68,12 @@ class TestAddFlowScopedReviewerViaApi:
         resp = client.post(
             f"/api/v1/popups/{popup.id}/reviewers",
             headers=_headers(admin_token_tenant_a),
-            json={"user_id": str(user.id), "flow_id": str(flow.id)},
+            json={"user_id": str(user.id), "sales_flow_id": str(flow.id)},
         )
 
         assert resp.status_code == 201, resp.text
         body = resp.json()
-        assert body["flow_id"] == str(flow.id)
+        assert body["sales_flow_id"] == str(flow.id)
 
         db.expire_all()
         refreshed = db.get(SalesFlows, flow.id)
@@ -94,7 +94,7 @@ class TestAddFlowScopedReviewerViaApi:
         resp = client.post(
             f"/api/v1/popups/{popup_a.id}/reviewers",
             headers=_headers(admin_token_tenant_a),
-            json={"user_id": str(user.id), "flow_id": str(foreign_flow.id)},
+            json={"user_id": str(user.id), "sales_flow_id": str(foreign_flow.id)},
         )
 
         assert resp.status_code == 404
@@ -119,7 +119,7 @@ class TestAddFlowScopedReviewerViaApi:
         client.post(
             f"/api/v1/popups/{popup.id}/reviewers",
             headers=_headers(admin_token_tenant_a),
-            json={"user_id": str(flow_user.id), "flow_id": str(flow.id)},
+            json={"user_id": str(flow_user.id), "sales_flow_id": str(flow.id)},
         )
 
         popup_shared = client.get(
@@ -134,7 +134,7 @@ class TestAddFlowScopedReviewerViaApi:
         resolved_for_flow = client.get(
             f"/api/v1/popups/{popup.id}/reviewers",
             headers=_headers(admin_token_tenant_a),
-            params={"flow_id": str(flow.id)},
+            params={"sales_flow_id": str(flow.id)},
         )
         assert resolved_for_flow.status_code == 200
         assert [r["user_id"] for r in resolved_for_flow.json()["results"]] == [
@@ -155,13 +155,13 @@ class TestAddFlowScopedReviewerViaApi:
         client.post(
             f"/api/v1/popups/{popup.id}/reviewers",
             headers=_headers(admin_token_tenant_a),
-            json={"user_id": str(user.id), "flow_id": str(flow.id)},
+            json={"user_id": str(user.id), "sales_flow_id": str(flow.id)},
         )
 
         resp = client.delete(
             f"/api/v1/popups/{popup.id}/reviewers/{user.id}",
             headers=_headers(admin_token_tenant_a),
-            params={"flow_id": str(flow.id)},
+            params={"sales_flow_id": str(flow.id)},
         )
         assert resp.status_code == 204
 

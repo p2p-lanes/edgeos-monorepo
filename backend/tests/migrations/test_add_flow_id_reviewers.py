@@ -1,21 +1,22 @@
 """Migration test for add_flow_id_reviewers (9bf2a7a71d10).
 
 Design: sdd/sales-flows slice 7 (D4: reviewer tri-state) — adds a nullable
-`flow_id` FK+index to `popupreviewers`, and a nullable `flow_id` FK+index to
-`approvalstrategies` (the orchestrator's binding re-key of the one-per-popup
-approval strategy constraint to the flow dimension, following the same
-established two-tier partial-unique pattern as slice 6's form definitions).
+`sales_flow_id` FK+index to `popupreviewers`, and a nullable `sales_flow_id`
+FK+index to `approvalstrategies` (the orchestrator's binding re-key of the
+one-per-popup approval strategy constraint to the flow dimension, following
+the same established two-tier partial-unique pattern as slice 6's form
+definitions).
 
 Uniqueness re-keys to a two-tier partial-index shape, mirroring the
 `email_templates` scope pattern and slice 6's `form_fields`/
 `base_field_configs` re-key:
 
-- `popupreviewers`: flow tier `(flow_id, user_id)` WHERE `flow_id IS NOT
-  NULL`; popup-shared tier `(popup_id, user_id)` WHERE `flow_id IS NULL`
-  (re-scopes the dropped `uq_popup_reviewer`).
-- `approvalstrategies`: flow tier `(flow_id)` WHERE `flow_id IS NOT NULL`;
-  popup-shared tier `(popup_id)` WHERE `flow_id IS NULL` (re-scopes the
-  dropped `uq_approval_strategy_popup`).
+- `popupreviewers`: flow tier `(sales_flow_id, user_id)` WHERE
+  `sales_flow_id IS NOT NULL`; popup-shared tier `(popup_id, user_id)`
+  WHERE `sales_flow_id IS NULL` (re-scopes the dropped `uq_popup_reviewer`).
+- `approvalstrategies`: flow tier `(sales_flow_id)` WHERE `sales_flow_id IS
+  NOT NULL`; popup-shared tier `(popup_id)` WHERE `sales_flow_id IS NULL`
+  (re-scopes the dropped `uq_approval_strategy_popup`).
 
 Scenarios:
 - Migration adds the column/FK/index to both tables.
@@ -23,8 +24,8 @@ Scenarios:
   replaced by the two-tier partial unique indexes.
 - Two rows scoped to DIFFERENT flows (same popup) both persist.
 - Two rows scoped to the SAME flow collide.
-- Two popup-shared (`flow_id IS NULL`) rows in the same popup still collide
-  (legacy behavior unchanged).
+- Two popup-shared (`sales_flow_id IS NULL`) rows in the same popup still
+  collide (legacy behavior unchanged).
 - A popup-shared row and a flow-scoped row never collide with each other.
 - Downgrade aborts loudly (no column/constraint touched) if any cross-tier
   duplicate exists — it NEVER deletes data.
@@ -115,7 +116,7 @@ def _insert_reviewer(
     db.exec(
         text(
             "INSERT INTO popupreviewers "
-            "(id, tenant_id, popup_id, user_id, flow_id) "
+            "(id, tenant_id, popup_id, user_id, sales_flow_id) "
             "VALUES (:id, :tid, :pid, :uid, :fid)"
         ).bindparams(
             id=uuid.uuid4(), tid=tenant_id, pid=popup_id, uid=user_id, fid=flow_id
@@ -133,7 +134,7 @@ def _insert_strategy(
     db.exec(
         text(
             "INSERT INTO approvalstrategies "
-            "(id, tenant_id, popup_id, flow_id) "
+            "(id, tenant_id, popup_id, sales_flow_id) "
             "VALUES (:id, :tid, :pid, :fid)"
         ).bindparams(id=uuid.uuid4(), tid=tenant_id, pid=popup_id, fid=flow_id)
     )
@@ -395,6 +396,6 @@ class TestAddFlowIdReviewersMigrationModule:
 
         dropped_columns = {call.args for call in mock_op.drop_column.call_args_list}
         assert dropped_columns == {
-            ("popupreviewers", "flow_id"),
-            ("approvalstrategies", "flow_id"),
+            ("popupreviewers", "sales_flow_id"),
+            ("approvalstrategies", "sales_flow_id"),
         }

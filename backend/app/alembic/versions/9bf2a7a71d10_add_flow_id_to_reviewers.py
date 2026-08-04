@@ -1,12 +1,12 @@
 """add flow id to reviewers
 
 Design: sdd/sales-flows slice 7 (D4: reviewer tri-state) — adds a nullable
-`flow_id` FK+index to `popupreviewers` (actual table name — SQLModel's
+`sales_flow_id` FK+index to `popupreviewers` (actual table name — SQLModel's
 default lowercased class name, no underscore) so a flow can either inherit
 its popup's reviewer list or fully replace it. The tri-state itself lives on
 `sales_flows.reviewers_mode` (added in slice 1, unchanged here): `inherit`
-reads `popupreviewers WHERE flow_id IS NULL`; `override` reads
-`popupreviewers WHERE flow_id = <flow>` and treats zero rows as a valid
+reads `popupreviewers WHERE sales_flow_id IS NULL`; `override` reads
+`popupreviewers WHERE sales_flow_id = <flow>` and treats zero rows as a valid
 answer (no reviewers) — the popup tier never falls through once a flow
 overrides.
 
@@ -18,32 +18,39 @@ slice 14) — this migration only makes the schema and read-resolution ready
 for that cutover, per the design's fallback-authority rule ("the popup
 column stays authoritative until that area's cutover slice lands").
 
+Column named `sales_flow_id`, matching the naming convention used by every
+other cutover in this series (`applications.sales_flow_id`,
+`payments.sales_flow_id`, `formfields.sales_flow_id`, etc.) — corrected
+in place (read-001 review finding) before this migration was ever deployed
+beyond local testcontainers.
+
 Uniqueness re-keys to a two-tier partial-index shape, mirroring slice 6's
 `form_fields`/`base_field_configs` re-key and the `email_templates` scope
 pattern:
 
-- `popupreviewers`: flow tier `uq_popup_reviewer_flow` on `(flow_id,
-  user_id)` WHERE `flow_id IS NOT NULL`; popup-shared tier
-  `uq_popup_reviewer_popup_shared` on `(popup_id, user_id)` WHERE `flow_id
-  IS NULL` — re-scopes the dropped `uq_popup_reviewer`, identical
-  enforcement for every row that stays flow-less.
+- `popupreviewers`: flow tier `uq_popup_reviewer_flow` on `(sales_flow_id,
+  user_id)` WHERE `sales_flow_id IS NOT NULL`; popup-shared tier
+  `uq_popup_reviewer_popup_shared` on `(popup_id, user_id)` WHERE
+  `sales_flow_id IS NULL` — re-scopes the dropped `uq_popup_reviewer`,
+  identical enforcement for every row that stays flow-less.
 - `approvalstrategies`: flow tier `uq_approval_strategy_flow` on
-  `(flow_id)` WHERE `flow_id IS NOT NULL`; popup-shared tier
-  `uq_approval_strategy_popup_shared` on `(popup_id)` WHERE `flow_id IS
-  NULL` — re-scopes the dropped `uq_approval_strategy_popup`.
+  `(sales_flow_id)` WHERE `sales_flow_id IS NOT NULL`; popup-shared tier
+  `uq_approval_strategy_popup_shared` on `(popup_id)` WHERE `sales_flow_id
+  IS NULL` — re-scopes the dropped `uq_approval_strategy_popup`.
 
 Postgres NULL semantics would otherwise let a plain constraint including
-`flow_id` admit unlimited duplicates once `flow_id` is NULL (every NULL is
-distinct in a unique index) — the popup-shared partial index is what closes
-that hole for the tier that holds every pre-existing row this slice.
+`sales_flow_id` admit unlimited duplicates once `sales_flow_id` is NULL
+(every NULL is distinct in a unique index) — the popup-shared partial index
+is what closes that hole for the tier that holds every pre-existing row this
+slice.
 
 `approvalstrategies.popup_id` also carries a second, redundant plain unique
 index (`ix_approvalstrategies_popup_id`, created alongside the named
 `uq_approval_strategy_popup` constraint by the original 0003 migration's
 `unique=True, index=True` column flags — both enforced the same thing).
 That index alone would keep blocking a second popup-scoped row per popup
-regardless of `flow_id`, defeating the re-key, so this migration drops it
-too and does not recreate it (the two-tier `uq_approval_strategy_popup_shared`
+regardless of `sales_flow_id`, defeating the re-key, so this migration drops
+it too and does not recreate it (the two-tier `uq_approval_strategy_popup_shared`
 partial index supersedes it for the popup-shared tier).
 
 Downgrade drops the two-tier indexes and the column, restoring the plain
@@ -80,31 +87,31 @@ def upgrade() -> None:
     for table in _TABLES:
         op.add_column(
             table,
-            sa.Column("flow_id", UUID(as_uuid=True), nullable=True),
+            sa.Column("sales_flow_id", UUID(as_uuid=True), nullable=True),
         )
         op.create_foreign_key(
-            f"fk_{table}_flow_id",
+            f"fk_{table}_sales_flow_id",
             table,
             "sales_flows",
-            ["flow_id"],
+            ["sales_flow_id"],
             ["id"],
         )
-        op.create_index(f"ix_{table}_flow_id", table, ["flow_id"])
+        op.create_index(f"ix_{table}_sales_flow_id", table, ["sales_flow_id"])
 
     op.drop_constraint("uq_popup_reviewer", "popupreviewers", type_="unique")
     op.create_index(
         "uq_popup_reviewer_flow",
         "popupreviewers",
-        ["flow_id", "user_id"],
+        ["sales_flow_id", "user_id"],
         unique=True,
-        postgresql_where=sa.text("flow_id IS NOT NULL"),
+        postgresql_where=sa.text("sales_flow_id IS NOT NULL"),
     )
     op.create_index(
         "uq_popup_reviewer_popup_shared",
         "popupreviewers",
         ["popup_id", "user_id"],
         unique=True,
-        postgresql_where=sa.text("flow_id IS NULL"),
+        postgresql_where=sa.text("sales_flow_id IS NULL"),
     )
 
     op.drop_constraint(
@@ -114,16 +121,16 @@ def upgrade() -> None:
     op.create_index(
         "uq_approval_strategy_flow",
         "approvalstrategies",
-        ["flow_id"],
+        ["sales_flow_id"],
         unique=True,
-        postgresql_where=sa.text("flow_id IS NOT NULL"),
+        postgresql_where=sa.text("sales_flow_id IS NOT NULL"),
     )
     op.create_index(
         "uq_approval_strategy_popup_shared",
         "approvalstrategies",
         ["popup_id"],
         unique=True,
-        postgresql_where=sa.text("flow_id IS NULL"),
+        postgresql_where=sa.text("sales_flow_id IS NULL"),
     )
 
 
@@ -186,6 +193,6 @@ def downgrade() -> None:
     )
 
     for table in reversed(_TABLES):
-        op.drop_index(f"ix_{table}_flow_id", table_name=table)
-        op.drop_constraint(f"fk_{table}_flow_id", table, type_="foreignkey")
-        op.drop_column(table, "flow_id")
+        op.drop_index(f"ix_{table}_sales_flow_id", table_name=table)
+        op.drop_constraint(f"fk_{table}_sales_flow_id", table, type_="foreignkey")
+        op.drop_column(table, "sales_flow_id")

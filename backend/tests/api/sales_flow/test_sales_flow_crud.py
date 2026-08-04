@@ -295,7 +295,7 @@ def _add_flow_reviewer(
     resp = client.post(
         f"/api/v1/popups/{popup_id}/reviewers",
         headers={"Authorization": f"Bearer {admin_token}"},
-        json={"user_id": str(user_id), "flow_id": flow_id},
+        json={"user_id": str(user_id), "sales_flow_id": flow_id},
     )
     assert resp.status_code == 201, resp.text
 

@@ -22,14 +22,14 @@ class ApprovalStrategiesCRUD(
     def get_by_popup(
         self, session: Session, popup_id: uuid.UUID
     ) -> ApprovalStrategies | None:
-        """Get the popup-shared approval strategy (`flow_id IS NULL`).
+        """Get the popup-shared approval strategy (`sales_flow_id IS NULL`).
 
         This is the tier every flow inherits by default (sdd/sales-flows
         slice 7) and the exact strategy every popup had before this slice.
         """
         statement = select(ApprovalStrategies).where(
             ApprovalStrategies.popup_id == popup_id,
-            ApprovalStrategies.flow_id.is_(None),  # type: ignore[union-attr]
+            ApprovalStrategies.sales_flow_id.is_(None),  # type: ignore[union-attr]
         )
         return session.exec(statement).first()
 
@@ -41,7 +41,7 @@ class ApprovalStrategiesCRUD(
         No write path creates one yet — the backoffice editor is slice 14.
         """
         statement = select(ApprovalStrategies).where(
-            ApprovalStrategies.flow_id == flow_id
+            ApprovalStrategies.sales_flow_id == flow_id
         )
         return session.exec(statement).first()
 

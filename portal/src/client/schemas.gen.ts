@@ -1946,7 +1946,7 @@ export const ApprovalStrategyPublicSchema = {
             format: 'uuid',
             title: 'Tenant Id'
         },
-        flow_id: {
+        sales_flow_id: {
             anyOf: [
                 {
                     type: 'string',
@@ -1956,7 +1956,7 @@ export const ApprovalStrategyPublicSchema = {
                     type: 'null'
                 }
             ],
-            title: 'Flow Id'
+            title: 'Sales Flow Id'
         },
         strategy_type: {
             '$ref': '#/components/schemas/ApprovalStrategyType'
@@ -16101,7 +16101,7 @@ export const PopupReviewerCreateSchema = {
             format: 'uuid',
             title: 'User Id'
         },
-        flow_id: {
+        sales_flow_id: {
             anyOf: [
                 {
                     type: 'string',
@@ -16111,7 +16111,7 @@ export const PopupReviewerCreateSchema = {
                     type: 'null'
                 }
             ],
-            title: 'Flow Id'
+            title: 'Sales Flow Id'
         },
         is_required: {
             type: 'boolean',
@@ -16129,9 +16129,9 @@ export const PopupReviewerCreateSchema = {
     title: 'PopupReviewerCreate',
     description: `Schema for adding a reviewer to a popup.
 
-\`flow_id\` omitted (None) adds a popup-shared reviewer; providing it adds
-a reviewer scoped exclusively to that flow (sdd/sales-flows D4) and
-switches the flow's \`reviewers_mode\` to 'override'.`
+\`sales_flow_id\` omitted (None) adds a popup-shared reviewer; providing
+it adds a reviewer scoped exclusively to that flow (sdd/sales-flows D4)
+and switches the flow's \`reviewers_mode\` to 'override'.`
 } as const;
 
 export const PopupReviewerPublicSchema = {
@@ -16156,7 +16156,7 @@ export const PopupReviewerPublicSchema = {
             format: 'uuid',
             title: 'Tenant Id'
         },
-        flow_id: {
+        sales_flow_id: {
             anyOf: [
                 {
                     type: 'string',
@@ -16166,7 +16166,7 @@ export const PopupReviewerPublicSchema = {
                     type: 'null'
                 }
             ],
-            title: 'Flow Id'
+            title: 'Sales Flow Id'
         },
         is_required: {
             type: 'boolean',

@@ -3,8 +3,8 @@
 Design: orchestrator's binding extension of D4 — the one-per-popup
 `approval_strategies` constraint re-keys to the flow dimension with popup
 fallback, mirroring the reviewer tri-state's own two-tier pattern.
-`get_for_flow(session, popup_id, flow_id)` returns the flow-owned strategy
-if one exists, else the popup-shared (`flow_id IS NULL`) fallback. No write
+`get_for_flow(session, popup_id, sales_flow_id)` returns the flow-owned strategy
+if one exists, else the popup-shared (`sales_flow_id IS NULL`) fallback. No write
 path creates a flow-scoped row yet (the backoffice editor is slice 14) —
 these tests seed rows directly to prove the resolution logic ahead of that
 write path.
@@ -64,12 +64,12 @@ def _make_strategy(
     popup: Popups,
     *,
     strategy_type: ApprovalStrategyType,
-    flow_id: uuid.UUID | None = None,
+    sales_flow_id: uuid.UUID | None = None,
 ) -> ApprovalStrategies:
     strategy = ApprovalStrategies(
         tenant_id=tenant.id,
         popup_id=popup.id,
-        flow_id=flow_id,
+        sales_flow_id=sales_flow_id,
         strategy_type=strategy_type,
     )
     db.add(strategy)
@@ -92,7 +92,7 @@ class TestGetForFlowFallback:
 
         assert resolved is not None
         assert resolved.strategy_type == ApprovalStrategyType.AUTO_ACCEPT
-        assert resolved.flow_id is None
+        assert resolved.sales_flow_id is None
 
     def test_none_flow_id_returns_popup_shared_strategy(
         self, db: Session, tenant_a: Tenants
@@ -122,14 +122,14 @@ class TestGetForFlowOwnership:
             tenant_a,
             popup,
             strategy_type=ApprovalStrategyType.ALL_REVIEWERS,
-            flow_id=flow_a.id,
+            sales_flow_id=flow_a.id,
         )
 
         resolved = approval_strategies_crud.get_for_flow(db, popup.id, flow_a.id)
 
         assert resolved is not None
         assert resolved.strategy_type == ApprovalStrategyType.ALL_REVIEWERS
-        assert resolved.flow_id == flow_a.id
+        assert resolved.sales_flow_id == flow_a.id
 
     def test_editing_flow_a_strategy_does_not_affect_flow_b(
         self, db: Session, tenant_a: Tenants
@@ -145,7 +145,7 @@ class TestGetForFlowOwnership:
             tenant_a,
             popup,
             strategy_type=ApprovalStrategyType.THRESHOLD,
-            flow_id=flow_a.id,
+            sales_flow_id=flow_a.id,
         )
 
         resolved_a = approval_strategies_crud.get_for_flow(db, popup.id, flow_a.id)

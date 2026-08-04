@@ -6956,14 +6956,14 @@ export class PopupReviewersService {
      * List Reviewers
      * List designated reviewers for a popup.
      *
-     * Without `flow_id`, returns the popup-shared tier only (sdd/sales-flows
-     * D4) — identical to this popup's reviewer list before this slice. With
-     * `flow_id`, returns the RESOLVED reviewer set for that flow per its
-     * `reviewers_mode` (inherit -> popup-shared tier; override -> only that
-     * flow's own rows, possibly empty).
+     * Without `sales_flow_id`, returns the popup-shared tier only
+     * (sdd/sales-flows D4) — identical to this popup's reviewer list before
+     * this slice. With `sales_flow_id`, returns the RESOLVED reviewer set for
+     * that flow per its `reviewers_mode` (inherit -> popup-shared tier;
+     * override -> only that flow's own rows, possibly empty).
      * @param data The data for the request.
      * @param data.popupId
-     * @param data.flowId
+     * @param data.salesFlowId
      * @param data.skip Number of items to skip
      * @param data.limit Maximum number of items to return
      * @param data.xTenantId
@@ -6981,7 +6981,7 @@ export class PopupReviewersService {
                 'X-Tenant-Id': data.xTenantId
             },
             query: {
-                flow_id: data.flowId,
+                sales_flow_id: data.salesFlowId,
                 skip: data.skip,
                 limit: data.limit
             },
@@ -6994,7 +6994,7 @@ export class PopupReviewersService {
     /**
      * Add Reviewer
      * Add a reviewer to a popup, or to one specific sales flow of that
-     * popup when `reviewer_in.flow_id` is set (sdd/sales-flows D4).
+     * popup when `reviewer_in.sales_flow_id` is set (sdd/sales-flows D4).
      * @param data The data for the request.
      * @param data.popupId
      * @param data.requestBody
@@ -7024,13 +7024,14 @@ export class PopupReviewersService {
      * Update Reviewer
      * Update a reviewer's settings.
      *
-     * `flow_id` selects the tier (sdd/sales-flows D4): omitted targets the
-     * popup-shared reviewer, provided targets that flow's own reviewer row.
+     * `sales_flow_id` selects the tier (sdd/sales-flows D4): omitted targets
+     * the popup-shared reviewer, provided targets that flow's own reviewer
+     * row.
      * @param data The data for the request.
      * @param data.popupId
      * @param data.userId
      * @param data.requestBody
-     * @param data.flowId
+     * @param data.salesFlowId
      * @param data.xTenantId
      * @returns PopupReviewerPublic Successful Response
      * @throws ApiError
@@ -7047,7 +7048,7 @@ export class PopupReviewersService {
                 'X-Tenant-Id': data.xTenantId
             },
             query: {
-                flow_id: data.flowId
+                sales_flow_id: data.salesFlowId
             },
             body: data.requestBody,
             mediaType: 'application/json',
@@ -7061,13 +7062,13 @@ export class PopupReviewersService {
      * Remove Reviewer
      * Remove a reviewer from a popup.
      *
-     * `flow_id` selects the tier (sdd/sales-flows D4). Removing the last
+     * `sales_flow_id` selects the tier (sdd/sales-flows D4). Removing the last
      * flow-tier reviewer for a flow resets that flow's `reviewers_mode` back
      * to 'inherit'.
      * @param data The data for the request.
      * @param data.popupId
      * @param data.userId
-     * @param data.flowId
+     * @param data.salesFlowId
      * @param data.xTenantId
      * @returns void Successful Response
      * @throws ApiError
@@ -7084,7 +7085,7 @@ export class PopupReviewersService {
                 'X-Tenant-Id': data.xTenantId
             },
             query: {
-                flow_id: data.flowId
+                sales_flow_id: data.salesFlowId
             },
             errors: {
                 422: 'Validation Error'

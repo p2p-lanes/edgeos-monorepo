@@ -64,13 +64,13 @@ def _make_human(db: Session, tenant: Tenants) -> Humans:
 
 
 def _make_application(
-    db: Session, tenant: Tenants, popup_id: uuid.UUID, human: Humans, flow_id
+    db: Session, tenant: Tenants, popup_id: uuid.UUID, human: Humans, sales_flow_id
 ) -> Applications:
     app = Applications(
         tenant_id=tenant.id,
         popup_id=popup_id,
         human_id=human.id,
-        sales_flow_id=flow_id,
+        sales_flow_id=sales_flow_id,
         status=ApplicationStatus.IN_REVIEW.value,
     )
     db.add(app)
@@ -98,17 +98,17 @@ def _set_strategy(
     popup_id: uuid.UUID,
     *,
     strategy_type: ApprovalStrategyType,
-    flow_id: uuid.UUID | None = None,
+    sales_flow_id: uuid.UUID | None = None,
 ) -> ApprovalStrategies:
     """Create or replace the strategy at the given tier (popup-shared when
-    `flow_id=None`, flow-owned otherwise). `_create_popup_via_api` already
+    `sales_flow_id=None`, flow-owned otherwise). `_create_popup_via_api` already
     seeds a popup-shared AUTO_ACCEPT row (task 5.0's `_seed_application_defaults`),
     so the popup tier must be replaced, not duplicated."""
     filters = [ApprovalStrategies.popup_id == popup_id]
-    if flow_id is not None:
-        filters.append(ApprovalStrategies.flow_id == flow_id)
+    if sales_flow_id is not None:
+        filters.append(ApprovalStrategies.sales_flow_id == sales_flow_id)
     else:
-        filters.append(ApprovalStrategies.flow_id.is_(None))  # type: ignore[union-attr]
+        filters.append(ApprovalStrategies.sales_flow_id.is_(None))  # type: ignore[union-attr]
     existing = db.exec(select(ApprovalStrategies).where(*filters)).first()
     if existing:
         db.delete(existing)
@@ -117,7 +117,7 @@ def _set_strategy(
     strategy = ApprovalStrategies(
         tenant_id=tenant.id,
         popup_id=popup_id,
-        flow_id=flow_id,
+        sales_flow_id=sales_flow_id,
         strategy_type=strategy_type,
     )
     db.add(strategy)
@@ -159,14 +159,14 @@ class TestRecalculateStatusResolvesThroughApplicationFlow:
             tenant_a,
             popup_id,
             strategy_type=ApprovalStrategyType.ALL_REVIEWERS,
-            flow_id=second_flow.id,
+            sales_flow_id=second_flow.id,
         )
         reviewer_user = _make_user(db, tenant_a)
         db.add(
             PopupReviewers(
                 tenant_id=tenant_a.id,
                 popup_id=popup_id,
-                flow_id=second_flow.id,
+                sales_flow_id=second_flow.id,
                 user_id=reviewer_user.id,
                 is_required=True,
             )
@@ -307,7 +307,9 @@ class TestSubmitReviewOverrideTierExclusivity:
             db,
             popup_id,
             tenant_a.id,
-            PopupReviewerCreate(user_id=flow_reviewer_user.id, flow_id=second_flow.id),
+            PopupReviewerCreate(
+                user_id=flow_reviewer_user.id, sales_flow_id=second_flow.id
+            ),
         )
         assert (
             sales_flows_crud.get(db, second_flow.id).reviewers_mode
@@ -397,7 +399,9 @@ class TestStaleVoteExcludedOnModeFlip:
             db,
             popup_id,
             tenant_a.id,
-            PopupReviewerCreate(user_id=flow_reviewer.id, flow_id=default_flow.id),
+            PopupReviewerCreate(
+                user_id=flow_reviewer.id, sales_flow_id=default_flow.id
+            ),
         )
         assert (
             sales_flows_crud.get(db, default_flow.id).reviewers_mode

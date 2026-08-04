@@ -1,9 +1,9 @@
 """Tests for flow-scoped reviewer resolution (sdd/sales-flows slice 7, D4).
 
 Design D4: `sales_flows.reviewers_mode` (`inherit`|`override`) + nullable
-`popup_reviewers.flow_id`. `resolve_for_flow(session, popup_id, flow_id)`:
+`popup_reviewers.sales_flow_id`. `resolve_for_flow(session, popup_id, sales_flow_id)`:
 
-- `flow_id=None` (no flow context) -> popup-shared tier (`flow_id IS NULL`).
+- `sales_flow_id=None` (no flow context) -> popup-shared tier (`sales_flow_id IS NULL`).
 - `reviewers_mode='inherit'` -> popup-shared tier.
 - `reviewers_mode='override'` -> ONLY that flow's own rows; zero rows is a
   valid answer (no reviewers) — the popup tier never falls through.
@@ -135,7 +135,7 @@ class TestResolveForFlowOverride:
             db,
             popup.id,
             tenant_a.id,
-            PopupReviewerCreate(user_id=flow_user.id, flow_id=flow.id),
+            PopupReviewerCreate(user_id=flow_user.id, sales_flow_id=flow.id),
         )
 
         resolved = popup_reviewers_crud.resolve_for_flow(db, popup.id, flow.id)
@@ -181,7 +181,7 @@ class TestCreateReviewerInvariant:
             db,
             popup.id,
             tenant_a.id,
-            PopupReviewerCreate(user_id=user.id, flow_id=flow.id),
+            PopupReviewerCreate(user_id=user.id, sales_flow_id=flow.id),
         )
 
         refreshed = sales_flows_crud.get(db, flow.id)
@@ -221,7 +221,7 @@ class TestDeleteReviewerInvariant:
             db,
             popup.id,
             tenant_a.id,
-            PopupReviewerCreate(user_id=user.id, flow_id=flow.id),
+            PopupReviewerCreate(user_id=user.id, sales_flow_id=flow.id),
         )
 
         popup_reviewers_crud.delete_reviewer(db, reviewer)
@@ -247,13 +247,13 @@ class TestDeleteReviewerInvariant:
             db,
             popup.id,
             tenant_a.id,
-            PopupReviewerCreate(user_id=user_1.id, flow_id=flow.id),
+            PopupReviewerCreate(user_id=user_1.id, sales_flow_id=flow.id),
         )
         popup_reviewers_crud.create_reviewer(
             db,
             popup.id,
             tenant_a.id,
-            PopupReviewerCreate(user_id=user_2.id, flow_id=flow.id),
+            PopupReviewerCreate(user_id=user_2.id, sales_flow_id=flow.id),
         )
 
         popup_reviewers_crud.delete_reviewer(db, reviewer_1)
@@ -289,7 +289,7 @@ class TestReviewerWriteAtomicity:
             db,
             popup.id,
             tenant_a.id,
-            PopupReviewerCreate(user_id=user.id, flow_id=flow.id),
+            PopupReviewerCreate(user_id=user.id, sales_flow_id=flow.id),
         )
 
         assert commit_calls == 1
@@ -313,7 +313,7 @@ class TestReviewerWriteAtomicity:
             db,
             popup.id,
             tenant_a.id,
-            PopupReviewerCreate(user_id=user.id, flow_id=flow.id),
+            PopupReviewerCreate(user_id=user.id, sales_flow_id=flow.id),
         )
 
         commit_calls = 0
