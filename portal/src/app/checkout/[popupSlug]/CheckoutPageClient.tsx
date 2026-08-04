@@ -18,6 +18,12 @@ import { useCheckoutRuntime } from "./hooks/useCheckoutRuntime"
 
 interface CheckoutPageClientProps {
   popupSlug: string
+  /**
+   * Named sales flow (sdd/sales-flows D6 URL scheme —
+   * `/checkout/{popupSlug}/{flowSlug}`). Omitted resolves the popup's
+   * default flow, matching the legacy 2-segment route.
+   */
+  flowSlug?: string
   initialRuntime?: CheckoutRuntimeResponse
   initialDataUpdatedAt?: number
   /** Language the server render fetched `initialRuntime` in, if any. */
@@ -26,6 +32,7 @@ interface CheckoutPageClientProps {
 
 export default function CheckoutPageClient({
   popupSlug,
+  flowSlug,
   initialRuntime,
   initialDataUpdatedAt,
   initialRuntimeLanguage = null,
@@ -54,6 +61,7 @@ export default function CheckoutPageClient({
     isError,
   } = useCheckoutRuntime(popupSlug, {
     language,
+    flowSlug,
     initialData: initialRuntime,
     initialDataUpdatedAt: initialMatchesLanguage ? initialDataUpdatedAt : 0,
   })

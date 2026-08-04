@@ -9,6 +9,7 @@ import { fetchCheckoutRuntime } from "./checkout-runtime"
 vi.mock("@/client", () => ({
   CheckoutService: {
     getRuntime: vi.fn(),
+    getFlowRuntime: vi.fn(),
   },
   ApiError: class ApiError extends Error {
     status: number
@@ -156,6 +157,20 @@ describe("fetchCheckoutRuntime", () => {
       expect.anything(),
     )
   })
+
+  it("requests the named-flow path when flowSlug is given (sdd/sales-flows D6)", async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve(runtimeData),
+    })
+
+    await fetchCheckoutRuntime("festival-2026", "tenant-abc", undefined, "vip")
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      expect.stringContaining("/api/v1/checkout/festival-2026/vip/runtime"),
+      expect.anything(),
+    )
+  })
 })
 
 describe("useCheckoutRuntime opts", () => {
@@ -199,5 +214,26 @@ describe("useCheckoutRuntime opts", () => {
 
     expect(getRuntime).toHaveBeenCalledTimes(1)
     expect(getRuntime).toHaveBeenCalledWith({ slug: "festival-2026" })
+  })
+
+  it("calls getFlowRuntime when flowSlug is provided (sdd/sales-flows D6)", async () => {
+    const { CheckoutService } = await import("@/client")
+    const getFlowRuntime = vi.mocked(CheckoutService.getFlowRuntime)
+    getFlowRuntime.mockResolvedValue(runtimeData)
+
+    const { result } = renderHook(
+      () => useCheckoutRuntime("festival-2026", { flowSlug: "vip" }),
+      { wrapper: createWrapper() },
+    )
+
+    await waitFor(() => {
+      expect(result.current.data).toEqual(runtimeData)
+    })
+
+    expect(getFlowRuntime).toHaveBeenCalledTimes(1)
+    expect(getFlowRuntime).toHaveBeenCalledWith({
+      slug: "festival-2026",
+      flowSlug: "vip",
+    })
   })
 })

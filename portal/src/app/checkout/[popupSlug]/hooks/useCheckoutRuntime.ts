@@ -19,13 +19,22 @@ export function useCheckoutRuntime(
      * the wrong language until an unrelated refetch happens to fire.
      */
     language?: string | null
+    /**
+     * Named sales flow (sdd/sales-flows D6 URL scheme —
+     * `/checkout/{popupSlug}/{flowSlug}`). Omitted resolves the popup's
+     * default flow, matching the legacy 2-segment route.
+     */
+    flowSlug?: string | null
     initialData?: CheckoutRuntimeResponse
     initialDataUpdatedAt?: number
   },
 ) {
   return useQuery({
-    queryKey: queryKeys.checkout.runtime(slug, opts?.language),
-    queryFn: () => CheckoutService.getRuntime({ slug }),
+    queryKey: queryKeys.checkout.runtime(slug, opts?.flowSlug, opts?.language),
+    queryFn: () =>
+      opts?.flowSlug
+        ? CheckoutService.getFlowRuntime({ slug, flowSlug: opts.flowSlug })
+        : CheckoutService.getRuntime({ slug }),
     enabled: slug.length > 0,
     staleTime: 30_000,
     gcTime: 60_000,

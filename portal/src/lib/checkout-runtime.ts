@@ -20,6 +20,12 @@ export async function fetchCheckoutRuntime(
   slug: string,
   tenantId: string,
   lang?: string,
+  /**
+   * Named sales flow (sdd/sales-flows D6 URL scheme —
+   * `/checkout/{popupSlug}/{flowSlug}`). Omitted resolves the popup's
+   * default flow via the legacy 2-segment route.
+   */
+  flowSlug?: string,
 ): Promise<CheckoutRuntimeResponse | null> {
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), 1500)
@@ -35,14 +41,14 @@ export async function fetchCheckoutRuntime(
     if (lang) {
       headers["Accept-Language"] = lang
     }
-    const res = await fetch(
-      `${API_BASE}/api/v1/checkout/${encodeURIComponent(slug)}/runtime`,
-      {
-        cache: "no-store",
-        headers,
-        signal: controller.signal,
-      },
-    )
+    const path = flowSlug
+      ? `/api/v1/checkout/${encodeURIComponent(slug)}/${encodeURIComponent(flowSlug)}/runtime`
+      : `/api/v1/checkout/${encodeURIComponent(slug)}/runtime`
+    const res = await fetch(`${API_BASE}${path}`, {
+      cache: "no-store",
+      headers,
+      signal: controller.signal,
+    })
 
     if (!res.ok) {
       console.error("Checkout runtime SSR fetch degraded", {
