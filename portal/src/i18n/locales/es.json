@@ -129,6 +129,9 @@
   "application": {
     "unavailable": "Aplicación no disponible",
     "unavailable_description": "El formulario de aplicación para este evento aún no está configurado.",
+    "flow_picker_title": "Elige cómo quieres aplicar",
+    "flow_picker_description": "Este evento tiene más de un tipo de aplicación. Selecciona uno para continuar.",
+    "flow_picker_select_placeholder": "Selecciona un tipo de aplicación",
     "step_of": "Paso {{current}} de {{total}}",
     "existing_found": "Aplicación existente encontrada",
     "existing_description": "Encontramos una aplicación previa asociada a tu email.",

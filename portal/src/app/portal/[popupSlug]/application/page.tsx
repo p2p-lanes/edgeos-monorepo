@@ -2,7 +2,7 @@
 
 import { FileUploadProvider } from "@edgeos/shared-form-ui"
 import { useRouter, useSearchParams } from "next/navigation"
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 import type { ApplicationPublic } from "@/client"
@@ -13,6 +13,7 @@ import { useCityProvider } from "@/providers/cityProvider"
 import { useFileUpload } from "../events/lib/useFileUpload"
 import { DynamicApplicationForm } from "./components/dynamic-application-form"
 import { ExistingApplicationCard } from "./components/existing-application-card"
+import { FlowPicker } from "./components/FlowPicker"
 import { FeePaymentBanner } from "./components/fee-payment-banner"
 import { FormHeader } from "./components/form-header"
 import { SectionSeparator } from "./components/section-separator"
@@ -73,11 +74,24 @@ export default function FormPage() {
   // Referral UUID carried from /r/{code} consumption page (REQ-GR-009)
   const referralId = searchParams.get("referral_id")
 
+  // sdd/sales-flows task 9.4: the FlowPicker is shown only when a popup has
+  // more than one portal-listed application flow — `needsFlowChoice` gates
+  // the form until the visitor picks one. Single/zero-flow popups never
+  // set it (FlowPicker renders nothing and auto-selects internally), so
+  // this is a no-op for the common case.
+  const [selectedFlowId, setSelectedFlowId] = useState<string | null>(null)
+  const [needsFlowChoice, setNeedsFlowChoice] = useState(false)
+  const handleFlowResolved = useCallback(
+    ({ needsChoice }: { needsChoice: boolean }) =>
+      setNeedsFlowChoice(needsChoice),
+    [],
+  )
+
   const {
     data: schema,
     isLoading: schemaLoading,
     isError,
-  } = useApplicationSchema(city?.id)
+  } = useApplicationSchema(city?.id, selectedFlowId)
   const { application: existingApp, importSource } = useFormInitData()
 
   const [showImport, setShowImport] = useState(false)
@@ -196,15 +210,24 @@ export default function FormPage() {
         <FormHeader />
         <SectionSeparator />
       </div>
-      <FileUploadProvider value={uploadFile}>
-        <DynamicApplicationForm
-          key={existingApp?.id ?? importedData?.id ?? "new"}
-          schema={schema}
-          existingApplication={prefillData}
-          popup={city}
-          referralId={referralId}
-        />
-      </FileUploadProvider>
+      <FlowPicker
+        popupId={city.id}
+        selectedFlowId={selectedFlowId}
+        onSelect={setSelectedFlowId}
+        onResolved={handleFlowResolved}
+      />
+      {needsFlowChoice && !selectedFlowId ? null : (
+        <FileUploadProvider value={uploadFile}>
+          <DynamicApplicationForm
+            key={existingApp?.id ?? importedData?.id ?? "new"}
+            schema={schema}
+            existingApplication={prefillData}
+            popup={city}
+            referralId={referralId}
+            salesFlowId={selectedFlowId}
+          />
+        </FileUploadProvider>
+      )}
     </main>
   )
 }

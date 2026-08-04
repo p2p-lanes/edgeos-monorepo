@@ -114,6 +114,9 @@
   "application": {
     "unavailable": "Umsókn ekki í boði",
     "unavailable_description": "Umsóknarformið fyrir þennan viðburð er ekki enn stillt.",
+    "flow_picker_title": "Veldu hvernig þú vilt sækja um",
+    "flow_picker_description": "Þessi viðburður hefur fleiri en eina umsóknarleið. Veldu eina til að halda áfram.",
+    "flow_picker_select_placeholder": "Veldu umsóknarleið",
     "step_of": "Skref {{current}} af {{total}}",
     "existing_found": "Fyrri umsókn fundin",
     "existing_description": "Við fundum fyrri umsókn tengda við netfangið þitt.",

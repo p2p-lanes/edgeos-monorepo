@@ -49,6 +49,12 @@ interface UseSubmitApplicationArgs {
   }
   /** Referral UUID carried from /r/{code} — passed to createMyApplication (REQ-GR-009). */
   referralId?: string | null
+  /**
+   * Explicit target sales flow chosen via the FlowPicker (sdd/sales-flows
+   * D6 URL scheme, task 9.4). Omitted keeps the backend's default-flow
+   * resolution.
+   */
+  salesFlowId?: string | null
 }
 
 /** Owns the create-or-update mutation, the "submit" and "save draft" flows,
@@ -61,6 +67,7 @@ export function useSubmitApplication({
   application,
   validate,
   referralId,
+  salesFlowId,
 }: UseSubmitApplicationArgs) {
   const { t, i18n } = useTranslation()
   const router = useRouter()
@@ -89,6 +96,7 @@ export function useSubmitApplication({
           status,
           schema,
           referralId,
+          salesFlowId,
         }),
       })
     },
