@@ -117,10 +117,43 @@ async def get_runtime(
 ) -> CheckoutRuntimeResponse:
     """Return popup metadata, products, buyer form, and ticketing steps for anonymous checkout.
 
-    Fully public endpoint (no JWT). Only serves sale_type=direct active popups.
-    Rate-limited 120/min/IP.
+    Fully public endpoint (no JWT). Resolves the popup's default sales flow
+    (sdd/sales-flows D6 URL scheme — this is the legacy 2-segment path; see
+    `/{slug}/{flow_slug}/runtime` for a named flow). Only serves direct/
+    upsale-type active flows. Rate-limited 120/min/IP.
     """
-    return runtime_for_slug(db, slug, tenant.id, parse_accept_language(accept_language))
+    return runtime_for_slug(
+        db, slug, tenant.id, None, parse_accept_language(accept_language)
+    )
+
+
+@router.get(
+    "/{slug}/{flow_slug}/runtime",
+    response_model=CheckoutRuntimeResponse,
+    dependencies=[
+        Depends(
+            RateLimit(limit=120, window_sec=60, key_prefix="rl:checkout-bootstrap")
+        ),
+    ],
+)
+async def get_flow_runtime(
+    slug: str,
+    flow_slug: str,
+    db: SessionDep,
+    tenant: PublicTenant,
+    accept_language: Annotated[str | None, Header(alias="Accept-Language")] = None,
+) -> CheckoutRuntimeResponse:
+    """Named-flow variant of the checkout runtime (sdd/sales-flows D6 URL
+    scheme: `/checkout/{popupSlug}/{flowSlug}`).
+
+    Fully public endpoint (no JWT). Unknown or reserved flow slugs, a flow
+    belonging to a different popup, or a flow whose effective status isn't
+    active all resolve to 404/403 — never a silent fallback to the default
+    flow. Rate-limited 120/min/IP.
+    """
+    return runtime_for_slug(
+        db, slug, tenant.id, flow_slug, parse_accept_language(accept_language)
+    )
 
 
 @router.get(

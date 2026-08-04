@@ -52,6 +52,16 @@ def _make_direct_popup(
     )
     db.add(popup)
     db.flush()
+    # sdd/sales-flows slice 9: the runtime endpoint now resolves a flow
+    # (default when none is given in the URL) — provision one directly,
+    # mirroring task 5.0's real PopupsCRUD.create provisioning, since this
+    # helper bypasses that CRUD.
+    from app.api.sales_flow.crud import sales_flows_crud
+
+    sales_flows_crud.provision_default_flow(
+        db, popup_id=popup.id, tenant_id=tenant.id, sale_type=SaleType.direct.value
+    )
+    db.flush()
     return popup
 
 
@@ -394,7 +404,10 @@ def test_runtime_unknown_slug_returns_404(
 def test_runtime_application_popup_returns_403(
     client: TestClient, db: Session, tenant_a: Tenants
 ) -> None:
-    """Application popup returns 403 (only direct-sale popups served)."""
+    """Application popup returns 403 (only direct/upsale sales flows served —
+    resolved via the default flow's own `type`, sdd/sales-flows slice 9)."""
+    from app.api.sales_flow.crud import sales_flows_crud
+
     slug = f"app-boot-{uuid.uuid4().hex[:8]}"
     popup = Popups(
         id=uuid.uuid4(),
@@ -405,6 +418,13 @@ def test_runtime_application_popup_returns_403(
         status="active",
     )
     db.add(popup)
+    db.flush()
+    sales_flows_crud.provision_default_flow(
+        db,
+        popup_id=popup.id,
+        tenant_id=tenant_a.id,
+        sale_type=SaleType.application.value,
+    )
     db.commit()
 
     response = client.get(

@@ -433,6 +433,20 @@ def popup_tenant_a_summer_fest(db: Session, tenant_a: Tenants) -> Popups:
             allows_coupons=True,
         )
         db.add(popup)
+        db.flush()
+        # sdd/sales-flows: the checkout runtime resolves a default flow
+        # (slice 9) — this fixture bypasses PopupsCRUD.create, so provision
+        # one directly, mirroring task 5.0's real provisioning.
+        from app.api.sales_flow.crud import sales_flows_crud
+
+        sales_flows_crud.provision_default_flow(
+            db,
+            popup_id=popup.id,
+            tenant_id=tenant_a.id,
+            sale_type=popup.sale_type.value
+            if hasattr(popup.sale_type, "value")
+            else popup.sale_type,
+        )
         db.commit()
         db.refresh(popup)
     return popup
@@ -456,6 +470,17 @@ def popup_tenant_b_summer_fest(db: Session, tenant_b: Tenants) -> Popups:
             allows_coupons=True,
         )
         db.add(popup)
+        db.flush()
+        from app.api.sales_flow.crud import sales_flows_crud
+
+        sales_flows_crud.provision_default_flow(
+            db,
+            popup_id=popup.id,
+            tenant_id=tenant_b.id,
+            sale_type=popup.sale_type.value
+            if hasattr(popup.sale_type, "value")
+            else popup.sale_type,
+        )
         db.commit()
         db.refresh(popup)
     return popup
