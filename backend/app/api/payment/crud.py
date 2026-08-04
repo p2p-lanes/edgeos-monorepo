@@ -748,6 +748,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         from app.api.popup.schemas import PopupStatus
         from app.api.sales_flow.crud import sales_flows_crud
         from app.api.sales_flow.eligibility import assert_upsale_eligible
+        from app.api.sales_flow.models import FlowProducts
         from app.api.sales_flow.resolver import resolve_flow
         from app.api.sales_flow.schemas import SalesFlowType
         from app.api.shared.enums import SaleType
@@ -822,6 +823,30 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             Products.is_active == True,  # noqa: E712
             Products.deleted_at.is_(None),  # type: ignore[attr-defined]
         )
+        if target_flow is not None:
+            # Flow-scoped product restriction (design D3): a product with no
+            # flow_products rows at all is unrestricted (empty-means-all,
+            # purchasable through any flow); a product assigned to one or
+            # more flows is purchasable only through an assigned flow. Closes
+            # the risk-001 bypass where a flow-exclusive product (e.g.
+            # upsale-only) was purchasable through any other flow of the
+            # same popup, including the default one.
+            product_has_flow_assignment = (
+                select(FlowProducts.product_id)
+                .where(FlowProducts.product_id == Products.id)
+                .exists()
+            )
+            product_assigned_to_target_flow = (
+                select(FlowProducts.product_id)
+                .where(
+                    FlowProducts.flow_id == target_flow.id,
+                    FlowProducts.product_id == Products.id,
+                )
+                .exists()
+            )
+            products_statement = products_statement.where(
+                ~product_has_flow_assignment | product_assigned_to_target_flow
+            )
         valid_products = list(session.exec(products_statement).all())
         if {product.id for product in valid_products} != set(product_ids):
             raise HTTPException(

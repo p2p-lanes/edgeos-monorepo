@@ -172,8 +172,9 @@ def runtime_for_slug(
     assert_upsale_eligible(session, flow, popup.id, tenant_id, current_human)
 
     # Load active products. Flow-scoped product filtering (flow_products,
-    # design D3) is wired in slice 12 (restriction enforcement) — every
-    # flow of a popup sees the full active catalog until then.
+    # design D3) is enforced purchase-side in payment/crud.py's
+    # create_open_ticketing_payment; this DISPLAY-side catalog read still
+    # shows every flow the full active catalog (deferred, tracked separately).
     products = list(
         session.exec(
             select(Products).where(

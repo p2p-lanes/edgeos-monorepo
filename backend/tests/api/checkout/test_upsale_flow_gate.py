@@ -25,7 +25,7 @@ from app.api.payment.schemas import PaymentStatus
 from app.api.popup.models import Popups
 from app.api.product.models import Products
 from app.api.sales_flow.crud import sales_flows_crud
-from app.api.sales_flow.models import SalesFlows
+from app.api.sales_flow.models import FlowProducts, SalesFlows
 from app.api.shared.enums import SaleType
 from app.api.tenant.models import Tenants
 from app.core.security import create_access_token
@@ -65,6 +65,13 @@ def _make_upsale_flow(db: Session, popup: Popups, *, slug: str) -> SalesFlows:
     db.add(flow)
     db.flush()
     return flow
+
+
+def _make_purchase_body(product: Products, *, email: str) -> dict:
+    return {
+        "products": [{"product_id": str(product.id), "quantity": 1}],
+        "buyer": {"email": email, "first_name": "Test", "last_name": "Buyer"},
+    }
 
 
 def _make_human(db: Session, tenant: Tenants, *, suffix: str) -> Humans:
@@ -235,3 +242,79 @@ class TestUpsalePurchaseGate:
             },
         )
         assert response.status_code == 401, response.text
+
+    def test_authenticated_ineligible_human_purchase_returns_403(
+        self, client: TestClient, db: Session, tenant_a: Tenants
+    ) -> None:
+        popup = _make_direct_popup(db, tenant_a, slug_prefix="pu-ineligible")
+        flow = _make_upsale_flow(db, popup, slug="addon")
+        human = _make_human(db, tenant_a, suffix="ineligible")
+        product = Products(
+            tenant_id=tenant_a.id,
+            popup_id=popup.id,
+            name="Addon Ticket",
+            slug=f"addon-{uuid.uuid4().hex[:6]}",
+            price=Decimal("0"),
+        )
+        db.add(product)
+        db.commit()
+
+        response = client.post(
+            f"/api/v1/checkout/{popup.slug}/purchase",
+            params={"flow_slug": flow.slug},
+            headers={
+                "X-Tenant-Id": str(tenant_a.id),
+                "Authorization": f"Bearer {_human_token(human)}",
+            },
+            json=_make_purchase_body(product, email="ineligible@test.com"),
+        )
+        assert response.status_code == 403, response.text
+
+
+class TestFlowScopedProductPurchase:
+    """risk-001 bypass: a product assigned to a flow via flow_products must
+    not be purchasable through a different flow of the same popup."""
+
+    def test_flow_exclusive_product_rejected_via_default_flow(
+        self, client: TestClient, db: Session, tenant_a: Tenants
+    ) -> None:
+        popup = _make_direct_popup(db, tenant_a, slug_prefix="fp-bypass")
+        upsale_flow = _make_upsale_flow(db, popup, slug="addon")
+        human = _make_human(db, tenant_a, suffix="fp-eligible")
+        _grant_approved_payment(db, tenant_a, popup, human)
+        product = Products(
+            tenant_id=tenant_a.id,
+            popup_id=popup.id,
+            name="Upsale-Only Addon",
+            slug=f"exclusive-{uuid.uuid4().hex[:6]}",
+            price=Decimal("0"),
+        )
+        db.add(product)
+        db.flush()
+        db.add(
+            FlowProducts(
+                tenant_id=tenant_a.id, flow_id=upsale_flow.id, product_id=product.id
+            )
+        )
+        db.commit()
+
+        # Rejected through the default (direct) flow: the product is
+        # flow-exclusive to the upsale flow, not this one.
+        default_response = client.post(
+            f"/api/v1/checkout/{popup.slug}/purchase",
+            headers={"X-Tenant-Id": str(tenant_a.id)},
+            json=_make_purchase_body(product, email="bypass-attempt@test.com"),
+        )
+        assert default_response.status_code == 422, default_response.text
+
+        # Purchasable through the upsale flow by an eligible human.
+        upsale_response = client.post(
+            f"/api/v1/checkout/{popup.slug}/purchase",
+            params={"flow_slug": upsale_flow.slug},
+            headers={
+                "X-Tenant-Id": str(tenant_a.id),
+                "Authorization": f"Bearer {_human_token(human)}",
+            },
+            json=_make_purchase_body(product, email="legit-upsale@test.com"),
+        )
+        assert upsale_response.status_code == 200, upsale_response.text

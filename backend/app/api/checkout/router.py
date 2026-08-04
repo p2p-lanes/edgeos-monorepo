@@ -1,9 +1,9 @@
 """Router for the open-ticketing checkout API.
 
 Endpoints:
-- GET  /checkout/{slug}/runtime  — public, anonymous, rate-limited 120/min/IP
+- GET  /checkout/{slug}/runtime  — public/anonymous for direct flows; upsale flows require sign-in and eligibility (design D8), rate-limited 120/min/IP
 - GET  /checkout/{slug}/share    — public, anonymous, rate-limited 120/min/IP
-- POST /checkout/{slug}/purchase — public, anonymous, rate-limited 10/min/IP
+- POST /checkout/{slug}/purchase — public/anonymous for direct flows; upsale flows require sign-in and eligibility (design D8), rate-limited 10/min/IP
 """
 
 import uuid
@@ -116,9 +116,9 @@ async def get_runtime(
     current_human: OptionalHuman,
     accept_language: Annotated[str | None, Header(alias="Accept-Language")] = None,
 ) -> CheckoutRuntimeResponse:
-    """Return popup metadata, products, buyer form, and ticketing steps for anonymous checkout.
+    """Return popup metadata, products, buyer form, and ticketing steps for checkout — public/anonymous for direct flows, sign-in and eligibility required for upsale flows.
 
-    Fully public endpoint (no JWT required). Resolves the popup's default
+    Resolves the popup's default
     sales flow (sdd/sales-flows D6 URL scheme — this is the legacy
     2-segment path; see `/{slug}/{flow_slug}/runtime` for a named flow).
     Only serves direct/upsale-type active flows. An upsale-type default
@@ -154,10 +154,9 @@ async def get_flow_runtime(
     current_human: OptionalHuman,
     accept_language: Annotated[str | None, Header(alias="Accept-Language")] = None,
 ) -> CheckoutRuntimeResponse:
-    """Named-flow variant of the checkout runtime (sdd/sales-flows D6 URL
-    scheme: `/checkout/{popupSlug}/{flowSlug}`).
+    """Named-flow variant of the checkout runtime — public/anonymous for direct flows, sign-in and eligibility required for upsale flows (sdd/sales-flows D6 URL scheme: `/checkout/{popupSlug}/{flowSlug}`).
 
-    Fully public endpoint (no JWT required). Unknown or reserved flow
+    Unknown or reserved flow
     slugs, a flow belonging to a different popup, or a flow whose effective
     status isn't active all resolve to 404/403 — never a silent fallback to
     the default flow. An upsale-type flow additionally requires a
@@ -245,7 +244,7 @@ async def purchase_open_ticketing(
     current_human: OptionalHuman,
     flow_slug: Annotated[str | None, Query()] = None,
 ) -> OpenTicketingPurchaseResponse:
-    """Create an anonymous open-ticketing payment and return provider checkout data.
+    """Create an open-ticketing payment and return provider checkout data — public/anonymous for direct flows, sign-in and eligibility required for upsale flows.
 
     ``flow_slug`` is optional (sdd/sales-flows slice 13) and mirrors the
     runtime's own fallback semantics: omitted -> the popup's default flow.
