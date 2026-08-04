@@ -385,7 +385,7 @@ async def delete_product(
 @router.get("/portal/products", response_model=ListModel[ProductPublic])
 async def list_portal_products(
     db: HumanTenantSession,
-    _: CurrentHuman,
+    current_human: CurrentHuman,
     popup_id: uuid.UUID | None = None,
     is_active: bool | None = None,
     category: str | None = None,
@@ -406,6 +406,26 @@ async def list_portal_products(
             is_active=is_active,
             category=category,
         )
+        # Catalog-read enforcement (design D5/D6, D3 amendment, sdd/sales-flows
+        # slice 12): scoped to a single popup, so its default flow gives a
+        # well-defined restriction context. No-op (legacy fixture popup, no
+        # provisioned default flow — same degrade precedent as elsewhere in
+        # this series) when the popup predates task 5.0. Unscoped listings
+        # (below) span multiple popups and have no single flow to resolve
+        # against, so they stay outside this filter — a disclosed, narrower
+        # scope than the flow-aware checkout runtime.
+        from app.api.sales_flow.crud import sales_flows_crud
+        from app.services.restrictions.context import build_context
+        from app.services.restrictions.enforcement import filter_allowed_products
+
+        flow = sales_flows_crud.get_default_flow(db, popup_id)
+        if flow is not None:
+            from app.api.popup.crud import popups_crud
+
+            popup = popups_crud.get(db, popup_id)
+            if popup is not None:
+                context = build_context(db, popup, flow, human=current_human)
+                products = filter_allowed_products(db, flow, popup, products, context)
     else:
         # Same read-only contract without popup_id: ended-popup products are
         # excluded so they cannot be enumerated through the unscoped listing.

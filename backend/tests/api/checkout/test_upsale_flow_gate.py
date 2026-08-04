@@ -273,7 +273,15 @@ class TestUpsalePurchaseGate:
 
 class TestFlowScopedProductPurchase:
     """risk-001 bypass: a product assigned to a flow via flow_products must
-    not be purchasable through a different flow of the same popup."""
+    not be purchasable through a different flow of the same popup.
+
+    sdd/sales-flows slice 12: this check was relocated from an inline
+    422 "not available" filter into `services/restrictions/enforcement.py`,
+    running BEFORE `humans_crud.find_or_create` (design's call-site table)
+    and returning the stable 403 machine code `product_not_in_flow` (D6)
+    instead of the ad hoc 422 slice 13 shipped ahead of this package's
+    existence.
+    """
 
     def test_flow_exclusive_product_rejected_via_default_flow(
         self, client: TestClient, db: Session, tenant_a: Tenants
@@ -305,7 +313,8 @@ class TestFlowScopedProductPurchase:
             headers={"X-Tenant-Id": str(tenant_a.id)},
             json=_make_purchase_body(product, email="bypass-attempt@test.com"),
         )
-        assert default_response.status_code == 422, default_response.text
+        assert default_response.status_code == 403, default_response.text
+        assert default_response.json()["detail"] == "product_not_in_flow"
 
         # Purchasable through the upsale flow by an eligible human.
         upsale_response = client.post(

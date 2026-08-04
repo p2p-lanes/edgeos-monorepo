@@ -171,10 +171,15 @@ def runtime_for_slug(
     )
     assert_upsale_eligible(session, flow, popup.id, tenant_id, current_human)
 
-    # Load active products. Flow-scoped product filtering (flow_products,
-    # design D3) is enforced purchase-side in payment/crud.py's
-    # create_open_ticketing_payment; this DISPLAY-side catalog read still
-    # shows every flow the full active catalog (deferred, tracked separately).
+    # Load active products, then apply catalog-read enforcement (design D5/D6,
+    # D3 amendment, sdd/sales-flows slice 12): D3 per-product exclusivity and
+    # the flow's restriction_rule, silently filtered — never an error at a
+    # catalog read. No buyer form data exists yet at this point (the buyer
+    # hasn't submitted the checkout form), so a `form_answer` predicate is
+    # UNRESOLVED here and fails closed under the evaluator's own rule.
+    from app.services.restrictions.context import build_context
+    from app.services.restrictions.enforcement import filter_allowed_products
+
     products = list(
         session.exec(
             select(Products).where(
@@ -183,6 +188,10 @@ def runtime_for_slug(
                 Products.deleted_at.is_(None),  # type: ignore[attr-defined]
             )
         ).all()
+    )
+    restriction_context = build_context(session, popup, flow, human=current_human)
+    products = filter_allowed_products(
+        session, flow, popup, products, restriction_context
     )
 
     sections, _ = form_sections_crud.find_for_flow(

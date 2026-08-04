@@ -748,7 +748,6 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         from app.api.popup.schemas import PopupStatus
         from app.api.sales_flow.crud import sales_flows_crud
         from app.api.sales_flow.eligibility import assert_upsale_eligible
-        from app.api.sales_flow.models import FlowProducts
         from app.api.sales_flow.resolver import resolve_flow
         from app.api.sales_flow.schemas import SalesFlowType
         from app.api.shared.enums import SaleType
@@ -788,6 +787,35 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 session, target_flow, popup.id, tenant.id, current_human
             )
 
+            # sdd/sales-flows slice 12 (design D5/D6, call-site table): the
+            # restriction gate (restriction_rule + D3 flow-exclusivity) is a
+            # read-only check and must run BEFORE any side effect — before
+            # humans_crud.find_or_create below, before the buyer/form
+            # validation, and before the SUPERSEDE_PENDING_ENABLED machinery
+            # further down. Subsumes slice 13's inline flow_products EXISTS
+            # predicate (previously OR'd into the products_statement further
+            # below, after find_or_create) into this properly-placed helper.
+            from app.services.restrictions.context import build_context
+            from app.services.restrictions.enforcement import (
+                assert_products_allowed,
+            )
+
+            _restriction_context = build_context(
+                session,
+                popup,
+                target_flow,
+                human=current_human,
+                buyer_form_data=obj.buyer.form_data,
+                buyer_email=obj.buyer.email,
+            )
+            assert_products_allowed(
+                session,
+                target_flow,
+                popup,
+                [line.product_id for line in obj.products],
+                _restriction_context,
+            )
+
         buyer = humans_crud.find_or_create(
             session,
             email=obj.buyer.email,
@@ -816,6 +844,11 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
 
         self._validate_open_ticketing_form_data(popup, obj.buyer.form_data)
 
+        # Flow-scoped product restriction (design D3) is already enforced
+        # above via `assert_products_allowed`, before any side effect — this
+        # query only needs the ordinary active/in-popup/not-deleted validity
+        # gate now (sdd/sales-flows slice 12 subsumed the flow_products
+        # membership check that used to live here, see above).
         product_ids = [line.product_id for line in obj.products]
         products_statement = select(Products).where(
             Products.id.in_(product_ids),  # type: ignore[attr-defined]
@@ -823,30 +856,6 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             Products.is_active == True,  # noqa: E712
             Products.deleted_at.is_(None),  # type: ignore[attr-defined]
         )
-        if target_flow is not None:
-            # Flow-scoped product restriction (design D3): a product with no
-            # flow_products rows at all is unrestricted (empty-means-all,
-            # purchasable through any flow); a product assigned to one or
-            # more flows is purchasable only through an assigned flow. Closes
-            # the risk-001 bypass where a flow-exclusive product (e.g.
-            # upsale-only) was purchasable through any other flow of the
-            # same popup, including the default one.
-            product_has_flow_assignment = (
-                select(FlowProducts.product_id)
-                .where(FlowProducts.product_id == Products.id)
-                .exists()
-            )
-            product_assigned_to_target_flow = (
-                select(FlowProducts.product_id)
-                .where(
-                    FlowProducts.flow_id == target_flow.id,
-                    FlowProducts.product_id == Products.id,
-                )
-                .exists()
-            )
-            products_statement = products_statement.where(
-                ~product_has_flow_assignment | product_assigned_to_target_flow
-            )
         valid_products = list(session.exec(products_statement).all())
         if {product.id for product in valid_products} != set(product_ids):
             raise HTTPException(
@@ -1006,6 +1015,9 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 tenant_id=tenant.id,
                 application_id=None,
                 popup_id=popup.id,
+                # Provenance only (design D7) — the flow this payment was
+                # made through, never read back for authorization/pricing.
+                sales_flow_id=target_flow.id if target_flow is not None else None,
                 status=PaymentStatus.PENDING.value,
                 amount=Decimal("0"),
                 currency=popup.currency,
@@ -2178,6 +2190,55 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         )
         return session.exec(statement).first()
 
+    def _enforce_restrictions_for_application(
+        self,
+        session: Session,
+        application_id: uuid.UUID,
+        obj: "PaymentCreate",
+    ) -> None:
+        """sdd/sales-flows slice 12 (design D5/D6): restriction_rule +
+        D3 flow-exclusivity gate for the authenticated purchase path
+        (`create_payment`). Read-only — raises 403/404, never mutates.
+
+        No-op (fail open, matching the anonymous path's own degrade
+        precedent — slice 13 deviation #2) when the application has no
+        resolvable flow, e.g. a legacy fixture popup built directly in the
+        DB without task 5.0's default-flow provisioning.
+        """
+        from app.api.sales_flow.crud import sales_flows_crud
+        from app.services.restrictions.context import build_context
+        from app.services.restrictions.enforcement import assert_products_allowed
+
+        application = self._get_application_with_products(session, application_id)
+        if application is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Application not found",
+            )
+
+        flow = (
+            sales_flows_crud.get(session, application.sales_flow_id)
+            if application.sales_flow_id is not None
+            else sales_flows_crud.get_default_flow(session, application.popup_id)
+        )
+        if flow is None:
+            return
+
+        context = build_context(
+            session,
+            application.popup,
+            flow,
+            human=application.human,
+            application=application,
+        )
+        assert_products_allowed(
+            session,
+            flow,
+            application.popup,
+            [p.product_id for p in obj.products],
+            context,
+        )
+
     # Idempotency window for duplicate-submit detection. Anything outside
     # this window is treated as a legitimate new purchase intent.
     _DUPLICATE_WINDOW_SECONDS = 300
@@ -2206,6 +2267,15 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         user), the system actor is used as the fallback.
         """
         application_id = _require_application_id(obj.application_id)
+
+        # sdd/sales-flows slice 12 (design D5/D6, call-site table): the
+        # restriction gate must run before the SUPERSEDE_PENDING_ENABLED
+        # block AND before the FOR UPDATE application lock below — a
+        # read-only check, so this is a separate, minimal fetch rather than
+        # reordering the rest of this function's well-tested structure
+        # (the full eager-loaded `application` is fetched again further
+        # down, once the lock/duplicate-short-circuit machinery needs it).
+        self._enforce_restrictions_for_application(session, application_id, obj)
 
         # ADR-2 supersede pre-step: cancel any prior PENDING SimpleFi payment
         # for this application BEFORE acquiring the application row lock and
@@ -2412,6 +2482,8 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 tenant_id=application.tenant_id,
                 application_id=obj.application_id,
                 popup_id=application.popup_id,
+                # Provenance only (design D7) — the application's own flow.
+                sales_flow_id=application.sales_flow_id,
                 status=PaymentStatus.APPROVED.value,
                 amount=preview.amount,
                 insurance_amount=preview.insurance_amount,
@@ -2622,6 +2694,8 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             tenant_id=application.tenant_id,
             application_id=obj.application_id,
             popup_id=application.popup_id,
+            # Provenance only (design D7) — the application's own flow.
+            sales_flow_id=application.sales_flow_id,
             status=simplefi_response.status,
             amount=preview.amount,
             insurance_amount=preview.insurance_amount,
