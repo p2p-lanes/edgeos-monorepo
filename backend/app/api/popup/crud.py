@@ -21,6 +21,7 @@ class PopupsCRUD(BaseCRUD[Popups, PopupCreate, PopupUpdate]):
     def create(self, session: Session, obj_in: PopupCreate) -> Popups:
         """Create a popup and seed the main attendee category in the same transaction."""
         from app.api.attendee_category.crud import attendee_categories_crud
+        from app.api.sales_flow.crud import sales_flows_crud
 
         popup = self.model(**obj_in.model_dump())
 
@@ -36,6 +37,17 @@ class PopupsCRUD(BaseCRUD[Popups, PopupCreate, PopupUpdate]):
 
         # Seed main category in same transaction
         attendee_categories_crud.seed_main_for_popup(session, popup.id, popup.tenant_id)
+
+        # sdd/sales-flows task 5.0: every popup must have exactly one default
+        # sales_flow (design D2 — a missing default is a 500-class invariant
+        # breach for the resolver). Mirrors the slice-2 backfill migration's
+        # guarantee for pre-existing popups. Class B columns stay NULL (D1).
+        sales_flows_crud.provision_default_flow(
+            session,
+            popup_id=popup.id,
+            tenant_id=popup.tenant_id,
+            sale_type=popup.sale_type.value,
+        )
 
         session.commit()
         session.refresh(popup)

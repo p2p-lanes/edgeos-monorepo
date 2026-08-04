@@ -110,14 +110,11 @@ class TestSalesFlowCreate:
         client: TestClient,
         admin_token_tenant_a: str,
     ) -> None:
-        """uq_sales_flows_default_per_popup — at most one is_default=true per popup."""
+        """uq_sales_flows_default_per_popup — at most one is_default=true per
+        popup. Popup creation now auto-provisions a default flow (task 5.0),
+        so the FIRST is_default=true attempt on a fresh popup is already the
+        SECOND default flow — this is the case under test."""
         popup_id = _create_popup(client, admin_token_tenant_a)
-        first = client.post(
-            "/api/v1/sales-flows",
-            headers={"Authorization": f"Bearer {admin_token_tenant_a}"},
-            json=_create_payload(popup_id, is_default=True),
-        )
-        assert first.status_code == 201
 
         second = client.post(
             "/api/v1/sales-flows",
@@ -236,16 +233,22 @@ class TestSalesFlowReadDelete:
         client: TestClient,
         admin_token_tenant_a: str,
     ) -> None:
+        """Popup creation now auto-provisions the default flow (task 5.0);
+        fetch it via the list endpoint instead of creating a second one."""
         popup_id = _create_popup(client, admin_token_tenant_a)
-        created = client.post(
+
+        listed = client.get(
             "/api/v1/sales-flows",
+            params={"popup_id": popup_id},
             headers={"Authorization": f"Bearer {admin_token_tenant_a}"},
-            json=_create_payload(popup_id, is_default=True),
         )
-        flow_id = created.json()["id"]
+        assert listed.status_code == 200
+        default_flow = next(
+            f for f in listed.json()["results"] if f["is_default"] is True
+        )
 
         response = client.delete(
-            f"/api/v1/sales-flows/{flow_id}",
+            f"/api/v1/sales-flows/{default_flow['id']}",
             headers={"Authorization": f"Bearer {admin_token_tenant_a}"},
         )
         assert response.status_code == 400
