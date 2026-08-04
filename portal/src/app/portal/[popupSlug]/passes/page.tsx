@@ -15,6 +15,7 @@ import { useProductsQuery } from "@/hooks/useProductsQuery"
 import { useApplication } from "@/providers/applicationProvider"
 import { useCityProvider } from "@/providers/cityProvider"
 import { usePassesProvider } from "@/providers/passesProvider"
+import { UpsaleFlowsPanel } from "./components/UpsaleFlowsPanel"
 import YourPasses from "./Tabs/YourPasses"
 
 export default function HomePasses() {
@@ -167,6 +168,10 @@ export default function HomePasses() {
 
   return (
     <div className="w-full md:mt-0 mx-auto items-center max-w-3xl p-6 bg-transparent">
+      <UpsaleFlowsPanel
+        popupSlug={String(params.popupSlug)}
+        popupId={popupId ?? undefined}
+      />
       <YourPasses
         access={access}
         onSwitchToBuy={() =>
