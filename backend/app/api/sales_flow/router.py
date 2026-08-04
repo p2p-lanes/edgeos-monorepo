@@ -20,6 +20,7 @@ from app.core.dependencies.users import (
     HumanTenantSession,
     TenantSession,
 )
+from app.services.restrictions.schemas import assert_restriction_rule_allowed_for_type
 
 router = APIRouter(prefix="/sales-flows", tags=["sales-flows"])
 
@@ -166,6 +167,27 @@ async def update_sales_flow(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="A sales flow with this slug already exists for this popup",
             )
+
+    # sdd/sales-flows G3 checkpoint 12.8 (CONFIRMED 2026-08-04): a
+    # type=direct flow can never resolve human_profile_field (no Humans row
+    # for an anonymous buyer), so re-validate whenever EITHER the type or
+    # the rule itself changes — a type flip alone can invalidate a
+    # previously-valid rule left untouched by this request.
+    if flow_in.type is not None or "restriction_rule" in flow_in.model_fields_set:
+        effective_type = flow_in.type.value if flow_in.type is not None else flow.type
+        effective_rule = (
+            flow_in.restriction_rule
+            if "restriction_rule" in flow_in.model_fields_set
+            else flow.restriction_rule
+        )
+        try:
+            assert_restriction_rule_allowed_for_type(
+                effective_rule, flow_type=effective_type
+            )
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+            ) from exc
 
     if flow_in.reviewers_mode is not None:
         has_flow_reviewers = popup_reviewers_crud.has_flow_reviewers(db, flow_id)

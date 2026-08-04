@@ -3,11 +3,16 @@ from datetime import datetime
 from decimal import Decimal
 from enum import StrEnum
 
-from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 from sqlalchemy import Boolean, Column, Integer, Numeric
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlmodel import Field, SQLModel, String
 
 from app.api.shared.enums import ApplicationLayout
+from app.services.restrictions.schemas import (
+    assert_restriction_rule_allowed_for_type,
+    parse_restriction_rule,
+)
 
 
 class SalesFlowType(StrEnum):
@@ -100,6 +105,15 @@ class SalesFlowBase(SQLModel):
     # inherits popup.status until a later change activates this column. ---
     status: str | None = Field(default=None, nullable=True)
 
+    # --- Class C: flow-only. NULL = restrictions feature off (design D5/D6,
+    # G3 checkpoint 12.8 CONFIRMED 2026-08-04). Closed AND/OR predicate tree
+    # over {form_answer, human_profile_field, has_purchased} — see
+    # `app/services/restrictions/schemas.py`. Never an expression language;
+    # adding a fourth predicate is a future SDD change, not configuration. ---
+    restriction_rule: dict | None = Field(
+        default=None, sa_column=Column(JSONB, nullable=True)
+    )
+
     # --- Class B: inheritable override (all NULLABLE — NULL = inherit popup) ---
     application_layout: ApplicationLayout | None = Field(default=None, nullable=True)
     requires_application_fee: bool | None = Field(default=None, nullable=True)
@@ -153,11 +167,27 @@ class SalesFlowCreate(BaseModel):
     abandoned_application_delay_days: int | None = None
     abandoned_application_repeat_days: int | None = None
     abandoned_application_max_count: int | None = None
+    restriction_rule: dict | None = None
 
     @field_validator("slug")
     @classmethod
     def validate_slug(cls, v: str) -> str:
         return validate_flow_slug(v)
+
+    @field_validator("restriction_rule")
+    @classmethod
+    def validate_restriction_rule_shape(cls, v: dict | None) -> dict | None:
+        if v is None:
+            return v
+        parse_restriction_rule(v)  # raises ValueError -> 422 on any bad shape
+        return v
+
+    @model_validator(mode="after")
+    def validate_restriction_rule_for_type(self) -> "SalesFlowCreate":
+        assert_restriction_rule_allowed_for_type(
+            self.restriction_rule, flow_type=self.type.value
+        )
+        return self
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
@@ -191,6 +221,7 @@ class SalesFlowUpdate(BaseModel):
     abandoned_application_delay_days: int | None = None
     abandoned_application_repeat_days: int | None = None
     abandoned_application_max_count: int | None = None
+    restriction_rule: dict | None = None
 
     @field_validator("slug")
     @classmethod
@@ -198,6 +229,14 @@ class SalesFlowUpdate(BaseModel):
         if v is None:
             return v
         return validate_flow_slug(v)
+
+    @field_validator("restriction_rule")
+    @classmethod
+    def validate_restriction_rule_shape(cls, v: dict | None) -> dict | None:
+        if v is None:
+            return v
+        parse_restriction_rule(v)  # raises ValueError -> 422 on any bad shape
+        return v
 
 
 class SalesFlowPublic(SalesFlowBase):
