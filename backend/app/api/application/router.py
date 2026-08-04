@@ -1104,22 +1104,21 @@ async def create_my_application(
     """Create an application for the current human (Portal)."""
     from app.api.popup.crud import popups_crud
     from app.api.popup.guards import ensure_popup_writable
+    from app.api.sales_flow.crud import sales_flows_crud
 
     ensure_popup_writable(popups_crud.get(db, app_in.popup_id))
 
     # Check for existing application. sdd/sales-flows slice 5 (G2, confirmed
     # 2026-08-04): one application per person PER FLOW, not per popup.
-    # Flow-scoped when the popup has a default flow; falls back to the
-    # legacy popup-level check otherwise (popups created before task 5.0,
-    # or via fixtures that bypass PopupsCRUD.create).
-    #
-    # Wording kept unchanged ("...for this popup"): the portal string-matches
-    # "already have an application" (useCheckoutState.ts) to recover the
-    # existing-application state — this substring is preserved verbatim.
-    # "sales flow" is not yet a portal-facing concept (flow selection isn't
-    # wired into the intake form until a later slice), so this message
-    # deliberately stays popup-oriented rather than exposing that jargon.
-    flow_id = crud.applications_crud.resolve_creation_flow_id(db, app_in.popup_id)
+    # Task 9.7: `app_in.sales_flow_id` (e.g. from the portal FlowPicker,
+    # task 9.4) targets an explicit non-default flow — validated (ownership
+    # + type=application) by `resolve_target_flow_id`, which raises 404 for
+    # an invalid one. Omitted keeps the pre-existing default-flow
+    # resolution, falling back to the legacy popup-level check for popups
+    # that predate task 5.0 provisioning (or bypass PopupsCRUD.create).
+    flow_id = crud.applications_crud.resolve_target_flow_id(
+        db, app_in.popup_id, app_in.sales_flow_id
+    )
     existing = (
         crud.applications_crud.get_by_human_flow(
             db, human_id=current_human.id, sales_flow_id=flow_id
@@ -1130,9 +1129,22 @@ async def create_my_application(
         )
     )
     if existing:
+        # Wording: the portal string-matches "already have an application"
+        # (useCheckoutState.ts:199) to recover the existing-application
+        # state — that substring is preserved verbatim in BOTH branches.
+        # "for this sales flow" only surfaces once an explicit non-default
+        # flow was targeted (now a portal-facing concept via the
+        # FlowPicker); the single-flow-per-popup case keeps the original,
+        # jargon-free wording.
+        target_flow = sales_flows_crud.get(db, flow_id) if flow_id is not None else None
+        detail = (
+            "You already have an application for this sales flow"
+            if target_flow is not None and not target_flow.is_default
+            else "You already have an application for this popup"
+        )
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="You already have an application for this popup",
+            detail=detail,
         )
 
     # Check if human is already a companion on someone else's application

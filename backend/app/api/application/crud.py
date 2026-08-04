@@ -252,6 +252,40 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         )
         return session.exec(statement).first()
 
+    def resolve_target_flow_id(
+        self,
+        session: Session,
+        popup_id: uuid.UUID,
+        explicit_flow_id: uuid.UUID | None = None,
+    ) -> uuid.UUID | None:
+        """Resolve the flow id to stamp on a new application, honoring an
+        explicit target when given (sdd/sales-flows task 9.7).
+
+        `explicit_flow_id` must belong to `popup_id` and be
+        `type=application` — raises 404 otherwise (mirrors every other
+        `_get_flow_or_404` in this SDD change; a client-supplied flow id is
+        always ownership-checked). Omitted falls back to
+        `resolve_creation_flow_id` (the popup's default flow, or None for
+        popups that predate task 5.0 provisioning).
+        """
+        if explicit_flow_id is None:
+            return self.resolve_creation_flow_id(session, popup_id)
+
+        from app.api.sales_flow.crud import sales_flows_crud
+        from app.api.sales_flow.schemas import SalesFlowType
+
+        flow = sales_flows_crud.get(session, explicit_flow_id)
+        if (
+            not flow
+            or flow.popup_id != popup_id
+            or flow.type != SalesFlowType.application
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Sales flow not found for this popup",
+            )
+        return flow.id
+
     def resolve_creation_flow_id(
         self, session: Session, popup_id: uuid.UUID
     ) -> uuid.UUID | None:
@@ -959,12 +993,13 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         }
         data["tenant_id"] = tenant_id
         data["human_id"] = human_id
-        # sdd/sales-flows slice 5 (G2): stamp the popup's default flow on
-        # every new application. None when the popup has no default flow
-        # yet (see resolve_creation_flow_id) — the column stays NULL, same
-        # as before this slice.
-        data["sales_flow_id"] = self.resolve_creation_flow_id(
-            session, app_data.popup_id
+        # sdd/sales-flows slice 5 (G2) + task 9.7: stamp the target flow on
+        # every new application — an explicit `sales_flow_id` (e.g. from the
+        # portal FlowPicker) when given, else the popup's default flow. None
+        # when the popup has no default flow yet (see resolve_creation_flow_id)
+        # — the column stays NULL, same as before slice 5.
+        data["sales_flow_id"] = self.resolve_target_flow_id(
+            session, app_data.popup_id, getattr(app_data, "sales_flow_id", None)
         )
 
         # Resolve referral when referral_id is provided.

@@ -270,6 +270,13 @@ class ApplicationCreate(BaseModel):
     human_id: uuid.UUID | None = None
     group_id: uuid.UUID | None = None  # Optional group to join
 
+    # sdd/sales-flows task 9.7: explicit target flow (URL-derived, e.g. from
+    # the portal's FlowPicker — task 9.4). Must belong to this popup and be
+    # type=application; validated server-side (ApplicationsCRUD.
+    # resolve_target_flow_id). Omitted keeps the pre-existing default-flow
+    # resolution.
+    sales_flow_id: uuid.UUID | None = None
+
     # Attribution columns — groups-rework T-gr-032 (REQ-GR-009, REQ-GR-016)
     invite_id: uuid.UUID | None = None
     referral_id: uuid.UUID | None = None
