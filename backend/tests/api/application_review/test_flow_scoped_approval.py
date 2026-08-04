@@ -15,6 +15,8 @@ from sqlmodel import Session, select
 
 from app.api.application.models import Applications
 from app.api.application.schemas import ApplicationStatus
+from app.api.application_review.crud import application_reviews_crud
+from app.api.application_review.schemas import ApplicationReviewCreate, ReviewDecision
 from app.api.approval_strategy.models import ApprovalStrategies
 from app.api.approval_strategy.schemas import ApprovalStrategyType
 from app.api.human.models import Humans
@@ -355,3 +357,71 @@ class TestSubmitReviewOverrideTierExclusivity:
         )
 
         assert resp.status_code == 201, resp.text
+
+
+class TestStaleVoteExcludedOnModeFlip:
+    """calculator-001: create_reviewer auto-flips a flow's reviewers_mode to
+    'override' on its first flow-tier add. A vote cast before that flip by a
+    reviewer outside the resolved designated set must not count (G1)."""
+
+    def _setup(self, db: Session, tenant: Tenants, popup_id: uuid.UUID):
+        default_flow = sales_flows_crud.get_default_flow(db, popup_id)
+        assert default_flow is not None
+        _set_strategy(
+            db, tenant, popup_id, strategy_type=ApprovalStrategyType.ANY_REVIEWER
+        )
+        operator = _make_user(db, tenant)
+        human = _make_human(db, tenant)
+        application = _make_application(db, tenant, popup_id, human, default_flow.id)
+        application_reviews_crud.create_review(
+            db,
+            application.id,
+            operator.id,
+            tenant.id,
+            ApplicationReviewCreate(decision=ReviewDecision.YES),
+        )
+        return default_flow, application
+
+    def test_pre_flip_vote_excluded_after_override_flip(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+        admin_token_tenant_a: str,
+    ) -> None:
+        popup_id = _create_popup_via_api(client, admin_token_tenant_a)
+        default_flow, application = self._setup(db, tenant_a, popup_id)
+
+        flow_reviewer = _make_user(db, tenant_a)
+        popup_reviewers_crud.create_reviewer(
+            db,
+            popup_id,
+            tenant_a.id,
+            PopupReviewerCreate(user_id=flow_reviewer.id, flow_id=default_flow.id),
+        )
+        assert (
+            sales_flows_crud.get(db, default_flow.id).reviewers_mode
+            == SalesFlowReviewersMode.override
+        )
+
+        updated = approval_calculator.recalculate_status(db, application)
+
+        assert updated.status == ApplicationStatus.IN_REVIEW.value, (
+            "The pre-flip vote was cast by a reviewer outside the flow's "
+            "designated set after the override flip - it must not count"
+        )
+
+    def test_same_vote_counts_without_the_flip(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+        admin_token_tenant_a: str,
+    ) -> None:
+        """Inherit-mode regression: unfiltered behavior is unchanged."""
+        popup_id = _create_popup_via_api(client, admin_token_tenant_a)
+        _default_flow, application = self._setup(db, tenant_a, popup_id)
+
+        updated = approval_calculator.recalculate_status(db, application)
+
+        assert updated.status == ApplicationStatus.ACCEPTED.value

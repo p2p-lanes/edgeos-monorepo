@@ -4,10 +4,12 @@ from typing import NoReturn
 from fastapi import APIRouter, HTTPException, status
 from sqlalchemy.exc import IntegrityError
 
+from app.api.popup_reviewer.crud import popup_reviewers_crud
 from app.api.sales_flow import crud
 from app.api.sales_flow.schemas import (
     SalesFlowCreate,
     SalesFlowPublic,
+    SalesFlowReviewersMode,
     SalesFlowUpdate,
 )
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
@@ -114,6 +116,31 @@ async def update_sales_flow(
                 detail="A sales flow with this slug already exists for this popup",
             )
 
+    if flow_in.reviewers_mode is not None:
+        has_flow_reviewers = popup_reviewers_crud.has_flow_reviewers(db, flow_id)
+        if (
+            flow_in.reviewers_mode == SalesFlowReviewersMode.override
+            and not has_flow_reviewers
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    "This sales flow has no reviewers of its own. "
+                    "Add a reviewer for this flow before enabling override mode."
+                ),
+            )
+        if (
+            flow_in.reviewers_mode == SalesFlowReviewersMode.inherit
+            and has_flow_reviewers
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    "This sales flow still has reviewers of its own. "
+                    "Remove them before switching back to the popup's shared reviewers."
+                ),
+            )
+
     try:
         updated = crud.sales_flows_crud.update(db, flow, flow_in)
     except IntegrityError as exc:
@@ -141,4 +168,11 @@ async def delete_sales_flow(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Cannot delete a popup's default sales flow",
         )
-    crud.sales_flows_crud.delete(db, flow)
+    try:
+        crud.sales_flows_crud.delete(db, flow)
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="This sales flow has configuration attached and cannot be deleted",
+        ) from exc

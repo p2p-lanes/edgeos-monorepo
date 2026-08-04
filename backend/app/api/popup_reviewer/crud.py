@@ -73,6 +73,19 @@ class PopupReviewersCRUD(
         )
         return list(session.exec(statement).all())
 
+    def has_flow_reviewers(self, session: Session, flow_id: uuid.UUID) -> bool:
+        """Whether a flow has any of its own (flow-tier) reviewer rows.
+
+        Used to validate `SalesFlows.reviewers_mode` transitions: 'override'
+        requires at least one row here, 'inherit' requires zero.
+        """
+        count = session.exec(
+            select(func.count())
+            .select_from(PopupReviewers)
+            .where(PopupReviewers.flow_id == flow_id)
+        ).one()
+        return count > 0
+
     def find_by_popup(
         self,
         session: Session,

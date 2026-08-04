@@ -191,6 +191,8 @@ class ApprovalCalculator:
         from app.api.approval_strategy.crud import approval_strategies_crud
         from app.api.human.crud import humans_crud
         from app.api.popup_reviewer.crud import popup_reviewers_crud
+        from app.api.sales_flow.crud import sales_flows_crud
+        from app.api.sales_flow.schemas import SalesFlowReviewersMode
 
         # Lock the application row to prevent concurrent recalculations
         session.exec(
@@ -242,6 +244,17 @@ class ApprovalCalculator:
         reviewers = popup_reviewers_crud.resolve_for_flow(
             session, application.popup_id, application.sales_flow_id
         )
+
+        # Stale-vote guard (G1): once a flow's reviewers_mode is 'override',
+        # only votes cast by that flow's own designated reviewers may count.
+        # Without this, votes cast before an override flip (e.g. by the
+        # popup-shared tier, now excluded) would keep driving the decision.
+        # Inherit-mode and flow-less applications are unaffected.
+        if application.sales_flow_id is not None:
+            flow = sales_flows_crud.get(session, application.sales_flow_id)
+            if flow and flow.reviewers_mode == SalesFlowReviewersMode.override:
+                designated_user_ids = {r.user_id for r in reviewers}
+                reviews = [r for r in reviews if r.reviewer_id in designated_user_ids]
 
         # Calculate new status (human_red_flag is False here since we handled it above)
         new_status = self.calculate_status(

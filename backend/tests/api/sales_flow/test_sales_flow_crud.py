@@ -1,8 +1,12 @@
 import uuid
 
 from fastapi.testclient import TestClient
+from sqlmodel import Session
 
 from app.api.popup.models import Popups
+from app.api.shared.enums import UserRole
+from app.api.tenant.models import Tenants
+from app.api.user.models import Users
 
 
 def _create_payload(popup_id: uuid.UUID, **overrides: object) -> dict:
@@ -271,3 +275,103 @@ class TestSalesFlowReadDelete:
             headers={"Authorization": f"Bearer {admin_token_tenant_a}"},
         )
         assert response.status_code == 204
+
+
+def _make_reviewer_candidate(db: Session, tenant: Tenants) -> Users:
+    user = Users(
+        email=f"flow-mode-guard-{uuid.uuid4().hex[:8]}@test.com",
+        role=UserRole.ADMIN,
+        tenant_id=tenant.id,
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+def _add_flow_reviewer(
+    client: TestClient, admin_token: str, popup_id: str, flow_id: str, user_id
+) -> None:
+    resp = client.post(
+        f"/api/v1/popups/{popup_id}/reviewers",
+        headers={"Authorization": f"Bearer {admin_token}"},
+        json={"user_id": str(user_id), "flow_id": flow_id},
+    )
+    assert resp.status_code == 201, resp.text
+
+
+class TestSalesFlowReviewersModeGuard:
+    def test_patch_override_with_zero_flow_reviewers_rejected(
+        self,
+        client: TestClient,
+        admin_token_tenant_a: str,
+        popup_tenant_a: Popups,
+    ) -> None:
+        created = client.post(
+            "/api/v1/sales-flows",
+            headers={"Authorization": f"Bearer {admin_token_tenant_a}"},
+            json=_create_payload(popup_tenant_a.id),
+        )
+        flow_id = created.json()["id"]
+
+        response = client.patch(
+            f"/api/v1/sales-flows/{flow_id}",
+            headers={"Authorization": f"Bearer {admin_token_tenant_a}"},
+            json={"reviewers_mode": "override"},
+        )
+        assert response.status_code == 400
+
+    def test_patch_inherit_with_flow_reviewers_rejected(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+        admin_token_tenant_a: str,
+        popup_tenant_a: Popups,
+    ) -> None:
+        created = client.post(
+            "/api/v1/sales-flows",
+            headers={"Authorization": f"Bearer {admin_token_tenant_a}"},
+            json=_create_payload(popup_tenant_a.id),
+        )
+        flow_id = created.json()["id"]
+        reviewer = _make_reviewer_candidate(db, tenant_a)
+        _add_flow_reviewer(
+            client, admin_token_tenant_a, str(popup_tenant_a.id), flow_id, reviewer.id
+        )
+
+        response = client.patch(
+            f"/api/v1/sales-flows/{flow_id}",
+            headers={"Authorization": f"Bearer {admin_token_tenant_a}"},
+            json={"reviewers_mode": "inherit"},
+        )
+        assert response.status_code == 400
+
+    def test_delete_flow_with_attached_reviewer_rejected(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+        admin_token_tenant_a: str,
+        popup_tenant_a: Popups,
+    ) -> None:
+        created = client.post(
+            "/api/v1/sales-flows",
+            headers={"Authorization": f"Bearer {admin_token_tenant_a}"},
+            json=_create_payload(popup_tenant_a.id),
+        )
+        flow_id = created.json()["id"]
+        reviewer = _make_reviewer_candidate(db, tenant_a)
+        _add_flow_reviewer(
+            client, admin_token_tenant_a, str(popup_tenant_a.id), flow_id, reviewer.id
+        )
+
+        response = client.delete(
+            f"/api/v1/sales-flows/{flow_id}",
+            headers={"Authorization": f"Bearer {admin_token_tenant_a}"},
+        )
+        assert response.status_code == 400
+        assert (
+            response.json()["detail"]
+            == "This sales flow has configuration attached and cannot be deleted"
+        )
