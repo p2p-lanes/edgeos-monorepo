@@ -96,6 +96,10 @@ class CouponValidatePublicRequest(BaseModel):
 
     popup_slug: str
     code: str
+    # sdd/sales-flows slice 11: resolved through the same flow-resolution
+    # contract as the checkout runtime (sales_flow/resolver.py::resolve_flow).
+    # Omitted -> the popup's default flow.
+    flow_slug: str | None = None
 
     @field_validator("code")
     @classmethod

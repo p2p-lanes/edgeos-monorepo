@@ -51,6 +51,7 @@ async def validate_coupon_public(
         popup_slug=request_in.popup_slug,
         code=request_in.code,
         tenant_id=tenant.id,
+        flow_slug=request_in.flow_slug,
     )
 
 

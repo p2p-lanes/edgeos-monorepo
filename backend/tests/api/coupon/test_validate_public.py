@@ -29,6 +29,22 @@ from tests.conftest import with_origin
 # ---------------------------------------------------------------------------
 
 
+def _provision_default_flow(db: Session, tenant: Tenants, popup: Popups) -> None:
+    # sdd/sales-flows slice 9+: `resolve_flow` requires every popup to carry a
+    # default sales flow (task 5.0 provisioning). These helpers bypass
+    # PopupsCRUD.create, so provision one directly — same fix applied to
+    # conftest.py's popup fixtures in slice 9 and test_reminder_dispatch.py's
+    # fixture in slice 10.
+    from app.api.sales_flow.crud import sales_flows_crud
+
+    sale_type = (
+        popup.sale_type.value if hasattr(popup.sale_type, "value") else popup.sale_type
+    )
+    sales_flows_crud.provision_default_flow(
+        db, popup_id=popup.id, tenant_id=tenant.id, sale_type=sale_type
+    )
+
+
 def _make_direct_popup(
     db: Session, tenant: Tenants, *, slug_suffix: str = "", allows_coupons: bool = True
 ) -> Popups:
@@ -44,6 +60,7 @@ def _make_direct_popup(
     )
     db.add(popup)
     db.flush()
+    _provision_default_flow(db, tenant, popup)
     return popup
 
 
@@ -59,6 +76,7 @@ def _make_app_popup(db: Session, tenant: Tenants) -> Popups:
     )
     db.add(popup)
     db.flush()
+    _provision_default_flow(db, tenant, popup)
     return popup
 
 
