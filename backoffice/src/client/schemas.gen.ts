@@ -977,6 +977,18 @@ export const ApplicationCreateSchema = {
             ],
             title: 'Group Id'
         },
+        sales_flow_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Sales Flow Id'
+        },
         invite_id: {
             anyOf: [
                 {

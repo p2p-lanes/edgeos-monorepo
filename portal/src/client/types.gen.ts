@@ -215,6 +215,7 @@ export type ApplicationCreate = {
     status?: (UserSettableStatus | null);
     human_id?: (string | null);
     group_id?: (string | null);
+    sales_flow_id?: (string | null);
     invite_id?: (string | null);
     referral_id?: (string | null);
     scholarship_request?: boolean;
@@ -5606,6 +5607,15 @@ export type CheckoutGetRuntimeData = {
 
 export type CheckoutGetRuntimeResponse = (CheckoutRuntimeResponse);
 
+export type CheckoutGetFlowRuntimeData = {
+    acceptLanguage?: (string | null);
+    flowSlug: string;
+    slug: string;
+    xTenantId?: (string | null);
+};
+
+export type CheckoutGetFlowRuntimeResponse = (CheckoutRuntimeResponse);
+
 export type CheckoutGetCheckoutShareMetaData = {
     slug: string;
     xTenantId?: (string | null);
@@ -6514,6 +6524,7 @@ export type FormFieldsDeleteFormFieldResponse = (void);
 
 export type FormFieldsGetApplicationSchemaData = {
     popupId: string;
+    salesFlowId?: (string | null);
     xTenantId?: (string | null);
 };
 
@@ -6524,6 +6535,7 @@ export type FormFieldsGetApplicationSchemaResponse = ({
 export type FormFieldsGetPortalApplicationSchemaData = {
     acceptLanguage?: (string | null);
     popupId: string;
+    salesFlowId?: (string | null);
 };
 
 export type FormFieldsGetPortalApplicationSchemaResponse = ({
@@ -7321,6 +7333,12 @@ export type ReferralsUpdateReferralAdminData = {
 
 export type ReferralsUpdateReferralAdminResponse = (ReferralPublic);
 
+export type SalesFlowsListPortalSalesFlowsData = {
+    popupId: string;
+};
+
+export type SalesFlowsListPortalSalesFlowsResponse = (ListModel_SalesFlowPublic_);
+
 export type SalesFlowsListSalesFlowsData = {
     /**
      * Maximum number of items to return
@@ -7648,6 +7666,7 @@ export type ThirdPartyDiscoveryGetThirdPartyOpenapiResponse = ({
 export type TicketingStepsListPortalTicketingStepsData = {
     acceptLanguage?: (string | null);
     popupId: string;
+    salesFlowId?: (string | null);
 };
 
 export type TicketingStepsListPortalTicketingStepsResponse = (ListModel_TicketingStepPublic_);
