@@ -56,6 +56,22 @@ def _make_popup(db: Session, tenant: Tenants, **reminder_config) -> Popups:
         **reminder_config,
     )
     db.add(popup)
+    db.flush()
+    # sdd/sales-flows slice 10: the dispatcher's dispatch unit is now the
+    # sales flow, not the popup (task 10.3) — this fixture bypasses
+    # PopupsCRUD.create, so provision one directly, mirroring task 5.0's
+    # real provisioning (same fix applied to conftest.py's popup fixtures
+    # in slice 9).
+    from app.api.sales_flow.crud import sales_flows_crud
+
+    sales_flows_crud.provision_default_flow(
+        db,
+        popup_id=popup.id,
+        tenant_id=tenant.id,
+        sale_type=popup.sale_type.value
+        if hasattr(popup.sale_type, "value")
+        else popup.sale_type,
+    )
     db.commit()
     db.refresh(popup)
     return popup
