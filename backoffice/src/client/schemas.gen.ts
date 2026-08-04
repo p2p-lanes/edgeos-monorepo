@@ -5559,6 +5559,17 @@ export const CouponValidatePublicRequestSchema = {
         code: {
             type: 'string',
             title: 'Code'
+        },
+        flow_slug: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Flow Slug'
         }
     },
     type: 'object',

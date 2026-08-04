@@ -1275,6 +1275,7 @@ export type CouponValidate = {
 export type CouponValidatePublicRequest = {
     popup_slug: string;
     code: string;
+    flow_slug?: (string | null);
 };
 
 /**
