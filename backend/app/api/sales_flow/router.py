@@ -13,9 +13,35 @@ from app.api.sales_flow.schemas import (
     SalesFlowUpdate,
 )
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
-from app.core.dependencies.users import CurrentOperator, CurrentWriter, TenantSession
+from app.core.dependencies.users import (
+    CurrentHuman,
+    CurrentOperator,
+    CurrentWriter,
+    HumanTenantSession,
+    TenantSession,
+)
 
 router = APIRouter(prefix="/sales-flows", tags=["sales-flows"])
+
+
+@router.get("/portal", response_model=ListModel[SalesFlowPublic])
+async def list_portal_sales_flows(
+    db: HumanTenantSession,
+    _: CurrentHuman,
+    popup_id: uuid.UUID,
+) -> ListModel[SalesFlowPublic]:
+    """List a popup's portal-listed application flows (Portal).
+
+    Backs the FlowPicker (sdd/sales-flows G0, task 9.4) — shown only when
+    more than one flow is returned here. `direct_url_only` flows and
+    non-application flows never appear, but remain reachable by direct URL
+    (see the checkout runtime and `resolve_flow`).
+    """
+    flows = crud.sales_flows_crud.find_portal_listed(db, popup_id)
+    return ListModel[SalesFlowPublic](
+        results=[SalesFlowPublic.model_validate(f) for f in flows],
+        paging=Paging(offset=0, limit=len(flows), total=len(flows)),
+    )
 
 
 def _raise_on_default_conflict(exc: IntegrityError) -> NoReturn:

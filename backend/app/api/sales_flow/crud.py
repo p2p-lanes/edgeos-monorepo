@@ -8,6 +8,7 @@ from app.api.sales_flow.schemas import (
     SalesFlowCreate,
     SalesFlowIdentityMode,
     SalesFlowReviewersMode,
+    SalesFlowType,
     SalesFlowUpdate,
     SalesFlowVisibility,
 )
@@ -69,6 +70,31 @@ class SalesFlowsCRUD(BaseCRUD[SalesFlows, SalesFlowCreate, SalesFlowUpdate]):
             SalesFlows.is_default == True,  # noqa: E712
         )
         return session.exec(statement).first()
+
+    def find_portal_listed(
+        self,
+        session: Session,
+        popup_id: uuid.UUID,
+        *,
+        type: str = SalesFlowType.application,  # noqa: A002
+    ) -> list[SalesFlows]:
+        """Portal-facing flow listing (sdd/sales-flows G0, task 9.4).
+
+        Only `visibility=portal_listed` flows of the given `type` — a
+        `direct_url_only` flow is reachable by URL (design: visibility is
+        listing-only) but never appears here. Ordered by `order` then
+        `created_at`, matching `find_by_popup`.
+        """
+        statement = (
+            select(SalesFlows)
+            .where(
+                SalesFlows.popup_id == popup_id,
+                SalesFlows.visibility == SalesFlowVisibility.portal_listed,
+                SalesFlows.type == type,
+            )
+            .order_by(SalesFlows.order, SalesFlows.created_at)  # type: ignore[union-attr]
+        )
+        return list(session.exec(statement).all())
 
     def find_by_popup(
         self,
