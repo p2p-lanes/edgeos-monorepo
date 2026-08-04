@@ -103,6 +103,26 @@ def _template_not_customizable_message(template_type: str) -> str:
     return "This email template can't be customized from backoffice"
 
 
+def _get_flow_or_404(db: TenantSession, popup_id: uuid.UUID, flow_id: uuid.UUID):
+    """Verify a sales flow exists and belongs to this popup (sdd/sales-flows
+    slice 10). Mirrors `popup_reviewer/router.py::_get_flow_or_404` — rejects
+    cross-popup flow injection via a client-supplied `sales_flow_id`."""
+    from app.api.sales_flow.crud import sales_flows_crud
+
+    flow = sales_flows_crud.get(db, flow_id)
+    if not flow or flow.popup_id != popup_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Sales flow not found for this popup",
+        )
+    return flow
+
+
+def _flow_scope_not_allowed_message(template_type: str) -> str:
+    template_label = _get_template_label(template_type) or "email"
+    return f"The {template_label} template cannot be scoped to a sales flow"
+
+
 def _duplicate_template_message(
     template_type: str, template_scope: TemplateScope
 ) -> str:
@@ -380,9 +400,15 @@ async def create_email_template(
                 detail=_template_scope_required_message(template_in.template_type),
             )
 
-        existing = crud.email_template_crud.get_by_popup_and_type(
-            db, template_in.popup_id, template_in.template_type
-        )
+        if template_in.sales_flow_id:
+            _get_flow_or_404(db, template_in.popup_id, template_in.sales_flow_id)
+            existing = crud.email_template_crud.get_by_flow_and_type(
+                db, template_in.sales_flow_id, template_in.template_type
+            )
+        else:
+            existing = crud.email_template_crud.get_by_popup_and_type(
+                db, template_in.popup_id, template_in.template_type
+            )
         if existing:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -404,6 +430,12 @@ async def create_email_template(
         else:
             tenant_id = current_user.tenant_id
     else:
+        if template_in.sales_flow_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=_flow_scope_not_allowed_message(template_in.template_type),
+            )
+
         tenant_id = _resolve_effective_tenant_id(current_user, db)
         existing = crud.email_template_crud.get_by_tenant_and_type(
             db, tenant_id, template_in.template_type
@@ -422,6 +454,7 @@ async def create_email_template(
     template_data["tenant_id"] = tenant_id
     if template_scope == TemplateScope.TENANT:
         template_data["popup_id"] = None
+        template_data["sales_flow_id"] = None
     template = EmailTemplates(**template_data)
 
     db.add(template)

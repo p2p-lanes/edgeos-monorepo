@@ -207,16 +207,39 @@ class EmailService:
         template_type: EmailTemplateType | str,
         context: Mapping[str, Any],
         popup_id: uuid.UUID | None = None,
+        sales_flow_id: uuid.UUID | None = None,
         tenant_id: uuid.UUID | None = None,
         db_session: Session | None = None,
     ) -> tuple[str, str | None]:
         """Render email using DB-stored custom template or file-based fallback.
+
+        Three-tier resolution (sdd/sales-flows slice 10, design's
+        "flow -> popup -> tenant"): a flow-scoped custom template is tried
+        first when `sales_flow_id` is given; an inactive or missing
+        flow-tier row falls through to the popup tier, which falls through
+        to the tenant/file tier exactly as it did before this slice.
 
         Returns:
             Tuple of (rendered_html, custom_subject_or_none)
         """
         template_type_enum = coerce_email_template_type(template_type)
         template_scope = get_template_scope(template_type_enum)
+
+        if db_session and template_scope == "popup" and sales_flow_id:
+            from app.api.email_template.crud import email_template_crud
+
+            custom = email_template_crud.get_active_flow_template(
+                db_session, sales_flow_id, template_type_enum.value
+            )
+            if custom:
+                rendered_html = self.render_custom_template(
+                    custom.html_content, context
+                )
+                rendered_subject = None
+                if custom.subject:
+                    env = SandboxedEnvironment(undefined=SilentUndefined)
+                    rendered_subject = env.from_string(custom.subject).render(**context)
+                return rendered_html, rendered_subject
 
         if db_session and template_scope == "tenant" and tenant_id:
             from app.api.email_template.crud import email_template_crud
@@ -362,6 +385,7 @@ class EmailService:
         db_session: Session | None = None,
         template_type: EmailTemplateType | str | None = None,
         popup_id: uuid.UUID | None = None,
+        sales_flow_id: uuid.UUID | None = None,
         application_id: uuid.UUID | None = None,
         payment_id: uuid.UUID | None = None,
         human_id: uuid.UUID | None = None,
@@ -399,6 +423,7 @@ class EmailService:
             error=error,
             template_type=template_type,
             popup_id=popup_id,
+            sales_flow_id=sales_flow_id,
             application_id=application_id,
             payment_id=payment_id,
             human_id=human_id,
@@ -416,6 +441,7 @@ class EmailService:
         error: str | None,
         template_type: EmailTemplateType | str | None,
         popup_id: uuid.UUID | None,
+        sales_flow_id: uuid.UUID | None = None,
         application_id: uuid.UUID | None,
         payment_id: uuid.UUID | None,
         human_id: uuid.UUID | None,
@@ -451,6 +477,7 @@ class EmailService:
                     to_email=recipient,
                     status=status,
                     popup_id=popup_id,
+                    sales_flow_id=sales_flow_id,
                     application_id=application_id,
                     payment_id=payment_id,
                     human_id=human_id,
@@ -892,6 +919,7 @@ class EmailService:
         from_address: str | None = None,
         from_name: str | None = None,
         popup_id: uuid.UUID | None = None,
+        sales_flow_id: uuid.UUID | None = None,
         db_session: Session | None = None,
         application_id: uuid.UUID | None = None,
         payment_id: uuid.UUID | None = None,
@@ -907,6 +935,7 @@ class EmailService:
             from_address=from_address,
             from_name=from_name,
             popup_id=popup_id,
+            sales_flow_id=sales_flow_id,
             db_session=db_session,
             application_id=application_id,
             payment_id=payment_id,
@@ -921,6 +950,7 @@ class EmailService:
         from_address: str | None = None,
         from_name: str | None = None,
         popup_id: uuid.UUID | None = None,
+        sales_flow_id: uuid.UUID | None = None,
         db_session: Session | None = None,
         application_id: uuid.UUID | None = None,
         human_id: uuid.UUID | None = None,
@@ -935,6 +965,7 @@ class EmailService:
             from_address=from_address,
             from_name=from_name,
             popup_id=popup_id,
+            sales_flow_id=sales_flow_id,
             db_session=db_session,
             application_id=application_id,
             human_id=human_id,
@@ -948,6 +979,7 @@ class EmailService:
         from_address: str | None = None,
         from_name: str | None = None,
         popup_id: uuid.UUID | None = None,
+        sales_flow_id: uuid.UUID | None = None,
         db_session: Session | None = None,
         application_id: uuid.UUID | None = None,
         human_id: uuid.UUID | None = None,
@@ -962,6 +994,7 @@ class EmailService:
             from_address=from_address,
             from_name=from_name,
             popup_id=popup_id,
+            sales_flow_id=sales_flow_id,
             db_session=db_session,
             application_id=application_id,
             human_id=human_id,
@@ -1187,6 +1220,7 @@ class EmailService:
         from_address: str | None = None,
         from_name: str | None = None,
         popup_id: uuid.UUID | None = None,
+        sales_flow_id: uuid.UUID | None = None,
         tenant_id: uuid.UUID | None = None,
         db_session: Session | None = None,
         attachments: list[EmailAttachment] | None = None,
@@ -1213,6 +1247,7 @@ class EmailService:
                 template_type,
                 enriched_context,
                 popup_id=popup_id,
+                sales_flow_id=sales_flow_id,
                 tenant_id=resolved_tenant_id,
                 db_session=db_session,
             )
@@ -1230,6 +1265,7 @@ class EmailService:
                 db_session=db_session,
                 template_type=template_type,
                 popup_id=popup_id,
+                sales_flow_id=sales_flow_id,
                 application_id=application_id,
                 payment_id=payment_id,
                 human_id=human_id,
