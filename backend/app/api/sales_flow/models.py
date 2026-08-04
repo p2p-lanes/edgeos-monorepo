@@ -19,8 +19,9 @@ class SalesFlows(SalesFlowBase, table=True):
 
     Design: sdd/sales-flows — every Class B column is nullable; NULL means
     "read the popup" (D1). See sales_flow/resolver.py::build_effective_config
-    for the read-through accessor — defined and unit-tested, awaiting its
-    cutover consumer in a later slice.
+    for the read-through accessor — live consumers: `reminder_dispatch.py`
+    (slice 10, reminder cadence) and `coupon/crud.py` (slice 11,
+    `allows_coupons`).
     """
 
     __tablename__ = "sales_flows"

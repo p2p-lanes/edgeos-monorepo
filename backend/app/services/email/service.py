@@ -51,6 +51,7 @@ from app.services.email.templates import (
 )
 
 if TYPE_CHECKING:
+    from app.api.email_template.models import EmailTemplates
     from app.api.payment.models import Payments
 
 
@@ -232,14 +233,7 @@ class EmailService:
                 db_session, sales_flow_id, template_type_enum.value
             )
             if custom:
-                rendered_html = self.render_custom_template(
-                    custom.html_content, context
-                )
-                rendered_subject = None
-                if custom.subject:
-                    env = SandboxedEnvironment(undefined=SilentUndefined)
-                    rendered_subject = env.from_string(custom.subject).render(**context)
-                return rendered_html, rendered_subject
+                return self._render_custom(custom, context)
 
         if db_session and template_scope == "tenant" and tenant_id:
             from app.api.email_template.crud import email_template_crud
@@ -248,14 +242,7 @@ class EmailService:
                 db_session, tenant_id, template_type_enum.value
             )
             if custom:
-                rendered_html = self.render_custom_template(
-                    custom.html_content, context
-                )
-                rendered_subject = None
-                if custom.subject:
-                    env = SandboxedEnvironment(undefined=SilentUndefined)
-                    rendered_subject = env.from_string(custom.subject).render(**context)
-                return rendered_html, rendered_subject
+                return self._render_custom(custom, context)
 
         if db_session and template_scope == "popup" and popup_id:
             from app.api.email_template.crud import email_template_crud
@@ -264,14 +251,7 @@ class EmailService:
                 db_session, popup_id, template_type_enum.value
             )
             if custom:
-                rendered_html = self.render_custom_template(
-                    custom.html_content, context
-                )
-                rendered_subject = None
-                if custom.subject:
-                    env = SandboxedEnvironment(undefined=SilentUndefined)
-                    rendered_subject = env.from_string(custom.subject).render(**context)
-                return rendered_html, rendered_subject
+                return self._render_custom(custom, context)
 
         # Fallback to file-based template
         file_path = TEMPLATE_TYPE_TO_FILE.get(template_type_enum)
@@ -280,6 +260,23 @@ class EmailService:
 
         rendered_html = self.render_template(file_path, context)
         return rendered_html, None
+
+    def _render_custom(
+        self, custom: "EmailTemplates", context: Mapping[str, Any]
+    ) -> tuple[str, str | None]:
+        """Render a DB-stored custom template's HTML and (optional) subject.
+
+        Shared by all three tiers `render_with_fallback` tries (flow,
+        tenant, popup) — extracted from a triplicated block (sdd/sales-flows
+        slice 10 review follow-up). Pure refactor: identical output to the
+        inlined version it replaces.
+        """
+        rendered_html = self.render_custom_template(custom.html_content, context)
+        rendered_subject = None
+        if custom.subject:
+            env = SandboxedEnvironment(undefined=SilentUndefined)
+            rendered_subject = env.from_string(custom.subject).render(**context)
+        return rendered_html, rendered_subject
 
     def render_template(self, template_name: str, context: Mapping[str, Any]) -> str:
         """
@@ -911,6 +908,16 @@ class EmailService:
             attachments=attachments,
         )
 
+    # sdd/sales-flows slice 10 boundary: only the three reminder methods below
+    # (`send_abandoned_cart`, `send_purchase_reminder`,
+    # `send_abandoned_application`) thread `sales_flow_id` through to
+    # `render_with_fallback`/`_record_email_log` — that's the reminder
+    # dispatcher's own flow-tier scope (`reminder_dispatch.py`), not a
+    # partial rollout. The other ~15 email types on this service (payment
+    # confirmations, application lifecycle, check-in, etc.) intentionally
+    # keep their pre-slice-10 signatures; the flow-tier resolution machinery
+    # in `render_with_fallback`/`_send_with_fallback`/`send_email` is generic
+    # and any future caller can pass `sales_flow_id` when it gets a consumer.
     async def send_abandoned_cart(
         self,
         to: str,
