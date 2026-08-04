@@ -1,0 +1,73 @@
+{
+  "name": "@edgeos/checkout-react",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "React adapter for the EdgeOS headless checkout SDK — a <CheckoutProvider> and hooks over @edgeos/checkout-core. Re-exports the core; the building-edgeos-checkout Claude Code skill ships in @edgeos/checkout-core.",
+  "keywords": [
+    "edgeos",
+    "checkout",
+    "react",
+    "hooks",
+    "headless",
+    "commerce",
+    "tickets",
+    "payments",
+    "sdk"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/p2p-lanes/edgeos-monorepo.git",
+    "directory": "packages/checkout-react"
+  },
+  "homepage": "https://github.com/p2p-lanes/edgeos-monorepo/tree/main/packages/checkout-react#readme",
+  "sideEffects": false,
+  "main": "./src/index.ts",
+  "module": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "files": ["dist", "README.md"],
+  "publishConfig": {
+    "access": "public",
+    "main": "./dist/index.js",
+    "module": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "import": "./dist/index.js"
+      }
+    }
+  },
+  "scripts": {
+    "build": "tsup",
+    "lint": "echo 'No lint script'",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "prepack": "tsup"
+  },
+  "peerDependencies": {
+    "react": "^18.0.0 || ^19.0.0",
+    "react-dom": "^18.0.0 || ^19.0.0"
+  },
+  "dependencies": {
+    "@edgeos/checkout-core": "workspace:^"
+  },
+  "devDependencies": {
+    "@testing-library/react": "^16.3.0",
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3",
+    "jsdom": "^26.1.0",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "tsup": "^8.5.0",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4"
+  }
+}
