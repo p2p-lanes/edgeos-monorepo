@@ -36,18 +36,24 @@ async def list_portal_ticketing_steps(
     _: CurrentHuman,
     popup_id: uuid.UUID,
     accept_language: Annotated[str | None, Header(alias="Accept-Language")] = None,
+    sales_flow_id: uuid.UUID | None = None,
 ) -> ListModel[TicketingStepPublic]:
     """List enabled ticketing steps for a popup (portal-facing).
 
-    Resolves the popup's default sales flow (falling back to the
-    popup-shared tier when the flow owns no steps of its own — see
-    `find_portal_for_flow`, sdd/sales-flows slice 8). URL-addressable
-    per-flow step selection lands in a later slice (9).
+    Resolves the sales flow named by `sales_flow_id` (sdd/sales-flows D6
+    URL scheme, task 9.8 — must belong to this popup, mirrors
+    `_get_flow_or_404`), falling back to the popup's default flow when
+    omitted, falling back further to the popup-shared tier when that flow
+    owns no steps of its own (see `find_portal_for_flow`, slice 8).
     """
     from app.api.sales_flow.crud import sales_flows_crud
 
-    default_flow = sales_flows_crud.get_default_flow(db, popup_id)
-    flow_id = default_flow.id if default_flow else None
+    if sales_flow_id is not None:
+        flow = _get_flow_or_404(db, popup_id, sales_flow_id)
+        flow_id = flow.id
+    else:
+        default_flow = sales_flows_crud.get_default_flow(db, popup_id)
+        flow_id = default_flow.id if default_flow else None
     steps = crud.ticketing_steps_crud.find_portal_for_flow(
         db, popup_id=popup_id, flow_id=flow_id
     )

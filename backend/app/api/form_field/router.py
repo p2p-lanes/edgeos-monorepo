@@ -421,21 +421,48 @@ async def delete_form_field(
     base_field_configs_crud.delete(db, base_config)
 
 
+def _resolve_schema_flow_id(
+    db: "Session", popup_id: uuid.UUID, sales_flow_id: uuid.UUID | None
+) -> uuid.UUID | None:
+    """Resolve the flow id to build a schema for (sdd/sales-flows slice 9,
+    task 9.8).
+
+    An explicit ``sales_flow_id`` must belong to this popup (mirrors
+    ``ticketing_step/router.py::_get_flow_or_404`` — rejects cross-popup
+    flow injection via a client-supplied id). Omitted falls back to the
+    popup's default flow, unchanged from before this slice.
+    """
+    from app.api.sales_flow.crud import sales_flows_crud
+
+    if sales_flow_id is not None:
+        flow = sales_flows_crud.get(db, sales_flow_id)
+        if not flow or flow.popup_id != popup_id:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Sales flow not found for this popup",
+            )
+        return flow.id
+
+    default_flow = sales_flows_crud.get_default_flow(db, popup_id)
+    return default_flow.id if default_flow else None
+
+
 @router.get("/schema/{popup_id}", response_model=dict[str, Any])
 async def get_application_schema(
     popup_id: uuid.UUID,
     db: AdminOrApiKeySession_FormsRead,
     _: AdminOrApiKey_FormsRead,
+    sales_flow_id: uuid.UUID | None = None,
 ) -> dict[str, Any]:
     """Get the complete application schema for a popup.
 
     Returns a schema combining base application fields with custom form
-    fields defined for the popup's default sales flow (falling back to the
-    popup-shared tier — see ``build_schema_for_flow``). URL-addressable
-    per-flow schema selection lands in a later slice (9).
+    fields defined for the resolved sales flow (falling back to the
+    popup-shared tier — see ``build_schema_for_flow``). ``sales_flow_id``
+    resolves an explicit flow (sdd/sales-flows D6 URL scheme, task 9.8);
+    omitted resolves the popup's default flow, as before.
     """
     from app.api.popup.crud import popups_crud
-    from app.api.sales_flow.crud import sales_flows_crud
 
     popup = popups_crud.get(db, popup_id)
     if not popup:
@@ -444,8 +471,7 @@ async def get_application_schema(
             detail="Popup not found",
         )
 
-    default_flow = sales_flows_crud.get_default_flow(db, popup_id)
-    flow_id = default_flow.id if default_flow else None
+    flow_id = _resolve_schema_flow_id(db, popup_id, sales_flow_id)
     return crud.form_fields_crud.build_schema_for_flow(db, popup_id, flow_id)
 
 
@@ -455,15 +481,16 @@ async def get_portal_application_schema(
     db: HumanTenantSession,
     _: CurrentHuman,
     accept_language: Annotated[str | None, Header(alias="Accept-Language")] = None,
+    sales_flow_id: uuid.UUID | None = None,
 ) -> dict[str, Any]:
     """Get the application form schema for a popup (Portal).
 
-    Resolves the popup's default sales flow (falling back to the
-    popup-shared tier — see ``build_schema_for_flow``). URL-addressable
-    per-flow schema selection lands in a later slice (9).
+    Resolves the sales flow named by ``sales_flow_id`` (sdd/sales-flows D6
+    URL scheme, task 9.8 — for the FlowPicker, task 9.4), falling back to
+    the popup's default flow when omitted (falling back further to the
+    popup-shared tier — see ``build_schema_for_flow``).
     """
     from app.api.popup.crud import popups_crud
-    from app.api.sales_flow.crud import sales_flows_crud
 
     popup = popups_crud.get(db, popup_id)
     if not popup:
@@ -472,8 +499,7 @@ async def get_portal_application_schema(
             detail="Popup not found",
         )
 
-    default_flow = sales_flows_crud.get_default_flow(db, popup_id)
-    flow_id = default_flow.id if default_flow else None
+    flow_id = _resolve_schema_flow_id(db, popup_id, sales_flow_id)
     schema = crud.form_fields_crud.build_schema_for_flow(db, popup_id, flow_id)
 
     lang = None
