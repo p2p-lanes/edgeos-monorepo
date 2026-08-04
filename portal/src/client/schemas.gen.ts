@@ -22547,6 +22547,18 @@ export const TicketingStepCreateSchema = {
             format: 'uuid',
             title: 'Popup Id'
         },
+        sales_flow_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Sales Flow Id'
+        },
         step_type: {
             type: 'string',
             title: 'Step Type'
@@ -22669,6 +22681,18 @@ export const TicketingStepPublicSchema = {
             type: 'string',
             format: 'uuid',
             title: 'Popup Id'
+        },
+        sales_flow_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Sales Flow Id'
         },
         step_type: {
             type: 'string',

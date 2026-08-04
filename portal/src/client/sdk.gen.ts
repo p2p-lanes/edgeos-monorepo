@@ -9144,6 +9144,11 @@ export class TicketingStepsService {
     /**
      * List Portal Ticketing Steps
      * List enabled ticketing steps for a popup (portal-facing).
+     *
+     * Resolves the popup's default sales flow (falling back to the
+     * popup-shared tier when the flow owns no steps of its own — see
+     * `find_portal_for_flow`, sdd/sales-flows slice 8). URL-addressable
+     * per-flow step selection lands in a later slice (9).
      * @param data The data for the request.
      * @param data.popupId
      * @param data.acceptLanguage
@@ -9168,8 +9173,16 @@ export class TicketingStepsService {
     
     /**
      * List Ticketing Steps
+     * List ticketing steps.
+     *
+     * Without `sales_flow_id`, returns the popup-shared tier only
+     * (sdd/sales-flows slice 8) — identical to this popup's step list before
+     * this slice, since no writer created flow-scoped rows until now. With
+     * `sales_flow_id`, returns the RESOLVED step list for that flow: its own
+     * rows if it owns any, else the popup-shared fallback.
      * @param data The data for the request.
      * @param data.popupId
+     * @param data.salesFlowId
      * @param data.skip Number of items to skip
      * @param data.limit Maximum number of items to return
      * @param data.xTenantId
@@ -9185,6 +9198,7 @@ export class TicketingStepsService {
             },
             query: {
                 popup_id: data.popupId,
+                sales_flow_id: data.salesFlowId,
                 skip: data.skip,
                 limit: data.limit
             },
