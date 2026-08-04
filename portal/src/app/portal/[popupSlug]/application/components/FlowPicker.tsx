@@ -11,12 +11,6 @@ interface FlowPickerProps {
    * no picker shown) or the flow the visitor picked. */
   onSelect: (flowId: string) => void
   selectedFlowId?: string | null
-  /**
-   * Fired once the flow list resolves, before any auto-select/render
-   * decision — lets the caller gate other UI (e.g. the application form)
-   * on whether an explicit choice is required. Not fired while loading.
-   */
-  onResolved?: (info: { needsChoice: boolean }) => void
 }
 
 /**
@@ -30,28 +24,17 @@ export function FlowPicker({
   popupId,
   onSelect,
   selectedFlowId,
-  onResolved,
 }: FlowPickerProps) {
   const { t } = useTranslation()
   const { data: flows, isLoading } = usePortalSalesFlows(popupId)
 
   const singleFlow = flows && flows.length === 1 ? flows[0] : null
+  // biome-ignore lint/correctness/useExhaustiveDependencies: only re-run when the resolved single flow's id changes — `singleFlow` itself is a new object every render (derived from `flows`), so including it would re-run on every unrelated re-render.
   useEffect(() => {
     if (singleFlow) {
       onSelect(singleFlow.id)
     }
-    // Only re-run when the resolved single flow's id changes — `onSelect`
-    // is expected to be referentially stable enough for this effect's
-    // purpose (auto-select, not a general dependency).
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [singleFlow?.id, onSelect, singleFlow])
-
-  useEffect(() => {
-    if (!isLoading && flows) {
-      onResolved?.({ needsChoice: flows.length > 1 })
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isLoading, flows?.length, flows, onResolved])
+  }, [singleFlow?.id, onSelect])
 
   if (isLoading || !flows || flows.length <= 1) {
     return null

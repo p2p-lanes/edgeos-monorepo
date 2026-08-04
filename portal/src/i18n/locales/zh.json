@@ -116,7 +116,6 @@
     "unavailable_description": "此活动的申请表尚未配置。",
     "flow_picker_title": "选择您的申请方式",
     "flow_picker_description": "此活动有多个申请通道，请选择一个以继续。",
-    "flow_picker_select_placeholder": "选择申请通道",
     "step_of": "第 {{current}} 步，共 {{total}} 步",
     "existing_found": "发现已有申请",
     "existing_description": "我们发现了与您电子邮件关联的先前申请。",

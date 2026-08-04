@@ -69,9 +69,10 @@ class ApplicationBase(SQLModel):
         default=None, foreign_key="groups.id", nullable=True, index=True
     )
     # Sales flow this application was submitted under. Nullable, backfilled
-    # to the popup's default flow (sdd/sales-flows slice 4). No read path
-    # consumes this column yet — the uniqueness re-key to
-    # (human_id, sales_flow_id) is a later slice, gated behind G2.
+    # to the popup's default flow (sdd/sales-flows slice 4). Read via
+    # `ApplicationsCRUD.get_by_human_flow` (duplicate-check gate, slice 5) —
+    # the uniqueness re-key to (human_id, sales_flow_id) is a later slice,
+    # gated behind G2.
     sales_flow_id: uuid.UUID | None = Field(
         default=None, foreign_key="sales_flows.id", nullable=True, index=True
     )

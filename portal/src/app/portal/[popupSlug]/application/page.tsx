@@ -18,6 +18,7 @@ import { FlowPicker } from "./components/FlowPicker"
 import { FeePaymentBanner } from "./components/fee-payment-banner"
 import { FormHeader } from "./components/form-header"
 import { SectionSeparator } from "./components/section-separator"
+import { shouldRedirectToStatus } from "./lib/shouldRedirectToStatus"
 
 function useFormInitData() {
   const { getCity, getPopups } = useCityProvider()
@@ -119,9 +120,8 @@ export default function FormPage() {
   // multi-flow popups the FlowPicker must get a chance to mount instead.
   useEffect(() => {
     if (
-      needsFlowChoice === false &&
       application &&
-      (application.status === "accepted" || application.status === "rejected")
+      shouldRedirectToStatus(needsFlowChoice, application.status)
     ) {
       router.replace(`/portal/${city?.slug}`)
     }
@@ -168,10 +168,7 @@ export default function FormPage() {
   // Resolved applications never render the form. The effect above redirects to
   // the portal home; show a loader meanwhile to avoid flashing it. Same
   // needsFlowChoice === false gate as the effect (rel-002 correction).
-  if (
-    needsFlowChoice === false &&
-    (application?.status === "accepted" || application?.status === "rejected")
-  ) {
+  if (shouldRedirectToStatus(needsFlowChoice, application?.status)) {
     return <Loader />
   }
 

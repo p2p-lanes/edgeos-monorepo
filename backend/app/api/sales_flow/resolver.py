@@ -1,10 +1,13 @@
 """Flow-resolution contract (sdd/sales-flows design, slice 9, task 9.1).
 
-Single module every consumer resolves a sales flow through — the checkout
-runtime (slice 9), form/ticketing-step schema endpoints (slice 9), and every
-later cutover slice (email tier resolution, coupon allowance, reminder
-cadence). Keeping this in one place is what makes those later cutovers a
-pure read-through change (design's "Fallback-authority rule").
+Single module every consumer resolves a sales flow through. Wired today:
+`resolve_flow` backs the checkout runtime (`checkout/crud.py::runtime_for_slug`)
+and, via its internal `get_default_flow` helper, `ticketing_step/router.py`
+and `form_field/router.py`'s portal schema endpoints. `resolve_active_direct_flow`
+and `build_effective_config` are defined and unit-tested but await their
+consumers (custom-domain landing, the Class B read-through cutover) in
+slices 10/11 — keeping this in one place is what makes those later
+cutovers a pure read-through change (design's "Fallback-authority rule").
 """
 
 import uuid

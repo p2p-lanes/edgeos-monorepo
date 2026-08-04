@@ -122,49 +122,6 @@ describe("FlowPicker", () => {
 
     expect(onSelect).toHaveBeenCalledWith("flow-2")
   })
-
-  it("reports needsChoice=false via onResolved when only one flow exists", async () => {
-    vi.mocked(SalesFlowsService.listPortalSalesFlows).mockResolvedValue({
-      results: [{ id: "flow-1", slug: "default", name: "Default", order: 0 }],
-      paging: { offset: 0, limit: 1, total: 1 },
-    } as never)
-
-    const onResolved = vi.fn()
-    renderWithClient(
-      <FlowPicker
-        popupId="popup-1"
-        onSelect={vi.fn()}
-        onResolved={onResolved}
-      />,
-    )
-
-    await waitFor(() => {
-      expect(onResolved).toHaveBeenCalledWith({ needsChoice: false })
-    })
-  })
-
-  it("reports needsChoice=true via onResolved when multiple flows exist", async () => {
-    vi.mocked(SalesFlowsService.listPortalSalesFlows).mockResolvedValue({
-      results: [
-        { id: "flow-1", slug: "default", name: "Default", order: 0 },
-        { id: "flow-2", slug: "vip", name: "VIP Track", order: 1 },
-      ],
-      paging: { offset: 0, limit: 2, total: 2 },
-    } as never)
-
-    const onResolved = vi.fn()
-    renderWithClient(
-      <FlowPicker
-        popupId="popup-1"
-        onSelect={vi.fn()}
-        onResolved={onResolved}
-      />,
-    )
-
-    await waitFor(() => {
-      expect(onResolved).toHaveBeenCalledWith({ needsChoice: true })
-    })
-  })
 })
 
 describe("useSubmitApplication create-vs-update (rel-001 correction)", () => {

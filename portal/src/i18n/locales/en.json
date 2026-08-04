@@ -131,7 +131,6 @@
     "unavailable_description": "The application form for this event is not yet configured.",
     "flow_picker_title": "Choose how you'd like to apply",
     "flow_picker_description": "This event has more than one application track. Select one to continue.",
-    "flow_picker_select_placeholder": "Select an application track",
     "step_of": "Step {{current}} of {{total}}",
     "existing_found": "Existing Application Found",
     "existing_description": "We've found a previous application associated with your email.",

@@ -63,7 +63,8 @@ class SalesFlowsCRUD(BaseCRUD[SalesFlows, SalesFlowCreate, SalesFlowUpdate]):
         """Get the default flow for a popup (is_default = true).
 
         A missing default flow after the backfill migration is an invariant
-        breach handled by callers (see resolver.py, added in a later slice).
+        breach handled by callers (see resolver.py's `resolve_flow` /
+        `get_default_flow`, which raise a 500 for this case).
         """
         statement = select(SalesFlows).where(
             SalesFlows.popup_id == popup_id,

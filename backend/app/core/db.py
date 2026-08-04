@@ -89,6 +89,7 @@ def _seed_users(session: Session, seed_data: dict, tenant_id) -> None:
 
 
 def _seed_popups(session: Session, seed_data: dict, tenant_id) -> dict:
+    from app.api.sales_flow.crud import sales_flows_crud
     from app.models import Popups
 
     popup_map: dict[str, Popups] = {}
@@ -120,6 +121,20 @@ def _seed_popups(session: Session, seed_data: dict, tenant_id) -> dict:
                 ),
             )
             session.add(popup)
+            session.flush()  # get the popup id without committing
+
+            # Every popup must have exactly one default sales_flow (design
+            # D2 — a missing default is a 500-class invariant breach for the
+            # resolver). This seed bypasses PopupsCRUD.create's direct-API
+            # path, so it has to provision the flow itself, in the same
+            # transaction, mirroring popup/crud.py::PopupsCRUD.create.
+            sales_flows_crud.provision_default_flow(
+                session,
+                popup_id=popup.id,
+                tenant_id=tenant_id,
+                sale_type=popup.sale_type.value,
+            )
+
             session.commit()
             session.refresh(popup)
             popup_map[popup_key] = popup
