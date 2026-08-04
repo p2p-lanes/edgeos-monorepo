@@ -188,10 +188,11 @@ def test_validate_public_expired_coupon_same_shape(
     assert body["detail"] == "Invalid or expired coupon"
 
 
-def test_validate_public_application_popup_returns_403(
+def test_validate_public_application_popup_returns_uniform_400(
     client: TestClient, db: Session, tenant_a: Tenants
 ) -> None:
-    """Application popup returns 403."""
+    """Application popup is rejected via the flow-type gate, collapsed to
+    the uniform 400 like every other failure state (never a raw 403)."""
     popup = _make_app_popup(db, tenant_a)
     db.commit()
 
@@ -201,7 +202,8 @@ def test_validate_public_application_popup_returns_403(
         headers={"X-Tenant-Id": str(tenant_a.id)},
     )
 
-    assert response.status_code == 403, response.text
+    assert response.status_code == 400, response.text
+    assert response.json()["detail"] == "Invalid or expired coupon"
 
 
 def test_validate_public_rate_limit_triggers_429(

@@ -40,10 +40,13 @@ class CouponsCRUD(BaseCRUD[Coupons, CouponCreate, CouponUpdate]):
         - Resolves the sales flow (default flow when `flow_slug` is omitted)
           through the same `resolve_flow` contract every other checkout
           surface uses (sdd/sales-flows slice 9/11 — coherent gate order):
-          unknown `flow_slug` -> 404, inactive popup/flow -> 403, a flow
-          whose type is neither `direct` nor `upsale` -> 403. This replaces
-          the old raw `popup.sale_type != "direct"` check with a flow-level
-          gate (a popup can now have flows of mixed type).
+          unknown `flow_slug`, inactive popup/flow, a flow whose type is
+          neither `direct` nor `upsale`, or a popup missing its default flow
+          all raise internally (404/403/500) but are caught here and
+          collapsed to the uniform 400 below. This replaces the old raw
+          `popup.sale_type != "direct"` check with a flow-level gate (a
+          popup can now have flows of mixed type), without leaking flow
+          state to an anonymous caller.
         - `allows_coupons` is read through the resolved flow's
           `EffectiveFlowConfig` (design D1/D2): a NULL override inherits the
           popup value; an explicit flow override wins either direction.
@@ -70,12 +73,22 @@ class CouponsCRUD(BaseCRUD[Coupons, CouponCreate, CouponUpdate]):
                 detail=_PUBLIC_COUPON_ERROR,
             )
 
-        flow = resolve_flow(
-            session,
-            popup,
-            flow_slug,
-            require_types={SalesFlowType.direct, SalesFlowType.upsale},
-        )
+        try:
+            flow = resolve_flow(
+                session,
+                popup,
+                flow_slug,
+                require_types={SalesFlowType.direct, SalesFlowType.upsale},
+            )
+        except HTTPException as exc:
+            # Every resolver failure (unknown slug, inactive, wrong type,
+            # missing default flow) collapses to the same uniform error —
+            # an anonymous caller must not be able to distinguish flow
+            # states from the coupon states below.
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=_PUBLIC_COUPON_ERROR,
+            ) from exc
 
         effective = build_effective_config(flow, popup)
         if not effective.allows_coupons:

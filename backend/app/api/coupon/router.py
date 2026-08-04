@@ -42,8 +42,12 @@ async def validate_coupon_public(
 ) -> CouponValidatePublicResponse:
     """Validate a coupon code for an anonymous open-ticketing checkout (no JWT required).
 
-    Returns coupon details on success. Returns 400 with uniform message for
-    any invalid/expired/unknown state. Returns 403 if popup is not direct-sale.
+    Resolves the sales flow (default flow when `flow_slug` is omitted) and
+    gates on `direct`/`upsale` flow types. Returns coupon details on
+    success. Returns 400 with the uniform "Invalid or expired coupon"
+    message for every failure state — unknown popup, unknown flow slug,
+    inactive popup/flow, wrong flow type, or any invalid/expired/unknown
+    coupon state — so an anonymous caller can never distinguish them.
     Rate-limited 30/min/IP.
     """
     return crud.coupons_crud.validate_public(

@@ -63,7 +63,9 @@ def _make_popup(
     return popup
 
 
-def _provision_default_flow(db: Session, popup: Popups, tenant: Tenants) -> SalesFlows:
+def _provision_flow_returning(
+    db: Session, popup: Popups, tenant: Tenants
+) -> SalesFlows:
     return sales_flows_crud.provision_default_flow(
         db,
         popup_id=popup.id,
@@ -119,7 +121,7 @@ class TestValidateCouponInheritance:
         """G5: NULL flow override -> byte-identical to the pre-slice-11
         popup-only check when the popup allows coupons."""
         popup = _make_popup(db, tenant_a, allows_coupons=True)
-        default_flow = _provision_default_flow(db, popup, tenant_a)
+        default_flow = _provision_flow_returning(db, popup, tenant_a)
         _make_coupon(db, popup, code="INHERITOK")
         db.commit()
         assert default_flow.allows_coupons is None
@@ -133,7 +135,7 @@ class TestValidateCouponInheritance:
         """G5, the other direction: NULL flow override + popup disallows ->
         still rejected, unchanged from pre-slice-11 behavior."""
         popup = _make_popup(db, tenant_a, allows_coupons=False)
-        _provision_default_flow(db, popup, tenant_a)
+        _provision_flow_returning(db, popup, tenant_a)
         _make_coupon(db, popup, code="INHERITBAD")
         db.commit()
 
@@ -177,7 +179,7 @@ class TestValidatePublicFlowResolution:
         self, client: TestClient, db: Session, tenant_a: Tenants
     ) -> None:
         popup = _make_popup(db, tenant_a, allows_coupons=True)
-        _provision_default_flow(db, popup, tenant_a)
+        _provision_flow_returning(db, popup, tenant_a)
         _make_coupon(db, popup, code="PUBINHERIT")
         db.commit()
 
@@ -196,7 +198,7 @@ class TestValidatePublicFlowResolution:
         rejects even though the popup and default flow both allow coupons —
         proves per-flow (not just per-popup) resolution."""
         popup = _make_popup(db, tenant_a, allows_coupons=True)
-        _provision_default_flow(db, popup, tenant_a)
+        _provision_flow_returning(db, popup, tenant_a)
         secondary = _make_flow(
             db, popup, slug="vip", type=SaleType.direct.value, allows_coupons=False
         )
@@ -215,11 +217,14 @@ class TestValidatePublicFlowResolution:
         assert response.status_code == 400, response.text
         assert response.json()["detail"] == "Invalid or expired coupon"
 
-    def test_public_unknown_flow_slug_returns_404(
+    def test_public_unknown_flow_slug_returns_uniform_400(
         self, client: TestClient, db: Session, tenant_a: Tenants
     ) -> None:
+        """An unknown `flow_slug` must not leak a 404 that would let an
+        anonymous caller distinguish "no such flow" from "invalid coupon" —
+        both collapse to the module's uniform 400."""
         popup = _make_popup(db, tenant_a)
-        _provision_default_flow(db, popup, tenant_a)
+        _provision_flow_returning(db, popup, tenant_a)
         db.commit()
 
         response = client.post(
@@ -231,17 +236,18 @@ class TestValidatePublicFlowResolution:
             },
             headers={"X-Tenant-Id": str(tenant_a.id)},
         )
-        assert response.status_code == 404, response.text
+        assert response.status_code == 400, response.text
+        assert response.json()["detail"] == "Invalid or expired coupon"
 
-    def test_public_application_type_flow_returns_403(
+    def test_public_application_type_flow_returns_uniform_400(
         self, client: TestClient, db: Session, tenant_a: Tenants
     ) -> None:
         """A flow of type=application is rejected even on an otherwise
         direct-sale popup — proves the type gate is FLOW-level, not just
         popup-level (the old `popup.sale_type` check alone would have missed
-        this)."""
+        this) — and the rejection stays the uniform 400, not a raw 403."""
         popup = _make_popup(db, tenant_a)
-        _provision_default_flow(db, popup, tenant_a)
+        _provision_flow_returning(db, popup, tenant_a)
         app_flow = _make_flow(db, popup, slug="apply", type=SaleType.application.value)
         db.commit()
 
@@ -254,7 +260,35 @@ class TestValidatePublicFlowResolution:
             },
             headers={"X-Tenant-Id": str(tenant_a.id)},
         )
-        assert response.status_code == 403, response.text
+        assert response.status_code == 400, response.text
+        assert response.json()["detail"] == "Invalid or expired coupon"
+
+    def test_public_popup_missing_default_flow_returns_uniform_400(
+        self, client: TestClient, db: Session, tenant_a: Tenants
+    ) -> None:
+        """A popup that bypassed default-flow provisioning (pre-task-5.0
+        data, or a direct DB insert) makes `resolve_flow` raise 500 — that
+        must not leak to the anonymous caller either; it collapses to the
+        same uniform 400 as every other failure state."""
+        slug = f"flow-coupon-nodefault-{uuid.uuid4().hex[:8]}"
+        popup = Popups(
+            tenant_id=tenant_a.id,
+            name=f"No Default Flow Popup {slug}",
+            slug=slug,
+            sale_type=SaleType.direct.value,
+            status="active",
+            allows_coupons=True,
+        )
+        db.add(popup)
+        db.commit()
+
+        response = client.post(
+            "/api/v1/coupons/validate-public",
+            json={"popup_slug": popup.slug, "code": "ANY"},
+            headers={"X-Tenant-Id": str(tenant_a.id)},
+        )
+        assert response.status_code == 400, response.text
+        assert response.json()["detail"] == "Invalid or expired coupon"
 
 
 # ---------------------------------------------------------------------------
@@ -267,7 +301,7 @@ class TestCouponCodesStayPopupScoped:
         self, client: TestClient, db: Session, tenant_a: Tenants
     ) -> None:
         popup = _make_popup(db, tenant_a, allows_coupons=True)
-        _provision_default_flow(db, popup, tenant_a)
+        _provision_flow_returning(db, popup, tenant_a)
         secondary = _make_flow(db, popup, slug="secondary", type=SaleType.direct.value)
         _make_coupon(db, popup, code="SHARED10")
         db.commit()
