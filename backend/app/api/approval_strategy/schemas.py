@@ -24,8 +24,15 @@ class ApprovalStrategyBase(SQLModel):
     for a specific popup.
     """
 
-    popup_id: uuid.UUID = Field(foreign_key="popups.id", index=True, unique=True)
+    popup_id: uuid.UUID = Field(foreign_key="popups.id", index=True)
     tenant_id: uuid.UUID = Field(foreign_key="tenants.id", index=True)
+    # sdd/sales-flows slice 7. NULL = popup-shared tier (the strategy every
+    # flow inherits by default), non-NULL = owned exclusively by that flow.
+    # No write path creates a flow-scoped row yet (backoffice editor is
+    # slice 14) — the resolution layer already reads it (get_for_flow).
+    flow_id: uuid.UUID | None = Field(
+        default=None, foreign_key="sales_flows.id", nullable=True, index=True
+    )
 
     strategy_type: ApprovalStrategyType = ApprovalStrategyType.ANY_REVIEWER
 
@@ -73,6 +80,7 @@ class ApprovalStrategyPublic(BaseModel):
     id: uuid.UUID
     popup_id: uuid.UUID
     tenant_id: uuid.UUID
+    flow_id: uuid.UUID | None = None
 
     strategy_type: ApprovalStrategyType
     required_approvals: int
