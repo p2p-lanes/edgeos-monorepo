@@ -55,6 +55,11 @@ interface UseSubmitApplicationArgs {
    * resolution.
    */
   salesFlowId?: string | null
+  /**
+   * True when the popup has more than one application flow (rel-001
+   * correction). Gates the create-vs-update branch below — see there.
+   */
+  needsFlowChoice?: boolean
 }
 
 /** Owns the create-or-update mutation, the "submit" and "save draft" flows,
@@ -68,6 +73,7 @@ export function useSubmitApplication({
   validate,
   referralId,
   salesFlowId,
+  needsFlowChoice,
 }: UseSubmitApplicationArgs) {
   const { t, i18n } = useTranslation()
   const router = useRouter()
@@ -82,7 +88,17 @@ export function useSubmitApplication({
 
   const submitMutation = useMutation({
     mutationFn: async (status: "draft" | "in review") => {
-      if (application?.id) {
+      // rel-001 correction: `application` is popup-scoped only —
+      // ApplicationPublic carries no sales_flow_id — so once a popup has
+      // more than one flow (needsFlowChoice), we cannot prove `application`
+      // belongs to the flow being submitted for. PATCHing it in that case
+      // risks silently overwriting a different flow's application. Single/
+      // zero-flow popups have no such ambiguity (only one flow can ever
+      // exist) and keep updating as before. Multi-flow popups always create
+      // instead: the backend's per-human-per-flow duplicate guard
+      // (create_my_application router) rejects a true same-flow resubmit
+      // with a clean 400 rather than us silently overwriting the wrong one.
+      if (application?.id && !needsFlowChoice) {
         return ApplicationsService.updateMyApplication({
           popupId: popup.id,
           requestBody: splitForUpdate({ values, status, schema }),

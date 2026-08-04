@@ -5,6 +5,7 @@ import { createElement } from "react"
 import { useCheckoutRuntime } from "@/app/checkout/[popupSlug]/hooks/useCheckoutRuntime"
 import type { CheckoutRuntimeResponse } from "@/client"
 import { fetchCheckoutRuntime } from "./checkout-runtime"
+import { queryKeys } from "./query-keys"
 
 vi.mock("@/client", () => ({
   CheckoutService: {
@@ -235,5 +236,34 @@ describe("useCheckoutRuntime opts", () => {
       slug: "festival-2026",
       flowSlug: "vip",
     })
+  })
+})
+
+describe("queryKeys.checkout.runtime", () => {
+  it("does not collide when a flow slug matches a language code", () => {
+    // Before the fix, flowSlug and lang shared one positional slot: both
+    // runtime(slug, "es") and runtime(slug, undefined, "es") produced the
+    // exact same key.
+    const byFlow = queryKeys.checkout.runtime("popup-1", "es")
+    const byLang = queryKeys.checkout.runtime("popup-1", undefined, "es")
+    expect(byFlow).not.toEqual(byLang)
+  })
+
+  it("keeps a stable base key for broad invalidation across flow/lang variants", () => {
+    expect(queryKeys.checkout.runtime("popup-1")).toEqual([
+      "checkout",
+      "runtime",
+      "popup-1",
+      {},
+    ])
+  })
+
+  it("labels both dimensions when flow and language are both present", () => {
+    expect(queryKeys.checkout.runtime("popup-1", "vip", "es")).toEqual([
+      "checkout",
+      "runtime",
+      "popup-1",
+      { flowSlug: "vip", lang: "es" },
+    ])
   })
 })

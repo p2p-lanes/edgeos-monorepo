@@ -1,18 +1,49 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
-import { fireEvent, render, screen, waitFor } from "@testing-library/react"
+import {
+  act,
+  fireEvent,
+  render,
+  renderHook,
+  screen,
+  waitFor,
+} from "@testing-library/react"
 import type { ReactNode } from "react"
+import { createElement } from "react"
 import { describe, expect, it, vi } from "vitest"
-import { SalesFlowsService } from "@/client"
+import type { ApplicationPublic, PopupPublic } from "@/client"
+import { ApplicationsService, SalesFlowsService } from "@/client"
+import type { ApplicationFormSchema } from "@/types/form-schema"
+import { useSubmitApplication } from "../hooks/use-submit-application"
 import { FlowPicker } from "./FlowPicker"
 
 vi.mock("@/client", () => ({
+  ApiError: class ApiError extends Error {},
   SalesFlowsService: {
     listPortalSalesFlows: vi.fn(),
+  },
+  ApplicationsService: {
+    updateMyApplication: vi
+      .fn()
+      .mockResolvedValue({ id: "app-1", status: "draft" }),
+    createMyApplication: vi
+      .fn()
+      .mockResolvedValue({ id: "app-2", status: "draft" }),
   },
 }))
 
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({ t: (key: string) => key }),
+}))
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
+}))
+vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }))
+vi.mock("@/hooks/useApplicationFee", () => ({
+  useApplicationFee: () => ({ createOrResume: vi.fn(), isPending: false }),
+}))
+vi.mock("@/providers/applicationProvider", () => ({
+  useApplication: () => ({ updateApplication: vi.fn() }),
 }))
 
 function renderWithClient(ui: ReactNode) {
@@ -133,5 +164,66 @@ describe("FlowPicker", () => {
     await waitFor(() => {
       expect(onResolved).toHaveBeenCalledWith({ needsChoice: true })
     })
+  })
+})
+
+describe("useSubmitApplication create-vs-update (rel-001 correction)", () => {
+  const schema: ApplicationFormSchema = {
+    base_fields: {},
+    custom_fields: {},
+    sections: [],
+  }
+  const popup = { id: "popup-1" } as PopupPublic
+
+  beforeEach(() => vi.clearAllMocks())
+
+  function wrapper({ children }: { children: ReactNode }) {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    })
+    return createElement(QueryClientProvider, { client: queryClient }, children)
+  }
+
+  it("updates when the popup has no flow ambiguity (single/zero-flow)", async () => {
+    const existing = { id: "app-1" } as ApplicationPublic
+    const { result } = renderHook(
+      () =>
+        useSubmitApplication({
+          popup,
+          schema,
+          values: {},
+          application: existing,
+          validate: () => ({ isValid: true, errors: {} }),
+          needsFlowChoice: false,
+        }),
+      { wrapper },
+    )
+
+    await act(async () => result.current.handleDraft())
+
+    expect(ApplicationsService.updateMyApplication).toHaveBeenCalled()
+    expect(ApplicationsService.createMyApplication).not.toHaveBeenCalled()
+  })
+
+  it("never PATCHes across flows: creates instead when the flow is ambiguous", async () => {
+    const existing = { id: "app-1" } as ApplicationPublic
+    const { result } = renderHook(
+      () =>
+        useSubmitApplication({
+          popup,
+          schema,
+          values: {},
+          application: existing,
+          validate: () => ({ isValid: true, errors: {} }),
+          salesFlowId: "flow-b",
+          needsFlowChoice: true,
+        }),
+      { wrapper },
+    )
+
+    await act(async () => result.current.handleDraft())
+
+    expect(ApplicationsService.createMyApplication).toHaveBeenCalled()
+    expect(ApplicationsService.updateMyApplication).not.toHaveBeenCalled()
   })
 })

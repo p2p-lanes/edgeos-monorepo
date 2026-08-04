@@ -2,12 +2,13 @@
 
 import { FileUploadProvider } from "@edgeos/shared-form-ui"
 import { useRouter, useSearchParams } from "next/navigation"
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 import type { ApplicationPublic } from "@/client"
 import { Loader } from "@/components/ui/Loader"
 import { useApplicationSchema } from "@/hooks/useApplicationSchema"
+import { usePortalSalesFlows } from "@/hooks/usePortalSalesFlows"
 import { useApplication } from "@/providers/applicationProvider"
 import { useCityProvider } from "@/providers/cityProvider"
 import { useFileUpload } from "../events/lib/useFileUpload"
@@ -80,12 +81,16 @@ export default function FormPage() {
   // set it (FlowPicker renders nothing and auto-selects internally), so
   // this is a no-op for the common case.
   const [selectedFlowId, setSelectedFlowId] = useState<string | null>(null)
-  const [needsFlowChoice, setNeedsFlowChoice] = useState(false)
-  const handleFlowResolved = useCallback(
-    ({ needsChoice }: { needsChoice: boolean }) =>
-      setNeedsFlowChoice(needsChoice),
-    [],
-  )
+  // Resolved independently of the <FlowPicker> element below (not via its
+  // onResolved callback): the terminal-status guards further down need this
+  // before we know whether it's even safe to reach the JSX that mounts
+  // FlowPicker. Same query, shared cache — no extra request.
+  const { data: portalFlows } = usePortalSalesFlows(city?.id)
+  // `null` = not resolved yet (never gates a redirect). `application` below
+  // is popup-scoped only — ApplicationPublic carries no sales_flow_id — so
+  // once a popup has more than one flow, a terminal `application` cannot be
+  // trusted to represent the flow the visitor is about to pick or submit.
+  const needsFlowChoice = portalFlows ? portalFlows.length > 1 : null
 
   const {
     data: schema,
@@ -109,14 +114,18 @@ export default function FormPage() {
   // Resolved applications are no longer accessible from the form.
   // draft/pending_fee/in review stay editable so the applicant can still finish,
   // retry the fee payment, or update details while the application is under review.
+  // Gated on needsFlowChoice === false: only single/zero-flow popups have an
+  // unambiguous `application` to redirect on (rel-002 correction) — for
+  // multi-flow popups the FlowPicker must get a chance to mount instead.
   useEffect(() => {
     if (
+      needsFlowChoice === false &&
       application &&
       (application.status === "accepted" || application.status === "rejected")
     ) {
       router.replace(`/portal/${city?.slug}`)
     }
-  }, [application, city, router])
+  }, [application, city, router, needsFlowChoice])
 
   useEffect(() => {
     if (city?.sale_type === "direct") {
@@ -157,10 +166,11 @@ export default function FormPage() {
   }
 
   // Resolved applications never render the form. The effect above redirects to
-  // the portal home; show a loader meanwhile to avoid flashing it.
+  // the portal home; show a loader meanwhile to avoid flashing it. Same
+  // needsFlowChoice === false gate as the effect (rel-002 correction).
   if (
-    application?.status === "accepted" ||
-    application?.status === "rejected"
+    needsFlowChoice === false &&
+    (application?.status === "accepted" || application?.status === "rejected")
   ) {
     return <Loader />
   }
@@ -214,7 +224,6 @@ export default function FormPage() {
         popupId={city.id}
         selectedFlowId={selectedFlowId}
         onSelect={setSelectedFlowId}
-        onResolved={handleFlowResolved}
       />
       {needsFlowChoice && !selectedFlowId ? null : (
         <FileUploadProvider value={uploadFile}>
@@ -225,6 +234,7 @@ export default function FormPage() {
             popup={city}
             referralId={referralId}
             salesFlowId={selectedFlowId}
+            needsFlowChoice={needsFlowChoice === true}
           />
         </FileUploadProvider>
       )}

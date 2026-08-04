@@ -50,22 +50,19 @@ export const queryKeys = {
   },
   checkout: {
     // The runtime payload is translated server-side from Accept-Language, so
-    // the language is part of the cache identity. Omitting `lang` yields the
-    // language-agnostic prefix, which still matches every language's entry for
-    // invalidation. `flowSlug` (sdd/sales-flows D6 URL scheme) is part of the
-    // identity too — a named flow's runtime must never be served from the
-    // default flow's cache entry, or vice versa.
+    // the language is part of the cache identity. `flowSlug` (sdd/sales-flows
+    // D6 URL scheme) is part of the identity too — a named flow's runtime
+    // must never be served from the default flow's cache entry, or vice
+    // versa. Both dimensions are labeled keys of a trailing filter object
+    // (not positional slots) so a flow slugged e.g. "es" can never collide
+    // with the "es" language, and `runtime(slug)` alone still yields `{}` —
+    // a filter that partially matches every flow/lang variant for broad
+    // invalidation (see checkoutProvider.tsx).
     runtime: (slug: string, flowSlug?: string | null, lang?: string | null) => {
-      if (flowSlug && lang) {
-        return ["checkout", "runtime", slug, flowSlug, lang] as const
-      }
-      if (flowSlug) {
-        return ["checkout", "runtime", slug, flowSlug] as const
-      }
-      if (lang) {
-        return ["checkout", "runtime", slug, lang] as const
-      }
-      return ["checkout", "runtime", slug] as const
+      const filter: { flowSlug?: string; lang?: string } = {}
+      if (flowSlug) filter.flowSlug = flowSlug
+      if (lang) filter.lang = lang
+      return ["checkout", "runtime", slug, filter] as const
     },
     coupon: (slug: string, code: string) =>
       ["checkout", "coupon", slug, code] as const,
