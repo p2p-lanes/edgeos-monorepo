@@ -70,9 +70,9 @@ class ApplicationBase(SQLModel):
     )
     # Sales flow this application was submitted under. Nullable, backfilled
     # to the popup's default flow (sdd/sales-flows slice 4). Read via
-    # `ApplicationsCRUD.get_by_human_flow` (duplicate-check gate, slice 5) —
-    # the uniqueness re-key to (human_id, sales_flow_id) is a later slice,
-    # gated behind G2.
+    # `ApplicationsCRUD.get_by_human_flow` (duplicate-check gate). Uniqueness
+    # is re-keyed to (human_id, sales_flow_id) as uq_application_human_flow
+    # since slice 5 (G2 confirmed 2026-08-04).
     sales_flow_id: uuid.UUID | None = Field(
         default=None, foreign_key="sales_flows.id", nullable=True, index=True
     )
