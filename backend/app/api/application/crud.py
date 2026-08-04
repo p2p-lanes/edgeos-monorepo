@@ -4,7 +4,7 @@ from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 
 from fastapi import HTTPException, status
-from sqlalchemy import desc, exists, or_
+from sqlalchemy import case, desc, exists, nullslast, or_
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.orm import selectinload
 from sqlmodel import Session, col, func, select
@@ -213,10 +213,27 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         actual question (access-ladder checks, invite redemption, "my
         application" lookups). NOT used by the duplicate-creation guards
         (see `get_by_human_flow`) since sdd/sales-flows slice 5 (G2).
+
+        Deterministic selection: after the re-key, a human can legitimately
+        hold 2+ applications for one popup (one per flow). Priority:
+        accepted status first, then most recent `submitted_at` (NULLs
+        last), then id as a tiebreaker — reads/mutations always resolve to
+        the same row.
         """
-        statement = select(Applications).where(
-            Applications.human_id == human_id,
-            Applications.popup_id == popup_id,
+        accepted_first = case(
+            (Applications.status == ApplicationStatus.ACCEPTED.value, 0), else_=1
+        )
+        statement = (
+            select(Applications)
+            .where(
+                Applications.human_id == human_id,
+                Applications.popup_id == popup_id,
+            )
+            .order_by(
+                accepted_first,
+                nullslast(desc(Applications.submitted_at)),
+                desc(Applications.id),
+            )
         )
         return session.exec(statement).first()
 

@@ -17,10 +17,13 @@ the real flow-resolution contract, not to this creation-time guard.
 """
 
 import uuid
+from datetime import UTC, datetime, timedelta
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session, select
 
+from app.api.application.crud import applications_crud
 from app.api.application.models import Applications
 from app.api.human.models import Humans
 from app.api.popup.models import Popups
@@ -56,6 +59,39 @@ def _make_legacy_popup(db: Session, tenant: Tenants) -> Popups:
     db.commit()
     db.refresh(popup)
     return popup
+
+
+def _seed_flow_applications(
+    db: Session,
+    tenant: Tenants,
+    human: Humans,
+    popup: Popups,
+    statuses: list[tuple[str, int]],
+) -> list[Applications]:
+    """One application per (status, days_ago), each on its own flow."""
+    now = datetime.now(UTC)
+    apps = []
+    for i, (status, days_ago) in enumerate(statuses):
+        flow = SalesFlows(
+            tenant_id=tenant.id,
+            popup_id=popup.id,
+            slug=f"flow-{i}-{uuid.uuid4().hex[:6]}",
+            name=f"Flow {i}",
+        )
+        db.add(flow)
+        db.flush()
+        app = Applications(
+            tenant_id=tenant.id,
+            popup_id=popup.id,
+            human_id=human.id,
+            sales_flow_id=flow.id,
+            status=status,
+            submitted_at=now - timedelta(days=days_ago),
+        )
+        db.add(app)
+        apps.append(app)
+    db.commit()
+    return apps
 
 
 def _make_human_token(db: Session, tenant: Tenants) -> tuple[Humans, str]:
@@ -187,3 +223,44 @@ class TestAdminDuplicateGuardIsFlowAware:
             },
         )
         assert second.status_code == 400
+
+
+class TestGetByHumanPopupDeterministicOrdering:
+    """rel-001: a human can now legitimately hold 2+ applications for one
+    popup (one per flow). `get_by_human_popup` must resolve to the same
+    row every time: accepted status first, then most recent submission.
+    """
+
+    @pytest.mark.parametrize(
+        ("statuses", "expected"),
+        [
+            ([("accepted", 5), ("in review", 0)], 0),  # older accepted still wins
+            ([("rejected", 5), ("in review", 0)], 1),  # none accepted: most recent
+        ],
+    )
+    def test_deterministic_selection(
+        self,
+        db: Session,
+        tenant_a: Tenants,
+        statuses: list[tuple[str, int]],
+        expected: int,
+    ) -> None:
+        popup = _make_legacy_popup(db, tenant_a)
+        human, _ = _make_human_token(db, tenant_a)
+        apps = _seed_flow_applications(db, tenant_a, human, popup, statuses)
+        result = applications_crud.get_by_human_popup(db, human.id, popup.id)
+        assert result is not None
+        assert result.id == apps[expected].id
+
+    def test_resolve_popup_access_grants_via_accepted_over_rejected(
+        self, db: Session, tenant_a: Tenants
+    ) -> None:
+        popup = _make_legacy_popup(db, tenant_a)
+        human, _ = _make_human_token(db, tenant_a)
+        _seed_flow_applications(
+            db, tenant_a, human, popup, [("rejected", 5), ("accepted", 0)]
+        )
+        result = applications_crud.resolve_popup_access(db, human.id, popup.id)
+        assert result.allowed is True
+        assert result.source == "application"
+        assert result.application_status == "accepted"
