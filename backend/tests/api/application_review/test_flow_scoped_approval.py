@@ -18,13 +18,16 @@ from app.api.application.schemas import ApplicationStatus
 from app.api.approval_strategy.models import ApprovalStrategies
 from app.api.approval_strategy.schemas import ApprovalStrategyType
 from app.api.human.models import Humans
+from app.api.popup_reviewer.crud import popup_reviewers_crud
 from app.api.popup_reviewer.models import PopupReviewers
+from app.api.popup_reviewer.schemas import PopupReviewerCreate
 from app.api.sales_flow.crud import sales_flows_crud
 from app.api.sales_flow.models import SalesFlows
 from app.api.sales_flow.schemas import SalesFlowReviewersMode
 from app.api.shared.enums import UserRole
 from app.api.tenant.models import Tenants
 from app.api.user.models import Users
+from app.core.security import create_access_token
 from app.services.approval.calculator import approval_calculator
 
 
@@ -245,3 +248,110 @@ class TestRecalculateStatusResolvesThroughApplicationFlow:
             "empty for this flow — the popup's required reviewer must "
             "never trigger an auto-rejection on this flow's application"
         )
+
+
+class TestSubmitReviewOverrideTierExclusivity:
+    """risk-001: on an override-mode flow, only that flow's own reviewers
+    may submit a vote. Inherit-mode flows (and legacy flow-less
+    applications) keep today's unrestricted behavior (G1)."""
+
+    def test_non_flow_reviewer_gets_403_on_override_flow(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+        admin_token_tenant_a: str,
+    ) -> None:
+        popup_id = _create_popup_via_api(client, admin_token_tenant_a)
+        second_flow = _make_second_flow(db, tenant_a, popup_id)
+        sales_flows_crud.ensure_reviewers_override(db, second_flow.id)
+
+        # A popup-shared reviewer is NOT on this flow's own reviewer list.
+        popup_reviewer_user = _make_user(db, tenant_a)
+        popup_reviewers_crud.create_reviewer(
+            db,
+            popup_id,
+            tenant_a.id,
+            PopupReviewerCreate(user_id=popup_reviewer_user.id),
+        )
+        outsider_token = create_access_token(
+            subject=popup_reviewer_user.id, token_type="user"
+        )
+
+        human = _make_human(db, tenant_a)
+        application = _make_application(db, tenant_a, popup_id, human, second_flow.id)
+
+        resp = client.post(
+            f"/api/v1/applications/{application.id}/reviews",
+            headers=_headers(outsider_token),
+            json={"decision": "yes"},
+        )
+
+        assert resp.status_code == 403
+        assert resp.json()["detail"] == "You are not a reviewer for this sales flow"
+
+    def test_flow_tier_reviewer_can_vote_on_override_flow(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+        admin_token_tenant_a: str,
+    ) -> None:
+        popup_id = _create_popup_via_api(client, admin_token_tenant_a)
+        second_flow = _make_second_flow(db, tenant_a, popup_id)
+
+        flow_reviewer_user = _make_user(db, tenant_a)
+        popup_reviewers_crud.create_reviewer(
+            db,
+            popup_id,
+            tenant_a.id,
+            PopupReviewerCreate(user_id=flow_reviewer_user.id, flow_id=second_flow.id),
+        )
+        assert (
+            sales_flows_crud.get(db, second_flow.id).reviewers_mode
+            == SalesFlowReviewersMode.override
+        )
+        flow_reviewer_token = create_access_token(
+            subject=flow_reviewer_user.id, token_type="user"
+        )
+
+        human = _make_human(db, tenant_a)
+        application = _make_application(db, tenant_a, popup_id, human, second_flow.id)
+
+        resp = client.post(
+            f"/api/v1/applications/{application.id}/reviews",
+            headers=_headers(flow_reviewer_token),
+            json={"decision": "yes"},
+        )
+
+        assert resp.status_code == 201, resp.text
+
+    def test_plain_operator_can_still_vote_on_inherit_mode_flow(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+        admin_token_tenant_a: str,
+    ) -> None:
+        """Regression guard: the default flow stays 'inherit' — any
+        operator can vote, exactly as before this gate was added (G1)."""
+        popup_id = _create_popup_via_api(client, admin_token_tenant_a)
+        default_flow = sales_flows_crud.get_default_flow(db, popup_id)
+        assert default_flow is not None
+        assert default_flow.reviewers_mode == SalesFlowReviewersMode.inherit
+
+        plain_operator = _make_user(db, tenant_a)
+        plain_operator_token = create_access_token(
+            subject=plain_operator.id, token_type="user"
+        )
+
+        human = _make_human(db, tenant_a)
+        application = _make_application(db, tenant_a, popup_id, human, default_flow.id)
+
+        resp = client.post(
+            f"/api/v1/applications/{application.id}/reviews",
+            headers=_headers(plain_operator_token),
+            json={"decision": "yes"},
+        )
+
+        assert resp.status_code == 201, resp.text

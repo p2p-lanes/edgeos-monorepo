@@ -210,6 +210,26 @@ async def submit_review(
             detail="User has no tenant assigned",
         )
 
+    # Override-tier exclusivity (risk-001): if the application's flow has
+    # switched to its own reviewer list, only reviewers on THAT list may
+    # vote. Inherit-mode flows (and legacy applications with no flow) keep
+    # today's behavior unchanged — any operator can vote (G1).
+    if application.sales_flow_id is not None:
+        from app.api.popup_reviewer.crud import popup_reviewers_crud
+        from app.api.sales_flow.crud import sales_flows_crud
+        from app.api.sales_flow.schemas import SalesFlowReviewersMode
+
+        flow = sales_flows_crud.get(db, application.sales_flow_id)
+        if flow and flow.reviewers_mode == SalesFlowReviewersMode.override:
+            flow_reviewers = popup_reviewers_crud.resolve_for_flow(
+                db, application.popup_id, application.sales_flow_id
+            )
+            if current_user.id not in {r.user_id for r in flow_reviewers}:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="You are not a reviewer for this sales flow",
+                )
+
     # Create or update the review
     review = application_reviews_crud.upsert_review(
         db, application_id, current_user.id, tenant_id, review_in

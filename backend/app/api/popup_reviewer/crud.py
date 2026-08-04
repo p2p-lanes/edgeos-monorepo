@@ -157,24 +157,28 @@ class PopupReviewersCRUD(
             weight_multiplier=reviewer_in.weight_multiplier,
         )
         session.add(db_obj)
-        session.commit()
-        session.refresh(db_obj)
+        session.flush()
 
         if reviewer_in.flow_id is not None:
             from app.api.sales_flow.crud import sales_flows_crud
 
-            sales_flows_crud.ensure_reviewers_override(session, reviewer_in.flow_id)
+            sales_flows_crud.ensure_reviewers_override(
+                session, reviewer_in.flow_id, commit=False
+            )
 
+        session.commit()
+        session.refresh(db_obj)
         return db_obj
 
     def delete_reviewer(self, session: Session, reviewer: PopupReviewers) -> None:
         """Delete a reviewer. If this was the last flow-tier reviewer for
         its flow, resets that flow's `reviewers_mode` back to 'inherit'
         (sdd/sales-flows D4 CRUD invariant — clearing the override falls
-        back to the popup-shared tier)."""
+        back to the popup-shared tier). Row delete and mode flip commit
+        together (rel-001: no window where one persists without the other)."""
         flow_id = reviewer.flow_id
         session.delete(reviewer)
-        session.commit()
+        session.flush()
 
         if flow_id is not None:
             remaining = session.exec(
@@ -185,7 +189,9 @@ class PopupReviewersCRUD(
             if remaining == 0:
                 from app.api.sales_flow.crud import sales_flows_crud
 
-                sales_flows_crud.reset_reviewers_inherit(session, flow_id)
+                sales_flows_crud.reset_reviewers_inherit(session, flow_id, commit=False)
+
+        session.commit()
 
 
 popup_reviewers_crud = PopupReviewersCRUD()

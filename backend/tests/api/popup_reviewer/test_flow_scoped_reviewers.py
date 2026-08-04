@@ -15,6 +15,7 @@ flow-tier reviewer resets it to `inherit`.
 
 import uuid
 
+import pytest
 from sqlmodel import Session
 
 from app.api.popup.models import Popups
@@ -260,3 +261,74 @@ class TestDeleteReviewerInvariant:
         refreshed = sales_flows_crud.get(db, flow.id)
         assert refreshed is not None
         assert refreshed.reviewers_mode == SalesFlowReviewersMode.override
+
+
+class TestReviewerWriteAtomicity:
+    """rel-001: the reviewer row write and the flow's `reviewers_mode` flip
+    must commit together as a single transaction, not two sequential
+    commits — proven here by counting calls to `Session.commit`."""
+
+    def test_create_reviewer_commits_exactly_once(
+        self, db: Session, tenant_a: Tenants, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        popup = _make_popup(db, tenant_a)
+        flow = _make_flow(db, tenant_a, popup, slug="flow-atomic-create")
+        user = _make_user(db, tenant_a, email=f"atomic-{popup.id.hex[:8]}@x.io")
+
+        commit_calls = 0
+        original_commit = db.commit
+
+        def counting_commit() -> None:
+            nonlocal commit_calls
+            commit_calls += 1
+            original_commit()
+
+        monkeypatch.setattr(db, "commit", counting_commit)
+
+        popup_reviewers_crud.create_reviewer(
+            db,
+            popup.id,
+            tenant_a.id,
+            PopupReviewerCreate(user_id=user.id, flow_id=flow.id),
+        )
+
+        assert commit_calls == 1
+        refreshed = sales_flows_crud.get(db, flow.id)
+        assert refreshed is not None
+        assert refreshed.reviewers_mode == SalesFlowReviewersMode.override
+
+    def test_delete_reviewer_commits_exactly_once(
+        self, db: Session, tenant_a: Tenants, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        popup = _make_popup(db, tenant_a)
+        flow = _make_flow(
+            db,
+            tenant_a,
+            popup,
+            slug="flow-atomic-delete",
+            reviewers_mode=SalesFlowReviewersMode.override,
+        )
+        user = _make_user(db, tenant_a, email=f"atomic-del-{popup.id.hex[:8]}@x.io")
+        reviewer = popup_reviewers_crud.create_reviewer(
+            db,
+            popup.id,
+            tenant_a.id,
+            PopupReviewerCreate(user_id=user.id, flow_id=flow.id),
+        )
+
+        commit_calls = 0
+        original_commit = db.commit
+
+        def counting_commit() -> None:
+            nonlocal commit_calls
+            commit_calls += 1
+            original_commit()
+
+        monkeypatch.setattr(db, "commit", counting_commit)
+
+        popup_reviewers_crud.delete_reviewer(db, reviewer)
+
+        assert commit_calls == 1
+        refreshed = sales_flows_crud.get(db, flow.id)
+        assert refreshed is not None
+        assert refreshed.reviewers_mode == SalesFlowReviewersMode.inherit
