@@ -281,6 +281,18 @@ class TestFlowScopedProductPurchase:
     and returning the stable 403 machine code `product_not_in_flow` (D6)
     instead of the ad hoc 422 slice 13 shipped ahead of this package's
     existence.
+
+    TODO(sdd/sales-flows slice 13 fix-validator, budget cut): the fix
+    validator's brief referenced "two budget-cut tests" for this bypass
+    that were deferred out of slice 13's review budget. Their exact scope
+    was not recoverable from available context (apply-progress/tasks
+    revision history for slice 13 predates what this batch could retrieve).
+    `test_flow_exclusive_product_rejected_via_default_flow` (below) and
+    `TestOpenTicketingRestrictionGate`/`TestAuthenticatedPaymentRestrictionGate`
+    in `tests/api/payment/test_restriction_purchase_gate.py` cover the D3
+    exclusivity bypass at both purchase call sites; if the original two
+    tests covered something narrower (e.g. a specific multi-product cart
+    mix), re-add them here once their scope is recovered.
     """
 
     def test_flow_exclusive_product_rejected_via_default_flow(

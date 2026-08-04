@@ -73,6 +73,18 @@ class CouponsCRUD(BaseCRUD[Coupons, CouponCreate, CouponUpdate]):
                 detail=_PUBLIC_COUPON_ERROR,
             )
 
+        # sdd/sales-flows slice 12 note (disclosed asymmetry, no design
+        # instruction to change it): unlike the checkout runtime and
+        # purchase endpoints, this resolver call is deliberately NOT
+        # followed by `assert_upsale_eligible`. Coupon validation is a
+        # metadata lookup (does this code exist and what discount does it
+        # give) — it never creates a payment, reveals attendee/purchase
+        # data, or grants access to the flow itself. An anonymous caller
+        # validating a coupon against an upsale-type flow learns nothing
+        # they couldn't learn by inspecting the discount on any other flow;
+        # the actual eligibility gate still applies at purchase time
+        # (`create_open_ticketing_payment` / `create_payment`), which is the
+        # only place a coupon's discount can turn into money moving.
         try:
             flow = resolve_flow(
                 session,
