@@ -1383,6 +1383,7 @@ export type EmailLogPublic = {
 
 export type EmailTemplateCreate = {
     popup_id?: (string | null);
+    sales_flow_id?: (string | null);
     template_type: string;
     subject?: (string | null);
     html_content: string;
@@ -1393,6 +1394,7 @@ export type EmailTemplatePublic = {
     id: string;
     tenant_id: string;
     popup_id: (string | null);
+    sales_flow_id?: (string | null);
     template_type: string;
     scope: TemplateScope;
     subject?: (string | null);

@@ -5924,6 +5924,18 @@ export const EmailTemplateCreateSchema = {
             ],
             title: 'Popup Id'
         },
+        sales_flow_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Sales Flow Id'
+        },
         template_type: {
             type: 'string',
             title: 'Template Type'
@@ -5977,6 +5989,18 @@ export const EmailTemplatePublicSchema = {
                 }
             ],
             title: 'Popup Id'
+        },
+        sales_flow_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Sales Flow Id'
         },
         template_type: {
             type: 'string',
