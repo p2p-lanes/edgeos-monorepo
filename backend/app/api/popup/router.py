@@ -227,7 +227,21 @@ async def create_popup(
     if popup.sale_type == SaleType.application.value:
         _seed_application_defaults(db, popup)
 
-    seed_ticketing_steps_for_popup(db, popup_id=popup.id, tenant_id=popup.tenant_id)
+    # sdd/sales-flows slice 8: the buyer-step gate reads the popup's default
+    # flow `type` (provisioned in the same transaction as the popup, task
+    # 5.0) instead of `popup.sale_type` directly — a same-value read-source
+    # swap today (the default flow's type IS the popup's sale_type), not an
+    # observable behavior change. Steps stay popup-shared (sales_flow_id
+    # left at its default None) — this seeding never writes flow-owned rows.
+    from app.api.sales_flow.crud import sales_flows_crud
+
+    default_flow = sales_flows_crud.get_default_flow(db, popup.id)
+    seed_ticketing_steps_for_popup(
+        db,
+        popup_id=popup.id,
+        tenant_id=popup.tenant_id,
+        flow_type=default_flow.type if default_flow else None,
+    )
 
     return PopupAdmin.model_validate(popup)
 

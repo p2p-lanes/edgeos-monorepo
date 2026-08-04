@@ -109,23 +109,36 @@ def seed_ticketing_steps_for_popup(
     db: Session,
     popup_id: uuid.UUID,
     tenant_id: uuid.UUID,
-    sale_type: str | None = None,
+    flow_type: str | None = None,
+    sales_flow_id: uuid.UUID | None = None,
 ) -> None:
-    """Seed the default ticketing-step set for a popup.
+    """Seed the default ticketing-step set for a popup, or one specific
+    sales flow of that popup when ``sales_flow_id`` is set (sdd/sales-flows
+    slice 8).
 
     Steps flagged with ``_direct_sale_only`` (e.g. the buyer step) only get
-    inserted when ``sale_type='direct'``. Application popups collect buyer
-    info via the application form earlier in the funnel, so the open-
-    ticketing buyer step is irrelevant there.
+    inserted when ``flow_type='direct'``. Application-type flows collect
+    buyer info via the application form earlier in the funnel, so the
+    open-ticketing buyer step is irrelevant there.
+
+    ``flow_type`` was ``sale_type`` (read off the popup) before slice 8 —
+    renamed because the gate now reads a sales flow's own ``type`` column
+    instead, per the design's per-area cutover: today every popup's default
+    flow is provisioned with ``type=popup.sale_type`` (task 5.0), so this is
+    a same-value read-source swap, not an observable behavior change, until
+    a flow's type can diverge from its popup's (e.g. slice 13's upsales).
+    ``sales_flow_id`` defaults to ``None`` (popup-shared tier, D1) — seeding
+    never writes flow-owned rows on its own; callers opt in explicitly.
     """
     from app.api.ticketing_step.models import TicketingSteps
 
     for step_def in DEFAULT_TICKETING_STEPS:
-        if step_def.get("_direct_sale_only") and sale_type != "direct":
+        if step_def.get("_direct_sale_only") and flow_type != "direct":
             continue
         step = TicketingSteps(
             tenant_id=tenant_id,
             popup_id=popup_id,
+            sales_flow_id=sales_flow_id,
             step_type=step_def["step_type"],
             title=step_def["title"],
             description=step_def.get("description"),

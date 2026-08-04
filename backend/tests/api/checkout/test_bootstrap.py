@@ -134,11 +134,13 @@ def _make_ticketing_step(
     title: str = "Select Tickets",
     order: int = 0,
     is_enabled: bool = True,
+    sales_flow_id: uuid.UUID | None = None,
 ) -> TicketingSteps:
     step = TicketingSteps(
         id=uuid.uuid4(),
         tenant_id=popup.tenant_id,
         popup_id=popup.id,
+        sales_flow_id=sales_flow_id,
         step_type=step_type,
         title=title,
         order=order,
@@ -272,6 +274,50 @@ def test_runtime_only_enabled_ticketing_steps(
     assert response.status_code == 200, response.text
     body = response.json()
     assert [step["title"] for step in body["ticketing_steps"]] == ["Visible Step"]
+
+
+def test_runtime_ticketing_steps_popup_shared_tier_only(
+    client: TestClient, db: Session, tenant_a: Tenants
+) -> None:
+    """The open-ticketing runtime hasn't resolved a flow yet (slice 9), so it
+    reads the popup-shared tier only (sales_flow_id IS NULL) for ticketing
+    steps — same fallback tier it already uses for form_sections/form_schema
+    (sdd/sales-flows slice 8, disclosed asymmetry vs the portal-facing
+    /ticketing-steps/portal endpoint, which resolves the default flow)."""
+    from app.api.sales_flow.models import SalesFlows
+
+    popup = _make_direct_popup(db, tenant_a)
+    flow = SalesFlows(
+        tenant_id=tenant_a.id,
+        popup_id=popup.id,
+        type="direct",
+        slug="a-flow-owned-step",
+        name="Flow",
+    )
+    db.add(flow)
+    db.flush()
+
+    _make_ticketing_step(db, popup, step_type="tickets", title="Shared Step")
+    _make_ticketing_step(
+        db,
+        popup,
+        step_type="buyer",
+        title="Flow-Owned Step",
+        order=1,
+        sales_flow_id=flow.id,
+    )
+    db.commit()
+
+    response = client.get(
+        f"/api/v1/checkout/{popup.slug}/runtime",
+        headers={"X-Tenant-Id": str(tenant_a.id)},
+    )
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert [step["title"] for step in body["ticketing_steps"]] == ["Shared Step"], (
+        "Flow-owned steps must never leak into the popup-shared runtime"
+    )
 
 
 def test_runtime_excludes_hidden_sections_and_their_fields(

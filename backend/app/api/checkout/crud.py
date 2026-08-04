@@ -134,11 +134,16 @@ def runtime_for_slug(
         ).all()
     )
 
+    # Popup-shared tier only (sales_flow_id IS NULL) — this direct-sale
+    # runtime hasn't resolved a flow yet (slice 9), so it reads the same
+    # fallback tier find_for_flow(popup_id, flow_id=None) would
+    # (sdd/sales-flows slice 8), matching the form_sections query above.
     ticketing_steps = list(
         session.exec(
             select(TicketingSteps)
             .where(
                 TicketingSteps.popup_id == popup.id,
+                TicketingSteps.sales_flow_id.is_(None),  # type: ignore[union-attr]
                 TicketingSteps.is_enabled == True,  # noqa: E712
             )
             .order_by(TicketingSteps.order)  # type: ignore[arg-type]
