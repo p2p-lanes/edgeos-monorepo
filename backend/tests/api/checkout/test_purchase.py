@@ -162,6 +162,7 @@ def _make_popup(
         status=status,
         simplefi_api_key="simplefi_test_key",
         currency="USD",
+        allows_coupons=True,
     )
     db.add(popup)
     db.flush()

@@ -2,6 +2,7 @@ import {
   CalendarDays,
   FileText,
   Layers,
+  Link2,
   MapPin,
   Ticket,
   Users,
@@ -41,6 +42,7 @@ const useResources = () => {
   const eventsEnabled = city?.events_enabled ?? true
   const attendeeDirectoryEnabled =
     city?.sale_type !== "direct" && (city?.show_attendee_directory ?? false)
+  const referralsEnabled = city?.referrals_enabled === true
 
   const isCompanion = participation?.type === "companion"
   const canSeeAttendees = application?.status === "accepted"
@@ -178,6 +180,12 @@ const useResources = () => {
           path: "/portal/agentic-access",
         },
       ],
+    },
+    {
+      name: t("sidebar.referrals"),
+      icon: Link2,
+      status: canSeeAttendees && referralsEnabled ? "active" : "hidden",
+      path: `/portal/${city?.slug}/referrals`,
     },
   ]
 

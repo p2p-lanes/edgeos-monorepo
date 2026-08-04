@@ -15,6 +15,28 @@ export type AbandonedCartPublic = {
 };
 
 /**
+ * Request body for POST /groups/{id}/members/by-application.
+ */
+export type AddMemberByApplicationRequest = {
+    application_id: string;
+};
+
+/**
+ * Result of a leader adding a member by email (Portal).
+ *
+ * - status="added": the email belonged to an existing human, now a member.
+ * - status="invited": the email is not registered yet, so it was whitelisted.
+ * The human auto-joins the group when they sign up.
+ */
+export type AddMemberResult = {
+    status: 'added' | 'invited';
+    email: string;
+    member?: (GroupMemberPublic | null);
+};
+
+export type status = 'added' | 'invited';
+
+/**
  * Request body for minting a new admin API key.
  */
 export type AdminApiKeyCreate = {
@@ -193,6 +215,8 @@ export type ApplicationCreate = {
     status?: (UserSettableStatus | null);
     human_id?: (string | null);
     group_id?: (string | null);
+    invite_id?: (string | null);
+    referral_id?: (string | null);
     scholarship_request?: boolean;
     scholarship_details?: (string | null);
     scholarship_video_url?: (string | null);
@@ -245,6 +269,9 @@ export type ApplicationPublic = {
     human_id: string;
     group_id?: (string | null);
     referral?: (string | null);
+    invite_id?: (string | null);
+    referral_id?: (string | null);
+    referred_by_name?: (string | null);
     info_not_shared?: Array<(string)>;
     status: string;
     custom_fields?: {
@@ -1430,6 +1457,7 @@ export type EventAvailabilityResult = {
     conflicts?: Array<(string)>;
     reason?: (string | null);
     effective_booking_mode?: (string | null);
+    opaque_conflicts?: Array<EventOpaque>;
 };
 
 /**
@@ -1501,6 +1529,7 @@ export type EventCreate = {
     status?: EventStatus;
     highlighted?: boolean;
     recurrence?: (RecurrenceRule | null);
+    group_id?: (string | null);
 };
 
 /**
@@ -1536,6 +1565,24 @@ export type EventInvitationPublic = {
     first_name?: (string | null);
     last_name?: (string | null);
     created_at: string;
+};
+
+/**
+ * Opaque event projection for non-privileged viewers on availability endpoints.
+ *
+ * Contains ONLY the fields needed to communicate a booking conflict without
+ * leaking any event metadata. Used as the non-full-detail branch of the
+ * ``EventPublic | EventOpaque`` discriminated union.
+ *
+ * Fields MUST match the design's Decision 1d contract:
+ * id, start_time, end_time, venue_id, is_opaque: Literal[True]
+ */
+export type EventOpaque = {
+    id: string;
+    start_time: string;
+    end_time: string;
+    venue_id?: (string | null);
+    is_opaque?: true;
 };
 
 /**
@@ -1611,6 +1658,7 @@ export type EventPublic = {
     recurrence_master_id?: (string | null);
     recurrence_exdates?: Array<(string)>;
     ical_sequence?: number;
+    group_id?: (string | null);
     created_at?: string;
     updated_at?: string;
     id: string;
@@ -1787,6 +1835,7 @@ export type EventUpdate = {
     collaborator_ids?: (Array<(string)> | null);
     status?: (EventStatus | null);
     highlighted?: (boolean | null);
+    group_id?: (string | null);
 };
 
 /**
@@ -2006,9 +2055,10 @@ export type GroupAdminUpdate = {
     discount_percentage?: (number | string | null);
     max_members?: (number | null);
     welcome_message?: (string | null);
-    is_ambassador_group?: (boolean | null);
-    ambassador_id?: (string | null);
     whitelisted_emails?: (Array<(string)> | null);
+    auto_approve_applications?: (boolean | null);
+    express_checkout?: (boolean | null);
+    enable_private_events?: (boolean | null);
 };
 
 /**
@@ -2022,9 +2072,14 @@ export type GroupCreate = {
     discount_percentage?: (number | string);
     max_members?: (number | null);
     welcome_message?: (string | null);
-    is_ambassador_group?: boolean;
-    ambassador_id?: (string | null);
     whitelisted_emails?: (Array<(string)> | null);
+};
+
+/**
+ * Request body for POST /groups/{id}/leaders (BO admin).
+ */
+export type GroupLeaderAssign = {
+    human_id: string;
 };
 
 /**
@@ -2048,6 +2103,7 @@ export type GroupMemberBatchResult = {
     role?: (string | null);
     gender?: (string | null);
     local_resident?: (boolean | null);
+    is_leader?: boolean;
     products?: Array<unknown>;
     success: boolean;
     err_msg?: (string | null);
@@ -2066,6 +2122,16 @@ export type GroupMemberCreate = {
 };
 
 /**
+ * Schema for inviting a member to a group by email (Portal leader).
+ *
+ * Only the email is needed: an existing human is added using their own
+ * profile (never overwritten); an unregistered email is whitelisted.
+ */
+export type GroupMemberInvite = {
+    email: string;
+};
+
+/**
  * Schema for member response with products.
  */
 export type GroupMemberPublic = {
@@ -2078,6 +2144,7 @@ export type GroupMemberPublic = {
     role?: (string | null);
     gender?: (string | null);
     local_resident?: (boolean | null);
+    is_leader?: boolean;
     products?: Array<unknown>;
 };
 
@@ -2105,13 +2172,39 @@ export type GroupPublic = {
     discount_percentage?: string;
     max_members?: (number | null);
     welcome_message?: (string | null);
-    is_ambassador_group?: boolean;
-    ambassador_id?: (string | null);
+    auto_approve_applications?: boolean;
+    express_checkout?: boolean;
+    enable_private_events?: boolean;
     id: string;
     created_at?: (string | null);
     updated_at?: (string | null);
     whitelisted_emails?: Array<GroupWhitelistedEmailPublic>;
     is_open?: boolean;
+};
+
+/**
+ * Response for GET /api/v1/portal/groups/{slug} — URL compat resolver.
+ *
+ * Design: Decision 1e — same-shape response with kind discriminator.
+ * Spec: REQ-GR-027 (slug resolver fallback to invites), REQ-GR-028 (canonical endpoint).
+ *
+ * Resolution order:
+ * 1. groups_crud.get_by_slug → kind="group"
+ * 2. invites_crud.get_by_token → kind="invite"
+ * 3. 404
+ *
+ * Caller (portal) branches once on kind. When kind="invite", the portal
+ * redirects to /invite/{token} for canonical redemption flow.
+ *
+ * invite field is typed as dict to avoid a circular schema import at module load;
+ * the router populates it from InvitePublicPreview.model_dump().
+ */
+export type GroupSlugResolution = {
+    kind: string;
+    group?: (GroupPublic | null);
+    invite?: ({
+    [key: string]: unknown;
+} | null);
 };
 
 /**
@@ -2144,8 +2237,9 @@ export type GroupWithMembers = {
     discount_percentage?: string;
     max_members?: (number | null);
     welcome_message?: (string | null);
-    is_ambassador_group?: boolean;
-    ambassador_id?: (string | null);
+    auto_approve_applications?: boolean;
+    express_checkout?: boolean;
+    enable_private_events?: boolean;
     id: string;
     created_at?: (string | null);
     updated_at?: (string | null);
@@ -2164,7 +2258,6 @@ export type HardDeleteSummary = {
     application_snapshots: number;
     carts: number;
     group_memberships: number;
-    ambassador_groups: number;
 };
 
 export type HTTPValidationError = {
@@ -2399,6 +2492,98 @@ export type HumanVerify = {
 export type InstallmentInterval = 'day' | 'week' | 'month' | 'year';
 
 /**
+ * Admin request body for POST /invites.
+ *
+ * token: auto-generated via secrets.token_urlsafe(16) when omitted.
+ * recipient_email: stored lowercase; NULL means open invite.
+ */
+export type InviteCreate = {
+    popup_id: string;
+    token?: (string | null);
+    recipient_email?: (string | null);
+    discount_percentage?: (number | string);
+    auto_approve?: boolean;
+    express_checkout?: boolean;
+    max_uses?: (number | null);
+};
+
+/**
+ * Full invite detail — admin-only response.
+ *
+ * Exposes all fields including token and recipient_email.
+ * Never sent to unauthenticated callers.
+ */
+export type InvitePublic = {
+    id: string;
+    popup_id: string;
+    token: string;
+    recipient_email?: (string | null);
+    discount_percentage: string;
+    auto_approve: boolean;
+    express_checkout: boolean;
+    max_uses?: (number | null);
+    current_uses: number;
+    used_at?: (string | null);
+    redeemed_by_human_id?: (string | null);
+    expires_at?: (string | null);
+    created_by: string;
+    created_at: string;
+    updated_at: string;
+};
+
+/**
+ * Unauthenticated preview — GET /invites/redeem/{token}.
+ *
+ * Spec: REQ-GR-005 — exposes inviter_name and is_email_restricted.
+ * recipient_email is intentionally ABSENT to prevent harvesting.
+ * id is included so the portal can pass invite_id on application create
+ * (the checkout flow needs the UUID, not the token string).
+ */
+export type InvitePublicPreview = {
+    id: string;
+    popup_id: string;
+    token: string;
+    inviter_name?: (string | null);
+    is_email_restricted: boolean;
+    discount_percentage: string;
+    max_uses?: (number | null);
+    current_uses: number;
+    expires_at?: (string | null);
+    already_redeemed?: boolean;
+};
+
+/**
+ * Portal redemption body — POST /invites/redeem/{token}.
+ */
+export type InviteRedeemRequest = {
+    popup_id: string;
+};
+
+/**
+ * Response after successful redemption.
+ *
+ * Includes the created application's public representation.
+ */
+export type InviteRedeemResponse = {
+    invite_id: string;
+    application_id: string;
+    application_status: string;
+};
+
+/**
+ * Admin request body for PATCH /invites/{id}.
+ *
+ * token and recipient_email are immutable post-create.
+ */
+export type InviteUpdate = {
+    expires_at?: (string | null);
+    max_uses?: (number | null);
+    discount_percentage?: (number | string | null);
+    auto_approve?: (boolean | null);
+    express_checkout?: (boolean | null);
+};
+
+/**
  * Top-level KPI cards with derived metrics.
  */
 export type KeyMetrics = {
@@ -2546,6 +2731,16 @@ export type ListModel_HumanPublic_ = {
     paging: Paging;
 };
 
+export type ListModel_InvitePublic_ = {
+    results: Array<InvitePublic>;
+    paging: Paging;
+};
+
+export type ListModel_MyGroupPublic_ = {
+    results: Array<MyGroupPublic>;
+    paging: Paging;
+};
+
 export type ListModel_PaymentPublic_ = {
     results: Array<PaymentPublic>;
     paging: Paging;
@@ -2563,6 +2758,11 @@ export type ListModel_PopupReviewerPublic_ = {
 
 export type ListModel_ProductPublic_ = {
     results: Array<ProductPublic>;
+    paging: Paging;
+};
+
+export type ListModel_ReferralPublic_ = {
+    results: Array<ReferralPublic>;
     paging: Paging;
 };
 
@@ -2613,6 +2813,53 @@ export type MeAccess = {
     app_name: string;
     scopes: Array<(string)>;
     api_key_scopes: Array<(string)>;
+};
+
+/**
+ * Group public schema augmented with the viewer's role (portal).
+ */
+export type MyGroupPublic = {
+    tenant_id: string;
+    popup_id: string;
+    name: string;
+    slug: string;
+    description?: (string | null);
+    discount_percentage?: string;
+    max_members?: (number | null);
+    welcome_message?: (string | null);
+    auto_approve_applications?: boolean;
+    express_checkout?: boolean;
+    enable_private_events?: boolean;
+    id: string;
+    created_at?: (string | null);
+    updated_at?: (string | null);
+    whitelisted_emails?: Array<GroupWhitelistedEmailPublic>;
+    is_open?: boolean;
+    is_leader?: boolean;
+};
+
+/**
+ * Group with members and viewer role (portal detail).
+ */
+export type MyGroupWithMembers = {
+    tenant_id: string;
+    popup_id: string;
+    name: string;
+    slug: string;
+    description?: (string | null);
+    discount_percentage?: string;
+    max_members?: (number | null);
+    welcome_message?: (string | null);
+    auto_approve_applications?: boolean;
+    express_checkout?: boolean;
+    enable_private_events?: boolean;
+    id: string;
+    created_at?: (string | null);
+    updated_at?: (string | null);
+    whitelisted_emails?: Array<GroupWhitelistedEmailPublic>;
+    is_open?: boolean;
+    members?: Array<GroupMemberPublic>;
+    is_leader?: boolean;
 };
 
 /**
@@ -2989,6 +3236,10 @@ export type PopupAdmin = {
     checkin_pass_lead_days?: (number | null);
     show_attendee_directory?: boolean;
     edit_passes_enabled?: boolean;
+    invites_enabled?: boolean;
+    referrals_enabled?: boolean;
+    group_private_events_enabled?: boolean;
+    max_referrals_per_attendee?: (number | null);
     installments_enabled?: boolean;
     installments_deadline?: (string | null);
     installments_max?: (number | null);
@@ -3115,6 +3366,10 @@ export type PopupPublic = {
     events_enabled?: boolean;
     show_attendee_directory?: boolean;
     edit_passes_enabled?: boolean;
+    invites_enabled?: boolean;
+    referrals_enabled?: boolean;
+    group_private_events_enabled?: boolean;
+    max_referrals_per_attendee?: (number | null);
     installments_enabled?: boolean;
     installments_deadline?: (string | null);
     installments_max?: (number | null);
@@ -3210,6 +3465,10 @@ export type PopupUpdate = {
     installments_interval?: (InstallmentInterval | null);
     installments_interval_count?: (number | null);
     checkin_pass_lead_days?: (number | null);
+    invites_enabled?: (boolean | null);
+    referrals_enabled?: (boolean | null);
+    group_private_events_enabled?: (boolean | null);
+    max_referrals_per_attendee?: (number | null);
     abandoned_cart_delay_days?: (number | null);
     abandoned_cart_repeat_days?: (number | null);
     abandoned_cart_max_count?: (number | null);
@@ -3501,6 +3760,79 @@ export type freq = 'DAILY' | 'WEEKLY' | 'MONTHLY';
  */
 export type RecurrenceUpdate = {
     recurrence?: (RecurrenceRule | null);
+};
+
+/**
+ * Admin request body for PATCH /admin/referrals/{id}.
+ *
+ * Extends owner fields with admin-only fields (discount_percentage, auto_approve).
+ */
+export type ReferralAdminUpdate = {
+    expires_at?: (string | null);
+    max_uses?: (number | null);
+    discount_percentage?: (number | string | null);
+    auto_approve?: (boolean | null);
+    is_disabled?: (boolean | null);
+};
+
+/**
+ * Human request body for POST /portal/referrals.
+ *
+ * code: auto-generated via secrets.token_urlsafe(16) when omitted.
+ * discount_percentage: defaults to 0. Only admin can change after creation.
+ * auto_approve: defaults to False. Only admin can change.
+ */
+export type ReferralCreate = {
+    popup_id: string;
+    code?: (string | null);
+    max_uses?: (number | null);
+    expires_at?: (string | null);
+};
+
+/**
+ * Full referral detail — owner/admin response.
+ */
+export type ReferralPublic = {
+    id: string;
+    popup_id: string;
+    referrer_human_id: string;
+    code: string;
+    discount_percentage: string;
+    auto_approve: boolean;
+    is_disabled?: boolean;
+    max_uses?: (number | null);
+    current_uses: number;
+    expires_at?: (string | null);
+    created_at: string;
+    updated_at: string;
+};
+
+/**
+ * Public lookup — GET /referrals/r/{code}.
+ *
+ * Spec: Design API surface table — returns no PII of referrer.
+ * id is included so the portal can pass referral_id on application create
+ * (REQ-GR-009 — attribution on application).
+ */
+export type ReferralPublicPreview = {
+    id: string;
+    popup_id: string;
+    code: string;
+    discount_percentage: string;
+    max_uses?: (number | null);
+    current_uses: number;
+    expires_at?: (string | null);
+};
+
+/**
+ * Human request body for PATCH /portal/referrals/{id}.
+ *
+ * Only expires_at and max_uses are mutable by the referral owner.
+ * discount_percentage and auto_approve are admin-only.
+ */
+export type ReferralUpdate = {
+    expires_at?: (string | null);
+    max_uses?: (number | null);
 };
 
 /**
@@ -6144,6 +6476,22 @@ export type GroupsDeleteGroupData = {
 
 export type GroupsDeleteGroupResponse = (void);
 
+export type GroupsAssignGroupLeaderData = {
+    groupId: string;
+    requestBody: GroupLeaderAssign;
+    xTenantId?: (string | null);
+};
+
+export type GroupsAssignGroupLeaderResponse = (GroupWithMembers);
+
+export type GroupsRemoveGroupLeaderData = {
+    groupId: string;
+    humanId: string;
+    xTenantId?: (string | null);
+};
+
+export type GroupsRemoveGroupLeaderResponse = (GroupWithMembers);
+
 export type GroupsListMyGroupsData = {
     /**
      * Maximum number of items to return
@@ -6155,13 +6503,13 @@ export type GroupsListMyGroupsData = {
     skip?: number;
 };
 
-export type GroupsListMyGroupsResponse = (ListModel_GroupPublic_);
+export type GroupsListMyGroupsResponse = (ListModel_MyGroupPublic_);
 
 export type GroupsGetMyGroupData = {
     groupId: string;
 };
 
-export type GroupsGetMyGroupResponse = (GroupWithMembers);
+export type GroupsGetMyGroupResponse = (MyGroupWithMembers);
 
 export type GroupsUpdateMyGroupData = {
     groupId: string;
@@ -6172,10 +6520,10 @@ export type GroupsUpdateMyGroupResponse = (GroupPublic);
 
 export type GroupsAddGroupMemberData = {
     groupId: string;
-    requestBody: GroupMemberCreate;
+    requestBody: GroupMemberInvite;
 };
 
-export type GroupsAddGroupMemberResponse = (GroupMemberPublic);
+export type GroupsAddGroupMemberResponse = (AddMemberResult);
 
 export type GroupsAddGroupMembersBatchData = {
     groupId: string;
@@ -6198,6 +6546,21 @@ export type GroupsRemoveGroupMemberData = {
 };
 
 export type GroupsRemoveGroupMemberResponse = (void);
+
+export type GroupsAddMemberByApplicationAdminData = {
+    groupId: string;
+    requestBody: AddMemberByApplicationRequest;
+    xTenantId?: (string | null);
+};
+
+export type GroupsAddMemberByApplicationAdminResponse = (GroupMemberPublic);
+
+export type GroupsAddMemberByApplicationLeaderData = {
+    groupId: string;
+    requestBody: AddMemberByApplicationRequest;
+};
+
+export type GroupsAddMemberByApplicationLeaderResponse = (GroupMemberPublic);
 
 export type GroupsGetGroupPublicData = {
     groupSlug: string;
@@ -6365,6 +6728,59 @@ export type HumansCreateHumanEnrichmentFactData = {
 };
 
 export type HumansCreateHumanEnrichmentFactResponse = (HumanEnrichmentFactPublic);
+
+export type InvitesPreviewInviteData = {
+    token: string;
+};
+
+export type InvitesPreviewInviteResponse = (InvitePublicPreview);
+
+export type InvitesRedeemInviteData = {
+    requestBody: InviteRedeemRequest;
+    token: string;
+};
+
+export type InvitesRedeemInviteResponse = (InviteRedeemResponse);
+
+export type InvitesListInvitesData = {
+    /**
+     * Maximum number of items to return
+     */
+    limit?: number;
+    popupId?: (string | null);
+    recipientEmail?: (string | null);
+    /**
+     * Number of items to skip
+     */
+    skip?: number;
+};
+
+export type InvitesListInvitesResponse = (ListModel_InvitePublic_);
+
+export type InvitesCreateInviteData = {
+    requestBody: InviteCreate;
+};
+
+export type InvitesCreateInviteResponse = (InvitePublic);
+
+export type InvitesGetInviteData = {
+    inviteId: string;
+};
+
+export type InvitesGetInviteResponse = (InvitePublic);
+
+export type InvitesUpdateInviteData = {
+    inviteId: string;
+    requestBody: InviteUpdate;
+};
+
+export type InvitesUpdateInviteResponse = (InvitePublic);
+
+export type InvitesDeleteInviteData = {
+    inviteId: string;
+};
+
+export type InvitesDeleteInviteResponse = (void);
 
 export type PaymentsListPaymentsData = {
     applicationId?: (string | null);
@@ -6587,6 +7003,19 @@ export type PopupsGetPortalPopupData = {
 
 export type PopupsGetPortalPopupResponse = (PopupPublic);
 
+export type PortalResolveGroupSlugData = {
+    popupId: string;
+    slug: string;
+};
+
+export type PortalResolveGroupSlugResponse = (GroupSlugResolution);
+
+export type PortalCanonicalInviteForwardData = {
+    token: string;
+};
+
+export type PortalCanonicalInviteForwardResponse = (unknown);
+
 export type PortalGetPopupAccessData = {
     popupId: string;
 };
@@ -6679,6 +7108,72 @@ export type ProductsListPortalProductsData = {
 };
 
 export type ProductsListPortalProductsResponse = (ListModel_ProductPublic_);
+
+export type ReferralsListMyReferralsData = {
+    /**
+     * Maximum number of items to return
+     */
+    limit?: number;
+    popupId?: (string | null);
+    /**
+     * Number of items to skip
+     */
+    skip?: number;
+};
+
+export type ReferralsListMyReferralsResponse = (ListModel_ReferralPublic_);
+
+export type ReferralsCreateReferralData = {
+    requestBody: ReferralCreate;
+};
+
+export type ReferralsCreateReferralResponse = (ReferralPublic);
+
+export type ReferralsUpdateMyReferralData = {
+    referralId: string;
+    requestBody: ReferralUpdate;
+};
+
+export type ReferralsUpdateMyReferralResponse = (ReferralPublic);
+
+export type ReferralsDeleteMyReferralData = {
+    referralId: string;
+};
+
+export type ReferralsDeleteMyReferralResponse = (void);
+
+export type ReferralsGetReferralPreviewData = {
+    code: string;
+};
+
+export type ReferralsGetReferralPreviewResponse = (ReferralPublicPreview);
+
+export type ReferralsListReferralsAdminData = {
+    /**
+     * Maximum number of items to return
+     */
+    limit?: number;
+    popupId?: (string | null);
+    /**
+     * Number of items to skip
+     */
+    skip?: number;
+};
+
+export type ReferralsListReferralsAdminResponse = (ListModel_ReferralPublic_);
+
+export type ReferralsGetReferralAdminData = {
+    referralId: string;
+};
+
+export type ReferralsGetReferralAdminResponse = (ReferralPublic);
+
+export type ReferralsUpdateReferralAdminData = {
+    referralId: string;
+    requestBody: ReferralAdminUpdate;
+};
+
+export type ReferralsUpdateReferralAdminResponse = (ReferralPublic);
 
 export type SavedViewsListSavedViewsData = {
     entity: string;

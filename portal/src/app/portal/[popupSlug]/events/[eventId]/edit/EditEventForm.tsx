@@ -13,6 +13,7 @@ import {
   type EventPublic,
   EventsService,
   type EventUpdate,
+  GroupsService,
   HumansService,
   type TrackPublic,
   TracksService,
@@ -100,6 +101,17 @@ export function EditEventForm({
   const tracks: TrackPublic[] = tracksData?.results ?? []
 
   const form = useEditEventForm(event)
+
+  const { data: myGroupsData } = useQuery({
+    queryKey: ["my-groups-private", popupId],
+    queryFn: () => GroupsService.listMyGroups({ limit: 100 }),
+    enabled: form.visibility === "private" && !!popupId,
+    staleTime: 60_000,
+  })
+  const eligibleGroups = (myGroupsData?.results ?? []).filter(
+    (g) =>
+      g.enable_private_events === true && (!popupId || g.popup_id === popupId),
+  )
 
   // Derive initial scheduling values from `event`. Memoised so the lazy
   // initialisers inside `useEventScheduling` only run once per mount.
@@ -310,7 +322,10 @@ export function EditEventForm({
 
         <VisibilityField
           value={form.visibility}
-          onChange={form.setVisibility}
+          onChange={form.handleVisibilityChange}
+          groupId={form.groupId}
+          onGroupChange={form.setGroupId}
+          eligibleGroups={eligibleGroups}
         />
 
         <HostDisplayField

@@ -562,12 +562,6 @@ def _seed_groups(
         if existing_group:
             group_map[group_key] = existing_group
         else:
-            ambassador_id = None
-            if group_data.get("ambassador_key"):
-                ambassador = human_map.get(group_data["ambassador_key"])
-                if ambassador:
-                    ambassador_id = ambassador.id
-
             group = Groups(
                 tenant_id=tenant_id,
                 popup_id=popup.id,
@@ -577,8 +571,6 @@ def _seed_groups(
                 discount_percentage=Decimal(group_data.get("discount_percentage", "0")),
                 max_members=group_data.get("max_members"),
                 welcome_message=group_data.get("welcome_message"),
-                is_ambassador_group=group_data.get("is_ambassador_group", False),
-                ambassador_id=ambassador_id,
             )
             session.add(group)
             session.commit()

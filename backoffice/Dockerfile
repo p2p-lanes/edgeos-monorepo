@@ -17,6 +17,7 @@ COPY ./packages/shared-form-ui /app/packages/shared-form-ui
 COPY ./packages/shared-events /app/packages/shared-events
 COPY ./backoffice /app/backoffice
 ARG VITE_API_URL
+ARG VITE_PORTAL_DOMAIN
 ENV NODE_ENV=production
 
 RUN pnpm --filter backoffice run build

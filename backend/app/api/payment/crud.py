@@ -22,7 +22,6 @@ if TYPE_CHECKING:
         CheckoutPreviewResponse,
         OpenTicketingPurchaseCreate,
     )
-    from app.api.group.models import Groups
     from app.api.human.models import Humans
     from app.api.popup.models import Popups
     from app.api.tenant.models import Tenants
@@ -2090,7 +2089,53 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 response.coupon_code = coupon.code
                 response.discount_value = coupon_discount
 
-        # Check scholarship discount (third competitor — best-of-three)
+        # Check invite discount — read live from the invite row, same as the
+        # group branch. application.discount_percentage is scholarship-only;
+        # invite discounts must not ride on that column.
+        if application.invite_id:
+            from app.api.invite.crud import invites_crud
+
+            invite = invites_crud.get(session, application.invite_id)
+            if invite and invite.discount_percentage:
+                invite_discount = Decimal(str(invite.discount_percentage))
+                discounted_amount, discounted_credit_applied = _calculate_price(
+                    standard_amount=standard_amount,
+                    non_discountable_amount=non_discountable_amount,
+                    discount_value=invite_discount,
+                    application=application,
+                    edit_passes=obj.edit_passes,
+                )
+                if discounted_amount < response.amount:
+                    response.amount = discounted_amount
+                    response.credit_applied = discounted_credit_applied
+                    response.discount_value = invite_discount
+                    response.coupon_id = None
+                    response.coupon_code = None
+                    response.group_id = None
+
+        # Check referral discount — read live; a disabled referral grants nothing.
+        if application.referral_id:
+            from app.api.referral.crud import referrals_crud
+
+            referral = referrals_crud.get(session, application.referral_id)
+            if referral and not referral.is_disabled and referral.discount_percentage:
+                referral_discount = Decimal(str(referral.discount_percentage))
+                discounted_amount, discounted_credit_applied = _calculate_price(
+                    standard_amount=standard_amount,
+                    non_discountable_amount=non_discountable_amount,
+                    discount_value=referral_discount,
+                    application=application,
+                    edit_passes=obj.edit_passes,
+                )
+                if discounted_amount < response.amount:
+                    response.amount = discounted_amount
+                    response.credit_applied = discounted_credit_applied
+                    response.discount_value = referral_discount
+                    response.coupon_id = None
+                    response.coupon_code = None
+                    response.group_id = None
+
+        # Check scholarship discount (last competitor — best-of-N)
         if (
             application.scholarship_status == ScholarshipStatus.APPROVED.value
             and application.discount_percentage
@@ -2855,15 +2900,9 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 session, products_to_add, payment_id=payment.id
             )
 
-            # Create ambassador group if patreon product was purchased.
-            # Direct-sale payments have no application — skip ambassador logic
-            # (it requires application.human_id for the group leader).
-            if payment.application_id is not None:
-                self._create_ambassador_group(session, payment)
-
-            # Clear cart after successful payment so a returning buyer never
-            # restores an already-paid cart. Both the application flow and open
-            # checkout key the cart by (human, popup), so delete by human.
+            # Clear cart after successful payment. Application flow clears by
+            # human; direct-sale (open checkout) clears the anonymous cart by the
+            # buyer email so a returning buyer never restores an already-paid cart.
             from app.api.cart.crud import carts_crud
 
             if payment.application:
@@ -2929,70 +2968,6 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             len(attendee_ids),
             payment.id,
         )
-
-    def _create_ambassador_group(
-        self,
-        session: Session,
-        payment: Payments,
-    ) -> "Groups | None":
-        """Create an ambassador group when a payment with a patreon product is approved.
-
-        Returns the created group, or None if no patreon product was purchased or the
-        human already has an ambassador group for this popup.
-        """
-        from app.api.group.crud import groups_crud
-        from app.api.product.schemas import CATEGORY_PATREON
-
-        has_patreon_product = any(
-            ps.product_category == CATEGORY_PATREON for ps in payment.products_snapshot
-        )
-        if not has_patreon_product:
-            return None
-
-        # Get application with popup
-        application = session.get(Applications, payment.application_id)
-        if not application or not application.human_id:
-            logger.warning(
-                "Cannot create ambassador group: application or human not found for payment %s",
-                payment.id,
-            )
-            return None
-
-        human = application.human
-        popup = application.popup
-
-        if not human or not popup:
-            logger.warning(
-                "Cannot create ambassador group: missing human or popup for payment %s",
-                payment.id,
-            )
-            return None
-
-        # Check if human already has an ambassador group for this popup
-        existing_group = groups_crud.get_ambassador_group(session, popup.id, human.id)
-        if existing_group:
-            logger.info(
-                "Ambassador group already exists for %s",
-                human.email,
-            )
-            return existing_group
-
-        # Build full name
-        first_name = human.first_name or ""
-        last_name = human.last_name or ""
-        full_name = f"{first_name} {last_name}".strip()
-
-        # Create ambassador group using the CRUD service
-        group = groups_crud.create_ambassador_group(
-            session,
-            tenant_id=application.tenant_id,
-            popup_id=popup.id,
-            popup_slug=popup.slug,
-            human_id=human.id,
-            human_name=full_name,
-        )
-
-        return group
 
     def _remove_products_from_attendees(
         self,

@@ -141,12 +141,15 @@ interface DynamicApplicationFormProps {
   schema: ApplicationFormSchema
   existingApplication?: ApplicationPublic | null
   popup: PopupPublic
+  /** Referral UUID carried from /r/{code} — attributed on application create (REQ-GR-009). */
+  referralId?: string | null
 }
 
 export function DynamicApplicationForm({
   schema,
   existingApplication,
   popup,
+  referralId,
 }: DynamicApplicationFormProps) {
   const { t } = useTranslation()
   const { getRelevantApplication } = useApplication()
@@ -167,6 +170,7 @@ export function DynamicApplicationForm({
     values,
     application,
     validate,
+    referralId,
   })
 
   const feeAlreadyPaid = Boolean(

@@ -2,7 +2,6 @@ import { AnimatePresence, motion } from "framer-motion"
 import { ChevronDown, Pencil, Trash2, User } from "lucide-react"
 import { useState } from "react"
 import type { GroupMemberPublic } from "@/client"
-import ParticipationTickets from "@/components/common/ParticipationTickets"
 import { Button } from "@/components/ui/button"
 import {
   Tooltip,
@@ -10,7 +9,6 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
-import useGetPassesData from "@/hooks/useGetPassesData"
 import MemberFormModal from "./AddMemberModal"
 import ConfirmDeleteModal from "./ConfirmDeleteModal"
 import DetailItem from "./DetailItem"
@@ -18,18 +16,13 @@ import DetailItem from "./DetailItem"
 interface MemberItemProps {
   member: GroupMemberPublic
   onMemberUpdated?: () => void
-  isAmbassadorGroup?: boolean
+  isLeader?: boolean
 }
 
-const MemberItem = ({
-  member,
-  onMemberUpdated,
-  isAmbassadorGroup,
-}: MemberItemProps) => {
+const MemberItem = ({ member, onMemberUpdated, isLeader }: MemberItemProps) => {
   const [isExpanded, setIsExpanded] = useState(false)
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
-  const { products: passes } = useGetPassesData()
 
   const handleEditClick = (e: React.MouseEvent) => {
     e.stopPropagation() // Prevent expand/collapse when clicking edit
@@ -130,21 +123,11 @@ const MemberItem = ({
                   />
 
                   <DetailItem label="ROLE" value={member.role || ""} />
-                  <div>
-                    <p className="text-xs text-gray-500 uppercase font-medium mb-1">
-                      PASSES
-                    </p>
-                    {/* LEGACY: member.products is Array<unknown> – review pass display */}
-                    <ParticipationTickets
-                      participation={member.products as any}
-                      passes={passes}
-                    />
-                  </div>
                 </div>
               </div>
 
               <div className="flex justify-end gap-3">
-                {!isAmbassadorGroup && (
+                {isLeader && (
                   <>
                     <Button
                       variant={"outline"}

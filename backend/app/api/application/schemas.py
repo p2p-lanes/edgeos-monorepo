@@ -132,6 +132,14 @@ class ApplicationBase(SQLModel):
     )
     incentive_currency: str | None = Field(default=None, max_length=10, nullable=True)
 
+    # Groups-rework: attribution columns for invite/referral flows
+    invite_id: uuid.UUID | None = Field(
+        default=None, foreign_key="invites.id", nullable=True
+    )
+    referral_id: uuid.UUID | None = Field(
+        default=None, foreign_key="referrals.id", nullable=True
+    )
+
 
 class ApplicationReviewerVote(BaseModel):
     """Compact reviewer + decision pair for the applications list."""
@@ -155,6 +163,11 @@ class ApplicationPublic(BaseModel):
 
     # Popup-specific
     referral: str | None = None
+    # Attribution (groups-rework): which invite/referral this application came
+    # through, plus a resolved display name of the referrer for the BO.
+    invite_id: uuid.UUID | None = None
+    referral_id: uuid.UUID | None = None
+    referred_by_name: str | None = None
     info_not_shared: list[str] = []
     status: str
     custom_fields: dict = {}
@@ -249,6 +262,10 @@ class ApplicationCreate(BaseModel):
     status: UserSettableStatus | None = None
     human_id: uuid.UUID | None = None
     group_id: uuid.UUID | None = None  # Optional group to join
+
+    # Attribution columns — groups-rework T-gr-032 (REQ-GR-009, REQ-GR-016)
+    invite_id: uuid.UUID | None = None
+    referral_id: uuid.UUID | None = None
 
     # Scholarship request (human-submittable fields only)
     scholarship_request: bool = False

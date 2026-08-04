@@ -26,6 +26,8 @@ interface UseCheckoutStateProps {
   popupId: string
   saleType: "application" | "direct"
   groupId?: string | null
+  inviteId?: string | null
+  referralId?: string | null
   schema?: ApplicationFormSchema
 }
 
@@ -80,6 +82,8 @@ const useCheckoutState = ({
   popupId,
   saleType,
   groupId,
+  inviteId,
+  referralId,
   schema,
 }: UseCheckoutStateProps) => {
   const queryClient = useQueryClient()
@@ -151,6 +155,8 @@ const useCheckoutState = ({
           requestBody: {
             ...mutationPayload.payload,
             group_id: groupId ?? undefined,
+            invite_id: inviteId ?? undefined,
+            referral_id: referralId ?? undefined,
           },
         })
       }

@@ -271,6 +271,27 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
         session.refresh(attendee)
         return attendee
 
+    def human_has_ticket_in_popup(
+        self,
+        session: Session,
+        human_id: uuid.UUID,
+        popup_id: uuid.UUID,
+    ) -> bool:
+        """Whether the human owns at least one ticket (attendee_product) in the
+        popup. Used to gate self-serve actions (e.g. creating a referral link)
+        to confirmed attendees who actually have an entry.
+        """
+        row = session.exec(
+            select(AttendeeProducts.id)
+            .join(Attendees, Attendees.id == AttendeeProducts.attendee_id)  # type: ignore[arg-type]
+            .where(
+                Attendees.human_id == human_id,
+                Attendees.popup_id == popup_id,
+            )
+            .limit(1)
+        ).first()
+        return row is not None
+
     def get_main_attendee(
         self,
         session: Session,

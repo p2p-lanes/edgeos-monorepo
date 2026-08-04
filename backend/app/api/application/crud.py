@@ -732,15 +732,60 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
                 detail="Popup not found",
             )
 
+        # Popup feature-flag guards for invite/referral paths (T-gr-017).
+        # These flags gate whether the invite/referral modules are active for
+        # this popup. Checked early so we fail fast before any DB lookups.
+        if getattr(app_data, "invite_id", None) and not popup.invites_enabled:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Invite-based applications are not enabled for this popup",
+            )
+        if getattr(app_data, "referral_id", None) and not popup.referrals_enabled:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Referral-based applications are not enabled for this popup",
+            )
+
         # Drafts are partial saves: skip "required field is missing" checks but
         # still validate types/constraints on any values the user did provide.
         is_draft = _is_draft_status(getattr(app_data, "status", None))
 
+        # Resolve group early so we can read explicit flags. The whitelist
+        # validation below re-uses this same object (no second DB hit).
+        _group_id = getattr(app_data, "group_id", None)
+        _group = None
+        if _group_id:
+            from app.api.group.crud import groups_crud as _groups_crud
+
+            _group = _groups_crud.get(session, _group_id)
+
         # Applications submitted through a group come from the portal's
-        # Express Checkout, which renders a reduced personal-info form. Scope
-        # required validation to that subset so users aren't blocked on fields
-        # the form never asked for.
-        is_express_checkout = bool(getattr(app_data, "group_id", None))
+        # Express Checkout ONLY when the group explicitly opts in via the
+        # express_checkout flag. Previously this was implicit (bool(group_id));
+        # now it requires the flag to be True. Design Decision 1f.
+        # Invite express_checkout flag works the same way: when the invite
+        # opts in, required fields are relaxed (shared behavior with group flow).
+        # REQ-GR-003 guard chain: expiry + use-limit checked here (before
+        # express_checkout is read). Email match is deferred until after
+        # human is fetched below.
+        _invite_id = getattr(app_data, "invite_id", None)
+        _invite = None
+        if _invite_id:
+            from app.api.invite.crud import invites_crud as _invites_crud
+
+            _invite = _invites_crud.get(session, _invite_id)
+            if not _invite:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Invite not found",
+                )
+            # Steps 1 + 2: expiry → max_uses (reuse shared validate_for_redemption)
+            _invites_crud.validate_for_redemption(_invite)
+
+        is_express_checkout = bool(
+            (_group and _group.express_checkout)
+            or (_invite and _invite.express_checkout)
+        )
 
         # Validate custom_fields against form field definitions. Non-draft
         # submissions must run even with empty/absent custom_fields so
@@ -782,26 +827,34 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
                     detail={"message": "Invalid base fields", "errors": errors},
                 )
 
-        # Validate group whitelist if group_id provided
-        if hasattr(app_data, "group_id") and app_data.group_id:
-            from app.api.group.crud import groups_crud
+        # Step 3 of REQ-GR-003: recipient_email match (case-insensitive).
+        # Deferred here so we have human.email available. Open invites (no
+        # recipient_email) skip this check entirely.
+        if _invite and _invite.recipient_email is not None:
+            if _invite.recipient_email.lower() != human.email.lower():
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="This invite is restricted to a different email address",
+                )
 
-            group = groups_crud.get(session, app_data.group_id)
-            if not group:
+        # Validate group whitelist if group_id provided.
+        # Reuses _group already fetched above (avoid duplicate DB hit).
+        if _group_id:
+            if not _group:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail="Group not found",
                 )
 
             # Check if group belongs to same popup
-            if group.popup_id != app_data.popup_id:
+            if _group.popup_id != app_data.popup_id:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="Group does not belong to this popup",
                 )
 
             # Check whitelist (skip if group is open - has no whitelisted emails)
-            if not group.is_open and not group.has_whitelisted_email(human.email):
+            if not _group.is_open and not _group.has_whitelisted_email(human.email):
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail="Your email is not whitelisted for this group",
@@ -833,6 +886,9 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
             "custom_fields",
             "status",
             "group_id",
+            # Attribution columns — groups-rework T-gr-032
+            "invite_id",
+            "referral_id",
             # Scholarship human-submittable fields (Phase 2.2)
             "scholarship_request",
             "scholarship_details",
@@ -846,8 +902,33 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         data["tenant_id"] = tenant_id
         data["human_id"] = human_id
 
-        # Auto-accept applications that come through a group (checkout/referral)
-        if data.get("group_id"):
+        # Resolve referral when referral_id is provided.
+        # Validate use limits and expiry; increment uses; auto-approve if flag set.
+        # T-gr-032: referral attribution wiring (groups-rework Decision 1f).
+        _referral_id = getattr(app_data, "referral_id", None)
+        _referral = None
+        if _referral_id:
+            from app.api.referral.crud import referrals_crud as _referrals_crud
+
+            _referral = _referrals_crud.get(session, _referral_id)
+            if not _referral:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Referral not found",
+                )
+            # Validate the referral is still usable (expiry + use limit)
+            _referrals_crud.validate_for_use(_referral)
+
+        # Auto-accept only when the group explicitly enables it via the
+        # auto_approve_applications flag, or when the referral/invite enables it.
+        # Previously this triggered for any application with a group_id (implicit);
+        # now the flag must be True. Design Decision 1f: NO retroactive changes.
+        should_auto_accept = bool(
+            (_group and _group.auto_approve_applications)
+            or (_referral and _referral.auto_approve)
+            or (_invite and _invite.auto_approve)
+        )
+        if should_auto_accept:
             if human.red_flag:
                 data["status"] = ApplicationStatus.REJECTED.value
             else:
@@ -925,6 +1006,16 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
             )
             self.create_snapshot(session, application, event)
 
+        # Create snapshot for invite auto-accept/reject (mirrors group snapshot).
+        # No group membership is added — invite flow is purchase-only.
+        if _invite is not None and should_auto_accept:
+            event = (
+                "auto_rejected"
+                if application.status == ApplicationStatus.REJECTED.value
+                else "auto_accepted"
+            )
+            self.create_snapshot(session, application, event)
+
         # Sync membership junction: Application.group_id records origin (historical),
         # GroupMembers records currently-active membership. Keep them aligned on creation
         # so max_members validation and is_member() reflect the new application.
@@ -945,6 +1036,24 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
                         human_id=human_id,
                     )
                 )
+
+        # Increment referral current_uses now that the application is being committed.
+        # T-gr-032: referral attribution — spec REQ-GR-009.
+        if _referral is not None:
+            _referral.current_uses += 1
+            session.add(_referral)
+
+        # Apply invite discount and increment uses (REQ-GR-004).
+        # Membership side-effect is GROUP-only — invite NEVER adds to group_members.
+        # Inline the uses increment (mirror referral pattern) so all writes
+        # commit in a single transaction boundary via the session.commit() below.
+        if _invite is not None:
+            _invite.current_uses += 1
+            if _invite.used_at is None:
+                _invite.used_at = datetime.now(UTC)
+            if _invite.max_uses == 1:
+                _invite.redeemed_by_human_id = human_id
+            session.add(_invite)
 
         session.commit()
         session.refresh(application)
@@ -978,9 +1087,16 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         # still validate types/constraints on any values the user did provide.
         is_draft = _is_draft_status(getattr(app_data, "status", None))
 
-        # Group applications use the Express Checkout reduced form on the
-        # portal; mirror that scope here when the admin creates one too.
-        is_express_checkout = bool(getattr(app_data, "group_id", None))
+        # Resolve group to read its explicit express_checkout flag.
+        # The presence of group_id alone MUST NOT trigger express checkout
+        # (REQ-GR-014). Mirror the portal path (create_internal ~line 436).
+        _admin_group_id = getattr(app_data, "group_id", None)
+        _admin_group = None
+        if _admin_group_id:
+            from app.api.group.crud import groups_crud as _groups_crud
+
+            _admin_group = _groups_crud.get(session, _admin_group_id)
+        is_express_checkout = bool(_admin_group and _admin_group.express_checkout)
 
         # Validate custom_fields against form field definitions. Non-draft
         # submissions must run even with empty/absent custom_fields so
