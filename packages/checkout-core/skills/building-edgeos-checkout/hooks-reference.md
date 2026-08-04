@@ -1,8 +1,12 @@
-# EdgeOS Checkout — Hooks & Store Reference
+# EdgeOS Checkout — React Hooks & Provider Reference
 
-Everything here is exported from `@edgeos/checkout-react`. The hooks are thin
-selectors over a framework-agnostic store built by `<CheckoutProvider>`; the
-store actions they expose are stable (safe in deps / event handlers).
+**React only.** Not using React? Read **`core-store-reference.md`** instead — it
+documents the same store this adapter wraps, for Vue/Svelte/vanilla/etc.
+
+Everything here is exported from `@edgeos/checkout-react` (which re-exports all of
+`@edgeos/checkout-core`). The hooks are thin selectors over the framework-agnostic
+store built by `<CheckoutProvider>`; the store actions they expose are stable
+(safe in deps / event handlers).
 
 ## `<CheckoutProvider>`
 

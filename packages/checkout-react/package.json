@@ -2,7 +2,7 @@
   "name": "@edgeos/checkout-react",
   "version": "0.1.0",
   "type": "module",
-  "description": "React adapter for the EdgeOS headless checkout SDK — a <CheckoutProvider> and hooks over @edgeos/checkout-core. Ships the building-edgeos-checkout Claude Code skill.",
+  "description": "React adapter for the EdgeOS headless checkout SDK — a <CheckoutProvider> and hooks over @edgeos/checkout-core. Re-exports the core; the building-edgeos-checkout Claude Code skill ships in @edgeos/checkout-core.",
   "keywords": [
     "edgeos",
     "checkout",
@@ -32,7 +32,7 @@
       "default": "./src/index.ts"
     }
   },
-  "files": ["dist", "skills", "README.md"],
+  "files": ["dist", "README.md"],
   "publishConfig": {
     "access": "public",
     "main": "./dist/index.js",

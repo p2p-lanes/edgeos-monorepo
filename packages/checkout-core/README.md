@@ -6,8 +6,7 @@ validation, coupons, payment handoff, analytics — with **zero UI and zero
 framework**. Bring your own components.
 
 Using React? Install [`@edgeos/checkout-react`](https://www.npmjs.com/package/@edgeos/checkout-react)
-instead — it re-exports everything here plus a provider and hooks, and ships a
-Claude Code skill that scaffolds a full checkout.
+instead — it re-exports everything here plus a provider and hooks.
 
 ## Install
 
@@ -48,8 +47,18 @@ const result = await store.submit() // → { checkoutUrl } to redirect the buyer
 - `submit()` returns a `checkoutUrl` (SimpleFi hosted page) — you redirect there; it does not "complete" the order.
 
 The public surface (client, store, selection, steps, order, pricing, cart, form,
-analytics, and all types) is exported from the package root. The React adapter
-documents the full contract in its bundled skill.
+analytics, and all types) is exported from the package root.
+
+## Build your checkout with Claude Code
+
+This package ships a **Claude Code skill** at
+`node_modules/@edgeos/checkout-core/skills/building-edgeos-checkout/`. Copy that
+folder into your project's `.claude/skills/` (or ask your Claude Code to do it),
+and it will scaffold a correct, restyle-me checkout on this SDK. It documents the
+full API contract, the framework-agnostic store, money/step/buyer-form rules, and
+ships two complete examples — one **vanilla/no-framework** (`example-vanilla.ts`)
+and one **React** (`example-checkout.tsx`). React users get this same skill
+transitively (the React package depends on this one).
 
 ## License
 

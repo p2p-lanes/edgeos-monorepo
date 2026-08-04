@@ -2,7 +2,7 @@
   "name": "@edgeos/checkout-core",
   "version": "0.1.0",
   "type": "module",
-  "description": "Framework-agnostic headless checkout engine for EdgeOS — store, typed API client, server-authoritative pricing, cart, form validation and analytics. Zero UI, zero framework.",
+  "description": "Framework-agnostic headless checkout engine for EdgeOS — store, typed API client, server-authoritative pricing, cart, form validation and analytics. Zero UI, zero framework. Ships the building-edgeos-checkout Claude Code skill.",
   "keywords": [
     "edgeos",
     "checkout",
@@ -31,7 +31,7 @@
       "default": "./src/index.ts"
     }
   },
-  "files": ["dist", "README.md"],
+  "files": ["dist", "skills", "README.md"],
   "publishConfig": {
     "access": "public",
     "main": "./dist/index.js",

@@ -48,12 +48,12 @@ function Checkout() {
 
 ## Build your checkout with Claude Code
 
-This package ships a **Claude Code skill** at
-`node_modules/@edgeos/checkout-react/skills/building-edgeos-checkout/`. Copy that
-folder into your project's `.claude/skills/` (or ask your Claude Code to do it),
-and it will scaffold a correct, restyle-me checkout on this SDK — it documents
-every hook, the API contract, money/step/buyer-form rules, and includes a
-complete example.
+The SDK ships a **Claude Code skill** that scaffolds a correct, restyle-me
+checkout — it documents every hook, the API contract, and money/step/buyer-form
+rules, with a complete React example. It lives in the core package (installed here
+as a dependency), at
+`node_modules/@edgeos/checkout-core/skills/building-edgeos-checkout/`. Copy that
+folder into your project's `.claude/skills/` (or ask your Claude Code to do it).
 
 ## License
 
