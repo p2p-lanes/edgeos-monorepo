@@ -5627,6 +5627,7 @@ export type CheckoutGetCheckoutShareMetaData = {
 export type CheckoutGetCheckoutShareMetaResponse = (CheckoutShareMeta);
 
 export type CheckoutPurchaseOpenTicketingData = {
+    flowSlug?: (string | null);
     requestBody: OpenTicketingPurchaseCreate;
     slug: string;
     xTenantId?: (string | null);
@@ -7341,6 +7342,12 @@ export type SalesFlowsListPortalSalesFlowsData = {
 };
 
 export type SalesFlowsListPortalSalesFlowsResponse = (ListModel_SalesFlowPublic_);
+
+export type SalesFlowsListPortalUpsaleFlowsData = {
+    popupId: string;
+};
+
+export type SalesFlowsListPortalUpsaleFlowsResponse = (ListModel_SalesFlowPublic_);
 
 export type SalesFlowsListSalesFlowsData = {
     /**
