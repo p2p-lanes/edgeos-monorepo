@@ -318,7 +318,20 @@ class TestAddFlowIdBackfillDML:
 
 
 # ---------------------------------------------------------------------------
-# Scenario: uq_application_human_popup untouched by this slice
+# Scenario: uq_application_human_popup untouched by THIS slice (4e221ea1a2ee)
+#
+# UPDATED for sdd/sales-flows slice 5 (e31496bde92c, G2 confirmed
+# 2026-08-04): at the full migration head, `uq_application_human_popup` no
+# longer exists — it was superseded by `uq_application_human_flow` on
+# (human_id, sales_flow_id). `_insert_application` here never sets
+# sales_flow_id, so at head two NULL-flow inserts for the same human/popup
+# are NOT rejected (Postgres NULL semantics — every NULL is distinct in a
+# unique index). This test now proves duplicate rejection still happens
+# when the same (human_id, sales_flow_id) pair is inserted twice — the
+# flow-scoped constraint this slice's own migration adds. Full behavioral
+# coverage of the re-key (including the "different flow, same popup, both
+# persist" G2 proof) lives in
+# tests/migrations/test_rekey_application_uniqueness_to_flow.py.
 # ---------------------------------------------------------------------------
 
 
@@ -329,9 +342,36 @@ class TestApplicationUniquenessUntouched:
         popup_id = _insert_popup(db, tenant_a.id)
         human_id = _insert_human(db, tenant_a.id)
         try:
-            _insert_application(db, tenant_a.id, popup_id, human_id)
+            flow_id = _insert_default_flow(db, tenant_a.id, popup_id)
+            db.exec(
+                text(
+                    "INSERT INTO applications "
+                    "(id, tenant_id, popup_id, human_id, sales_flow_id) "
+                    "VALUES (:id, :tid, :pid, :hid, :fid)"
+                ).bindparams(
+                    id=uuid.uuid4(),
+                    tid=tenant_a.id,
+                    pid=popup_id,
+                    hid=human_id,
+                    fid=flow_id,
+                )
+            )
+            db.commit()
             with pytest.raises(IntegrityError):
-                _insert_application(db, tenant_a.id, popup_id, human_id)
+                db.exec(
+                    text(
+                        "INSERT INTO applications "
+                        "(id, tenant_id, popup_id, human_id, sales_flow_id) "
+                        "VALUES (:id, :tid, :pid, :hid, :fid)"
+                    ).bindparams(
+                        id=uuid.uuid4(),
+                        tid=tenant_a.id,
+                        pid=popup_id,
+                        hid=human_id,
+                        fid=flow_id,
+                    )
+                )
+                db.commit()
             db.rollback()
         finally:
             _cleanup(db, popup_id, human_id)

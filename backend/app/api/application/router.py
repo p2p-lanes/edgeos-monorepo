@@ -1107,9 +1107,27 @@ async def create_my_application(
 
     ensure_popup_writable(popups_crud.get(db, app_in.popup_id))
 
-    # Check for existing application
-    existing = crud.applications_crud.get_by_human_popup(
-        db, human_id=current_human.id, popup_id=app_in.popup_id
+    # Check for existing application. sdd/sales-flows slice 5 (G2, confirmed
+    # 2026-08-04): one application per person PER FLOW, not per popup.
+    # Flow-scoped when the popup has a default flow; falls back to the
+    # legacy popup-level check otherwise (popups created before task 5.0,
+    # or via fixtures that bypass PopupsCRUD.create).
+    #
+    # Wording kept unchanged ("...for this popup"): the portal string-matches
+    # "already have an application" (useCheckoutState.ts) to recover the
+    # existing-application state — this substring is preserved verbatim.
+    # "sales flow" is not yet a portal-facing concept (flow selection isn't
+    # wired into the intake form until a later slice), so this message
+    # deliberately stays popup-oriented rather than exposing that jargon.
+    flow_id = crud.applications_crud.resolve_creation_flow_id(db, app_in.popup_id)
+    existing = (
+        crud.applications_crud.get_by_human_flow(
+            db, human_id=current_human.id, sales_flow_id=flow_id
+        )
+        if flow_id is not None
+        else crud.applications_crud.get_by_human_popup(
+            db, human_id=current_human.id, popup_id=app_in.popup_id
+        )
     )
     if existing:
         raise HTTPException(

@@ -206,12 +206,53 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
     def get_by_human_popup(
         self, session: Session, human_id: uuid.UUID, popup_id: uuid.UUID
     ) -> Applications | None:
-        """Get an application by human_id and popup_id."""
+        """Get an application by human_id and popup_id.
+
+        Popup-scoped, not flow-scoped — legitimate for reads where "does
+        this human already participate in this popup, in any flow" is the
+        actual question (access-ladder checks, invite redemption, "my
+        application" lookups). NOT used by the duplicate-creation guards
+        (see `get_by_human_flow`) since sdd/sales-flows slice 5 (G2).
+        """
         statement = select(Applications).where(
             Applications.human_id == human_id,
             Applications.popup_id == popup_id,
         )
         return session.exec(statement).first()
+
+    def get_by_human_flow(
+        self, session: Session, human_id: uuid.UUID, sales_flow_id: uuid.UUID
+    ) -> Applications | None:
+        """Get an application by human_id and sales_flow_id.
+
+        Design: sdd/sales-flows slice 5, human checkpoint G2 (confirmed
+        2026-08-04) — one application per person PER FLOW, not per popup.
+        Used by the duplicate-creation guards.
+        """
+        statement = select(Applications).where(
+            Applications.human_id == human_id,
+            Applications.sales_flow_id == sales_flow_id,
+        )
+        return session.exec(statement).first()
+
+    def resolve_creation_flow_id(
+        self, session: Session, popup_id: uuid.UUID
+    ) -> uuid.UUID | None:
+        """Resolve the sales_flow_id to stamp on a newly created application.
+
+        Returns the popup's default flow id, or None when the popup has no
+        default flow yet. None is a legitimate, expected outcome (not an
+        invariant breach) for any popup created before task 5.0 shipped, or
+        by fixtures/tests that bypass `PopupsCRUD.create` — the slice-9
+        resolver's "missing default is a 500-class invariant breach" rule
+        (design D2) applies to the real flow-resolution contract, not to
+        this creation-time guard. Callers must fall back to the legacy
+        popup-level duplicate check when this returns None.
+        """
+        from app.api.sales_flow.crud import sales_flows_crud
+
+        default_flow = sales_flows_crud.get_default_flow(session, popup_id)
+        return default_flow.id if default_flow else None
 
     def find_by_human(
         self,
@@ -901,6 +942,13 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         }
         data["tenant_id"] = tenant_id
         data["human_id"] = human_id
+        # sdd/sales-flows slice 5 (G2): stamp the popup's default flow on
+        # every new application. None when the popup has no default flow
+        # yet (see resolve_creation_flow_id) — the column stays NULL, same
+        # as before this slice.
+        data["sales_flow_id"] = self.resolve_creation_flow_id(
+            session, app_data.popup_id
+        )
 
         # Resolve referral when referral_id is provided.
         # Validate use limits and expiry; increment uses; auto-approve if flag set.
@@ -1172,14 +1220,22 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
             if profile_update:
                 humans_crud.update(session, human, HumanUpdate(**profile_update))
 
-        # Check for existing application
-        existing = self.get_by_human_popup(
-            session, human_id=human.id, popup_id=app_data.popup_id
+        # Check for existing application. sdd/sales-flows slice 5 (G2,
+        # confirmed 2026-08-04): flow-scoped when the popup has a default
+        # flow; falls back to the legacy popup-level check otherwise (see
+        # resolve_creation_flow_id).
+        flow_id = self.resolve_creation_flow_id(session, app_data.popup_id)
+        existing = (
+            self.get_by_human_flow(session, human_id=human.id, sales_flow_id=flow_id)
+            if flow_id is not None
+            else self.get_by_human_popup(
+                session, human_id=human.id, popup_id=app_data.popup_id
+            )
         )
         if existing:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="An application already exists for this human and popup",
+                detail="An application already exists for this human and sales flow",
             )
 
         # Build application data
@@ -1202,6 +1258,7 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         }
         data["tenant_id"] = tenant_id
         data["human_id"] = human.id
+        data["sales_flow_id"] = flow_id
 
         # Convert status enum to string
         if data.get("status") and hasattr(data["status"], "value"):
@@ -1540,10 +1597,16 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         from app.api.form_field.crud import form_fields_crud
 
         now = datetime.now(UTC)
+        # sdd/sales-flows slice 5: stamp the popup's default flow, same as
+        # every other application-creation path. The caller (grant_tickets_admin)
+        # already confirmed no application exists for this human/popup via
+        # get_by_human_popup before reaching here, so this never collides.
+        flow_id = self.resolve_creation_flow_id(session, popup_id)
         application = Applications(
             tenant_id=tenant_id,
             popup_id=popup_id,
             human_id=human.id,
+            sales_flow_id=flow_id,
             status=ApplicationStatus.ACCEPTED.value,
             submitted_at=now,
             accepted_at=now,
