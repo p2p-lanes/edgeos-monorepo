@@ -887,6 +887,7 @@ export type BaseFieldConfigPublic = {
     id: string;
     tenant_id: string;
     popup_id: string;
+    sales_flow_id?: (string | null);
     field_name: string;
     section_id?: (string | null);
     position?: number;
@@ -1940,6 +1941,7 @@ export type FormFieldPublic = {
     id: string;
     tenant_id: string;
     popup_id: string;
+    sales_flow_id?: (string | null);
     name: string;
     label: string;
     short_label?: (string | null);
@@ -1995,6 +1997,7 @@ export type FormSectionPublic = {
     id: string;
     tenant_id: string;
     popup_id: string;
+    sales_flow_id?: (string | null);
     label: string;
     description?: (string | null);
     order?: number;

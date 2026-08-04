@@ -3901,6 +3901,18 @@ export const BaseFieldConfigPublicSchema = {
             format: 'uuid',
             title: 'Popup Id'
         },
+        sales_flow_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Sales Flow Id'
+        },
         field_name: {
             type: 'string',
             title: 'Field Name'
@@ -8971,6 +8983,18 @@ export const FormFieldPublicSchema = {
             format: 'uuid',
             title: 'Popup Id'
         },
+        sales_flow_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Sales Flow Id'
+        },
         name: {
             type: 'string',
             title: 'Name'
@@ -9365,6 +9389,18 @@ export const FormSectionPublicSchema = {
             type: 'string',
             format: 'uuid',
             title: 'Popup Id'
+        },
+        sales_flow_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Sales Flow Id'
         },
         label: {
             type: 'string',

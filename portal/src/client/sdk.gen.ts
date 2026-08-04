@@ -5257,8 +5257,10 @@ export class FormFieldsService {
      * Get Application Schema
      * Get the complete application schema for a popup.
      *
-     * Returns a schema combining base application fields with
-     * custom form fields defined for the popup.
+     * Returns a schema combining base application fields with custom form
+     * fields defined for the popup's default sales flow (falling back to the
+     * popup-shared tier — see ``build_schema_for_flow``). URL-addressable
+     * per-flow schema selection lands in a later slice (9).
      * @param data The data for the request.
      * @param data.popupId
      * @param data.xTenantId
@@ -5284,6 +5286,10 @@ export class FormFieldsService {
     /**
      * Get Portal Application Schema
      * Get the application form schema for a popup (Portal).
+     *
+     * Resolves the popup's default sales flow (falling back to the
+     * popup-shared tier — see ``build_schema_for_flow``). URL-addressable
+     * per-flow schema selection lands in a later slice (9).
      * @param data The data for the request.
      * @param data.popupId
      * @param data.acceptLanguage
