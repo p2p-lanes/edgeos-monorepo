@@ -44,7 +44,7 @@ from app.api.payment.router import (
 from app.api.payment.schemas import PaymentStatus, PendingReleaseResponse
 from app.api.translation.service import parse_accept_language
 from app.core.dependencies.tenants import PublicTenant
-from app.core.dependencies.users import SessionDep
+from app.core.dependencies.users import OptionalHuman, SessionDep
 from app.core.rate_limit import RateLimit
 from app.services.meta_capi import (
     enqueue_initiate_checkout_event,
@@ -113,17 +113,27 @@ async def get_runtime(
     slug: str,
     db: SessionDep,
     tenant: PublicTenant,
+    current_human: OptionalHuman,
     accept_language: Annotated[str | None, Header(alias="Accept-Language")] = None,
 ) -> CheckoutRuntimeResponse:
     """Return popup metadata, products, buyer form, and ticketing steps for anonymous checkout.
 
-    Fully public endpoint (no JWT). Resolves the popup's default sales flow
-    (sdd/sales-flows D6 URL scheme — this is the legacy 2-segment path; see
-    `/{slug}/{flow_slug}/runtime` for a named flow). Only serves direct/
-    upsale-type active flows. Rate-limited 120/min/IP.
+    Fully public endpoint (no JWT required). Resolves the popup's default
+    sales flow (sdd/sales-flows D6 URL scheme — this is the legacy
+    2-segment path; see `/{slug}/{flow_slug}/runtime` for a named flow).
+    Only serves direct/upsale-type active flows. An upsale-type default
+    flow additionally requires a portal-authenticated, eligible human
+    (sdd/sales-flows slice 13) — a bearer token is honored when present via
+    `OptionalHuman`, but is not required unless the resolved flow is
+    upsale-type. Rate-limited 120/min/IP.
     """
     return runtime_for_slug(
-        db, slug, tenant.id, None, parse_accept_language(accept_language)
+        db,
+        slug,
+        tenant.id,
+        None,
+        parse_accept_language(accept_language),
+        current_human,
     )
 
 
@@ -141,18 +151,27 @@ async def get_flow_runtime(
     flow_slug: str,
     db: SessionDep,
     tenant: PublicTenant,
+    current_human: OptionalHuman,
     accept_language: Annotated[str | None, Header(alias="Accept-Language")] = None,
 ) -> CheckoutRuntimeResponse:
     """Named-flow variant of the checkout runtime (sdd/sales-flows D6 URL
     scheme: `/checkout/{popupSlug}/{flowSlug}`).
 
-    Fully public endpoint (no JWT). Unknown or reserved flow slugs, a flow
-    belonging to a different popup, or a flow whose effective status isn't
-    active all resolve to 404/403 — never a silent fallback to the default
-    flow. Rate-limited 120/min/IP.
+    Fully public endpoint (no JWT required). Unknown or reserved flow
+    slugs, a flow belonging to a different popup, or a flow whose effective
+    status isn't active all resolve to 404/403 — never a silent fallback to
+    the default flow. An upsale-type flow additionally requires a
+    portal-authenticated, eligible human (sdd/sales-flows slice 13, design
+    D8): anonymous -> 401, authenticated-but-ineligible -> 403. Rate-limited
+    120/min/IP.
     """
     return runtime_for_slug(
-        db, slug, tenant.id, flow_slug, parse_accept_language(accept_language)
+        db,
+        slug,
+        tenant.id,
+        flow_slug,
+        parse_accept_language(accept_language),
+        current_human,
     )
 
 
@@ -223,8 +242,18 @@ async def purchase_open_ticketing(
     background_tasks: BackgroundTasks,
     db: SessionDep,
     tenant: PublicTenant,
+    current_human: OptionalHuman,
+    flow_slug: Annotated[str | None, Query()] = None,
 ) -> OpenTicketingPurchaseResponse:
-    """Create an anonymous open-ticketing payment and return provider checkout data."""
+    """Create an anonymous open-ticketing payment and return provider checkout data.
+
+    ``flow_slug`` is optional (sdd/sales-flows slice 13) and mirrors the
+    runtime's own fallback semantics: omitted -> the popup's default flow.
+    When the resolved flow is upsale-type, the same portal-auth + approved-
+    payment gate as the runtime applies server-side (design D8) — UI-only
+    gating is never sufficient, since this is the endpoint that actually
+    creates the payment.
+    """
     popup = get_open_ticketing_popup(db, slug, tenant.id)
 
     payment, checkout_url, redirect_url = payments_crud.create_open_ticketing_payment(
@@ -237,6 +266,8 @@ async def purchase_open_ticketing(
             fbc=request_in.fbc,
             fbp=request_in.fbp,
         ),
+        flow_slug=flow_slug,
+        current_human=current_human,
     )
 
     if checkout_url and payment.status == PaymentStatus.PENDING.value:

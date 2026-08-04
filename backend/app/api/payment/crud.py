@@ -18,6 +18,7 @@ from app.api.human.models import Humans
 if TYPE_CHECKING:
     from app.api.checkout.schemas import OpenTicketingPurchaseCreate
     from app.api.human.models import Humans
+    from app.api.human.schemas import HumanPublic
     from app.api.popup.models import Popups
     from app.api.tenant.models import Tenants
 from app.api.application.schemas import ApplicationStatus, ScholarshipStatus
@@ -722,6 +723,8 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         popup: "Popups",
         tenant: "Tenants",
         attribution: dict[str, str | None] | None = None,
+        flow_slug: str | None = None,
+        current_human: "HumanPublic | None" = None,
     ) -> tuple[Payments, str, str | None]:
         """Create an anonymous open-ticketing payment with per-ticket attendees.
 
@@ -730,8 +733,23 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         ``redirect_url`` is set only for the zero-amount bypass when the popup
         configures a custom open-checkout success URL — paid flows redirect via
         SimpleFi and return None.
+
+        sdd/sales-flows slice 13 (task 13.1/13.2): mirrors the checkout
+        runtime's upsale eligibility gate (design D8). An explicit
+        ``flow_slug`` always resolves through the full `resolve_flow`
+        contract (unknown/inactive/wrong-type -> 404/403, never a silent
+        fallback). Omitted -> the popup's default flow resolved via
+        `SalesFlowsCRUD.get_default_flow` (Optional, graceful degrade) so
+        popups built directly in tests/fixtures without task 5.0
+        provisioning keep working exactly as before this slice — every
+        REAL popup always has a default flow. `assert_upsale_eligible` is a
+        no-op unless the resolved flow is upsale-type.
         """
         from app.api.popup.schemas import PopupStatus
+        from app.api.sales_flow.crud import sales_flows_crud
+        from app.api.sales_flow.eligibility import assert_upsale_eligible
+        from app.api.sales_flow.resolver import resolve_flow
+        from app.api.sales_flow.schemas import SalesFlowType
         from app.api.shared.enums import SaleType
         from app.api.tenant.utils import get_portal_url
         from app.services.simplefi import get_simplefi_client
@@ -753,6 +771,20 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Popup does not support open ticketing",
+            )
+
+        if flow_slug is not None:
+            target_flow = resolve_flow(
+                session,
+                popup,
+                flow_slug,
+                require_types={SalesFlowType.direct, SalesFlowType.upsale},
+            )
+        else:
+            target_flow = sales_flows_crud.get_default_flow(session, popup.id)
+        if target_flow is not None:
+            assert_upsale_eligible(
+                session, target_flow, popup.id, tenant.id, current_human
             )
 
         buyer = humans_crud.find_or_create(

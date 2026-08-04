@@ -44,6 +44,31 @@ async def list_portal_sales_flows(
     )
 
 
+@router.get("/portal/upsale", response_model=ListModel[SalesFlowPublic])
+async def list_portal_upsale_flows(
+    db: HumanTenantSession,
+    current_human: CurrentHuman,
+    popup_id: uuid.UUID,
+) -> ListModel[SalesFlowPublic]:
+    """List a popup's portal-listed upsale flows the current human is
+    eligible for (Portal, sdd/sales-flows G0 #2/#3, D8, task 13.3).
+
+    Deliberately a separate endpoint from `/portal` (which backs the
+    application FlowPicker and assumes application-type flows only — mixing
+    upsale flows into that response would break its single-flow
+    auto-select semantics). Eligibility is "any APPROVED payment anywhere
+    in the popup", evaluated live; an ineligible human sees an empty
+    catalog here rather than an error, matching every other portal listing.
+    """
+    from app.api.application.crud import applications_crud  # noqa: PLC0415
+
+    flows = applications_crud.resolve_upsale_catalog(db, current_human.id, popup_id)
+    return ListModel[SalesFlowPublic](
+        results=[SalesFlowPublic.model_validate(f) for f in flows],
+        paging=Paging(offset=0, limit=len(flows), total=len(flows)),
+    )
+
+
 def _raise_on_default_conflict(exc: IntegrityError) -> NoReturn:
     if "uq_sales_flows_default_per_popup" in str(getattr(exc, "orig", exc)):
         raise HTTPException(

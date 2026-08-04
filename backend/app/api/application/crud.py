@@ -43,6 +43,7 @@ from app.core.filters import build_filter_expression, text_condition_expression
 
 if TYPE_CHECKING:
     from app.api.human.models import Humans
+    from app.api.sales_flow.models import SalesFlows
 
 
 # Attendee categories shown in the Portal attendee directory. Kids (and any
@@ -2019,6 +2020,42 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         return PopupAccessResponse(
             allowed=False,
             reason="no_access",
+        )
+
+    def resolve_upsale_catalog(
+        self,
+        session: Session,
+        human_id: uuid.UUID,
+        popup_id: uuid.UUID,
+    ) -> list["SalesFlows"]:
+        """Flow-aware catalog resolution (sdd/sales-flows design G0 #2, D8,
+        task 13.2). Returns every portal-listed, `type=upsale` sales flow of
+        `popup_id` the human is currently eligible for.
+
+        Eligibility (D8, G0 #3) is "any APPROVED payment anywhere in the
+        popup", evaluated live via `has_approved_payment` — an accepted but
+        unpaid application does NOT qualify. This is a listing, not an
+        access gate: an ineligible or unknown human degrades to an empty
+        catalog rather than raising, matching `find_portal_listed`'s own
+        listing semantics elsewhere.
+
+        Scope note: this resolves the ELIGIBLE UPSALE side of G0's "the
+        catalog a person sees is their accepting flow's plus eligible
+        upsale flows" only. The "accepting flow" half has no consumer yet
+        (no shipped surface needs to know which flow a human's application
+        belongs to alongside this list) — inventing that lookup here would
+        be unused public surface (same precedent as slice 9's
+        EffectiveFlowConfig scoping decision). Add it when a real consumer
+        needs it.
+        """
+        from app.api.sales_flow.crud import sales_flows_crud
+        from app.api.sales_flow.eligibility import has_approved_payment
+        from app.api.sales_flow.schemas import SalesFlowType
+
+        if not has_approved_payment(session, human_id, popup_id):
+            return []
+        return sales_flows_crud.find_portal_listed(
+            session, popup_id, type=SalesFlowType.upsale
         )
 
     def list_comments(

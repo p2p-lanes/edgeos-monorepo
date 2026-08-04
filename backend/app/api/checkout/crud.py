@@ -1,9 +1,13 @@
 """CRUD aggregator for the open-ticketing checkout bootstrap endpoint (CAP-A)."""
 
 import uuid
+from typing import TYPE_CHECKING
 
 from fastapi import HTTPException, status
 from sqlmodel import Session, select
+
+if TYPE_CHECKING:
+    from app.api.human.schemas import HumanPublic
 
 from app.api.attendee_category.crud import attendee_categories_crud
 from app.api.attendee_category.schemas import AttendeeCategoryPublic
@@ -21,6 +25,7 @@ from app.api.form_section.models import FormSections
 from app.api.popup.models import Popups
 from app.api.popup.schemas import PopupPublic, PopupStatus
 from app.api.product.models import Products
+from app.api.sales_flow.eligibility import assert_upsale_eligible
 from app.api.sales_flow.resolver import resolve_flow
 from app.api.sales_flow.schemas import SalesFlowType
 from app.api.shared.enums import SaleType
@@ -127,6 +132,7 @@ def runtime_for_slug(
     tenant_id: uuid.UUID,
     flow_slug: str | None = None,
     lang: str | None = None,
+    current_human: "HumanPublic | None" = None,
 ) -> CheckoutRuntimeResponse:
     """Load the public runtime data for an open-ticketing checkout page.
 
@@ -149,6 +155,12 @@ def runtime_for_slug(
     overlaid with the matching translations. The overlay is default-agnostic:
     if the requested language equals the popup default (no rows exist), the
     untranslated source is returned unchanged.
+
+    sdd/sales-flows slice 13 (task 13.1/13.2): an upsale-type flow
+    additionally requires ``current_human`` to be a portal-authenticated
+    human with >=1 APPROVED payment in this popup (design D8, G0 #2/#3) —
+    see `assert_upsale_eligible`. Direct-type flows are unaffected; this
+    endpoint remains fully anonymous for them.
     """
     popup = _get_popup_by_slug_or_404(session, slug, tenant_id)
     flow = resolve_flow(
@@ -157,6 +169,7 @@ def runtime_for_slug(
         flow_slug,
         require_types={SalesFlowType.direct, SalesFlowType.upsale},
     )
+    assert_upsale_eligible(session, flow, popup.id, tenant_id, current_human)
 
     # Load active products. Flow-scoped product filtering (flow_products,
     # design D3) is wired in slice 12 (restriction enforcement) — every
