@@ -142,6 +142,14 @@ class PaymentBase(SQLModel):
         default=None, foreign_key="applications.id", index=True, nullable=True
     )
     popup_id: uuid.UUID = Field(foreign_key="popups.id", index=True)
+    # Sales flow this payment was made under. Nullable, backfilled to the
+    # popup's default flow (sdd/sales-flows slice 4). Provenance only per
+    # design D7 — read for background/reporting partitioning (e.g. the
+    # reminder dispatcher), never for a request-path authorization, pricing,
+    # or eligibility rule.
+    sales_flow_id: uuid.UUID | None = Field(
+        default=None, foreign_key="sales_flows.id", nullable=True, index=True
+    )
     external_id: str | None = Field(default=None, nullable=True)
     status: str = Field(default=PaymentStatus.PENDING.value, index=True)
     amount: Decimal = Field(
