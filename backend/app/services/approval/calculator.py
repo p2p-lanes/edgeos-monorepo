@@ -224,17 +224,23 @@ class ApprovalCalculator:
         if application.status != ApplicationStatus.IN_REVIEW.value:
             return application
 
-        # Get strategy
-        strategy = approval_strategies_crud.get_by_popup(session, application.popup_id)
+        # Get strategy — flow-owned if the application's flow has one, else
+        # the popup-shared fallback (sdd/sales-flows slice 7).
+        strategy = approval_strategies_crud.get_for_flow(
+            session, application.popup_id, application.sales_flow_id
+        )
 
         # Get reviews - use find_all since we need all of them for calculation
         reviews = application_reviews_crud.find_all_by_application(
             session, application.id
         )
 
-        # Get designated reviewers (typically bounded by design - few reviewers per popup)
-        reviewers = popup_reviewers_crud.find_all_by_popup(
-            session, application.popup_id
+        # Get designated reviewers, resolved through the application's flow
+        # tri-state `reviewers_mode` (D4): inherit -> popup-shared tier;
+        # override -> only that flow's own reviewers (bounded by design -
+        # few reviewers per popup/flow).
+        reviewers = popup_reviewers_crud.resolve_for_flow(
+            session, application.popup_id, application.sales_flow_id
         )
 
         # Calculate new status (human_red_flag is False here since we handled it above)

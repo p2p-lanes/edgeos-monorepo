@@ -22,11 +22,43 @@ class ApprovalStrategiesCRUD(
     def get_by_popup(
         self, session: Session, popup_id: uuid.UUID
     ) -> ApprovalStrategies | None:
-        """Get approval strategy by popup_id."""
+        """Get the popup-shared approval strategy (`flow_id IS NULL`).
+
+        This is the tier every flow inherits by default (sdd/sales-flows
+        slice 7) and the exact strategy every popup had before this slice.
+        """
         statement = select(ApprovalStrategies).where(
-            ApprovalStrategies.popup_id == popup_id
+            ApprovalStrategies.popup_id == popup_id,
+            ApprovalStrategies.flow_id.is_(None),  # type: ignore[union-attr]
         )
         return session.exec(statement).first()
+
+    def get_by_flow(
+        self, session: Session, flow_id: uuid.UUID
+    ) -> ApprovalStrategies | None:
+        """Strategy owned exclusively by `flow_id` (sdd/sales-flows slice 7).
+
+        No write path creates one yet — the backoffice editor is slice 14.
+        """
+        statement = select(ApprovalStrategies).where(
+            ApprovalStrategies.flow_id == flow_id
+        )
+        return session.exec(statement).first()
+
+    def get_for_flow(
+        self,
+        session: Session,
+        popup_id: uuid.UUID,
+        flow_id: uuid.UUID | None,
+    ) -> ApprovalStrategies | None:
+        """Flow-owned strategy if `flow_id` owns one, else the popup-shared
+        fallback (sdd/sales-flows slice 7). `flow_id=None` (e.g. a legacy
+        application with no flow) always returns the popup-shared tier."""
+        if flow_id is not None:
+            flow_strategy = self.get_by_flow(session, flow_id)
+            if flow_strategy:
+                return flow_strategy
+        return self.get_by_popup(session, popup_id)
 
     def create_for_popup(
         self,

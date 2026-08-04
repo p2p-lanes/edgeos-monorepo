@@ -1353,8 +1353,11 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
             self.create_snapshot(session, application, "auto_rejected")
             return
 
-        # Check approval strategy
-        strategy = approval_strategies_crud.get_by_popup(session, application.popup_id)
+        # Check approval strategy — flow-owned if the application's flow
+        # has one, else the popup-shared fallback (sdd/sales-flows slice 7).
+        strategy = approval_strategies_crud.get_for_flow(
+            session, application.popup_id, application.sales_flow_id
+        )
         should_auto_accept = (
             strategy is None
             or strategy.strategy_type == ApprovalStrategyType.AUTO_ACCEPT

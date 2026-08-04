@@ -1,0 +1,247 @@
+"""Tests for flow-scoped approval strategy + reviewer resolution feeding the
+approval calculator (sdd/sales-flows slice 7, task 7.2).
+
+`ApprovalCalculator.calculate_status` itself is UNCHANGED (design D4) — it
+still only consumes `is_required` off a pre-resolved `designated_reviewers`
+list. The resolution layer that FEEDS it (`recalculate_status`) now reads
+`application.sales_flow_id` and resolves the strategy/reviewers through
+that flow instead of always the popup tier.
+"""
+
+import uuid
+
+from fastapi.testclient import TestClient
+from sqlmodel import Session, select
+
+from app.api.application.models import Applications
+from app.api.application.schemas import ApplicationStatus
+from app.api.approval_strategy.models import ApprovalStrategies
+from app.api.approval_strategy.schemas import ApprovalStrategyType
+from app.api.human.models import Humans
+from app.api.popup_reviewer.models import PopupReviewers
+from app.api.sales_flow.crud import sales_flows_crud
+from app.api.sales_flow.models import SalesFlows
+from app.api.sales_flow.schemas import SalesFlowReviewersMode
+from app.api.shared.enums import UserRole
+from app.api.tenant.models import Tenants
+from app.api.user.models import Users
+from app.services.approval.calculator import approval_calculator
+
+
+def _headers(token: str) -> dict[str, str]:
+    return {"Authorization": f"Bearer {token}"}
+
+
+def _create_popup_via_api(client: TestClient, admin_token: str) -> uuid.UUID:
+    """Fresh popup via the real create path — auto-provisions a default
+    flow (task 5.0)."""
+    unique = uuid.uuid4().hex[:8]
+    resp = client.post(
+        "/api/v1/popups",
+        headers=_headers(admin_token),
+        json={"name": f"Flow Approval Test {unique}"},
+    )
+    assert resp.status_code == 201, resp.text
+    return uuid.UUID(resp.json()["id"])
+
+
+def _make_human(db: Session, tenant: Tenants) -> Humans:
+    human = Humans(
+        tenant_id=tenant.id,
+        email=f"flow-approval-{uuid.uuid4().hex[:8]}@test.com",
+        first_name="Test",
+        last_name="Human",
+    )
+    db.add(human)
+    db.commit()
+    db.refresh(human)
+    return human
+
+
+def _make_application(
+    db: Session, tenant: Tenants, popup_id: uuid.UUID, human: Humans, flow_id
+) -> Applications:
+    app = Applications(
+        tenant_id=tenant.id,
+        popup_id=popup_id,
+        human_id=human.id,
+        sales_flow_id=flow_id,
+        status=ApplicationStatus.IN_REVIEW.value,
+    )
+    db.add(app)
+    db.commit()
+    db.refresh(app)
+    return app
+
+
+def _make_second_flow(db: Session, tenant: Tenants, popup_id: uuid.UUID) -> SalesFlows:
+    flow = SalesFlows(
+        tenant_id=tenant.id,
+        popup_id=popup_id,
+        slug=f"upsale-flow-{uuid.uuid4().hex[:8]}",
+        name="Second Flow",
+    )
+    db.add(flow)
+    db.commit()
+    db.refresh(flow)
+    return flow
+
+
+def _set_strategy(
+    db: Session,
+    tenant: Tenants,
+    popup_id: uuid.UUID,
+    *,
+    strategy_type: ApprovalStrategyType,
+    flow_id: uuid.UUID | None = None,
+) -> ApprovalStrategies:
+    """Create or replace the strategy at the given tier (popup-shared when
+    `flow_id=None`, flow-owned otherwise). `_create_popup_via_api` already
+    seeds a popup-shared AUTO_ACCEPT row (task 5.0's `_seed_application_defaults`),
+    so the popup tier must be replaced, not duplicated."""
+    filters = [ApprovalStrategies.popup_id == popup_id]
+    if flow_id is not None:
+        filters.append(ApprovalStrategies.flow_id == flow_id)
+    else:
+        filters.append(ApprovalStrategies.flow_id.is_(None))  # type: ignore[union-attr]
+    existing = db.exec(select(ApprovalStrategies).where(*filters)).first()
+    if existing:
+        db.delete(existing)
+        db.commit()
+
+    strategy = ApprovalStrategies(
+        tenant_id=tenant.id,
+        popup_id=popup_id,
+        flow_id=flow_id,
+        strategy_type=strategy_type,
+    )
+    db.add(strategy)
+    db.commit()
+    db.refresh(strategy)
+    return strategy
+
+
+def _make_user(db: Session, tenant: Tenants) -> Users:
+    user = Users(
+        email=f"flow-approval-reviewer-{uuid.uuid4().hex[:8]}@test.com",
+        role=UserRole.ADMIN,
+        tenant_id=tenant.id,
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+class TestRecalculateStatusResolvesThroughApplicationFlow:
+    def test_flow_owned_strategy_overrides_popup_shared_auto_accept(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+        admin_token_tenant_a: str,
+    ) -> None:
+        popup_id = _create_popup_via_api(client, admin_token_tenant_a)
+        default_flow = sales_flows_crud.get_default_flow(db, popup_id)
+        assert default_flow is not None
+
+        second_flow = _make_second_flow(db, tenant_a, popup_id)
+        _set_strategy(
+            db, tenant_a, popup_id, strategy_type=ApprovalStrategyType.AUTO_ACCEPT
+        )
+        _set_strategy(
+            db,
+            tenant_a,
+            popup_id,
+            strategy_type=ApprovalStrategyType.ALL_REVIEWERS,
+            flow_id=second_flow.id,
+        )
+        reviewer_user = _make_user(db, tenant_a)
+        db.add(
+            PopupReviewers(
+                tenant_id=tenant_a.id,
+                popup_id=popup_id,
+                flow_id=second_flow.id,
+                user_id=reviewer_user.id,
+                is_required=True,
+            )
+        )
+        db.commit()
+
+        human = _make_human(db, tenant_a)
+        application = _make_application(db, tenant_a, popup_id, human, second_flow.id)
+
+        updated = approval_calculator.recalculate_status(db, application)
+
+        assert updated.status == ApplicationStatus.IN_REVIEW.value, (
+            "The flow's own ALL_REVIEWERS strategy must be used instead of "
+            "the popup-shared AUTO_ACCEPT strategy"
+        )
+
+    def test_default_flow_falls_back_to_popup_shared_strategy(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+        admin_token_tenant_a: str,
+    ) -> None:
+        popup_id = _create_popup_via_api(client, admin_token_tenant_a)
+        default_flow = sales_flows_crud.get_default_flow(db, popup_id)
+        assert default_flow is not None
+
+        _set_strategy(
+            db, tenant_a, popup_id, strategy_type=ApprovalStrategyType.AUTO_ACCEPT
+        )
+
+        human = _make_human(db, tenant_a)
+        application = _make_application(db, tenant_a, popup_id, human, default_flow.id)
+
+        updated = approval_calculator.recalculate_status(db, application)
+
+        assert updated.status == ApplicationStatus.ACCEPTED.value, (
+            "The default flow owns no strategy of its own — must fall "
+            "back to the popup-shared tier"
+        )
+
+    def test_flow_override_reviewers_mode_excludes_popup_reviewers_from_rejection(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+        admin_token_tenant_a: str,
+    ) -> None:
+        """A flow in 'override' mode with zero of its own reviewers must
+        never reject based on the popup's required reviewers — those are
+        not part of this flow's designated set at all."""
+        popup_id = _create_popup_via_api(client, admin_token_tenant_a)
+        second_flow = _make_second_flow(db, tenant_a, popup_id)
+        sales_flows_crud.ensure_reviewers_override(db, second_flow.id)
+        assert (
+            sales_flows_crud.get(db, second_flow.id).reviewers_mode
+            == SalesFlowReviewersMode.override
+        )
+
+        _set_strategy(
+            db, tenant_a, popup_id, strategy_type=ApprovalStrategyType.ANY_REVIEWER
+        )
+        popup_reviewer_user = _make_user(db, tenant_a)
+        db.add(
+            PopupReviewers(
+                tenant_id=tenant_a.id,
+                popup_id=popup_id,
+                user_id=popup_reviewer_user.id,
+                is_required=True,
+            )
+        )
+        db.commit()
+
+        human = _make_human(db, tenant_a)
+        application = _make_application(db, tenant_a, popup_id, human, second_flow.id)
+
+        updated = approval_calculator.recalculate_status(db, application)
+
+        assert updated.status == ApplicationStatus.IN_REVIEW.value, (
+            "With zero flow-tier reviewers, required_reviewer_ids resolves "
+            "empty for this flow — the popup's required reviewer must "
+            "never trigger an auto-rejection on this flow's application"
+        )

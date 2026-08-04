@@ -155,5 +155,36 @@ class SalesFlowsCRUD(BaseCRUD[SalesFlows, SalesFlowCreate, SalesFlowUpdate]):
         session.add(flow)
         return flow
 
+    def ensure_reviewers_override(
+        self, session: Session, flow_id: uuid.UUID
+    ) -> SalesFlows | None:
+        """Set `reviewers_mode='override'` if not already (sdd/sales-flows
+        D4 CRUD invariant, enforced here — not in SQL). Called when a
+        flow-tier reviewer is added. Idempotent no-op if already 'override'
+        or the flow doesn't exist."""
+        flow = self.get(session, flow_id)
+        if flow and flow.reviewers_mode != SalesFlowReviewersMode.override:
+            flow.reviewers_mode = SalesFlowReviewersMode.override
+            session.add(flow)
+            session.commit()
+            session.refresh(flow)
+        return flow
+
+    def reset_reviewers_inherit(
+        self, session: Session, flow_id: uuid.UUID
+    ) -> SalesFlows | None:
+        """Set `reviewers_mode='inherit'` if not already (sdd/sales-flows D4
+        CRUD invariant). Called once a flow's last flow-tier reviewer is
+        removed — clearing the override falls back to the popup-shared
+        tier. Idempotent no-op if already 'inherit' or the flow doesn't
+        exist."""
+        flow = self.get(session, flow_id)
+        if flow and flow.reviewers_mode != SalesFlowReviewersMode.inherit:
+            flow.reviewers_mode = SalesFlowReviewersMode.inherit
+            session.add(flow)
+            session.commit()
+            session.refresh(flow)
+        return flow
+
 
 sales_flows_crud = SalesFlowsCRUD()
