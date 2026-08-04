@@ -1,7 +1,7 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query"
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router"
 import type { ColumnDef } from "@tanstack/react-table"
-import { Plus, Tag } from "lucide-react"
+import { Info, Plus, Tag } from "lucide-react"
 import { Suspense } from "react"
 
 import { type CouponPublic, CouponsService } from "@/client"
@@ -10,6 +10,7 @@ import { EmptyState } from "@/components/Common/EmptyState"
 import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
 import { StatusBadge } from "@/components/Common/StatusBadge"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
@@ -160,6 +161,19 @@ function Coupons() {
         </div>
         {isOperatorOrAbove && isContextReady && <AddCouponButton />}
       </div>
+      {isContextReady && (
+        <Alert>
+          <Info className="h-4 w-4" />
+          <AlertTitle>When to use coupons</AlertTitle>
+          <AlertDescription>
+            Coupons are open discount codes anyone can enter at checkout, ideal
+            for promotions and campaigns. For discounts aimed at a specific
+            person or with automatic approval, use invites. For attendee-driven
+            discounts, use referrals. For team registrations with a shared
+            discount, use groups.
+          </AlertDescription>
+        </Alert>
+      )}
       {!isContextReady ? (
         <WorkspaceAlert resource="coupons" />
       ) : (
