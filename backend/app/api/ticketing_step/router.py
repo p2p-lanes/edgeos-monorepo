@@ -37,8 +37,20 @@ async def list_portal_ticketing_steps(
     popup_id: uuid.UUID,
     accept_language: Annotated[str | None, Header(alias="Accept-Language")] = None,
 ) -> ListModel[TicketingStepPublic]:
-    """List enabled ticketing steps for a popup (portal-facing)."""
-    steps = crud.ticketing_steps_crud.find_portal_by_popup(db, popup_id=popup_id)
+    """List enabled ticketing steps for a popup (portal-facing).
+
+    Resolves the popup's default sales flow (falling back to the
+    popup-shared tier when the flow owns no steps of its own — see
+    `find_portal_for_flow`, sdd/sales-flows slice 8). URL-addressable
+    per-flow step selection lands in a later slice (9).
+    """
+    from app.api.sales_flow.crud import sales_flows_crud
+
+    default_flow = sales_flows_crud.get_default_flow(db, popup_id)
+    flow_id = default_flow.id if default_flow else None
+    steps = crud.ticketing_steps_crud.find_portal_for_flow(
+        db, popup_id=popup_id, flow_id=flow_id
+    )
     lang = parse_accept_language(accept_language)
     translations_map = (
         get_translations_bulk(db, "ticketing_step", [s.id for s in steps], lang)
@@ -61,11 +73,24 @@ async def list_ticketing_steps(
     db: AdminOrApiKeySession_TicketingStepsRead,
     _: AdminOrApiKey_TicketingStepsRead,
     popup_id: uuid.UUID | None = None,
+    sales_flow_id: uuid.UUID | None = None,
     skip: PaginationSkip = 0,
     limit: PaginationLimit = 100,
 ) -> ListModel[TicketingStepPublic]:
-    if popup_id:
-        steps, total = crud.ticketing_steps_crud.find_by_popup(
+    """List ticketing steps.
+
+    Without `sales_flow_id`, returns the popup-shared tier only
+    (sdd/sales-flows slice 8) — identical to this popup's step list before
+    this slice, since no writer created flow-scoped rows until now. With
+    `sales_flow_id`, returns the RESOLVED step list for that flow: its own
+    rows if it owns any, else the popup-shared fallback.
+    """
+    if popup_id and sales_flow_id is not None:
+        steps, total = crud.ticketing_steps_crud.find_for_flow(
+            db, popup_id=popup_id, flow_id=sales_flow_id, skip=skip, limit=limit
+        )
+    elif popup_id:
+        steps, total = crud.ticketing_steps_crud.find_shared(
             db, popup_id=popup_id, skip=skip, limit=limit
         )
     else:
@@ -161,9 +186,13 @@ async def create_ticketing_step(
     else:
         tenant_id = current_user.tenant_id
 
-    # Singleton guard: only one enabled patron-preset step per popup.
+    # Singleton guard: only one enabled patron-preset step per tier
+    # (sdd/sales-flows slice 8 — flow tier if sales_flow_id is set, else the
+    # popup-shared tier).
     if step_in.template == "patron-preset" and step_in.is_enabled:
-        crud.ticketing_steps_crud._assert_no_active_patron_preset(db, step_in.popup_id)
+        crud.ticketing_steps_crud._assert_no_active_patron_preset(
+            db, step_in.popup_id, flow_id=step_in.sales_flow_id
+        )
 
     # FK existence check for attendee_categories in template_config (Pattern B, ADR-5)
     _validate_template_config_fk(

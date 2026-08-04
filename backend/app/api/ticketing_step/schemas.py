@@ -158,6 +158,12 @@ def _validate_meal_plan_select_template_config(
 class TicketingStepBase(SQLModel):
     tenant_id: uuid.UUID = Field(foreign_key="tenants.id", index=True)
     popup_id: uuid.UUID = Field(foreign_key="popups.id", index=True)
+    # sdd/sales-flows slice 8. NULL = popup-shared tier (the step list every
+    # flow inherits by default), non-NULL = owned exclusively by that flow.
+    # Mirrors FormFieldBase.sales_flow_id / PopupReviewerBase.sales_flow_id.
+    sales_flow_id: uuid.UUID | None = Field(
+        default=None, foreign_key="sales_flows.id", nullable=True, index=True
+    )
     step_type: str
     title: str
     description: str | None = Field(default=None, nullable=True)
@@ -180,6 +186,7 @@ class TicketingStepPublic(BaseModel):
     id: uuid.UUID
     tenant_id: uuid.UUID
     popup_id: uuid.UUID
+    sales_flow_id: uuid.UUID | None = None
     step_type: str
     title: str
     description: str | None = None
@@ -200,6 +207,7 @@ class TicketingStepPublic(BaseModel):
 
 class TicketingStepCreate(BaseModel):
     popup_id: uuid.UUID
+    sales_flow_id: uuid.UUID | None = None
     step_type: str
     title: str
     description: str | None = None
