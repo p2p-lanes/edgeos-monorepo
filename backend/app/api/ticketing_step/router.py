@@ -119,6 +119,24 @@ async def get_ticketing_step(
     return TicketingStepPublic.model_validate(step)
 
 
+def _get_flow_or_404(db, popup_id: uuid.UUID, flow_id: uuid.UUID):
+    """Verify a sales flow exists and belongs to this popup.
+
+    Mirrors app.api.popup_reviewer.router._get_flow_or_404 (sdd/sales-flows
+    D4) — prevents cross-popup flow injection via a client-supplied
+    sales_flow_id.
+    """
+    from app.api.sales_flow.crud import sales_flows_crud
+
+    flow = sales_flows_crud.get(db, flow_id)
+    if not flow or flow.popup_id != popup_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Sales flow not found for this popup",
+        )
+    return flow
+
+
 def _validate_template_config_fk(
     template: str | None,
     template_config: dict | None,
@@ -185,6 +203,9 @@ async def create_ticketing_step(
         tenant_id = popup.tenant_id
     else:
         tenant_id = current_user.tenant_id
+
+    if step_in.sales_flow_id is not None:
+        _get_flow_or_404(db, step_in.popup_id, step_in.sales_flow_id)
 
     # Singleton guard: only one enabled patron-preset step per tier
     # (sdd/sales-flows slice 8 — flow tier if sales_flow_id is set, else the

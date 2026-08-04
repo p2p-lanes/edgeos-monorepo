@@ -5,7 +5,7 @@
 import uuid
 
 from fastapi.testclient import TestClient
-from sqlmodel import Session
+from sqlmodel import Session, select
 
 from app.api.human.models import Humans
 from app.api.popup.models import Popups
@@ -154,6 +154,37 @@ class TestListPortalTicketingStepsResolvesDefaultFlow:
             "The popup's default flow owns a step of its own — the portal "
             "must resolve through it, not the popup-shared tier"
         )
+
+
+class TestCreateTicketingStepRejectsCrossPopupFlow:
+    def test_sales_flow_id_from_another_popup_returns_404(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+        admin_token_tenant_a: str,
+    ) -> None:
+        popup_a = _make_popup(db, tenant_a)
+        popup_b = _make_popup(db, tenant_a)
+        flow_b = _make_flow(db, tenant_a, popup_b, slug="router-flow-cross-popup")
+
+        resp = client.post(
+            "/api/v1/ticketing-steps",
+            headers=_headers(admin_token_tenant_a),
+            json={
+                "popup_id": str(popup_a.id),
+                "sales_flow_id": str(flow_b.id),
+                "step_type": "tickets",
+                "title": "Tickets",
+                "is_enabled": True,
+            },
+        )
+
+        assert resp.status_code == 404, resp.text
+        persisted = db.exec(
+            select(TicketingSteps).where(TicketingSteps.popup_id == popup_a.id)
+        ).all()
+        assert persisted == []
 
 
 class TestCreateTicketingStepPatronGuardPerTier:
