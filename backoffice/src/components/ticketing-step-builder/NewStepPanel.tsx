@@ -34,6 +34,9 @@ function toKebabCase(str: string): string {
 
 interface NewStepPanelProps {
   popupId: string
+  /** sdd/sales-flows slice 8: omitted creates a popup-shared step; set to a
+   * non-default flow's id to create a step owned exclusively by that flow. */
+  salesFlowId?: string
   nextOrder: number
   confirmStepId?: string
   onCreated: (stepId: string) => void
@@ -42,6 +45,7 @@ interface NewStepPanelProps {
 
 export function NewStepPanel({
   popupId,
+  salesFlowId,
   nextOrder,
   confirmStepId,
   onCreated,
@@ -83,6 +87,7 @@ export function NewStepPanel({
       const newStep = await TicketingStepsService.createTicketingStep({
         requestBody: {
           popup_id: popupId,
+          sales_flow_id: salesFlowId ?? null,
           step_type: effectiveStepType,
           title,
           order: insertOrder,

@@ -12,8 +12,13 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router"
 import { Loader2 } from "lucide-react"
 import { useEffect, useMemo, useState } from "react"
 
-import { type TicketingStepPublic, TicketingStepsService } from "@/client"
+import {
+  SalesFlowsService,
+  type TicketingStepPublic,
+  TicketingStepsService,
+} from "@/client"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
+import { FlowSelector } from "@/components/ticketing-step-builder/FlowSelector"
 import { NewStepPanel } from "@/components/ticketing-step-builder/NewStepPanel"
 import { StepCanvas } from "@/components/ticketing-step-builder/StepCanvas"
 import { StepDetailPanel } from "@/components/ticketing-step-builder/StepDetailPanel"
@@ -26,12 +31,14 @@ import { createErrorHandler } from "@/utils"
 
 interface TicketingStepsSearch {
   step?: string
+  flow?: string
 }
 
 export const Route = createFileRoute("/_layout/ticketing-steps/")({
   component: TicketingStepsPage,
   validateSearch: (raw: Record<string, unknown>): TicketingStepsSearch => ({
     ...(typeof raw.step === "string" && raw.step ? { step: raw.step } : {}),
+    ...(typeof raw.flow === "string" && raw.flow ? { flow: raw.flow } : {}),
   }),
   head: () => ({
     meta: [{ title: "Ticketing Steps - EdgeOS" }],
@@ -67,19 +74,31 @@ function TicketingStepsPage() {
 function TicketingStepsContent({ popupId }: { popupId: string }) {
   const queryClient = useQueryClient()
   const navigate = useNavigate()
-  const { step } = Route.useSearch()
+  const { step, flow: flowParam } = Route.useSearch()
   const { showErrorToast } = useCustomToast()
 
   const [adding, setAdding] = useState(false)
   const [displayOrder, setDisplayOrder] = useState<string[]>([])
 
+  // sdd/sales-flows slice 8: the step list is flow-scoped. Absent an
+  // explicit ?flow= selection, default to the popup's default flow so the
+  // builder shows the same list single-flow popups always saw.
+  const { data: flowsData } = useQuery({
+    queryKey: ["sales-flows", popupId],
+    queryFn: () => SalesFlowsService.listSalesFlows({ popupId, limit: 100 }),
+  })
+  const defaultFlowId = flowsData?.results.find((f) => f.is_default)?.id
+  const activeFlowId = flowParam ?? defaultFlowId
+
   const { data: stepsData, isLoading } = useQuery({
-    queryKey: ["ticketing-steps", popupId],
+    queryKey: ["ticketing-steps", popupId, activeFlowId],
     queryFn: () =>
       TicketingStepsService.listTicketingSteps({
         popupId,
+        salesFlowId: activeFlowId,
         limit: 100,
       }),
+    enabled: !!activeFlowId,
   })
 
   const steps = useMemo(() => {
@@ -140,17 +159,34 @@ function TicketingStepsContent({ popupId }: { popupId: string }) {
 
   const selectStep = (id: string) => {
     setAdding(false)
-    navigate({ to: "/ticketing-steps", search: { step: id } })
+    navigate({
+      to: "/ticketing-steps",
+      search: { step: id, ...(flowParam ? { flow: flowParam } : {}) },
+    })
   }
 
   const clearSelection = () => {
     setAdding(false)
-    navigate({ to: "/ticketing-steps", search: {} })
+    navigate({
+      to: "/ticketing-steps",
+      search: flowParam ? { flow: flowParam } : {},
+    })
   }
 
   const startAdding = () => {
     setAdding(true)
-    navigate({ to: "/ticketing-steps", search: {} })
+    navigate({
+      to: "/ticketing-steps",
+      search: flowParam ? { flow: flowParam } : {},
+    })
+  }
+
+  // Switching flows re-scopes the whole step list — clear any selection
+  // from the previous flow's list rather than risk pointing at a step id
+  // that doesn't belong to the newly selected flow's resolved tier.
+  const selectFlow = (flowId: string) => {
+    setAdding(false)
+    navigate({ to: "/ticketing-steps", search: { flow: flowId } })
   }
 
   const selectedStep = step ? steps.find((s) => s.id === step) : undefined
@@ -181,6 +217,12 @@ function TicketingStepsContent({ popupId }: { popupId: string }) {
           </p>
         </div>
 
+        <FlowSelector
+          popupId={popupId}
+          value={activeFlowId}
+          onChange={selectFlow}
+        />
+
         <DndContext
           sensors={sensors}
           collisionDetection={closestCenter}
@@ -203,6 +245,13 @@ function TicketingStepsContent({ popupId }: { popupId: string }) {
         {adding ? (
           <NewStepPanel
             popupId={popupId}
+            // A new step under the DEFAULT flow stays in the popup-shared
+            // tier (sales_flow_id omitted) — matching D1: no flow writes
+            // its own overrides implicitly. Only an explicit non-default
+            // flow selection creates a flow-owned row.
+            salesFlowId={
+              activeFlowId !== defaultFlowId ? activeFlowId : undefined
+            }
             nextOrder={orderedSteps.length}
             confirmStepId={steps.find((s) => s.step_type === "confirm")?.id}
             onCreated={(id) => selectStep(id)}
