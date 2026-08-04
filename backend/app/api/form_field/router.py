@@ -49,6 +49,7 @@ def _base_config_to_public(config: BaseFieldConfigs) -> FormFieldPublic:
         id=config.id,
         tenant_id=config.tenant_id,
         popup_id=config.popup_id,
+        sales_flow_id=config.sales_flow_id,
         name=config.field_name,
         label=config.label or "",
         field_type=config.field_type or definition["type"],
@@ -428,10 +429,13 @@ async def get_application_schema(
 ) -> dict[str, Any]:
     """Get the complete application schema for a popup.
 
-    Returns a schema combining base application fields with
-    custom form fields defined for the popup.
+    Returns a schema combining base application fields with custom form
+    fields defined for the popup's default sales flow (falling back to the
+    popup-shared tier — see ``build_schema_for_flow``). URL-addressable
+    per-flow schema selection lands in a later slice (9).
     """
     from app.api.popup.crud import popups_crud
+    from app.api.sales_flow.crud import sales_flows_crud
 
     popup = popups_crud.get(db, popup_id)
     if not popup:
@@ -440,7 +444,9 @@ async def get_application_schema(
             detail="Popup not found",
         )
 
-    return crud.form_fields_crud.build_schema_for_popup(db, popup_id)
+    default_flow = sales_flows_crud.get_default_flow(db, popup_id)
+    flow_id = default_flow.id if default_flow else None
+    return crud.form_fields_crud.build_schema_for_flow(db, popup_id, flow_id)
 
 
 @router.get("/portal/schema/{popup_id}", response_model=dict[str, Any])
@@ -450,8 +456,14 @@ async def get_portal_application_schema(
     _: CurrentHuman,
     accept_language: Annotated[str | None, Header(alias="Accept-Language")] = None,
 ) -> dict[str, Any]:
-    """Get the application form schema for a popup (Portal)."""
+    """Get the application form schema for a popup (Portal).
+
+    Resolves the popup's default sales flow (falling back to the
+    popup-shared tier — see ``build_schema_for_flow``). URL-addressable
+    per-flow schema selection lands in a later slice (9).
+    """
     from app.api.popup.crud import popups_crud
+    from app.api.sales_flow.crud import sales_flows_crud
 
     popup = popups_crud.get(db, popup_id)
     if not popup:
@@ -460,7 +472,9 @@ async def get_portal_application_schema(
             detail="Popup not found",
         )
 
-    schema = crud.form_fields_crud.build_schema_for_popup(db, popup_id)
+    default_flow = sales_flows_crud.get_default_flow(db, popup_id)
+    flow_id = default_flow.id if default_flow else None
+    schema = crud.form_fields_crud.build_schema_for_flow(db, popup_id, flow_id)
 
     lang = None
     if accept_language and accept_language != "en":

@@ -117,11 +117,18 @@ def runtime_for_slug(
         ).all()
     )
 
-    # Load form_sections with their form_fields, ordered by section.order then field.position
+    # Load form_sections with their form_fields, ordered by section.order then
+    # field.position. Popup-shared tier only (sales_flow_id IS NULL) — this
+    # direct-sale runtime hasn't resolved a flow yet (slice 9), so it reads
+    # the same fallback tier build_schema_for_flow(popup_id, flow_id=None)
+    # would (sdd/sales-flows slice 6).
     sections = list(
         session.exec(
             select(FormSections)
-            .where(FormSections.popup_id == popup.id)
+            .where(
+                FormSections.popup_id == popup.id,
+                FormSections.sales_flow_id.is_(None),  # type: ignore[union-attr]
+            )
             .order_by(FormSections.order)  # type: ignore[arg-type]
             .options(selectinload(FormSections.form_fields))  # ty: ignore[invalid-argument-type]
         ).all()
@@ -186,7 +193,7 @@ def runtime_for_slug(
                 ),
             )
             # Hidden sections (and their fields) are never surfaced to the
-            # anonymous checkout, mirroring build_schema_for_popup.
+            # anonymous checkout, mirroring build_schema_for_flow.
             for sec in sections
             if not sec.hidden
         ],
@@ -194,7 +201,9 @@ def runtime_for_slug(
         attendee_categories=[
             AttendeeCategoryPublic.model_validate(c) for c in attendee_categories
         ],
-        form_schema=form_fields_crud.build_schema_for_popup(session, popup.id),
+        # No flow resolved yet on this direct-sale runtime (slice 9) —
+        # popup-shared tier fallback, same as the buyer_form sections above.
+        form_schema=form_fields_crud.build_schema_for_flow(session, popup.id, None),
     )
 
 

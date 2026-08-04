@@ -146,6 +146,9 @@ class FormFieldsCRUD(BaseCRUD[FormFields, FormFieldCreate, FormFieldUpdate]):
         limit: int = 100,
         search: str | None = None,
     ) -> tuple[list[FormFields], int]:
+        """Returns ALL fields for the popup regardless of `sales_flow_id`
+        (admin/legacy management surface — untouched by sdd/sales-flows
+        slice 6, see `find_for_flow` for the flow-aware read path)."""
         statement = (
             select(FormFields)
             .outerjoin(FormSections, FormFields.section_id == FormSections.id)
@@ -171,6 +174,100 @@ class FormFieldsCRUD(BaseCRUD[FormFields, FormFieldCreate, FormFieldUpdate]):
         results = list(session.exec(statement).all())
 
         return results, total
+
+    def find_by_flow(
+        self,
+        session: Session,
+        flow_id: uuid.UUID,
+        skip: int = 0,
+        limit: int = 100,
+        search: str | None = None,
+    ) -> tuple[list[FormFields], int]:
+        """Fields owned exclusively by `flow_id` (sdd/sales-flows slice 6)."""
+        statement = (
+            select(FormFields)
+            .outerjoin(FormSections, FormFields.section_id == FormSections.id)
+            .where(FormFields.sales_flow_id == flow_id)
+            .order_by(FormSections.order, FormFields.position)  # type: ignore[arg-type]
+        )
+
+        if search:
+            search_term = f"%{search}%"
+            statement = statement.where(
+                or_(
+                    col(FormFields.label).ilike(search_term),
+                    col(FormFields.name).ilike(search_term),
+                    col(FormFields.field_type).ilike(search_term),
+                )
+            )
+
+        count_statement = select(func.count()).select_from(statement.subquery())
+        total = session.exec(count_statement).one()
+
+        statement = statement.offset(skip).limit(limit)
+        results = list(session.exec(statement).all())
+
+        return results, total
+
+    def find_shared(
+        self,
+        session: Session,
+        popup_id: uuid.UUID,
+        skip: int = 0,
+        limit: int = 100,
+        search: str | None = None,
+    ) -> tuple[list[FormFields], int]:
+        """Popup-shared fields (`sales_flow_id IS NULL`) — the fallback
+        tier every flow reads until it owns its own fields."""
+        statement = (
+            select(FormFields)
+            .outerjoin(FormSections, FormFields.section_id == FormSections.id)
+            .where(
+                FormFields.popup_id == popup_id,
+                FormFields.sales_flow_id.is_(None),  # type: ignore[union-attr]
+            )
+            .order_by(FormSections.order, FormFields.position)  # type: ignore[arg-type]
+        )
+
+        if search:
+            search_term = f"%{search}%"
+            statement = statement.where(
+                or_(
+                    col(FormFields.label).ilike(search_term),
+                    col(FormFields.name).ilike(search_term),
+                    col(FormFields.field_type).ilike(search_term),
+                )
+            )
+
+        count_statement = select(func.count()).select_from(statement.subquery())
+        total = session.exec(count_statement).one()
+
+        statement = statement.offset(skip).limit(limit)
+        results = list(session.exec(statement).all())
+
+        return results, total
+
+    def find_for_flow(
+        self,
+        session: Session,
+        popup_id: uuid.UUID,
+        flow_id: uuid.UUID | None,
+        skip: int = 0,
+        limit: int = 100,
+        search: str | None = None,
+    ) -> tuple[list[FormFields], int]:
+        """Flow-owned fields if `flow_id` owns any, else the popup-shared
+        fallback (Q1: flow-owned forms). `flow_id=None` always returns the
+        popup-shared tier directly."""
+        if flow_id is not None:
+            flow_rows, flow_total = self.find_by_flow(
+                session, flow_id, skip=skip, limit=limit, search=search
+            )
+            if flow_total:
+                return flow_rows, flow_total
+        return self.find_shared(
+            session, popup_id, skip=skip, limit=limit, search=search
+        )
 
     def validate_base_fields(
         self,
@@ -422,12 +519,16 @@ class FormFieldsCRUD(BaseCRUD[FormFields, FormFieldCreate, FormFieldUpdate]):
     ) -> set[str]:
         """Names of custom fields the portal form currently renders.
 
-        Mirrors ``build_schema_for_popup`` visibility: fields in hidden
+        Mirrors ``build_schema_for_flow`` visibility: fields in hidden
         sections are excluded. When ``is_express_checkout`` is True, the set
         is further restricted to the sections the Express Checkout mini-form
         renders. Stored answers outside this set (deleted, renamed, or hidden
         fields) are never part of a portal payload, so update paths must
         preserve them instead of treating their absence as a cleared value.
+
+        Deliberately popup-scoped (not flow-aware) — untouched by
+        sdd/sales-flows slice 6, same as ``find_by_popup``/
+        ``validate_custom_fields``/``validate_base_fields``.
         """
         from app.api.form_section.crud import form_sections_crud
 
@@ -453,28 +554,40 @@ class FormFieldsCRUD(BaseCRUD[FormFields, FormFieldCreate, FormFieldUpdate]):
             names.add(field.name)
         return names
 
-    def build_schema_for_popup(
-        self, session: Session, popup_id: uuid.UUID
+    def build_schema_for_flow(
+        self,
+        session: Session,
+        popup_id: uuid.UUID,
+        flow_id: uuid.UUID | None,
     ) -> dict[str, Any]:
-        """Build a JSON Schema-like structure for a popup's form fields.
+        """Build a JSON Schema-like structure for a sales flow's form.
+
+        sdd/sales-flows slice 6 (Q1: flow-owned forms) — evolved from the
+        former `build_schema_for_popup`. For each of sections, base fields,
+        and custom fields independently: uses `flow_id`'s own rows if it
+        owns any, else falls back to the popup-shared tier
+        (`sales_flow_id IS NULL`, the exact form every flow rendered before
+        this slice). `flow_id=None` always resolves the popup-shared tier.
 
         This returns a schema that includes:
         - Base fields: human profile + application-level fields (source of truth)
-        - Custom form fields defined for the popup
+        - Custom form fields defined for the flow
         Each base field includes a `target` indicating where the data lives:
         - "human": stored on the Human entity
         - "application": stored on the Application entity
         """
-        fields, _ = self.find_by_popup(session, popup_id, skip=0, limit=1000)
+        fields, _ = self.find_for_flow(session, popup_id, flow_id, skip=0, limit=1000)
 
         # Load popup for interpolating help_text
         popup = session.get(Popups, popup_id)
         popup_name = popup.name if popup else "the event"
 
-        # Load sections for this popup
+        # Load sections for this flow (with popup-shared fallback)
         from app.api.form_section.crud import form_sections_crud
 
-        db_sections, _ = form_sections_crud.find_by_popup(session, popup_id, limit=None)
+        db_sections, _ = form_sections_crud.find_for_flow(
+            session, popup_id, flow_id, limit=None
+        )
 
         # Hidden sections are dropped from the schema entirely (and so are
         # their fields). The data + section row stay in the DB so the admin
@@ -491,7 +604,7 @@ class FormFieldsCRUD(BaseCRUD[FormFields, FormFieldCreate, FormFieldUpdate]):
             field_applies_to_popup,
         )
 
-        db_configs = base_field_configs_crud.find_by_popup(session, popup_id)
+        db_configs = base_field_configs_crud.find_for_flow(session, popup_id, flow_id)
 
         base_fields: dict[str, Any] = {}
         for config in db_configs:
@@ -570,6 +683,119 @@ class FormFieldsCRUD(BaseCRUD[FormFields, FormFieldCreate, FormFieldUpdate]):
             "base_fields": base_fields,
             "custom_fields": custom_fields,
             "sections": sections,
+        }
+
+    def copy_form_to_flow(
+        self,
+        session: Session,
+        *,
+        popup_id: uuid.UUID,
+        tenant_id: uuid.UUID,
+        target_flow_id: uuid.UUID,
+        source_flow_id: uuid.UUID | None,
+    ) -> dict[str, int]:
+        """Copy a form (sections + base field configs + custom fields) from
+        a source into `target_flow_id` as independent rows.
+
+        Backend half of the Q1 mitigation (task 6.3, "copy form from
+        another flow"): `source_flow_id=None` copies the popup-shared tier
+        (the form every flow reads by default); a specific flow id copies
+        exactly that flow's own rows verbatim (never the fallback-resolved
+        schema — copying an empty flow yields an empty target, which is the
+        honest answer). The target flow ends up owning its own rows,
+        independent of the source: editing either afterward never affects
+        the other. No endpoint exposes this yet — the backoffice UI lands
+        in a later slice (14).
+
+        Returns a count of copied rows per table for caller/test assertions.
+        """
+        from app.api.base_field_config.crud import base_field_configs_crud
+        from app.api.base_field_config.models import BaseFieldConfigs
+        from app.api.form_section.crud import form_sections_crud
+
+        if source_flow_id is not None:
+            source_sections, _ = form_sections_crud.find_by_flow(
+                session, source_flow_id, limit=None
+            )
+            source_configs = base_field_configs_crud.find_by_flow(
+                session, source_flow_id
+            )
+            source_fields, _ = self.find_by_flow(session, source_flow_id, limit=1000)
+        else:
+            source_sections, _ = form_sections_crud.find_shared(
+                session, popup_id, limit=None
+            )
+            source_configs = base_field_configs_crud.find_shared(session, popup_id)
+            source_fields, _ = self.find_shared(session, popup_id, limit=1000)
+
+        section_id_map: dict[uuid.UUID, uuid.UUID] = {}
+        for section in source_sections:
+            new_section = FormSections(
+                tenant_id=tenant_id,
+                popup_id=popup_id,
+                sales_flow_id=target_flow_id,
+                label=section.label,
+                description=section.description,
+                order=section.order,
+                protected=section.protected,
+                hidden=section.hidden,
+                kind=section.kind,
+            )
+            session.add(new_section)
+            session.flush()
+            section_id_map[section.id] = new_section.id
+
+        for config in source_configs:
+            session.add(
+                BaseFieldConfigs(
+                    tenant_id=tenant_id,
+                    popup_id=popup_id,
+                    sales_flow_id=target_flow_id,
+                    field_name=config.field_name,
+                    section_id=section_id_map.get(config.section_id)
+                    if config.section_id
+                    else None,
+                    position=config.position,
+                    required=config.required,
+                    label=config.label,
+                    placeholder=config.placeholder,
+                    help_text=config.help_text,
+                    options=config.options,
+                    field_type=config.field_type,
+                )
+            )
+
+        for field in source_fields:
+            session.add(
+                FormFields(
+                    tenant_id=tenant_id,
+                    popup_id=popup_id,
+                    sales_flow_id=target_flow_id,
+                    name=field.name,
+                    label=field.label,
+                    short_label=field.short_label,
+                    field_type=field.field_type,
+                    section_id=section_id_map.get(field.section_id)
+                    if field.section_id
+                    else None,
+                    position=field.position,
+                    required=field.required,
+                    options=field.options,
+                    placeholder=field.placeholder,
+                    help_text=field.help_text,
+                    min_date=field.min_date,
+                    max_date=field.max_date,
+                    config=dict(field.config) if field.config else None,
+                    width=field.width,
+                )
+            )
+
+        session.commit()
+
+        return {
+            "sections": len(source_sections),
+            "base_fields": len(source_configs),
+            "fields": len(source_fields),
         }
 
 

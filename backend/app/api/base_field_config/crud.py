@@ -76,9 +76,14 @@ class BaseFieldConfigsCRUD(
     def find_by_popup(
         self, session: Session, popup_id: uuid.UUID
     ) -> list[BaseFieldConfigs]:
-        # Order by (section.order, position) so callers that don't regroup still
-        # render fields in the same visual order as the form builder: sections
-        # stay together instead of being interleaved by raw position value.
+        """Returns ALL configs for the popup regardless of `sales_flow_id`
+        (admin/legacy management surface — untouched by sdd/sales-flows
+        slice 6, see `find_for_flow` for the flow-aware read path).
+
+        Order by (section.order, position) so callers that don't regroup still
+        render fields in the same visual order as the form builder: sections
+        stay together instead of being interleaved by raw position value.
+        """
         statement = (
             select(BaseFieldConfigs)
             .outerjoin(
@@ -89,6 +94,55 @@ class BaseFieldConfigsCRUD(
             .order_by(FormSections.order, BaseFieldConfigs.position)  # type: ignore[arg-type]
         )
         return list(session.exec(statement).all())
+
+    def find_by_flow(
+        self, session: Session, flow_id: uuid.UUID
+    ) -> list[BaseFieldConfigs]:
+        """Configs owned exclusively by `flow_id` (sdd/sales-flows slice 6)."""
+        statement = (
+            select(BaseFieldConfigs)
+            .outerjoin(
+                FormSections,
+                BaseFieldConfigs.section_id == FormSections.id,  # type: ignore[arg-type]
+            )
+            .where(BaseFieldConfigs.sales_flow_id == flow_id)
+            .order_by(FormSections.order, BaseFieldConfigs.position)  # type: ignore[arg-type]
+        )
+        return list(session.exec(statement).all())
+
+    def find_shared(
+        self, session: Session, popup_id: uuid.UUID
+    ) -> list[BaseFieldConfigs]:
+        """Popup-shared configs (`sales_flow_id IS NULL`) — the fallback
+        tier every flow reads until it owns its own configs."""
+        statement = (
+            select(BaseFieldConfigs)
+            .outerjoin(
+                FormSections,
+                BaseFieldConfigs.section_id == FormSections.id,  # type: ignore[arg-type]
+            )
+            .where(
+                BaseFieldConfigs.popup_id == popup_id,
+                BaseFieldConfigs.sales_flow_id.is_(None),  # type: ignore[union-attr]
+            )
+            .order_by(FormSections.order, BaseFieldConfigs.position)  # type: ignore[arg-type]
+        )
+        return list(session.exec(statement).all())
+
+    def find_for_flow(
+        self,
+        session: Session,
+        popup_id: uuid.UUID,
+        flow_id: uuid.UUID | None,
+    ) -> list[BaseFieldConfigs]:
+        """Flow-owned configs if `flow_id` owns any, else the popup-shared
+        fallback (Q1: flow-owned forms). `flow_id=None` always returns the
+        popup-shared tier directly."""
+        if flow_id is not None:
+            flow_rows = self.find_by_flow(session, flow_id)
+            if flow_rows:
+                return flow_rows
+        return self.find_shared(session, popup_id)
 
     def create_defaults_for_popup(
         self,

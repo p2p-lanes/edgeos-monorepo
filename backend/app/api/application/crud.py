@@ -1014,8 +1014,8 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
             data["status"] = data["status"].value
 
         # Capture the custom fields schema at submission time
-        data["custom_fields_schema"] = form_fields_crud.build_schema_for_popup(
-            session, app_data.popup_id
+        data["custom_fields_schema"] = form_fields_crud.build_schema_for_flow(
+            session, app_data.popup_id, data["sales_flow_id"]
         )
 
         application = Applications(**data)
@@ -1289,8 +1289,8 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
             data["accepted_at"] = datetime.now(UTC)
 
         # Capture the custom fields schema at submission time
-        data["custom_fields_schema"] = form_fields_crud.build_schema_for_popup(
-            session, app_data.popup_id
+        data["custom_fields_schema"] = form_fields_crud.build_schema_for_flow(
+            session, app_data.popup_id, flow_id
         )
 
         application = Applications(**data)
@@ -1627,8 +1627,8 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
             status=ApplicationStatus.ACCEPTED.value,
             submitted_at=now,
             accepted_at=now,
-            custom_fields_schema=form_fields_crud.build_schema_for_popup(
-                session, popup_id
+            custom_fields_schema=form_fields_crud.build_schema_for_flow(
+                session, popup_id, flow_id
             ),
             # Granted (comped/gifted) people never filled the application
             # form, so they never consented to sharing anything: default the
