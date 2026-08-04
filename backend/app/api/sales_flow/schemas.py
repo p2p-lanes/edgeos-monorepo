@@ -210,6 +210,72 @@ class SalesFlowPublic(SalesFlowBase):
     model_config = ConfigDict(from_attributes=True)
 
 
+# Class B (inheritable override) column names — must exactly match both
+# SalesFlowBase and PopupBase field names (same names by construction, see
+# design D1/D2). Single source of truth for `build_effective_config`
+# (sales_flow/resolver.py) and its NULL-matrix unit tests.
+EFFECTIVE_CONFIG_FIELDS: tuple[str, ...] = (
+    "application_layout",
+    "requires_application_fee",
+    "application_fee_amount",
+    "allows_scholarship",
+    "allows_incentive",
+    "allows_coupons",
+    "open_checkout_success_url",
+    "open_checkout_cancel_url",
+    "open_checkout_signing_secret",
+    "abandoned_cart_delay_days",
+    "abandoned_cart_repeat_days",
+    "abandoned_cart_max_count",
+    "purchase_reminder_delay_days",
+    "purchase_reminder_repeat_days",
+    "purchase_reminder_max_count",
+    "abandoned_application_delay_days",
+    "abandoned_application_repeat_days",
+    "abandoned_application_max_count",
+)
+
+
+class EffectiveFlowConfig(BaseModel):
+    """Read-through view of every Class B (inheritable override) column.
+
+    Design: sdd/sales-flows D2/D1. NULL on the flow means "inherit the
+    popup column of the same name" — this model already carries the
+    RESOLVED value, never NULL for a field that's non-nullable on
+    PopupBase (both operands can't be NULL: the popup column always has a
+    concrete value).
+
+    Slice 9 decision (design's "Open Questions" left this shape open):
+    this is a **sibling** object, never merged into `PopupPublic`. It is
+    built by `sales_flow/resolver.py::build_effective_config` and consumed
+    internally by the cutover slices that actually read these columns
+    through the flow (email tier resolution — slice 10, coupon allowance —
+    slice 11, reminder cadence — slice 10). No API response serializes this
+    in slice 9: no consumer needs it publicly yet, and inventing an unused
+    public surface would be scope creep on top of the URL/resolver work
+    this slice is actually chartered to deliver.
+    """
+
+    application_layout: ApplicationLayout
+    requires_application_fee: bool
+    application_fee_amount: Decimal | None = None
+    allows_scholarship: bool
+    allows_incentive: bool
+    allows_coupons: bool | None = None
+    open_checkout_success_url: str | None = None
+    open_checkout_cancel_url: str | None = None
+    open_checkout_signing_secret: str | None = None
+    abandoned_cart_delay_days: int | None = None
+    abandoned_cart_repeat_days: int | None = None
+    abandoned_cart_max_count: int | None = None
+    purchase_reminder_delay_days: int | None = None
+    purchase_reminder_repeat_days: int | None = None
+    purchase_reminder_max_count: int | None = None
+    abandoned_application_delay_days: int | None = None
+    abandoned_application_repeat_days: int | None = None
+    abandoned_application_max_count: int | None = None
+
+
 class FlowProductsBase(SQLModel):
     """Base schema for the flow_products link table.
 
