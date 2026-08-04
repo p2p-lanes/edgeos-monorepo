@@ -3045,6 +3045,7 @@ export type PaymentPublic = {
     tenant_id: string;
     application_id?: (string | null);
     popup_id: string;
+    sales_flow_id?: (string | null);
     external_id?: (string | null);
     status?: string;
     amount?: string;
