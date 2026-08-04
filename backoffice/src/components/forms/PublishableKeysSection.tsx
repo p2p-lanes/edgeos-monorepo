@@ -1,10 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Check, Copy, KeyRound, Plus, Trash2 } from "lucide-react"
 import { useState } from "react"
-import {
-  type PublishableKeyCreated,
-  PublishableKeysService,
-} from "@/services/publishableKeys"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -14,6 +10,10 @@ import { LoadingButton } from "@/components/ui/loading-button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Textarea } from "@/components/ui/textarea"
 import useCustomToast from "@/hooks/useCustomToast"
+import {
+  type PublishableKeyCreated,
+  PublishableKeysService,
+} from "@/services/publishableKeys"
 import { createErrorHandler } from "@/utils"
 
 interface PublishableKeysSectionProps {
@@ -103,9 +103,9 @@ export function PublishableKeysSection({
           <AlertDescription>
             Browser-safe <strong>publishable keys</strong> let an
             externally-hosted checkout (built on the EdgeOS checkout SDK)
-            consume this organization's gatherings. They are not secret — restrict
-            them by listing the exact origins allowed to use them. One key works
-            across all of this organization's gatherings.
+            consume this organization's gatherings. They are not secret —
+            restrict them by listing the exact origins allowed to use them. One
+            key works across all of this organization's gatherings.
           </AlertDescription>
         </Alert>
 
@@ -196,7 +196,11 @@ export function PublishableKeysSection({
                     <div className="mt-1 flex flex-wrap gap-1">
                       {key.allowed_origins.length > 0 ? (
                         key.allowed_origins.map((o) => (
-                          <Badge key={o} variant="outline" className="text-[10px]">
+                          <Badge
+                            key={o}
+                            variant="outline"
+                            className="text-[10px]"
+                          >
                             {o}
                           </Badge>
                         ))
