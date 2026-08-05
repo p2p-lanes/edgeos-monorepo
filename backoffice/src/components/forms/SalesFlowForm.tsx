@@ -286,6 +286,7 @@ export function SalesFlowForm({
           navigate({ to: "/sales-flows/$id/edit", params: { id: data.id } }),
       })
       queryClient.invalidateQueries({ queryKey: ["sales-flows"] })
+      form.reset()
       onSuccess()
     },
     onError: handleMutationError,
@@ -300,6 +301,7 @@ export function SalesFlowForm({
     onSuccess: () => {
       showSuccessToast("Sales flow updated successfully")
       queryClient.invalidateQueries({ queryKey: ["sales-flows"] })
+      form.reset()
       onSuccess()
     },
     onError: handleMutationError,
