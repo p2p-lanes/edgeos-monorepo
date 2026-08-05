@@ -220,7 +220,7 @@ class EmailService:
         flow-tier row falls through to the popup tier, which falls through
         to the tenant/file tier exactly as it did before this slice.
 
-        Slice 14 backlog: a custom template row that FAILS to render (bad
+        A custom template row that FAILS to render (bad
         Jinja syntax, SSTI-sandbox violation, etc.) also falls through to
         the next tier instead of raising and blocking the send outright — a
         broken flow-tier override must never take down the popup/tenant

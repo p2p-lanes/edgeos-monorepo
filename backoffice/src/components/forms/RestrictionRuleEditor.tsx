@@ -121,7 +121,7 @@ export function RestrictionRuleEditor({
     <div className="space-y-3">
       {leaves.length === 0 ? (
         <p className="text-sm text-muted-foreground">
-          No restriction — every eligible buyer can purchase from this flow.
+          No restriction: every eligible buyer can purchase from this flow.
         </p>
       ) : (
         <>

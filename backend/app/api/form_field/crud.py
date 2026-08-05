@@ -707,6 +707,10 @@ class FormFieldsCRUD(BaseCRUD[FormFields, FormFieldCreate, FormFieldUpdate]):
         the other. HTTP endpoint: POST /form-fields/copy-to-flow/{target_flow_id}
         (task 14.1); backoffice UI is a confirm dialog on the flow detail page.
 
+        The target's existing flow-tier rows are deleted first (same
+        transaction), so this genuinely REPLACES rather than appends —
+        matching the confirm dialog's promise.
+
         Returns a count of copied rows per table for caller/test assertions.
         """
         from app.api.base_field_config.crud import base_field_configs_crud
@@ -727,6 +731,18 @@ class FormFieldsCRUD(BaseCRUD[FormFields, FormFieldCreate, FormFieldUpdate]):
             )
             source_configs = base_field_configs_crud.find_shared(session, popup_id)
             source_fields, _ = self.find_shared(session, popup_id, limit=1000)
+
+        # Clear the target's existing own rows first (replace, not append).
+        # FK-safe order: fields/configs reference section_id, so delete
+        # them before their sections.
+        existing_fields, _ = self.find_by_flow(session, target_flow_id, limit=1000)
+        existing_configs = base_field_configs_crud.find_by_flow(session, target_flow_id)
+        existing_sections, _ = form_sections_crud.find_by_flow(
+            session, target_flow_id, limit=None
+        )
+        for row in (*existing_fields, *existing_configs, *existing_sections):
+            session.delete(row)
+        session.flush()
 
         section_id_map: dict[uuid.UUID, uuid.UUID] = {}
         for section in source_sections:

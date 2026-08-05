@@ -181,9 +181,9 @@ def test_flow_fallback_is_byte_identical_to_legacy_behavior(
 def test_flow_render_error_falls_through_to_popup_tier(
     db: Session, tenant_a: Tenants
 ) -> None:
-    """Slice 14 backlog: a flow-tier template that fails to render (invalid
-    Jinja syntax here) falls through to the popup tier instead of raising
-    and blocking the send."""
+    """A flow-tier template that fails to render (invalid Jinja syntax
+    here) falls through to the popup tier instead of raising and blocking
+    the send."""
     popup = _make_popup(db, tenant_a)
     flow = _make_flow(db, tenant_a, popup, slug="flow-f")
     _make_template(

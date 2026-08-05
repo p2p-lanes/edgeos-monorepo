@@ -168,9 +168,10 @@ class ApplicationPublic(BaseModel):
     popup_id: uuid.UUID
     human_id: uuid.UUID
     group_id: uuid.UUID | None = None
-    # sdd/sales-flows task 14.x backlog: expose the flow this application
-    # belongs to. Lets the portal's needsFlowChoice heuristic (task 9.4)
-    # read the resolved flow directly instead of re-deriving it.
+    # sdd/sales-flows slice 14: the flow this application belongs to, so
+    # callers can read it directly instead of re-deriving it. The portal's
+    # needsFlowChoice (task 9.4) still uses a flow-count check, not this
+    # field — see application/page.tsx for why (deferred, not missing).
     sales_flow_id: uuid.UUID | None = None
 
     # Popup-specific

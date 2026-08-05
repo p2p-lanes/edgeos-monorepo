@@ -593,6 +593,11 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         read path ad hoc. Deferred as its own reviewed slice — this queue is
         a hot, constantly-polled surface and this final slice already spans
         3 services; disclosed rather than bundled in under time pressure.
+
+        TODO (disclosed): `approval_strategy` also resolves flow -> popup
+        with no admin write path for the flow tier (see
+        `approval_strategy/crud.py::get_for_flow`) — the same shape of gap
+        as `reviewers_mode` above: backend-supported, admin-inaccessible.
         """
         already_reviewed = (
             exists()
