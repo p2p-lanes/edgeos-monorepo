@@ -9,8 +9,10 @@ import {
   User,
   Workflow,
 } from "lucide-react"
+import { useState } from "react"
 
 import {
+  type ApiError,
   type PopupAdmin,
   PopupsService,
   type SalesFlowCreate,
@@ -24,6 +26,7 @@ import {
   type OverrideFieldKind,
   OverrideFieldRow,
 } from "@/components/forms/OverrideFieldRow"
+import { RestrictionRuleEditor } from "@/components/forms/RestrictionRuleEditor"
 import { Button } from "@/components/ui/button"
 import {
   HeroInput,
@@ -52,6 +55,10 @@ import {
   type OverrideMode,
   resolveOverrideValue,
 } from "@/lib/salesFlowOverrides"
+import {
+  draftsToRestrictionRule,
+  parseRestrictionRuleToDrafts,
+} from "@/lib/salesFlowRestrictionRule"
 import { createErrorHandler } from "@/utils"
 
 interface OverrideFieldConfig {
@@ -228,6 +235,24 @@ interface SalesFlowFormProps {
   onSuccess: () => void
 }
 
+/**
+ * Pydantic model-level validators (assert_restriction_rule_allowed_for_type)
+ * report `loc = ["body"]`, not a `restriction_rule`-scoped path, so the
+ * only reliable signal is the message text itself — every restriction_rule
+ * validation error, structural or type-guard, starts with that field name.
+ */
+function extractRestrictionRuleError(err: ApiError): string | undefined {
+  const detail = (
+    err.body as { detail?: string | Array<{ msg: string }> } | undefined
+  )?.detail
+  const messages = Array.isArray(detail)
+    ? detail.map((d) => d.msg)
+    : typeof detail === "string"
+      ? [detail]
+      : []
+  return messages.find((msg) => msg.includes("restriction_rule"))
+}
+
 export function SalesFlowForm({
   popupId,
   defaultValues,
@@ -239,11 +264,17 @@ export function SalesFlowForm({
   const { isOperatorOrAbove } = useAuth()
   const isEdit = !!defaultValues
   const readOnly = !isOperatorOrAbove
+  const [restrictionRuleError, setRestrictionRuleError] = useState<string>()
 
   const { data: popup } = useQuery({
     queryKey: ["popups", popupId],
     queryFn: () => PopupsService.getPopup({ popupId }),
   })
+
+  const handleMutationError = (err: ApiError) => {
+    setRestrictionRuleError(extractRestrictionRuleError(err))
+    createErrorHandler(showErrorToast)(err)
+  }
 
   const createMutation = useMutation({
     mutationFn: (data: SalesFlowCreate) =>
@@ -257,7 +288,7 @@ export function SalesFlowForm({
       queryClient.invalidateQueries({ queryKey: ["sales-flows"] })
       onSuccess()
     },
-    onError: createErrorHandler(showErrorToast),
+    onError: handleMutationError,
   })
 
   const updateMutation = useMutation({
@@ -271,7 +302,7 @@ export function SalesFlowForm({
       queryClient.invalidateQueries({ queryKey: ["sales-flows"] })
       onSuccess()
     },
-    onError: createErrorHandler(showErrorToast),
+    onError: handleMutationError,
   })
 
   const deleteMutation = useMutation({
@@ -296,9 +327,13 @@ export function SalesFlowForm({
       reviewers_mode: defaultValues?.reviewers_mode ?? "inherit",
       identity_mode: defaultValues?.identity_mode ?? "portal_auth",
       overrides: buildInitialOverrides(defaultValues),
+      restrictionRule: parseRestrictionRuleToDrafts(
+        defaultValues?.restriction_rule ?? null,
+      ),
     },
     onSubmit: ({ value }) => {
       if (readOnly) return
+      setRestrictionRuleError(undefined)
       const overridePayload = Object.fromEntries(
         OVERRIDE_FIELDS.map((field) => {
           const draft = value.overrides[field.key]
@@ -320,6 +355,12 @@ export function SalesFlowForm({
         order: Number(value.order),
         reviewers_mode: value.reviewers_mode,
         identity_mode: value.identity_mode,
+        restriction_rule: value.restrictionRule.unsupported
+          ? defaultValues?.restriction_rule
+          : draftsToRestrictionRule(
+              value.restrictionRule.combinator,
+              value.restrictionRule.leaves,
+            ),
         ...overridePayload,
       }
       if (isEdit) {
@@ -511,6 +552,33 @@ export function SalesFlowForm({
                   </SelectContent>
                 </Select>
               </InlineRow>
+            )}
+          </form.Field>
+        </InlineSection>
+
+        <Separator />
+
+        <InlineSection title="Restriction Rule">
+          <p className="px-1 text-xs text-muted-foreground">
+            Gate purchases from this flow behind buyer conditions. No conditions
+            means every eligible buyer can purchase.
+          </p>
+          <form.Field name="restrictionRule">
+            {(field) => (
+              <RestrictionRuleEditor
+                combinator={field.state.value.combinator}
+                leaves={field.state.value.leaves}
+                unsupported={field.state.value.unsupported}
+                onChange={(combinator, leaves) =>
+                  field.handleChange({
+                    combinator,
+                    leaves,
+                    unsupported: field.state.value.unsupported,
+                  })
+                }
+                readOnly={readOnly}
+                error={restrictionRuleError}
+              />
             )}
           </form.Field>
         </InlineSection>
