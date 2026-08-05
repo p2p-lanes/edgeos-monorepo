@@ -121,6 +121,13 @@ function reconstructFullHtml(editableContent: string): string {
 interface EmailTemplateEditorProps {
   templateType: EmailTemplateType
   popupId?: string
+  /**
+   * sdd/sales-flows task 14.1: scopes a NEW template to one flow's own
+   * tier (slice 10's three-tier resolution). Ignored once `existingTemplate`
+   * is set — updates/deletes always target that row by id, regardless of
+   * which tier it lives in.
+   */
+  salesFlowId?: string
   existingTemplate?: EmailTemplatePublic
   typeInfo: TemplateTypeInfo
   onSave: () => void
@@ -129,6 +136,7 @@ interface EmailTemplateEditorProps {
 export function EmailTemplateEditor({
   templateType,
   popupId,
+  salesFlowId,
   existingTemplate,
   typeInfo,
   onSave,
@@ -326,6 +334,7 @@ export function EmailTemplateEditor({
         requestBody: buildEmailTemplateCreatePayload({
           scope: typeInfo.scope,
           popupId,
+          salesFlowId,
           templateType,
           htmlContent: data.html_content,
           subject: data.subject,
