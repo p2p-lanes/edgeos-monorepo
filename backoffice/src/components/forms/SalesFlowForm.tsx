@@ -27,6 +27,7 @@ import {
   OverrideFieldRow,
 } from "@/components/forms/OverrideFieldRow"
 import { RestrictionRuleEditor } from "@/components/forms/RestrictionRuleEditor"
+import { SalesFlowVisibilityNote } from "@/components/forms/SalesFlowVisibilityNote"
 import { Button } from "@/components/ui/button"
 import {
   HeroInput,
@@ -496,6 +497,17 @@ export function SalesFlowForm({
               </InlineRow>
             )}
           </form.Field>
+
+          <form.Subscribe
+            selector={(state) => ({
+              type: state.values.type,
+              visibility: state.values.visibility,
+            })}
+          >
+            {({ type, visibility }) => (
+              <SalesFlowVisibilityNote type={type} visibility={visibility} />
+            )}
+          </form.Subscribe>
 
           <form.Field name="order">
             {(field) => (

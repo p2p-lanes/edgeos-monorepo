@@ -1,18 +1,22 @@
-import { useSuspenseQuery } from "@tanstack/react-query"
+import { useQuery, useSuspenseQuery } from "@tanstack/react-query"
 import { createFileRoute } from "@tanstack/react-router"
 import { Suspense } from "react"
 
-import { SalesFlowsService } from "@/client"
+import { PopupsService, SalesFlowsService } from "@/client"
 import { FormPageLayout } from "@/components/Common/FormPageLayout"
 import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
 import { CopyFormToFlowDialog } from "@/components/forms/CopyFormToFlowDialog"
 import { FlowEmailTemplatesSection } from "@/components/forms/FlowEmailTemplatesSection"
 import { ReviewersManager } from "@/components/forms/ReviewersManager"
 import { SalesFlowForm } from "@/components/forms/SalesFlowForm"
+import { SalesFlowScopeBanner } from "@/components/forms/SalesFlowScopeBanner"
+import { SalesFlowUrlCard } from "@/components/forms/SalesFlowUrlCard"
 import { InlineSection } from "@/components/ui/inline-form"
 import { Separator } from "@/components/ui/separator"
 import { Skeleton } from "@/components/ui/skeleton"
+import { useCurrentTenant } from "@/hooks/useCurrentTenant"
 import { useGoBack } from "@/hooks/useGoBack"
+import { getPortalBaseUrl } from "@/lib/portal-urls"
 
 export const Route = createFileRoute("/_layout/sales-flows/$id/edit")({
   component: EditSalesFlowPage,
@@ -31,9 +35,23 @@ function getSalesFlowQueryOptions(flowId: string) {
 function EditSalesFlowContent({ flowId }: { flowId: string }) {
   const goBack = useGoBack({ to: "/sales-flows" })
   const { data: salesFlow } = useSuspenseQuery(getSalesFlowQueryOptions(flowId))
+  const { data: popup } = useQuery({
+    queryKey: ["popups", salesFlow.popup_id],
+    queryFn: () => PopupsService.getPopup({ popupId: salesFlow.popup_id }),
+  })
+  const { data: tenant } = useCurrentTenant()
+  const portalBaseUrl = getPortalBaseUrl(tenant)
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
+      <SalesFlowScopeBanner flowName={salesFlow.name} />
+
+      <SalesFlowUrlCard
+        portalBaseUrl={portalBaseUrl}
+        popupSlug={popup?.slug}
+        flow={salesFlow}
+      />
+
       <SalesFlowForm
         popupId={salesFlow.popup_id}
         defaultValues={salesFlow}
