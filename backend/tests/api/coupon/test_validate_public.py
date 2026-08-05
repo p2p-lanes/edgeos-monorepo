@@ -1,13 +1,16 @@
 """Tests for POST /coupons/validate-public — CAP-B.
 
-TDD phase: RED → GREEN.
-
 Scenarios:
 1. Valid coupon returns 200 with correct shape
 2. Unknown coupon code returns 400 with uniform message
 3. Expired coupon returns 400 with identical shape (no differentiation)
-4. Application popup returns 403
+4. Application popup returns 400 via the uniform flow-type gate (never a
+   raw 403 — sdd/sales-flows slice 9)
 5. Rate-limit: 31st request returns 429 (mocked)
+6. Cross-tenant resolution: origin-scoped popup lookup, uniform 400 for a
+   coupon that exists but belongs to a different tenant
+7. Missing Origin/X-Tenant-Id returns 404 from the tenant resolver before
+   any coupon logic runs
 """
 
 import uuid
