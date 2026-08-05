@@ -171,6 +171,7 @@ export type ApplicationAdminCreate = {
 } | null);
     status?: ApplicationStatus;
     group_id?: (string | null);
+    sales_flow_id?: (string | null);
 };
 
 export type ApplicationCommentCreate = {
@@ -269,6 +270,7 @@ export type ApplicationPublic = {
     popup_id: string;
     human_id: string;
     group_id?: (string | null);
+    sales_flow_id?: (string | null);
     referral?: (string | null);
     invite_id?: (string | null);
     referral_id?: (string | null);
@@ -1218,6 +1220,21 @@ export type CompanionParticipation = {
     attendee: AttendeeInfo;
     application_status: string;
     owner_email?: (string | null);
+};
+
+/**
+ * sdd/sales-flows task 14.1: HTTP body for the copy-form-to-flow
+ * backoffice action. `source_flow_id` omitted copies the popup-shared
+ * tier; a specific flow id copies exactly that flow's own rows.
+ */
+export type CopyFormToFlowRequest = {
+    source_flow_id?: (string | null);
+};
+
+export type CopyFormToFlowResponse = {
+    sections: number;
+    base_fields: number;
+    fields: number;
 };
 
 /**
@@ -6534,6 +6551,14 @@ export type FormFieldsDeleteFormFieldData = {
 };
 
 export type FormFieldsDeleteFormFieldResponse = (void);
+
+export type FormFieldsCopyFormToFlowData = {
+    requestBody: CopyFormToFlowRequest;
+    targetFlowId: string;
+    xTenantId?: (string | null);
+};
+
+export type FormFieldsCopyFormToFlowResponse = (CopyFormToFlowResponse);
 
 export type FormFieldsGetApplicationSchemaData = {
     popupId: string;

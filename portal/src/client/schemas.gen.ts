@@ -725,6 +725,18 @@ export const ApplicationAdminCreateSchema = {
                 }
             ],
             title: 'Group Id'
+        },
+        sales_flow_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Sales Flow Id'
         }
     },
     type: 'object',
@@ -1171,6 +1183,18 @@ export const ApplicationPublicSchema = {
                 }
             ],
             title: 'Group Id'
+        },
+        sales_flow_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Sales Flow Id'
         },
         referral: {
             anyOf: [
@@ -5314,6 +5338,48 @@ export const CompanionParticipationSchema = {
     required: ['attendee', 'application_status'],
     title: 'CompanionParticipation',
     description: "Response when human is a companion on someone else's application."
+} as const;
+
+export const CopyFormToFlowRequestSchema = {
+    properties: {
+        source_flow_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Source Flow Id'
+        }
+    },
+    type: 'object',
+    title: 'CopyFormToFlowRequest',
+    description: `sdd/sales-flows task 14.1: HTTP body for the copy-form-to-flow
+backoffice action. \`source_flow_id\` omitted copies the popup-shared
+tier; a specific flow id copies exactly that flow's own rows.`
+} as const;
+
+export const CopyFormToFlowResponseSchema = {
+    properties: {
+        sections: {
+            type: 'integer',
+            title: 'Sections'
+        },
+        base_fields: {
+            type: 'integer',
+            title: 'Base Fields'
+        },
+        fields: {
+            type: 'integer',
+            title: 'Fields'
+        }
+    },
+    type: 'object',
+    required: ['sections', 'base_fields', 'fields'],
+    title: 'CopyFormToFlowResponse'
 } as const;
 
 export const CouponCreateSchema = {
