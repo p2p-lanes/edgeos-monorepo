@@ -577,6 +577,22 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
 
         The reviewed-by-me exclusion and pagination run in SQL so the count is
         exact and no oversized candidate list is loaded into Python.
+
+        TODO (sdd/sales-flows, deferred from slice 14 — disclosed, not
+        forgotten): this queue is scoped by `popup_ids` only, with no
+        `sales_flow_id`/`reviewers_mode` awareness (design D4's tri-state).
+        A reviewer added only at a flow's OVERRIDE tier currently sees every
+        IN_REVIEW application across the whole popup, not just the flows
+        they're actually assigned to — the queue doesn't yet resolve, per
+        application, whether its flow's `reviewers_mode` is inherit or
+        override and filter accordingly. Fixing this correctly also touches
+        the reviewers_mode flip's concurrency story (two reviewers editing
+        the same flow's override list at once), which should use the
+        `with_for_update` precedent already established in
+        `payment/crud.py`'s pending-payment locking, not be bolted onto this
+        read path ad hoc. Deferred as its own reviewed slice — this queue is
+        a hot, constantly-polled surface and this final slice already spans
+        3 services; disclosed rather than bundled in under time pressure.
         """
         already_reviewed = (
             exists()

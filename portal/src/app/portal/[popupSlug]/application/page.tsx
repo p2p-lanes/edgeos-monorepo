@@ -87,10 +87,17 @@ export default function FormPage() {
   // before we know whether it's even safe to reach the JSX that mounts
   // FlowPicker. Same query, shared cache — no extra request.
   const { data: portalFlows } = usePortalSalesFlows(city?.id)
-  // `null` = not resolved yet (never gates a redirect). `application` below
-  // is popup-scoped only — ApplicationPublic carries no sales_flow_id — so
-  // once a popup has more than one flow, a terminal `application` cannot be
-  // trusted to represent the flow the visitor is about to pick or submit.
+  // `null` = not resolved yet (never gates a redirect). Deliberately still
+  // a flow-COUNT heuristic, not an `application.sales_flow_id` lookup:
+  // ApplicationPublic exposes sales_flow_id as of slice 14, but a terminal
+  // `application` fetched here is resolved by human+popup, independent of
+  // FlowPicker's (not-yet-made) selection — so even knowing the existing
+  // application's flow doesn't tell us it's the SAME flow this visitor is
+  // about to pick. Once a popup has more than one flow, redirecting on a
+  // terminal status is unsafe until the visitor has chosen. Simplifying
+  // this to a per-flow lookup was considered and deferred (task 14.x
+  // backlog) — it would change what "terminal" means for a multi-flow
+  // visitor, which is a product decision, not a mechanical refactor.
   const needsFlowChoice = portalFlows ? portalFlows.length > 1 : null
 
   const {
