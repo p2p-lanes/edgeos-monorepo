@@ -19210,6 +19210,18 @@ export const SalesFlowCreateSchema = {
                 }
             ],
             title: 'Abandoned Application Max Count'
+        },
+        restriction_rule: {
+            anyOf: [
+                {
+                    additionalProperties: true,
+                    type: 'object'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Restriction Rule'
         }
     },
     type: 'object',
@@ -19282,6 +19294,18 @@ export const SalesFlowPublicSchema = {
                 }
             ],
             title: 'Status'
+        },
+        restriction_rule: {
+            anyOf: [
+                {
+                    additionalProperties: true,
+                    type: 'object'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Restriction Rule'
         },
         application_layout: {
             anyOf: [
@@ -19817,6 +19841,18 @@ export const SalesFlowUpdateSchema = {
                 }
             ],
             title: 'Abandoned Application Max Count'
+        },
+        restriction_rule: {
+            anyOf: [
+                {
+                    additionalProperties: true,
+                    type: 'object'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Restriction Rule'
         }
     },
     type: 'object',

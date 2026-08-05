@@ -3930,6 +3930,9 @@ export type SalesFlowCreate = {
     abandoned_application_delay_days?: (number | null);
     abandoned_application_repeat_days?: (number | null);
     abandoned_application_max_count?: (number | null);
+    restriction_rule?: ({
+    [key: string]: unknown;
+} | null);
 };
 
 /**
@@ -3953,6 +3956,9 @@ export type SalesFlowPublic = {
     reviewers_mode?: SalesFlowReviewersMode;
     identity_mode?: SalesFlowIdentityMode;
     status?: (string | null);
+    restriction_rule?: ({
+    [key: string]: unknown;
+} | null);
     application_layout?: (ApplicationLayout | null);
     requires_application_fee?: (boolean | null);
     application_fee_amount?: (string | null);
@@ -4016,6 +4022,9 @@ export type SalesFlowUpdate = {
     abandoned_application_delay_days?: (number | null);
     abandoned_application_repeat_days?: (number | null);
     abandoned_application_max_count?: (number | null);
+    restriction_rule?: ({
+    [key: string]: unknown;
+} | null);
 };
 
 /**
