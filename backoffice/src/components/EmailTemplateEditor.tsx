@@ -131,6 +131,12 @@ interface EmailTemplateEditorProps {
   existingTemplate?: EmailTemplatePublic
   typeInfo: TemplateTypeInfo
   onSave: () => void
+  /**
+   * Height of the editor root. The default fits the full-page route
+   * (email-templates/$type.edit); dialog hosts must pass a height that
+   * fits their container (e.g. "h-[75vh]") or the panes overflow.
+   */
+  heightClassName?: string
 }
 
 export function EmailTemplateEditor({
@@ -140,6 +146,7 @@ export function EmailTemplateEditor({
   existingTemplate,
   typeInfo,
   onSave,
+  heightClassName = "h-[calc(100vh-180px)]",
 }: EmailTemplateEditorProps) {
   const queryClient = useQueryClient()
   const { showSuccessToast, showErrorToast } = useCustomToast()
@@ -428,7 +435,7 @@ export function EmailTemplateEditor({
   const isSaving = createMutation.isPending || updateMutation.isPending
 
   return (
-    <div className="flex h-[calc(100vh-180px)] flex-col gap-2">
+    <div className={`flex ${heightClassName} flex-col gap-2`}>
       {/* Single toolbar: subject + all actions */}
       <div className="flex items-center gap-2">
         <Input

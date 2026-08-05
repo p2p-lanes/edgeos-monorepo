@@ -93,7 +93,7 @@ export function FlowEmailTemplatesSection({
         open={editingType !== null}
         onOpenChange={(open) => !open && setEditingType(null)}
       >
-        <DialogContent className="max-w-5xl">
+        <DialogContent className="sm:max-w-5xl">
           <DialogTitle>{editingTypeInfo?.label ?? "Edit Template"}</DialogTitle>
           <DialogDescription className="sr-only">
             Edit this flow's own version of the {editingTypeInfo?.label} email
@@ -106,6 +106,7 @@ export function FlowEmailTemplatesSection({
               salesFlowId={flowId}
               existingTemplate={existingTemplate}
               typeInfo={editingTypeInfo}
+              heightClassName="h-[75vh]"
               onSave={() => {
                 refetch()
                 setEditingType(null)
