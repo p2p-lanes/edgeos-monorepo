@@ -220,6 +220,15 @@ class EmailService:
         flow-tier row falls through to the popup tier, which falls through
         to the tenant/file tier exactly as it did before this slice.
 
+        Slice 14 backlog: a custom template row that FAILS to render (bad
+        Jinja syntax, SSTI-sandbox violation, etc.) also falls through to
+        the next tier instead of raising and blocking the send outright — a
+        broken flow-tier override must never take down the popup/tenant
+        template or the underlying transactional email. The error is
+        logged with the offending template's id/scope so an operator can
+        find and fix it; the file tier is the final backstop and is
+        expected to always render.
+
         Returns:
             Tuple of (rendered_html, custom_subject_or_none)
         """
@@ -233,7 +242,14 @@ class EmailService:
                 db_session, sales_flow_id, template_type_enum.value
             )
             if custom:
-                return self._render_custom(custom, context)
+                try:
+                    return self._render_custom(custom, context)
+                except Exception:
+                    logger.error(
+                        "Flow-tier custom template {} failed to render, "
+                        "falling back to the next tier",
+                        custom.id,
+                    )
 
         if db_session and template_scope == "tenant" and tenant_id:
             from app.api.email_template.crud import email_template_crud
@@ -242,7 +258,14 @@ class EmailService:
                 db_session, tenant_id, template_type_enum.value
             )
             if custom:
-                return self._render_custom(custom, context)
+                try:
+                    return self._render_custom(custom, context)
+                except Exception:
+                    logger.error(
+                        "Tenant-tier custom template {} failed to render, "
+                        "falling back to the next tier",
+                        custom.id,
+                    )
 
         if db_session and template_scope == "popup" and popup_id:
             from app.api.email_template.crud import email_template_crud
@@ -251,7 +274,14 @@ class EmailService:
                 db_session, popup_id, template_type_enum.value
             )
             if custom:
-                return self._render_custom(custom, context)
+                try:
+                    return self._render_custom(custom, context)
+                except Exception:
+                    logger.error(
+                        "Popup-tier custom template {} failed to render, "
+                        "falling back to the next tier",
+                        custom.id,
+                    )
 
         # Fallback to file-based template
         file_path = TEMPLATE_TYPE_TO_FILE.get(template_type_enum)

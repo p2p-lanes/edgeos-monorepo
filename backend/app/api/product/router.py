@@ -14,7 +14,13 @@ from app.api.product.schemas import (
     ProductUpdate,
 )
 from app.api.shared.enums import UserRole
-from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
+from app.api.shared.response import (
+    MAX_PAGE_LIMIT,
+    ListModel,
+    PaginationLimit,
+    PaginationSkip,
+    Paging,
+)
 from app.api.translation.service import (
     TRANSLATABLE_FIELDS,
     apply_translation_overlay,
@@ -424,9 +430,9 @@ async def list_portal_products(
 
         if flow is not None and popup is not None:
             # rel-001/risk-002: filter-then-paginate so total is the
-            # filtered count, not the raw pre-filter one (1000 = max page).
+            # filtered count, not the raw pre-filter one.
             all_products, _ = crud.products_crud.find_by_popup(
-                db, skip=0, limit=1000, **find_kwargs
+                db, skip=0, limit=MAX_PAGE_LIMIT, **find_kwargs
             )
             context = build_context(db, popup, flow, human=current_human)
             filtered = filter_allowed_products(db, flow, popup, all_products, context)

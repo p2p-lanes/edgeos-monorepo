@@ -168,6 +168,10 @@ class ApplicationPublic(BaseModel):
     popup_id: uuid.UUID
     human_id: uuid.UUID
     group_id: uuid.UUID | None = None
+    # sdd/sales-flows task 14.x backlog: expose the flow this application
+    # belongs to. Lets the portal's needsFlowChoice heuristic (task 9.4)
+    # read the resolved flow directly instead of re-deriving it.
+    sales_flow_id: uuid.UUID | None = None
 
     # Popup-specific
     referral: str | None = None

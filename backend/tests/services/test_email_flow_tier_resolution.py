@@ -178,6 +178,57 @@ def test_flow_fallback_is_byte_identical_to_legacy_behavior(
     assert flow_subject == legacy_subject
 
 
+def test_flow_render_error_falls_through_to_popup_tier(
+    db: Session, tenant_a: Tenants
+) -> None:
+    """Slice 14 backlog: a flow-tier template that fails to render (invalid
+    Jinja syntax here) falls through to the popup tier instead of raising
+    and blocking the send."""
+    popup = _make_popup(db, tenant_a)
+    flow = _make_flow(db, tenant_a, popup, slug="flow-f")
+    _make_template(
+        db, tenant_a, popup_id=popup.id, html_content="<p>Popup safe version</p>"
+    )
+    _make_template(
+        db,
+        tenant_a,
+        popup_id=popup.id,
+        sales_flow_id=flow.id,
+        html_content="<p>Broken {% if %}</p>",
+    )
+
+    html, _ = EmailService().render_with_fallback(
+        template_type=_TEMPLATE_TYPE,
+        context={},
+        popup_id=popup.id,
+        sales_flow_id=flow.id,
+        db_session=db,
+    )
+
+    assert "Popup safe version" in html
+
+
+def test_popup_render_error_falls_through_to_file_default(
+    db: Session, tenant_a: Tenants
+) -> None:
+    """Same fallback, one tier down: a broken popup-tier template (no flow
+    override present) falls through to the file-based default."""
+    popup = _make_popup(db, tenant_a)
+    _make_template(
+        db, tenant_a, popup_id=popup.id, html_content="<p>Broken {% if %}</p>"
+    )
+
+    html, subject = EmailService().render_with_fallback(
+        template_type=_TEMPLATE_TYPE,
+        context={"popup_name": popup.name},
+        popup_id=popup.id,
+        db_session=db,
+    )
+
+    assert subject is None
+    assert html
+
+
 def test_no_override_at_any_tier_falls_through_to_file_default(
     db: Session, tenant_a: Tenants
 ) -> None:

@@ -158,6 +158,7 @@ def _build_application_public(
         popup_id=application.popup_id,
         human_id=application.human_id,
         group_id=application.group_id,
+        sales_flow_id=application.sales_flow_id,
         referral=application.referral,
         invite_id=application.invite_id,
         referral_id=application.referral_id,

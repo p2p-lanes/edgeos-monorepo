@@ -1,0 +1,255 @@
+"""Slice 14 backlog — DB-level coverage for `PurchaseContext.has_purchased`
+(`_has_purchased_product`/`_has_purchased_category`). Slice 12 shipped these
+with only pure unit coverage (schemas/evaluator) plus indirect exercise
+through the HTTP purchase-gate tests; this fills the gap the orchestrator's
+brief called out explicitly: product + category, positive + negative,
+through the application-attributed leg (the direct/attendee-only leg is
+already covered by the catalog-filter integration tests).
+"""
+
+import uuid
+from decimal import Decimal
+
+from sqlmodel import Session
+
+from app.api.application.models import Applications
+from app.api.application.schemas import ApplicationStatus
+from app.api.attendee.models import Attendees
+from app.api.human.models import Humans
+from app.api.human.schemas import HumanPublic
+from app.api.payment.models import PaymentProducts, Payments
+from app.api.payment.schemas import PaymentStatus
+from app.api.popup.models import Popups
+from app.api.product.models import Products
+from app.api.sales_flow.crud import sales_flows_crud
+from app.api.sales_flow.models import SalesFlows
+from app.api.tenant.models import Tenants
+from app.services.restrictions.context import build_context
+
+
+def _make_popup(db: Session, tenant: Tenants) -> Popups:
+    popup = Popups(
+        tenant_id=tenant.id,
+        name=f"Has Purchased Popup {uuid.uuid4().hex[:8]}",
+        slug=f"has-purchased-{uuid.uuid4().hex[:8]}",
+        status="active",
+        currency="USD",
+    )
+    db.add(popup)
+    db.flush()
+    return popup
+
+
+def _make_flow(db: Session, tenant: Tenants, popup: Popups) -> SalesFlows:
+    return sales_flows_crud.provision_default_flow(
+        db, popup_id=popup.id, tenant_id=tenant.id, sale_type="application"
+    )
+
+
+def _make_product(db: Session, popup: Popups, *, category: str = "ticket") -> Products:
+    product = Products(
+        tenant_id=popup.tenant_id,
+        popup_id=popup.id,
+        name=f"Product {uuid.uuid4().hex[:6]}",
+        slug=f"prod-{uuid.uuid4().hex[:8]}",
+        price=Decimal("10"),
+        category=category,
+        is_active=True,
+    )
+    db.add(product)
+    db.flush()
+    return product
+
+
+def _make_human(db: Session, tenant: Tenants) -> Humans:
+    human = Humans(
+        tenant_id=tenant.id,
+        email=f"has-purchased-{uuid.uuid4().hex[:8]}@test.com",
+    )
+    db.add(human)
+    db.flush()
+    return human
+
+
+def _make_application(
+    db: Session, popup: Popups, human: Humans, flow: SalesFlows
+) -> Applications:
+    application = Applications(
+        tenant_id=popup.tenant_id,
+        popup_id=popup.id,
+        human_id=human.id,
+        sales_flow_id=flow.id,
+        status=ApplicationStatus.ACCEPTED.value,
+    )
+    db.add(application)
+    db.flush()
+    return application
+
+
+def _make_attendee(
+    db: Session, popup: Popups, human: Humans, application: Applications
+) -> Attendees:
+    attendee = Attendees(
+        tenant_id=popup.tenant_id,
+        popup_id=popup.id,
+        human_id=human.id,
+        application_id=application.id,
+        name="Has Purchased Attendee",
+        email=human.email,
+        category="main",
+    )
+    db.add(attendee)
+    db.flush()
+    return attendee
+
+
+def _make_approved_payment(
+    db: Session,
+    popup: Popups,
+    application: Applications,
+    attendee: Attendees,
+    product: Products,
+    *,
+    status: str = PaymentStatus.APPROVED.value,
+) -> Payments:
+    payment = Payments(
+        tenant_id=popup.tenant_id,
+        popup_id=popup.id,
+        application_id=application.id,
+        status=status,
+        amount=product.price,
+    )
+    db.add(payment)
+    db.flush()
+    db.add(
+        PaymentProducts(
+            tenant_id=popup.tenant_id,
+            payment_id=payment.id,
+            product_id=product.id,
+            attendee_id=attendee.id,
+            product_name=product.name,
+            product_price=product.price,
+            product_category=product.category,
+        )
+    )
+    db.flush()
+    return payment
+
+
+class TestHasPurchasedProduct:
+    def test_positive_returns_true_for_approved_purchase(
+        self, db: Session, tenant_a: Tenants
+    ) -> None:
+        popup = _make_popup(db, tenant_a)
+        flow = _make_flow(db, tenant_a, popup)
+        human = _make_human(db, tenant_a)
+        application = _make_application(db, popup, human, flow)
+        attendee = _make_attendee(db, popup, human, application)
+        product = _make_product(db, popup)
+        _make_approved_payment(db, popup, application, attendee, product)
+
+        context = build_context(
+            db, popup, flow, human=HumanPublic.model_validate(human)
+        )
+
+        assert context.has_purchased("product", str(product.id)) is True
+
+    def test_negative_returns_false_when_no_purchase_exists(
+        self, db: Session, tenant_a: Tenants
+    ) -> None:
+        popup = _make_popup(db, tenant_a)
+        flow = _make_flow(db, tenant_a, popup)
+        human = _make_human(db, tenant_a)
+        product = _make_product(db, popup)
+
+        context = build_context(
+            db, popup, flow, human=HumanPublic.model_validate(human)
+        )
+
+        assert context.has_purchased("product", str(product.id)) is False
+
+    def test_negative_when_payment_is_not_approved(
+        self, db: Session, tenant_a: Tenants
+    ) -> None:
+        popup = _make_popup(db, tenant_a)
+        flow = _make_flow(db, tenant_a, popup)
+        human = _make_human(db, tenant_a)
+        application = _make_application(db, popup, human, flow)
+        attendee = _make_attendee(db, popup, human, application)
+        product = _make_product(db, popup)
+        _make_approved_payment(
+            db,
+            popup,
+            application,
+            attendee,
+            product,
+            status=PaymentStatus.PENDING.value,
+        )
+
+        context = build_context(
+            db, popup, flow, human=HumanPublic.model_validate(human)
+        )
+
+        assert context.has_purchased("product", str(product.id)) is False
+
+
+class TestHasPurchasedCategory:
+    def test_positive_returns_true_for_approved_purchase_in_category(
+        self, db: Session, tenant_a: Tenants
+    ) -> None:
+        popup = _make_popup(db, tenant_a)
+        flow = _make_flow(db, tenant_a, popup)
+        human = _make_human(db, tenant_a)
+        application = _make_application(db, popup, human, flow)
+        attendee = _make_attendee(db, popup, human, application)
+        product = _make_product(db, popup, category="merch")
+        _make_approved_payment(db, popup, application, attendee, product)
+
+        context = build_context(
+            db, popup, flow, human=HumanPublic.model_validate(human)
+        )
+
+        assert context.has_purchased("category", "merch") is True
+
+    def test_negative_returns_false_for_a_different_category(
+        self, db: Session, tenant_a: Tenants
+    ) -> None:
+        popup = _make_popup(db, tenant_a)
+        flow = _make_flow(db, tenant_a, popup)
+        human = _make_human(db, tenant_a)
+        application = _make_application(db, popup, human, flow)
+        attendee = _make_attendee(db, popup, human, application)
+        product = _make_product(db, popup, category="merch")
+        _make_approved_payment(db, popup, application, attendee, product)
+
+        context = build_context(
+            db, popup, flow, human=HumanPublic.model_validate(human)
+        )
+
+        assert context.has_purchased("category", "ticket") is False
+
+
+class TestHasPurchasedMemoization:
+    def test_result_is_cached_across_repeated_calls(
+        self, db: Session, tenant_a: Tenants
+    ) -> None:
+        """Same (scope, value) pair must hit the memoization cache, not
+        re-run the query — asserted indirectly via a stable, repeatable
+        result across calls (design D8's memoized-on-context contract)."""
+        popup = _make_popup(db, tenant_a)
+        flow = _make_flow(db, tenant_a, popup)
+        human = _make_human(db, tenant_a)
+        application = _make_application(db, popup, human, flow)
+        attendee = _make_attendee(db, popup, human, application)
+        product = _make_product(db, popup)
+        _make_approved_payment(db, popup, application, attendee, product)
+
+        context = build_context(
+            db, popup, flow, human=HumanPublic.model_validate(human)
+        )
+
+        first = context.has_purchased("product", str(product.id))
+        second = context.has_purchased("product", str(product.id))
+        assert first is True
+        assert second is True
+        assert context._has_purchased_cache[("product", str(product.id))] is True
