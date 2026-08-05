@@ -704,8 +704,8 @@ class FormFieldsCRUD(BaseCRUD[FormFields, FormFieldCreate, FormFieldUpdate]):
         schema — copying an empty flow yields an empty target, which is the
         honest answer). The target flow ends up owning its own rows,
         independent of the source: editing either afterward never affects
-        the other. No endpoint exposes this yet — the backoffice UI lands
-        in a later slice (14).
+        the other. HTTP endpoint: POST /form-fields/copy-to-flow/{target_flow_id}
+        (task 14.1); backoffice UI is a confirm dialog on the flow detail page.
 
         Returns a count of copied rows per table for caller/test assertions.
         """

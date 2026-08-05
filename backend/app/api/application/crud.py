@@ -1276,8 +1276,12 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         # Check for existing application. sdd/sales-flows slice 5 (G2,
         # confirmed 2026-08-04): flow-scoped when the popup has a default
         # flow; falls back to the legacy popup-level check otherwise (see
-        # resolve_creation_flow_id).
-        flow_id = self.resolve_creation_flow_id(session, app_data.popup_id)
+        # resolve_creation_flow_id). Task 14.2: honors an explicit
+        # sales_flow_id from the backoffice, 404 if it doesn't belong to
+        # this popup or isn't type=application.
+        flow_id = self.resolve_target_flow_id(
+            session, app_data.popup_id, app_data.sales_flow_id
+        )
         existing = (
             self.get_by_human_flow(session, human_id=human.id, sales_flow_id=flow_id)
             if flow_id is not None

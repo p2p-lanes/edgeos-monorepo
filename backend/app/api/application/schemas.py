@@ -350,6 +350,13 @@ class ApplicationAdminCreate(BaseModel):
     status: ApplicationStatus = ApplicationStatus.DRAFT
     group_id: uuid.UUID | None = None
 
+    # sdd/sales-flows task 14.2: explicit target flow for backoffice-created
+    # applications, mirroring ApplicationCreate.sales_flow_id (task 9.7).
+    # Validated by ApplicationsCRUD.resolve_target_flow_id — must belong to
+    # popup_id and be type=application, otherwise 404. Omitted keeps the
+    # pre-existing default-flow resolution.
+    sales_flow_id: uuid.UUID | None = None
+
     @field_validator("email")
     @classmethod
     def clean_email(cls, v: str) -> str:

@@ -151,3 +151,17 @@ class FormFieldUpdate(BaseModel):
     max_date: str | None = None
     config: dict[str, Any] | None = None
     width: Literal["full", "half", "half_row"] | None = None
+
+
+class CopyFormToFlowRequest(BaseModel):
+    """sdd/sales-flows task 14.1: HTTP body for the copy-form-to-flow
+    backoffice action. `source_flow_id` omitted copies the popup-shared
+    tier; a specific flow id copies exactly that flow's own rows."""
+
+    source_flow_id: uuid.UUID | None = None
+
+
+class CopyFormToFlowResponse(BaseModel):
+    sections: int
+    base_fields: int
+    fields: int

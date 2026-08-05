@@ -18,7 +18,13 @@ if TYPE_CHECKING:
 
     from app.api.popup.models import Popups
 from app.api.form_field.models import FormFields
-from app.api.form_field.schemas import FormFieldCreate, FormFieldPublic, FormFieldUpdate
+from app.api.form_field.schemas import (
+    CopyFormToFlowRequest,
+    CopyFormToFlowResponse,
+    FormFieldCreate,
+    FormFieldPublic,
+    FormFieldUpdate,
+)
 from app.api.shared.enums import UserRole
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
 from app.api.translation.service import delete_translations_for_entity
@@ -445,6 +451,52 @@ def _resolve_schema_flow_id(
 
     default_flow = sales_flows_crud.get_default_flow(db, popup_id)
     return default_flow.id if default_flow else None
+
+
+@router.post(
+    "/copy-to-flow/{target_flow_id}",
+    response_model=CopyFormToFlowResponse,
+)
+async def copy_form_to_flow(
+    target_flow_id: uuid.UUID,
+    body: CopyFormToFlowRequest,
+    db: AdminOrApiKeySession_FormsWrite,
+    _: AdminOrApiKey_FormsWrite,
+) -> CopyFormToFlowResponse:
+    """Copy a form (sections + base field configs + custom fields) into
+    `target_flow_id` (sdd/sales-flows task 14.1 — HTTP half of the CRUD
+    method shipped in slice 6, task 6.3).
+
+    `target_flow_id`'s own popup/tenant are resolved server-side, never
+    trusted from the client. `source_flow_id` (body, optional) must belong
+    to the SAME popup as the target — mirrors `_resolve_schema_flow_id`'s
+    cross-popup rejection. Omitted copies the popup-shared tier.
+    """
+    from app.api.sales_flow.crud import sales_flows_crud
+
+    target_flow = sales_flows_crud.get(db, target_flow_id)
+    if not target_flow:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Sales flow not found",
+        )
+
+    if body.source_flow_id is not None:
+        source_flow = sales_flows_crud.get(db, body.source_flow_id)
+        if not source_flow or source_flow.popup_id != target_flow.popup_id:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Sales flow not found for this popup",
+            )
+
+    counts = crud.form_fields_crud.copy_form_to_flow(
+        db,
+        popup_id=target_flow.popup_id,
+        tenant_id=target_flow.tenant_id,
+        target_flow_id=target_flow.id,
+        source_flow_id=body.source_flow_id,
+    )
+    return CopyFormToFlowResponse(**counts)
 
 
 @router.get("/schema/{popup_id}", response_model=dict[str, Any])
