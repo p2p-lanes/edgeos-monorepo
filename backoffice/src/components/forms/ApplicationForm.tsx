@@ -7,12 +7,13 @@ import { useForm } from "@tanstack/react-form"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useNavigate } from "@tanstack/react-router"
 import { Mail, User } from "lucide-react"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import {
   type ApplicationAdminCreate,
   type ApplicationStatus,
   ApplicationsService,
   FormFieldsService,
+  SalesFlowsService,
 } from "@/client"
 import { FieldError } from "@/components/Common/FieldError"
 import { FormErrorSummary } from "@/components/Common/FormErrorSummary"
@@ -29,6 +30,13 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { LoadingButton } from "@/components/ui/loading-button"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { Separator } from "@/components/ui/separator"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
@@ -74,17 +82,43 @@ export function ApplicationForm({ onSuccess }: ApplicationFormProps) {
   // Track if saving as draft
   const [savingAsDraft, setSavingAsDraft] = useState(false)
 
-  // Fetch schema for the selected popup
+  // sdd/sales-flows task 14.2: explicit target flow for this application.
+  // "" means "let the backend resolve the popup's default flow" (the
+  // pre-existing behavior). Reset whenever the selected popup changes so a
+  // stale flow id from a previous gathering is never submitted.
+  const [salesFlowId, setSalesFlowId] = useState<string>("")
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: intentional reset-on-change, selectedPopupId is not read in the body
+  useEffect(() => {
+    setSalesFlowId("")
+  }, [selectedPopupId])
+
+  const { data: salesFlows } = useQuery({
+    queryKey: ["sales-flows", selectedPopupId],
+    queryFn: () =>
+      SalesFlowsService.listSalesFlows({
+        popupId: selectedPopupId!,
+        limit: 100,
+      }),
+    enabled: !!selectedPopupId,
+  })
+  const applicationFlows = (salesFlows?.results ?? []).filter(
+    (f) => f.type === "application",
+  )
+
+  // Fetch schema for the selected popup (and flow, if one is explicitly
+  // chosen — form fields are flow-scoped since slice 6).
   const {
     data: schema,
     isLoading: schemaLoading,
     isError: _schemaError,
   } = useQuery({
-    queryKey: ["form-fields", "schema", selectedPopupId],
+    queryKey: ["form-fields", "schema", selectedPopupId, salesFlowId],
     queryFn: async () => {
       if (!selectedPopupId) return null
       const result = await FormFieldsService.getApplicationSchema({
         popupId: selectedPopupId,
+        salesFlowId: salesFlowId || undefined,
       })
       return result as unknown as ApplicationSchema
     },
@@ -171,6 +205,7 @@ export function ApplicationForm({ onSuccess }: ApplicationFormProps) {
       // Build the payload dynamically from base_fields target
       const payload: Record<string, unknown> = {
         popup_id: selectedPopupId,
+        sales_flow_id: salesFlowId || undefined,
         email: (value as Record<string, unknown>).email || undefined,
         status: status as ApplicationStatus,
         custom_fields:
@@ -351,6 +386,28 @@ export function ApplicationForm({ onSuccess }: ApplicationFormProps) {
                     </div>
                   )}
                 </form.Field>
+
+                {/* sdd/sales-flows task 14.2: explicit target flow, only
+                    shown when the gathering has more than one application
+                    flow (single-flow gatherings behave exactly as before). */}
+                {applicationFlows.length > 1 && (
+                  <div className="space-y-2">
+                    <Label htmlFor="sales-flow">Sales Flow</Label>
+                    <Select value={salesFlowId} onValueChange={setSalesFlowId}>
+                      <SelectTrigger id="sales-flow" className="w-full">
+                        <SelectValue placeholder="Default flow" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {applicationFlows.map((flow) => (
+                          <SelectItem key={flow.id} value={flow.id}>
+                            {flow.name}
+                            {flow.is_default ? " (default)" : ""}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
 
                 {/* Base fields from schema */}
                 <div className="grid gap-4 sm:grid-cols-2">
