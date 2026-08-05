@@ -273,7 +273,9 @@
     "step_config_error_detail": "Ekkert sniðmát er tengt þessu skrefi. Hafðu samband við stjórnanda.",
     "previous_payment_completed": "Fyrri greiðsla þín var lokið.",
     "pending_payment_wait": "Þú ert með greiðslu í bið. Bíddu í nokkrar mínútur.",
-    "payment_cancel_failed": "Okkur tókst ekki að afgreiða greiðsluna. Reyndu aftur."
+    "payment_cancel_failed": "Okkur tókst ekki að afgreiða greiðsluna. Reyndu aftur.",
+    "flow_restriction_violated": "Þú uppfyllir ekki skilyrði til að kaupa í gegnum þessa leið.",
+    "product_not_in_flow": "Þessi vara er ekki í boði í gegnum þessa leið."
   },
   "openCheckout": {
     "loading": "Hleður greiðslu...",
@@ -301,7 +303,9 @@
     "thank_you_total": "Samtals",
     "previous_payment_completed": "Fyrri greiðsla þín var lokið.",
     "payment_cancel_failed": "Okkur tókst ekki að afgreiða greiðsluna. Reyndu aftur.",
-    "pending_payment_wait": "Þú ert með greiðslu í bið. Bíddu í nokkrar mínútur."
+    "pending_payment_wait": "Þú ert með greiðslu í bið. Bíddu í nokkrar mínútur.",
+    "flow_restriction_violated": "Þú uppfyllir ekki skilyrði til að kaupa í gegnum þessa leið.",
+    "product_not_in_flow": "Þessi vara er ekki í boði í gegnum þessa leið."
   },
   "passes": {
     "your_passes": "Passarnir þínir",

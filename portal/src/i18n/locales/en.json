@@ -300,6 +300,8 @@
     "previous_payment_completed": "Your previous payment was completed.",
     "pending_payment_wait": "You have a pending payment. Please wait a few minutes.",
     "payment_cancel_failed": "We could not process your payment. Please try again.",
+    "flow_restriction_violated": "You are not eligible to purchase from this flow.",
+    "product_not_in_flow": "This product is not available through this flow.",
     "amanita": {
       "buyer_kicker": "Your details",
       "buyer_title": "You're one step away!",
@@ -378,7 +380,9 @@
     "thank_you_total": "Total",
     "previous_payment_completed": "Your previous payment was completed.",
     "payment_cancel_failed": "We could not process your payment. Please try again.",
-    "pending_payment_wait": "You have a pending payment. Please wait a few minutes."
+    "pending_payment_wait": "You have a pending payment. Please wait a few minutes.",
+    "flow_restriction_violated": "You are not eligible to purchase from this flow.",
+    "product_not_in_flow": "This product is not available through this flow."
   },
   "passes": {
     "your_passes": "Your Passes",

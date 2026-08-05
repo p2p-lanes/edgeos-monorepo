@@ -283,7 +283,9 @@
     "step_config_error_detail": "此步骤未分配模板。请联系管理员。",
     "previous_payment_completed": "您之前的付款已完成。",
     "pending_payment_wait": "您有一笔待处理的付款，请等待几分钟。",
-    "payment_cancel_failed": "我们无法处理您的付款，请重试。"
+    "payment_cancel_failed": "我们无法处理您的付款，请重试。",
+    "flow_restriction_violated": "您不符合通过此渠道购买的条件。",
+    "product_not_in_flow": "此商品无法通过此渠道购买。"
   },
   "openCheckout": {
     "loading": "正在加载结账...",
@@ -311,7 +313,9 @@
     "thank_you_total": "总计",
     "previous_payment_completed": "您之前的付款已完成。",
     "payment_cancel_failed": "我们无法处理您的付款，请重试。",
-    "pending_payment_wait": "您有一笔待处理的付款，请等待几分钟。"
+    "pending_payment_wait": "您有一笔待处理的付款，请等待几分钟。",
+    "flow_restriction_violated": "您不符合通过此渠道购买的条件。",
+    "product_not_in_flow": "此商品无法通过此渠道购买。"
   },
   "passes": {
     "your_passes": "我的通行证",
