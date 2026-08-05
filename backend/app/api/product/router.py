@@ -398,14 +398,6 @@ async def list_portal_products(
         # Ended popups keep their products visible here: the portal recap
         # views still need them, and purchasing is blocked at the payment,
         # cart, and application layers.
-        products, total = crud.products_crud.find_by_popup(
-            db,
-            popup_id=popup_id,
-            skip=skip,
-            limit=limit,
-            is_active=is_active,
-            category=category,
-        )
         # Catalog-read enforcement (design D5/D6, D3 amendment, sdd/sales-flows
         # slice 12): scoped to a single popup, so its default flow gives a
         # well-defined restriction context. No-op (legacy fixture popup, no
@@ -418,14 +410,32 @@ async def list_portal_products(
         from app.services.restrictions.context import build_context
         from app.services.restrictions.enforcement import filter_allowed_products
 
+        find_kwargs = {
+            "popup_id": popup_id,
+            "is_active": is_active,
+            "category": category,
+        }
         flow = sales_flows_crud.get_default_flow(db, popup_id)
+        popup = None
         if flow is not None:
             from app.api.popup.crud import popups_crud
 
             popup = popups_crud.get(db, popup_id)
-            if popup is not None:
-                context = build_context(db, popup, flow, human=current_human)
-                products = filter_allowed_products(db, flow, popup, products, context)
+
+        if flow is not None and popup is not None:
+            # rel-001/risk-002: filter-then-paginate so total is the
+            # filtered count, not the raw pre-filter one (1000 = max page).
+            all_products, _ = crud.products_crud.find_by_popup(
+                db, skip=0, limit=1000, **find_kwargs
+            )
+            context = build_context(db, popup, flow, human=current_human)
+            filtered = filter_allowed_products(db, flow, popup, all_products, context)
+            total = len(filtered)
+            products = filtered[skip : skip + limit]
+        else:
+            products, total = crud.products_crud.find_by_popup(
+                db, skip=skip, limit=limit, **find_kwargs
+            )
     else:
         # Same read-only contract without popup_id: ended-popup products are
         # excluded so they cannot be enumerated through the unscoped listing.

@@ -12,6 +12,7 @@ Pure module — no I/O, no session. `context.py` owns resolution, `evaluator.py`
 owns tree evaluation.
 """
 
+import uuid
 from enum import StrEnum
 from typing import Annotated, Any, Literal
 
@@ -128,6 +129,17 @@ class HasPurchasedLeaf(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
+    @model_validator(mode="after")
+    def _value_is_uuid_for_product_scope(self) -> "HasPurchasedLeaf":
+        if self.scope == HasPurchasedScope.product:
+            try:
+                uuid.UUID(self.value)
+            except (ValueError, AttributeError, TypeError) as exc:
+                raise ValueError(
+                    f"has_purchased value {self.value!r} must be a UUID."
+                ) from exc
+        return self
+
 
 RestrictionLeaf = Annotated[
     FormAnswerLeaf | HumanProfileFieldLeaf | HasPurchasedLeaf,
@@ -190,16 +202,23 @@ def assert_restriction_rule_allowed_for_type(
     has no `Humans` row for an anonymous buyer, so a `human_profile_field`
     predicate there is unresolvable and, under fail-closed evaluation, would
     silently block every anonymous buyer. Reject (raise `ValueError`, surfaced
-    as 422) instead of shipping a rule that can never pass.
+    as 422) instead of shipping a rule that can never pass. Same rejection
+    applies to `has_purchased` (risk-001: buyer_email is unverified).
 
     No-op when `rule_data` is None (feature off) or `flow_type != "direct"`.
     """
     if rule_data is None or flow_type != "direct":
         return
     node = parse_restriction_rule(rule_data)
-    if any(isinstance(leaf, HumanProfileFieldLeaf) for leaf in iter_leaves(node)):
+    leaves = iter_leaves(node)
+    if any(isinstance(leaf, HumanProfileFieldLeaf) for leaf in leaves):
         raise ValueError(
             "restriction_rule cannot use human_profile_field on a "
             "type=direct flow: anonymous buyers have no profile to match "
             "against, so this predicate would block every buyer."
+        )
+    if any(isinstance(leaf, HasPurchasedLeaf) for leaf in leaves):
+        raise ValueError(
+            "restriction_rule cannot use has_purchased on a type=direct "
+            "flow: anonymous buyers have no verified purchase history."
         )

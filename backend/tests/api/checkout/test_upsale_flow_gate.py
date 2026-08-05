@@ -326,7 +326,7 @@ class TestFlowScopedProductPurchase:
             json=_make_purchase_body(product, email="bypass-attempt@test.com"),
         )
         assert default_response.status_code == 403, default_response.text
-        assert default_response.json()["detail"] == "product_not_in_flow"
+        assert default_response.json()["detail"] == {"code": "product_not_in_flow"}
 
         # Purchasable through the upsale flow by an eligible human.
         upsale_response = client.post(

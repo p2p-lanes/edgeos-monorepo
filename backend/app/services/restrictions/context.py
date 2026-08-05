@@ -14,6 +14,7 @@ import uuid
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
+from loguru import logger
 from sqlmodel import Session
 
 from app.services.restrictions.schemas import UNRESOLVED, HasPurchasedScope
@@ -69,37 +70,30 @@ class PurchaseContext:
         if cache_key in self._has_purchased_cache:
             return self._has_purchased_cache[cache_key]
 
-        human_id = self._resolve_human_id()
-        if human_id is None:
-            # No human record exists for this buyer at all (anonymous, no
-            # prior email match) -> they cannot have purchased anything.
-            # This is a resolved fact (False), not an unresolvable one.
-            result = False
-        elif scope == HasPurchasedScope.category.value:
+        # risk-001: buyer_email is unverified — only an authenticated human
+        # may resolve purchase history. Fails closed otherwise.
+        if self.human is None:
+            self._has_purchased_cache[cache_key] = UNRESOLVED
+            return UNRESOLVED
+
+        human_id = self.human.id
+        if scope == HasPurchasedScope.category.value:
             result = _has_purchased_category(
                 self.session, self.popup.id, human_id, value
             )
         else:
+            try:
+                product_id = uuid.UUID(value)
+            except ValueError:
+                logger.warning("has_purchased: non-UUID value {!r} — denying", value)
+                self._has_purchased_cache[cache_key] = UNRESOLVED
+                return UNRESOLVED
             result = _has_purchased_product(
-                self.session, self.popup.id, human_id, uuid.UUID(value)
+                self.session, self.popup.id, human_id, product_id
             )
 
         self._has_purchased_cache[cache_key] = result
         return result
-
-    def _resolve_human_id(self) -> uuid.UUID | None:
-        if self.human is not None:
-            return self.human.id
-
-        if not self.buyer_email:
-            return None
-
-        from app.api.human.crud import humans_crud
-
-        existing = humans_crud.get_by_email(
-            self.session, email=self.buyer_email, tenant_id=self.popup.tenant_id
-        )
-        return existing.id if existing else None
 
 
 def _has_purchased_product(

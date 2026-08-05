@@ -20,6 +20,7 @@ from app.services.restrictions.schemas import (
     RestrictionLeafUnion,
     RestrictionNode,
     RestrictionOp,
+    RestrictionPredicateKind,
 )
 
 
@@ -48,7 +49,7 @@ def evaluate(node: RestrictionNode, context: RestrictionContext) -> bool:
 def _resolve_leaf(leaf: RestrictionLeafUnion, context: RestrictionContext) -> Any:
     if isinstance(leaf, HasPurchasedLeaf):
         return context.has_purchased(leaf.scope.value, leaf.value)
-    if leaf.kind == "form_answer":
+    if leaf.kind == RestrictionPredicateKind.form_answer:
         return context.form_answer(leaf.field_name)
     return context.human_profile_field(leaf.field)
 

@@ -17,6 +17,8 @@ from app.services.restrictions.schemas import (
     parse_restriction_rule,
 )
 
+_UUID = "11111111-1111-1111-1111-111111111111"
+
 
 class TestParseRestrictionRule:
     def test_parses_bare_form_answer_leaf(self) -> None:
@@ -39,10 +41,16 @@ class TestParseRestrictionRule:
 
     def test_parses_bare_has_purchased_leaf(self) -> None:
         node = parse_restriction_rule(
-            {"kind": "has_purchased", "scope": "product", "value": "abc-123"}
+            {"kind": "has_purchased", "scope": "product", "value": _UUID}
         )
         assert isinstance(node, HasPurchasedLeaf)
         assert node.op == "exists"
+
+    def test_rejects_non_uuid_value_for_product_scope(self) -> None:
+        with pytest.raises(ValidationError):
+            parse_restriction_rule(
+                {"kind": "has_purchased", "scope": "product", "value": "not-a-uuid"}
+            )
 
     def test_parses_nested_all_of_any_of_tree(self) -> None:
         node = parse_restriction_rule(
@@ -117,7 +125,7 @@ class TestIterLeaves:
                             {
                                 "kind": "has_purchased",
                                 "scope": "product",
-                                "value": "p1",
+                                "value": _UUID,
                             },
                             {
                                 "kind": "human_profile_field",
@@ -157,11 +165,12 @@ class TestAssertRestrictionRuleAllowedForType:
         with pytest.raises(ValueError, match="human_profile_field"):
             assert_restriction_rule_allowed_for_type(rule, flow_type="direct")
 
-    def test_allows_form_answer_and_has_purchased_on_direct_flow(self) -> None:
-        rule = {
-            "all_of": [
-                {"kind": "form_answer", "field_name": "x", "op": "exists"},
-                {"kind": "has_purchased", "scope": "product", "value": "p1"},
-            ]
-        }
-        assert_restriction_rule_allowed_for_type(rule, flow_type="direct")
+    def test_form_answer_allowed_has_purchased_rejected_on_direct_flow(self) -> None:
+        assert_restriction_rule_allowed_for_type(
+            {"kind": "form_answer", "field_name": "x", "op": "exists"},
+            flow_type="direct",
+        )
+        rule = {"kind": "has_purchased", "scope": "category", "value": "ticket"}
+        with pytest.raises(ValueError, match="has_purchased"):
+            assert_restriction_rule_allowed_for_type(rule, flow_type="direct")
+        assert_restriction_rule_allowed_for_type(rule, flow_type="application")

@@ -107,9 +107,13 @@ class TestPortalProductListingCatalogFilter:
             },
         )
         assert response.status_code == 200, response.text
-        product_ids = {p["id"] for p in response.json()["results"]}
+        body = response.json()
+        product_ids = {p["id"] for p in body["results"]}
         assert str(shared_product.id) in product_ids
         assert str(exclusive_product.id) not in product_ids
+        # rel-001/risk-002: paging.total must reflect the filtered count
+        # (1 visible product here), not the raw pre-filter count (2).
+        assert body["paging"]["total"] == len(body["results"]) == 1
 
     def test_unassigned_products_visible_in_scoped_listing(
         self, client: TestClient, db: Session, tenant_a: Tenants

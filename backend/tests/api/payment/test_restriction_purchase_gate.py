@@ -205,7 +205,7 @@ class TestOpenTicketingRestrictionGate:
                 db, obj=obj, popup=popup, tenant=tenant_a
             )
         assert exc_info.value.status_code == 403
-        assert exc_info.value.detail == "flow_restriction_violated"
+        assert exc_info.value.detail == {"code": "flow_restriction_violated"}
 
         # Ordering proof: rejected before humans_crud.find_or_create — no
         # Humans row was created for this buyer.
@@ -278,7 +278,7 @@ class TestOpenTicketingRestrictionGate:
                 db, obj=obj, popup=popup, tenant=tenant_a
             )
         assert exc_info.value.status_code == 403
-        assert exc_info.value.detail == "product_not_in_flow"
+        assert exc_info.value.detail == {"code": "product_not_in_flow"}
 
     def test_no_restriction_rule_does_not_affect_purchase(
         self, db: Session, tenant_a: Tenants
@@ -339,7 +339,7 @@ class TestAuthenticatedPaymentRestrictionGate:
         with pytest.raises(HTTPException) as exc_info:
             payments_crud.create_payment(db, obj)
         assert exc_info.value.status_code == 403
-        assert exc_info.value.detail == "flow_restriction_violated"
+        assert exc_info.value.detail == {"code": "flow_restriction_violated"}
 
         db.refresh(product)
         assert product.total_stock_remaining == 5, (
@@ -421,7 +421,7 @@ class TestAuthenticatedPaymentRestrictionGate:
         with pytest.raises(HTTPException) as exc_info:
             payments_crud.create_payment(db, obj)
         assert exc_info.value.status_code == 403
-        assert exc_info.value.detail == "product_not_in_flow"
+        assert exc_info.value.detail == {"code": "product_not_in_flow"}
 
     def test_no_default_flow_skips_enforcement(
         self, db: Session, tenant_a: Tenants

@@ -30,6 +30,8 @@ from repeated purchase attempts regardless of the error code's precision.
 import uuid
 
 from fastapi import HTTPException, status
+from loguru import logger
+from pydantic import ValidationError
 from sqlmodel import Session, select
 
 from app.services.restrictions.context import PurchaseContext
@@ -44,7 +46,11 @@ def _restriction_passes(flow, context: PurchaseContext) -> bool:
     rule_data = getattr(flow, "restriction_rule", None)
     if not rule_data:
         return True
-    node = parse_restriction_rule(rule_data)
+    try:
+        node = parse_restriction_rule(rule_data)
+    except ValidationError:
+        logger.warning("Malformed restriction_rule on flow {} — denying", flow.id)
+        return False
     return evaluate(node, context)
 
 
@@ -96,14 +102,14 @@ def assert_products_allowed(
     if not _restriction_passes(flow, context):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail=RESTRICTION_RULE_VIOLATED,
+            detail={"code": RESTRICTION_RULE_VIOLATED},
         )
 
     allowed_ids = _flow_allowed_product_ids(session, flow.id, product_ids)
     if set(product_ids) - allowed_ids:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail=PRODUCT_NOT_IN_FLOW,
+            detail={"code": PRODUCT_NOT_IN_FLOW},
         )
 
 
