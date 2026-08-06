@@ -2095,7 +2095,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         if application.invite_id:
             from app.api.invite.crud import invites_crud
 
-            invite = invites_crud.get(session, application.invite_id)
+            invite = invites_crud.get_admin_created(session, application.invite_id)
             if invite and invite.discount_percentage:
                 invite_discount = Decimal(str(invite.discount_percentage))
                 discounted_amount, discounted_credit_applied = _calculate_price(
@@ -2117,7 +2117,9 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         if application.referral_id:
             from app.api.referral.crud import referrals_crud
 
-            referral = referrals_crud.get(session, application.referral_id)
+            referral = referrals_crud.get_portal_created(
+                session, application.referral_id
+            )
             if referral and not referral.is_disabled and referral.discount_percentage:
                 referral_discount = Decimal(str(referral.discount_percentage))
                 discounted_amount, discounted_credit_applied = _calculate_price(

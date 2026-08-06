@@ -143,7 +143,7 @@ async def update_my_referral(
 
     Spec: API surface PATCH (owner): only expires_at, max_uses mutable by owner.
     """
-    referral = referrals_crud.get(db, referral_id)
+    referral = referrals_crud.get_portal_created(db, referral_id)
     if not referral:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Referral not found"
@@ -167,7 +167,7 @@ async def delete_my_referral(
     current_human: CurrentHuman,
 ) -> None:
     """Portal: delete own referral. 409 if current_uses > 0."""
-    referral = referrals_crud.get(db, referral_id)
+    referral = referrals_crud.get_portal_created(db, referral_id)
     if not referral:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Referral not found"
@@ -290,7 +290,7 @@ async def get_referral_admin(
 
     Spec: API surface GET /admin/referrals/{id}.
     """
-    referral = referrals_crud.get(db, referral_id)
+    referral = referrals_crud.get_portal_created(db, referral_id)
     if not referral:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Referral not found"
@@ -310,7 +310,7 @@ async def update_referral_admin(
     Spec: API surface PATCH /admin/referrals/{id}.
     Admin-only fields: discount_percentage, auto_approve.
     """
-    referral = referrals_crud.get(db, referral_id)
+    referral = referrals_crud.get_portal_created(db, referral_id)
     if not referral:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Referral not found"

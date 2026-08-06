@@ -24,10 +24,10 @@ from sqlmodel import Session
 
 from app.api.attendee.models import AttendeeProducts, Attendees
 from app.api.human.models import Humans
+from app.api.invite.models import Invites
 from app.api.popup.models import Popups
 from app.api.popup.schemas import PopupStatus
 from app.api.product.models import Products
-from app.api.referral.models import Referrals
 from app.api.tenant.models import Tenants
 from app.api.user.models import Users
 from app.core.security import create_access_token
@@ -130,16 +130,22 @@ def _make_referral(
     discount_percentage: Decimal = Decimal("0"),
     expires_at: datetime | None = None,
     is_disabled: bool = False,
-) -> Referrals:
+) -> Invites:
+    """Build a referral: an Invite carrying a referrer_human_id.
+
+    Referrals were merged into `invites` (migration a3f8c1d94e27), so a row in
+    the old `referrals` table is invisible to every code path now.
+    """
     ref_code = code or f"ref-{uuid.uuid4().hex[:12]}"
-    ref = Referrals(
+    ref = Invites(
         tenant_id=popup.tenant_id,
         popup_id=popup.id,
         referrer_human_id=referrer.id,
-        code=ref_code,
+        token=ref_code,
         max_uses=max_uses,
         current_uses=current_uses,
         auto_approve=auto_approve,
+        express_checkout=True,
         discount_percentage=discount_percentage,
         expires_at=expires_at,
         is_disabled=is_disabled,
@@ -169,7 +175,7 @@ class TestReferralModel:
         human = _make_human(db, tenant_a)
         referral = _make_referral(db, popup, human, code="model-test-ref")
 
-        fetched = db.get(Referrals, referral.id)
+        fetched = db.get(Invites, referral.id)
         assert fetched is not None
         assert fetched.code == "model-test-ref"
         assert fetched.popup_id == popup.id
@@ -186,7 +192,7 @@ class TestReferralModel:
         referral = _make_referral(
             db, popup, human, code="disc-test-ref", discount_percentage=Decimal("15.50")
         )
-        fetched = db.get(Referrals, referral.id)
+        fetched = db.get(Invites, referral.id)
         assert fetched is not None
         assert fetched.discount_percentage == Decimal("15.50")
 
@@ -805,8 +811,8 @@ class TestReferralRLS:
         ref_b = _make_referral(db, popup_b, human_b, code=shared_code)
 
         # Both exist independently
-        fetched_a = db.get(Referrals, ref_a.id)
-        fetched_b = db.get(Referrals, ref_b.id)
+        fetched_a = db.get(Invites, ref_a.id)
+        fetched_b = db.get(Invites, ref_b.id)
         assert fetched_a is not None
         assert fetched_b is not None
         assert fetched_a.popup_id != fetched_b.popup_id

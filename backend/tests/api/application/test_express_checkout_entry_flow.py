@@ -28,7 +28,6 @@ from app.api.group.models import Groups
 from app.api.human.models import Humans
 from app.api.invite.models import Invites
 from app.api.popup.models import Popups
-from app.api.referral.models import Referrals
 from app.api.tenant.models import Tenants
 from app.api.user.models import Users
 from app.core.security import create_access_token
@@ -150,13 +149,15 @@ def _make_invite(db: Session, popup: Popups, creator: Users) -> Invites:
     return invite
 
 
-def _make_referral(db: Session, popup: Popups, referrer: Humans) -> Referrals:
-    referral = Referrals(
+def _make_referral(db: Session, popup: Popups, referrer: Humans) -> Invites:
+    """A referral is an Invite carrying a referrer_human_id."""
+    referral = Invites(
         tenant_id=popup.tenant_id,
         popup_id=popup.id,
         referrer_human_id=referrer.id,
-        code=f"ref-{uuid.uuid4().hex[:12]}",
+        token=f"ref-{uuid.uuid4().hex[:12]}",
         auto_approve=False,
+        express_checkout=True,
         discount_percentage=Decimal("0"),
     )
     db.add(referral)

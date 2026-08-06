@@ -14,11 +14,13 @@ if TYPE_CHECKING:
 
 
 class Referrals(SQLModel, table=True):
-    """Human-driven ambassador code for referral-based access to a popup.
+    """DEAD TABLE — kept only so its rows survive until the module is removed.
 
-    A human creates a referral code and shares it with others. When someone
-    uses the code to apply, the referral's attribution and discount settings
-    are applied to their application.
+    Referrals were merged into ``invites`` (migration a3f8c1d94e27): a referral
+    is now an Invite carrying a ``referrer_human_id``. Nothing reads or writes
+    this table anymore; ``referrals_crud`` operates on Invites. The table and
+    this model are dropped once the API and both frontends stop speaking the
+    referral vocabulary.
     """
 
     __tablename__ = "referrals"

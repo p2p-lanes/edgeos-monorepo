@@ -338,7 +338,7 @@ async def get_invite(
     _: CurrentAdmin,
 ) -> InvitePublic:
     """Admin: get single invite by id."""
-    invite = invites_crud.get(db, invite_id)
+    invite = invites_crud.get_admin_created(db, invite_id)
     if not invite:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Invite not found"
@@ -358,7 +358,7 @@ async def update_invite(
     token and recipient_email are immutable post-create → 400 if attempted.
     Spec: API surface PATCH allowed fields.
     """
-    invite = invites_crud.get(db, invite_id)
+    invite = invites_crud.get_admin_created(db, invite_id)
     if not invite:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Invite not found"
@@ -375,7 +375,7 @@ async def delete_invite(
     _: CurrentAdmin,
 ) -> None:
     """Admin: delete invite. 409 if current_uses > 0."""
-    invite = invites_crud.get(db, invite_id)
+    invite = invites_crud.get_admin_created(db, invite_id)
     if not invite:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Invite not found"

@@ -9,7 +9,7 @@ import uuid
 from datetime import UTC, datetime
 
 from fastapi import HTTPException, status
-from sqlmodel import Session, desc, func, select
+from sqlmodel import Session, col, desc, func, select
 
 from app.api.invite.models import Invites
 from app.api.invite.schemas import InviteCreate, InviteUpdate, generate_invite_token
@@ -17,7 +17,13 @@ from app.api.shared.crud import BaseCRUD
 
 
 class InvitesCRUD(BaseCRUD[Invites, InviteCreate, InviteUpdate]):
-    """CRUD operations for Invites."""
+    """CRUD operations for admin-created Invites.
+
+    Portal-created links (referrals) share the ``invites`` table but are served
+    by the referral module. Every lookup here excludes them: they carry no
+    ``created_by``, which InvitePublic requires, and they have their own
+    ownership rules.
+    """
 
     def __init__(self) -> None:
         super().__init__(Invites)
@@ -26,6 +32,20 @@ class InvitesCRUD(BaseCRUD[Invites, InviteCreate, InviteUpdate]):
     # Lookups
     # ------------------------------------------------------------------
 
+    def get_admin_created(
+        self, session: Session, invite_id: uuid.UUID
+    ) -> Invites | None:
+        """Fetch an admin-created invite by id.
+
+        A portal link's id must read as "not found" through the invite surface,
+        the same way the referral surface hides admin invites.
+        """
+        stmt = select(Invites).where(
+            Invites.id == invite_id,
+            col(Invites.referrer_human_id).is_(None),
+        )
+        return session.exec(stmt).first()
+
     def get_by_token(
         self, session: Session, popup_id: uuid.UUID, token: str
     ) -> Invites | None:
@@ -33,13 +53,17 @@ class InvitesCRUD(BaseCRUD[Invites, InviteCreate, InviteUpdate]):
         stmt = select(Invites).where(
             Invites.popup_id == popup_id,
             Invites.token == token,
+            col(Invites.referrer_human_id).is_(None),
         )
         return session.exec(stmt).first()
 
     def get_by_token_any_popup(self, session: Session, token: str) -> Invites | None:
         """Fetch invite by token across all popups (used for redeem endpoint which
         does NOT require caller to know popup_id upfront)."""
-        stmt = select(Invites).where(Invites.token == token)
+        stmt = select(Invites).where(
+            Invites.token == token,
+            col(Invites.referrer_human_id).is_(None),
+        )
         return session.exec(stmt).first()
 
     def find_by_popup(
@@ -52,7 +76,10 @@ class InvitesCRUD(BaseCRUD[Invites, InviteCreate, InviteUpdate]):
         limit: int = 100,
     ) -> tuple[list[Invites], int]:
         """List invites for a popup with optional recipient_email filter."""
-        stmt = select(Invites).where(Invites.popup_id == popup_id)
+        stmt = select(Invites).where(
+            Invites.popup_id == popup_id,
+            col(Invites.referrer_human_id).is_(None),
+        )
         if recipient_email:
             stmt = stmt.where(
                 func.lower(Invites.recipient_email) == recipient_email.lower()

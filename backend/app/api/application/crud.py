@@ -766,7 +766,7 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         if _invite_id:
             from app.api.invite.crud import invites_crud as _invites_crud
 
-            _invite = _invites_crud.get(session, _invite_id)
+            _invite = _invites_crud.get_admin_created(session, _invite_id)
             if not _invite:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
@@ -784,7 +784,7 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         if _referral_id:
             from app.api.referral.crud import referrals_crud as _referrals_crud
 
-            _referral = _referrals_crud.get(session, _referral_id)
+            _referral = _referrals_crud.get_portal_created(session, _referral_id)
             if not _referral:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
