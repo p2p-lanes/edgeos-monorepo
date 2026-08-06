@@ -2115,7 +2115,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
 
         # Check referral discount — read live; a disabled referral grants nothing.
         if application.referral_id:
-            from app.api.referral.crud import referrals_crud
+            from app.api.invite.crud import invites_crud as referrals_crud
 
             referral = referrals_crud.get_portal_created(
                 session, application.referral_id

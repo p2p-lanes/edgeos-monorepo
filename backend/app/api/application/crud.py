@@ -782,16 +782,16 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         _referral_id = getattr(app_data, "referral_id", None)
         _referral = None
         if _referral_id:
-            from app.api.referral.crud import referrals_crud as _referrals_crud
+            from app.api.invite.crud import invites_crud as _links_crud
 
-            _referral = _referrals_crud.get_portal_created(session, _referral_id)
+            _referral = _links_crud.get_portal_created(session, _referral_id)
             if not _referral:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail="Referral not found",
                 )
             # Validate the referral is still usable (disabled + expiry + limit)
-            _referrals_crud.validate_for_use(_referral)
+            _links_crud.validate_for_redemption(_referral)
 
         # Express Checkout scope is a property of the ENTRY FLOW, not of the
         # link that opened it: the portal renders the reduced mini-form for

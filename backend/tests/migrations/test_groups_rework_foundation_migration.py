@@ -22,9 +22,7 @@ class TestGroupsReworkFoundationMigration:
     # groups table — new flag columns
     # -----------------------------------------------------------------------
 
-    def test_groups_auto_approve_applications_column_exists(
-        self, db: Session
-    ) -> None:
+    def test_groups_auto_approve_applications_column_exists(self, db: Session) -> None:
         """groups.auto_approve_applications must exist, be NOT NULL, default false."""
         conn = db.connection()
         row = conn.exec_driver_sql(
@@ -223,9 +221,7 @@ class TestGroupsReworkFoundationMigration:
             "Index 'ix_applications_invite_id' not found on applications."
         )
 
-    def test_applications_referral_id_partial_index_exists(
-        self, db: Session
-    ) -> None:
+    def test_applications_referral_id_partial_index_exists(self, db: Session) -> None:
         """ix_applications_referral_id partial index must exist on applications."""
         conn = db.connection()
         row = conn.exec_driver_sql(
@@ -354,108 +350,3 @@ class TestGroupsReworkFoundationMigration:
     # -----------------------------------------------------------------------
     # referrals table — existence, key columns, indexes, RLS
     # -----------------------------------------------------------------------
-
-    def test_referrals_table_exists(self, db: Session) -> None:
-        """referrals table must exist."""
-        conn = db.connection()
-        row = conn.exec_driver_sql(
-            """
-            SELECT table_name
-            FROM information_schema.tables
-            WHERE table_name = 'referrals'
-              AND table_schema = 'public'
-            """
-        ).fetchone()
-        assert row is not None, "Table 'referrals' does not exist."
-
-    def test_referrals_code_column_exists(self, db: Session) -> None:
-        """referrals.code must exist and be NOT NULL."""
-        conn = db.connection()
-        row = conn.exec_driver_sql(
-            """
-            SELECT column_name, is_nullable
-            FROM information_schema.columns
-            WHERE table_name = 'referrals'
-              AND column_name = 'code'
-            """
-        ).fetchone()
-        assert row is not None, "Column 'code' not found on referrals."
-        assert row[1] == "NO", "referrals.code must be NOT NULL"
-
-    def test_referrals_referrer_human_id_not_null(self, db: Session) -> None:
-        """referrals.referrer_human_id must exist and be NOT NULL."""
-        conn = db.connection()
-        row = conn.exec_driver_sql(
-            """
-            SELECT column_name, is_nullable
-            FROM information_schema.columns
-            WHERE table_name = 'referrals'
-              AND column_name = 'referrer_human_id'
-            """
-        ).fetchone()
-        assert row is not None, "Column 'referrer_human_id' not found on referrals."
-        assert row[1] == "NO", "referrals.referrer_human_id must be NOT NULL"
-
-    def test_referrals_current_uses_not_null(self, db: Session) -> None:
-        """referrals.current_uses must be NOT NULL with default 0."""
-        conn = db.connection()
-        row = conn.exec_driver_sql(
-            """
-            SELECT column_name, is_nullable, column_default
-            FROM information_schema.columns
-            WHERE table_name = 'referrals'
-              AND column_name = 'current_uses'
-            """
-        ).fetchone()
-        assert row is not None, "Column 'current_uses' not found on referrals."
-        assert row[1] == "NO", "referrals.current_uses must be NOT NULL"
-        assert row[2] is not None and "0" in str(row[2]), (
-            f"referrals.current_uses must default to 0, got: {row[2]}"
-        )
-
-    def test_referrals_popup_code_unique_index_exists(self, db: Session) -> None:
-        """uq_referrals_popup_code unique index must exist on referrals."""
-        conn = db.connection()
-        row = conn.exec_driver_sql(
-            """
-            SELECT indexname
-            FROM pg_indexes
-            WHERE tablename = 'referrals'
-              AND indexname = 'uq_referrals_popup_code'
-            """
-        ).fetchone()
-        assert row is not None, (
-            "Unique index 'uq_referrals_popup_code' not found on referrals."
-        )
-
-    def test_referrals_referrer_human_id_index_exists(self, db: Session) -> None:
-        """ix_referrals_referrer_human_id index must exist on referrals."""
-        conn = db.connection()
-        row = conn.exec_driver_sql(
-            """
-            SELECT indexname
-            FROM pg_indexes
-            WHERE tablename = 'referrals'
-              AND indexname = 'ix_referrals_referrer_human_id'
-            """
-        ).fetchone()
-        assert row is not None, (
-            "Index 'ix_referrals_referrer_human_id' not found on referrals."
-        )
-
-    def test_referrals_rls_policy_exists(self, db: Session) -> None:
-        """RLS policy tenant_isolation_policy_referrals must exist on referrals."""
-        conn = db.connection()
-        row = conn.exec_driver_sql(
-            """
-            SELECT policyname
-            FROM pg_policies
-            WHERE tablename = 'referrals'
-              AND schemaname = 'public'
-              AND policyname = 'tenant_isolation_policy_referrals'
-            """
-        ).fetchone()
-        assert row is not None, (
-            "RLS policy 'tenant_isolation_policy_referrals' not found on referrals. "
-            "add_tenant_table_permissions('referrals') was not called."
-        )
