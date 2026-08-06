@@ -3,8 +3,11 @@
 Covers:
   - T-gr-015: Replace implicit bool(group_id) auto-accept with explicit
     group.auto_approve_applications flag.
-  - T-gr-016: Replace implicit bool(group_id) express-checkout with explicit
-    group.express_checkout flag.
+  - T-gr-016: SUPERSEDED. Express checkout is no longer driven by
+    group.express_checkout; it follows the entry flow, because the portal
+    renders the reduced mini-form for every group / invite / referral link
+    regardless of any flag. See
+    tests/api/application/test_express_checkout_entry_flow.py.
   - T-gr-021: Flag transition tests (retroactive non-change guarantee).
 """
 
@@ -271,40 +274,28 @@ class TestFlagTransitionRetroactive:
 
 
 # ---------------------------------------------------------------------------
-# T-gr-016: Express checkout driven by explicit group.express_checkout flag
+# T-gr-016 (superseded): express checkout now follows the entry flow, not the
+# group.express_checkout flag. See test_express_checkout_entry_flow.py.
 # ---------------------------------------------------------------------------
 
 
 class TestExpressCheckoutFlag:
-    """express_checkout=False → standard validation flow (T-gr-016).
+    """Group flags must not silently elevate an application (was T-gr-016).
 
-    The express-checkout path is tested indirectly via the application creation
-    flow. When express_checkout=False, the `is_express_checkout` flag passed to
-    form field validation is False, so required non-express-checkout fields must
-    be provided.
+    These two cases only ever asserted the resulting STATUS, never the
+    express-checkout scope — the original docstring said as much, using DRAFT
+    as a proxy for a flag it never read. They are kept for what they really
+    cover: neither group_id nor express_checkout auto-accepts anything.
 
-    We verify the behavior by inspecting the internal flag via a group that has
-    express_checkout=True (should skip required-field blocks) vs False (should
-    not skip). The simplest observable difference is whether the application
-    creation succeeds without all required fields, since express_checkout skips
-    some validation.
-
-    For this project, the key contract is: if group.express_checkout=False,
-    is_express_checkout is False (standard checkout). We test via the fact that
-    auto_approve_applications=False AND express_checkout=False leaves app as
-    DRAFT (no implicit elevation from group_id).
+    The express-checkout scope itself is now driven by the entry flow rather
+    than by group.express_checkout, and is covered directly in
+    tests/api/application/test_express_checkout_entry_flow.py.
     """
 
-    def test_express_checkout_false_no_implicit_checkout(
+    def test_group_membership_alone_does_not_auto_accept(
         self, client: TestClient, db: Session, tenant_a: Tenants
     ) -> None:
-        """Group with express_checkout=False must not trigger express checkout.
-
-        The observable effect: with express_checkout=False the application goes
-        through normal validation rather than the reduced-form path.
-        Creating with minimal fields and auto_approve_applications=False
-        results in a DRAFT application (not auto-accepted).
-        """
+        """auto_approve_applications=False leaves the application in DRAFT."""
         popup = _make_popup(db, tenant_a)
         human = _make_human(db, tenant_a)
         group = _make_group(
@@ -327,13 +318,10 @@ class TestExpressCheckoutFlag:
         # express_checkout=False, auto_approve=False → DRAFT
         assert body["status"] == ApplicationStatus.DRAFT.value
 
-    def test_no_group_id_not_express_checkout(
+    def test_application_without_group_is_not_auto_accepted(
         self, client: TestClient, db: Session, tenant_a: Tenants
     ) -> None:
-        """Application without group_id is never express checkout.
-
-        Triangulation: is_express_checkout must be False when group_id is None.
-        """
+        """Triangulation: no group_id, no elevation either."""
         popup = _make_popup(db, tenant_a)
         human = _make_human(db, tenant_a)
         token = _human_token(human)

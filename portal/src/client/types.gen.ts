@@ -1147,6 +1147,40 @@ export type CheckoutBuyerSection = {
 
 export type CheckoutMode = 'pass_system' | 'simple_quantity';
 
+export type CheckoutPreviewLine = {
+    product_id: string;
+    quantity: number;
+    unit_price: string;
+    line_total: string;
+    discountable: boolean;
+};
+
+/**
+ * Request schema for POST /checkout/{slug}/preview.
+ */
+export type CheckoutPreviewRequest = {
+    products: Array<ProductLine>;
+    coupon_code?: (string | null);
+    insurance?: boolean;
+};
+
+/**
+ * Server-computed price breakdown for anonymous checkout (no side effects).
+ */
+export type CheckoutPreviewResponse = {
+    lines: Array<CheckoutPreviewLine>;
+    discountable_amount: string;
+    non_discountable_amount: string;
+    coupon_code?: (string | null);
+    discount_value?: (string | null);
+    discount_amount?: string;
+    post_discount_amount: string;
+    insurance_amount?: string;
+    contribution_amount?: string;
+    total: string;
+    currency: string;
+};
+
 /**
  * Public product available in the checkout runtime.
  */
@@ -2508,10 +2542,35 @@ export type InviteCreate = {
 };
 
 /**
- * Full invite detail — admin-only response.
+ * Attendee request body for POST /portal/invites.
+ *
+ * An attendee sets far less than an admin: the policy fields (discount,
+ * auto_approve) stay admin-only, and max_uses is dictated by the popup's
+ * max_referrals_per_attendee quota.
+ */
+export type InvitePortalCreate = {
+    popup_id: string;
+    token?: (string | null);
+    max_uses?: (number | null);
+    expires_at?: (string | null);
+};
+
+/**
+ * Attendee request body for PATCH /portal/invites/{id} — owner-mutable only.
+ */
+export type InvitePortalUpdate = {
+    expires_at?: (string | null);
+    max_uses?: (number | null);
+};
+
+/**
+ * Full link detail — admin, or the owning attendee for their own link.
  *
  * Exposes all fields including token and recipient_email.
  * Never sent to unauthenticated callers.
+ *
+ * Exactly one issuer is set: ``created_by`` for a backoffice link,
+ * ``referrer_human_id`` for one an attendee created from the portal.
  */
 export type InvitePublic = {
     id: string;
@@ -2521,12 +2580,14 @@ export type InvitePublic = {
     discount_percentage: string;
     auto_approve: boolean;
     express_checkout: boolean;
+    is_disabled?: boolean;
     max_uses?: (number | null);
     current_uses: number;
     used_at?: (string | null);
     redeemed_by_human_id?: (string | null);
     expires_at?: (string | null);
-    created_by: string;
+    created_by?: (string | null);
+    referrer_human_id?: (string | null);
     created_at: string;
     updated_at: string;
 };
@@ -2581,6 +2642,7 @@ export type InviteUpdate = {
     discount_percentage?: (number | string | null);
     auto_approve?: (boolean | null);
     express_checkout?: (boolean | null);
+    is_disabled?: (boolean | null);
 };
 
 /**
@@ -2758,11 +2820,6 @@ export type ListModel_PopupReviewerPublic_ = {
 
 export type ListModel_ProductPublic_ = {
     results: Array<ProductPublic>;
-    paging: Paging;
-};
-
-export type ListModel_ReferralPublic_ = {
-    results: Array<ReferralPublic>;
     paging: Paging;
 };
 
@@ -3735,6 +3792,37 @@ export type ProductWithQuantity = {
     quantity?: number;
 };
 
+export type PublishableKeyCreate = {
+    name: string;
+    allowed_origins?: Array<(string)>;
+};
+
+/**
+ * Returned only at creation — carries the raw browser-safe token once.
+ */
+export type PublishableKeyCreated = {
+    id: string;
+    popup_id?: (string | null);
+    name: string;
+    key_prefix: string;
+    allowed_origins: Array<(string)>;
+    created_at: string;
+    last_used_at?: (string | null);
+    revoked_at?: (string | null);
+    key: string;
+};
+
+export type PublishableKeyPublic = {
+    id: string;
+    popup_id?: (string | null);
+    name: string;
+    key_prefix: string;
+    allowed_origins: Array<(string)>;
+    created_at: string;
+    last_used_at?: (string | null);
+    revoked_at?: (string | null);
+};
+
 export type PublishPermission = 'admin_only' | 'everyone';
 
 /**
@@ -3760,79 +3848,6 @@ export type freq = 'DAILY' | 'WEEKLY' | 'MONTHLY';
  */
 export type RecurrenceUpdate = {
     recurrence?: (RecurrenceRule | null);
-};
-
-/**
- * Admin request body for PATCH /admin/referrals/{id}.
- *
- * Extends owner fields with admin-only fields (discount_percentage, auto_approve).
- */
-export type ReferralAdminUpdate = {
-    expires_at?: (string | null);
-    max_uses?: (number | null);
-    discount_percentage?: (number | string | null);
-    auto_approve?: (boolean | null);
-    is_disabled?: (boolean | null);
-};
-
-/**
- * Human request body for POST /portal/referrals.
- *
- * code: auto-generated via secrets.token_urlsafe(16) when omitted.
- * discount_percentage: defaults to 0. Only admin can change after creation.
- * auto_approve: defaults to False. Only admin can change.
- */
-export type ReferralCreate = {
-    popup_id: string;
-    code?: (string | null);
-    max_uses?: (number | null);
-    expires_at?: (string | null);
-};
-
-/**
- * Full referral detail — owner/admin response.
- */
-export type ReferralPublic = {
-    id: string;
-    popup_id: string;
-    referrer_human_id: string;
-    code: string;
-    discount_percentage: string;
-    auto_approve: boolean;
-    is_disabled?: boolean;
-    max_uses?: (number | null);
-    current_uses: number;
-    expires_at?: (string | null);
-    created_at: string;
-    updated_at: string;
-};
-
-/**
- * Public lookup — GET /referrals/r/{code}.
- *
- * Spec: Design API surface table — returns no PII of referrer.
- * id is included so the portal can pass referral_id on application create
- * (REQ-GR-009 — attribution on application).
- */
-export type ReferralPublicPreview = {
-    id: string;
-    popup_id: string;
-    code: string;
-    discount_percentage: string;
-    max_uses?: (number | null);
-    current_uses: number;
-    expires_at?: (string | null);
-};
-
-/**
- * Human request body for PATCH /portal/referrals/{id}.
- *
- * Only expires_at and max_uses are mutable by the referral owner.
- * discount_percentage and auto_approve are admin-only.
- */
-export type ReferralUpdate = {
-    expires_at?: (string | null);
-    max_uses?: (number | null);
 };
 
 /**
@@ -5458,13 +5473,24 @@ export type CheckInListCheckInsResponse = (ListModel_CheckInListItem_);
 export type CheckoutGetRuntimeData = {
     acceptLanguage?: (string | null);
     slug: string;
+    xEdgeOsPublishableKey?: (string | null);
     xTenantId?: (string | null);
 };
 
 export type CheckoutGetRuntimeResponse = (CheckoutRuntimeResponse);
 
+export type CheckoutPreviewOpenTicketingData = {
+    requestBody: CheckoutPreviewRequest;
+    slug: string;
+    xEdgeOsPublishableKey?: (string | null);
+    xTenantId?: (string | null);
+};
+
+export type CheckoutPreviewOpenTicketingResponse = (CheckoutPreviewResponse);
+
 export type CheckoutGetCheckoutShareMetaData = {
     slug: string;
+    xEdgeOsPublishableKey?: (string | null);
     xTenantId?: (string | null);
 };
 
@@ -5473,6 +5499,7 @@ export type CheckoutGetCheckoutShareMetaResponse = (CheckoutShareMeta);
 export type CheckoutPurchaseOpenTicketingData = {
     requestBody: OpenTicketingPurchaseCreate;
     slug: string;
+    xEdgeOsPublishableKey?: (string | null);
     xTenantId?: (string | null);
 };
 
@@ -5481,6 +5508,7 @@ export type CheckoutPurchaseOpenTicketingResponse = (OpenTicketingPurchaseRespon
 export type CheckoutUpsertOpenCartData = {
     requestBody: OpenCartUpsert;
     slug: string;
+    xEdgeOsPublishableKey?: (string | null);
     xTenantId?: (string | null);
 };
 
@@ -5496,6 +5524,7 @@ export type CheckoutRestoreOpenCartData = {
      */
     sig: string;
     slug: string;
+    xEdgeOsPublishableKey?: (string | null);
     xTenantId?: (string | null);
 };
 
@@ -5504,6 +5533,7 @@ export type CheckoutRestoreOpenCartResponse = (OpenCartPublic);
 export type CheckoutReleasePendingOpenData = {
     requestBody: PendingReleaseOpenRequest;
     slug: string;
+    xEdgeOsPublishableKey?: (string | null);
     xTenantId?: (string | null);
 };
 
@@ -5511,6 +5541,7 @@ export type CheckoutReleasePendingOpenResponse = (PendingReleaseResponse);
 
 export type CouponsValidateCouponPublicData = {
     requestBody: CouponValidatePublicRequest;
+    xEdgeOsPublishableKey?: (string | null);
     xTenantId?: (string | null);
 };
 
@@ -5767,6 +5798,7 @@ export type EventsListPublicCalendarData = {
     startBefore?: (string | null);
     tags?: (Array<(string)> | null);
     trackIds?: (Array<(string)> | null);
+    xEdgeOsPublishableKey?: (string | null);
     xTenantId?: (string | null);
 };
 
@@ -5774,6 +5806,7 @@ export type EventsListPublicCalendarResponse = (EventPublicCalendarResponse);
 
 export type EventsGetPublicEventShareMetaData = {
     eventId: string;
+    xEdgeOsPublishableKey?: (string | null);
     xTenantId?: (string | null);
 };
 
@@ -6742,7 +6775,17 @@ export type InvitesRedeemInviteData = {
 
 export type InvitesRedeemInviteResponse = (InviteRedeemResponse);
 
+export type InvitesPreviewLinkData = {
+    token: string;
+};
+
+export type InvitesPreviewLinkResponse = (InvitePublicPreview);
+
 export type InvitesListInvitesData = {
+    /**
+     * Which links to return: both kinds, backoffice, or attendee.
+     */
+    issuer?: 'all' | 'admin' | 'portal';
     /**
      * Maximum number of items to return
      */
@@ -6781,6 +6824,39 @@ export type InvitesDeleteInviteData = {
 };
 
 export type InvitesDeleteInviteResponse = (void);
+
+export type InvitesListMyLinksData = {
+    /**
+     * Maximum number of items to return
+     */
+    limit?: number;
+    popupId?: (string | null);
+    /**
+     * Number of items to skip
+     */
+    skip?: number;
+};
+
+export type InvitesListMyLinksResponse = (ListModel_InvitePublic_);
+
+export type InvitesCreateMyLinkData = {
+    requestBody: InvitePortalCreate;
+};
+
+export type InvitesCreateMyLinkResponse = (InvitePublic);
+
+export type InvitesUpdateMyLinkData = {
+    linkId: string;
+    requestBody: InvitePortalUpdate;
+};
+
+export type InvitesUpdateMyLinkResponse = (InvitePublic);
+
+export type InvitesDeleteMyLinkData = {
+    linkId: string;
+};
+
+export type InvitesDeleteMyLinkResponse = (void);
 
 export type PaymentsListPaymentsData = {
     applicationId?: (string | null);
@@ -7109,71 +7185,25 @@ export type ProductsListPortalProductsData = {
 
 export type ProductsListPortalProductsResponse = (ListModel_ProductPublic_);
 
-export type ReferralsListMyReferralsData = {
-    /**
-     * Maximum number of items to return
-     */
-    limit?: number;
-    popupId?: (string | null);
-    /**
-     * Number of items to skip
-     */
-    skip?: number;
+export type PublishableKeysCreatePublishableKeyData = {
+    requestBody: PublishableKeyCreate;
+    xTenantId?: (string | null);
 };
 
-export type ReferralsListMyReferralsResponse = (ListModel_ReferralPublic_);
+export type PublishableKeysCreatePublishableKeyResponse = (PublishableKeyCreated);
 
-export type ReferralsCreateReferralData = {
-    requestBody: ReferralCreate;
+export type PublishableKeysListPublishableKeysData = {
+    xTenantId?: (string | null);
 };
 
-export type ReferralsCreateReferralResponse = (ReferralPublic);
+export type PublishableKeysListPublishableKeysResponse = (Array<PublishableKeyPublic>);
 
-export type ReferralsUpdateMyReferralData = {
-    referralId: string;
-    requestBody: ReferralUpdate;
+export type PublishableKeysRevokePublishableKeyData = {
+    keyId: string;
+    xTenantId?: (string | null);
 };
 
-export type ReferralsUpdateMyReferralResponse = (ReferralPublic);
-
-export type ReferralsDeleteMyReferralData = {
-    referralId: string;
-};
-
-export type ReferralsDeleteMyReferralResponse = (void);
-
-export type ReferralsGetReferralPreviewData = {
-    code: string;
-};
-
-export type ReferralsGetReferralPreviewResponse = (ReferralPublicPreview);
-
-export type ReferralsListReferralsAdminData = {
-    /**
-     * Maximum number of items to return
-     */
-    limit?: number;
-    popupId?: (string | null);
-    /**
-     * Number of items to skip
-     */
-    skip?: number;
-};
-
-export type ReferralsListReferralsAdminResponse = (ListModel_ReferralPublic_);
-
-export type ReferralsGetReferralAdminData = {
-    referralId: string;
-};
-
-export type ReferralsGetReferralAdminResponse = (ReferralPublic);
-
-export type ReferralsUpdateReferralAdminData = {
-    referralId: string;
-    requestBody: ReferralAdminUpdate;
-};
-
-export type ReferralsUpdateReferralAdminResponse = (ReferralPublic);
+export type PublishableKeysRevokePublishableKeyResponse = (void);
 
 export type SavedViewsListSavedViewsData = {
     entity: string;

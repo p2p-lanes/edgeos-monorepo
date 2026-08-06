@@ -759,21 +759,14 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
 
             _group = _groups_crud.get(session, _group_id)
 
-        # Applications submitted through a group come from the portal's
-        # Express Checkout ONLY when the group explicitly opts in via the
-        # express_checkout flag. Previously this was implicit (bool(group_id));
-        # now it requires the flag to be True. Design Decision 1f.
-        # Invite express_checkout flag works the same way: when the invite
-        # opts in, required fields are relaxed (shared behavior with group flow).
-        # REQ-GR-003 guard chain: expiry + use-limit checked here (before
-        # express_checkout is read). Email match is deferred until after
-        # human is fetched below.
+        # REQ-GR-003 guard chain: expiry + use-limit checked here. Email match
+        # is deferred until after human is fetched below.
         _invite_id = getattr(app_data, "invite_id", None)
         _invite = None
         if _invite_id:
             from app.api.invite.crud import invites_crud as _invites_crud
 
-            _invite = _invites_crud.get(session, _invite_id)
+            _invite = _invites_crud.get_admin_created(session, _invite_id)
             if not _invite:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
@@ -782,10 +775,39 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
             # Steps 1 + 2: expiry → max_uses (reuse shared validate_for_redemption)
             _invites_crud.validate_for_redemption(_invite)
 
-        is_express_checkout = bool(
-            (_group and _group.express_checkout)
-            or (_invite and _invite.express_checkout)
-        )
+        # Resolve referral when referral_id is provided (REQ-GR-009/010).
+        # Resolved here, alongside group and invite, because the express
+        # checkout scope below depends on it. Uses are incremented later, once
+        # the application is actually being committed.
+        _referral_id = getattr(app_data, "referral_id", None)
+        _referral = None
+        if _referral_id:
+            from app.api.invite.crud import invites_crud as _links_crud
+
+            _referral = _links_crud.get_portal_created(session, _referral_id)
+            if not _referral:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Referral not found",
+                )
+            # Validate the referral is still usable (disabled + expiry + limit)
+            _links_crud.validate_for_redemption(_referral)
+
+        # Express Checkout scope is a property of the ENTRY FLOW, not of the
+        # link that opened it: the portal renders the reduced mini-form for
+        # every group / invite / referral entry point (PersonalInfoForm ->
+        # getCheckoutMiniFormSchema), unconditionally. Validating against the
+        # full form here would reject required fields the applicant was never
+        # shown -- which is exactly what referral links hit, since Referrals
+        # has no express_checkout column to opt in with.
+        #
+        # This supersedes T-gr-016 / Design Decision 1f, which made the scope
+        # depend on the per-link group.express_checkout / invite.express_checkout
+        # flags. Those flags never reached the portal, so the two sides could
+        # disagree. The columns are intentionally left in place: express
+        # checkout is moving to per-popup configuration, and that change decides
+        # their fate.
+        is_express_checkout = bool(_group or _invite or _referral)
 
         # Validate custom_fields against form field definitions. Non-draft
         # submissions must run even with empty/absent custom_fields so
@@ -902,22 +924,9 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         data["tenant_id"] = tenant_id
         data["human_id"] = human_id
 
-        # Resolve referral when referral_id is provided.
-        # Validate use limits and expiry; increment uses; auto-approve if flag set.
-        # T-gr-032: referral attribution wiring (groups-rework Decision 1f).
-        _referral_id = getattr(app_data, "referral_id", None)
-        _referral = None
-        if _referral_id:
-            from app.api.referral.crud import referrals_crud as _referrals_crud
-
-            _referral = _referrals_crud.get(session, _referral_id)
-            if not _referral:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail="Referral not found",
-                )
-            # Validate the referral is still usable (expiry + use limit)
-            _referrals_crud.validate_for_use(_referral)
+        # _referral was resolved and validated above, next to group and invite
+        # (T-gr-032: referral attribution wiring, groups-rework Decision 1f).
+        # Its current_uses is incremented further down, on commit.
 
         # Auto-accept only when the group explicitly enables it via the
         # auto_approve_applications flag, or when the referral/invite enables it.
@@ -1344,9 +1353,17 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         resulting_status = incoming_status or application.status
         is_draft = _is_draft_status(resulting_status)
 
-        # Group applications use the Express Checkout reduced form on the
-        # portal; keep the relaxed required subset for their updates too.
-        is_express_checkout = bool(update_data.get("group_id") or application.group_id)
+        # Applications that entered through a group, invite or referral link
+        # were filled with the Express Checkout reduced form; keep the same
+        # relaxed required subset for their updates. Mirrors the entry-flow
+        # rule in create_internal -- invite and referral were missing here, so
+        # re-submitting such an application demanded fields it never rendered.
+        is_express_checkout = bool(
+            update_data.get("group_id")
+            or application.group_id
+            or application.invite_id
+            or application.referral_id
+        )
 
         stored_custom: dict[str, Any] = application.custom_fields or {}
         incoming_custom = update_data.get("custom_fields")

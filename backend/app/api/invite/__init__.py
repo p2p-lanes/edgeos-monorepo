@@ -1,3 +1,3 @@
-from app.api.invite.router import router
+from app.api.invite.router import portal_router, router
 
-__all__ = ["router"]
+__all__ = ["portal_router", "router"]

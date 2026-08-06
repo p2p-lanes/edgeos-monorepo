@@ -722,10 +722,10 @@ async def get_application(
     referred_by_name = None
     if application.referral_id:
         from app.api.human.models import Humans
-        from app.api.referral.models import Referrals
+        from app.api.invite.models import Invites
 
-        referral = db.get(Referrals, application.referral_id)
-        if referral:
+        referral = db.get(Invites, application.referral_id)
+        if referral and referral.referrer_human_id:
             referrer = db.get(Humans, referral.referrer_human_id)
             if referrer:
                 referred_by_name = (

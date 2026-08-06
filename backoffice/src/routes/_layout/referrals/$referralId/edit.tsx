@@ -7,7 +7,7 @@ import {
 import { createFileRoute, useNavigate } from "@tanstack/react-router"
 import { Ban, Calendar, Hash, Percent, ShieldCheck } from "lucide-react"
 import { Suspense } from "react"
-import { type ReferralAdminUpdate, ReferralsService } from "@/client"
+import { InvitesService, type InviteUpdate } from "@/client"
 import { FormPageLayout } from "@/components/Common/FormPageLayout"
 import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
 import { Button } from "@/components/ui/button"
@@ -37,7 +37,7 @@ export const Route = createFileRoute("/_layout/referrals/$referralId/edit")({
 function getReferralQueryOptions(referralId: string) {
   return {
     queryKey: ["referrals", referralId],
-    queryFn: () => ReferralsService.getReferralAdmin({ referralId }),
+    queryFn: () => InvitesService.getInvite({ inviteId: referralId }),
   }
 }
 
@@ -64,9 +64,9 @@ function EditReferralContent({ referralId }: { referralId: string }) {
   }
 
   const updateMutation = useMutation({
-    mutationFn: (data: ReferralAdminUpdate) =>
-      ReferralsService.updateReferralAdmin({
-        referralId: referral.id,
+    mutationFn: (data: InviteUpdate) =>
+      InvitesService.updateInvite({
+        inviteId: referral.id,
         requestBody: data,
       }),
     onSuccess: () => {
@@ -117,7 +117,7 @@ function EditReferralContent({ referralId }: { referralId: string }) {
         <div className="flex gap-6 text-sm text-muted-foreground">
           <div>
             <span className="text-xs uppercase tracking-wider">Code</span>
-            <p className="font-mono">{referral.code}</p>
+            <p className="font-mono">{referral.token}</p>
           </div>
           <div>
             <span className="text-xs uppercase tracking-wider">Uses</span>

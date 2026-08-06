@@ -209,6 +209,7 @@
     "send_code": "Enviar código",
     "verify_code": "Verificar código",
     "submit_error": "Ocurrió un error al enviar el formulario. Por favor, intentá de nuevo.",
+    "duplicate_application": "Ya tenés una aplicación pendiente para este pop-up. Revisá tu email o contactá a soporte.",
     "application_required": "Aplicación requerida",
     "application_required_message": "Hola {{userName}}, antes de comprar un pase, ¡nos gustaría conocerte mejor!",
     "application_required_prompt": "Por favor, visitá el Portal de Edge y aplicá a {{popupName}}, para que podamos revisar tu información.",
