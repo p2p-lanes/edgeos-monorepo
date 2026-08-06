@@ -49,12 +49,10 @@ class FormFieldBase(SQLModel):
 
     tenant_id: uuid.UUID = Field(foreign_key="tenants.id", index=True)
     popup_id: uuid.UUID = Field(foreign_key="popups.id", index=True)
-    # sdd/sales-flows slice 6 (Q1: flow-owned forms). NULL = popup-shared
-    # (the legacy form every flow of the popup read before this slice, and
-    # the fallback a flow keeps reading until it gets its own flow-scoped
-    # fields). Non-NULL = owned exclusively by that flow.
-    sales_flow_id: uuid.UUID | None = Field(
-        default=None, foreign_key="sales_flows.id", nullable=True, index=True
+    # sdd/sales-flows-rediseno slice 3: belongs to exactly one flow.
+    # There is no popup-shared tier and nothing is inherited.
+    sales_flow_id: uuid.UUID = Field(
+        foreign_key="sales_flows.id", nullable=False, index=True
     )
     name: str = Field(index=True)
     label: str
@@ -90,7 +88,7 @@ class FormFieldPublic(BaseModel):
     id: uuid.UUID
     tenant_id: uuid.UUID
     popup_id: uuid.UUID
-    sales_flow_id: uuid.UUID | None = None
+    sales_flow_id: uuid.UUID
     name: str
     label: str
     short_label: str | None = None
@@ -118,6 +116,9 @@ class FormFieldPublic(BaseModel):
 
 class FormFieldCreate(BaseModel):
     popup_id: uuid.UUID
+    # The flow whose form this field joins. Writes are explicit; only reads
+    # fall back to the popup's default flow.
+    sales_flow_id: uuid.UUID
     label: str
     short_label: str | None = None
     field_type: str = FormFieldType.TEXT.value

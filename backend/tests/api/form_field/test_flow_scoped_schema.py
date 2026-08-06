@@ -70,7 +70,7 @@ def _make_field(
     popup: Popups,
     name: str,
     *,
-    flow_id: uuid.UUID | None = None,
+    flow_id: uuid.UUID,
     section_id: uuid.UUID | None = None,
 ) -> FormFields:
     field = FormFields(
@@ -94,7 +94,7 @@ def _make_section(
     popup: Popups,
     label: str,
     *,
-    flow_id: uuid.UUID | None = None,
+    flow_id: uuid.UUID,
 ) -> FormSections:
     section = FormSections(
         tenant_id=tenant.id,
@@ -114,7 +114,7 @@ def _make_base_config(
     popup: Popups,
     field_name: str,
     *,
-    flow_id: uuid.UUID | None = None,
+    flow_id: uuid.UUID,
 ) -> BaseFieldConfigs:
     config = BaseFieldConfigs(
         tenant_id=tenant.id,
@@ -129,44 +129,34 @@ def _make_base_config(
     return config
 
 
-class TestBuildSchemaForFlowFallback:
-    def test_flow_with_no_own_rows_falls_back_to_popup_shared_schema(
-        self, db: Session, tenant_a: Tenants
-    ) -> None:
-        popup = _make_popup(db, tenant_a)
-        flow = _make_flow(db, tenant_a, popup, slug="flow-a")
-        _make_field(db, tenant_a, popup, "shared_field")
-
-        schema = form_fields_crud.build_schema_for_flow(db, popup.id, flow.id)
-
-        assert "shared_field" in schema["custom_fields"]
-
-    def test_none_flow_id_matches_popup_shared_schema(
-        self, db: Session, tenant_a: Tenants
-    ) -> None:
-        popup = _make_popup(db, tenant_a)
-        _make_field(db, tenant_a, popup, "no_flow_field")
-
-        with_none = form_fields_crud.build_schema_for_flow(db, popup.id, None)
-        assert "no_flow_field" in with_none["custom_fields"]
-
-
 class TestBuildSchemaForFlowOwnership:
-    def test_flow_scoped_field_used_instead_of_popup_shared(
+    def test_schema_contains_only_the_flows_own_fields(
         self, db: Session, tenant_a: Tenants
     ) -> None:
+        """A sibling flow's fields must never appear in this flow's schema."""
         popup = _make_popup(db, tenant_a)
         flow_a = _make_flow(db, tenant_a, popup, slug="flow-a")
-        _make_field(db, tenant_a, popup, "popup_only_field")
+        flow_b = _make_flow(db, tenant_a, popup, slug="flow-b")
+        _make_field(db, tenant_a, popup, "flow_b_only_field", flow_id=flow_b.id)
         _make_field(db, tenant_a, popup, "flow_a_only_field", flow_id=flow_a.id)
 
         schema = form_fields_crud.build_schema_for_flow(db, popup.id, flow_a.id)
 
         assert "flow_a_only_field" in schema["custom_fields"]
-        assert "popup_only_field" not in schema["custom_fields"], (
-            "Once a flow owns its own fields, the popup-shared tier must "
-            "not leak into that flow's schema"
-        )
+        assert "flow_b_only_field" not in schema["custom_fields"]
+
+    def test_flow_without_fields_gets_an_empty_schema(
+        self, db: Session, tenant_a: Tenants
+    ) -> None:
+        """The deleted fallback: empty means empty, not "borrow someone's"."""
+        popup = _make_popup(db, tenant_a)
+        populated = _make_flow(db, tenant_a, popup, slug="flow-populated")
+        empty = _make_flow(db, tenant_a, popup, slug="flow-empty")
+        _make_field(db, tenant_a, popup, "populated_field", flow_id=populated.id)
+
+        schema = form_fields_crud.build_schema_for_flow(db, popup.id, empty.id)
+
+        assert schema["custom_fields"] == {}
 
     def test_editing_flow_a_does_not_affect_flow_b_schema(
         self, db: Session, tenant_a: Tenants
@@ -184,49 +174,6 @@ class TestBuildSchemaForFlowOwnership:
 
 
 class TestCopyFormToFlow:
-    def test_copy_from_popup_shared_creates_independent_field_rows(
-        self, db: Session, tenant_a: Tenants
-    ) -> None:
-        popup = _make_popup(db, tenant_a)
-        target = _make_flow(db, tenant_a, popup, slug="target-flow")
-        _make_field(db, tenant_a, popup, "copyable_field")
-
-        form_fields_crud.copy_form_to_flow(
-            db,
-            popup_id=popup.id,
-            tenant_id=tenant_a.id,
-            target_flow_id=target.id,
-            source_flow_id=None,
-        )
-
-        target_schema = form_fields_crud.build_schema_for_flow(db, popup.id, target.id)
-        assert "copyable_field" in target_schema["custom_fields"]
-
-        # The copy is an independent row: mutating the target's copy must
-        # not touch the popup-shared source.
-        copied_field = db.exec(
-            FormFields.__table__.select().where(
-                FormFields.popup_id == popup.id,
-                FormFields.sales_flow_id == target.id,
-                FormFields.name == "copyable_field",
-            )
-        ).first()
-        assert copied_field is not None
-        assert copied_field.id is not None
-
-        source_field_count = len(
-            list(
-                db.exec(
-                    FormFields.__table__.select().where(
-                        FormFields.popup_id == popup.id,
-                        FormFields.sales_flow_id.is_(None),
-                        FormFields.name == "copyable_field",
-                    )
-                )
-            )
-        )
-        assert source_field_count == 1, "Source row must remain untouched"
-
     def test_copy_from_source_flow_to_target_flow_is_independent(
         self, db: Session, tenant_a: Tenants
     ) -> None:

@@ -24,6 +24,7 @@ from app.api.product.models import Products
 from app.api.shared.enums import SaleType
 from app.api.tenant.models import Tenants
 from app.utils.encryption import encrypt
+from tests._flow_helpers import default_flow_id, provision_default_flow
 from tests.conftest import with_origin
 
 
@@ -59,6 +60,7 @@ def _make_popup(
     )
     db.add(popup)
     db.flush()
+    provision_default_flow(db, popup, sale_type=str(popup.sale_type))
     return popup
 
 
@@ -115,6 +117,7 @@ def _make_section(
         id=uuid.uuid4(),
         tenant_id=popup.tenant_id,
         popup_id=popup.id,
+        sales_flow_id=default_flow_id(db, popup.id),
         label=label,
         order=0,
         kind="standard",
@@ -131,6 +134,7 @@ def _make_field(
         id=uuid.uuid4(),
         tenant_id=popup.tenant_id,
         popup_id=popup.id,
+        sales_flow_id=default_flow_id(db, popup.id),
         section_id=section.id,
         name=f"first_name_{uuid.uuid4().hex[:4]}",
         label="Nombre",

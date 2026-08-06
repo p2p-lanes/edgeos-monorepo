@@ -25,6 +25,7 @@ from app.api.product.models import Products
 from app.api.shared.enums import SaleType
 from app.api.tenant.models import Tenants
 from app.api.ticketing_step.models import TicketingSteps
+from tests._flow_helpers import default_flow_id
 from tests.conftest import with_origin
 
 # ---------------------------------------------------------------------------
@@ -97,11 +98,13 @@ def _make_form_section(
     order: int = 0,
     label: str = "Buyer Info",
     hidden: bool = False,
+    sales_flow_id=None,
 ) -> FormSections:
     section = FormSections(
         id=uuid.uuid4(),
         tenant_id=popup.tenant_id,
         popup_id=popup.id,
+        sales_flow_id=sales_flow_id or default_flow_id(db, popup.id),
         label=label,
         order=order,
         hidden=hidden,
@@ -119,11 +122,13 @@ def _make_form_field(
     name: str = "first_name",
     label: str = "Nombre",
     required: bool = True,
+    sales_flow_id=None,
 ) -> FormFields:
     field = FormFields(
         id=uuid.uuid4(),
         tenant_id=popup.tenant_id,
         popup_id=popup.id,
+        sales_flow_id=sales_flow_id or default_flow_id(db, popup.id),
         section_id=section.id,
         name=f"{name}_{uuid.uuid4().hex[:4]}",
         label=label,

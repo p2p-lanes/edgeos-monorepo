@@ -78,7 +78,7 @@ class BaseFieldConfigsCRUD(
     ) -> list[BaseFieldConfigs]:
         """Returns ALL configs for the popup regardless of `sales_flow_id`
         (admin/legacy management surface — untouched by sdd/sales-flows
-        slice 6, see `find_for_flow` for the flow-aware read path).
+        slice 6 — see `find_by_flow` for one flow's own configs).
 
         Order by (section.order, position) so callers that don't regroup still
         render fields in the same visual order as the form builder: sections
@@ -98,7 +98,7 @@ class BaseFieldConfigsCRUD(
     def find_by_flow(
         self, session: Session, flow_id: uuid.UUID
     ) -> list[BaseFieldConfigs]:
-        """Configs owned exclusively by `flow_id` (sdd/sales-flows slice 6)."""
+        """The base-field configs of `flow_id` — no fallback (slice 3)."""
         statement = (
             select(BaseFieldConfigs)
             .outerjoin(
@@ -110,63 +110,31 @@ class BaseFieldConfigsCRUD(
         )
         return list(session.exec(statement).all())
 
-    def find_shared(
-        self, session: Session, popup_id: uuid.UUID
-    ) -> list[BaseFieldConfigs]:
-        """Popup-shared configs (`sales_flow_id IS NULL`) — the fallback
-        tier every flow reads until it owns its own configs."""
-        statement = (
-            select(BaseFieldConfigs)
-            .outerjoin(
-                FormSections,
-                BaseFieldConfigs.section_id == FormSections.id,  # type: ignore[arg-type]
-            )
-            .where(
-                BaseFieldConfigs.popup_id == popup_id,
-                BaseFieldConfigs.sales_flow_id.is_(None),  # type: ignore[union-attr]
-            )
-            .order_by(FormSections.order, BaseFieldConfigs.position)  # type: ignore[arg-type]
-        )
-        return list(session.exec(statement).all())
-
-    def find_for_flow(
-        self,
-        session: Session,
-        popup_id: uuid.UUID,
-        flow_id: uuid.UUID | None,
-    ) -> list[BaseFieldConfigs]:
-        """Flow-owned configs if `flow_id` owns any, else the popup-shared
-        fallback (Q1: flow-owned forms). `flow_id=None` always returns the
-        popup-shared tier directly."""
-        if flow_id is not None:
-            flow_rows = self.find_by_flow(session, flow_id)
-            if flow_rows:
-                return flow_rows
-        return self.find_shared(session, popup_id)
-
     def create_defaults_for_popup(
         self,
         session: Session,
         popup_id: uuid.UUID,
         tenant_id: uuid.UUID,
+        sales_flow_id: uuid.UUID,
         section_map: dict[str, uuid.UUID],
     ) -> list[BaseFieldConfigs]:
-        """Create one BaseFieldConfig per base field for a popup.
+        """Create one BaseFieldConfig per base field, owned by one flow.
 
-        Idempotent: existing (popup_id, field_name) rows are left untouched.
-        This matters when a feature flag is toggled on, off, and back on —
-        configs persist across the off cycle and must not be re-inserted.
+        `sales_flow_id` is required (sdd/sales-flows-rediseno slice 3): a
+        config belongs to a flow's form, and popup creation passes the
+        default flow it just provisioned.
 
-        Args:
-            session: DB session
-            popup_id: The popup to create configs for
-            tenant_id: Tenant owning the popup
-            section_map: Maps section keys (e.g. "profile") to FormSection UUIDs
+        Idempotent: existing (sales_flow_id, field_name) rows are left
+        untouched. This matters when a feature flag is toggled on, off, and
+        back on — configs persist across the off cycle and must not be
+        re-inserted.
         """
         existing_names = {
             c.field_name
             for c in session.exec(
-                select(BaseFieldConfigs).where(BaseFieldConfigs.popup_id == popup_id)
+                select(BaseFieldConfigs).where(
+                    BaseFieldConfigs.sales_flow_id == sales_flow_id
+                )
             ).all()
         }
 
@@ -181,6 +149,7 @@ class BaseFieldConfigsCRUD(
             config = BaseFieldConfigs(
                 tenant_id=tenant_id,
                 popup_id=popup_id,
+                sales_flow_id=sales_flow_id,
                 field_name=field_name,
                 section_id=section_map.get(section_key),
                 position=definition.get("default_position", 0),

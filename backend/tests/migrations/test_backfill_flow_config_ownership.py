@@ -100,40 +100,37 @@ def _seed_secondary_flow(db: Session, popup_id: uuid.UUID) -> uuid.UUID:
     return flow_id
 
 
-def _seed_field(
+def _seed_reviewer(
     db: Session,
     popup_id: uuid.UUID,
+    user_id: uuid.UUID,
     flow_id: uuid.UUID | None = None,
 ) -> uuid.UUID:
-    """Seed a form field, the representative config row for these tests.
+    """Seed a reviewer row, the representative config row for these tests.
 
-    `ticketingsteps.sales_flow_id` went NOT NULL in slice 2, so an unowned
-    step is no longer expressible; `formfields` still carries the nullable
-    column until slice 3 does the same there.
+    The representative table has to be one whose `sales_flow_id` is still
+    nullable, since the point is to seed an UNOWNED row and watch the
+    backfill claim it. Steps went NOT NULL in slice 2 and the form tables in
+    slice 3; `popupreviewers` follows in slice 6, and this seed moves again
+    then.
     """
-    field_id = uuid.uuid4()
+    reviewer_id = uuid.uuid4()
     db.exec(
         text(
-            "INSERT INTO formfields "
-            "(id, tenant_id, popup_id, name, label, sales_flow_id) "
-            "SELECT :id, p.tenant_id, :pid, :name, :label, :fid "
+            "INSERT INTO popupreviewers "
+            "(id, tenant_id, popup_id, user_id, sales_flow_id) "
+            "SELECT :id, p.tenant_id, :pid, :uid, :fid "
             "FROM popups p WHERE p.id = :pid"
-        ).bindparams(
-            id=field_id,
-            pid=popup_id,
-            name=f"field_{field_id.hex[:8]}",
-            label=f"Field {field_id.hex[:6]}",
-            fid=flow_id,
-        )
+        ).bindparams(id=reviewer_id, pid=popup_id, uid=user_id, fid=flow_id)
     )
     db.commit()
-    return field_id
+    return reviewer_id
 
 
-def _flow_of_field(db: Session, field_id: uuid.UUID):
+def _flow_of_reviewer(db: Session, reviewer_id: uuid.UUID):
     return db.exec(
-        text("SELECT sales_flow_id FROM formfields WHERE id = :id").bindparams(
-            id=field_id
+        text("SELECT sales_flow_id FROM popupreviewers WHERE id = :id").bindparams(
+            id=reviewer_id
         )
     ).one()[0]
 
@@ -141,7 +138,7 @@ def _flow_of_field(db: Session, field_id: uuid.UUID):
 def _cleanup(db: Session, popup_id: uuid.UUID) -> None:
     for stmt in (
         "DELETE FROM ticketingsteps WHERE popup_id = :id",
-        "DELETE FROM formfields WHERE popup_id = :id",
+        "DELETE FROM popupreviewers WHERE popup_id = :id",
         "DELETE FROM email_templates WHERE popup_id = :id",
         "DELETE FROM sales_flows WHERE popup_id = :id",
         "DELETE FROM popups WHERE id = :id",
@@ -174,55 +171,63 @@ def test_alembic_single_head_after_backfill() -> None:
 
 
 def test_shared_config_row_is_claimed_by_the_default_flow(
-    db: Session, tenant_a: Tenants
+    db: Session, tenant_a: Tenants, admin_user_tenant_a
 ) -> None:
     module = _load_migration_module()
     popup_id, default_flow_id = _seed_popup_with_default_flow(db, tenant_a.id)
     try:
-        shared_field = _seed_field(db, popup_id, flow_id=None)
-        assert _flow_of_field(db, shared_field) is None
+        shared_reviewer = _seed_reviewer(
+            db, popup_id, admin_user_tenant_a.id, flow_id=None
+        )
+        assert _flow_of_reviewer(db, shared_reviewer) is None
 
         with patch.object(module.op, "get_bind", return_value=db.connection()):
             module.upgrade()
         db.commit()
 
-        assert _flow_of_field(db, shared_field) == default_flow_id
+        assert _flow_of_reviewer(db, shared_reviewer) == default_flow_id
     finally:
         _cleanup(db, popup_id)
 
 
 def test_row_owned_by_a_non_default_flow_is_not_stolen(
-    db: Session, tenant_a: Tenants
+    db: Session, tenant_a: Tenants, admin_user_tenant_a
 ) -> None:
     """The backfill claims unowned rows only — it never re-points owned ones."""
     module = _load_migration_module()
     popup_id, default_flow_id = _seed_popup_with_default_flow(db, tenant_a.id)
     try:
         other_flow_id = _seed_secondary_flow(db, popup_id)
-        owned_field = _seed_field(db, popup_id, flow_id=other_flow_id)
+        owned_reviewer = _seed_reviewer(
+            db, popup_id, admin_user_tenant_a.id, flow_id=other_flow_id
+        )
 
         with patch.object(module.op, "get_bind", return_value=db.connection()):
             module.upgrade()
         db.commit()
 
-        assert _flow_of_field(db, owned_field) == other_flow_id
-        assert _flow_of_field(db, owned_field) != default_flow_id
+        assert _flow_of_reviewer(db, owned_reviewer) == other_flow_id
+        assert _flow_of_reviewer(db, owned_reviewer) != default_flow_id
     finally:
         _cleanup(db, popup_id)
 
 
-def test_backfill_is_idempotent(db: Session, tenant_a: Tenants) -> None:
+def test_backfill_is_idempotent(
+    db: Session, tenant_a: Tenants, admin_user_tenant_a
+) -> None:
     module = _load_migration_module()
     popup_id, default_flow_id = _seed_popup_with_default_flow(db, tenant_a.id)
     try:
-        shared_field = _seed_field(db, popup_id, flow_id=None)
+        shared_reviewer = _seed_reviewer(
+            db, popup_id, admin_user_tenant_a.id, flow_id=None
+        )
 
         for _ in range(2):
             with patch.object(module.op, "get_bind", return_value=db.connection()):
                 module.upgrade()
             db.commit()
 
-        assert _flow_of_field(db, shared_field) == default_flow_id
+        assert _flow_of_reviewer(db, shared_reviewer) == default_flow_id
     finally:
         _cleanup(db, popup_id)
 

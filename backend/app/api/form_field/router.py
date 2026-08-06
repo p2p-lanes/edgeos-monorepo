@@ -73,10 +73,12 @@ def _base_config_to_public(config: BaseFieldConfigs) -> FormFieldPublic:
     )
 
 
-def _get_base_fields_as_public(db: "Session", popup: "Popups") -> list[FormFieldPublic]:
-    """Build FormFieldPublic entries from existing BaseFieldConfigs, filtered
-    by the popup's current feature flags."""
-    configs = base_field_configs_crud.find_by_popup(db, popup.id)
+def _get_base_fields_as_public(
+    db: "Session", popup: "Popups", flow_id: uuid.UUID
+) -> list[FormFieldPublic]:
+    """Build FormFieldPublic entries from one flow's BaseFieldConfigs,
+    filtered by the popup's current feature flags."""
+    configs = base_field_configs_crud.find_by_flow(db, flow_id)
     return [
         _base_config_to_public(c)
         for c in configs
@@ -89,6 +91,7 @@ async def list_form_fields(
     db: AdminOrApiKeySession_FormsRead,
     _: AdminOrApiKey_FormsRead,
     popup_id: uuid.UUID | None = None,
+    sales_flow_id: uuid.UUID | None = None,
     search: str | None = None,
     skip: PaginationSkip = 0,
     limit: PaginationLimit = 100,
@@ -103,17 +106,20 @@ async def list_form_fields(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Popup not found",
             )
-        base_fields = _get_base_fields_as_public(db, popup)
-        custom_fields, custom_total = crud.form_fields_crud.find_by_popup(
-            db, popup_id=popup_id, skip=skip, limit=limit, search=search
+        # One flow's form, never a merge across the popup's flows
+        # (sdd/sales-flows-rediseno slice 3).
+        flow_id = _resolve_schema_flow_id(db, popup_id, sales_flow_id)
+        base_fields = _get_base_fields_as_public(db, popup, flow_id)
+        custom_fields, custom_total = crud.form_fields_crud.find_by_flow(
+            db, flow_id, skip=skip, limit=limit, search=search
         )
         all_fields = base_fields + [_to_public(f) for f in custom_fields]
         # Sort by (section.order, position) so fields group by section and
         # appear in their configured order. Sorting by position alone
         # interleaves fields across sections (e.g. a position=0 field from
         # section 2 lands between position=0 and position=1 of section 1).
-        sections, _section_total = form_sections_crud.find_by_popup(
-            db, popup_id, skip=0, limit=1000
+        sections, _section_total = form_sections_crud.find_by_flow(
+            db, flow_id, skip=0, limit=1000
         )
         # Unsectioned fields (section_id is None) sort last by using +inf.
         section_order_by_id: dict[uuid.UUID, int] = {s.id: s.order for s in sections}
@@ -315,12 +321,17 @@ async def create_form_field(
     else:
         tenant_id = current_user.tenant_id
 
+    # Rejects a flow that belongs to another popup, and resolves the
+    # default flow when the caller did not name one.
+    flow_id = _resolve_schema_flow_id(db, field_in.popup_id, field_in.sales_flow_id)
+
     # Auto-generate the internal field name from label
     name = crud.form_fields_crud.generate_field_name(
         db, field_in.label, field_in.popup_id
     )
 
     field_data = field_in.model_dump()
+    field_data["sales_flow_id"] = flow_id
     field_data["tenant_id"] = tenant_id
     field_data["name"] = name
     field = FormFields(**field_data)
@@ -429,14 +440,15 @@ async def delete_form_field(
 
 def _resolve_schema_flow_id(
     db: "Session", popup_id: uuid.UUID, sales_flow_id: uuid.UUID | None
-) -> uuid.UUID | None:
-    """Resolve the flow id to build a schema for (sdd/sales-flows slice 9,
-    task 9.8).
+) -> uuid.UUID:
+    """The flow whose form to build: the requested one, or the popup's
+    default flow when none was named.
 
     An explicit ``sales_flow_id`` must belong to this popup (mirrors
     ``ticketing_step/router.py::_get_flow_or_404`` — rejects cross-popup
-    flow injection via a client-supplied id). Omitted falls back to the
-    popup's default flow, unchanged from before this slice.
+    flow injection via a client-supplied id). Every popup has a default
+    flow, so a missing one means the popup is unusable rather than
+    form-less: say so instead of returning an empty schema.
     """
     from app.api.sales_flow.crud import sales_flows_crud
 
@@ -450,7 +462,12 @@ def _resolve_schema_flow_id(
         return flow.id
 
     default_flow = sales_flows_crud.get_default_flow(db, popup_id)
-    return default_flow.id if default_flow else None
+    if default_flow is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="This popup has no default sales flow",
+        )
+    return default_flow.id
 
 
 @router.post(
@@ -468,9 +485,10 @@ async def copy_form_to_flow(
     method shipped in slice 6, task 6.3).
 
     `target_flow_id`'s own popup/tenant are resolved server-side, never
-    trusted from the client. `source_flow_id` (body, optional) must belong
-    to the SAME popup as the target — mirrors `_resolve_schema_flow_id`'s
-    cross-popup rejection. Omitted copies the popup-shared tier.
+    trusted from the client. `source_flow_id` (body) names the flow to copy
+    from and must belong to the SAME popup as the target — mirrors
+    `_resolve_schema_flow_id`'s cross-popup rejection. Omitted copies from
+    the popup's default flow, the only form guaranteed to exist.
     """
     from app.api.sales_flow.crud import sales_flows_crud
 
@@ -481,20 +499,16 @@ async def copy_form_to_flow(
             detail="Sales flow not found",
         )
 
-    if body.source_flow_id is not None:
-        source_flow = sales_flows_crud.get(db, body.source_flow_id)
-        if not source_flow or source_flow.popup_id != target_flow.popup_id:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Sales flow not found for this popup",
-            )
+    source_flow_id = _resolve_schema_flow_id(
+        db, target_flow.popup_id, body.source_flow_id
+    )
 
     counts = crud.form_fields_crud.copy_form_to_flow(
         db,
         popup_id=target_flow.popup_id,
         tenant_id=target_flow.tenant_id,
         target_flow_id=target_flow.id,
-        source_flow_id=body.source_flow_id,
+        source_flow_id=source_flow_id,
     )
     return CopyFormToFlowResponse(**counts)
 

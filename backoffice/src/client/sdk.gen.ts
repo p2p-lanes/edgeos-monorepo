@@ -5132,6 +5132,7 @@ export class FormFieldsService {
      * List Form Fields
      * @param data The data for the request.
      * @param data.popupId
+     * @param data.salesFlowId
      * @param data.search
      * @param data.skip Number of items to skip
      * @param data.limit Maximum number of items to return
@@ -5148,6 +5149,7 @@ export class FormFieldsService {
             },
             query: {
                 popup_id: data.popupId,
+                sales_flow_id: data.salesFlowId,
                 search: data.search,
                 skip: data.skip,
                 limit: data.limit
@@ -5318,9 +5320,10 @@ export class FormFieldsService {
      * method shipped in slice 6, task 6.3).
      *
      * `target_flow_id`'s own popup/tenant are resolved server-side, never
-     * trusted from the client. `source_flow_id` (body, optional) must belong
-     * to the SAME popup as the target — mirrors `_resolve_schema_flow_id`'s
-     * cross-popup rejection. Omitted copies the popup-shared tier.
+     * trusted from the client. `source_flow_id` (body) names the flow to copy
+     * from and must belong to the SAME popup as the target — mirrors
+     * `_resolve_schema_flow_id`'s cross-popup rejection. Omitted copies from
+     * the popup's default flow, the only form guaranteed to exist.
      * @param data The data for the request.
      * @param data.targetFlowId
      * @param data.requestBody
@@ -5421,6 +5424,7 @@ export class FormSectionsService {
      * List Form Sections
      * @param data The data for the request.
      * @param data.popupId
+     * @param data.salesFlowId
      * @param data.skip Number of items to skip
      * @param data.limit Maximum number of items to return
      * @param data.xTenantId
@@ -5436,6 +5440,7 @@ export class FormSectionsService {
             },
             query: {
                 popup_id: data.popupId,
+                sales_flow_id: data.salesFlowId,
                 skip: data.skip,
                 limit: data.limit
             },

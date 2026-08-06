@@ -31,6 +31,7 @@ from app.api.referral.models import Referrals
 from app.api.tenant.models import Tenants
 from app.api.user.models import Users
 from app.core.security import create_access_token
+from tests._flow_helpers import provision_default_flow
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -66,6 +67,7 @@ def _make_popup(
     db.add(popup)
     db.commit()
     db.refresh(popup)
+    provision_default_flow(db, popup)
     return popup
 
 

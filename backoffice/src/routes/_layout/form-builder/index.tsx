@@ -18,7 +18,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { createFileRoute } from "@tanstack/react-router"
 import { Loader2, Sparkles } from "lucide-react"
 import { useCallback, useMemo, useState } from "react"
-
 import {
   type FormFieldPublic,
   FormFieldsService,
@@ -26,6 +25,7 @@ import {
   FormSectionsService,
   type FormSectionUpdate,
   PopupsService,
+  SalesFlowsService,
 } from "@/client"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
 import { CatalogDialog } from "@/components/form-builder/CatalogDialog"
@@ -41,6 +41,7 @@ import { DragOverlayContent } from "@/components/form-builder/DragOverlayContent
 import { FieldConfigPanel } from "@/components/form-builder/FieldConfigPanel"
 import { FieldPalette } from "@/components/form-builder/FieldPalette"
 import { FormCanvas } from "@/components/form-builder/FormCanvas"
+import { FlowSelector } from "@/components/ticketing-step-builder/FlowSelector"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -81,25 +82,33 @@ export const Route = createFileRoute("/_layout/form-builder/")({
 
 const UNSECTIONED = "__unsectioned__"
 
-function getAllFormFieldsQueryOptions(popupId: string | null) {
+// A form belongs to one sales flow, so every read and write here is
+// scoped to the flow being edited. Editing one flow's form never changes
+// another's.
+function getAllFormFieldsQueryOptions(popupId: string | null, flowId?: string) {
   return {
     queryFn: () =>
       FormFieldsService.listFormFields({
         popupId: popupId || undefined,
+        salesFlowId: flowId,
         limit: 200,
       }),
-    queryKey: ["form-fields", popupId, "all"],
+    queryKey: ["form-fields", popupId, flowId, "all"],
   }
 }
 
-function getAllFormSectionsQueryOptions(popupId: string | null) {
+function getAllFormSectionsQueryOptions(
+  popupId: string | null,
+  flowId?: string,
+) {
   return {
     queryFn: () =>
       FormSectionsService.listFormSections({
         popupId: popupId || undefined,
+        salesFlowId: flowId,
         limit: 200,
       }),
-    queryKey: ["form-sections", popupId, "all"],
+    queryKey: ["form-sections", popupId, flowId, "all"],
   }
 }
 
@@ -130,6 +139,16 @@ function FormBuilderPage() {
 }
 
 function FormBuilderContent({ popupId }: { popupId: string }) {
+  // Which flow's form is on screen. Defaults to the popup's default flow;
+  // single-flow popups never see the selector.
+  const { data: flowsData } = useQuery({
+    queryKey: ["sales-flows", popupId],
+    queryFn: () => SalesFlowsService.listSalesFlows({ popupId, limit: 100 }),
+  })
+  const defaultFlowId = flowsData?.results.find((f) => f.is_default)?.id
+  const [pickedFlowId, setPickedFlowId] = useState<string | undefined>()
+  const activeFlowId = pickedFlowId ?? defaultFlowId
+
   const queryClient = useQueryClient()
   const { showSuccessToast, showErrorToast } = useCustomToast()
 
@@ -146,11 +165,13 @@ function FormBuilderContent({ popupId }: { popupId: string }) {
   )
 
   const { data: formFieldsData, isLoading: isLoadingFields } = useQuery({
-    ...getAllFormFieldsQueryOptions(popupId),
+    ...getAllFormFieldsQueryOptions(popupId, activeFlowId),
+    enabled: !!activeFlowId,
   })
 
   const { data: formSectionsData, isLoading: isLoadingSections } = useQuery({
-    ...getAllFormSectionsQueryOptions(popupId),
+    ...getAllFormSectionsQueryOptions(popupId, activeFlowId),
+    enabled: !!activeFlowId,
   })
 
   const { data: popup } = useQuery({
@@ -258,6 +279,7 @@ function FormBuilderContent({ popupId }: { popupId: string }) {
       return FormFieldsService.createFormField({
         requestBody: {
           popup_id: popupId,
+          sales_flow_id: activeFlowId as string,
           label,
           field_type: data.fieldType,
           section_id: data.sectionId,
@@ -303,6 +325,7 @@ function FormBuilderContent({ popupId }: { popupId: string }) {
       FormSectionsService.createFormSection({
         requestBody: {
           popup_id: popupId,
+          sales_flow_id: activeFlowId as string,
           label,
           order: sections.length,
         },
@@ -670,6 +693,16 @@ function FormBuilderContent({ popupId }: { popupId: string }) {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <div className="w-[200px]">
+            <FlowSelector
+              popupId={popupId}
+              value={activeFlowId}
+              onChange={(flowId) => {
+                setPickedFlowId(flowId)
+                setSelectedFieldId(null)
+              }}
+            />
+          </div>
           {popup && (
             <div className="flex items-center gap-2">
               <span className="text-sm text-muted-foreground">Layout</span>

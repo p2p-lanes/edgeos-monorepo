@@ -53,16 +53,33 @@ from app.services.image_ingestion import ImageIngestionService
 router = APIRouter(prefix="/popups", tags=["popups"])
 
 
+def _default_flow_or_500(db, popup_id: uuid.UUID):
+    """The popup's default flow, which every popup has (provisioned at
+    creation, backfilled by `4a983282b8aa`). Its absence is a broken popup,
+    not an empty one — say so rather than writing a form row nowhere."""
+    from app.api.sales_flow.crud import sales_flows_crud
+
+    flow = sales_flows_crud.get_default_flow(db, popup_id)
+    if flow is None:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Popup has no default sales flow",
+        )
+    return flow
+
+
 def _create_form_section(
     db: TenantSession,
     *,
     popup: Popups,
     key: str,
+    sales_flow_id: uuid.UUID,
 ) -> FormSections:
     section_def = DEFAULT_SECTIONS[key]
     section = FormSections(
         tenant_id=popup.tenant_id,
         popup_id=popup.id,
+        sales_flow_id=sales_flow_id,
         label=section_def["label"],
         order=section_def["order"],
         protected=True,
@@ -75,6 +92,10 @@ def _create_form_section(
 
 
 def _seed_application_defaults(db: TenantSession, popup: Popups) -> None:
+    # The form belongs to the popup's default flow (slice 3): a section or
+    # base-field config has no other place to live.
+    default_flow = _default_flow_or_500(db, popup.id)
+
     if popup.approval_strategy is None:
         approval_strategies_crud.create_for_popup(
             db,
@@ -93,7 +114,9 @@ def _seed_application_defaults(db: TenantSession, popup: Popups) -> None:
 
         existing_section = existing_sections.get(section_def["label"])
         if existing_section is None:
-            existing_section = _create_form_section(db, popup=popup, key=key)
+            existing_section = _create_form_section(
+                db, popup=popup, key=key, sales_flow_id=default_flow.id
+            )
         section_map[key] = existing_section.id
 
     if popup.base_field_configs:
@@ -107,6 +130,7 @@ def _seed_application_defaults(db: TenantSession, popup: Popups) -> None:
             BaseFieldConfigs(
                 tenant_id=popup.tenant_id,
                 popup_id=popup.id,
+                sales_flow_id=default_flow.id,
                 field_name=field_name,
                 section_id=section_map[section_key],
                 position=definition.get("default_position", 0),
@@ -329,7 +353,13 @@ async def update_popup(
 
     # Create gated sections and base field configs on first enable.
     # Section and config creation are both idempotent: re-enabling a flag
-    # reuses any row left over from a previous enable cycle.
+    # reuses any row left over from a previous enable cycle. Both belong to
+    # the popup's default flow — a form row has no other place to live
+    # (sdd/sales-flows-rediseno slice 3) — so the flow is resolved lazily,
+    # only when a row is actually about to be written. A PATCH that touches
+    # nothing form-related must not depend on it.
+    default_flow = None
+
     section_map: dict[str, uuid.UUID] = {}
     for key, should_create in [
         ("scholarship", scholarship_enabling),
@@ -348,9 +378,12 @@ async def update_popup(
         if existing_section is not None:
             section_map[key] = existing_section.id
             continue
+        if default_flow is None:
+            default_flow = _default_flow_or_500(db, updated.id)
         section = FormSections(
             tenant_id=updated.tenant_id,
             popup_id=updated.id,
+            sales_flow_id=default_flow.id,
             label=section_def["label"],
             order=section_def["order"],
             protected=True,
@@ -362,10 +395,13 @@ async def update_popup(
         section_map[key] = section.id
 
     if section_map:
+        if default_flow is None:
+            default_flow = _default_flow_or_500(db, updated.id)
         base_field_configs_crud.create_defaults_for_popup(
             db,
             popup_id=updated.id,
             tenant_id=updated.tenant_id,
+            sales_flow_id=default_flow.id,
             section_map=section_map,
         )
 

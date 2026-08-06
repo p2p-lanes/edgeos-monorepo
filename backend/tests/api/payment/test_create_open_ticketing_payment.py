@@ -29,6 +29,7 @@ from app.api.product.models import Products
 from app.api.shared.enums import SaleType
 from app.api.tenant.models import Tenants
 from app.services.simplefi.client import CancelOutcome
+from tests._flow_helpers import default_flow_id, provision_default_flow
 
 
 def _make_popup(
@@ -62,6 +63,7 @@ def _make_popup(
     )
     db.add(popup)
     db.flush()
+    provision_default_flow(db, popup)
     return popup
 
 
@@ -98,6 +100,7 @@ def _make_section(
         id=uuid.uuid4(),
         tenant_id=popup.tenant_id,
         popup_id=popup.id,
+        sales_flow_id=default_flow_id(db, popup.id),
         label=label,
         order=order,
         kind="standard",
@@ -122,6 +125,7 @@ def _make_field(
         id=uuid.uuid4(),
         tenant_id=popup.tenant_id,
         popup_id=popup.id,
+        sales_flow_id=default_flow_id(db, popup.id),
         section_id=section.id,
         name=f"{name}_{uuid.uuid4().hex[:4]}",
         label=label,

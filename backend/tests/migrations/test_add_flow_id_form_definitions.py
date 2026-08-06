@@ -173,7 +173,15 @@ def test_alembic_single_head_after_add_flow_id_form_definitions() -> None:
 # ---------------------------------------------------------------------------
 
 
-class TestFormFieldsTwoTierUniqueness:
+class TestFormFieldsUniquenessPerFlow:
+    """One field name per FLOW.
+
+    This started as a two-tier invariant (flow tier + popup-shared tier).
+    sdd/sales-flows-rediseno slice 3 (`d3f6b2a81c95`) made `sales_flow_id`
+    NOT NULL, which removed the shared tier and collapsed the two partial
+    indexes into one.
+    """
+
     def test_same_name_different_flows_both_persist(
         self, db: Session, tenant_a: Tenants
     ) -> None:
@@ -208,47 +216,10 @@ class TestFormFieldsTwoTierUniqueness:
         finally:
             _cleanup(db, popup_id)
 
-    def test_same_name_both_popup_shared_rejected(
-        self, db: Session, tenant_a: Tenants
-    ) -> None:
-        """Legacy behavior: two NULL-flow rows in the same popup still collide."""
-        popup_id = _insert_popup(db, tenant_a.id)
-        try:
-            _insert_form_field(db, tenant_a.id, popup_id, "shared_dup", None)
 
-            with pytest.raises(IntegrityError):
-                _insert_form_field(db, tenant_a.id, popup_id, "shared_dup", None)
-            db.rollback()
-        finally:
-            _cleanup(db, popup_id)
+class TestBaseFieldConfigsUniquenessPerFlow:
+    """One config per (flow, field_name) — see the note above."""
 
-    def test_popup_shared_and_flow_scoped_same_name_do_not_collide(
-        self, db: Session, tenant_a: Tenants
-    ) -> None:
-        popup_id = _insert_popup(db, tenant_a.id)
-        try:
-            flow_a = _insert_flow(db, tenant_a.id, popup_id, slug="flow-a")
-            _insert_form_field(db, tenant_a.id, popup_id, "cross_tier", None)
-            # Must not raise — different tier (flow-scoped vs popup-shared).
-            _insert_form_field(db, tenant_a.id, popup_id, "cross_tier", flow_a)
-
-            count = db.exec(
-                text(
-                    "SELECT COUNT(*) FROM formfields "
-                    "WHERE popup_id = :pid AND name = 'cross_tier'"
-                ).bindparams(pid=popup_id)
-            ).scalar()
-            assert count == 2
-        finally:
-            _cleanup(db, popup_id)
-
-
-# ---------------------------------------------------------------------------
-# Scenario: base_field_configs two-tier uniqueness against real Postgres
-# ---------------------------------------------------------------------------
-
-
-class TestBaseFieldConfigsTwoTierUniqueness:
     def test_same_field_name_different_flows_both_persist(
         self, db: Session, tenant_a: Tenants
     ) -> None:
@@ -269,24 +240,6 @@ class TestBaseFieldConfigsTwoTierUniqueness:
             assert count == 2
         finally:
             _cleanup(db, popup_id)
-
-    def test_same_field_name_both_popup_shared_rejected(
-        self, db: Session, tenant_a: Tenants
-    ) -> None:
-        popup_id = _insert_popup(db, tenant_a.id)
-        try:
-            _insert_base_field_config(db, tenant_a.id, popup_id, "email", None)
-
-            with pytest.raises(IntegrityError):
-                _insert_base_field_config(db, tenant_a.id, popup_id, "email", None)
-            db.rollback()
-        finally:
-            _cleanup(db, popup_id)
-
-
-# ---------------------------------------------------------------------------
-# Scenario: real module upgrade()/downgrade() via mocked op.get_bind()
-# ---------------------------------------------------------------------------
 
 
 class TestAddFlowIdFormDefinitionsMigrationModule:

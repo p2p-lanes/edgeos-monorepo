@@ -891,7 +891,7 @@ export type BaseFieldConfigPublic = {
     id: string;
     tenant_id: string;
     popup_id: string;
-    sales_flow_id?: (string | null);
+    sales_flow_id: string;
     field_name: string;
     section_id?: (string | null);
     position?: number;
@@ -1942,6 +1942,7 @@ export type EventVisibility = 'public' | 'private' | 'unlisted';
 
 export type FormFieldCreate = {
     popup_id: string;
+    sales_flow_id: string;
     label: string;
     short_label?: (string | null);
     field_type?: string;
@@ -1963,7 +1964,7 @@ export type FormFieldPublic = {
     id: string;
     tenant_id: string;
     popup_id: string;
-    sales_flow_id?: (string | null);
+    sales_flow_id: string;
     name: string;
     label: string;
     short_label?: (string | null);
@@ -2007,6 +2008,7 @@ export type FormFieldUpdate = {
 
 export type FormSectionCreate = {
     popup_id: string;
+    sales_flow_id: string;
     label: string;
     description?: (string | null);
     order?: number;
@@ -2019,7 +2021,7 @@ export type FormSectionPublic = {
     id: string;
     tenant_id: string;
     popup_id: string;
-    sales_flow_id?: (string | null);
+    sales_flow_id: string;
     label: string;
     description?: (string | null);
     order?: number;
@@ -6498,6 +6500,7 @@ export type FormFieldsListFormFieldsData = {
      */
     limit?: number;
     popupId?: (string | null);
+    salesFlowId?: (string | null);
     search?: (string | null);
     /**
      * Number of items to skip
@@ -6586,6 +6589,7 @@ export type FormSectionsListFormSectionsData = {
      */
     limit?: number;
     popupId?: (string | null);
+    salesFlowId?: (string | null);
     /**
      * Number of items to skip
      */

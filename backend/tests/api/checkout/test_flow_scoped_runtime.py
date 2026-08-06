@@ -27,6 +27,7 @@ from app.api.sales_flow.models import SalesFlows
 from app.api.shared.enums import SaleType
 from app.api.tenant.models import Tenants
 from app.api.ticketing_step.models import TicketingSteps
+from tests._flow_helpers import default_flow_id
 
 
 def _make_direct_popup(db: Session, tenant: Tenants) -> Popups:
@@ -101,7 +102,7 @@ def _make_section(
     section = FormSections(
         tenant_id=popup.tenant_id,
         popup_id=popup.id,
-        sales_flow_id=sales_flow_id,
+        sales_flow_id=sales_flow_id or default_flow_id(db, popup.id),
         label=label,
         order=order,
     )
@@ -123,7 +124,7 @@ def _make_field(
     field = FormFields(
         tenant_id=popup.tenant_id,
         popup_id=popup.id,
-        sales_flow_id=sales_flow_id,
+        sales_flow_id=sales_flow_id or default_flow_id(db, popup.id),
         section_id=section.id,
         name=f"{name}_{uuid.uuid4().hex[:6]}",
         label=label,
@@ -235,42 +236,39 @@ class TestFlowSlugRouting:
 
 
 class TestSectionFieldTierParity:
-    """risk-001: fields must resolve through the same tier-filtered
-    `find_for_flow` list used for sections, never the unfiltered
-    `FormSections.form_fields` ORM relationship."""
+    """risk-001: fields must resolve through the flow's own `find_by_flow`
+    list, never the unfiltered `FormSections.form_fields` ORM relationship
+    (which ignores `sales_flow_id`)."""
 
-    def test_shared_section_never_leaks_another_flows_field(
+    def test_a_shared_section_id_never_leaks_another_flows_field(
         self, client: TestClient, db: Session, tenant_a: Tenants
     ) -> None:
         popup = _make_direct_popup(db, tenant_a)
         flow_a = _make_flow(db, popup, slug="flow-a")
         flow_b = _make_flow(db, popup, slug="flow-b")
 
-        # A popup-shared section (no flow owns it).
-        shared_section = _make_section(db, popup, label="Shared Section")
+        section = _make_section(db, popup, label="Buyer Info", sales_flow_id=flow_a.id)
         _make_field(
             db,
             popup,
-            shared_section,
-            name="shared_field",
-            label="Shared Field",
+            section,
+            name="flow_a_field",
+            label="Flow A Field",
+            sales_flow_id=flow_a.id,
         )
-        # flow_b owns a field that happens to point at the SAME shared
-        # section_id (legal: section ownership and field ownership are
-        # independent tiers).
+        # flow_b owns a field pointing at the SAME section_id. Nothing stops
+        # that at the DB level, so the read path is what must not confuse
+        # "shares a section id" with "belongs to this flow".
         _make_field(
             db,
             popup,
-            shared_section,
+            section,
             name="flow_b_field",
             label="Flow B Field",
             sales_flow_id=flow_b.id,
         )
         db.commit()
 
-        # flow_a owns no fields/sections of its own -> falls back to the
-        # popup-shared tier for BOTH. It must see ONLY the shared field,
-        # never flow_b's field that happens to share the section id.
         response = client.get(
             f"/api/v1/checkout/{popup.slug}/{flow_a.slug}/runtime",
             headers={"X-Tenant-Id": str(tenant_a.id)},
@@ -279,7 +277,7 @@ class TestSectionFieldTierParity:
         body = response.json()
         assert len(body["buyer_form"]) == 1
         field_labels = [f["label"] for f in body["buyer_form"][0]["form_fields"]]
-        assert field_labels == ["Shared Field"]
+        assert field_labels == ["Flow A Field"]
 
 
 class TestTranslationParity:

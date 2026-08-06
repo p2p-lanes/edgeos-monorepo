@@ -3950,15 +3950,8 @@ export const BaseFieldConfigPublicSchema = {
             title: 'Popup Id'
         },
         sales_flow_id: {
-            anyOf: [
-                {
-                    type: 'string',
-                    format: 'uuid'
-                },
-                {
-                    type: 'null'
-                }
-            ],
+            type: 'string',
+            format: 'uuid',
             title: 'Sales Flow Id'
         },
         field_name: {
@@ -4047,7 +4040,7 @@ export const BaseFieldConfigPublicSchema = {
         }
     },
     type: 'object',
-    required: ['id', 'tenant_id', 'popup_id', 'field_name'],
+    required: ['id', 'tenant_id', 'popup_id', 'sales_flow_id', 'field_name'],
     title: 'BaseFieldConfigPublic'
 } as const;
 
@@ -8961,6 +8954,11 @@ export const FormFieldCreateSchema = {
             format: 'uuid',
             title: 'Popup Id'
         },
+        sales_flow_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Sales Flow Id'
+        },
         label: {
             type: 'string',
             title: 'Label'
@@ -9087,7 +9085,7 @@ export const FormFieldCreateSchema = {
         }
     },
     type: 'object',
-    required: ['popup_id', 'label'],
+    required: ['popup_id', 'sales_flow_id', 'label'],
     title: 'FormFieldCreate'
 } as const;
 
@@ -9109,15 +9107,8 @@ export const FormFieldPublicSchema = {
             title: 'Popup Id'
         },
         sales_flow_id: {
-            anyOf: [
-                {
-                    type: 'string',
-                    format: 'uuid'
-                },
-                {
-                    type: 'null'
-                }
-            ],
+            type: 'string',
+            format: 'uuid',
             title: 'Sales Flow Id'
         },
         name: {
@@ -9295,7 +9286,7 @@ export const FormFieldPublicSchema = {
         }
     },
     type: 'object',
-    required: ['id', 'tenant_id', 'popup_id', 'name', 'label', 'field_type'],
+    required: ['id', 'tenant_id', 'popup_id', 'sales_flow_id', 'name', 'label', 'field_type'],
     title: 'FormFieldPublic'
 } as const;
 
@@ -9462,6 +9453,11 @@ export const FormSectionCreateSchema = {
             format: 'uuid',
             title: 'Popup Id'
         },
+        sales_flow_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Sales Flow Id'
+        },
         label: {
             type: 'string',
             title: 'Label'
@@ -9488,7 +9484,7 @@ export const FormSectionCreateSchema = {
         }
     },
     type: 'object',
-    required: ['popup_id', 'label'],
+    required: ['popup_id', 'sales_flow_id', 'label'],
     title: 'FormSectionCreate'
 } as const;
 
@@ -9516,15 +9512,8 @@ export const FormSectionPublicSchema = {
             title: 'Popup Id'
         },
         sales_flow_id: {
-            anyOf: [
-                {
-                    type: 'string',
-                    format: 'uuid'
-                },
-                {
-                    type: 'null'
-                }
-            ],
+            type: 'string',
+            format: 'uuid',
             title: 'Sales Flow Id'
         },
         label: {
@@ -9564,7 +9553,7 @@ export const FormSectionPublicSchema = {
         }
     },
     type: 'object',
-    required: ['id', 'tenant_id', 'popup_id', 'label'],
+    required: ['id', 'tenant_id', 'popup_id', 'sales_flow_id', 'label'],
     title: 'FormSectionPublic'
 } as const;
 

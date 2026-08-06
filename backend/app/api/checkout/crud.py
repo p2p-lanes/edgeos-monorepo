@@ -142,7 +142,7 @@ def runtime_for_slug(
     restriction all live there now (design's Flow-Resolution Contract).
     Products, buyer-form sections/fields, and ticketing steps are then all
     resolved through THAT SAME flow, closing two disclosed slice-8 gaps:
-    - risk-001: fields come from the tier-filtered `find_for_flow` list,
+    - risk-001: fields come from the flow's own `find_by_flow` list,
       grouped by section afterward — never the unfiltered
       `FormSections.form_fields` ORM relationship (which ignored
       `sales_flow_id` and could leak a different flow's field that happens
@@ -194,12 +194,8 @@ def runtime_for_slug(
         session, flow, popup, products, restriction_context
     )
 
-    sections, _ = form_sections_crud.find_for_flow(
-        session, popup.id, flow.id, limit=None
-    )
-    fields, _ = form_fields_crud.find_for_flow(
-        session, popup.id, flow.id, skip=0, limit=1000
-    )
+    sections, _ = form_sections_crud.find_by_flow(session, flow.id, limit=None)
+    fields, _ = form_fields_crud.find_by_flow(session, flow.id, skip=0, limit=1000)
     fields_by_section: dict[uuid.UUID | None, list[FormFields]] = {}
     for f in fields:
         fields_by_section.setdefault(f.section_id, []).append(f)

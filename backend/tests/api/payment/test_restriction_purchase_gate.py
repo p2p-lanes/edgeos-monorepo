@@ -31,6 +31,7 @@ from app.api.sales_flow.crud import sales_flows_crud
 from app.api.sales_flow.models import FlowProducts, SalesFlows
 from app.api.shared.enums import SaleType
 from app.api.tenant.models import Tenants
+from tests._flow_helpers import default_flow_id, provision_default_flow
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -50,6 +51,7 @@ def _make_direct_popup_with_default_flow(
     )
     db.add(popup)
     db.flush()
+    provision_default_flow(db, popup)
     flow = sales_flows_crud.provision_default_flow(
         db, popup_id=popup.id, tenant_id=tenant.id, sale_type=SaleType.direct.value
     )
@@ -70,6 +72,7 @@ def _make_application_popup_with_default_flow(
     )
     db.add(popup)
     db.flush()
+    provision_default_flow(db, popup)
     flow = sales_flows_crud.provision_default_flow(
         db, popup_id=popup.id, tenant_id=tenant.id, sale_type=SaleType.application.value
     )
@@ -102,6 +105,7 @@ def _make_vip_code_field(db: Session, popup: Popups) -> None:
     section = FormSections(
         tenant_id=popup.tenant_id,
         popup_id=popup.id,
+        sales_flow_id=default_flow_id(db, popup.id),
         label="Buyer Info",
         order=0,
         kind="standard",
@@ -111,6 +115,7 @@ def _make_vip_code_field(db: Session, popup: Popups) -> None:
     field = FormFields(
         tenant_id=popup.tenant_id,
         popup_id=popup.id,
+        sales_flow_id=default_flow_id(db, popup.id),
         section_id=section.id,
         name="vip_code",
         label="VIP Code",
@@ -439,6 +444,7 @@ class TestAuthenticatedPaymentRestrictionGate:
         )
         db.add(popup)
         db.flush()
+        provision_default_flow(db, popup)
         human = _make_human(db, tenant_a)
         application = Applications(
             tenant_id=popup.tenant_id,

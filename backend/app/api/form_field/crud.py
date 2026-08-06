@@ -148,7 +148,7 @@ class FormFieldsCRUD(BaseCRUD[FormFields, FormFieldCreate, FormFieldUpdate]):
     ) -> tuple[list[FormFields], int]:
         """Returns ALL fields for the popup regardless of `sales_flow_id`
         (admin/legacy management surface — untouched by sdd/sales-flows
-        slice 6, see `find_for_flow` for the flow-aware read path)."""
+        slice 6 — see `find_by_flow` for one flow's own fields)."""
         statement = (
             select(FormFields)
             .outerjoin(FormSections, FormFields.section_id == FormSections.id)
@@ -183,7 +183,9 @@ class FormFieldsCRUD(BaseCRUD[FormFields, FormFieldCreate, FormFieldUpdate]):
         limit: int = 100,
         search: str | None = None,
     ) -> tuple[list[FormFields], int]:
-        """Fields owned exclusively by `flow_id` (sdd/sales-flows slice 6)."""
+        """The form fields of `flow_id` — the only way to read a flow's form
+        (sdd/sales-flows-rediseno slice 3). Empty means the flow has no
+        fields, never that it should borrow another flow's."""
         statement = (
             select(FormFields)
             .outerjoin(FormSections, FormFields.section_id == FormSections.id)
@@ -208,66 +210,6 @@ class FormFieldsCRUD(BaseCRUD[FormFields, FormFieldCreate, FormFieldUpdate]):
         results = list(session.exec(statement).all())
 
         return results, total
-
-    def find_shared(
-        self,
-        session: Session,
-        popup_id: uuid.UUID,
-        skip: int = 0,
-        limit: int = 100,
-        search: str | None = None,
-    ) -> tuple[list[FormFields], int]:
-        """Popup-shared fields (`sales_flow_id IS NULL`) — the fallback
-        tier every flow reads until it owns its own fields."""
-        statement = (
-            select(FormFields)
-            .outerjoin(FormSections, FormFields.section_id == FormSections.id)
-            .where(
-                FormFields.popup_id == popup_id,
-                FormFields.sales_flow_id.is_(None),  # type: ignore[union-attr]
-            )
-            .order_by(FormSections.order, FormFields.position)  # type: ignore[arg-type]
-        )
-
-        if search:
-            search_term = f"%{search}%"
-            statement = statement.where(
-                or_(
-                    col(FormFields.label).ilike(search_term),
-                    col(FormFields.name).ilike(search_term),
-                    col(FormFields.field_type).ilike(search_term),
-                )
-            )
-
-        count_statement = select(func.count()).select_from(statement.subquery())
-        total = session.exec(count_statement).one()
-
-        statement = statement.offset(skip).limit(limit)
-        results = list(session.exec(statement).all())
-
-        return results, total
-
-    def find_for_flow(
-        self,
-        session: Session,
-        popup_id: uuid.UUID,
-        flow_id: uuid.UUID | None,
-        skip: int = 0,
-        limit: int = 100,
-        search: str | None = None,
-    ) -> tuple[list[FormFields], int]:
-        """Flow-owned fields if `flow_id` owns any, else the popup-shared
-        fallback (Q1: flow-owned forms). `flow_id=None` always returns the
-        popup-shared tier directly."""
-        if flow_id is not None:
-            flow_rows, flow_total = self.find_by_flow(
-                session, flow_id, skip=skip, limit=limit, search=search
-            )
-            if flow_total:
-                return flow_rows, flow_total
-        return self.find_shared(
-            session, popup_id, skip=skip, limit=limit, search=search
-        )
 
     def validate_base_fields(
         self,
@@ -558,16 +500,14 @@ class FormFieldsCRUD(BaseCRUD[FormFields, FormFieldCreate, FormFieldUpdate]):
         self,
         session: Session,
         popup_id: uuid.UUID,
-        flow_id: uuid.UUID | None,
+        flow_id: uuid.UUID,
     ) -> dict[str, Any]:
         """Build a JSON Schema-like structure for a sales flow's form.
 
-        sdd/sales-flows slice 6 (Q1: flow-owned forms) — evolved from the
-        former `build_schema_for_popup`. For each of sections, base fields,
-        and custom fields independently: uses `flow_id`'s own rows if it
-        owns any, else falls back to the popup-shared tier
-        (`sales_flow_id IS NULL`, the exact form every flow rendered before
-        this slice). `flow_id=None` always resolves the popup-shared tier.
+        Sections, base fields and custom fields all come from `flow_id`'s
+        own rows (sdd/sales-flows-rediseno slice 3). Nothing is inherited,
+        so a flow with no form produces an empty schema rather than
+        another flow's.
 
         This returns a schema that includes:
         - Base fields: human profile + application-level fields (source of truth)
@@ -576,18 +516,16 @@ class FormFieldsCRUD(BaseCRUD[FormFields, FormFieldCreate, FormFieldUpdate]):
         - "human": stored on the Human entity
         - "application": stored on the Application entity
         """
-        fields, _ = self.find_for_flow(session, popup_id, flow_id, skip=0, limit=1000)
+        fields, _ = self.find_by_flow(session, flow_id, skip=0, limit=1000)
 
         # Load popup for interpolating help_text
         popup = session.get(Popups, popup_id)
         popup_name = popup.name if popup else "the event"
 
-        # Load sections for this flow (with popup-shared fallback)
+        # Load this flow's own sections.
         from app.api.form_section.crud import form_sections_crud
 
-        db_sections, _ = form_sections_crud.find_for_flow(
-            session, popup_id, flow_id, limit=None
-        )
+        db_sections, _ = form_sections_crud.find_by_flow(session, flow_id, limit=None)
 
         # Hidden sections are dropped from the schema entirely (and so are
         # their fields). The data + section row stay in the DB so the admin
@@ -604,7 +542,7 @@ class FormFieldsCRUD(BaseCRUD[FormFields, FormFieldCreate, FormFieldUpdate]):
             field_applies_to_popup,
         )
 
-        db_configs = base_field_configs_crud.find_for_flow(session, popup_id, flow_id)
+        db_configs = base_field_configs_crud.find_by_flow(session, flow_id)
 
         base_fields: dict[str, Any] = {}
         for config in db_configs:
@@ -692,45 +630,35 @@ class FormFieldsCRUD(BaseCRUD[FormFields, FormFieldCreate, FormFieldUpdate]):
         popup_id: uuid.UUID,
         tenant_id: uuid.UUID,
         target_flow_id: uuid.UUID,
-        source_flow_id: uuid.UUID | None,
+        source_flow_id: uuid.UUID,
     ) -> dict[str, int]:
         """Copy a form (sections + base field configs + custom fields) from
-        a source into `target_flow_id` as independent rows.
+                a source into `target_flow_id` as independent rows.
 
-        Backend half of the Q1 mitigation (task 6.3, "copy form from
-        another flow"): `source_flow_id=None` copies the popup-shared tier
-        (the form every flow reads by default); a specific flow id copies
-        exactly that flow's own rows verbatim (never the fallback-resolved
-        schema — copying an empty flow yields an empty target, which is the
-        honest answer). The target flow ends up owning its own rows,
-        independent of the source: editing either afterward never affects
-        the other. HTTP endpoint: POST /form-fields/copy-to-flow/{target_flow_id}
-        (task 14.1); backoffice UI is a confirm dialog on the flow detail page.
+        This is how a flow gets a form without inheriting one
+                (sdd/sales-flows-rediseno R3): copying is an explicit one-time
+                event, after which the two flows are independent and editing either
+                never affects the other. `source_flow_id` names the flow to copy
+                from and copies exactly its own rows — copying an empty flow yields
+                an empty target, which is the honest answer. HTTP endpoint:
+                POST /form-fields/copy-to-flow/{target_flow_id}; the backoffice
+                surfaces it as a confirm dialog on the flow detail page.
 
-        The target's existing flow-tier rows are deleted first (same
-        transaction), so this genuinely REPLACES rather than appends —
-        matching the confirm dialog's promise.
+                The target's existing flow-tier rows are deleted first (same
+                transaction), so this genuinely REPLACES rather than appends —
+                matching the confirm dialog's promise.
 
-        Returns a count of copied rows per table for caller/test assertions.
+                Returns a count of copied rows per table for caller/test assertions.
         """
         from app.api.base_field_config.crud import base_field_configs_crud
         from app.api.base_field_config.models import BaseFieldConfigs
         from app.api.form_section.crud import form_sections_crud
 
-        if source_flow_id is not None:
-            source_sections, _ = form_sections_crud.find_by_flow(
-                session, source_flow_id, limit=None
-            )
-            source_configs = base_field_configs_crud.find_by_flow(
-                session, source_flow_id
-            )
-            source_fields, _ = self.find_by_flow(session, source_flow_id, limit=1000)
-        else:
-            source_sections, _ = form_sections_crud.find_shared(
-                session, popup_id, limit=None
-            )
-            source_configs = base_field_configs_crud.find_shared(session, popup_id)
-            source_fields, _ = self.find_shared(session, popup_id, limit=1000)
+        source_sections, _ = form_sections_crud.find_by_flow(
+            session, source_flow_id, limit=None
+        )
+        source_configs = base_field_configs_crud.find_by_flow(session, source_flow_id)
+        source_fields, _ = self.find_by_flow(session, source_flow_id, limit=1000)
 
         # Clear the target's existing own rows first (replace, not append).
         # FK-safe order: fields/configs reference section_id, so delete

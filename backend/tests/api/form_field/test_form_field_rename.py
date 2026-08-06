@@ -14,6 +14,7 @@ from app.api.human.models import Humans
 from app.api.popup.models import Popups
 from app.api.tenant.models import Tenants
 from app.api.ticketing_step.models import TicketingSteps
+from tests._flow_helpers import default_flow_id
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -28,12 +29,18 @@ def _create_field(
     client: TestClient,
     token: str,
     popup_id: str,
+    flow_id: str,
     label: str,
 ) -> dict:
     resp = client.post(
         "/api/v1/form-fields",
         headers=_admin_headers(token),
-        json={"popup_id": popup_id, "label": label, "field_type": "text"},
+        json={
+            "popup_id": popup_id,
+            "sales_flow_id": flow_id,
+            "label": label,
+            "field_type": "text",
+        },
     )
     assert resp.status_code == 201, resp.text
     return resp.json()
@@ -86,12 +93,14 @@ class TestRenameWhileUnused:
         client: TestClient,
         admin_token_tenant_a: str,
         popup_tenant_a: Popups,
+        default_flow_tenant_a,
     ) -> None:
         suffix = uuid.uuid4().hex[:6]
         data = _create_field(
             client,
             admin_token_tenant_a,
             str(popup_tenant_a.id),
+            str(default_flow_tenant_a.id),
             label=f"New text field {suffix}",
         )
         assert data["name"] == f"new_text_field_{suffix}"
@@ -110,12 +119,14 @@ class TestRenameWhileUnused:
         client: TestClient,
         admin_token_tenant_a: str,
         popup_tenant_a: Popups,
+        default_flow_tenant_a,
     ) -> None:
         suffix = uuid.uuid4().hex[:6]
         data = _create_field(
             client,
             admin_token_tenant_a,
             str(popup_tenant_a.id),
+            str(default_flow_tenant_a.id),
             label=f"New text field {suffix}",
         )
         _patch_field(
@@ -137,18 +148,21 @@ class TestRenameWhileUnused:
         client: TestClient,
         admin_token_tenant_a: str,
         popup_tenant_a: Popups,
+        default_flow_tenant_a,
     ) -> None:
         suffix = uuid.uuid4().hex[:6]
         _create_field(
             client,
             admin_token_tenant_a,
             str(popup_tenant_a.id),
+            str(default_flow_tenant_a.id),
             label=f"Company Name {suffix}",
         )
         other = _create_field(
             client,
             admin_token_tenant_a,
             str(popup_tenant_a.id),
+            str(default_flow_tenant_a.id),
             label=f"Placeholder {suffix}",
         )
         updated = _patch_field(
@@ -164,12 +178,14 @@ class TestRenameWhileUnused:
         client: TestClient,
         admin_token_tenant_a: str,
         popup_tenant_a: Popups,
+        default_flow_tenant_a,
     ) -> None:
         suffix = uuid.uuid4().hex[:6]
         data = _create_field(
             client,
             admin_token_tenant_a,
             str(popup_tenant_a.id),
+            str(default_flow_tenant_a.id),
             label=f"Untouched Label {suffix}",
         )
         updated = _patch_field(
@@ -186,12 +202,14 @@ class TestRenameWhileUnused:
         client: TestClient,
         admin_token_tenant_a: str,
         popup_tenant_a: Popups,
+        default_flow_tenant_a,
     ) -> None:
         suffix = uuid.uuid4().hex[:6]
         data = _create_field(
             client,
             admin_token_tenant_a,
             str(popup_tenant_a.id),
+            str(default_flow_tenant_a.id),
             label=f"Same Slug {suffix}",
         )
         # Different label text, identical slug — no pointless suffix churn.
@@ -217,12 +235,14 @@ class TestNameFrozenWhenUsed:
         admin_token_tenant_a: str,
         tenant_a: Tenants,
         popup_tenant_a: Popups,
+        default_flow_tenant_a,
     ) -> None:
         suffix = uuid.uuid4().hex[:6]
         data = _create_field(
             client,
             admin_token_tenant_a,
             str(popup_tenant_a.id),
+            str(default_flow_tenant_a.id),
             label=f"Answered Field {suffix}",
         )
         _create_application_with_answer(db, tenant_a, popup_tenant_a, data["name"])
@@ -243,17 +263,20 @@ class TestNameFrozenWhenUsed:
         admin_token_tenant_a: str,
         tenant_a: Tenants,
         popup_tenant_a: Popups,
+        default_flow_tenant_a,
     ) -> None:
         suffix = uuid.uuid4().hex[:6]
         data = _create_field(
             client,
             admin_token_tenant_a,
             str(popup_tenant_a.id),
+            str(default_flow_tenant_a.id),
             label=f"Step Gated Field {suffix}",
         )
         step = TicketingSteps(
             tenant_id=tenant_a.id,
             popup_id=popup_tenant_a.id,
+            sales_flow_id=default_flow_id(db, popup_tenant_a.id),
             step_type="custom",
             title=f"Tickets {suffix}",
             template="ticket-select",

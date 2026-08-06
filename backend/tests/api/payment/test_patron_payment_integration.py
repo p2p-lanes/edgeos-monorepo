@@ -28,6 +28,7 @@ from app.api.product.models import Products
 from app.api.shared.enums import SaleType
 from app.api.tenant.models import Tenants
 from app.api.ticketing_step.models import TicketingSteps
+from tests._flow_helpers import default_flow_id, provision_default_flow
 
 # ---- Fixtures ---------------------------------------------------------------
 
@@ -67,6 +68,7 @@ def _make_popup(
     )
     db.add(popup)
     db.flush()
+    provision_default_flow(db, popup)
     return popup
 
 
@@ -118,6 +120,7 @@ def _make_patron_step(
         id=uuid.uuid4(),
         tenant_id=popup.tenant_id,
         popup_id=popup.id,
+        sales_flow_id=default_flow_id(db, popup.id),
         step_type="patron",
         title="Patron",
         template="patron-preset",
@@ -209,6 +212,7 @@ class TestResolvePatronTemplateConfig:
             id=uuid.uuid4(),
             tenant_id=popup_tenant_a.tenant_id,
             popup_id=popup_tenant_a.id,
+            sales_flow_id=default_flow_id(db, popup_tenant_a.id),
             step_type="patron",
             title="Patron",
             order=99,

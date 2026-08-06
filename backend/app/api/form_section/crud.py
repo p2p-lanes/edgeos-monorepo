@@ -25,7 +25,7 @@ class FormSectionsCRUD(BaseCRUD[FormSections, FormSectionCreate, FormSectionUpda
 
         Returns ALL sections for the popup regardless of `sales_flow_id`
         (admin/legacy management surface — untouched by sdd/sales-flows
-        slice 6, see `find_for_flow` for the flow-aware read path).
+        slice 6 — see `find_by_flow` for one flow's own sections).
         """
         statement = (
             select(FormSections)
@@ -64,52 +64,6 @@ class FormSectionsCRUD(BaseCRUD[FormSections, FormSectionCreate, FormSectionUpda
         results = list(session.exec(statement).all())
 
         return results, total
-
-    def find_shared(
-        self,
-        session: Session,
-        popup_id: uuid.UUID,
-        skip: int = 0,
-        limit: int | None = 100,
-    ) -> tuple[list[FormSections], int]:
-        """Popup-shared sections (`sales_flow_id IS NULL`) — the fallback
-        tier every flow reads until it owns its own sections."""
-        statement = (
-            select(FormSections)
-            .where(
-                FormSections.popup_id == popup_id,
-                FormSections.sales_flow_id.is_(None),  # type: ignore[union-attr]
-            )
-            .order_by(FormSections.order)
-        )
-
-        count_statement = select(func.count()).select_from(statement.subquery())
-        total = session.exec(count_statement).one()
-
-        if limit is not None:
-            statement = statement.offset(skip).limit(limit)
-        results = list(session.exec(statement).all())
-
-        return results, total
-
-    def find_for_flow(
-        self,
-        session: Session,
-        popup_id: uuid.UUID,
-        flow_id: uuid.UUID | None,
-        skip: int = 0,
-        limit: int | None = 100,
-    ) -> tuple[list[FormSections], int]:
-        """Flow-owned sections if `flow_id` owns any, else the popup-shared
-        fallback (Q1: flow-owned forms). `flow_id=None` always returns the
-        popup-shared tier directly."""
-        if flow_id is not None:
-            flow_rows, flow_total = self.find_by_flow(
-                session, flow_id, skip=skip, limit=limit
-            )
-            if flow_total:
-                return flow_rows, flow_total
-        return self.find_shared(session, popup_id, skip=skip, limit=limit)
 
 
 form_sections_crud = FormSectionsCRUD()

@@ -20,6 +20,7 @@ from app.api.human.models import Humans
 from app.api.popup.models import Popups
 from app.api.tenant.models import Tenants
 from app.core.security import create_access_token
+from tests._flow_helpers import default_flow_id, provision_default_flow
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -32,6 +33,7 @@ def _make_popup(db: Session, tenant: Tenants) -> Popups:
     db.add(popup)
     db.commit()
     db.refresh(popup)
+    provision_default_flow(db, popup)
     return popup
 
 
@@ -49,6 +51,7 @@ def _make_field(
     field = FormFields(
         tenant_id=popup.tenant_id,
         popup_id=popup.id,
+        sales_flow_id=default_flow_id(db, popup.id),
         name=name,
         label=label,
         field_type=field_type,
@@ -451,6 +454,7 @@ class TestPatchReplaceSemantics:
         section = FormSections(
             tenant_id=popup.tenant_id,
             popup_id=popup.id,
+            sales_flow_id=default_flow_id(db, popup.id),
             label="Hidden extras",
             hidden=True,
         )

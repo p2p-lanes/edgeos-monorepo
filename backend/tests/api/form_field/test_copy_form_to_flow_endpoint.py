@@ -17,6 +17,7 @@ from app.api.form_section.crud import form_sections_crud
 from app.api.form_section.models import FormSections
 from app.api.sales_flow.models import SalesFlows
 from app.api.tenant.models import Tenants
+from tests._flow_helpers import default_flow_id
 
 
 def _headers(token: str) -> dict[str, str]:
@@ -47,11 +48,15 @@ def _make_flow(db: Session, tenant: Tenants, popup_id: str, *, slug: str) -> Sal
     return flow
 
 
-def _seed_shared_field(db: Session, tenant: Tenants, popup_id: str, name: str) -> None:
+def _seed_default_flow_field(
+    db: Session, tenant: Tenants, popup_id: str, name: str
+) -> None:
+    """Seed a field into the popup's default flow — what an omitted
+    `source_flow_id` resolves to."""
     field = FormFields(
         tenant_id=tenant.id,
         popup_id=uuid.UUID(popup_id),
-        sales_flow_id=None,
+        sales_flow_id=default_flow_id(db, uuid.UUID(popup_id)),
         name=name,
         label=name,
         field_type="text",
@@ -62,7 +67,7 @@ def _seed_shared_field(db: Session, tenant: Tenants, popup_id: str, name: str) -
 
 
 class TestCopyFormToFlowEndpoint:
-    def test_copy_from_popup_shared_tier_to_target_flow(
+    def test_omitted_source_copies_the_default_flows_form(
         self,
         client: TestClient,
         admin_token_tenant_a: str,
@@ -71,7 +76,7 @@ class TestCopyFormToFlowEndpoint:
     ) -> None:
         popup_id = _create_popup_via_api(client, admin_token_tenant_a)
         target = _make_flow(db, tenant_a, popup_id, slug="target-copy-a")
-        _seed_shared_field(db, tenant_a, popup_id, "copyable_field")
+        _seed_default_flow_field(db, tenant_a, popup_id, "copyable_field")
 
         resp = client.post(
             f"/api/v1/form-fields/copy-to-flow/{target.id}",

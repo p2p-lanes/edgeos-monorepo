@@ -22,6 +22,7 @@ from app.api.popup.models import Popups
 from app.api.sales_flow.crud import sales_flows_crud
 from app.api.sales_flow.models import SalesFlows
 from app.api.tenant.models import Tenants
+from tests._flow_helpers import default_flow_id
 
 
 def _make_popup(db: Session, tenant: Tenants) -> Popups:
@@ -49,9 +50,12 @@ def _make_flow(db: Session, popup: Popups, *, slug: str) -> SalesFlows:
     return flow
 
 
-def _make_field(db: Session, popup: Popups, *, name: str, sales_flow_id=None):
+def _make_field(db: Session, popup: Popups, *, name: str, sales_flow_id):
     section = FormSections(
-        tenant_id=popup.tenant_id, popup_id=popup.id, label="Section"
+        tenant_id=popup.tenant_id,
+        popup_id=popup.id,
+        sales_flow_id=sales_flow_id,
+        label="Section",
     )
     db.add(section)
     db.flush()
@@ -79,7 +83,12 @@ class TestAdminSchemaEndpointAcceptsExplicitFlow:
     ) -> None:
         popup = _make_popup(db, tenant_a)
         flow = _make_flow(db, popup, slug="vip")
-        _make_field(db, popup, name="shared_field")
+        _make_field(
+            db,
+            popup,
+            name="default_flow_field",
+            sales_flow_id=default_flow_id(db, popup.id),
+        )
         _make_field(db, popup, name="vip_field", sales_flow_id=flow.id)
         db.commit()
 
@@ -90,7 +99,7 @@ class TestAdminSchemaEndpointAcceptsExplicitFlow:
         )
         assert response.status_code == 200, response.text
         assert "vip_field" in response.json()["custom_fields"]
-        assert "shared_field" not in response.json()["custom_fields"]
+        assert "default_flow_field" not in response.json()["custom_fields"]
 
     def test_omitted_sales_flow_id_resolves_default_flow(
         self,
@@ -101,7 +110,12 @@ class TestAdminSchemaEndpointAcceptsExplicitFlow:
     ) -> None:
         popup = _make_popup(db, tenant_a)
         flow = _make_flow(db, popup, slug="vip")
-        _make_field(db, popup, name="shared_field")
+        _make_field(
+            db,
+            popup,
+            name="default_flow_field",
+            sales_flow_id=default_flow_id(db, popup.id),
+        )
         _make_field(db, popup, name="vip_field", sales_flow_id=flow.id)
         db.commit()
 
@@ -110,7 +124,7 @@ class TestAdminSchemaEndpointAcceptsExplicitFlow:
             headers={"Authorization": f"Bearer {admin_token_tenant_a}"},
         )
         assert response.status_code == 200, response.text
-        assert "shared_field" in response.json()["custom_fields"]
+        assert "default_flow_field" in response.json()["custom_fields"]
         assert "vip_field" not in response.json()["custom_fields"]
 
     def test_flow_from_another_popup_returns_404(
@@ -145,7 +159,12 @@ class TestPortalSchemaEndpointAcceptsExplicitFlow:
 
         popup = _make_popup(db, tenant_a)
         flow = _make_flow(db, popup, slug="vip")
-        _make_field(db, popup, name="shared_field")
+        _make_field(
+            db,
+            popup,
+            name="default_flow_field",
+            sales_flow_id=default_flow_id(db, popup.id),
+        )
         _make_field(db, popup, name="vip_field", sales_flow_id=flow.id)
         human = Humans(
             tenant_id=tenant_a.id,
@@ -164,4 +183,4 @@ class TestPortalSchemaEndpointAcceptsExplicitFlow:
         )
         assert response.status_code == 200, response.text
         assert "vip_field" in response.json()["custom_fields"]
-        assert "shared_field" not in response.json()["custom_fields"]
+        assert "default_flow_field" not in response.json()["custom_fields"]

@@ -9,11 +9,10 @@ from sqlmodel import Column, Field, SQLModel
 class BaseFieldConfigBase(SQLModel):
     tenant_id: uuid.UUID = Field(foreign_key="tenants.id", index=True)
     popup_id: uuid.UUID = Field(foreign_key="popups.id", index=True)
-    # sdd/sales-flows slice 6 (Q1: flow-owned forms). NULL = popup-shared
-    # (the legacy config every flow of the popup read before this slice),
-    # non-NULL = owned exclusively by that flow. Mirrors FormFieldBase.
-    sales_flow_id: uuid.UUID | None = Field(
-        default=None, foreign_key="sales_flows.id", nullable=True, index=True
+    # sdd/sales-flows-rediseno slice 3: belongs to exactly one flow.
+    # There is no popup-shared tier and nothing is inherited.
+    sales_flow_id: uuid.UUID = Field(
+        foreign_key="sales_flows.id", nullable=False, index=True
     )
     field_name: str = Field(index=True)
     section_id: uuid.UUID | None = Field(
@@ -36,7 +35,7 @@ class BaseFieldConfigPublic(BaseModel):
     id: uuid.UUID
     tenant_id: uuid.UUID
     popup_id: uuid.UUID
-    sales_flow_id: uuid.UUID | None = None
+    sales_flow_id: uuid.UUID
     field_name: str
     section_id: uuid.UUID | None = None
     position: int = 0

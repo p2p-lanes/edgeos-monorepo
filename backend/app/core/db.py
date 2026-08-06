@@ -147,6 +147,7 @@ def _seed_base_field_configs(session: Session, popup_map: dict, tenant_id) -> No
     from app.api.base_field_config.constants import DEFAULT_SECTIONS
     from app.api.base_field_config.crud import base_field_configs_crud
     from app.api.base_field_config.models import BaseFieldConfigs
+    from app.api.sales_flow.crud import sales_flows_crud
     from app.models import FormSections
 
     for popup_key, popup in popup_map.items():
@@ -154,6 +155,11 @@ def _seed_base_field_configs(session: Session, popup_map: dict, tenant_id) -> No
             select(BaseFieldConfigs).where(BaseFieldConfigs.popup_id == popup.id)
         ).first()
         if existing_configs:
+            continue
+
+        default_flow = sales_flows_crud.get_default_flow(session, popup.id)
+        if default_flow is None:
+            logger.warning(f"Skipping form seed for {popup_key}: no default sales flow")
             continue
 
         default_section_map = {}
@@ -170,6 +176,7 @@ def _seed_base_field_configs(session: Session, popup_map: dict, tenant_id) -> No
                 section = FormSections(
                     tenant_id=tenant_id,
                     popup_id=popup.id,
+                    sales_flow_id=default_flow.id,
                     label=section_def["label"],
                     order=section_def["order"],
                     protected=True,
@@ -182,7 +189,11 @@ def _seed_base_field_configs(session: Session, popup_map: dict, tenant_id) -> No
                 logger.info(f"Default section created: {section.label} for {popup_key}")
 
         base_field_configs_crud.create_defaults_for_popup(
-            session, popup.id, tenant_id, default_section_map
+            session,
+            popup.id,
+            tenant_id,
+            default_flow.id,
+            default_section_map,
         )
         logger.info(f"Base field configs created for {popup_key}")
 
@@ -390,6 +401,7 @@ def _seed_products(
 def _seed_form_sections(
     session: Session, seed_data: dict, popup_map: dict, tenant_id
 ) -> dict:
+    from app.api.sales_flow.crud import sales_flows_crud
     from app.models import FormSections
 
     section_map: dict[str, FormSections] = {}
@@ -412,9 +424,17 @@ def _seed_form_sections(
         if existing_section:
             section_map[section_key] = existing_section
         else:
+            default_flow = sales_flows_crud.get_default_flow(session, popup.id)
+            if default_flow is None:
+                logger.warning(
+                    f"Skipping form section {section_data['label']}: "
+                    f"{popup_key} has no default sales flow"
+                )
+                continue
             section = FormSections(
                 tenant_id=tenant_id,
                 popup_id=popup.id,
+                sales_flow_id=default_flow.id,
                 label=section_data["label"],
                 description=section_data.get("description"),
                 order=section_data.get("order", 0),
@@ -432,6 +452,7 @@ def _seed_form_sections(
 def _seed_form_fields(
     session: Session, seed_data: dict, popup_map: dict, section_map: dict, tenant_id
 ) -> None:
+    from app.api.sales_flow.crud import sales_flows_crud
     from app.models import FormFields
 
     for field_data in seed_data.get("form_fields", []):
@@ -455,9 +476,17 @@ def _seed_form_fields(
             )
         ).first()
         if not existing_field:
+            default_flow = sales_flows_crud.get_default_flow(session, popup.id)
+            if default_flow is None:
+                logger.warning(
+                    f"Skipping form field {field_data['name']}: "
+                    "popup has no default sales flow"
+                )
+                continue
             field = FormFields(
                 tenant_id=tenant_id,
                 popup_id=popup.id,
+                sales_flow_id=default_flow.id,
                 name=field_data["name"],
                 label=field_data["label"],
                 field_type=field_data.get("field_type", "text"),
