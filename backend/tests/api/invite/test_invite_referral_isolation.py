@@ -1,10 +1,10 @@
-"""Admin invites and portal links share one table but not one surface.
+"""What stays separate now that admin invites and portal links share a table.
 
-Referrals were merged into `invites` (migration a3f8c1d94e27). Both kinds of
-link now live in the same rows, told apart by referrer_human_id. Until the API
-is unified too, each surface must show only its own: a portal link leaking into
-the admin invite list would 500 on serialization, because it carries no
-created_by and InvitePublic requires one.
+Referrals were merged into `invites` (migration a3f8c1d94e27) and the API was
+unified on top of it, so an admin now moderates BOTH kinds from one surface.
+What must not blur is everything else: an attendee reaches only their own
+links, and the two public URL shapes keep their own meaning -- /r/{code} is for
+attendee links, /invites/redeem/{token} for admin ones.
 """
 
 from __future__ import annotations
@@ -83,7 +83,7 @@ def _make_admin_invite(db: Session, popup: Popups, creator: Users) -> Invites:
 
 
 class TestInviteReferralIsolation:
-    def test_admin_invite_list_excludes_portal_links(
+    def test_a_portal_link_serializes_without_a_created_by(
         self,
         client: TestClient,
         db: Session,
@@ -91,10 +91,10 @@ class TestInviteReferralIsolation:
         admin_user_tenant_a: Users,
         admin_token_tenant_a: str,
     ) -> None:
-        """A portal link in the same popup must not appear as an invite.
+        """Both kinds list together, and the issuer-less one must not 500.
 
-        It has no created_by, so serializing it through InvitePublic would 500
-        rather than merely showing the wrong row.
+        InvitePublic.created_by used to be required, so the first portal link to
+        reach this list would have broken the whole response rather than one row.
         """
         popup = _make_popup(db, tenant_a)
         referrer = _make_human(db, tenant_a)
@@ -107,17 +107,19 @@ class TestInviteReferralIsolation:
         )
 
         assert resp.status_code == 200, resp.json()
-        returned = {row["id"] for row in resp.json()["results"]}
-        assert str(admin_invite.id) in returned
-        assert str(portal_link.id) not in returned
+        rows = {row["id"]: row for row in resp.json()["results"]}
+        assert str(admin_invite.id) in rows
+        assert rows[str(portal_link.id)]["created_by"] is None
+        assert rows[str(portal_link.id)]["referrer_human_id"] == str(referrer.id)
 
-    def test_portal_link_is_not_reachable_through_the_invite_detail_route(
+    def test_admin_can_reach_a_portal_link_by_id(
         self,
         client: TestClient,
         db: Session,
         tenant_a: Tenants,
         admin_token_tenant_a: str,
     ) -> None:
+        """Moderating attendee links is what the admin-referral surface did."""
         popup = _make_popup(db, tenant_a)
         referrer = _make_human(db, tenant_a)
         portal_link = _make_portal_link(db, popup, referrer)
@@ -127,45 +129,21 @@ class TestInviteReferralIsolation:
             headers=_auth(admin_token_tenant_a),
         )
 
-        assert resp.status_code == 404, resp.json()
+        assert resp.status_code == 200, resp.json()
+        assert resp.json()["id"] == str(portal_link.id)
 
-    def test_admin_invite_is_not_reachable_through_the_referral_route(
-        self,
-        client: TestClient,
-        db: Session,
-        tenant_a: Tenants,
-        admin_user_tenant_a: Users,
-        admin_token_tenant_a: str,
-    ) -> None:
-        """The mirror case: an admin invite must not be editable as a referral."""
-        popup = _make_popup(db, tenant_a)
-        admin_invite = _make_admin_invite(db, popup, admin_user_tenant_a)
-
-        resp = client.get(
-            f"/api/v1/admin/referrals/{admin_invite.id}",
-            headers=_auth(admin_token_tenant_a),
-        )
-
-        assert resp.status_code == 404, resp.json()
-
-    def test_admin_invite_token_does_not_resolve_as_a_public_referral_code(
+    def test_an_attendee_link_is_not_addressable_as_an_admin_invite(
         self,
         client: TestClient,
         db: Session,
         tenant_a: Tenants,
         admin_user_tenant_a: Users,
     ) -> None:
-        """Admin invites keep their own redeem URL; /r/{code} is portal-only."""
-        popup = _make_popup(db, tenant_a)
-        admin_invite = _make_admin_invite(db, popup, admin_user_tenant_a)
+        """The invite-only routes still exclude attendee links.
 
-        resp = client.get(f"/api/v1/referrals/r/{admin_invite.token}")
-
-        assert resp.status_code == 404, resp.json()
-
-    def test_portal_link_code_does_not_resolve_as_an_invite_token(
-        self, client: TestClient, db: Session, tenant_a: Tenants
-    ) -> None:
+        Redemption applies the invite's email binding and single-use bookkeeping,
+        neither of which an attendee link has.
+        """
         popup = _make_popup(db, tenant_a)
         referrer = _make_human(db, tenant_a)
         portal_link = _make_portal_link(db, popup, referrer)
@@ -173,3 +151,37 @@ class TestInviteReferralIsolation:
         resp = client.get(f"/api/v1/invites/redeem/{portal_link.token}")
 
         assert resp.status_code == 404, resp.json()
+
+    def test_the_unified_preview_resolves_both_kinds(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+        admin_user_tenant_a: Users,
+    ) -> None:
+        """One public preview, whoever issued the link.
+
+        Guards against re-splitting the surface: /r/{code} in the portal now
+        calls this for links that used to have their own endpoint.
+        """
+        popup = _make_popup(db, tenant_a)
+        referrer = _make_human(db, tenant_a)
+        portal_link = _make_portal_link(db, popup, referrer)
+        admin_invite = _make_admin_invite(db, popup, admin_user_tenant_a)
+
+        from_portal = client.get(f"/api/v1/invites/preview/{portal_link.token}")
+        from_admin = client.get(f"/api/v1/invites/preview/{admin_invite.token}")
+
+        assert from_portal.status_code == 200, from_portal.json()
+        assert from_admin.status_code == 200, from_admin.json()
+        assert from_portal.json()["id"] == str(portal_link.id)
+        assert from_admin.json()["id"] == str(admin_invite.id)
+
+    def test_the_referral_routes_are_gone(self, client: TestClient) -> None:
+        """No leftover surface still speaking the old vocabulary."""
+        for path in (
+            "/api/v1/portal/referrals",
+            "/api/v1/admin/referrals",
+            "/api/v1/referrals/r/some-code",
+        ):
+            assert client.get(path).status_code == 404, path

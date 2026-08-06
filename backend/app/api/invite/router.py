@@ -9,12 +9,15 @@ Spec: REQ-GR-001..007 (invites), REQ-GR-026 (popup.invites_enabled gate).
 """
 
 import uuid
+from typing import Annotated, Literal
 
-from fastapi import APIRouter, HTTPException, Response, status
+from fastapi import APIRouter, HTTPException, Query, Response, status
 
 from app.api.invite.crud import invites_crud
 from app.api.invite.schemas import (
     InviteCreate,
+    InvitePortalCreate,
+    InvitePortalUpdate,
     InvitePublic,
     InvitePublicPreview,
     InviteRedeemRequest,
@@ -29,7 +32,13 @@ from app.core.dependencies.users import (
     SessionDep,
 )
 
+IssuerFilter = Annotated[
+    Literal["all", "admin", "portal"],
+    Query(description="Which links to return: both kinds, backoffice, or attendee."),
+]
+
 router = APIRouter(prefix="/invites", tags=["invites"])
+portal_router = APIRouter(prefix="/portal/invites", tags=["invites"])
 
 
 # ---------------------------------------------------------------------------
@@ -116,6 +125,91 @@ async def preview_invite(
         max_uses=invite.max_uses,
         current_uses=invite.current_uses,
         expires_at=invite.expires_at,
+        already_redeemed=already_redeemed,
+    )
+
+
+@router.get(
+    "/preview/{token}",
+    response_model=InvitePublicPreview,
+    summary="Preview any access link (unauthenticated)",
+)
+async def preview_link(
+    token: str,
+    db: SessionDep,
+    response: Response,
+    current_human: OptionalHuman,
+) -> InvitePublicPreview:
+    """Preview a link of either kind, resolved by token.
+
+    Same guard order as the invite-only preview, but the popup feature flag
+    checked depends on who issued the link: invites_enabled for a backoffice
+    link, referrals_enabled for an attendee one.
+
+    ``inviter_name`` is filled only for backoffice links. An attendee link
+    never names its owner: it is a public URL and the owner is a private
+    individual (spec: referral preview returns no PII of the referrer).
+    """
+    response.headers["Cache-Control"] = "no-store"
+    _no_store = {"Cache-Control": "no-store"}
+
+    link = invites_crud.get_any_by_token(db, token)
+    if not link:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Link not found",
+            headers=_no_store,
+        )
+
+    already_redeemed = False
+    if current_human is not None:
+        from app.api.application.crud import applications_crud
+
+        already_redeemed = (
+            applications_crud.get_by_human_popup(db, current_human.id, link.popup_id)
+            is not None
+        )
+
+    if not already_redeemed:
+        from app.api.popup.crud import popups_crud
+        from app.api.popup.guards import ensure_popup_link_active
+
+        popup = popups_crud.get(db, link.popup_id)
+        ensure_popup_link_active(popup)
+        if popup is not None:
+            enabled = (
+                popup.referrals_enabled
+                if link.is_portal_created
+                else popup.invites_enabled
+            )
+            if not enabled:
+                raise HTTPException(
+                    status_code=status.HTTP_410_GONE,
+                    detail="This kind of link is not enabled for this event",
+                    headers=_no_store,
+                )
+        invites_crud.validate_for_redemption(link)
+
+    inviter_name: str | None = None
+    if not link.is_portal_created:
+        from sqlmodel import select as _select
+
+        from app.api.user.models import Users
+
+        creator = db.exec(_select(Users).where(Users.id == link.created_by)).first()
+        if creator:
+            inviter_name = creator.full_name or creator.email
+
+    return InvitePublicPreview(
+        id=link.id,
+        popup_id=link.popup_id,
+        token=link.token,
+        inviter_name=inviter_name,
+        is_email_restricted=link.recipient_email is not None,
+        discount_percentage=link.discount_percentage,
+        max_uses=link.max_uses,
+        current_uses=link.current_uses,
+        expires_at=link.expires_at,
         already_redeemed=already_redeemed,
     )
 
@@ -271,16 +365,25 @@ async def list_invites(
     _: CurrentAdmin,
     popup_id: uuid.UUID | None = None,
     recipient_email: str | None = None,
+    issuer: IssuerFilter = "all",
     skip: PaginationSkip = 0,
     limit: PaginationLimit = 100,
 ) -> ListModel[InvitePublic]:
-    """Admin: list invites, optionally filtered by popup_id or recipient_email.
+    """Admin: list access links, optionally filtered by popup or recipient.
+
+    ``issuer`` narrows to backoffice links ("admin") or attendee-created ones
+    ("portal"). Both kinds are moderated from here since they were merged.
 
     Spec: REQ-GR-006 — admin listing scoped to current tenant via RLS.
     """
     if popup_id:
         results, total = invites_crud.find_by_popup(
-            db, popup_id, recipient_email=recipient_email, skip=skip, limit=limit
+            db,
+            popup_id,
+            recipient_email=recipient_email,
+            issuer=issuer,
+            skip=skip,
+            limit=limit,
         )
     else:
         results, total = invites_crud.find(db, skip=skip, limit=limit)
@@ -338,7 +441,7 @@ async def get_invite(
     _: CurrentAdmin,
 ) -> InvitePublic:
     """Admin: get single invite by id."""
-    invite = invites_crud.get_admin_created(db, invite_id)
+    invite = invites_crud.get(db, invite_id)
     if not invite:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Invite not found"
@@ -358,7 +461,7 @@ async def update_invite(
     token and recipient_email are immutable post-create → 400 if attempted.
     Spec: API surface PATCH allowed fields.
     """
-    invite = invites_crud.get_admin_created(db, invite_id)
+    invite = invites_crud.get(db, invite_id)
     if not invite:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Invite not found"
@@ -375,9 +478,144 @@ async def delete_invite(
     _: CurrentAdmin,
 ) -> None:
     """Admin: delete invite. 409 if current_uses > 0."""
-    invite = invites_crud.get_admin_created(db, invite_id)
+    invite = invites_crud.get(db, invite_id)
     if not invite:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Invite not found"
         )
     invites_crud.delete_invite(db, invite)
+
+
+# ---------------------------------------------------------------------------
+# Portal — an attendee's own links (what used to be /portal/referrals)
+# ---------------------------------------------------------------------------
+
+
+@portal_router.get("", response_model=ListModel[InvitePublic])
+async def list_my_links(
+    db: SessionDep,
+    current_human: CurrentHuman,
+    popup_id: uuid.UUID | None = None,
+    skip: PaginationSkip = 0,
+    limit: PaginationLimit = 100,
+) -> ListModel[InvitePublic]:
+    """Portal: list the links this attendee created for a popup."""
+    if popup_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="popup_id is required",
+        )
+
+    results, total = invites_crud.find_by_human(
+        db, current_human.id, popup_id, skip=skip, limit=limit
+    )
+    return ListModel[InvitePublic](
+        results=[InvitePublic.model_validate(r) for r in results],
+        paging=Paging(limit=limit, offset=skip, total=total),
+    )
+
+
+@portal_router.post(
+    "", response_model=InvitePublic, status_code=status.HTTP_201_CREATED
+)
+async def create_my_link(
+    db: SessionDep,
+    current_human: CurrentHuman,
+    body: InvitePortalCreate,
+) -> InvitePublic:
+    """Portal: create this attendee's link for a popup.
+
+    Spec: REQ-GR-008 (entity), REQ-GR-026 (popup.referrals_enabled gate).
+    Token auto-generated when omitted. 409 if (popup_id, token) collides.
+    """
+    from app.api.attendee.crud import attendees_crud
+    from app.api.popup.crud import popups_crud
+
+    popup = popups_crud.get(db, body.popup_id)
+    if not popup:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Popup not found"
+        )
+
+    if not popup.referrals_enabled:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Attendee links are not enabled for this popup",
+        )
+
+    # Anti-abuse gate: only attendees who actually hold a ticket may create a
+    # link. Stops someone who just arrived through a link (and was
+    # auto-approved) from immediately spawning their own without committing.
+    if not attendees_crud.human_has_ticket_in_popup(
+        db, current_human.id, body.popup_id
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You need a ticket for this popup to create a link.",
+        )
+
+    # One link per attendee per popup.
+    _, existing_count = invites_crud.find_by_human(
+        db, current_human.id, body.popup_id, limit=1
+    )
+    if existing_count >= 1:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="You already have a link for this popup.",
+        )
+
+    # Popup config always dictates max_uses, even when it says unlimited.
+    link = invites_crud.create_portal_link(
+        db,
+        body,
+        tenant_id=popup.tenant_id,
+        referrer_human_id=current_human.id,
+        max_uses_override=popup.max_referrals_per_attendee,
+    )
+    return InvitePublic.model_validate(link)
+
+
+@portal_router.patch("/{link_id}", response_model=InvitePublic)
+async def update_my_link(
+    link_id: uuid.UUID,
+    db: SessionDep,
+    current_human: CurrentHuman,
+    body: InvitePortalUpdate,
+) -> InvitePublic:
+    """Portal: update own link — only expires_at and max_uses are mutable."""
+    link = invites_crud.get_portal_created(db, link_id)
+    if not link:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Link not found"
+        )
+
+    if link.referrer_human_id != current_human.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not own this link",
+        )
+
+    updated = invites_crud.update_invite(db, link, body)
+    return InvitePublic.model_validate(updated)
+
+
+@portal_router.delete("/{link_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_my_link(
+    link_id: uuid.UUID,
+    db: SessionDep,
+    current_human: CurrentHuman,
+) -> None:
+    """Portal: delete own link. 409 if it has already been used."""
+    link = invites_crud.get_portal_created(db, link_id)
+    if not link:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Link not found"
+        )
+
+    if link.referrer_human_id != current_human.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not own this link",
+        )
+
+    invites_crud.delete_invite(db, link)
