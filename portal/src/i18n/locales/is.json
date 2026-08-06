@@ -185,6 +185,7 @@
     "send_code": "Senda kóða",
     "verify_code": "Staðfesta kóða",
     "submit_error": "Villa kom upp við að senda eyðublaðið. Vinsamlegast reyndu aftur.",
+    "duplicate_application": "Þú ert nú þegar með umsókn í bið fyrir þennan viðburð. Athugaðu tölvupóstinn þinn eða hafðu samband við þjónustuver.",
     "application_required": "Umsókn krafist",
     "application_required_message": "Hæ {{userName}}, áður en þú getur keypt passa langar okkur að kynnast þér betur!",
     "application_required_prompt": "Vinsamlegast farðu á Edge vefgáttina og sæktu um {{popupName}}, svo við getum yfirfarið upplýsingar þínar.",
