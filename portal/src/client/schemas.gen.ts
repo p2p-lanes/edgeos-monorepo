@@ -8947,6 +8947,44 @@ export const EventVisibilitySchema = {
     title: 'EventVisibility'
 } as const;
 
+export const FlowProductAssignmentSchema = {
+    properties: {
+        product_ids: {
+            items: {
+                type: 'string',
+                format: 'uuid'
+            },
+            type: 'array',
+            title: 'Product Ids'
+        }
+    },
+    type: 'object',
+    required: ['product_ids'],
+    title: 'FlowProductAssignment',
+    description: `The full set of products a flow sells.
+
+A replace, not a patch: the UI shows every product of the popup with a
+checkbox, so sending the whole set is what the user actually means and
+removes the "did my unchecking register?" ambiguity.`
+} as const;
+
+export const FlowProductAssignmentPublicSchema = {
+    properties: {
+        product_ids: {
+            items: {
+                type: 'string',
+                format: 'uuid'
+            },
+            type: 'array',
+            title: 'Product Ids'
+        }
+    },
+    type: 'object',
+    required: ['product_ids'],
+    title: 'FlowProductAssignmentPublic',
+    description: 'Assigned product ids, in no particular order.'
+} as const;
+
 export const FormFieldCreateSchema = {
     properties: {
         popup_id: {

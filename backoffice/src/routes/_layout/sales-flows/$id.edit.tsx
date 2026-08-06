@@ -7,6 +7,7 @@ import { FormPageLayout } from "@/components/Common/FormPageLayout"
 import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
 import { CopyFormToFlowDialog } from "@/components/forms/CopyFormToFlowDialog"
 import { FlowEmailTemplatesSection } from "@/components/forms/FlowEmailTemplatesSection"
+import { FlowProductsSection } from "@/components/forms/FlowProductsSection"
 import { ReviewersManager } from "@/components/forms/ReviewersManager"
 import { SalesFlowForm } from "@/components/forms/SalesFlowForm"
 import { SalesFlowScopeBanner } from "@/components/forms/SalesFlowScopeBanner"
@@ -57,6 +58,10 @@ function EditSalesFlowContent({ flowId }: { flowId: string }) {
         defaultValues={salesFlow}
         onSuccess={goBack}
       />
+
+      <Separator />
+
+      <FlowProductsSection popupId={salesFlow.popup_id} flowId={flowId} />
 
       <Separator />
 
