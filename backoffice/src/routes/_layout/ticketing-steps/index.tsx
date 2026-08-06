@@ -242,16 +242,13 @@ function TicketingStepsContent({ popupId }: { popupId: string }) {
 
       {/* Detail pane */}
       <div className="min-w-0 flex-1">
-        {adding ? (
+        {adding && activeFlowId ? (
           <NewStepPanel
             popupId={popupId}
-            // A new step under the DEFAULT flow stays in the popup-shared
-            // tier (sales_flow_id omitted) — matching D1: no flow writes
-            // its own overrides implicitly. Only an explicit non-default
-            // flow selection creates a flow-owned row.
-            salesFlowId={
-              activeFlowId !== defaultFlowId ? activeFlowId : undefined
-            }
+            // The step is created into the flow being viewed, default or
+            // not. There is no shared tier to omit into, so the panel waits
+            // until the flow list has resolved.
+            salesFlowId={activeFlowId}
             nextOrder={orderedSteps.length}
             confirmStepId={steps.find((s) => s.step_type === "confirm")?.id}
             onCreated={(id) => selectStep(id)}

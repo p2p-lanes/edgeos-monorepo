@@ -4540,7 +4540,7 @@ export type TicketDuration = 'day' | 'week' | 'month' | 'full';
 
 export type TicketingStepCreate = {
     popup_id: string;
-    sales_flow_id?: (string | null);
+    sales_flow_id: string;
     step_type: string;
     title: string;
     description?: (string | null);
@@ -4562,7 +4562,7 @@ export type TicketingStepPublic = {
     id: string;
     tenant_id: string;
     popup_id: string;
-    sales_flow_id?: (string | null);
+    sales_flow_id: string;
     step_type: string;
     title: string;
     description?: (string | null);

@@ -48,8 +48,16 @@ class TestSeedTicketingStepsForPopupFlowTypeGate:
         db.add(popup)
         db.commit()
 
+        flow = sales_flows_crud.provision_default_flow(
+            db, popup_id=popup.id, tenant_id=tenant.id, sale_type="direct"
+        )
+        db.commit()
         seed_ticketing_steps_for_popup(
-            db, popup_id=popup.id, tenant_id=tenant.id, flow_type="direct"
+            db,
+            popup_id=popup.id,
+            tenant_id=tenant.id,
+            sales_flow_id=flow.id,
+            flow_type="direct",
         )
 
         steps, _ = ticketing_steps_crud.find_by_popup(db, popup.id)
@@ -77,8 +85,16 @@ class TestSeedTicketingStepsForPopupFlowTypeGate:
         db.commit()
         db.refresh(popup)
 
+        flow = sales_flows_crud.provision_default_flow(
+            db, popup_id=popup.id, tenant_id=tenant.id, sale_type="application"
+        )
+        db.commit()
         seed_ticketing_steps_for_popup(
-            db, popup_id=popup.id, tenant_id=tenant.id, flow_type="application"
+            db,
+            popup_id=popup.id,
+            tenant_id=tenant.id,
+            sales_flow_id=flow.id,
+            flow_type="application",
         )
 
         steps, _ = ticketing_steps_crud.find_by_popup(db, popup.id)

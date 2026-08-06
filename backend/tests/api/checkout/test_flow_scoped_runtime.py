@@ -140,8 +140,11 @@ class TestFlowSlugRouting:
         self, client: TestClient, db: Session, tenant_a: Tenants
     ) -> None:
         popup = _make_direct_popup(db, tenant_a)
+        default_flow = sales_flows_crud.get_default_flow(db, popup.id)
         flow = _make_flow(db, popup, slug="vip")
-        _make_ticketing_step(db, popup, title="Default Step")
+        _make_ticketing_step(
+            db, popup, title="Default Step", sales_flow_id=default_flow.id
+        )
         _make_ticketing_step(db, popup, title="VIP Step", sales_flow_id=flow.id)
         db.commit()
 
@@ -157,8 +160,11 @@ class TestFlowSlugRouting:
         self, client: TestClient, db: Session, tenant_a: Tenants
     ) -> None:
         popup = _make_direct_popup(db, tenant_a)
+        default_flow = sales_flows_crud.get_default_flow(db, popup.id)
         flow = _make_flow(db, popup, slug="vip")
-        _make_ticketing_step(db, popup, title="Shared Step")
+        _make_ticketing_step(
+            db, popup, title="Default Step", sales_flow_id=default_flow.id
+        )
         _make_ticketing_step(db, popup, title="VIP Step", sales_flow_id=flow.id)
         db.commit()
 
@@ -168,7 +174,7 @@ class TestFlowSlugRouting:
         )
         assert response.status_code == 200, response.text
         titles = [s["title"] for s in response.json()["ticketing_steps"]]
-        assert titles == ["Shared Step"]
+        assert titles == ["Default Step"]
 
     def test_unknown_flow_slug_returns_404_not_200(
         self, client: TestClient, db: Session, tenant_a: Tenants

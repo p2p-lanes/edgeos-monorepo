@@ -9301,13 +9301,13 @@ export class ThirdPartyDiscoveryService {
 export class TicketingStepsService {
     /**
      * List Portal Ticketing Steps
-     * List enabled ticketing steps for a popup (portal-facing).
+     * List the enabled ticketing steps of one sales flow (portal-facing).
      *
-     * Resolves the sales flow named by `sales_flow_id` (sdd/sales-flows D6
-     * URL scheme, task 9.8 — must belong to this popup, mirrors
-     * `_get_flow_or_404`), falling back to the popup's default flow when
-     * omitted, falling back further to the popup-shared tier when that flow
-     * owns no steps of its own (see `find_portal_for_flow`, slice 8).
+     * Resolves the flow named by `sales_flow_id` (sdd/sales-flows D6 URL
+     * scheme — must belong to this popup, mirrors `_get_flow_or_404`), or the
+     * popup's default flow when omitted. The resolved flow's own steps are
+     * the answer: since slice 2 nothing is inherited, so an empty list means
+     * this flow has no steps.
      * @param data The data for the request.
      * @param data.popupId
      * @param data.salesFlowId
@@ -9336,11 +9336,10 @@ export class TicketingStepsService {
      * List Ticketing Steps
      * List ticketing steps.
      *
-     * Without `sales_flow_id`, returns the popup-shared tier only
-     * (sdd/sales-flows slice 8) — identical to this popup's step list before
-     * this slice, since no writer created flow-scoped rows until now. With
-     * `sales_flow_id`, returns the RESOLVED step list for that flow: its own
-     * rows if it owns any, else the popup-shared fallback.
+     * With `popup_id`, returns the step list of one flow: the one named by
+     * `sales_flow_id`, or the popup's default flow when omitted. That list is
+     * exactly what the flow owns — since slice 2 there is no shared tier to
+     * fall back to.
      * @param data The data for the request.
      * @param data.popupId
      * @param data.salesFlowId

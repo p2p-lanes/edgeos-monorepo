@@ -1,14 +1,19 @@
-"""Tests for flow-scoped ticketing-step resolution (sdd/sales-flows slice 8).
+"""Ticketing steps belong to exactly one sales flow.
 
-Design (task 8 binding): a flow that owns ANY step row uses ONLY its own
-list — the popup tier never leaks in, even for a fully-disabled flow-owned
-list. A flow with zero rows of its own falls back to the popup-shared tier
-(`sales_flow_id IS NULL`, the exact step list every popup had before this
-slice). Mirrors slice 6's `find_for_flow` (forms) pattern exactly.
+Design: sdd/sales-flows-rediseno slice 2 — the popup-shared tier and the
+read-time fallback are gone. A flow's step list is what that flow owns:
+never another flow's, never a popup-level default. An empty list means
+"this flow has no steps", which is a fact about the flow, not a cue to go
+looking somewhere else.
+
+These tests exist to keep the deleted fallback deleted. Every one of them
+would have passed before slice 2 only by accident.
 """
 
 import uuid
 
+import pytest
+from fastapi import HTTPException
 from sqlmodel import Session
 
 from app.api.popup.models import Popups
@@ -60,7 +65,7 @@ def _make_step(
     popup: Popups,
     *,
     step_type: str,
-    sales_flow_id: uuid.UUID | None = None,
+    sales_flow_id: uuid.UUID,
     is_enabled: bool = True,
     template: str | None = None,
 ) -> TicketingSteps:
@@ -79,139 +84,104 @@ def _make_step(
     return step
 
 
-class TestFindForFlowFallback:
-    def test_none_flow_id_returns_popup_shared_steps(
+class TestFlowOwnsItsSteps:
+    def test_flow_reads_only_its_own_steps(
         self, db: Session, tenant_a: Tenants
     ) -> None:
         popup = _make_popup(db, tenant_a)
-        _make_step(db, tenant_a, popup, step_type="tickets")
+        flow_a = _make_flow(db, tenant_a, popup, slug=f"own-a-{uuid.uuid4().hex[:6]}")
+        flow_b = _make_flow(db, tenant_a, popup, slug=f"own-b-{uuid.uuid4().hex[:6]}")
+        _make_step(db, tenant_a, popup, step_type="tickets", sales_flow_id=flow_a.id)
+        _make_step(db, tenant_a, popup, step_type="buyer", sales_flow_id=flow_b.id)
 
-        steps, total = ticketing_steps_crud.find_for_flow(db, popup.id, None)
+        steps, total = ticketing_steps_crud.find_by_flow(db, flow_a.id)
 
         assert total == 1
         assert [s.step_type for s in steps] == ["tickets"]
 
-    def test_flow_with_no_own_steps_falls_back_to_popup_shared(
+    def test_flow_without_steps_gets_nothing(
         self, db: Session, tenant_a: Tenants
     ) -> None:
+        """The deleted fallback: a sibling flow's list must not leak in."""
         popup = _make_popup(db, tenant_a)
-        flow = _make_flow(db, tenant_a, popup, slug="flow-a")
-        _make_step(db, tenant_a, popup, step_type="tickets")
+        populated = _make_flow(
+            db, tenant_a, popup, slug=f"populated-{uuid.uuid4().hex[:6]}"
+        )
+        empty = _make_flow(db, tenant_a, popup, slug=f"empty-{uuid.uuid4().hex[:6]}")
+        _make_step(db, tenant_a, popup, step_type="tickets", sales_flow_id=populated.id)
 
-        steps, total = ticketing_steps_crud.find_for_flow(db, popup.id, flow.id)
+        steps, total = ticketing_steps_crud.find_by_flow(db, empty.id)
 
-        assert total == 1
-        assert [s.step_type for s in steps] == ["tickets"]
+        assert total == 0
+        assert steps == []
 
-
-class TestFindForFlowOwnership:
-    def test_flow_owned_steps_exclude_popup_shared(
+    def test_editing_one_flow_does_not_touch_another(
         self, db: Session, tenant_a: Tenants
     ) -> None:
+        """The F2 guarantee, at the data layer."""
         popup = _make_popup(db, tenant_a)
-        flow = _make_flow(db, tenant_a, popup, slug="flow-owner")
-        _make_step(db, tenant_a, popup, step_type="tickets")
-        _make_step(db, tenant_a, popup, step_type="buyer", sales_flow_id=flow.id)
-
-        steps, total = ticketing_steps_crud.find_for_flow(db, popup.id, flow.id)
-
-        assert total == 1
-        assert [s.step_type for s in steps] == ["buyer"], (
-            "A flow that owns any step must use ONLY its own list"
+        flow_a = _make_flow(db, tenant_a, popup, slug=f"edit-a-{uuid.uuid4().hex[:6]}")
+        flow_b = _make_flow(db, tenant_a, popup, slug=f"edit-b-{uuid.uuid4().hex[:6]}")
+        step_a = _make_step(
+            db, tenant_a, popup, step_type="tickets", sales_flow_id=flow_a.id
+        )
+        step_b = _make_step(
+            db, tenant_a, popup, step_type="tickets", sales_flow_id=flow_b.id
         )
 
-    def test_flow_owned_all_disabled_never_falls_back(
+        step_a.title = "Renamed in flow A"
+        db.add(step_a)
+        db.commit()
+        db.refresh(step_b)
+
+        assert step_b.title == "tickets"
+
+
+class TestPortalReadPath:
+    def test_portal_returns_only_enabled_steps_of_the_flow(
         self, db: Session, tenant_a: Tenants
     ) -> None:
         popup = _make_popup(db, tenant_a)
-        flow = _make_flow(db, tenant_a, popup, slug="flow-all-disabled")
-        _make_step(db, tenant_a, popup, step_type="tickets")
+        flow = _make_flow(db, tenant_a, popup, slug=f"portal-{uuid.uuid4().hex[:6]}")
+        _make_step(db, tenant_a, popup, step_type="tickets", sales_flow_id=flow.id)
         _make_step(
             db,
             tenant_a,
             popup,
-            step_type="buyer",
+            step_type="housing",
             sales_flow_id=flow.id,
             is_enabled=False,
         )
 
-        steps, total = ticketing_steps_crud.find_for_flow(db, popup.id, flow.id)
+        steps = ticketing_steps_crud.find_portal_by_flow(db, flow.id)
 
-        assert total == 1
-        assert steps[0].step_type == "buyer", (
-            "Ownership is ANY row regardless of is_enabled — a fully-disabled "
-            "flow-owned list still owns it, it never falls through"
-        )
+        assert [s.step_type for s in steps] == ["tickets"]
 
-    def test_editing_flow_a_steps_does_not_affect_flow_b(
+    def test_all_steps_disabled_yields_empty_not_a_fallback(
         self, db: Session, tenant_a: Tenants
     ) -> None:
         popup = _make_popup(db, tenant_a)
-        flow_a = _make_flow(db, tenant_a, popup, slug="flow-a")
-        flow_b = _make_flow(db, tenant_a, popup, slug="flow-b")
-        _make_step(db, tenant_a, popup, step_type="tickets")
-        _make_step(db, tenant_a, popup, step_type="buyer", sales_flow_id=flow_a.id)
-
-        steps_a, _ = ticketing_steps_crud.find_for_flow(db, popup.id, flow_a.id)
-        steps_b, _ = ticketing_steps_crud.find_for_flow(db, popup.id, flow_b.id)
-
-        assert [s.step_type for s in steps_a] == ["buyer"]
-        assert [s.step_type for s in steps_b] == ["tickets"], (
-            "Flow B owns no steps of its own — must fall back to the "
-            "popup-shared tier, not leak flow A's steps"
-        )
-
-
-class TestFindPortalForFlow:
-    def test_portal_resolution_filters_enabled_within_owned_tier(
-        self, db: Session, tenant_a: Tenants
-    ) -> None:
-        popup = _make_popup(db, tenant_a)
-        flow = _make_flow(db, tenant_a, popup, slug="flow-portal")
-        _make_step(db, tenant_a, popup, step_type="buyer", sales_flow_id=flow.id)
+        other = _make_flow(db, tenant_a, popup, slug=f"other-{uuid.uuid4().hex[:6]}")
+        flow = _make_flow(db, tenant_a, popup, slug=f"dark-{uuid.uuid4().hex[:6]}")
+        _make_step(db, tenant_a, popup, step_type="tickets", sales_flow_id=other.id)
         _make_step(
             db,
             tenant_a,
             popup,
-            step_type="hidden",
+            step_type="tickets",
             sales_flow_id=flow.id,
             is_enabled=False,
         )
 
-        steps = ticketing_steps_crud.find_portal_for_flow(db, popup.id, flow.id)
+        assert ticketing_steps_crud.find_portal_by_flow(db, flow.id) == []
 
-        assert [s.step_type for s in steps] == ["buyer"]
 
-    def test_portal_resolution_falls_back_when_flow_owns_nothing(
+class TestPatronGuardIsPerFlow:
+    def test_second_patron_step_in_the_same_flow_is_rejected(
         self, db: Session, tenant_a: Tenants
     ) -> None:
         popup = _make_popup(db, tenant_a)
-        flow = _make_flow(db, tenant_a, popup, slug="flow-empty")
-        _make_step(db, tenant_a, popup, step_type="tickets")
-
-        steps = ticketing_steps_crud.find_portal_for_flow(db, popup.id, flow.id)
-
-        assert [s.step_type for s in steps] == ["tickets"]
-
-
-class TestPatronPresetGuardPerTier:
-    def test_flow_tier_guard_ignores_popup_shared_patron_step(
-        self, db: Session, tenant_a: Tenants
-    ) -> None:
-        popup = _make_popup(db, tenant_a)
-        flow = _make_flow(db, tenant_a, popup, slug="flow-patron")
-        _make_step(db, tenant_a, popup, step_type="patron", template="patron-preset")
-
-        # Must not raise — flow tier has no patron-preset row of its own yet.
-        ticketing_steps_crud._assert_no_active_patron_preset(
-            db, popup.id, flow_id=flow.id
-        )
-
-    def test_popup_shared_guard_ignores_flow_owned_patron_step(
-        self, db: Session, tenant_a: Tenants
-    ) -> None:
-        popup = _make_popup(db, tenant_a)
-        flow = _make_flow(db, tenant_a, popup, slug="flow-patron-2")
+        flow = _make_flow(db, tenant_a, popup, slug=f"patron-{uuid.uuid4().hex[:6]}")
         _make_step(
             db,
             tenant_a,
@@ -221,5 +191,25 @@ class TestPatronPresetGuardPerTier:
             template="patron-preset",
         )
 
-        # Must not raise — popup-shared tier has no patron-preset row.
-        ticketing_steps_crud._assert_no_active_patron_preset(db, popup.id)
+        with pytest.raises(HTTPException) as exc:
+            ticketing_steps_crud._assert_no_active_patron_preset(db, flow.id)
+
+        assert exc.value.status_code == 422
+
+    def test_another_flow_may_have_its_own_patron_step(
+        self, db: Session, tenant_a: Tenants
+    ) -> None:
+        popup = _make_popup(db, tenant_a)
+        flow_a = _make_flow(db, tenant_a, popup, slug=f"pat-a-{uuid.uuid4().hex[:6]}")
+        flow_b = _make_flow(db, tenant_a, popup, slug=f"pat-b-{uuid.uuid4().hex[:6]}")
+        _make_step(
+            db,
+            tenant_a,
+            popup,
+            step_type="patron",
+            sales_flow_id=flow_a.id,
+            template="patron-preset",
+        )
+
+        # Must not raise: the invariant is one patron step per FLOW.
+        ticketing_steps_crud._assert_no_active_patron_preset(db, flow_b.id)

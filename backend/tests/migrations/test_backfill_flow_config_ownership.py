@@ -100,35 +100,40 @@ def _seed_secondary_flow(db: Session, popup_id: uuid.UUID) -> uuid.UUID:
     return flow_id
 
 
-def _seed_step(
+def _seed_field(
     db: Session,
     popup_id: uuid.UUID,
-    step_type: str,
     flow_id: uuid.UUID | None = None,
 ) -> uuid.UUID:
-    step_id = uuid.uuid4()
+    """Seed a form field, the representative config row for these tests.
+
+    `ticketingsteps.sales_flow_id` went NOT NULL in slice 2, so an unowned
+    step is no longer expressible; `formfields` still carries the nullable
+    column until slice 3 does the same there.
+    """
+    field_id = uuid.uuid4()
     db.exec(
         text(
-            "INSERT INTO ticketingsteps "
-            '(id, tenant_id, popup_id, step_type, title, "order", sales_flow_id) '
-            "SELECT :id, p.tenant_id, :pid, :st, :title, 0, :fid "
+            "INSERT INTO formfields "
+            "(id, tenant_id, popup_id, name, label, sales_flow_id) "
+            "SELECT :id, p.tenant_id, :pid, :name, :label, :fid "
             "FROM popups p WHERE p.id = :pid"
         ).bindparams(
-            id=step_id,
+            id=field_id,
             pid=popup_id,
-            st=step_type,
-            title=f"Step {step_id.hex[:6]}",
+            name=f"field_{field_id.hex[:8]}",
+            label=f"Field {field_id.hex[:6]}",
             fid=flow_id,
         )
     )
     db.commit()
-    return step_id
+    return field_id
 
 
-def _flow_of_step(db: Session, step_id: uuid.UUID):
+def _flow_of_field(db: Session, field_id: uuid.UUID):
     return db.exec(
-        text("SELECT sales_flow_id FROM ticketingsteps WHERE id = :id").bindparams(
-            id=step_id
+        text("SELECT sales_flow_id FROM formfields WHERE id = :id").bindparams(
+            id=field_id
         )
     ).one()[0]
 
@@ -136,6 +141,7 @@ def _flow_of_step(db: Session, step_id: uuid.UUID):
 def _cleanup(db: Session, popup_id: uuid.UUID) -> None:
     for stmt in (
         "DELETE FROM ticketingsteps WHERE popup_id = :id",
+        "DELETE FROM formfields WHERE popup_id = :id",
         "DELETE FROM email_templates WHERE popup_id = :id",
         "DELETE FROM sales_flows WHERE popup_id = :id",
         "DELETE FROM popups WHERE id = :id",
@@ -173,14 +179,14 @@ def test_shared_config_row_is_claimed_by_the_default_flow(
     module = _load_migration_module()
     popup_id, default_flow_id = _seed_popup_with_default_flow(db, tenant_a.id)
     try:
-        shared_step = _seed_step(db, popup_id, "tickets", flow_id=None)
-        assert _flow_of_step(db, shared_step) is None
+        shared_field = _seed_field(db, popup_id, flow_id=None)
+        assert _flow_of_field(db, shared_field) is None
 
         with patch.object(module.op, "get_bind", return_value=db.connection()):
             module.upgrade()
         db.commit()
 
-        assert _flow_of_step(db, shared_step) == default_flow_id
+        assert _flow_of_field(db, shared_field) == default_flow_id
     finally:
         _cleanup(db, popup_id)
 
@@ -193,14 +199,14 @@ def test_row_owned_by_a_non_default_flow_is_not_stolen(
     popup_id, default_flow_id = _seed_popup_with_default_flow(db, tenant_a.id)
     try:
         other_flow_id = _seed_secondary_flow(db, popup_id)
-        owned_step = _seed_step(db, popup_id, "tickets", flow_id=other_flow_id)
+        owned_field = _seed_field(db, popup_id, flow_id=other_flow_id)
 
         with patch.object(module.op, "get_bind", return_value=db.connection()):
             module.upgrade()
         db.commit()
 
-        assert _flow_of_step(db, owned_step) == other_flow_id
-        assert _flow_of_step(db, owned_step) != default_flow_id
+        assert _flow_of_field(db, owned_field) == other_flow_id
+        assert _flow_of_field(db, owned_field) != default_flow_id
     finally:
         _cleanup(db, popup_id)
 
@@ -209,14 +215,14 @@ def test_backfill_is_idempotent(db: Session, tenant_a: Tenants) -> None:
     module = _load_migration_module()
     popup_id, default_flow_id = _seed_popup_with_default_flow(db, tenant_a.id)
     try:
-        shared_step = _seed_step(db, popup_id, "tickets", flow_id=None)
+        shared_field = _seed_field(db, popup_id, flow_id=None)
 
         for _ in range(2):
             with patch.object(module.op, "get_bind", return_value=db.connection()):
                 module.upgrade()
             db.commit()
 
-        assert _flow_of_step(db, shared_step) == default_flow_id
+        assert _flow_of_field(db, shared_field) == default_flow_id
     finally:
         _cleanup(db, popup_id)
 

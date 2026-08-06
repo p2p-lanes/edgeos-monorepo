@@ -146,6 +146,13 @@ def _make_ticketing_step(
     is_enabled: bool = True,
     sales_flow_id: uuid.UUID | None = None,
 ) -> TicketingSteps:
+    # Every step belongs to a flow (slice 2). Unless a test is specifically
+    # about a second flow, that flow is the popup's default one.
+    if sales_flow_id is None:
+        from app.api.sales_flow.crud import sales_flows_crud
+
+        sales_flow_id = sales_flows_crud.get_default_flow(db, popup.id).id
+
     step = TicketingSteps(
         id=uuid.uuid4(),
         tenant_id=popup.tenant_id,
@@ -286,17 +293,17 @@ def test_runtime_only_enabled_ticketing_steps(
     assert [step["title"] for step in body["ticketing_steps"]] == ["Visible Step"]
 
 
-def test_runtime_ticketing_steps_popup_shared_tier_only(
+def test_runtime_returns_only_the_resolved_flows_steps(
     client: TestClient, db: Session, tenant_a: Tenants
 ) -> None:
-    """The open-ticketing runtime hasn't resolved a flow yet (slice 9), so it
-    reads the popup-shared tier only (sales_flow_id IS NULL) for ticketing
-    steps — same fallback tier it already uses for form_sections/form_schema
-    (sdd/sales-flows slice 8, disclosed asymmetry vs the portal-facing
-    /ticketing-steps/portal endpoint, which resolves the default flow)."""
+    """Without a flow slug the runtime resolves the popup's default flow and
+    returns exactly its steps (sdd/sales-flows-rediseno slice 2). Another
+    flow's list must never appear."""
+    from app.api.sales_flow.crud import sales_flows_crud
     from app.api.sales_flow.models import SalesFlows
 
     popup = _make_direct_popup(db, tenant_a)
+    default_flow = sales_flows_crud.get_default_flow(db, popup.id)
     flow = SalesFlows(
         tenant_id=tenant_a.id,
         popup_id=popup.id,
@@ -307,7 +314,13 @@ def test_runtime_ticketing_steps_popup_shared_tier_only(
     db.add(flow)
     db.flush()
 
-    _make_ticketing_step(db, popup, step_type="tickets", title="Shared Step")
+    _make_ticketing_step(
+        db,
+        popup,
+        step_type="tickets",
+        title="Default Flow Step",
+        sales_flow_id=default_flow.id,
+    )
     _make_ticketing_step(
         db,
         popup,
@@ -325,9 +338,9 @@ def test_runtime_ticketing_steps_popup_shared_tier_only(
 
     assert response.status_code == 200, response.text
     body = response.json()
-    assert [step["title"] for step in body["ticketing_steps"]] == ["Shared Step"], (
-        "Flow-owned steps must never leak into the popup-shared runtime"
-    )
+    assert [step["title"] for step in body["ticketing_steps"]] == [
+        "Default Flow Step"
+    ], "Another flow's steps must never leak into the resolved flow's runtime"
 
 
 def test_runtime_excludes_hidden_sections_and_their_fields(

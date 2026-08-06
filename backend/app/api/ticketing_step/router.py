@@ -38,25 +38,16 @@ async def list_portal_ticketing_steps(
     accept_language: Annotated[str | None, Header(alias="Accept-Language")] = None,
     sales_flow_id: uuid.UUID | None = None,
 ) -> ListModel[TicketingStepPublic]:
-    """List enabled ticketing steps for a popup (portal-facing).
+    """List the enabled ticketing steps of one sales flow (portal-facing).
 
-    Resolves the sales flow named by `sales_flow_id` (sdd/sales-flows D6
-    URL scheme, task 9.8 — must belong to this popup, mirrors
-    `_get_flow_or_404`), falling back to the popup's default flow when
-    omitted, falling back further to the popup-shared tier when that flow
-    owns no steps of its own (see `find_portal_for_flow`, slice 8).
+    Resolves the flow named by `sales_flow_id` (sdd/sales-flows D6 URL
+    scheme — must belong to this popup, mirrors `_get_flow_or_404`), or the
+    popup's default flow when omitted. The resolved flow's own steps are
+    the answer: since slice 2 nothing is inherited, so an empty list means
+    this flow has no steps.
     """
-    from app.api.sales_flow.crud import sales_flows_crud
-
-    if sales_flow_id is not None:
-        flow = _get_flow_or_404(db, popup_id, sales_flow_id)
-        flow_id = flow.id
-    else:
-        default_flow = sales_flows_crud.get_default_flow(db, popup_id)
-        flow_id = default_flow.id if default_flow else None
-    steps = crud.ticketing_steps_crud.find_portal_for_flow(
-        db, popup_id=popup_id, flow_id=flow_id
-    )
+    flow = _resolve_flow_or_404(db, popup_id, sales_flow_id)
+    steps = crud.ticketing_steps_crud.find_portal_by_flow(db, flow.id)
     lang = parse_accept_language(accept_language)
     translations_map = (
         get_translations_bulk(db, "ticketing_step", [s.id for s in steps], lang)
@@ -85,19 +76,15 @@ async def list_ticketing_steps(
 ) -> ListModel[TicketingStepPublic]:
     """List ticketing steps.
 
-    Without `sales_flow_id`, returns the popup-shared tier only
-    (sdd/sales-flows slice 8) — identical to this popup's step list before
-    this slice, since no writer created flow-scoped rows until now. With
-    `sales_flow_id`, returns the RESOLVED step list for that flow: its own
-    rows if it owns any, else the popup-shared fallback.
+    With `popup_id`, returns the step list of one flow: the one named by
+    `sales_flow_id`, or the popup's default flow when omitted. That list is
+    exactly what the flow owns — since slice 2 there is no shared tier to
+    fall back to.
     """
-    if popup_id and sales_flow_id is not None:
-        steps, total = crud.ticketing_steps_crud.find_for_flow(
-            db, popup_id=popup_id, flow_id=sales_flow_id, skip=skip, limit=limit
-        )
-    elif popup_id:
-        steps, total = crud.ticketing_steps_crud.find_shared(
-            db, popup_id=popup_id, skip=skip, limit=limit
+    if popup_id:
+        flow = _resolve_flow_or_404(db, popup_id, sales_flow_id)
+        steps, total = crud.ticketing_steps_crud.find_by_flow(
+            db, flow.id, skip=skip, limit=limit
         )
     else:
         steps, total = crud.ticketing_steps_crud.find(db, skip=skip, limit=limit)
@@ -141,6 +128,28 @@ def _get_flow_or_404(db, popup_id: uuid.UUID, flow_id: uuid.UUID):
             detail="Sales flow not found for this popup",
         )
     return flow
+
+
+def _resolve_flow_or_404(db, popup_id: uuid.UUID, flow_id: uuid.UUID | None):
+    """The flow a step read is scoped to: the requested one, or the popup's
+    default flow when none was named.
+
+    Every popup has a default flow (`4a983282b8aa`), so a missing one means
+    the popup is unusable rather than empty — say so instead of returning a
+    silently empty step list.
+    """
+    if flow_id is not None:
+        return _get_flow_or_404(db, popup_id, flow_id)
+
+    from app.api.sales_flow.crud import sales_flows_crud
+
+    default_flow = sales_flows_crud.get_default_flow(db, popup_id)
+    if default_flow is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="This popup has no default sales flow",
+        )
+    return default_flow
 
 
 def _validate_template_config_fk(
@@ -210,15 +219,13 @@ async def create_ticketing_step(
     else:
         tenant_id = current_user.tenant_id
 
-    if step_in.sales_flow_id is not None:
-        _get_flow_or_404(db, step_in.popup_id, step_in.sales_flow_id)
+    _get_flow_or_404(db, step_in.popup_id, step_in.sales_flow_id)
 
-    # Singleton guard: only one enabled patron-preset step per tier
-    # (sdd/sales-flows slice 8 — flow tier if sales_flow_id is set, else the
-    # popup-shared tier).
+    # Singleton guard: one enabled patron-preset step per flow
+    # (sdd/sales-flows-rediseno slice 2).
     if step_in.template == "patron-preset" and step_in.is_enabled:
         crud.ticketing_steps_crud._assert_no_active_patron_preset(
-            db, step_in.popup_id, flow_id=step_in.sales_flow_id
+            db, step_in.sales_flow_id
         )
 
     # FK existence check for attendee_categories in template_config (Pattern B, ADR-5)

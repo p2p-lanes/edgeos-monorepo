@@ -20,9 +20,12 @@ def _admin_headers(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
-def _make_ticket_select_step(popup_id: uuid.UUID, sections: list[dict]) -> dict:
+def _make_ticket_select_step(
+    popup_id: uuid.UUID, flow_id: uuid.UUID, sections: list[dict]
+) -> dict:
     return {
         "popup_id": str(popup_id),
+        "sales_flow_id": str(flow_id),
         "step_type": "tickets",
         "title": f"Ticket Step {uuid.uuid4().hex[:8]}",
         "template": "ticket-select",
@@ -45,13 +48,16 @@ class TestTemplateConfigAttendeeCategories:
         client: TestClient,
         admin_token_tenant_a: str,
         popup_tenant_a: Popups,
+        default_flow_tenant_a,
     ) -> None:
         """POST section without attendee_categories key → 201, GET returns null."""
         section = _base_section("no-cat")
         resp = client.post(
             "/api/v1/ticketing-steps",
             headers=_admin_headers(admin_token_tenant_a),
-            json=_make_ticket_select_step(popup_tenant_a.id, [section]),
+            json=_make_ticket_select_step(
+                popup_tenant_a.id, default_flow_tenant_a.id, [section]
+            ),
         )
         assert resp.status_code == 201, resp.text
         step_id = resp.json()["id"]
@@ -69,6 +75,7 @@ class TestTemplateConfigAttendeeCategories:
         client: TestClient,
         admin_token_tenant_a: str,
         popup_tenant_a: Popups,
+        default_flow_tenant_a,
     ) -> None:
         """POST section with valid attendee_categories (UUIDs) → 201, GET returns exact list."""
         # Fetch the main category UUID for this popup
@@ -86,6 +93,7 @@ class TestTemplateConfigAttendeeCategories:
                 headers=_admin_headers(admin_token_tenant_a),
                 json={
                     "popup_id": str(popup_tenant_a.id),
+                    "sales_flow_id": str(default_flow_tenant_a.id),
                     "key": "vip",
                     "sort_order": 1,
                     "enabled_in_passes_flow": True,
@@ -100,7 +108,9 @@ class TestTemplateConfigAttendeeCategories:
         resp = client.post(
             "/api/v1/ticketing-steps",
             headers=_admin_headers(admin_token_tenant_a),
-            json=_make_ticket_select_step(popup_tenant_a.id, [section]),
+            json=_make_ticket_select_step(
+                popup_tenant_a.id, default_flow_tenant_a.id, [section]
+            ),
         )
         assert resp.status_code == 201, resp.text
         step_id = resp.json()["id"]
@@ -118,13 +128,16 @@ class TestTemplateConfigAttendeeCategories:
         client: TestClient,
         admin_token_tenant_a: str,
         popup_tenant_a: Popups,
+        default_flow_tenant_a,
     ) -> None:
         """POST section with 'teen' in attendee_categories → 422 (not in backend enum)."""
         section = {**_base_section("invalid"), "attendee_categories": ["teen"]}
         resp = client.post(
             "/api/v1/ticketing-steps",
             headers=_admin_headers(admin_token_tenant_a),
-            json=_make_ticket_select_step(popup_tenant_a.id, [section]),
+            json=_make_ticket_select_step(
+                popup_tenant_a.id, default_flow_tenant_a.id, [section]
+            ),
         )
         assert resp.status_code == 422, resp.text
 
@@ -133,13 +146,16 @@ class TestTemplateConfigAttendeeCategories:
         client: TestClient,
         admin_token_tenant_a: str,
         popup_tenant_a: Popups,
+        default_flow_tenant_a,
     ) -> None:
         """POST section with empty [] list → 201, stored and returned as []."""
         section = {**_base_section("empty"), "attendee_categories": []}
         resp = client.post(
             "/api/v1/ticketing-steps",
             headers=_admin_headers(admin_token_tenant_a),
-            json=_make_ticket_select_step(popup_tenant_a.id, [section]),
+            json=_make_ticket_select_step(
+                popup_tenant_a.id, default_flow_tenant_a.id, [section]
+            ),
         )
         assert resp.status_code == 201, resp.text
         step_id = resp.json()["id"]
@@ -157,6 +173,7 @@ class TestTemplateConfigAttendeeCategories:
         client: TestClient,
         admin_token_tenant_a: str,
         popup_tenant_a: Popups,
+        default_flow_tenant_a,
     ) -> None:
         """PATCH with template: ticket_select + invalid attendee_categories → 422."""
         # First create a valid step
@@ -164,7 +181,9 @@ class TestTemplateConfigAttendeeCategories:
         post_resp = client.post(
             "/api/v1/ticketing-steps",
             headers=_admin_headers(admin_token_tenant_a),
-            json=_make_ticket_select_step(popup_tenant_a.id, [section]),
+            json=_make_ticket_select_step(
+                popup_tenant_a.id, default_flow_tenant_a.id, [section]
+            ),
         )
         assert post_resp.status_code == 201, post_resp.text
         step_id = post_resp.json()["id"]
@@ -189,6 +208,7 @@ class TestTemplateConfigAttendeeCategories:
         client: TestClient,
         admin_token_tenant_a: str,
         popup_tenant_a: Popups,
+        default_flow_tenant_a,
     ) -> None:
         """POST with non-ticket_select template + invalid attendee_categories → 201 (skipped)."""
         section = {**_base_section("other-tmpl"), "attendee_categories": ["teen"]}
@@ -197,6 +217,7 @@ class TestTemplateConfigAttendeeCategories:
             headers=_admin_headers(admin_token_tenant_a),
             json={
                 "popup_id": str(popup_tenant_a.id),
+                "sales_flow_id": str(default_flow_tenant_a.id),
                 "step_type": "tickets",
                 "title": f"Other Template {uuid.uuid4().hex[:8]}",
                 "template": "other",

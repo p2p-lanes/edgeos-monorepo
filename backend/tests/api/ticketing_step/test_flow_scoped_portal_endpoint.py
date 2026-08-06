@@ -41,7 +41,7 @@ def _make_flow(db: Session, popup: Popups, *, slug: str) -> SalesFlows:
     return flow
 
 
-def _make_step(db: Session, popup: Popups, *, title: str, sales_flow_id=None):
+def _make_step(db: Session, popup: Popups, *, title: str, sales_flow_id):
     step = TicketingSteps(
         tenant_id=popup.tenant_id,
         popup_id=popup.id,
@@ -76,7 +76,8 @@ class TestPortalTicketingStepsAcceptsExplicitFlow:
     ) -> None:
         popup = _make_popup(db, tenant_a)
         flow = _make_flow(db, popup, slug="vip")
-        _make_step(db, popup, title="Shared Step")
+        other = _make_flow(db, popup, slug="portal-other-flow")
+        _make_step(db, popup, title="Other Flow Step", sales_flow_id=other.id)
         _make_step(db, popup, title="VIP Step", sales_flow_id=flow.id)
         db.commit()
         token = _human_token(db, tenant_a)

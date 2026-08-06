@@ -188,6 +188,7 @@ def _seed_base_field_configs(session: Session, popup_map: dict, tenant_id) -> No
 
 
 def _seed_ticketing_steps(session: Session, popup_map: dict, tenant_id) -> None:
+    from app.api.sales_flow.crud import sales_flows_crud
     from app.api.ticketing_step.constants import seed_ticketing_steps_for_popup
     from app.models import TicketingSteps
 
@@ -198,11 +199,19 @@ def _seed_ticketing_steps(session: Session, popup_map: dict, tenant_id) -> None:
         if existing:
             continue
 
+        default_flow = sales_flows_crud.get_default_flow(session, popup.id)
+        if default_flow is None:
+            logger.warning(
+                f"Skipping ticketing-step seed for {popup_key}: no default sales flow"
+            )
+            continue
+
         seed_ticketing_steps_for_popup(
             session,
             popup_id=popup.id,
             tenant_id=tenant_id,
-            flow_type=str(popup.sale_type) if popup.sale_type else None,
+            sales_flow_id=default_flow.id,
+            flow_type=default_flow.type,
         )
         logger.info(f"Ticketing steps seeded for {popup_key}")
 

@@ -83,11 +83,11 @@ class TestPatronProductRulesMigration:
             SELECT indexname
             FROM pg_indexes
             WHERE tablename = 'ticketingsteps'
-              AND indexname = 'uq_ticketing_step_patron_popup_shared'
+              AND indexname = 'uq_ticketing_step_patron_flow'
             """
         ).fetchone()
         assert row is not None, (
-            "Index 'uq_ticketing_step_patron_popup_shared' not found on "
+            "Index 'uq_ticketing_step_patron_flow' not found on "
             "ticketingsteps. Run migration 96ca481168da."
         )
 
@@ -103,12 +103,10 @@ class TestPatronProductRulesMigration:
             JOIN pg_class c ON c.relname = pi.indexname
             JOIN pg_index ix ON ix.indexrelid = c.oid
             WHERE pi.tablename = 'ticketingsteps'
-              AND pi.indexname = 'uq_ticketing_step_patron_popup_shared'
+              AND pi.indexname = 'uq_ticketing_step_patron_flow'
             """
         ).fetchone()
-        assert row is not None, (
-            "uq_ticketing_step_patron_popup_shared not found in pg_index"
-        )
+        assert row is not None, "uq_ticketing_step_patron_flow not found in pg_index"
         assert row[0] is True, (
             "uq_ticketing_step_patron_popup_shared must be a unique index"
         )

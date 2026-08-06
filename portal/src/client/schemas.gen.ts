@@ -22697,15 +22697,8 @@ export const TicketingStepCreateSchema = {
             title: 'Popup Id'
         },
         sales_flow_id: {
-            anyOf: [
-                {
-                    type: 'string',
-                    format: 'uuid'
-                },
-                {
-                    type: 'null'
-                }
-            ],
+            type: 'string',
+            format: 'uuid',
             title: 'Sales Flow Id'
         },
         step_type: {
@@ -22810,7 +22803,7 @@ export const TicketingStepCreateSchema = {
         }
     },
     type: 'object',
-    required: ['popup_id', 'step_type', 'title'],
+    required: ['popup_id', 'sales_flow_id', 'step_type', 'title'],
     title: 'TicketingStepCreate'
 } as const;
 
@@ -22832,15 +22825,8 @@ export const TicketingStepPublicSchema = {
             title: 'Popup Id'
         },
         sales_flow_id: {
-            anyOf: [
-                {
-                    type: 'string',
-                    format: 'uuid'
-                },
-                {
-                    type: 'null'
-                }
-            ],
+            type: 'string',
+            format: 'uuid',
             title: 'Sales Flow Id'
         },
         step_type: {
@@ -22950,7 +22936,7 @@ export const TicketingStepPublicSchema = {
         }
     },
     type: 'object',
-    required: ['id', 'tenant_id', 'popup_id', 'step_type', 'title'],
+    required: ['id', 'tenant_id', 'popup_id', 'sales_flow_id', 'step_type', 'title'],
     title: 'TicketingStepPublic'
 } as const;
 

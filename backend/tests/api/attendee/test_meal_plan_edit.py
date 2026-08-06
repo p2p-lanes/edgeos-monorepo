@@ -93,6 +93,16 @@ def _make_popup(db: Session, tenant: Tenants, *, suffix: str) -> Popups:
     db.add(popup)
     db.commit()
     db.refresh(popup)
+
+    # A real popup always gets a default flow at creation, and since
+    # sdd/sales-flows-rediseno slice 2 a ticketing step cannot exist without
+    # one.
+    from app.api.sales_flow.crud import sales_flows_crud
+
+    sales_flows_crud.provision_default_flow(
+        db, popup_id=popup.id, tenant_id=tenant.id, sale_type="direct"
+    )
+    db.commit()
     return popup
 
 
@@ -128,10 +138,13 @@ def _make_meal_plan_step(
     popup: Popups,
     product: Products,
 ) -> TicketingSteps:
+    from app.api.sales_flow.crud import sales_flows_crud
+
     step = TicketingSteps(
         id=uuid.uuid4(),
         tenant_id=tenant.id,
         popup_id=popup.id,
+        sales_flow_id=sales_flows_crud.get_default_flow(db, popup.id).id,
         step_type="meal_plan",
         title="Meal Plan",
         template="meal-plan-select",

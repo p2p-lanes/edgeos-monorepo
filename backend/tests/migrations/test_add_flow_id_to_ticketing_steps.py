@@ -158,7 +158,15 @@ def test_alembic_single_head_after_add_flow_id_to_ticketing_steps() -> None:
 # ---------------------------------------------------------------------------
 
 
-class TestPatronPresetTwoTierUniqueness:
+class TestPatronPresetUniquenessPerFlow:
+    """One enabled patron-preset step per FLOW.
+
+    This started as a two-tier invariant (flow tier + popup-shared tier).
+    sdd/sales-flows-rediseno slice 2 (`c5a71e3f8b24`) made `sales_flow_id`
+    NOT NULL, which removed the shared tier and collapsed the two partial
+    indexes into one.
+    """
+
     def test_different_flows_both_persist(self, db: Session, tenant_a: Tenants) -> None:
         popup_id = _insert_popup(db, tenant_a.id)
         try:
@@ -191,46 +199,15 @@ class TestPatronPresetTwoTierUniqueness:
         finally:
             _cleanup(db, popup_id)
 
-    def test_both_popup_shared_rejected(self, db: Session, tenant_a: Tenants) -> None:
-        """Legacy behavior: at most one enabled patron-preset step per popup, unchanged."""
-        popup_id = _insert_popup(db, tenant_a.id)
-        try:
-            _insert_patron_step(db, tenant_a.id, popup_id, None)
-
-            with pytest.raises(IntegrityError):
-                _insert_patron_step(db, tenant_a.id, popup_id, None)
-            db.rollback()
-        finally:
-            _cleanup(db, popup_id)
-
-    def test_popup_shared_and_flow_scoped_do_not_collide(
-        self, db: Session, tenant_a: Tenants
-    ) -> None:
+    def test_disabled_rows_never_collide(self, db: Session, tenant_a: Tenants) -> None:
+        """A disabled patron-preset row sits outside the partial index, so it
+        never collides — even twice within the same flow."""
         popup_id = _insert_popup(db, tenant_a.id)
         try:
             flow_a = _insert_flow(db, tenant_a.id, popup_id, slug="flow-a")
-            _insert_patron_step(db, tenant_a.id, popup_id, None)
-            # Must not raise — different tier (flow-scoped vs popup-shared).
-            _insert_patron_step(db, tenant_a.id, popup_id, flow_a)
-
-            count = db.exec(
-                text(
-                    "SELECT COUNT(*) FROM ticketingsteps "
-                    "WHERE popup_id = :pid AND template = 'patron-preset'"
-                ).bindparams(pid=popup_id)
-            ).scalar()
-            assert count == 2
-        finally:
-            _cleanup(db, popup_id)
-
-    def test_disabled_rows_never_collide(self, db: Session, tenant_a: Tenants) -> None:
-        """A disabled patron-preset row is outside the partial index entirely,
-        same as before this slice — it never collides with anything."""
-        popup_id = _insert_popup(db, tenant_a.id)
-        try:
-            _insert_patron_step(db, tenant_a.id, popup_id, None, is_enabled=False)
+            _insert_patron_step(db, tenant_a.id, popup_id, flow_a, is_enabled=False)
             # Must not raise — the first row is disabled, outside the index.
-            _insert_patron_step(db, tenant_a.id, popup_id, None, is_enabled=False)
+            _insert_patron_step(db, tenant_a.id, popup_id, flow_a, is_enabled=False)
 
             count = db.exec(
                 text(

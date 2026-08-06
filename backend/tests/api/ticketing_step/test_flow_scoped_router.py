@@ -64,17 +64,24 @@ def _make_step(
 
 
 class TestListTicketingStepsFlowAware:
-    def test_without_sales_flow_id_returns_popup_shared_tier(
+    def test_without_sales_flow_id_resolves_the_default_flow(
         self,
         client: TestClient,
         db: Session,
         tenant_a: Tenants,
         admin_token_tenant_a: str,
     ) -> None:
+        """Omitting the flow means "the default one", never a shared tier."""
         popup = _make_popup(db, tenant_a)
-        flow = _make_flow(db, tenant_a, popup, slug="router-flow-a")
-        _make_step(db, tenant_a, popup, step_type="tickets")
-        _make_step(db, tenant_a, popup, step_type="buyer", sales_flow_id=flow.id)
+        default_flow = sales_flows_crud.provision_default_flow(
+            db, popup_id=popup.id, tenant_id=tenant_a.id, sale_type="application"
+        )
+        db.commit()
+        other = _make_flow(db, tenant_a, popup, slug="router-flow-a")
+        _make_step(
+            db, tenant_a, popup, step_type="tickets", sales_flow_id=default_flow.id
+        )
+        _make_step(db, tenant_a, popup, step_type="buyer", sales_flow_id=other.id)
 
         resp = client.get(
             "/api/v1/ticketing-steps",
@@ -94,8 +101,14 @@ class TestListTicketingStepsFlowAware:
         admin_token_tenant_a: str,
     ) -> None:
         popup = _make_popup(db, tenant_a)
+        default_flow = sales_flows_crud.provision_default_flow(
+            db, popup_id=popup.id, tenant_id=tenant_a.id, sale_type="application"
+        )
+        db.commit()
         flow = _make_flow(db, tenant_a, popup, slug="router-flow-b")
-        _make_step(db, tenant_a, popup, step_type="tickets")
+        _make_step(
+            db, tenant_a, popup, step_type="tickets", sales_flow_id=default_flow.id
+        )
         _make_step(db, tenant_a, popup, step_type="buyer", sales_flow_id=flow.id)
 
         resp = client.get(
@@ -135,7 +148,8 @@ class TestListPortalTicketingStepsResolvesDefaultFlow:
             db, popup_id=popup.id, tenant_id=tenant_a.id, sale_type="application"
         )
         db.commit()
-        _make_step(db, tenant_a, popup, step_type="tickets")
+        other = _make_flow(db, tenant_a, popup, slug="router-flow-portal-other")
+        _make_step(db, tenant_a, popup, step_type="tickets", sales_flow_id=other.id)
         _make_step(
             db, tenant_a, popup, step_type="buyer", sales_flow_id=default_flow.id
         )
@@ -151,8 +165,8 @@ class TestListPortalTicketingStepsResolvesDefaultFlow:
         assert resp.status_code == 200, resp.text
         step_types = [s["step_type"] for s in resp.json()["results"]]
         assert step_types == ["buyer"], (
-            "The popup's default flow owns a step of its own — the portal "
-            "must resolve through it, not the popup-shared tier"
+            "The portal resolves the popup's default flow and returns exactly "
+            "its steps — a sibling flow's list must never leak in"
         )
 
 
@@ -187,8 +201,20 @@ class TestCreateTicketingStepRejectsCrossPopupFlow:
         assert persisted == []
 
 
-class TestCreateTicketingStepPatronGuardPerTier:
-    def test_flow_owned_patron_step_does_not_block_popup_shared_patron_step(
+class TestCreateTicketingStepPatronGuardPerFlow:
+    """One enabled patron step per FLOW — not per popup (slice 2)."""
+
+    def _patron_body(self, popup_id, flow_id) -> dict:
+        return {
+            "popup_id": str(popup_id),
+            "sales_flow_id": str(flow_id),
+            "step_type": "patron",
+            "title": "Patron",
+            "template": "patron-preset",
+            "is_enabled": True,
+        }
+
+    def test_each_flow_may_have_its_own_patron_step(
         self,
         client: TestClient,
         db: Session,
@@ -196,31 +222,43 @@ class TestCreateTicketingStepPatronGuardPerTier:
         admin_token_tenant_a: str,
     ) -> None:
         popup = _make_popup(db, tenant_a)
-        flow = _make_flow(db, tenant_a, popup, slug="router-flow-patron")
+        flow_a = _make_flow(db, tenant_a, popup, slug="router-flow-patron-a")
+        flow_b = _make_flow(db, tenant_a, popup, slug="router-flow-patron-b")
 
-        flow_patron = client.post(
+        first = client.post(
             "/api/v1/ticketing-steps",
             headers=_headers(admin_token_tenant_a),
-            json={
-                "popup_id": str(popup.id),
-                "sales_flow_id": str(flow.id),
-                "step_type": "patron",
-                "title": "Patron",
-                "template": "patron-preset",
-                "is_enabled": True,
-            },
+            json=self._patron_body(popup.id, flow_a.id),
         )
-        assert flow_patron.status_code == 201, flow_patron.text
+        assert first.status_code == 201, first.text
 
-        popup_shared_patron = client.post(
+        second = client.post(
             "/api/v1/ticketing-steps",
             headers=_headers(admin_token_tenant_a),
-            json={
-                "popup_id": str(popup.id),
-                "step_type": "patron",
-                "title": "Patron",
-                "template": "patron-preset",
-                "is_enabled": True,
-            },
+            json=self._patron_body(popup.id, flow_b.id),
         )
-        assert popup_shared_patron.status_code == 201, popup_shared_patron.text
+        assert second.status_code == 201, second.text
+
+    def test_second_patron_step_in_the_same_flow_is_rejected(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+        admin_token_tenant_a: str,
+    ) -> None:
+        popup = _make_popup(db, tenant_a)
+        flow = _make_flow(db, tenant_a, popup, slug="router-flow-patron-dup")
+
+        first = client.post(
+            "/api/v1/ticketing-steps",
+            headers=_headers(admin_token_tenant_a),
+            json=self._patron_body(popup.id, flow.id),
+        )
+        assert first.status_code == 201, first.text
+
+        duplicate = client.post(
+            "/api/v1/ticketing-steps",
+            headers=_headers(admin_token_tenant_a),
+            json=self._patron_body(popup.id, flow.id),
+        )
+        assert duplicate.status_code == 422, duplicate.text

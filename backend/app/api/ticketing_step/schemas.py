@@ -158,11 +158,10 @@ def _validate_meal_plan_select_template_config(
 class TicketingStepBase(SQLModel):
     tenant_id: uuid.UUID = Field(foreign_key="tenants.id", index=True)
     popup_id: uuid.UUID = Field(foreign_key="popups.id", index=True)
-    # sdd/sales-flows slice 8. NULL = popup-shared tier (the step list every
-    # flow inherits by default), non-NULL = owned exclusively by that flow.
-    # Mirrors FormFieldBase.sales_flow_id / PopupReviewerBase.sales_flow_id.
-    sales_flow_id: uuid.UUID | None = Field(
-        default=None, foreign_key="sales_flows.id", nullable=True, index=True
+    # sdd/sales-flows-rediseno slice 2: a step belongs to exactly one flow.
+    # There is no popup-shared tier and nothing is inherited.
+    sales_flow_id: uuid.UUID = Field(
+        foreign_key="sales_flows.id", nullable=False, index=True
     )
     step_type: str
     title: str
@@ -186,7 +185,7 @@ class TicketingStepPublic(BaseModel):
     id: uuid.UUID
     tenant_id: uuid.UUID
     popup_id: uuid.UUID
-    sales_flow_id: uuid.UUID | None = None
+    sales_flow_id: uuid.UUID
     step_type: str
     title: str
     description: str | None = None
@@ -207,7 +206,9 @@ class TicketingStepPublic(BaseModel):
 
 class TicketingStepCreate(BaseModel):
     popup_id: uuid.UUID
-    sales_flow_id: uuid.UUID | None = None
+    # Required: every step is created into a specific flow. The caller picks
+    # the flow it is looking at; there is no shared tier to omit into.
+    sales_flow_id: uuid.UUID
     step_type: str
     title: str
     description: str | None = None

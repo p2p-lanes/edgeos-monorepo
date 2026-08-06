@@ -204,9 +204,7 @@ def runtime_for_slug(
     for f in fields:
         fields_by_section.setdefault(f.section_id, []).append(f)
 
-    ticketing_steps = ticketing_steps_crud.find_portal_for_flow(
-        session, popup_id=popup.id, flow_id=flow.id
-    )
+    ticketing_steps = ticketing_steps_crud.find_portal_by_flow(session, flow.id)
 
     attendee_categories = attendee_categories_crud.list_by_popup(session, popup.id)
 

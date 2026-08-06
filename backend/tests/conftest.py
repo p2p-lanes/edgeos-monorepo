@@ -381,6 +381,43 @@ def check_in_controller_token_tenant_b(check_in_controller_user_tenant_b: Users)
     )
 
 
+def _ensure_default_flow(db: Session, popup: Popups):
+    """Give a fixture-built popup the default flow a real one always has.
+
+    `PopupsCRUD.create` provisions one; fixtures that construct `Popups`
+    directly bypass it. Since sdd/sales-flows-rediseno slice 2 a ticketing
+    step cannot exist without a flow, so a popup without one is not a
+    smaller fixture — it is an impossible popup.
+    """
+    from app.api.sales_flow.crud import sales_flows_crud
+
+    existing = sales_flows_crud.get_default_flow(db, popup.id)
+    if existing is not None:
+        return existing
+
+    sale_type = getattr(popup.sale_type, "value", popup.sale_type)
+    flow = sales_flows_crud.provision_default_flow(
+        db,
+        popup_id=popup.id,
+        tenant_id=popup.tenant_id,
+        sale_type=sale_type,
+    )
+    db.commit()
+    return flow
+
+
+@pytest.fixture(scope="session")
+def default_flow_tenant_a(db: Session, popup_tenant_a: Popups):
+    """The default sales flow of `popup_tenant_a` — every step needs one."""
+    return _ensure_default_flow(db, popup_tenant_a)
+
+
+@pytest.fixture(scope="session")
+def default_flow_tenant_b(db: Session, popup_tenant_b: Popups):
+    """The default sales flow of `popup_tenant_b`."""
+    return _ensure_default_flow(db, popup_tenant_b)
+
+
 @pytest.fixture(scope="session")
 def popup_tenant_a(db: Session, tenant_a: Tenants) -> Popups:
     popup = db.exec(select(Popups).where(Popups.slug == "popup-tenant-a")).first()
@@ -395,6 +432,7 @@ def popup_tenant_a(db: Session, tenant_a: Tenants) -> Popups:
         db.commit()
         db.refresh(popup)
 
+    _ensure_default_flow(db, popup)
     return popup
 
 
@@ -412,6 +450,7 @@ def popup_tenant_b(db: Session, tenant_b: Tenants) -> Popups:
         db.commit()
         db.refresh(popup)
 
+    _ensure_default_flow(db, popup)
     return popup
 
 

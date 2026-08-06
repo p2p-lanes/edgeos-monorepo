@@ -109,26 +109,20 @@ def seed_ticketing_steps_for_popup(
     db: Session,
     popup_id: uuid.UUID,
     tenant_id: uuid.UUID,
+    sales_flow_id: uuid.UUID,
     flow_type: str | None = None,
-    sales_flow_id: uuid.UUID | None = None,
 ) -> None:
-    """Seed the default ticketing-step set for a popup, or one specific
-    sales flow of that popup when ``sales_flow_id`` is set (sdd/sales-flows
-    slice 8).
+    """Seed the default ticketing-step set into one sales flow.
+
+    ``sales_flow_id`` is required (sdd/sales-flows-rediseno slice 2): steps
+    are always seeded INTO a flow, because there is no other place for a
+    step to live. Popup creation passes the default flow it just
+    provisioned.
 
     Steps flagged with ``_direct_sale_only`` (e.g. the buyer step) only get
     inserted when ``flow_type='direct'``. Application-type flows collect
     buyer info via the application form earlier in the funnel, so the
     open-ticketing buyer step is irrelevant there.
-
-    ``flow_type`` was ``sale_type`` (read off the popup) before slice 8 —
-    renamed because the gate now reads a sales flow's own ``type`` column
-    instead, per the design's per-area cutover: today every popup's default
-    flow is provisioned with ``type=popup.sale_type`` (task 5.0), so this is
-    a same-value read-source swap, not an observable behavior change, until
-    a flow's type can diverge from its popup's (e.g. slice 13's upsales).
-    ``sales_flow_id`` defaults to ``None`` (popup-shared tier, D1) — seeding
-    never writes flow-owned rows on its own; callers opt in explicitly.
     """
     from app.api.ticketing_step.models import TicketingSteps
 
