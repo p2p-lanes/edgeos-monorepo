@@ -27,6 +27,7 @@ from app.api.popup.models import Popups
 from app.api.product.models import Products
 from app.api.shared.enums import SaleType
 from app.api.tenant.models import Tenants
+from tests._flow_helpers import assign_to_default_flow
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -125,6 +126,7 @@ def _make_product(
     )
     db.add(product)
     db.flush()
+    assign_to_default_flow(db, product)
     return product
 
 
@@ -145,6 +147,7 @@ def _make_non_discountable_product(
     )
     db.add(product)
     db.flush()
+    assign_to_default_flow(db, product)
     return product
 
 

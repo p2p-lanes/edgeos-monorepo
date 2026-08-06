@@ -30,6 +30,7 @@ from app.api.popup.models import Popups
 from app.api.product.models import Products
 from app.api.tenant.models import Tenants
 from app.core.security import create_access_token
+from tests._flow_helpers import assign_to_default_flow
 
 
 class _FakeProduct:
@@ -161,6 +162,7 @@ def _make_product(
     db.add(product)
     db.commit()
     db.refresh(product)
+    assign_to_default_flow(db, product)
     return product
 
 

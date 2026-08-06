@@ -31,7 +31,7 @@ from app.api.referral.models import Referrals
 from app.api.tenant.models import Tenants
 from app.api.user.models import Users
 from app.core.security import create_access_token
-from tests._flow_helpers import provision_default_flow
+from tests._flow_helpers import assign_to_default_flow, provision_default_flow
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -100,6 +100,7 @@ def _give_ticket(db: Session, popup: Popups, human: Humans) -> AttendeeProducts:
     )
     db.add(product)
     db.flush()
+    assign_to_default_flow(db, product)
     attendee = Attendees(
         tenant_id=popup.tenant_id,
         popup_id=popup.id,

@@ -20,6 +20,7 @@ from app.api.human.models import Humans
 from app.api.payment.models import PaymentProducts, Payments
 from app.api.popup.models import Popups
 from app.api.tenant.models import Tenants
+from tests._flow_helpers import assign_to_default_flow
 
 
 def _auth(token: str) -> dict[str, str]:
@@ -142,6 +143,7 @@ def test_cascade_removes_payments_and_product_snapshots(
     )
     db.add(product)
     db.flush()
+    assign_to_default_flow(db, product)
 
     payment = Payments(
         id=uuid.uuid4(),

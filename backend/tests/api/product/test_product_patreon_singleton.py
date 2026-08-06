@@ -39,6 +39,13 @@ def _create_isolated_popup(db, tenant_id: uuid.UUID) -> uuid.UUID:
         (str(popup_id), f"Singleton Test {popup_id.hex[:8]}", slug, str(tenant_id)),
     )
     db.commit()
+
+    from app.api.sales_flow.crud import sales_flows_crud
+
+    sales_flows_crud.provision_default_flow(
+        db, popup_id=popup_id, tenant_id=tenant_id, sale_type="direct"
+    )
+    db.commit()
     return popup_id
 
 

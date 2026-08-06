@@ -22,6 +22,7 @@ from app.api.product.models import Products
 from app.api.product.product_state import ProductSaleState, derive_product_state
 from app.api.product.schemas import ProductUpdate
 from app.api.tenant.models import Tenants
+from tests._flow_helpers import assign_to_default_flow
 
 
 def _make_product(
@@ -46,6 +47,7 @@ def _make_product(
     db.add(product)
     db.commit()
     db.refresh(product)
+    assign_to_default_flow(db, product)
     return product
 
 

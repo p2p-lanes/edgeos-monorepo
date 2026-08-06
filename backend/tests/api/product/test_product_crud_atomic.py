@@ -21,6 +21,7 @@ from app.api.popup.models import Popups
 from app.api.product.crud import products_crud
 from app.api.product.models import Products
 from app.api.tenant.models import Tenants
+from tests._flow_helpers import assign_to_default_flow
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -49,6 +50,7 @@ def _make_product(
     db.add(product)
     db.commit()
     db.refresh(product)
+    assign_to_default_flow(db, product)
     return product
 
 

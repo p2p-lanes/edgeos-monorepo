@@ -30,6 +30,7 @@ from app.api.popup.models import Popups
 from app.api.product.models import Products
 from app.api.shared.enums import InstallmentInterval, SaleType
 from app.api.tenant.models import Tenants
+from tests._flow_helpers import assign_to_default_flow
 
 # ---- Helpers ----------------------------------------------------------------
 
@@ -98,6 +99,7 @@ def _make_ticket(db: Session, popup: Popups, price: str = "600") -> Products:
     )
     db.add(product)
     db.flush()
+    assign_to_default_flow(db, product)
     return product
 
 

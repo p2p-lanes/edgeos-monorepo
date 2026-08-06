@@ -22,6 +22,7 @@ from app.api.product.models import Products
 from app.api.tenant.models import Tenants
 from app.api.user.models import Users
 from app.core.security import create_access_token
+from tests._flow_helpers import assign_to_default_flow
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -46,6 +47,7 @@ def _make_product(db: Session, tenant: Tenants, popup: Popups) -> Products:
     db.add(product)
     db.commit()
     db.refresh(product)
+    assign_to_default_flow(db, product)
     return product
 
 

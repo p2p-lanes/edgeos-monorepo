@@ -36,6 +36,7 @@ from app.api.product.models import Products
 from app.api.shared.enums import SaleType
 from app.api.tenant.models import Tenants
 from app.services.simplefi.client import CancelOutcome, CancelOutcomeAmbiguousError
+from tests._flow_helpers import assign_to_default_flow
 
 # ---------------------------------------------------------------------------
 # Shared helpers
@@ -111,6 +112,7 @@ def _make_product(
     )
     db.add(product)
     db.flush()
+    assign_to_default_flow(db, product)
     return product
 
 

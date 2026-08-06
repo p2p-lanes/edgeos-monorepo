@@ -28,7 +28,11 @@ from app.api.product.models import Products
 from app.api.shared.enums import SaleType
 from app.api.tenant.models import Tenants
 from app.api.ticketing_step.models import TicketingSteps
-from tests._flow_helpers import default_flow_id, provision_default_flow
+from tests._flow_helpers import (
+    assign_to_default_flow,
+    default_flow_id,
+    provision_default_flow,
+)
 
 # ---- Fixtures ---------------------------------------------------------------
 
@@ -87,6 +91,7 @@ def _make_patreon_product(db: Session, popup: Popups) -> Products:
     )
     db.add(product)
     db.flush()
+    assign_to_default_flow(db, product)
     return product
 
 
@@ -103,6 +108,7 @@ def _make_ticket_product(db: Session, popup: Popups, price: str = "3000") -> Pro
     )
     db.add(product)
     db.flush()
+    assign_to_default_flow(db, product)
     return product
 
 

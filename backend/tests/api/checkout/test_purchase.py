@@ -24,7 +24,11 @@ from app.api.product.models import Products
 from app.api.shared.enums import SaleType
 from app.api.tenant.models import Tenants
 from app.utils.encryption import encrypt
-from tests._flow_helpers import default_flow_id, provision_default_flow
+from tests._flow_helpers import (
+    assign_to_default_flow,
+    default_flow_id,
+    provision_default_flow,
+)
 from tests.conftest import with_origin
 
 
@@ -87,6 +91,7 @@ def _make_product(
     )
     db.add(product)
     db.flush()
+    assign_to_default_flow(db, product)
     return product
 
 

@@ -34,6 +34,7 @@ from app.api.payment.crud import payments_crud
 from app.api.popup.models import Popups
 from app.api.product.models import Products
 from app.api.tenant.models import Tenants
+from tests._flow_helpers import assign_to_default_flow, provision_default_flow
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -70,6 +71,7 @@ def _make_product(
     db.add(product)
     db.commit()
     db.refresh(product)
+    assign_to_default_flow(db, product)
     return product
 
 
@@ -348,6 +350,7 @@ def _make_ot_popup(db: Session, tenant: Tenants) -> Popups:
     db.add(popup)
     db.commit()
     db.refresh(popup)
+    provision_default_flow(db, popup)
     return popup
 
 
@@ -375,6 +378,7 @@ def _make_ot_product(
     db.add(product)
     db.commit()
     db.refresh(product)
+    assign_to_default_flow(db, product)
     return product
 
 

@@ -19,6 +19,7 @@ from app.api.product.crud import products_crud
 from app.api.product.models import Products
 from app.api.product.schemas import ProductUpdate
 from app.api.tenant.models import Tenants
+from tests._flow_helpers import assign_to_default_flow
 
 
 def _make_unlimited_product(db: Session, tenant: Tenants, popup: Popups) -> Products:
@@ -37,6 +38,7 @@ def _make_unlimited_product(db: Session, tenant: Tenants, popup: Popups) -> Prod
     db.add(product)
     db.commit()
     db.refresh(product)
+    assign_to_default_flow(db, product)
     return product
 
 

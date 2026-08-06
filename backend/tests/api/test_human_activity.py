@@ -22,6 +22,7 @@ from app.api.payment.models import PaymentProducts, Payments
 from app.api.popup.models import Popups
 from app.api.product.models import Products
 from app.api.tenant.models import Tenants
+from tests._flow_helpers import assign_to_default_flow
 
 
 def _auth(token: str) -> dict[str, str]:
@@ -92,6 +93,7 @@ def _seed_history(db: Session, tenant: Tenants, popup: Popups, human: Humans) ->
     )
     db.add(product)
     db.commit()
+    assign_to_default_flow(db, product)
 
     payment = Payments(
         id=uuid.uuid4(),
