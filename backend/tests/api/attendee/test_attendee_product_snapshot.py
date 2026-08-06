@@ -27,7 +27,6 @@ from app.api.payment.schemas import PaymentStatus, PaymentType
 from app.api.popup.models import Popups
 from app.api.product.models import Products
 from app.api.tenant.models import Tenants
-from tests._flow_helpers import assign_to_default_flow
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -58,7 +57,6 @@ def _make_product(
     db.add(product)
     db.commit()
     db.refresh(product)
-    assign_to_default_flow(db, product)
     return product
 
 
@@ -317,7 +315,6 @@ def test_product_renamed_after_purchase_snapshot_wins(
     product.category = "patreon"
     db.add(product)
     db.commit()
-    assign_to_default_flow(db, product)
 
     loaded = _load_attendee_with_relations(db, attendee.id)
     result = _build_attendee_with_origin(loaded)

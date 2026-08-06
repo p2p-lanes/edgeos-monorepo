@@ -25,7 +25,6 @@ from app.api.sales_flow.crud import sales_flows_crud
 from app.api.sales_flow.models import SalesFlows
 from app.api.tenant.models import Tenants
 from app.services.restrictions.context import build_context
-from tests._flow_helpers import assign_to_default_flow
 
 
 def _make_popup(db: Session, tenant: Tenants) -> Popups:
@@ -59,7 +58,6 @@ def _make_product(db: Session, popup: Popups, *, category: str = "ticket") -> Pr
     )
     db.add(product)
     db.flush()
-    assign_to_default_flow(db, product)
     return product
 
 

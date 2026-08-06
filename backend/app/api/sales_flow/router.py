@@ -7,8 +7,6 @@ from sqlalchemy.exc import IntegrityError
 from app.api.popup_reviewer.crud import popup_reviewers_crud
 from app.api.sales_flow import crud
 from app.api.sales_flow.schemas import (
-    FlowProductAssignment,
-    FlowProductAssignmentPublic,
     SalesFlowCreate,
     SalesFlowPublic,
     SalesFlowReviewersMode,
@@ -251,95 +249,3 @@ async def delete_sales_flow(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="This sales flow has configuration attached and cannot be deleted",
         ) from exc
-
-
-def _flow_or_404(db, flow_id: uuid.UUID):
-    flow = crud.sales_flows_crud.get(db, flow_id)
-    if not flow:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Sales flow not found",
-        )
-    return flow
-
-
-@router.get("/{flow_id}/products", response_model=FlowProductAssignmentPublic)
-async def list_flow_products(
-    flow_id: uuid.UUID,
-    db: TenantSession,
-    _: CurrentOperator,
-) -> FlowProductAssignmentPublic:
-    """The products this flow sells (sdd/sales-flows-rediseno slice 4b).
-
-    Assignment is the only way a product reaches a checkout, so this is the
-    read side of the control the backoffice needs to make that visible.
-    """
-    from sqlmodel import select
-
-    from app.api.sales_flow.models import FlowProducts
-
-    flow = _flow_or_404(db, flow_id)
-    rows = db.exec(
-        select(FlowProducts.product_id).where(FlowProducts.flow_id == flow.id)
-    ).all()
-    return FlowProductAssignmentPublic(product_ids=list(rows))
-
-
-@router.put("/{flow_id}/products", response_model=FlowProductAssignmentPublic)
-async def set_flow_products(
-    flow_id: uuid.UUID,
-    body: FlowProductAssignment,
-    db: TenantSession,
-    _current_user: CurrentWriter,
-) -> FlowProductAssignmentPublic:
-    """Replace the flow's product set.
-
-    Every id must belong to this flow's popup — a product from another
-    popup is rejected rather than silently dropped, mirroring the
-    cross-popup flow rejection elsewhere. Removing a product only stops it
-    being sold through THIS flow: its stock and its assignments to other
-    flows are untouched.
-    """
-    from sqlmodel import select
-
-    from app.api.product.models import Products
-    from app.api.sales_flow.models import FlowProducts
-
-    flow = _flow_or_404(db, flow_id)
-    requested = set(body.product_ids)
-
-    if requested:
-        valid = set(
-            db.exec(
-                select(Products.id).where(
-                    Products.id.in_(requested),  # type: ignore[attr-defined]
-                    Products.popup_id == flow.popup_id,
-                )
-            ).all()
-        )
-        unknown = requested - valid
-        if unknown:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Product not found for this popup",
-            )
-
-    existing_rows = list(
-        db.exec(select(FlowProducts).where(FlowProducts.flow_id == flow.id)).all()
-    )
-    existing = {row.product_id for row in existing_rows}
-
-    for row in existing_rows:
-        if row.product_id not in requested:
-            db.delete(row)
-    for product_id in requested - existing:
-        db.add(
-            FlowProducts(
-                tenant_id=flow.tenant_id,
-                flow_id=flow.id,
-                product_id=product_id,
-            )
-        )
-
-    db.commit()
-    return FlowProductAssignmentPublic(product_ids=sorted(requested, key=str))

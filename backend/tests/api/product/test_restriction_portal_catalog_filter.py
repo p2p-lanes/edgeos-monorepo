@@ -21,7 +21,6 @@ from app.api.sales_flow.models import FlowProducts, SalesFlows
 from app.api.shared.enums import SaleType
 from app.api.tenant.models import Tenants
 from app.core.security import create_access_token
-from tests._flow_helpers import assign_to_default_flow
 
 
 def _make_popup_with_default_flow(
@@ -44,9 +43,7 @@ def _make_popup_with_default_flow(
     return popup
 
 
-def _make_product(
-    db: Session, popup: Popups, *, name: str, assign_default: bool = True
-) -> Products:
+def _make_product(db: Session, popup: Popups, *, name: str) -> Products:
     product = Products(
         tenant_id=popup.tenant_id,
         popup_id=popup.id,
@@ -58,9 +55,6 @@ def _make_product(
     )
     db.add(product)
     db.flush()
-    # Exclusive-product scenarios assign elsewhere on purpose.
-    if assign_default:
-        assign_to_default_flow(db, product)
     return product
 
 
@@ -93,9 +87,7 @@ class TestPortalProductListingCatalogFilter:
         db.flush()
 
         shared_product = _make_product(db, popup, name="Shared Product")
-        exclusive_product = _make_product(
-            db, popup, name="Exclusive Product", assign_default=False
-        )
+        exclusive_product = _make_product(db, popup, name="Exclusive Product")
         db.add(
             FlowProducts(
                 tenant_id=tenant_a.id,

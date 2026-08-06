@@ -20,7 +20,6 @@ from sqlmodel import Session
 
 from app.api.popup.models import Popups
 from app.api.tenant.models import Tenants
-from tests._flow_helpers import provision_default_flow
 
 
 def _admin_headers(token: str) -> dict[str, str]:
@@ -36,7 +35,6 @@ def _make_popup(db: Session, tenant: Tenants) -> Popups:
     db.add(popup)
     db.commit()
     db.refresh(popup)
-    provision_default_flow(db, popup)
     return popup
 
 

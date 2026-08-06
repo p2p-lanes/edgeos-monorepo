@@ -1,13 +1,13 @@
-"""Restriction enforcement (sdd/sales-flows design D5/D6).
+"""Restriction enforcement (sdd/sales-flows design D5/D6, D3 amendment).
 
 Two checks, both gated behind ONE flow (design):
 1. `flow.restriction_rule` (if set) evaluates true for the request's
    `PurchaseContext` -> else the flow is closed to this buyer.
-2. Every requested product is assigned to this flow via `flow_products`
-   (sdd/sales-flows-rediseno slice 4, R6). Assignment is the only way in: a
-   product assigned nowhere sells nowhere. The earlier rule — an empty
-   assignment meaning "available in every flow" — is gone, along with the
-   surprise that assigning a product to one flow removed it from the rest.
+2. Every requested product is a member of the flow's product set (D3:
+   `flow_products` empty for a flow = all active popup products; a product
+   with ANY `flow_products` row is purchasable/visible only through an
+   assigned flow — the per-product exclusivity ratified as the D3 amendment,
+   G3 #3, 2026-08-04).
 
 `assert_products_allowed` is the hard-block call site (purchase paths):
 raises 403 with a stable machine code (design D6) so the portal can render
@@ -57,16 +57,12 @@ def _restriction_passes(flow, context: PurchaseContext) -> bool:
 def _flow_allowed_product_ids(
     session: Session, flow_id: uuid.UUID, product_ids: list[uuid.UUID]
 ) -> set[uuid.UUID]:
-    """Product IDs (from `product_ids`) assigned to `flow_id`.
+    """Product IDs (from `product_ids`) allowed for `flow_id` under the D3
+    exclusivity rule: unassigned everywhere; assigned only where assigned.
 
-    A product sells in a flow because someone assigned it there
-    (sdd/sales-flows-rediseno slice 4, R6). Unassigned means unassigned: it
-    sells nowhere, rather than everywhere. Stock is unaffected — it lives on
-    the product, and flows sharing a product share its stock.
-
-    One lightweight query against `flow_products`, not a correlated subquery
-    against `Products` — this lets purchase-path callers run the check with
-    just the requested IDs, before any `Products` row is loaded.
+    Two lightweight queries against `flow_products`, not a correlated
+    subquery against `Products` — this lets purchase-path callers run the
+    check with just the requested IDs, before any `Products` row is loaded.
     """
     from app.api.sales_flow.models import FlowProducts
 
@@ -75,12 +71,21 @@ def _flow_allowed_product_ids(
 
     unique_ids = set(product_ids)
     rows = session.exec(
-        select(FlowProducts.product_id).where(
-            FlowProducts.flow_id == flow_id,
-            FlowProducts.product_id.in_(unique_ids),  # type: ignore[attr-defined]
+        select(FlowProducts.product_id, FlowProducts.flow_id).where(
+            FlowProducts.product_id.in_(unique_ids)  # type: ignore[attr-defined]
         )
     ).all()
-    return set(rows)
+
+    flows_by_product: dict[uuid.UUID, set[uuid.UUID]] = {}
+    for product_id, assigned_flow_id in rows:
+        flows_by_product.setdefault(product_id, set()).add(assigned_flow_id)
+
+    allowed: set[uuid.UUID] = set()
+    for product_id in unique_ids:
+        assigned_flows = flows_by_product.get(product_id)
+        if not assigned_flows or flow_id in assigned_flows:
+            allowed.add(product_id)
+    return allowed
 
 
 def assert_products_allowed(
@@ -117,7 +122,7 @@ def filter_allowed_products(
 ) -> list:
     """Silent filter — call at every catalog-read call site. A failing
     restriction_rule filters the WHOLE catalog to empty (the rule gates the
-    flow, not individual products); assignment filters per-product."""
+    flow, not individual products); D3 exclusivity filters per-product."""
     if not _restriction_passes(flow, context):
         return []
 

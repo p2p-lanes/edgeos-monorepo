@@ -9,8 +9,6 @@ from datetime import datetime
 
 import pytest
 
-from tests._flow_helpers import assign_to_default_flow
-
 
 class TestCheckInPayload:
     """CheckInPayload must validate source enum and optional fields."""
@@ -160,7 +158,6 @@ class TestCheckInModel:
         )
         db.add(product)
         db.commit()
-        assign_to_default_flow(db, product)
 
         human = Humans(
             id=uuid.uuid4(),

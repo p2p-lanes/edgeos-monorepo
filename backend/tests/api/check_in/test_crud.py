@@ -17,7 +17,6 @@ from app.api.human.models import Humans
 from app.api.popup.models import Popups
 from app.api.product.models import Products
 from app.api.tenant.models import Tenants
-from tests._flow_helpers import assign_to_default_flow
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -41,7 +40,6 @@ def _make_ticket_chain(
     )
     db.add(product)
     db.commit()
-    assign_to_default_flow(db, product)
 
     human = Humans(
         id=uuid.uuid4(),

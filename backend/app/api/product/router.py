@@ -111,33 +111,6 @@ async def list_products(
     )
 
 
-def _assign_to_default_flow(db, product) -> None:
-    """Put a new product in its popup's default flow.
-
-    Since sdd/sales-flows-rediseno slice 4 a product sells only where it is
-    assigned, so creating one without an assignment would create something
-    unsellable. Product creation carries no flow context, and the default
-    flow is the one every popup has — assigning there preserves "create a
-    product and it is on sale" while keeping the row explicit.
-    """
-    from app.api.sales_flow.crud import sales_flows_crud
-    from app.api.sales_flow.models import FlowProducts
-
-    default_flow = sales_flows_crud.get_default_flow(db, product.popup_id)
-    if default_flow is None:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Popup has no default sales flow",
-        )
-    db.add(
-        FlowProducts(
-            tenant_id=product.tenant_id,
-            flow_id=default_flow.id,
-            product_id=product.id,
-        )
-    )
-
-
 @router.post(
     "/batch",
     response_model=list[ProductBatchResult],
@@ -193,7 +166,6 @@ async def create_products_batch(
 
                 db.add(product)
                 db.flush()
-                _assign_to_default_flow(db, product)
 
                 results.append(
                     ProductBatchResult(
@@ -294,8 +266,6 @@ async def create_product(
     product = Products(**product_data)
 
     db.add(product)
-    db.flush()
-    _assign_to_default_flow(db, product)
     db.commit()
     db.refresh(product)
 

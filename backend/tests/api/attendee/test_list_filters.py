@@ -22,7 +22,6 @@ from app.api.attendee_category.models import AttendeeCategories
 from app.api.popup.models import Popups
 from app.api.product.models import Products
 from app.api.tenant.models import Tenants
-from tests._flow_helpers import assign_to_default_flow
 from tests.api.application_review.test_pending_reviews import (
     _auth,
     _make_admin,
@@ -86,7 +85,6 @@ def _make_ticket(
     )
     db.add(product)
     db.flush()
-    assign_to_default_flow(db, product)
     db.add(
         AttendeeProducts(
             tenant_id=tenant.id,

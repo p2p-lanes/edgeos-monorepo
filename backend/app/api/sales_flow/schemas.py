@@ -328,20 +328,3 @@ class FlowProductsBase(SQLModel):
     product_id: uuid.UUID = Field(
         foreign_key="products.id", primary_key=True, index=True
     )
-
-
-class FlowProductAssignment(BaseModel):
-    """The full set of products a flow sells.
-
-    A replace, not a patch: the UI shows every product of the popup with a
-    checkbox, so sending the whole set is what the user actually means and
-    removes the "did my unchecking register?" ambiguity.
-    """
-
-    product_ids: list[uuid.UUID]
-
-
-class FlowProductAssignmentPublic(BaseModel):
-    """Assigned product ids, in no particular order."""
-
-    product_ids: list[uuid.UUID]

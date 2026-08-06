@@ -19,7 +19,6 @@ from app.api.product.models import Products
 from app.api.shared.enums import SaleType
 from app.api.tenant.models import Tenants
 from app.utils.checkout_signing import build_cart_restore_token
-from tests._flow_helpers import assign_to_default_flow
 
 
 @pytest.fixture(autouse=True)
@@ -65,7 +64,6 @@ def _make_product(db: Session, popup: Popups, *, price: str = "100.00") -> Produ
     )
     db.add(product)
     db.flush()
-    assign_to_default_flow(db, product)
     return product
 
 

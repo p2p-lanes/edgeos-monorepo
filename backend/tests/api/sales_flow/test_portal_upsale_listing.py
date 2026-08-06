@@ -26,7 +26,6 @@ from app.api.sales_flow.crud import sales_flows_crud
 from app.api.sales_flow.models import SalesFlows
 from app.api.tenant.models import Tenants
 from app.core.security import create_access_token
-from tests._flow_helpers import assign_to_default_flow
 
 
 def _make_popup(db: Session, tenant: Tenants) -> Popups:
@@ -81,7 +80,6 @@ def _grant_approved_payment(
     )
     db.add(product)
     db.flush()
-    assign_to_default_flow(db, product)
     attendee = Attendees(
         tenant_id=tenant.id,
         application_id=None,

@@ -19,7 +19,6 @@ from app.api.sales_flow.crud import sales_flows_crud
 from app.api.sales_flow.models import FlowProducts, SalesFlows
 from app.api.shared.enums import SaleType
 from app.api.tenant.models import Tenants
-from tests._flow_helpers import assign_to_default_flow
 
 
 def _make_direct_popup(db: Session, tenant: Tenants, *, slug_prefix: str) -> Popups:
@@ -40,9 +39,7 @@ def _make_direct_popup(db: Session, tenant: Tenants, *, slug_prefix: str) -> Pop
     return popup
 
 
-def _make_product(
-    db: Session, popup: Popups, *, name: str, assign_default: bool = True
-) -> Products:
+def _make_product(db: Session, popup: Popups, *, name: str) -> Products:
     product = Products(
         tenant_id=popup.tenant_id,
         popup_id=popup.id,
@@ -54,9 +51,6 @@ def _make_product(
     )
     db.add(product)
     db.flush()
-    # Exclusive-product scenarios assign elsewhere on purpose.
-    if assign_default:
-        assign_to_default_flow(db, product)
     return product
 
 
@@ -76,9 +70,7 @@ class TestCheckoutRuntimeCatalogFilter:
         db.flush()
 
         shared_product = _make_product(db, popup, name="Shared Ticket")
-        exclusive_product = _make_product(
-            db, popup, name="Exclusive Ticket", assign_default=False
-        )
+        exclusive_product = _make_product(db, popup, name="Exclusive Ticket")
         db.add(
             FlowProducts(
                 tenant_id=tenant_a.id,

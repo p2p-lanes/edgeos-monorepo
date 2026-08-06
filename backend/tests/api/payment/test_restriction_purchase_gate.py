@@ -31,11 +31,7 @@ from app.api.sales_flow.crud import sales_flows_crud
 from app.api.sales_flow.models import FlowProducts, SalesFlows
 from app.api.shared.enums import SaleType
 from app.api.tenant.models import Tenants
-from tests._flow_helpers import (
-    assign_to_default_flow,
-    default_flow_id,
-    provision_default_flow,
-)
+from tests._flow_helpers import default_flow_id, provision_default_flow
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -85,12 +81,7 @@ def _make_application_popup_with_default_flow(
 
 
 def _make_product(
-    db: Session,
-    popup: Popups,
-    *,
-    price: str = "0",
-    stock: int | None = None,
-    assign_default: bool = True,
+    db: Session, popup: Popups, *, price: str = "0", stock: int | None = None
 ) -> Products:
     product = Products(
         tenant_id=popup.tenant_id,
@@ -105,9 +96,6 @@ def _make_product(
     )
     db.add(product)
     db.flush()
-    # Exclusive-product scenarios assign elsewhere on purpose.
-    if assign_default:
-        assign_to_default_flow(db, product)
     return product
 
 
@@ -275,7 +263,7 @@ class TestOpenTicketingRestrictionGate:
         )
         db.add(other_flow)
         db.flush()
-        product = _make_product(db, popup, assign_default=False)
+        product = _make_product(db, popup)
         db.add(
             FlowProducts(
                 tenant_id=tenant_a.id, flow_id=other_flow.id, product_id=product.id
@@ -413,7 +401,7 @@ class TestAuthenticatedPaymentRestrictionGate:
         db.flush()
         human = _make_human(db, tenant_a)
         application = _make_application(db, popup, human, default_flow)
-        product = _make_product(db, popup, assign_default=False)
+        product = _make_product(db, popup)
         db.add(
             FlowProducts(
                 tenant_id=tenant_a.id, flow_id=other_flow.id, product_id=product.id

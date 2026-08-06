@@ -47,34 +47,3 @@ def provision_default_flow(db, popup, sale_type: str = "application"):
     )
     db.commit()
     return flow
-
-
-def assign_to_default_flow(db, product) -> None:
-    """Assign a directly-built product to its popup's default flow.
-
-    Since sdd/sales-flows-rediseno slice 4 a product sells only where it is
-    assigned, so a test product with no assignment is invisible everywhere —
-    which is correct, but almost never what the test means.
-    """
-    from app.api.popup.models import Popups
-    from app.api.sales_flow.models import FlowProducts
-
-    # Fixtures build popups directly and skip the provisioning a real popup
-    # gets at creation, so do it here rather than making every caller
-    # remember. Idempotent.
-    popup = db.get(Popups, product.popup_id)
-    flow = provision_default_flow(db, popup)
-    flow_id = flow.id
-    exists = db.get(FlowProducts, (flow_id, product.id))
-    if exists is not None:
-        return
-    db.add(
-        FlowProducts(
-            tenant_id=product.tenant_id,
-            flow_id=flow_id,
-            product_id=product.id,
-        )
-    )
-    # Commit, not flush: assignments are read back through the API client
-    # and from other threads, neither of which sees an uncommitted row.
-    db.commit()

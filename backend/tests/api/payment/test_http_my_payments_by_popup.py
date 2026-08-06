@@ -28,7 +28,6 @@ from app.api.payment.schemas import PaymentStatus
 from app.api.popup.models import Popups
 from app.api.tenant.models import Tenants
 from app.core.security import create_access_token
-from tests._flow_helpers import assign_to_default_flow
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -114,7 +113,6 @@ def _make_product(db: Session, tenant: Tenants, popup: Popups, *, suffix: str):
     )
     db.add(product)
     db.flush()
-    assign_to_default_flow(db, product)
     return product
 
 

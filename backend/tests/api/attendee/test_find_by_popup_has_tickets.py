@@ -18,7 +18,6 @@ from app.api.attendee.models import AttendeeProducts, Attendees
 from app.api.popup.models import Popups
 from app.api.product.models import Products
 from app.api.tenant.models import Tenants
-from tests._flow_helpers import assign_to_default_flow
 
 
 def _make_popup(db: Session, tenant: Tenants) -> Popups:
@@ -63,7 +62,6 @@ def _make_product(db: Session, tenant: Tenants, popup: Popups) -> Products:
     db.add(product)
     db.commit()
     db.refresh(product)
-    assign_to_default_flow(db, product)
     return product
 
 

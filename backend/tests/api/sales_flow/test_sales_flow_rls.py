@@ -11,7 +11,6 @@ from app.api.shared.enums import CredentialType
 from app.api.tenant.credential_models import TenantCredentials
 from app.api.tenant.models import Tenants
 from app.utils.encryption import decrypt
-from tests._flow_helpers import assign_to_default_flow
 
 
 def _get_tenant_dsn(
@@ -192,7 +191,6 @@ class TestFlowProductsRLS:
         db.add(product)
         db.commit()
         db.refresh(product)
-        assign_to_default_flow(db, product)
         return product
 
     def test_tenant_role_can_insert_and_read_own_link(

@@ -19,7 +19,6 @@ from app.api.human.models import Humans
 from app.api.popup.models import Popups
 from app.api.product.models import Products
 from app.api.tenant.models import Tenants
-from tests._flow_helpers import assign_to_default_flow
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -47,7 +46,6 @@ def _make_product(
     db.add(product)
     db.commit()
     db.refresh(product)
-    assign_to_default_flow(db, product)
     return product
 
 
@@ -255,7 +253,6 @@ class TestRemoveProduct:
         product.total_stock_remaining = 4  # one unit consumed by the ticket
         db.add(product)
         db.commit()
-        assign_to_default_flow(db, product)
         attendee = _make_attendee(db, tenant_a, popup_tenant_a)
         ticket = _make_ticket(db, tenant_a, attendee, product)
 
@@ -361,7 +358,6 @@ class TestAddProducts:
         product.is_active = False
         db.add(product)
         db.commit()
-        assign_to_default_flow(db, product)
         attendee = _make_attendee(db, tenant_a, popup_tenant_a)
 
         with pytest.raises(HTTPException) as exc:

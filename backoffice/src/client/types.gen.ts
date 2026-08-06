@@ -1940,24 +1940,6 @@ export type EventVenueUpdate = {
 
 export type EventVisibility = 'public' | 'private' | 'unlisted';
 
-/**
- * The full set of products a flow sells.
- *
- * A replace, not a patch: the UI shows every product of the popup with a
- * checkbox, so sending the whole set is what the user actually means and
- * removes the "did my unchecking register?" ambiguity.
- */
-export type FlowProductAssignment = {
-    product_ids: Array<(string)>;
-};
-
-/**
- * Assigned product ids, in no particular order.
- */
-export type FlowProductAssignmentPublic = {
-    product_ids: Array<(string)>;
-};
-
 export type FormFieldCreate = {
     popup_id: string;
     sales_flow_id: string;
@@ -7448,21 +7430,6 @@ export type SalesFlowsDeleteSalesFlowData = {
 };
 
 export type SalesFlowsDeleteSalesFlowResponse = (void);
-
-export type SalesFlowsListFlowProductsData = {
-    flowId: string;
-    xTenantId?: (string | null);
-};
-
-export type SalesFlowsListFlowProductsResponse = (FlowProductAssignmentPublic);
-
-export type SalesFlowsSetFlowProductsData = {
-    flowId: string;
-    requestBody: FlowProductAssignment;
-    xTenantId?: (string | null);
-};
-
-export type SalesFlowsSetFlowProductsResponse = (FlowProductAssignmentPublic);
 
 export type SavedViewsListSavedViewsData = {
     entity: string;
