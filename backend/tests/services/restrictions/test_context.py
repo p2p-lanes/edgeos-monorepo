@@ -1,5 +1,5 @@
-"""Slice 14 backlog — DB-level coverage for `PurchaseContext.has_purchased`
-(`_has_purchased_product`/`_has_purchased_category`). Slice 12 shipped these
+"""Slice 14 backlog — DB-level coverage for `PurchaseContext.has_product`
+(`_holds_product`/`_holds_category`). Slice 12 shipped these
 with only pure unit coverage (schemas/evaluator) plus indirect exercise
 through the HTTP purchase-gate tests; this fills the gap the orchestrator's
 brief called out explicitly: product + category, positive + negative,
@@ -87,13 +87,13 @@ def _make_application(
 
 
 def _make_attendee(
-    db: Session, popup: Popups, human: Humans, application: Applications
+    db: Session, popup: Popups, human: Humans, application: Applications | None
 ) -> Attendees:
     attendee = Attendees(
         tenant_id=popup.tenant_id,
         popup_id=popup.id,
         human_id=human.id,
-        application_id=application.id,
+        application_id=application.id if application is not None else None,
         name="Has Purchased Attendee",
         email=human.email,
         category="main",
@@ -132,12 +132,41 @@ def _make_approved_payment(
             product_category=product.category,
         )
     )
+    if status == PaymentStatus.APPROVED.value:
+        # Approval materialises the holding rows in production — every
+        # approval path in PaymentsCRUD calls _add_products_to_attendees —
+        # and since slice 5 that is what the predicate reads.
+        _grant_product(db, popup, attendee, product, payment_id=payment.id)
     db.flush()
     return payment
 
 
-class TestHasPurchasedProduct:
-    def test_positive_returns_true_for_approved_purchase(
+def _grant_product(
+    db: Session,
+    popup: Popups,
+    attendee: Attendees,
+    product: Products,
+    *,
+    payment_id=None,
+) -> None:
+    """Hold a product. `payment_id=None` is the admin grant: no payment
+    ever existed."""
+    from app.api.attendee.models import AttendeeProducts
+
+    db.add(
+        AttendeeProducts(
+            tenant_id=popup.tenant_id,
+            attendee_id=attendee.id,
+            product_id=product.id,
+            payment_id=payment_id,
+            check_in_code=uuid.uuid4().hex[:10],
+        )
+    )
+    db.flush()
+
+
+class TestHoldsProduct:
+    def test_true_for_an_approved_purchase(
         self, db: Session, tenant_a: Tenants
     ) -> None:
         popup = _make_popup(db, tenant_a)
@@ -152,9 +181,28 @@ class TestHasPurchasedProduct:
             db, popup, flow, human=HumanPublic.model_validate(human)
         )
 
-        assert context.has_purchased("product", str(product.id)) is True
+        assert context.has_product("product", str(product.id)) is True
 
-    def test_negative_returns_false_when_no_purchase_exists(
+    def test_true_for_an_admin_granted_product(
+        self, db: Session, tenant_a: Tenants
+    ) -> None:
+        """F1: a product handed over by an organizer counts. The checkout
+        gate always said so; this predicate used to disagree, and the two
+        surfaces contradicting each other is what emptied the catalog."""
+        popup = _make_popup(db, tenant_a)
+        flow = _make_flow(db, tenant_a, popup)
+        human = _make_human(db, tenant_a)
+        attendee = _make_attendee(db, popup, human, None)
+        product = _make_product(db, popup)
+        _grant_product(db, popup, attendee, product)
+
+        context = build_context(
+            db, popup, flow, human=HumanPublic.model_validate(human)
+        )
+
+        assert context.has_product("product", str(product.id)) is True
+
+    def test_negative_returns_false_when_nothing_is_held(
         self, db: Session, tenant_a: Tenants
     ) -> None:
         popup = _make_popup(db, tenant_a)
@@ -166,7 +214,7 @@ class TestHasPurchasedProduct:
             db, popup, flow, human=HumanPublic.model_validate(human)
         )
 
-        assert context.has_purchased("product", str(product.id)) is False
+        assert context.has_product("product", str(product.id)) is False
 
     def test_negative_when_payment_is_not_approved(
         self, db: Session, tenant_a: Tenants
@@ -190,11 +238,11 @@ class TestHasPurchasedProduct:
             db, popup, flow, human=HumanPublic.model_validate(human)
         )
 
-        assert context.has_purchased("product", str(product.id)) is False
+        assert context.has_product("product", str(product.id)) is False
 
 
-class TestHasPurchasedCategory:
-    def test_positive_returns_true_for_approved_purchase_in_category(
+class TestHoldsCategory:
+    def test_true_for_an_approved_purchase_in_category(
         self, db: Session, tenant_a: Tenants
     ) -> None:
         popup = _make_popup(db, tenant_a)
@@ -209,7 +257,7 @@ class TestHasPurchasedCategory:
             db, popup, flow, human=HumanPublic.model_validate(human)
         )
 
-        assert context.has_purchased("category", "merch") is True
+        assert context.has_product("category", "merch") is True
 
     def test_negative_returns_false_for_a_different_category(
         self, db: Session, tenant_a: Tenants
@@ -226,10 +274,10 @@ class TestHasPurchasedCategory:
             db, popup, flow, human=HumanPublic.model_validate(human)
         )
 
-        assert context.has_purchased("category", "ticket") is False
+        assert context.has_product("category", "ticket") is False
 
 
-class TestHasPurchasedMemoization:
+class TestHoldsMemoization:
     def test_result_is_cached_across_repeated_calls(
         self, db: Session, tenant_a: Tenants
     ) -> None:
@@ -248,8 +296,8 @@ class TestHasPurchasedMemoization:
             db, popup, flow, human=HumanPublic.model_validate(human)
         )
 
-        first = context.has_purchased("product", str(product.id))
-        second = context.has_purchased("product", str(product.id))
+        first = context.has_product("product", str(product.id))
+        second = context.has_product("product", str(product.id))
         assert first is True
         assert second is True
-        assert context._has_purchased_cache[("product", str(product.id))] is True
+        assert context._has_product_cache[("product", str(product.id))] is True

@@ -131,7 +131,7 @@ class TestRestrictionRuleColumn:
             rule = {
                 "all_of": [
                     {
-                        "kind": "has_purchased",
+                        "kind": "has_product",
                         "scope": "product",
                         "value": str(uuid.uuid4()),
                     }

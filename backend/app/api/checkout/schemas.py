@@ -93,6 +93,13 @@ class CheckoutRuntimeResponse(BaseModel):
     # the human-gated /portal/popups/{id}/attendee-categories endpoint.
     attendee_categories: list[AttendeeCategoryPublic] = []
     form_schema: dict[str, Any] | None = None
+    # Why the catalog is empty, when it is empty for a reason
+    # (sdd/sales-flows-rediseno slice 5, F3). Without it the portal cannot
+    # tell "this flow's rule turned you away" from "nothing is configured
+    # here", and showed the same blank step for both. A stable machine code
+    # so the portal renders its own copy; None whenever products are present
+    # or the flow simply has nothing set up.
+    empty_catalog_reason: str | None = None
 
 
 class CheckoutShareMeta(BaseModel):

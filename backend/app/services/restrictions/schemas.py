@@ -2,7 +2,7 @@
 CONFIRMED 2026-08-04).
 
 CLOSED predicate set (G3 #1, binding — never a DSL, never user-configurable):
-``form_answer``, ``human_profile_field``, ``has_purchased`` (product|category).
+``form_answer``, ``human_profile_field``, ``has_product`` (product|category).
 An AND/OR tree over these three. Adding a fourth predicate is a future SDD
 change, never a runtime configuration knob.
 
@@ -42,10 +42,10 @@ class RestrictionPredicateKind(StrEnum):
 
     form_answer = "form_answer"
     human_profile_field = "human_profile_field"
-    has_purchased = "has_purchased"
+    has_product = "has_product"
 
 
-class HasPurchasedScope(StrEnum):
+class HasProductScope(StrEnum):
     product = "product"
     category = "category"
 
@@ -114,15 +114,23 @@ class HumanProfileFieldLeaf(BaseModel):
         return self
 
 
-class HasPurchasedLeaf(BaseModel):
-    """Has the buyer previously received an APPROVED payment for the given
-    product or category, anywhere in the popup (matches the upsale
-    eligibility precedent — `sales_flow/eligibility.py`)."""
+class HasProductLeaf(BaseModel):
+    """Does the buyer hold the given product (or one of the given category)
+    anywhere in this popup, however they got it?
 
-    kind: Literal[RestrictionPredicateKind.has_purchased] = (
-        RestrictionPredicateKind.has_purchased
+    Named for what it answers. It used to be `has_purchased`, which stopped
+    being true once an admin-granted product started counting
+    (sdd/sales-flows-rediseno slice 5): an organizer reading a rule called
+    "has purchased" would reasonably assume money changed hands. Same
+    definition as `sales_flow/eligibility.py::has_popup_products`, so the
+    checkout gate and the restriction engine cannot disagree — which is
+    exactly how F1 happened.
+    """
+
+    kind: Literal[RestrictionPredicateKind.has_product] = (
+        RestrictionPredicateKind.has_product
     )
-    scope: HasPurchasedScope
+    scope: HasProductScope
     value: str
     op: RestrictionOp = RestrictionOp.exists
     negate: bool = False
@@ -130,19 +138,19 @@ class HasPurchasedLeaf(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     @model_validator(mode="after")
-    def _value_is_uuid_for_product_scope(self) -> "HasPurchasedLeaf":
-        if self.scope == HasPurchasedScope.product:
+    def _value_is_uuid_for_product_scope(self) -> "HasProductLeaf":
+        if self.scope == HasProductScope.product:
             try:
                 uuid.UUID(self.value)
             except (ValueError, AttributeError, TypeError) as exc:
                 raise ValueError(
-                    f"has_purchased value {self.value!r} must be a UUID."
+                    f"has_product value {self.value!r} must be a UUID."
                 ) from exc
         return self
 
 
 RestrictionLeaf = Annotated[
-    FormAnswerLeaf | HumanProfileFieldLeaf | HasPurchasedLeaf,
+    FormAnswerLeaf | HumanProfileFieldLeaf | HasProductLeaf,
     Field(discriminator="kind"),
 ]
 
@@ -192,7 +200,7 @@ def iter_leaves(node: RestrictionNode) -> "list[RestrictionLeafUnion]":
     return [node]
 
 
-RestrictionLeafUnion = FormAnswerLeaf | HumanProfileFieldLeaf | HasPurchasedLeaf
+RestrictionLeafUnion = FormAnswerLeaf | HumanProfileFieldLeaf | HasProductLeaf
 
 
 def assert_restriction_rule_allowed_for_type(
@@ -203,7 +211,7 @@ def assert_restriction_rule_allowed_for_type(
     predicate there is unresolvable and, under fail-closed evaluation, would
     silently block every anonymous buyer. Reject (raise `ValueError`, surfaced
     as 422) instead of shipping a rule that can never pass. Same rejection
-    applies to `has_purchased` (risk-001: buyer_email is unverified).
+    applies to `has_product` (risk-001: buyer_email is unverified).
 
     No-op when `rule_data` is None (feature off) or `flow_type != "direct"`.
     """
@@ -217,8 +225,8 @@ def assert_restriction_rule_allowed_for_type(
             "type=direct flow: anonymous buyers have no profile to match "
             "against, so this predicate would block every buyer."
         )
-    if any(isinstance(leaf, HasPurchasedLeaf) for leaf in leaves):
+    if any(isinstance(leaf, HasProductLeaf) for leaf in leaves):
         raise ValueError(
-            "restriction_rule cannot use has_purchased on a type=direct "
+            "restriction_rule cannot use has_product on a type=direct "
             "flow: anonymous buyers have no verified purchase history."
         )

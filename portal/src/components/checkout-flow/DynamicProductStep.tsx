@@ -21,7 +21,7 @@ export default function DynamicProductStep({
   onSkip,
   isFirstSection,
 }: DynamicProductStepProps) {
-  const { getProductsForStep } = useCheckout()
+  const { getProductsForStep, emptyCatalogReason } = useCheckout()
   const { t } = useTranslation()
 
   const filtered = getProductsForStep(stepConfig)
@@ -61,9 +61,18 @@ export default function DynamicProductStep({
     : VARIANT_REGISTRY["ticket-select"]
 
   if (!VariantComponent || (!isContentOnly && filtered.length === 0)) {
+    // An empty step has more than one cause, and showing the same blank
+    // message for all of them is what hid the original bug: a buyer turned
+    // away by the flow's rule saw "no products", same as a flow nobody had
+    // configured yet.
+    const message =
+      emptyCatalogReason === "flow_restriction_violated"
+        ? t("checkout.not_eligible_for_flow")
+        : t("checkout.no_products")
+
     return (
       <div className="flex flex-col items-center justify-center py-12 text-center">
-        <p className="text-gray-500 mb-6">{t("checkout.no_products")}</p>
+        <p className="text-gray-500 mb-6">{message}</p>
         <Button variant="outline" onClick={onSkip}>
           {t("common.continue")}
         </Button>

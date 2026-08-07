@@ -289,6 +289,7 @@
     "payment_error": "Something went wrong with your payment. Please try again.",
     "popup_ended_error": "Este popup ha finalizado. Las compras ya no están disponibles.",
     "no_products": "No hay productos disponibles para este paso.",
+    "not_eligible_for_flow": "Este checkout no está disponible para tu cuenta.",
     "no_images": "No hay imágenes disponibles para este paso.",
     "no_video": "No hay video disponible para este paso.",
     "no_passes": "No hay pases disponibles.",

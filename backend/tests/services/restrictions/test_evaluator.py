@@ -10,7 +10,7 @@ from types import SimpleNamespace
 from typing import Any
 
 from app.services.restrictions.context import PurchaseContext
-from app.services.restrictions.enforcement import _restriction_passes
+from app.services.restrictions.enforcement import restriction_passes
 from app.services.restrictions.evaluator import evaluate
 from app.services.restrictions.schemas import UNRESOLVED, parse_restriction_rule
 
@@ -27,7 +27,7 @@ class FakeContext:
     def human_profile_field(self, field_name: str) -> Any:
         return self.human_fields.get(field_name, UNRESOLVED)
 
-    def has_purchased(self, scope: str, value: str) -> Any:
+    def has_product(self, scope: str, value: str) -> Any:
         return self.purchases.get((scope, value), UNRESOLVED)
 
 
@@ -113,36 +113,34 @@ _PRODUCT_ID = "11111111-1111-1111-1111-111111111111"
 
 class TestHasPurchasedPredicate:
     def test_exists_true_when_purchased(self) -> None:
-        node = _leaf(kind="has_purchased", scope="product", value=_PRODUCT_ID)
+        node = _leaf(kind="has_product", scope="product", value=_PRODUCT_ID)
         ctx = FakeContext(purchases={("product", _PRODUCT_ID): True})
         assert evaluate(node, ctx) is True
 
     def test_exists_false_when_not_purchased(self) -> None:
-        node = _leaf(kind="has_purchased", scope="product", value=_PRODUCT_ID)
+        node = _leaf(kind="has_product", scope="product", value=_PRODUCT_ID)
         ctx = FakeContext(purchases={("product", _PRODUCT_ID): False})
         assert evaluate(node, ctx) is False
 
     def test_negate_means_has_not_purchased(self) -> None:
-        node = _leaf(
-            kind="has_purchased", scope="category", value="ticket", negate=True
-        )
+        node = _leaf(kind="has_product", scope="category", value="ticket", negate=True)
         ctx = FakeContext(purchases={("category", "ticket"): False})
         assert evaluate(node, ctx) is True
 
     def test_unresolved_fails_closed(self) -> None:
-        node = _leaf(kind="has_purchased", scope="product", value=_PRODUCT_ID)
+        node = _leaf(kind="has_product", scope="product", value=_PRODUCT_ID)
         ctx = FakeContext()  # no cached answer -> UNRESOLVED
         assert evaluate(node, ctx) is False
 
 
 class TestPurchaseContextBackstops:
-    """risk-001/rel-002: has_purchased fails closed, never raises."""
+    """risk-001/rel-002: has_product fails closed, never raises."""
 
     def test_no_authenticated_human_fails_closed(self) -> None:
         ctx = PurchaseContext(  # type: ignore[arg-type]
             session=None, popup=None, flow=None, human=None, buyer_email="x@test.com"
         )
-        assert ctx.has_purchased("product", _PRODUCT_ID) is UNRESOLVED
+        assert ctx.has_product("product", _PRODUCT_ID) is UNRESOLVED
 
     def test_non_uuid_product_value_fails_closed(self) -> None:
         ctx = PurchaseContext(  # type: ignore[arg-type]
@@ -151,11 +149,11 @@ class TestPurchaseContextBackstops:
             flow=SimpleNamespace(id="flow-1"),
             human=SimpleNamespace(id="human-1"),
         )
-        assert ctx.has_purchased("product", "not-a-uuid") is UNRESOLVED
+        assert ctx.has_product("product", "not-a-uuid") is UNRESOLVED
 
     def test_malformed_restriction_rule_denies(self) -> None:
         flow = SimpleNamespace(id="flow-1", restriction_rule={"kind": "arbitrary_sql"})
-        assert _restriction_passes(flow, context=None) is False
+        assert restriction_passes(flow, context=None) is False
 
 
 class TestAllOfAnyOf:

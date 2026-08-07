@@ -190,6 +190,19 @@ def runtime_for_slug(
         ).all()
     )
     restriction_context = build_context(session, popup, flow, human=current_human)
+    from app.services.restrictions.enforcement import (
+        RESTRICTION_RULE_VIOLATED,
+        restriction_passes,
+    )
+
+    # Tell the portal WHY an empty catalog is empty (slice 5, F3). A rule
+    # that turns this buyer away and a flow with nothing configured used to
+    # produce the same blank step, which is how the original bug went
+    # unnoticed for so long.
+    empty_catalog_reason: str | None = None
+    if products and not restriction_passes(flow, restriction_context):
+        empty_catalog_reason = RESTRICTION_RULE_VIOLATED
+
     products = filter_allowed_products(
         session, flow, popup, products, restriction_context
     )
@@ -300,6 +313,7 @@ def runtime_for_slug(
             AttendeeCategoryPublic.model_validate(c) for c in attendee_categories
         ],
         form_schema=form_schema,
+        empty_catalog_reason=empty_catalog_reason,
     )
 
 

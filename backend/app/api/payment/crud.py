@@ -3703,6 +3703,20 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                         payment=payment,
                     )
 
+        # Leaving APPROVED revokes what approval granted. Access is read
+        # from `attendee_products` (sdd/sales-flows-rediseno slice 5), so
+        # leaving those rows behind would keep a refunded buyer inside
+        # upsale flows and any `has_product` rule — the opposite of design
+        # D8, which promises revocation takes effect immediately. Removal is
+        # keyed by `payment_id`, so an admin-granted product (no payment)
+        # and products from OTHER payments are untouched. Stock restoration
+        # stays deliberately out of scope here, per design §4.2.
+        if (
+            old_status == PaymentStatus.APPROVED.value
+            and new_status != PaymentStatus.APPROVED
+        ):
+            self._remove_products_from_attendees(session, payment)
+
         payment.status = new_status.value
 
         # If approving, add products to attendees

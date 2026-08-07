@@ -263,6 +263,7 @@
     "coupon_no_longer_valid": "This coupon is no longer available. Your total has been updated. Please review and try again.",
     "payment_error": "Something went wrong with your payment. Please try again.",
     "no_products": "Engar vörur í boði fyrir þetta skref.",
+    "not_eligible_for_flow": "Þessi greiðsluleið er ekki í boði fyrir reikninginn þinn.",
     "no_images": "Engar myndir í boði fyrir þetta skref.",
     "no_video": "Ekkert myndband í boði fyrir þetta skref.",
     "no_passes": "Engir passar í boði.",

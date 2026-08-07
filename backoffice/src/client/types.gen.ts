@@ -1195,6 +1195,7 @@ export type CheckoutRuntimeResponse = {
     form_schema?: ({
     [key: string]: unknown;
 } | null);
+    empty_catalog_reason?: (string | null);
 };
 
 /**

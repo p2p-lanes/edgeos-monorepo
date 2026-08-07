@@ -14,7 +14,7 @@ from typing import Any, Protocol
 
 from app.services.restrictions.schemas import (
     UNRESOLVED,
-    HasPurchasedLeaf,
+    HasProductLeaf,
     RestrictionAllOf,
     RestrictionAnyOf,
     RestrictionLeafUnion,
@@ -33,7 +33,7 @@ class RestrictionContext(Protocol):
 
     def human_profile_field(self, field: str) -> Any: ...
 
-    def has_purchased(self, scope: str, value: str) -> Any: ...
+    def has_product(self, scope: str, value: str) -> Any: ...
 
 
 def evaluate(node: RestrictionNode, context: RestrictionContext) -> bool:
@@ -47,8 +47,8 @@ def evaluate(node: RestrictionNode, context: RestrictionContext) -> bool:
 
 
 def _resolve_leaf(leaf: RestrictionLeafUnion, context: RestrictionContext) -> Any:
-    if isinstance(leaf, HasPurchasedLeaf):
-        return context.has_purchased(leaf.scope.value, leaf.value)
+    if isinstance(leaf, HasProductLeaf):
+        return context.has_product(leaf.scope.value, leaf.value)
     if leaf.kind == RestrictionPredicateKind.form_answer:
         return context.form_answer(leaf.field_name)
     return context.human_profile_field(leaf.field)

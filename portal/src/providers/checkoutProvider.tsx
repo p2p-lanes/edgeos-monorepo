@@ -76,6 +76,10 @@ interface CheckoutContextValue {
   allProducts: ProductsPass[]
   productsByStepId: Map<string, ProductsPass[]>
   getProductsForStep: StepProductResolution["getProductsForStep"]
+  /** Why the catalog came back empty, when it did for a reason. Lets a
+   *  step say "this flow is not open to you" instead of the blank
+   *  "no products" it showed for every cause alike. */
+  emptyCatalogReason: string | null
   attendees: AttendeePassState[]
   isLoading: boolean
   isInitialLoading: boolean
@@ -206,6 +210,7 @@ interface CheckoutProviderProps {
   children: ReactNode
   initialStep?: CheckoutStep
   productsOverride?: ProductsPass[]
+  emptyCatalogReason?: string | null
   configuredStepsOverride?: TicketingStepPublic[]
   accountCreditOverride?: number
   validatePromoCodeOverride?: (code: string) => Promise<number | null>
@@ -227,6 +232,7 @@ export function CheckoutProvider({
   children,
   initialStep = "passes",
   productsOverride,
+  emptyCatalogReason = null,
   configuredStepsOverride,
   accountCreditOverride,
   validatePromoCodeOverride,
@@ -1368,6 +1374,7 @@ export function CheckoutProvider({
     summary,
     allProducts: products,
     productsByStepId,
+    emptyCatalogReason,
     getProductsForStep,
     attendees: attendeePasses,
     isLoading,

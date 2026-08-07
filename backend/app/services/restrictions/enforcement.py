@@ -40,7 +40,7 @@ RESTRICTION_RULE_VIOLATED = "flow_restriction_violated"
 PRODUCT_NOT_IN_FLOW = "product_not_in_flow"
 
 
-def _restriction_passes(flow, context: PurchaseContext) -> bool:
+def restriction_passes(flow, context: PurchaseContext) -> bool:
     rule_data = getattr(flow, "restriction_rule", None)
     if not rule_data:
         return True
@@ -80,7 +80,7 @@ def assert_products_allowed(
     side effect (design: before `humans_crud.find_or_create` on the
     anonymous path, before the `SUPERSEDE_PENDING_ENABLED` block and the
     `FOR UPDATE` application lock on the authenticated path)."""
-    if not _restriction_passes(flow, context):
+    if not restriction_passes(flow, context):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail={"code": RESTRICTION_RULE_VIOLATED},
@@ -105,7 +105,7 @@ def filter_allowed_products(
     restriction_rule filters the WHOLE catalog to empty (the rule gates the
     flow, not individual products); what the steps offer filters
     per-product."""
-    if not _restriction_passes(flow, context):
+    if not restriction_passes(flow, context):
         return []
 
     allowed_ids = _flow_allowed_product_ids(session, flow, [p.id for p in products])

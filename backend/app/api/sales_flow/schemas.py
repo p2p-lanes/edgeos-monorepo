@@ -107,7 +107,7 @@ class SalesFlowBase(SQLModel):
 
     # --- Class C: flow-only. NULL = restrictions feature off (design D5/D6,
     # G3 checkpoint 12.8 CONFIRMED 2026-08-04). Closed AND/OR predicate tree
-    # over {form_answer, human_profile_field, has_purchased} — see
+    # over {form_answer, human_profile_field, has_product} — see
     # `app/services/restrictions/schemas.py`. Never an expression language;
     # adding a fourth predicate is a future SDD change, not configuration. ---
     restriction_rule: dict | None = Field(

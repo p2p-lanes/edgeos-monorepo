@@ -273,6 +273,7 @@
     "coupon_no_longer_valid": "This coupon is no longer available. Your total has been updated. Please review and try again.",
     "payment_error": "Something went wrong with your payment. Please try again.",
     "no_products": "此步骤暂无可用产品。",
+    "not_eligible_for_flow": "此结账流程不适用于您的账户。",
     "no_images": "此步骤暂无可用图片。",
     "no_video": "此步骤暂无可用视频。",
     "no_passes": "暂无可用通行证。",

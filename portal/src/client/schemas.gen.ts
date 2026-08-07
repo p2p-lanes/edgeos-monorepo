@@ -5237,6 +5237,17 @@ export const CheckoutRuntimeResponseSchema = {
                 }
             ],
             title: 'Form Schema'
+        },
+        empty_catalog_reason: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Empty Catalog Reason'
         }
     },
     type: 'object',

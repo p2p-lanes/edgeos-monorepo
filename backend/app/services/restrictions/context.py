@@ -5,7 +5,7 @@ itself stays pure. Mirrors `services/approval/calculator.py`'s split between
 a DB-free calculator and its DB-bound `recalculate_status` caller.
 
 Built once per request via `build_context` and reused across every leaf
-predicate resolved during that request (the `has_purchased` lookup is
+predicate resolved during that request (the `has_product` lookup is
 memoized on `self` — same pattern as design D8's "memoized on
 PurchaseContext only").
 """
@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING, Any
 from loguru import logger
 from sqlmodel import Session
 
-from app.services.restrictions.schemas import UNRESOLVED, HasPurchasedScope
+from app.services.restrictions.schemas import UNRESOLVED, HasProductScope
 
 if TYPE_CHECKING:
     from app.api.application.models import Applications
@@ -44,7 +44,7 @@ class PurchaseContext:
     application: "Applications | None" = None
     buyer_form_data: dict | None = None
     buyer_email: str | None = None
-    _has_purchased_cache: dict[tuple[str, str], bool] = field(default_factory=dict)
+    _has_product_cache: dict[tuple[str, str], bool] = field(default_factory=dict)
 
     def form_answer(self, field_name: str) -> Any:
         """`application.custom_fields` on the authenticated path,
@@ -65,151 +65,101 @@ class PurchaseContext:
             return UNRESOLVED
         return getattr(self.human, field_name, UNRESOLVED)
 
-    def has_purchased(self, scope: str, value: str) -> Any:
+    def has_product(self, scope: str, value: str) -> Any:
         cache_key = (scope, value)
-        if cache_key in self._has_purchased_cache:
-            return self._has_purchased_cache[cache_key]
+        if cache_key in self._has_product_cache:
+            return self._has_product_cache[cache_key]
 
         # risk-001: buyer_email is unverified — only an authenticated human
         # may resolve purchase history. Fails closed otherwise.
         if self.human is None:
-            self._has_purchased_cache[cache_key] = UNRESOLVED
+            self._has_product_cache[cache_key] = UNRESOLVED
             return UNRESOLVED
 
         human_id = self.human.id
-        if scope == HasPurchasedScope.category.value:
-            result = _has_purchased_category(
-                self.session, self.popup.id, human_id, value
-            )
+        if scope == HasProductScope.category.value:
+            result = _holds_category(self.session, self.popup.id, human_id, value)
         else:
             try:
                 product_id = uuid.UUID(value)
             except ValueError:
-                logger.warning("has_purchased: non-UUID value {!r} — denying", value)
-                self._has_purchased_cache[cache_key] = UNRESOLVED
+                logger.warning("has_product: non-UUID value {!r} — denying", value)
+                self._has_product_cache[cache_key] = UNRESOLVED
                 return UNRESOLVED
-            result = _has_purchased_product(
-                self.session, self.popup.id, human_id, product_id
-            )
+            result = _holds_product(self.session, self.popup.id, human_id, product_id)
 
-        self._has_purchased_cache[cache_key] = result
+        self._has_product_cache[cache_key] = result
         return result
 
 
-def _has_purchased_product(
+def _holds_product(
     session: Session, popup_id: uuid.UUID, human_id: uuid.UUID, product_id: uuid.UUID
 ) -> bool:
-    """Mirrors `sales_flow/eligibility.py::has_approved_payment`, narrowed to
-    a single product via `PaymentProducts`."""
+    """Does `human_id` hold `product_id` in this popup, however they got it?
+
+    `attendee_products` is the holding table: an approved payment writes
+    rows there on approval, and an admin grant writes them directly with no
+    payment at all. Reading it answers both cases with one query and keeps
+    this predicate identical to
+    `sales_flow/eligibility.py::has_popup_products` — the divergence
+    between those two was F1.
+
+    Revocation stays live: cancelling an approved payment deletes the rows
+    it created, so access disappears with them.
+    """
     from sqlalchemy import exists as sa_exists
     from sqlmodel import select
 
-    from app.api.application.models import Applications
-    from app.api.attendee.models import Attendees
-    from app.api.payment.models import PaymentProducts, Payments
-    from app.api.payment.schemas import PaymentStatus
+    from app.api.attendee.models import AttendeeProducts, Attendees
 
-    app_leg = select(
-        sa_exists()
-        .where(Payments.popup_id == popup_id)
-        .where(Payments.status == PaymentStatus.APPROVED.value)
-        .where(
-            Payments.application_id.in_(  # type: ignore[union-attr]
-                select(Applications.id).where(
-                    Applications.human_id == human_id,
-                    Applications.popup_id == popup_id,
-                )
-            )
-        )
-        .where(
-            Payments.id.in_(  # type: ignore[union-attr]
-                select(PaymentProducts.payment_id).where(
-                    PaymentProducts.product_id == product_id
-                )
-            )
-        )
-    )
-    if session.exec(app_leg).one():
-        return True
-
-    direct_leg = select(
-        sa_exists()
-        .where(Payments.popup_id == popup_id)
-        .where(Payments.status == PaymentStatus.APPROVED.value)
-        .where(Payments.application_id.is_(None))  # type: ignore[union-attr]
-        .where(
-            Payments.id.in_(  # type: ignore[union-attr]
-                select(PaymentProducts.payment_id)
-                .join(Attendees, PaymentProducts.attendee_id == Attendees.id)
-                .where(
+    stmt = select(
+        sa_exists().where(
+            AttendeeProducts.product_id == product_id,
+            AttendeeProducts.attendee_id.in_(  # type: ignore[union-attr]
+                select(Attendees.id).where(
                     Attendees.human_id == human_id,
                     Attendees.popup_id == popup_id,
-                    Attendees.application_id.is_(None),  # type: ignore[union-attr]
-                    PaymentProducts.product_id == product_id,
                 )
-            )
+            ),
         )
     )
-    return session.exec(direct_leg).one()
+    return session.exec(stmt).one()
 
 
-def _has_purchased_category(
+def _holds_category(
     session: Session, popup_id: uuid.UUID, human_id: uuid.UUID, category: str
 ) -> bool:
-    """Same shape as `_has_purchased_product`, matched by
-    `PaymentProducts.product_category` (the purchase-time snapshot, not a
-    live join to `Products` — stable even if a product is later
-    recategorized or deleted)."""
+    """Same as `_holds_product`, matched by the product's category.
+
+    The category comes from a live join to `Products`, not a purchase-time
+    snapshot: an admin-granted product has no payment row to snapshot, so
+    this is the one source available to both paths. Recategorising a product
+    therefore changes who matches, which is the honest reading of "holds
+    something in this category".
+    """
     from sqlalchemy import exists as sa_exists
     from sqlmodel import select
 
-    from app.api.application.models import Applications
-    from app.api.attendee.models import Attendees
-    from app.api.payment.models import PaymentProducts, Payments
-    from app.api.payment.schemas import PaymentStatus
+    from app.api.attendee.models import AttendeeProducts, Attendees
+    from app.api.product.models import Products
 
-    app_leg = select(
-        sa_exists()
-        .where(Payments.popup_id == popup_id)
-        .where(Payments.status == PaymentStatus.APPROVED.value)
-        .where(
-            Payments.application_id.in_(  # type: ignore[union-attr]
-                select(Applications.id).where(
-                    Applications.human_id == human_id,
-                    Applications.popup_id == popup_id,
+    stmt = select(
+        sa_exists().where(
+            AttendeeProducts.product_id.in_(  # type: ignore[union-attr]
+                select(Products.id).where(
+                    Products.popup_id == popup_id,
+                    Products.category == category,
                 )
-            )
-        )
-        .where(
-            Payments.id.in_(  # type: ignore[union-attr]
-                select(PaymentProducts.payment_id).where(
-                    PaymentProducts.product_category == category
-                )
-            )
-        )
-    )
-    if session.exec(app_leg).one():
-        return True
-
-    direct_leg = select(
-        sa_exists()
-        .where(Payments.popup_id == popup_id)
-        .where(Payments.status == PaymentStatus.APPROVED.value)
-        .where(Payments.application_id.is_(None))  # type: ignore[union-attr]
-        .where(
-            Payments.id.in_(  # type: ignore[union-attr]
-                select(PaymentProducts.payment_id)
-                .join(Attendees, PaymentProducts.attendee_id == Attendees.id)
-                .where(
+            ),
+            AttendeeProducts.attendee_id.in_(  # type: ignore[union-attr]
+                select(Attendees.id).where(
                     Attendees.human_id == human_id,
                     Attendees.popup_id == popup_id,
-                    Attendees.application_id.is_(None),  # type: ignore[union-attr]
-                    PaymentProducts.product_category == category,
                 )
-            )
+            ),
         )
     )
-    return session.exec(direct_leg).one()
+    return session.exec(stmt).one()
 
 
 def build_context(
