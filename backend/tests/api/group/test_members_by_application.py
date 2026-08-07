@@ -22,7 +22,10 @@ from app.api.popup.models import Popups
 from app.api.tenant.models import Tenants
 from app.api.user.models import Users
 from app.core.security import create_access_token
-from tests._flow_helpers import application_flow_id
+from tests._flow_helpers import (
+    application_flow_id,
+    group_flow_id,
+)
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -68,6 +71,7 @@ def _make_human(db: Session, tenant: Tenants) -> Humans:
 
 def _make_group(db: Session, tenant: Tenants, popup: Popups) -> Groups:
     g = Groups(
+        sales_flow_id=group_flow_id(db, popup.id),
         tenant_id=tenant.id,
         popup_id=popup.id,
         name=f"ByApp Group {uuid.uuid4().hex[:6]}",
@@ -372,6 +376,7 @@ class TestMembersByApplication:
 
         # Create a group with max_members=1
         group = Groups(
+            sales_flow_id=group_flow_id(db, popup.id),
             tenant_id=tenant_a.id,
             popup_id=popup.id,
             name=f"Full Group {uuid.uuid4().hex[:6]}",

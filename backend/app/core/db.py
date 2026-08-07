@@ -606,6 +606,7 @@ def _seed_humans(session: Session, seed_data: dict, tenant_id) -> dict:
 def _seed_groups(
     session: Session, seed_data: dict, popup_map: dict, human_map: dict, tenant_id
 ) -> dict:
+    from app.api.sales_flow.crud import sales_flows_crud
     from app.models import GroupLeaders, GroupMembers, Groups
 
     group_map: dict[str, Groups] = {}
@@ -627,9 +628,19 @@ def _seed_groups(
         if existing_group:
             group_map[group_key] = existing_group
         else:
+            # Every group applies through a flow
+            # (sdd/sales-flows-rediseno), and seeded popups are provisioned
+            # with a default one.
+            default_flow = sales_flows_crud.get_default_flow(session, popup.id)
+            if default_flow is None:
+                raise RuntimeError(
+                    f"seeded popup {popup.slug} has no default sales flow"
+                )
+
             group = Groups(
                 tenant_id=tenant_id,
                 popup_id=popup.id,
+                sales_flow_id=default_flow.id,
                 name=group_data["name"],
                 slug=group_data["slug"],
                 description=group_data.get("description"),

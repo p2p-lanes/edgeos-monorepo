@@ -2105,6 +2105,7 @@ export type GroupAdminUpdate = {
  */
 export type GroupCreate = {
     popup_id: string;
+    sales_flow_id?: (string | null);
     name: string;
     slug?: (string | null);
     description?: (string | null);
@@ -2205,6 +2206,7 @@ export type GroupMemberUpdate = {
 export type GroupPublic = {
     tenant_id: string;
     popup_id: string;
+    sales_flow_id: string;
     name: string;
     slug: string;
     description?: (string | null);
@@ -2270,6 +2272,7 @@ export type GroupWhitelistedEmailPublic = {
 export type GroupWithMembers = {
     tenant_id: string;
     popup_id: string;
+    sales_flow_id: string;
     name: string;
     slug: string;
     description?: (string | null);
@@ -2867,6 +2870,7 @@ export type MeAccess = {
 export type MyGroupPublic = {
     tenant_id: string;
     popup_id: string;
+    sales_flow_id: string;
     name: string;
     slug: string;
     description?: (string | null);
@@ -2890,6 +2894,7 @@ export type MyGroupPublic = {
 export type MyGroupWithMembers = {
     tenant_id: string;
     popup_id: string;
+    sales_flow_id: string;
     name: string;
     slug: string;
     description?: (string | null);

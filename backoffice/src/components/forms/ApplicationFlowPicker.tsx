@@ -10,7 +10,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 
-interface InviteFlowPickerProps {
+interface ApplicationFlowPickerProps {
   popupId: string
   value: string
   onChange: (flowId: string) => void
@@ -18,18 +18,19 @@ interface InviteFlowPickerProps {
 }
 
 /**
- * Which flow an invite lands its recipient in.
+ * Which flow something sends people into — an invite, a group, anything
+ * whose recipients end up filing an application.
  *
- * Only application flows are offered. Redeeming an invite creates an
- * application, so an invite into a direct sale would redeem into nothing —
- * the API refuses it, and offering it here would only produce that error.
+ * Only application flows are offered. A direct sale produces no
+ * application, so choosing one would land nowhere; the API refuses it, and
+ * offering it here would only produce that error.
  */
-export function InviteFlowPicker({
+export function ApplicationFlowPicker({
   popupId,
   value,
   onChange,
   disabled = false,
-}: InviteFlowPickerProps) {
+}: ApplicationFlowPickerProps) {
   const { data } = useQuery({
     queryKey: ["sales-flows", { popupId }],
     queryFn: () => SalesFlowsService.listSalesFlows({ popupId, limit: 100 }),

@@ -144,3 +144,12 @@ def invite_flow_id(db, popup_id: uuid.UUID) -> uuid.UUID:
     built its popup with `Popups(...)` and never went through creation.
     """
     return application_flow_id(db, popup_id)
+
+
+def group_flow_id(db, popup_id: uuid.UUID) -> uuid.UUID:
+    """The flow a group's members apply through.
+
+    `groups.sales_flow_id` is NOT NULL since sdd/sales-flows-rediseno, so a
+    fixture that builds a `Groups` row directly has to name one.
+    """
+    return application_flow_id(db, popup_id)

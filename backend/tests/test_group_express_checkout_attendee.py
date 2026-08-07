@@ -13,7 +13,10 @@ from app.api.human.models import Humans
 from app.api.popup.models import Popups
 from app.api.tenant.models import Tenants
 from app.core.security import create_access_token
-from tests._flow_helpers import seed_default_steps
+from tests._flow_helpers import (
+    group_flow_id,
+    seed_default_steps,
+)
 
 
 def test_group_application_creates_main_attendee(
@@ -35,6 +38,7 @@ def test_group_application_creates_main_attendee(
     assert main_cat is not None
 
     group = Groups(
+        sales_flow_id=group_flow_id(db, popup.id),
         tenant_id=tenant_a.id,
         popup_id=popup.id,
         name="Group T",

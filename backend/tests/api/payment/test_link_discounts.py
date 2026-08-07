@@ -29,6 +29,7 @@ from app.api.tenant.models import Tenants
 from app.api.user.models import Users
 from tests._flow_helpers import (
     application_flow_id,
+    group_flow_id,
     invite_flow_id,
 )
 
@@ -119,6 +120,7 @@ def _make_group(
 ) -> Groups:
     suffix = uuid.uuid4().hex[:6]
     group = Groups(
+        sales_flow_id=group_flow_id(db, popup.id),
         tenant_id=tenant.id,
         popup_id=popup.id,
         name=f"Disc Group {suffix}",

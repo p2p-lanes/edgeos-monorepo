@@ -1019,9 +1019,29 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         # Stamp the target flow on every new application — an explicit
         # `sales_flow_id` (e.g. from the portal FlowPicker) when given, else
         # the popup's default flow. Never absent (F4).
+        requested_flow_id = getattr(app_data, "sales_flow_id", None)
         data["sales_flow_id"] = self.resolve_target_flow_id(
-            session, app_data.popup_id, getattr(app_data, "sales_flow_id", None)
+            session, app_data.popup_id, requested_flow_id
         )
+
+        # A group decides the flow for the people who join through it
+        # (sdd/sales-flows-rediseno). A request naming a different one is a
+        # disagreement about where this person belongs, and answering it by
+        # picking a side silently is how the group's own form and emails
+        # stopped reaching anybody in the first place.
+        if _group is not None:
+            if (
+                requested_flow_id is not None
+                and requested_flow_id != _group.sales_flow_id
+            ):
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=(
+                        "This group applies through a different sales flow. "
+                        "Leave the flow out to use the group's own."
+                    ),
+                )
+            data["sales_flow_id"] = _group.sales_flow_id
 
         # Resolve referral when referral_id is provided.
         # Validate use limits and expiry; increment uses; auto-approve if flag set.
@@ -1293,15 +1313,27 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
             if profile_update:
                 humans_crud.update(session, human, HumanUpdate(**profile_update))
 
-        # Check for existing application. sdd/sales-flows slice 5 (G2,
-        # confirmed 2026-08-04): flow-scoped when the popup has a default
-        # flow; falls back to the legacy popup-level check otherwise (see
-        # resolve_creation_flow_id). Task 14.2: honors an explicit
-        # sales_flow_id from the backoffice, 404 if it doesn't belong to
-        # this popup or isn't type=application.
+        # Check for existing application, scoped to the flow this one
+        # lands in. Honors an explicit sales_flow_id from the backoffice,
+        # 404 if it does not belong to this popup or is not an application
+        # flow. A group overrides it for the same reason as the portal
+        # path: the group decides where the people who join it belong.
         flow_id = self.resolve_target_flow_id(
             session, app_data.popup_id, app_data.sales_flow_id
         )
+        if _admin_group is not None:
+            if (
+                app_data.sales_flow_id is not None
+                and app_data.sales_flow_id != _admin_group.sales_flow_id
+            ):
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=(
+                        "This group applies through a different sales flow. "
+                        "Leave the flow out to use the group's own."
+                    ),
+                )
+            flow_id = _admin_group.sales_flow_id
         existing = self.get_by_human_flow(
             session, human_id=human.id, sales_flow_id=flow_id
         )

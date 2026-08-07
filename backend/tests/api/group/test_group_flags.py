@@ -27,6 +27,7 @@ from app.api.tenant.models import Tenants
 from app.core.security import create_access_token
 from tests._flow_helpers import (
     application_flow_id,
+    group_flow_id,
     seed_default_steps,
 )
 
@@ -79,6 +80,7 @@ def _make_group(
 ) -> Groups:
     """Create a group with explicit behavior flags."""
     g = Groups(
+        sales_flow_id=group_flow_id(db, popup.id),
         tenant_id=tenant.id,
         popup_id=popup.id,
         name=f"Flag Group {uuid.uuid4().hex[:6]}",

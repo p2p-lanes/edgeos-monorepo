@@ -33,6 +33,7 @@ from app.api.human.models import Humans
 from app.api.popup.models import Popups
 from app.api.tenant.models import Tenants
 from app.core.security import create_access_token
+from tests._flow_helpers import group_flow_id
 
 # ---------------------------------------------------------------------------
 # Test helpers
@@ -99,6 +100,7 @@ def _make_venue(db: Session, tenant: Tenants, popup: Popups) -> EventVenues:
 
 def _make_group(db: Session, tenant: Tenants, popup: Popups) -> Groups:
     g = Groups(
+        sales_flow_id=group_flow_id(db, popup.id),
         tenant_id=tenant.id,
         popup_id=popup.id,
         name=f"Opacity Group {uuid.uuid4().hex[:6]}",

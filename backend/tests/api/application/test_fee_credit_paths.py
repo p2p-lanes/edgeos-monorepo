@@ -35,6 +35,7 @@ from app.core.security import create_access_token
 from tests._flow_helpers import (
     application_flow_id,
     default_flow_id,
+    group_flow_id,
     provision_default_flow,
 )
 
@@ -330,6 +331,7 @@ class TestFeeCreditPaths:
 
         # Create an open group for this popup
         group = Groups(
+            sales_flow_id=group_flow_id(db, popup.id),
             tenant_id=tenant_a.id,
             popup_id=popup.id,
             name=f"FeeGroup {uuid.uuid4().hex[:6]}",

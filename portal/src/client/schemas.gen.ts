@@ -9865,6 +9865,18 @@ export const GroupCreateSchema = {
             format: 'uuid',
             title: 'Popup Id'
         },
+        sales_flow_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Sales Flow Id'
+        },
         name: {
             type: 'string',
             title: 'Name'
@@ -10337,6 +10349,11 @@ export const GroupPublicSchema = {
             format: 'uuid',
             title: 'Popup Id'
         },
+        sales_flow_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Sales Flow Id'
+        },
         name: {
             type: 'string',
             title: 'Name'
@@ -10443,7 +10460,7 @@ export const GroupPublicSchema = {
         }
     },
     type: 'object',
-    required: ['tenant_id', 'popup_id', 'name', 'slug', 'id'],
+    required: ['tenant_id', 'popup_id', 'sales_flow_id', 'name', 'slug', 'id'],
     title: 'GroupPublic',
     description: 'Group schema for API responses.'
 } as const;
@@ -10573,6 +10590,11 @@ export const GroupWithMembersSchema = {
             format: 'uuid',
             title: 'Popup Id'
         },
+        sales_flow_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Sales Flow Id'
+        },
         name: {
             type: 'string',
             title: 'Name'
@@ -10687,7 +10709,7 @@ export const GroupWithMembersSchema = {
         }
     },
     type: 'object',
-    required: ['tenant_id', 'popup_id', 'name', 'slug', 'id'],
+    required: ['tenant_id', 'popup_id', 'sales_flow_id', 'name', 'slug', 'id'],
     title: 'GroupWithMembers',
     description: 'Group with members list.'
 } as const;
@@ -13070,6 +13092,11 @@ export const MyGroupPublicSchema = {
             format: 'uuid',
             title: 'Popup Id'
         },
+        sales_flow_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Sales Flow Id'
+        },
         name: {
             type: 'string',
             title: 'Name'
@@ -13181,7 +13208,7 @@ export const MyGroupPublicSchema = {
         }
     },
     type: 'object',
-    required: ['tenant_id', 'popup_id', 'name', 'slug', 'id'],
+    required: ['tenant_id', 'popup_id', 'sales_flow_id', 'name', 'slug', 'id'],
     title: 'MyGroupPublic',
     description: "Group public schema augmented with the viewer's role (portal)."
 } as const;
@@ -13197,6 +13224,11 @@ export const MyGroupWithMembersSchema = {
             type: 'string',
             format: 'uuid',
             title: 'Popup Id'
+        },
+        sales_flow_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Sales Flow Id'
         },
         name: {
             type: 'string',
@@ -13317,7 +13349,7 @@ export const MyGroupWithMembersSchema = {
         }
     },
     type: 'object',
-    required: ['tenant_id', 'popup_id', 'name', 'slug', 'id'],
+    required: ['tenant_id', 'popup_id', 'sales_flow_id', 'name', 'slug', 'id'],
     title: 'MyGroupWithMembers',
     description: 'Group with members and viewer role (portal detail).'
 } as const;

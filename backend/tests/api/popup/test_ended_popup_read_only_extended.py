@@ -22,6 +22,7 @@ from app.api.tenant.models import Tenants
 from app.core.security import create_access_token
 from tests._flow_helpers import (
     application_flow_id,
+    group_flow_id,
     seed_default_steps,
 )
 
@@ -81,6 +82,7 @@ def _make_group_with_leader(
     db: Session, tenant: Tenants, popup: Popups, leader: Humans
 ) -> Groups:
     group = Groups(
+        sales_flow_id=group_flow_id(db, popup.id),
         tenant_id=tenant.id,
         popup_id=popup.id,
         name=f"Ended RO Ext Group {uuid.uuid4().hex[:6]}",

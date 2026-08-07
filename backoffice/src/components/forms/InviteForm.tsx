@@ -11,7 +11,7 @@ import {
 import { DangerZone } from "@/components/Common/DangerZone"
 import { FieldError } from "@/components/Common/FieldError"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
-import { InviteFlowPicker } from "@/components/forms/InviteFlowPicker"
+import { ApplicationFlowPicker } from "@/components/forms/ApplicationFlowPicker"
 import { Button } from "@/components/ui/button"
 import { DatePicker } from "@/components/ui/date-picker"
 import {
@@ -177,7 +177,7 @@ export function InviteForm({ defaultValues, onSuccess }: InviteFormProps) {
           <form.Field name="sales_flow_id">
             {(field) => (
               <InlineSection title="Sales flow">
-                <InviteFlowPicker
+                <ApplicationFlowPicker
                   popupId={selectedPopupId}
                   value={field.state.value}
                   onChange={(flowId) => field.handleChange(flowId)}

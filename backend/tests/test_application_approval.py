@@ -33,6 +33,7 @@ from app.core.security import create_access_token
 from tests._flow_helpers import (
     application_flow_id,
     default_flow_id,
+    group_flow_id,
     provision_default_flow,
 )
 
@@ -615,6 +616,7 @@ class TestApprovalTransitions:
         leader_token = create_access_token(subject=leader.id, token_type="human")
 
         group = Groups(
+            sales_flow_id=group_flow_id(db, popup.id),
             tenant_id=tenant_a.id,
             popup_id=popup.id,
             name="Test Group T10",

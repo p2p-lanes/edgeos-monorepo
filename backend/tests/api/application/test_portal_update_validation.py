@@ -20,7 +20,11 @@ from app.api.human.models import Humans
 from app.api.popup.models import Popups
 from app.api.tenant.models import Tenants
 from app.core.security import create_access_token
-from tests._flow_helpers import default_flow_id, provision_default_flow
+from tests._flow_helpers import (
+    default_flow_id,
+    group_flow_id,
+    provision_default_flow,
+)
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -495,6 +499,7 @@ class TestPatchReplaceSemantics:
         data = _create_draft(client, token, popup, {"motivation": "I want in"})
 
         group = Groups(
+            sales_flow_id=group_flow_id(db, popup.id),
             tenant_id=popup.tenant_id,
             popup_id=popup.id,
             name="Test Group",

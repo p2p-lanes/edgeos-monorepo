@@ -20,7 +20,10 @@ from app.api.human.models import Humans
 from app.api.payment.models import PaymentProducts, Payments
 from app.api.popup.models import Popups
 from app.api.tenant.models import Tenants
-from tests._flow_helpers import application_flow_id
+from tests._flow_helpers import (
+    application_flow_id,
+    group_flow_id,
+)
 
 
 def _auth(token: str) -> dict[str, str]:
@@ -222,6 +225,7 @@ def test_cascade_removes_group_memberships(
     member = _make_human(db, tenant_a.id, "member")
 
     group = Groups(
+        sales_flow_id=group_flow_id(db, popup_tenant_a.id),
         id=uuid.uuid4(),
         tenant_id=tenant_a.id,
         popup_id=popup_tenant_a.id,
