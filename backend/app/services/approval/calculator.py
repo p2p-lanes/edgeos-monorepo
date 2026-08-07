@@ -226,10 +226,13 @@ class ApprovalCalculator:
         if application.status != ApplicationStatus.IN_REVIEW.value:
             return application
 
-        # Get strategy — flow-owned if the application's flow has one, else
-        # the popup-shared fallback (sdd/sales-flows slice 7).
-        strategy = approval_strategies_crud.get_for_flow(
-            session, application.popup_id, application.sales_flow_id
+        # The strategy of the application's own flow (slice 6). An
+        # application with no flow is legacy data; read the popup's default
+        # flow so it still resolves.
+        strategy = (
+            approval_strategies_crud.get_by_flow(session, application.sales_flow_id)
+            if application.sales_flow_id
+            else approval_strategies_crud.get_by_popup(session, application.popup_id)
         )
 
         # Get reviews - use find_all since we need all of them for calculation

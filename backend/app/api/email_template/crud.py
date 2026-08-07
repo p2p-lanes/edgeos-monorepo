@@ -84,25 +84,14 @@ class EmailTemplateCRUD(
 
         return results, total
 
-    def get_active_popup_template(
-        self, session: Session, popup_id: uuid.UUID, template_type: str
-    ) -> EmailTemplates | None:
-        """Popup-shared tier only — see `get_by_popup_and_type`."""
-        statement = select(EmailTemplates).where(
-            EmailTemplates.popup_id == popup_id,
-            EmailTemplates.sales_flow_id == None,  # noqa: E711
-            EmailTemplates.template_type == template_type,
-            EmailTemplates.is_active == True,  # noqa: E712
-        )
-        return session.exec(statement).first()
-
     def get_active_flow_template(
         self, session: Session, sales_flow_id: uuid.UUID, template_type: str
     ) -> EmailTemplates | None:
-        """Flow tier — resolved first, see `services/email/service.py`.
+        """This flow's template, or None.
 
-        An inactive flow-tier row is deliberately NOT returned here (the
-        caller falls through to the popup tier instead of failing).
+        An inactive row is deliberately NOT returned: the caller falls
+        through to the shipped file template rather than failing, and since
+        slice 6 there is no popup tier in between.
         """
         statement = select(EmailTemplates).where(
             EmailTemplates.sales_flow_id == sales_flow_id,

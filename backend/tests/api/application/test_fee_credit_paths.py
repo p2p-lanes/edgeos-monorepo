@@ -32,6 +32,7 @@ from app.api.popup.models import Popups
 from app.api.shared.enums import HumanRating, SaleType
 from app.api.tenant.models import Tenants
 from app.core.security import create_access_token
+from tests._flow_helpers import default_flow_id, provision_default_flow
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -58,6 +59,7 @@ def _make_fee_popup(
     )
     db.add(popup)
     db.flush()
+    provision_default_flow(db, popup)
     return popup
 
 
@@ -285,6 +287,7 @@ class TestFeeCreditPaths:
         strategy = ApprovalStrategies(
             tenant_id=tenant_a.id,
             popup_id=popup.id,
+            sales_flow_id=default_flow_id(db, popup.id),
             strategy_type=ApprovalStrategyType.AUTO_ACCEPT,
         )
         db.add(strategy)

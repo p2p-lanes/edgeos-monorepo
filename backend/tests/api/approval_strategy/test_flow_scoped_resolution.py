@@ -3,7 +3,7 @@
 Design: orchestrator's binding extension of D4 — the one-per-popup
 `approval_strategies` constraint re-keys to the flow dimension with popup
 fallback, mirroring the reviewer tri-state's own two-tier pattern.
-`get_for_flow(session, popup_id, sales_flow_id)` returns the flow-owned strategy
+`get_by_flow(session, sales_flow_id)` returns that flow's own strategy
 if one exists, else the popup-shared (`sales_flow_id IS NULL`) fallback. No write
 path creates a flow-scoped row yet (the backoffice editor is slice 14) —
 these tests seed rows directly to prove the resolution logic ahead of that
@@ -25,6 +25,7 @@ from app.api.sales_flow.schemas import (
     SalesFlowVisibility,
 )
 from app.api.tenant.models import Tenants
+from tests._flow_helpers import provision_default_flow
 
 
 def _make_popup(db: Session, tenant: Tenants) -> Popups:
@@ -36,6 +37,7 @@ def _make_popup(db: Session, tenant: Tenants) -> Popups:
     db.add(popup)
     db.commit()
     db.refresh(popup)
+    provision_default_flow(db, popup)
     return popup
 
 
@@ -64,7 +66,7 @@ def _make_strategy(
     popup: Popups,
     *,
     strategy_type: ApprovalStrategyType,
-    sales_flow_id: uuid.UUID | None = None,
+    sales_flow_id: uuid.UUID,
 ) -> ApprovalStrategies:
     strategy = ApprovalStrategies(
         tenant_id=tenant.id,
@@ -78,44 +80,57 @@ def _make_strategy(
     return strategy
 
 
-class TestGetForFlowFallback:
-    def test_flow_with_no_own_strategy_falls_back_to_popup_shared(
+class TestStrategyOwnership:
+    def test_flow_without_a_strategy_gets_none(
         self, db: Session, tenant_a: Tenants
     ) -> None:
+        """The deleted fallback: a sibling's strategy must not leak in."""
         popup = _make_popup(db, tenant_a)
-        flow = _make_flow(db, tenant_a, popup, slug="flow-a")
+        populated = _make_flow(db, tenant_a, popup, slug="flow-populated")
+        empty = _make_flow(db, tenant_a, popup, slug="flow-empty")
         _make_strategy(
-            db, tenant_a, popup, strategy_type=ApprovalStrategyType.AUTO_ACCEPT
+            db,
+            tenant_a,
+            popup,
+            strategy_type=ApprovalStrategyType.AUTO_ACCEPT,
+            sales_flow_id=populated.id,
         )
 
-        resolved = approval_strategies_crud.get_for_flow(db, popup.id, flow.id)
+        assert approval_strategies_crud.get_by_flow(db, empty.id) is None
 
-        assert resolved is not None
-        assert resolved.strategy_type == ApprovalStrategyType.AUTO_ACCEPT
-        assert resolved.sales_flow_id is None
-
-    def test_none_flow_id_returns_popup_shared_strategy(
+    def test_get_by_popup_reads_the_default_flows_strategy(
         self, db: Session, tenant_a: Tenants
     ) -> None:
+        """Naming a popup means its default flow, not a shared tier."""
+        from app.api.sales_flow.crud import sales_flows_crud
+
         popup = _make_popup(db, tenant_a)
+        default_flow = sales_flows_crud.get_default_flow(db, popup.id)
         _make_strategy(
-            db, tenant_a, popup, strategy_type=ApprovalStrategyType.ANY_REVIEWER
+            db,
+            tenant_a,
+            popup,
+            strategy_type=ApprovalStrategyType.ANY_REVIEWER,
+            sales_flow_id=default_flow.id,
         )
 
-        resolved = approval_strategies_crud.get_for_flow(db, popup.id, None)
+        resolved = approval_strategies_crud.get_by_popup(db, popup.id)
 
         assert resolved is not None
         assert resolved.strategy_type == ApprovalStrategyType.ANY_REVIEWER
 
-
-class TestGetForFlowOwnership:
-    def test_flow_owned_strategy_used_instead_of_popup_shared(
+    def test_two_flows_review_independently(
         self, db: Session, tenant_a: Tenants
     ) -> None:
         popup = _make_popup(db, tenant_a)
         flow_a = _make_flow(db, tenant_a, popup, slug="flow-a")
+        flow_b = _make_flow(db, tenant_a, popup, slug="flow-b")
         _make_strategy(
-            db, tenant_a, popup, strategy_type=ApprovalStrategyType.AUTO_ACCEPT
+            db,
+            tenant_a,
+            popup,
+            strategy_type=ApprovalStrategyType.AUTO_ACCEPT,
+            sales_flow_id=flow_b.id,
         )
         _make_strategy(
             db,
@@ -125,7 +140,7 @@ class TestGetForFlowOwnership:
             sales_flow_id=flow_a.id,
         )
 
-        resolved = approval_strategies_crud.get_for_flow(db, popup.id, flow_a.id)
+        resolved = approval_strategies_crud.get_by_flow(db, flow_a.id)
 
         assert resolved is not None
         assert resolved.strategy_type == ApprovalStrategyType.ALL_REVIEWERS
@@ -138,7 +153,11 @@ class TestGetForFlowOwnership:
         flow_a = _make_flow(db, tenant_a, popup, slug="flow-a")
         flow_b = _make_flow(db, tenant_a, popup, slug="flow-b")
         _make_strategy(
-            db, tenant_a, popup, strategy_type=ApprovalStrategyType.AUTO_ACCEPT
+            db,
+            tenant_a,
+            popup,
+            strategy_type=ApprovalStrategyType.AUTO_ACCEPT,
+            sales_flow_id=flow_b.id,
         )
         _make_strategy(
             db,
@@ -148,13 +167,12 @@ class TestGetForFlowOwnership:
             sales_flow_id=flow_a.id,
         )
 
-        resolved_a = approval_strategies_crud.get_for_flow(db, popup.id, flow_a.id)
-        resolved_b = approval_strategies_crud.get_for_flow(db, popup.id, flow_b.id)
+        resolved_a = approval_strategies_crud.get_by_flow(db, flow_a.id)
+        resolved_b = approval_strategies_crud.get_by_flow(db, flow_b.id)
 
         assert resolved_a is not None
         assert resolved_a.strategy_type == ApprovalStrategyType.THRESHOLD
         assert resolved_b is not None
         assert resolved_b.strategy_type == ApprovalStrategyType.AUTO_ACCEPT, (
-            "Flow B has no strategy of its own — must fall back to the "
-            "popup-shared tier, not leak flow A's strategy"
+            "Each flow keeps its own strategy — editing one never reaches the other"
         )

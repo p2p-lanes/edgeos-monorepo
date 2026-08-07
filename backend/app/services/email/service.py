@@ -267,21 +267,11 @@ class EmailService:
                         custom.id,
                     )
 
-        if db_session and template_scope == "popup" and popup_id:
-            from app.api.email_template.crud import email_template_crud
-
-            custom = email_template_crud.get_active_popup_template(
-                db_session, popup_id, template_type_enum.value
-            )
-            if custom:
-                try:
-                    return self._render_custom(custom, context)
-                except Exception:
-                    logger.error(
-                        "Popup-tier custom template {} failed to render, "
-                        "falling back to the next tier",
-                        custom.id,
-                    )
+        # The popup tier is gone (sdd/sales-flows-rediseno slice 6): a
+        # popup-scoped template belongs to one flow, so two application
+        # flows can word their acceptance email differently. A flow with no
+        # template of its own falls straight through to the shipped file,
+        # not to a sibling's copy.
 
         # Fallback to file-based template
         file_path = TEMPLATE_TYPE_TO_FILE.get(template_type_enum)
@@ -296,8 +286,8 @@ class EmailService:
     ) -> tuple[str, str | None]:
         """Render a DB-stored custom template's HTML and (optional) subject.
 
-        Shared by all three tiers `render_with_fallback` tries (flow,
-        tenant, popup) — extracted from a triplicated block (sdd/sales-flows
+        Shared by both tiers `render_with_fallback` tries (flow and
+        tenant) — extracted from a duplicated block (sdd/sales-flows
         slice 10 review follow-up). Pure refactor: identical output to the
         inlined version it replaces.
         """

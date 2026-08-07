@@ -229,6 +229,7 @@ def _seed_ticketing_steps(session: Session, popup_map: dict, tenant_id) -> None:
 
 def _seed_approval_strategies(session: Session, popup_map: dict, tenant_id) -> None:
     from app.api.approval_strategy.schemas import ApprovalStrategyType
+    from app.api.sales_flow.crud import sales_flows_crud
     from app.models import ApprovalStrategies
 
     for popup_key, popup in popup_map.items():
@@ -236,9 +237,16 @@ def _seed_approval_strategies(session: Session, popup_map: dict, tenant_id) -> N
             select(ApprovalStrategies).where(ApprovalStrategies.popup_id == popup.id)
         ).first()
         if not existing_strategy:
+            default_flow = sales_flows_crud.get_default_flow(session, popup.id)
+            if default_flow is None:
+                logger.warning(
+                    f"Skipping approval strategy for {popup_key}: no default flow"
+                )
+                continue
             strategy = ApprovalStrategies(
                 tenant_id=tenant_id,
                 popup_id=popup.id,
+                sales_flow_id=default_flow.id,
                 strategy_type=ApprovalStrategyType.AUTO_ACCEPT,
             )
             session.add(strategy)

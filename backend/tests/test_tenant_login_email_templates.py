@@ -8,6 +8,7 @@ from app.api.popup.models import Popups
 from app.api.tenant.models import Tenants
 from app.api.user.models import Users
 from app.services.email.service import EmailService
+from tests._flow_helpers import default_flow_id
 
 
 def _admin_headers(token: str) -> dict[str, str]:
@@ -59,12 +60,18 @@ def _create_popup_template(
     subject: str,
     html_content: str,
     is_active: bool = True,
+    sales_flow_id: uuid.UUID | None = None,
 ):
     return client.post(
         "/api/v1/email-templates",
         headers=_admin_headers(token),
         json={
             "popup_id": str(popup_id),
+            **(
+                {"sales_flow_id": str(sales_flow_id)}
+                if sales_flow_id is not None
+                else {}
+            ),
             "template_type": template_type,
             "subject": subject,
             "html_content": html_content,
@@ -183,6 +190,10 @@ def test_popup_communications_ignore_tenant_auth_templates(
     )
     assert auth_response.status_code == 201
 
+    # Since slice 6 a popup-scoped template belongs to a flow, so the
+    # communication is authored on the popup's default flow and rendered
+    # through it.
+    flow_id = default_flow_id(db, popup_tenant_a.id)
     popup_response = _create_popup_template(
         client,
         admin_token_tenant_a,
@@ -190,6 +201,7 @@ def test_popup_communications_ignore_tenant_auth_templates(
         template_type="application_received",
         subject="Popup subject",
         html_content="<html><body>Popup communication for {{ popup_name }}</body></html>",
+        sales_flow_id=flow_id,
     )
     assert popup_response.status_code == 201
 
@@ -197,6 +209,7 @@ def test_popup_communications_ignore_tenant_auth_templates(
         template_type="application_received",
         context={"popup_name": popup_tenant_a.name},
         popup_id=popup_tenant_a.id,
+        sales_flow_id=flow_id,
         db_session=db,
     )
 

@@ -30,6 +30,7 @@ from app.api.shared.enums import HumanRating, UserRole
 from app.api.tenant.models import Tenants
 from app.api.user.models import Users
 from app.core.security import create_access_token
+from tests._flow_helpers import default_flow_id, provision_default_flow
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -49,6 +50,7 @@ def _make_popup(db: Session, tenant: Tenants, *, slug_suffix: str) -> Popups:
         db.add(popup)
         db.commit()
         db.refresh(popup)
+        provision_default_flow(db, popup)
     return popup
 
 
@@ -100,6 +102,7 @@ def _set_strategy(
 
     strategy = ApprovalStrategies(
         popup_id=popup.id,
+        sales_flow_id=default_flow_id(db, popup.id),
         tenant_id=tenant.id,
         strategy_type=strategy_type,
         required_approvals=required_approvals,

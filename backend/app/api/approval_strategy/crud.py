@@ -1,6 +1,7 @@
 import uuid
 from datetime import UTC, datetime
 
+from fastapi import HTTPException, status
 from sqlmodel import Session, select
 
 from app.api.approval_strategy.models import ApprovalStrategies
@@ -22,43 +23,29 @@ class ApprovalStrategiesCRUD(
     def get_by_popup(
         self, session: Session, popup_id: uuid.UUID
     ) -> ApprovalStrategies | None:
-        """Get the popup-shared approval strategy (`sales_flow_id IS NULL`).
+        """The strategy of the popup's DEFAULT flow.
 
-        This is the tier every flow inherits by default (sdd/sales-flows
-        slice 7) and the exact strategy every popup had before this slice.
+        Kept for callers that name a popup and mean "its default flow"
+        (sdd/sales-flows-rediseno slice 6). There is no popup-shared
+        strategy any more: a strategy belongs to one flow, so two
+        application flows can review their applicants differently.
         """
-        statement = select(ApprovalStrategies).where(
-            ApprovalStrategies.popup_id == popup_id,
-            ApprovalStrategies.sales_flow_id.is_(None),  # type: ignore[union-attr]
-        )
-        return session.exec(statement).first()
+        from app.api.sales_flow.crud import sales_flows_crud
+
+        default_flow = sales_flows_crud.get_default_flow(session, popup_id)
+        if default_flow is None:
+            return None
+        return self.get_by_flow(session, default_flow.id)
 
     def get_by_flow(
         self, session: Session, flow_id: uuid.UUID
     ) -> ApprovalStrategies | None:
-        """Strategy owned exclusively by `flow_id` (sdd/sales-flows slice 7).
-
-        No write path creates one yet — the backoffice editor is slice 14.
-        """
+        """The strategy of `flow_id` — the only way to read one. None means
+        this flow has no strategy, never that it should borrow another's."""
         statement = select(ApprovalStrategies).where(
             ApprovalStrategies.sales_flow_id == flow_id
         )
         return session.exec(statement).first()
-
-    def get_for_flow(
-        self,
-        session: Session,
-        popup_id: uuid.UUID,
-        flow_id: uuid.UUID | None,
-    ) -> ApprovalStrategies | None:
-        """Flow-owned strategy if `flow_id` owns one, else the popup-shared
-        fallback (sdd/sales-flows slice 7). `flow_id=None` (e.g. a legacy
-        application with no flow) always returns the popup-shared tier."""
-        if flow_id is not None:
-            flow_strategy = self.get_by_flow(session, flow_id)
-            if flow_strategy:
-                return flow_strategy
-        return self.get_by_popup(session, popup_id)
 
     def create_for_popup(
         self,
@@ -66,11 +53,25 @@ class ApprovalStrategiesCRUD(
         popup_id: uuid.UUID,
         tenant_id: uuid.UUID,
         strategy_in: ApprovalStrategyCreate,
+        sales_flow_id: uuid.UUID | None = None,
     ) -> ApprovalStrategies:
-        """Create approval strategy for a popup."""
+        """Create a strategy for a flow. Omitting `sales_flow_id` means the
+        popup's default flow, the one every popup has."""
+        if sales_flow_id is None:
+            from app.api.sales_flow.crud import sales_flows_crud
+
+            default_flow = sales_flows_crud.get_default_flow(session, popup_id)
+            if default_flow is None:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Popup has no default sales flow",
+                )
+            sales_flow_id = default_flow.id
+
         db_obj = ApprovalStrategies(
             popup_id=popup_id,
             tenant_id=tenant_id,
+            sales_flow_id=sales_flow_id,
             **strategy_in.model_dump(),
         )
         session.add(db_obj)

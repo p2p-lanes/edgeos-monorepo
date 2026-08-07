@@ -140,8 +140,10 @@ async def get_review_summary(
 
     # Calculate weighted score using SQL aggregation if applicable
     weighted_score = None
-    strategy = approval_strategies_crud.get_for_flow(
-        db, application.popup_id, application.sales_flow_id
+    strategy = (
+        approval_strategies_crud.get_by_flow(db, application.sales_flow_id)
+        if application.sales_flow_id
+        else approval_strategies_crud.get_by_popup(db, application.popup_id)
     )
     if strategy and strategy.strategy_type == ApprovalStrategyType.WEIGHTED:
         weighted_score = application_reviews_crud.calculate_weighted_score(

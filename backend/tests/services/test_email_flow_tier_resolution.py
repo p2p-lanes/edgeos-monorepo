@@ -94,14 +94,13 @@ def test_flow_tier_wins_over_popup_tier(db: Session, tenant_a: Tenants) -> None:
     assert "Popup version" not in html
 
 
-def test_inactive_flow_row_falls_through_to_popup_tier(
+def test_inactive_flow_row_falls_through_to_the_file_template(
     db: Session, tenant_a: Tenants
 ) -> None:
+    """Deactivating a flow's template means "use the shipped default", not
+    "use whatever the popup used to have"."""
     popup = _make_popup(db, tenant_a)
     flow = _make_flow(db, tenant_a, popup, slug="flow-b")
-    _make_template(
-        db, tenant_a, popup_id=popup.id, html_content="<p>Popup active version</p>"
-    )
     _make_template(
         db,
         tenant_a,
@@ -119,17 +118,23 @@ def test_inactive_flow_row_falls_through_to_popup_tier(
         db_session=db,
     )
 
-    assert "Popup active version" in html
     assert "Flow inactive version" not in html
 
 
-def test_flow_with_no_row_falls_through_to_popup_tier(
+def test_flow_with_no_row_falls_through_to_the_file_template(
     db: Session, tenant_a: Tenants
 ) -> None:
+    """Slice 6 removed the popup tier: a flow with no template of its own
+    reaches the shipped file, never a sibling flow's wording."""
     popup = _make_popup(db, tenant_a)
     flow = _make_flow(db, tenant_a, popup, slug="flow-c")
+    other = _make_flow(db, tenant_a, popup, slug="flow-c-other")
     _make_template(
-        db, tenant_a, popup_id=popup.id, html_content="<p>Only popup row exists</p>"
+        db,
+        tenant_a,
+        popup_id=popup.id,
+        sales_flow_id=other.id,
+        html_content="<p>Another flow's wording</p>",
     )
 
     html, _ = EmailService().render_with_fallback(
@@ -140,7 +145,7 @@ def test_flow_with_no_row_falls_through_to_popup_tier(
         db_session=db,
     )
 
-    assert "Only popup row exists" in html
+    assert "Another flow's wording" not in html
 
 
 def test_flow_fallback_is_byte_identical_to_legacy_behavior(
@@ -178,17 +183,13 @@ def test_flow_fallback_is_byte_identical_to_legacy_behavior(
     assert flow_subject == legacy_subject
 
 
-def test_flow_render_error_falls_through_to_popup_tier(
+def test_flow_render_error_falls_through_to_the_file_template(
     db: Session, tenant_a: Tenants
 ) -> None:
-    """A flow-tier template that fails to render (invalid Jinja syntax
-    here) falls through to the popup tier instead of raising and blocking
-    the send."""
+    """A flow template with invalid Jinja must not block the send: it falls
+    through to the shipped file rather than raising."""
     popup = _make_popup(db, tenant_a)
     flow = _make_flow(db, tenant_a, popup, slug="flow-f")
-    _make_template(
-        db, tenant_a, popup_id=popup.id, html_content="<p>Popup safe version</p>"
-    )
     _make_template(
         db,
         tenant_a,
@@ -205,7 +206,8 @@ def test_flow_render_error_falls_through_to_popup_tier(
         db_session=db,
     )
 
-    assert "Popup safe version" in html
+    assert "Broken" not in html
+    assert html
 
 
 def test_popup_render_error_falls_through_to_file_default(

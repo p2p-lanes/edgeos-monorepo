@@ -1983,15 +1983,8 @@ export const ApprovalStrategyPublicSchema = {
             title: 'Tenant Id'
         },
         sales_flow_id: {
-            anyOf: [
-                {
-                    type: 'string',
-                    format: 'uuid'
-                },
-                {
-                    type: 'null'
-                }
-            ],
+            type: 'string',
+            format: 'uuid',
             title: 'Sales Flow Id'
         },
         strategy_type: {
@@ -2051,7 +2044,7 @@ export const ApprovalStrategyPublicSchema = {
         }
     },
     type: 'object',
-    required: ['id', 'popup_id', 'tenant_id', 'strategy_type', 'required_approvals', 'accept_threshold', 'reject_threshold', 'strong_yes_weight', 'yes_weight', 'no_weight', 'strong_no_weight'],
+    required: ['id', 'popup_id', 'tenant_id', 'sales_flow_id', 'strategy_type', 'required_approvals', 'accept_threshold', 'reject_threshold', 'strong_yes_weight', 'yes_weight', 'no_weight', 'strong_no_weight'],
     title: 'ApprovalStrategyPublic',
     description: 'ApprovalStrategy schema for API responses.'
 } as const;

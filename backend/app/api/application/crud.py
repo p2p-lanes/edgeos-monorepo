@@ -596,7 +596,7 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
 
         TODO (disclosed): `approval_strategy` also resolves flow -> popup
         with no admin write path for the flow tier (see
-        `approval_strategy/crud.py::get_for_flow`) — the same shape of gap
+        `approval_strategy/crud.py::get_by_flow`) — the same shape of gap
         as `reviewers_mode` above: backend-supported, admin-inaccessible.
         """
         already_reviewed = (
@@ -1414,10 +1414,13 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
             self.create_snapshot(session, application, "auto_rejected")
             return
 
-        # Check approval strategy — flow-owned if the application's flow
-        # has one, else the popup-shared fallback (sdd/sales-flows slice 7).
-        strategy = approval_strategies_crud.get_for_flow(
-            session, application.popup_id, application.sales_flow_id
+        # The strategy of the application's own flow (slice 6). An
+        # application with no flow is legacy data; fall back to the popup's
+        # default flow so it still resolves.
+        strategy = (
+            approval_strategies_crud.get_by_flow(session, application.sales_flow_id)
+            if application.sales_flow_id
+            else approval_strategies_crud.get_by_popup(session, application.popup_id)
         )
         should_auto_accept = (
             strategy is None

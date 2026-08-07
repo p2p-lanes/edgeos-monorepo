@@ -45,6 +45,7 @@ from app.api.shared.enums import SaleType, UserRole
 from app.api.tenant.models import Tenants
 from app.api.user.models import Users
 from app.core.security import create_access_token
+from tests._flow_helpers import default_flow_id, provision_default_flow
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -67,11 +68,13 @@ def _make_manual_review_fee_popup(db: Session, tenant: Tenants) -> Popups:
     )
     db.add(popup)
     db.flush()
+    provision_default_flow(db, popup)
 
     # ANY_REVIEWER: one YES vote is enough to accept the application
     strategy = ApprovalStrategies(
         tenant_id=tenant.id,
         popup_id=popup.id,
+        sales_flow_id=default_flow_id(db, popup.id),
         strategy_type=ApprovalStrategyType.ANY_REVIEWER,
     )
     db.add(strategy)

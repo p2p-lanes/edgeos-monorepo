@@ -2,7 +2,7 @@ import uuid
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Index, text
+from sqlalchemy import Index
 from sqlalchemy.dialects.postgresql import UUID
 from sqlmodel import Column, DateTime, Field, Relationship, func
 
@@ -14,31 +14,15 @@ if TYPE_CHECKING:
 
 
 class ApprovalStrategies(ApprovalStrategyBase, table=True):
-    """Approval strategy for a popup, or — when `sales_flow_id` is set —
-    for one specific sales flow of that popup only (sdd/sales-flows
-    slice 7).
+    """How one sales flow reviews and accepts its applications.
 
-    Defines the rules for reviewing and accepting applications.
-    `uq_approval_strategy_flow` covers flow-owned rows;
-    `uq_approval_strategy_popup_shared` re-scopes the original popup-wide
-    constraint to the NULL (popup-shared) tier. See migration
-    `9bf2a7a71d10_add_flow_id_to_reviewers.py`.
+    One strategy per flow (sdd/sales-flows-rediseno slice 6), so two
+    application flows of the same popup can review differently — which is
+    the point of having flows. See migration
+    `c9e2f4b71d38_approval_strategy_flow_required.py`.
     """
 
-    __table_args__ = (
-        Index(
-            "uq_approval_strategy_flow",
-            "sales_flow_id",
-            unique=True,
-            postgresql_where=text("sales_flow_id IS NOT NULL"),
-        ),
-        Index(
-            "uq_approval_strategy_popup_shared",
-            "popup_id",
-            unique=True,
-            postgresql_where=text("sales_flow_id IS NULL"),
-        ),
-    )
+    __table_args__ = (Index("uq_approval_strategy_flow", "sales_flow_id", unique=True),)
 
     id: uuid.UUID = Field(
         default_factory=uuid.uuid4,

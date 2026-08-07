@@ -30,6 +30,7 @@ from app.api.human.models import Humans
 from app.api.popup.models import Popups
 from app.api.tenant.models import Tenants
 from app.core.security import create_access_token
+from tests._flow_helpers import default_flow_id, provision_default_flow
 
 # ---------------------------------------------------------------------------
 # Helpers — reused across all tests
@@ -58,6 +59,7 @@ def _make_popup(
         db.add(popup)
         db.commit()
         db.refresh(popup)
+        provision_default_flow(db, popup)
     return popup
 
 
@@ -90,6 +92,7 @@ def _set_auto_accept_strategy(
 
     strategy = ApprovalStrategies(
         popup_id=popup.id,
+        sales_flow_id=default_flow_id(db, popup.id),
         tenant_id=tenant.id,
         strategy_type=ApprovalStrategyType.AUTO_ACCEPT,
         required_approvals=1,
@@ -439,6 +442,7 @@ class TestScholarshipEndpoint:
         strategy = AS(
             popup_id=popup.id,
             tenant_id=tenant_a.id,
+            sales_flow_id=default_flow_id(db, popup.id),
             strategy_type=ApprovalStrategyType.ANY_REVIEWER,
             required_approvals=1,
         )
