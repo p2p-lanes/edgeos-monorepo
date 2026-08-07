@@ -5379,6 +5379,32 @@ export const CopyFormToFlowResponseSchema = {
     title: 'CopyFormToFlowResponse'
 } as const;
 
+export const CopyStepsToFlowRequestSchema = {
+    properties: {
+        source_flow_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Source Flow Id'
+        }
+    },
+    type: 'object',
+    required: ['source_flow_id'],
+    title: 'CopyStepsToFlowRequest',
+    description: 'Which flow to copy the checkout steps from.'
+} as const;
+
+export const CopyStepsToFlowResponseSchema = {
+    properties: {
+        steps: {
+            type: 'integer',
+            title: 'Steps'
+        }
+    },
+    type: 'object',
+    required: ['steps'],
+    title: 'CopyStepsToFlowResponse'
+} as const;
+
 export const CouponCreateSchema = {
     properties: {
         popup_id: {

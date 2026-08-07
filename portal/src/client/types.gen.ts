@@ -1239,6 +1239,17 @@ export type CopyFormToFlowResponse = {
 };
 
 /**
+ * Which flow to copy the checkout steps from.
+ */
+export type CopyStepsToFlowRequest = {
+    source_flow_id: string;
+};
+
+export type CopyStepsToFlowResponse = {
+    steps: number;
+};
+
+/**
  * Coupon schema for creation.
  */
 export type CouponCreate = {
@@ -7764,6 +7775,14 @@ export type TicketingStepsDeleteTicketingStepData = {
 };
 
 export type TicketingStepsDeleteTicketingStepResponse = (void);
+
+export type TicketingStepsCopyStepsToFlowData = {
+    requestBody: CopyStepsToFlowRequest;
+    targetFlowId: string;
+    xTenantId?: (string | null);
+};
+
+export type TicketingStepsCopyStepsToFlowResponse = (CopyStepsToFlowResponse);
 
 export type TracksListTracksData = {
     /**

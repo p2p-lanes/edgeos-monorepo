@@ -105,5 +105,57 @@ class TicketingStepsCRUD(
         )
         return list(session.exec(statement).all())
 
+    def copy_steps_to_flow(
+        self,
+        session: Session,
+        *,
+        tenant_id: uuid.UUID,
+        popup_id: uuid.UUID,
+        target_flow_id: uuid.UUID,
+        source_flow_id: uuid.UUID,
+    ) -> int:
+        """Copy `source_flow_id`'s steps into `target_flow_id` as new rows.
+
+        This is how a flow gets steps without inheriting any
+        (sdd/sales-flows-rediseno R3): copying is a one-time event, after
+        which the two flows are independent and editing either never
+        reaches the other. Copying a flow with no steps yields none, which
+        is the honest answer.
+
+        The target's existing steps are deleted first, so this genuinely
+        REPLACES rather than appends — matching what the create screen
+        promises when it offers to start from another flow.
+        """
+        existing, _ = self.find_by_flow(session, target_flow_id, limit=1000)
+        for step in existing:
+            session.delete(step)
+        session.flush()
+
+        source, _ = self.find_by_flow(session, source_flow_id, limit=1000)
+        for step in source:
+            session.add(
+                TicketingSteps(
+                    tenant_id=tenant_id,
+                    popup_id=popup_id,
+                    sales_flow_id=target_flow_id,
+                    step_type=step.step_type,
+                    title=step.title,
+                    description=step.description,
+                    order=step.order,
+                    is_enabled=step.is_enabled,
+                    protected=step.protected,
+                    product_category=step.product_category,
+                    template=step.template,
+                    template_config=step.template_config,
+                    watermark=step.watermark,
+                    show_title=step.show_title,
+                    show_watermark=step.show_watermark,
+                    show_in_navbar=step.show_in_navbar,
+                    emoji=step.emoji,
+                )
+            )
+        session.commit()
+        return len(source)
+
 
 ticketing_steps_crud = TicketingStepsCRUD()

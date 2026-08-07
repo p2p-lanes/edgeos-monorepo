@@ -7,6 +7,8 @@ from app.api.shared.enums import UserRole
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
 from app.api.ticketing_step import crud
 from app.api.ticketing_step.schemas import (
+    CopyStepsToFlowRequest,
+    CopyStepsToFlowResponse,
     TicketingStepCreate,
     TicketingStepPublic,
     TicketingStepUpdate,
@@ -328,3 +330,44 @@ async def delete_ticketing_step(
 
     delete_translations_for_entity(db, "ticketing_step", step.id)
     crud.ticketing_steps_crud.delete(db, step)
+
+
+@router.post("/copy-to-flow/{target_flow_id}", response_model=CopyStepsToFlowResponse)
+async def copy_steps_to_flow(
+    target_flow_id: uuid.UUID,
+    body: CopyStepsToFlowRequest,
+    db: AdminOrApiKeySession_TicketingStepsWrite,
+    _current_user: AdminOrApiKey_TicketingStepsWrite,
+) -> CopyStepsToFlowResponse:
+    """Copy another flow's checkout steps into `target_flow_id`.
+
+    How a new flow gets a checkout without inheriting one
+    (sdd/sales-flows-rediseno R3). The target's own steps are replaced, so
+    calling twice does not append. `source_flow_id` must belong to the same
+    popup as the target — a foreign flow is rejected rather than silently
+    ignored.
+    """
+    from app.api.sales_flow.crud import sales_flows_crud
+
+    target_flow = sales_flows_crud.get(db, target_flow_id)
+    if not target_flow:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Sales flow not found",
+        )
+
+    source_flow = sales_flows_crud.get(db, body.source_flow_id)
+    if not source_flow or source_flow.popup_id != target_flow.popup_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Sales flow not found for this popup",
+        )
+
+    copied = crud.ticketing_steps_crud.copy_steps_to_flow(
+        db,
+        tenant_id=target_flow.tenant_id,
+        popup_id=target_flow.popup_id,
+        target_flow_id=target_flow.id,
+        source_flow_id=source_flow.id,
+    )
+    return CopyStepsToFlowResponse(steps=copied)

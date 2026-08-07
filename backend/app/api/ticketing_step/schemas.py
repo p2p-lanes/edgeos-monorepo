@@ -259,3 +259,13 @@ class TicketingStepUpdate(BaseModel):
             self.template, self.template_config
         )
         return self
+
+
+class CopyStepsToFlowRequest(BaseModel):
+    """Which flow to copy the checkout steps from."""
+
+    source_flow_id: uuid.UUID
+
+
+class CopyStepsToFlowResponse(BaseModel):
+    steps: int

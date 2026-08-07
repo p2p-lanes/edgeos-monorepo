@@ -3,10 +3,9 @@ import { useEffect } from "react"
 
 import { FormPageLayout } from "@/components/Common/FormPageLayout"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
-import { SalesFlowForm } from "@/components/forms/SalesFlowForm"
+import { NewSalesFlowForm } from "@/components/forms/NewSalesFlowForm"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
 import useAuth from "@/hooks/useAuth"
-import { useGoBack } from "@/hooks/useGoBack"
 
 export const Route = createFileRoute("/_layout/sales-flows/new")({
   component: NewSalesFlow,
@@ -17,7 +16,6 @@ export const Route = createFileRoute("/_layout/sales-flows/new")({
 
 function NewSalesFlow() {
   const navigate = useNavigate()
-  const goBack = useGoBack({ to: "/sales-flows" })
   const { isOperatorOrAbove, isUserLoading } = useAuth()
   const { selectedPopupId, isContextReady } = useWorkspace()
 
@@ -35,13 +33,13 @@ function NewSalesFlow() {
   return (
     <FormPageLayout
       title="Create Sales Flow"
-      description="Add a new way for attendees to apply for or purchase this gathering"
+      description="Name it and pick where it starts from. Everything else is configured afterwards."
       backTo="/sales-flows"
     >
       {!isContextReady || !selectedPopupId ? (
         <WorkspaceAlert resource="sales flow" action="create" />
       ) : (
-        <SalesFlowForm popupId={selectedPopupId} onSuccess={goBack} />
+        <NewSalesFlowForm popupId={selectedPopupId} />
       )}
     </FormPageLayout>
   )
