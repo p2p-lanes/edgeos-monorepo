@@ -4014,6 +4014,24 @@ export type SalesFlowPublic = {
 };
 
 /**
+ * What a flow is missing before it can sell
+ * (sdd/sales-flows-rediseno slice 8).
+ *
+ * `blockers` and `warnings` carry machine codes, not sentences. The
+ * backoffice owns the wording, and a code that nobody renders yet is
+ * still a code the API can add without breaking a client.
+ */
+export type SalesFlowReadiness = {
+    flow_id: string;
+    enabled_step_count: number;
+    offered_product_count: number;
+    form_field_count: number;
+    has_approval_strategy: boolean;
+    blockers: Array<(string)>;
+    warnings: Array<(string)>;
+};
+
+/**
  * Whether a flow uses the popup-level reviewer list or its own (D4).
  */
 export type SalesFlowReviewersMode = 'inherit' | 'override';
@@ -7420,6 +7438,13 @@ export type SalesFlowsCreateSalesFlowData = {
 };
 
 export type SalesFlowsCreateSalesFlowResponse = (SalesFlowPublic);
+
+export type SalesFlowsListSalesFlowReadinessData = {
+    popupId: string;
+    xTenantId?: (string | null);
+};
+
+export type SalesFlowsListSalesFlowReadinessResponse = (Array<SalesFlowReadiness>);
 
 export type SalesFlowsGetSalesFlowData = {
     flowId: string;

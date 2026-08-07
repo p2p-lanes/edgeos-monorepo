@@ -25,6 +25,8 @@ interface ConfigFieldRowProps {
   value: string
   onValueChange: (value: string) => void
   readOnly?: boolean
+  /** Whether a secret is already stored. Its value is never loaded. */
+  isConfigured?: boolean
 }
 
 /**
@@ -44,6 +46,7 @@ export function ConfigFieldRow({
   value,
   onValueChange,
   readOnly = false,
+  isConfigured = false,
 }: ConfigFieldRowProps) {
   const controlId = `flow-config-${fieldKey}`
 
@@ -94,6 +97,8 @@ export function ConfigFieldRow({
             value={value}
             onChange={(e) => onValueChange(e.target.value)}
             disabled={readOnly}
+            autoComplete="new-password"
+            placeholder={isConfigured ? "Set. Type to replace" : "Not set"}
             className="w-56 text-sm"
           />
         )}

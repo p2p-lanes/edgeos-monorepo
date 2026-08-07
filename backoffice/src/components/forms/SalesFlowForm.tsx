@@ -191,6 +191,11 @@ function parseDraftValue(
  * The flow's own values. There is no inherited value to fall back to since
  * sdd/sales-flows-rediseno slice 7 — creating a flow copies the popup's
  * configuration into it, so what the form shows is what the flow stores.
+ *
+ * A secret starts empty no matter what is stored. Loading it would put the
+ * value in the DOM for anyone who opens the page or its devtools, and an
+ * operator never needs to read a secret back to replace it. Empty means
+ * "leave it as it is" on save, which is what `configPayload` relies on.
  */
 function buildInitialConfig(
   defaultValues?: SalesFlowPublic,
@@ -198,10 +203,12 @@ function buildInitialConfig(
   return Object.fromEntries(
     CONFIG_FIELDS.map((field) => [
       field.key,
-      rawToInput(
-        field.kind,
-        defaultValues?.[field.key as keyof SalesFlowPublic] as never,
-      ),
+      field.kind === "secret"
+        ? ""
+        : rawToInput(
+            field.kind,
+            defaultValues?.[field.key as keyof SalesFlowPublic] as never,
+          ),
     ]),
   )
 }
@@ -309,7 +316,11 @@ export function SalesFlowForm({
       if (readOnly) return
       setRestrictionRuleError(undefined)
       const configPayload = Object.fromEntries(
-        CONFIG_FIELDS.map((field) => [
+        CONFIG_FIELDS.filter(
+          // An untouched secret field is empty, and empty must not clear a
+          // stored secret — omitting the key leaves it as it is.
+          (field) => field.kind !== "secret" || value.config[field.key] !== "",
+        ).map((field) => [
           field.key,
           parseDraftValue(field.kind, value.config[field.key]),
         ]),
@@ -583,6 +594,11 @@ export function SalesFlowForm({
                         field.handleChange(value as never)
                       }
                       readOnly={readOnly}
+                      isConfigured={Boolean(
+                        defaultValues?.[
+                          fieldConfig.key as keyof SalesFlowPublic
+                        ],
+                      )}
                     />
                   )}
                 </form.Field>

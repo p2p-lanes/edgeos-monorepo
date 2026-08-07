@@ -1,32 +1,17 @@
-import { keepPreviousData, useQuery } from "@tanstack/react-query"
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router"
-import type { ColumnDef } from "@tanstack/react-table"
+import { useQuery } from "@tanstack/react-query"
+import { createFileRoute, Link } from "@tanstack/react-router"
 import { Plus, Workflow } from "lucide-react"
 import { Suspense } from "react"
 
-import { type SalesFlowPublic, SalesFlowsService } from "@/client"
-import { DataTable, SortableHeader } from "@/components/Common/DataTable"
+import { SalesFlowsService } from "@/client"
 import { EmptyState } from "@/components/Common/EmptyState"
 import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
-import { StatusBadge } from "@/components/Common/StatusBadge"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
-import { Badge } from "@/components/ui/badge"
+import { FlowMapCard } from "@/components/SalesFlows/FlowMapCard"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
 import useAuth from "@/hooks/useAuth"
-
-function getSalesFlowsQueryOptions(popupId: string) {
-  return {
-    queryFn: () =>
-      SalesFlowsService.listSalesFlows({
-        popupId,
-        skip: 0,
-        limit: 100,
-      }),
-    queryKey: ["sales-flows", { popupId }],
-  }
-}
 
 export const Route = createFileRoute("/_layout/sales-flows/")({
   component: SalesFlows,
@@ -46,72 +31,72 @@ function AddSalesFlowButton() {
   )
 }
 
-const columns: ColumnDef<SalesFlowPublic>[] = [
-  {
-    accessorKey: "name",
-    header: ({ column }) => <SortableHeader label="Name" column={column} />,
-    cell: ({ row }) => (
-      <div className="flex items-center gap-2">
-        <span className="font-medium">{row.original.name}</span>
-        {row.original.is_default && <Badge variant="secondary">Default</Badge>}
-      </div>
-    ),
-  },
-  {
-    accessorKey: "slug",
-    header: "Slug",
-    cell: ({ row }) => (
-      <span className="font-mono text-sm">{row.original.slug}</span>
-    ),
-  },
-  {
-    accessorKey: "type",
-    header: "Type",
-  },
-  {
-    accessorKey: "visibility",
-    header: "Visibility",
-    cell: ({ row }) => (
-      <StatusBadge
-        status={row.original.visibility === "portal_listed" ? "active" : "none"}
-        className="capitalize"
-      />
-    ),
-  },
-]
-
-function SalesFlowsTableContent({ popupId }: { popupId: string }) {
-  const navigate = useNavigate()
+/**
+ * The flow map (sdd/sales-flows-rediseno slice 8).
+ *
+ * This replaced a table of name, slug, type and visibility. That table
+ * could not answer the only question worth asking on this screen — which
+ * flow is broken — because a flow with an empty checkout rendered exactly
+ * like a working one. Readiness is fetched separately so a flow still
+ * lists when the check itself fails.
+ */
+function FlowMap({ popupId }: { popupId: string }) {
   const { data: salesFlows } = useQuery({
-    ...getSalesFlowsQueryOptions(popupId),
-    placeholderData: keepPreviousData,
+    queryKey: ["sales-flows", { popupId }],
+    queryFn: () =>
+      SalesFlowsService.listSalesFlows({ popupId, skip: 0, limit: 100 }),
+  })
+
+  const { data: readiness } = useQuery({
+    queryKey: ["sales-flows", "readiness", { popupId }],
+    queryFn: () => SalesFlowsService.listSalesFlowReadiness({ popupId }),
   })
 
   if (!salesFlows) return <Skeleton className="h-64 w-full" />
 
+  if (salesFlows.results.length === 0) {
+    return (
+      <EmptyState
+        icon={Workflow}
+        title="No sales flows yet"
+        description="Create a sales flow to control how attendees apply for or purchase this gathering."
+        action={
+          <Button asChild>
+            <Link to="/sales-flows/new">
+              <Plus className="mr-2 h-4 w-4" />
+              Add Sales Flow
+            </Link>
+          </Button>
+        }
+      />
+    )
+  }
+
+  const readinessById = new Map(
+    (readiness ?? []).map((row) => [row.flow_id, row]),
+  )
+  const blockedCount = (readiness ?? []).filter(
+    (row) => row.blockers.length > 0,
+  ).length
+
   return (
-    <DataTable
-      columns={columns}
-      data={salesFlows.results}
-      onRowClick={(flow) =>
-        navigate({ to: "/sales-flows/$id/edit", params: { id: flow.id } })
-      }
-      emptyState={
-        <EmptyState
-          icon={Workflow}
-          title="No sales flows yet"
-          description="Create a sales flow to control how attendees apply for or purchase this gathering."
-          action={
-            <Button asChild>
-              <Link to="/sales-flows/new">
-                <Plus className="mr-2 h-4 w-4" />
-                Add Sales Flow
-              </Link>
-            </Button>
-          }
-        />
-      }
-    />
+    <div className="flex flex-col gap-4">
+      {blockedCount > 0 && (
+        <p className="text-sm text-destructive">
+          {blockedCount} of {salesFlows.results.length} flows cannot take a
+          purchase right now.
+        </p>
+      )}
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        {salesFlows.results.map((flow) => (
+          <FlowMapCard
+            key={flow.id}
+            flow={flow}
+            readiness={readinessById.get(flow.id)}
+          />
+        ))}
+      </div>
+    </div>
   )
 }
 
@@ -135,7 +120,7 @@ function SalesFlows() {
       ) : (
         <QueryErrorBoundary>
           <Suspense fallback={<Skeleton className="h-64 w-full" />}>
-            <SalesFlowsTableContent popupId={selectedPopupId} />
+            <FlowMap popupId={selectedPopupId} />
           </Suspense>
         </QueryErrorBoundary>
       )}

@@ -6,9 +6,11 @@ from sqlalchemy.exc import IntegrityError
 
 from app.api.popup_reviewer.crud import popup_reviewers_crud
 from app.api.sales_flow import crud
+from app.api.sales_flow.readiness import flow_readiness
 from app.api.sales_flow.schemas import (
     SalesFlowCreate,
     SalesFlowPublic,
+    SalesFlowReadiness,
     SalesFlowReviewersMode,
     SalesFlowUpdate,
 )
@@ -95,6 +97,24 @@ async def list_sales_flows(
         results=[SalesFlowPublic.model_validate(f) for f in flows],
         paging=Paging(offset=skip, limit=limit, total=total),
     )
+
+
+@router.get("/readiness", response_model=list[SalesFlowReadiness])
+async def list_sales_flow_readiness(
+    db: TenantSession,
+    _: CurrentOperator,
+    popup_id: uuid.UUID,
+) -> list[SalesFlowReadiness]:
+    """What each flow of a popup is missing before it can sell (BO only).
+
+    Declared before `/{flow_id}`: FastAPI matches routes in declaration
+    order, so a literal path that a UUID converter would also accept has to
+    come first.
+    """
+    flows, _total = crud.sales_flows_crud.find_by_popup(
+        db, popup_id=popup_id, limit=100
+    )
+    return [flow_readiness(db, flow) for flow in flows]
 
 
 @router.get("/{flow_id}", response_model=SalesFlowPublic)

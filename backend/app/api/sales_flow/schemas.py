@@ -249,6 +249,24 @@ class SalesFlowPublic(SalesFlowBase):
     model_config = ConfigDict(from_attributes=True)
 
 
+class SalesFlowReadiness(BaseModel):
+    """What a flow is missing before it can sell
+    (sdd/sales-flows-rediseno slice 8).
+
+    `blockers` and `warnings` carry machine codes, not sentences. The
+    backoffice owns the wording, and a code that nobody renders yet is
+    still a code the API can add without breaking a client.
+    """
+
+    flow_id: uuid.UUID
+    enabled_step_count: int
+    offered_product_count: int
+    form_field_count: int
+    has_approval_strategy: bool
+    blockers: list[str]
+    warnings: list[str]
+
+
 # Class B (inheritable override) column names — must exactly match both
 # SalesFlowBase and PopupBase field names (same names by construction, see
 # design D1/D2). Single source of truth for `build_effective_config`

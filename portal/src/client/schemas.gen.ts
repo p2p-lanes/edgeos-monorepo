@@ -19619,6 +19619,55 @@ export const SalesFlowPublicSchema = {
     description: 'Sales flow schema for API responses.'
 } as const;
 
+export const SalesFlowReadinessSchema = {
+    properties: {
+        flow_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Flow Id'
+        },
+        enabled_step_count: {
+            type: 'integer',
+            title: 'Enabled Step Count'
+        },
+        offered_product_count: {
+            type: 'integer',
+            title: 'Offered Product Count'
+        },
+        form_field_count: {
+            type: 'integer',
+            title: 'Form Field Count'
+        },
+        has_approval_strategy: {
+            type: 'boolean',
+            title: 'Has Approval Strategy'
+        },
+        blockers: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Blockers'
+        },
+        warnings: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Warnings'
+        }
+    },
+    type: 'object',
+    required: ['flow_id', 'enabled_step_count', 'offered_product_count', 'form_field_count', 'has_approval_strategy', 'blockers', 'warnings'],
+    title: 'SalesFlowReadiness',
+    description: `What a flow is missing before it can sell
+(sdd/sales-flows-rediseno slice 8).
+
+\`blockers\` and \`warnings\` carry machine codes, not sentences. The
+backoffice owns the wording, and a code that nobody renders yet is
+still a code the API can add without breaking a client.`
+} as const;
+
 export const SalesFlowReviewersModeSchema = {
     type: 'string',
     enum: ['inherit', 'override'],

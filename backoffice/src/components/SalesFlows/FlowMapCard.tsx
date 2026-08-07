@@ -1,0 +1,114 @@
+import { Link } from "@tanstack/react-router"
+import { AlertTriangle, CircleAlert, CircleCheck, EyeOff } from "lucide-react"
+
+import type { SalesFlowPublic, SalesFlowReadiness } from "@/client"
+import { Badge } from "@/components/ui/badge"
+import { Card, CardContent } from "@/components/ui/card"
+
+/**
+ * One flow on the map (sdd/sales-flows-rediseno slice 8).
+ *
+ * The card shows STATE, not configuration. The table it replaces listed
+ * name, slug, type and visibility, and a flow with an empty checkout looked
+ * exactly like a working one there. What an operator needs to see first is
+ * whether the flow can take money today.
+ */
+
+const BLOCKER_TEXT: Record<string, string> = {
+  no_steps: "The checkout has no steps, so buyers see an empty page",
+  sells_nothing: "The steps offer no product that is on sale",
+  no_form: "The application form has no questions",
+}
+
+const WARNING_TEXT: Record<string, string> = {
+  unlisted: "Not listed in the portal, reachable only by its link",
+  accepts_everyone: "No approval rules, so every application is accepted",
+}
+
+interface FlowMapCardProps {
+  flow: SalesFlowPublic
+  readiness?: SalesFlowReadiness
+}
+
+export function FlowMapCard({ flow, readiness }: FlowMapCardProps) {
+  const blockers = readiness?.blockers ?? []
+  const warnings = readiness?.warnings ?? []
+  const isBlocked = blockers.length > 0
+
+  return (
+    <Card
+      className={
+        isBlocked
+          ? "border-destructive/40"
+          : "transition-colors hover:border-primary/40"
+      }
+    >
+      <CardContent className="flex flex-col gap-3 p-5">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <Link
+              to="/sales-flows/$id/edit"
+              params={{ id: flow.id }}
+              className="font-medium hover:underline"
+            >
+              {flow.name}
+            </Link>
+            <p className="truncate font-mono text-xs text-muted-foreground">
+              {flow.slug}
+            </p>
+          </div>
+          <div className="flex shrink-0 items-center gap-1.5">
+            {flow.is_default && <Badge variant="secondary">Default</Badge>}
+            <Badge variant="outline" className="capitalize">
+              {flow.type}
+            </Badge>
+          </div>
+        </div>
+
+        {readiness && (
+          <p className="text-xs text-muted-foreground">
+            {readiness.enabled_step_count} step
+            {readiness.enabled_step_count === 1 ? "" : "s"} ·{" "}
+            {readiness.offered_product_count} product
+            {readiness.offered_product_count === 1 ? "" : "s"} on sale
+            {flow.type === "application" &&
+              ` · ${readiness.form_field_count} form question${
+                readiness.form_field_count === 1 ? "" : "s"
+              }`}
+          </p>
+        )}
+
+        <div className="flex flex-col gap-1.5">
+          {blockers.map((code) => (
+            <p
+              key={code}
+              className="flex items-start gap-1.5 text-xs text-destructive"
+            >
+              <CircleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              {BLOCKER_TEXT[code] ?? code}
+            </p>
+          ))}
+          {warnings.map((code) => (
+            <p
+              key={code}
+              className="flex items-start gap-1.5 text-xs text-muted-foreground"
+            >
+              {code === "unlisted" ? (
+                <EyeOff className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              ) : (
+                <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              )}
+              {WARNING_TEXT[code] ?? code}
+            </p>
+          ))}
+          {readiness && !isBlocked && warnings.length === 0 && (
+            <p className="flex items-center gap-1.5 text-xs text-success">
+              <CircleCheck className="h-3.5 w-3.5 shrink-0" />
+              Ready to sell
+            </p>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
