@@ -10,6 +10,7 @@ import { DataTable, SortableHeader } from "@/components/Common/DataTable"
 import { EmptyState } from "@/components/Common/EmptyState"
 import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
+import { FlowNameCell } from "@/components/forms/FlowNameCell"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
@@ -64,6 +65,13 @@ function InviteCopyLink({ invite }: { invite: InvitePublic }) {
   return <CopyLinkButton url={url} iconOnly />
 }
 
+function FlowCell({ invite }: { invite: InvitePublic }) {
+  const { selectedPopupId } = useWorkspace()
+  return (
+    <FlowNameCell popupId={selectedPopupId} flowId={invite.sales_flow_id} />
+  )
+}
+
 const columns: ColumnDef<InvitePublic>[] = [
   {
     accessorKey: "token",
@@ -71,6 +79,13 @@ const columns: ColumnDef<InvitePublic>[] = [
     cell: ({ row }) => (
       <span className="font-mono text-sm">{row.original.token}</span>
     ),
+  },
+  {
+    // Two invites can look identical and land people in different flows,
+    // which decides the form they fill in and the emails they get.
+    accessorKey: "sales_flow_id",
+    header: "Sales flow",
+    cell: ({ row }) => <FlowCell invite={row.original} />,
   },
   {
     accessorKey: "recipient_email",

@@ -91,9 +91,19 @@ class InvitesCRUD(BaseCRUD[Invites, InviteCreate, InviteUpdate]):
                 detail="An invite with this token already exists for this popup",
             )
 
+        if obj_in.sales_flow_id is None:
+            # The router resolves and validates it before calling here, so
+            # reaching this means a caller skipped that step rather than
+            # that a default is wanted.
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="This invite has no sales flow.",
+            )
+
         invite = Invites(
             tenant_id=tenant_id,
             popup_id=obj_in.popup_id,
+            sales_flow_id=obj_in.sales_flow_id,
             token=token,
             recipient_email=(
                 obj_in.recipient_email.lower() if obj_in.recipient_email else None

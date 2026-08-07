@@ -28,6 +28,7 @@ from app.api.popup.models import Popups
 from app.api.tenant.models import Tenants
 from app.api.user.models import Users
 from app.core.security import create_access_token
+from tests._flow_helpers import invite_flow_id
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -87,6 +88,7 @@ def _make_invite(
 ) -> Invites:
     tok = token or f"invitetok-{uuid.uuid4().hex[:16]}"
     inv = Invites(
+        sales_flow_id=invite_flow_id(db, popup.id),
         tenant_id=popup.tenant_id,
         popup_id=popup.id,
         token=tok,
@@ -251,6 +253,7 @@ class TestGroupSlugResolver:
         popup = _make_popup(db, tenant_a)
         token = f"restricted-{uuid.uuid4().hex[:8]}"
         inv = Invites(
+            sales_flow_id=invite_flow_id(db, popup.id),
             tenant_id=popup.tenant_id,
             popup_id=popup.id,
             token=token,

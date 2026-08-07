@@ -11842,6 +11842,18 @@ export const InviteCreateSchema = {
             format: 'uuid',
             title: 'Popup Id'
         },
+        sales_flow_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Sales Flow Id'
+        },
         token: {
             anyOf: [
                 {
@@ -11920,6 +11932,11 @@ export const InvitePublicSchema = {
             type: 'string',
             format: 'uuid',
             title: 'Popup Id'
+        },
+        sales_flow_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Sales Flow Id'
         },
         token: {
             type: 'string',
@@ -12017,7 +12034,7 @@ export const InvitePublicSchema = {
         }
     },
     type: 'object',
-    required: ['id', 'popup_id', 'token', 'discount_percentage', 'auto_approve', 'express_checkout', 'current_uses', 'created_by', 'created_at', 'updated_at'],
+    required: ['id', 'popup_id', 'sales_flow_id', 'token', 'discount_percentage', 'auto_approve', 'express_checkout', 'current_uses', 'created_by', 'created_at', 'updated_at'],
     title: 'InvitePublic',
     description: `Full invite detail — admin-only response.
 

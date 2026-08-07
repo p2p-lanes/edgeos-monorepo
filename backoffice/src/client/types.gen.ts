@@ -2538,6 +2538,7 @@ export type InstallmentInterval = 'day' | 'week' | 'month' | 'year';
  */
 export type InviteCreate = {
     popup_id: string;
+    sales_flow_id?: (string | null);
     token?: (string | null);
     recipient_email?: (string | null);
     discount_percentage?: (number | string);
@@ -2555,6 +2556,7 @@ export type InviteCreate = {
 export type InvitePublic = {
     id: string;
     popup_id: string;
+    sales_flow_id: string;
     token: string;
     recipient_email?: (string | null);
     discount_percentage: string;

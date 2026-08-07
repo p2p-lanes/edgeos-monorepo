@@ -133,3 +133,14 @@ def application_flow_id(db, popup_id: uuid.UUID) -> uuid.UUID:
     if popup is None:
         raise AssertionError(f"popup {popup_id} does not exist")
     return seed_default_steps(db, popup, sale_type="application").id
+
+
+def invite_flow_id(db, popup_id: uuid.UUID) -> uuid.UUID:
+    """The flow an invite lands its recipient in.
+
+    `invites.sales_flow_id` is NOT NULL since sdd/sales-flows-rediseno, so a
+    fixture that builds an `Invites` row directly has to name one. Mirrors
+    `application_flow_id`: it provisions the default flow when the fixture
+    built its popup with `Popups(...)` and never went through creation.
+    """
+    return application_flow_id(db, popup_id)

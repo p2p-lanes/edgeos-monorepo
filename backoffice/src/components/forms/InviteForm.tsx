@@ -11,6 +11,7 @@ import {
 import { DangerZone } from "@/components/Common/DangerZone"
 import { FieldError } from "@/components/Common/FieldError"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
+import { InviteFlowPicker } from "@/components/forms/InviteFlowPicker"
 import { Button } from "@/components/ui/button"
 import { DatePicker } from "@/components/ui/date-picker"
 import {
@@ -110,6 +111,7 @@ export function InviteForm({ defaultValues, onSuccess }: InviteFormProps) {
       expires_at: formatDateForInput(defaultValues?.expires_at),
       auto_approve: defaultValues?.auto_approve ?? true,
       express_checkout: defaultValues?.express_checkout ?? true,
+      sales_flow_id: defaultValues?.sales_flow_id ?? "",
     },
     onSubmit: ({ value }) => {
       if (readOnly) return
@@ -128,6 +130,7 @@ export function InviteForm({ defaultValues, onSuccess }: InviteFormProps) {
         }
         createMutation.mutate({
           popup_id: selectedPopupId,
+          sales_flow_id: value.sales_flow_id || undefined,
           token: value.token || undefined,
           recipient_email: value.recipient_email || undefined,
           discount_percentage: Number(value.discount_percentage) || 0,
@@ -158,6 +161,33 @@ export function InviteForm({ defaultValues, onSuccess }: InviteFormProps) {
         }}
         className="mx-auto max-w-2xl space-y-6"
       >
+        {/*
+          Which flow the recipient lands in. Redeeming creates an
+          application, and an application belongs to a flow — before this
+          the invite silently used the gathering's default one whatever it
+          was meant for. Only application flows are listed: a direct sale
+          produces no application to redeem into.
+
+          Locked after creation: the flow decides which form the recipient
+          fills in and which emails they get, and moving a live invite
+          between flows would change both under people already holding the
+          link.
+        */}
+        {!isEdit && selectedPopupId && (
+          <form.Field name="sales_flow_id">
+            {(field) => (
+              <InlineSection title="Sales flow">
+                <InviteFlowPicker
+                  popupId={selectedPopupId}
+                  value={field.state.value}
+                  onChange={(flowId) => field.handleChange(flowId)}
+                  disabled={readOnly}
+                />
+              </InlineSection>
+            )}
+          </form.Field>
+        )}
+
         {/* Hero: Token */}
         <div className="space-y-3">
           <form.Field name="token">

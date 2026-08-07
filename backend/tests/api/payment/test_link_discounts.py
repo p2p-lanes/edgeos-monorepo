@@ -27,7 +27,10 @@ from app.api.referral.models import Referrals
 from app.api.shared.enums import SaleType
 from app.api.tenant.models import Tenants
 from app.api.user.models import Users
-from tests._flow_helpers import application_flow_id
+from tests._flow_helpers import (
+    application_flow_id,
+    invite_flow_id,
+)
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -73,6 +76,7 @@ def _make_invite(
     discount_percentage: Decimal,
 ) -> Invites:
     invite = Invites(
+        sales_flow_id=invite_flow_id(db, popup.id),
         tenant_id=tenant.id,
         popup_id=popup.id,
         token=f"tok-{uuid.uuid4().hex[:10]}",
