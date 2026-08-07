@@ -15,7 +15,7 @@ import {
 } from "@dnd-kit/core"
 import { arrayMove, sortableKeyboardCoordinates } from "@dnd-kit/sortable"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { createFileRoute } from "@tanstack/react-router"
+import { createFileRoute, useNavigate } from "@tanstack/react-router"
 import { Loader2, Sparkles } from "lucide-react"
 import { useCallback, useMemo, useState } from "react"
 import {
@@ -25,7 +25,6 @@ import {
   FormSectionsService,
   type FormSectionUpdate,
   PopupsService,
-  SalesFlowsService,
 } from "@/client"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
 import { CatalogDialog } from "@/components/form-builder/CatalogDialog"
@@ -41,7 +40,7 @@ import { DragOverlayContent } from "@/components/form-builder/DragOverlayContent
 import { FieldConfigPanel } from "@/components/form-builder/FieldConfigPanel"
 import { FieldPalette } from "@/components/form-builder/FieldPalette"
 import { FormCanvas } from "@/components/form-builder/FormCanvas"
-import { FlowSelector } from "@/components/ticketing-step-builder/FlowSelector"
+import { FlowScopeBar } from "@/components/SalesFlows/FlowScopeBar"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -71,10 +70,17 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
 import useAuth from "@/hooks/useAuth"
 import useCustomToast from "@/hooks/useCustomToast"
+import { rememberFlow, useFlowScope } from "@/hooks/useFlowScope"
 import { createErrorHandler } from "@/utils"
 
 export const Route = createFileRoute("/_layout/form-builder/")({
   component: FormBuilderPage,
+  // A form belongs to one flow, so the address has to name it. Without
+  // this, a link to "the form" means something different depending on who
+  // opens it and what they last looked at.
+  validateSearch: (raw: Record<string, unknown>) => ({
+    ...(typeof raw.flow === "string" && raw.flow ? { flow: raw.flow } : {}),
+  }),
   head: () => ({
     meta: [{ title: "Form Builder - EdgeOS" }],
   }),
@@ -139,15 +145,22 @@ function FormBuilderPage() {
 }
 
 function FormBuilderContent({ popupId }: { popupId: string }) {
-  // Which flow's form is on screen. Defaults to the popup's default flow;
-  // single-flow popups never see the selector.
-  const { data: flowsData } = useQuery({
-    queryKey: ["sales-flows", popupId],
-    queryFn: () => SalesFlowsService.listSalesFlows({ popupId, limit: 100 }),
-  })
-  const defaultFlowId = flowsData?.results.find((f) => f.is_default)?.id
-  const [pickedFlowId, setPickedFlowId] = useState<string | undefined>()
-  const activeFlowId = pickedFlowId ?? defaultFlowId
+  const navigate = useNavigate()
+  const { flow: flowParam } = Route.useSearch()
+
+  // Whose form is on screen. The URL is the answer; memory only decides
+  // where you land when the URL says nothing.
+  const adoptFlow = useCallback(
+    (flowId: string) => {
+      navigate({ to: "/form-builder", search: { flow: flowId }, replace: true })
+    },
+    [navigate],
+  )
+  const {
+    flows,
+    activeFlowId,
+    isLoading: flowsLoading,
+  } = useFlowScope(popupId, flowParam, adoptFlow)
 
   const queryClient = useQueryClient()
   const { showSuccessToast, showErrorToast } = useCustomToast()
@@ -693,16 +706,6 @@ function FormBuilderContent({ popupId }: { popupId: string }) {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <div className="w-[200px]">
-            <FlowSelector
-              popupId={popupId}
-              value={activeFlowId}
-              onChange={(flowId) => {
-                setPickedFlowId(flowId)
-                setSelectedFieldId(null)
-              }}
-            />
-          </div>
           {popup && (
             <div className="flex items-center gap-2">
               <span className="text-sm text-muted-foreground">Layout</span>
@@ -735,6 +738,19 @@ function FormBuilderContent({ popupId }: { popupId: string }) {
           </Button>
         </div>
       </div>
+
+      <FlowScopeBar
+        popupId={popupId}
+        flows={flows}
+        activeFlowId={activeFlowId}
+        onSelect={(flowId: string) => {
+          rememberFlow(popupId, flowId)
+          setSelectedFieldId(null)
+          navigate({ to: "/form-builder", search: { flow: flowId } })
+        }}
+        isLoading={flowsLoading}
+        resource="form questions"
+      />
 
       <DndContext
         sensors={sensors}

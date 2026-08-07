@@ -10,15 +10,11 @@ import { arrayMove } from "@dnd-kit/sortable"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { createFileRoute, useNavigate } from "@tanstack/react-router"
 import { Loader2 } from "lucide-react"
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 
-import {
-  SalesFlowsService,
-  type TicketingStepPublic,
-  TicketingStepsService,
-} from "@/client"
+import { type TicketingStepPublic, TicketingStepsService } from "@/client"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
-import { FlowSelector } from "@/components/ticketing-step-builder/FlowSelector"
+import { FlowScopeBar } from "@/components/SalesFlows/FlowScopeBar"
 import { NewStepPanel } from "@/components/ticketing-step-builder/NewStepPanel"
 import { StepCanvas } from "@/components/ticketing-step-builder/StepCanvas"
 import { StepDetailPanel } from "@/components/ticketing-step-builder/StepDetailPanel"
@@ -27,6 +23,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
 import useAuth from "@/hooks/useAuth"
 import useCustomToast from "@/hooks/useCustomToast"
+import { rememberFlow, useFlowScope } from "@/hooks/useFlowScope"
 import { createErrorHandler } from "@/utils"
 
 interface TicketingStepsSearch {
@@ -80,15 +77,24 @@ function TicketingStepsContent({ popupId }: { popupId: string }) {
   const [adding, setAdding] = useState(false)
   const [displayOrder, setDisplayOrder] = useState<string[]>([])
 
-  // sdd/sales-flows slice 8: the step list is flow-scoped. Absent an
-  // explicit ?flow= selection, default to the popup's default flow so the
-  // builder shows the same list single-flow popups always saw.
-  const { data: flowsData } = useQuery({
-    queryKey: ["sales-flows", popupId],
-    queryFn: () => SalesFlowsService.listSalesFlows({ popupId, limit: 100 }),
-  })
-  const defaultFlowId = flowsData?.results.find((f) => f.is_default)?.id
-  const activeFlowId = flowParam ?? defaultFlowId
+  // The step list belongs to one flow, and the URL says which. Landing
+  // here without a `flow` adopts the remembered or default one and writes
+  // it into the URL, so the address always describes what is on screen.
+  const adoptFlow = useCallback(
+    (flowId: string) => {
+      navigate({
+        to: "/ticketing-steps",
+        search: { flow: flowId },
+        replace: true,
+      })
+    },
+    [navigate],
+  )
+  const {
+    flows,
+    activeFlowId,
+    isLoading: flowsLoading,
+  } = useFlowScope(popupId, flowParam, adoptFlow)
 
   const { data: stepsData, isLoading } = useQuery({
     queryKey: ["ticketing-steps", popupId, activeFlowId],
@@ -183,9 +189,10 @@ function TicketingStepsContent({ popupId }: { popupId: string }) {
 
   // Switching flows re-scopes the whole step list — clear any selection
   // from the previous flow's list rather than risk pointing at a step id
-  // that doesn't belong to the newly selected flow's resolved tier.
+  // that does not belong to the newly selected flow.
   const selectFlow = (flowId: string) => {
     setAdding(false)
+    rememberFlow(popupId, flowId)
     navigate({ to: "/ticketing-steps", search: { flow: flowId } })
   }
 
@@ -217,10 +224,13 @@ function TicketingStepsContent({ popupId }: { popupId: string }) {
           </p>
         </div>
 
-        <FlowSelector
+        <FlowScopeBar
           popupId={popupId}
-          value={activeFlowId}
-          onChange={selectFlow}
+          flows={flows}
+          activeFlowId={activeFlowId}
+          onSelect={selectFlow}
+          isLoading={flowsLoading}
+          resource="checkout steps"
         />
 
         <DndContext

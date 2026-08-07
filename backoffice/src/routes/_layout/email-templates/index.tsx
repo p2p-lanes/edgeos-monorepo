@@ -1,50 +1,51 @@
 import { useQuery } from "@tanstack/react-query"
-import { createFileRoute, Link } from "@tanstack/react-router"
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router"
 import { Pencil } from "lucide-react"
-import { Suspense, useEffect, useState } from "react"
+import { Suspense, useCallback } from "react"
 
-import { EmailTemplatesService, SalesFlowsService } from "@/client"
+import { EmailTemplatesService, type SalesFlowPublic } from "@/client"
 import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
-import { FlowScopePicker } from "@/components/EmailTemplates/FlowScopePicker"
+import { FlowScopeBar } from "@/components/SalesFlows/FlowScopeBar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
 import useAuth from "@/hooks/useAuth"
+import { rememberFlow, useFlowScope } from "@/hooks/useFlowScope"
 
 export const Route = createFileRoute("/_layout/email-templates/")({
   component: EmailTemplatesPage,
+  // The sale mails on this page belong to one flow, so the address names
+  // it. The gathering mails below them do not move with it.
+  validateSearch: (raw: Record<string, unknown>) => ({
+    ...(typeof raw.flow === "string" && raw.flow ? { flow: raw.flow } : {}),
+  }),
   head: () => ({
     meta: [{ title: "Email Templates - EdgeOS" }],
   }),
 })
 
-export function TemplateList() {
+interface TemplateListProps {
+  /** Whose sale mails are on screen. The route resolves it from the URL. */
+  flowId?: string
+  flows?: SalesFlowPublic[]
+  onSelectFlow?: (flowId: string) => void
+  flowsLoading?: boolean
+}
+
+export function TemplateList({
+  flowId,
+  flows = [],
+  onSelectFlow,
+  flowsLoading = false,
+}: TemplateListProps = {}) {
   const { selectedPopupId, effectiveTenantId } = useWorkspace()
-  const [flowId, setFlowId] = useState<string>()
 
   const { data: types } = useQuery({
     queryKey: ["email-template-types"],
     queryFn: () => EmailTemplatesService.listTemplateTypes(),
   })
-
-  const { data: flows } = useQuery({
-    queryKey: ["sales-flows", { popupId: selectedPopupId }],
-    queryFn: () =>
-      SalesFlowsService.listSalesFlows({
-        popupId: selectedPopupId!,
-        limit: 100,
-      }),
-    enabled: !!selectedPopupId,
-  })
-
-  // Land on the default flow so the page is never showing nobody's mails.
-  useEffect(() => {
-    if (flowId || !flows?.results?.length) return
-    const fallback = flows.results.find((f) => f.is_default) ?? flows.results[0]
-    setFlowId(fallback.id)
-  }, [flows, flowId])
 
   const { data: tenantTemplates } = useQuery({
     queryKey: ["email-templates", "tenant", effectiveTenantId],
@@ -92,10 +93,13 @@ export function TemplateList() {
   return (
     <div className="space-y-6">
       {selectedPopupId && (
-        <FlowScopePicker
+        <FlowScopeBar
           popupId={selectedPopupId}
-          value={flowId}
-          onChange={setFlowId}
+          flows={flows}
+          activeFlowId={flowId}
+          onSelect={(nextFlowId: string) => onSelectFlow?.(nextFlowId)}
+          isLoading={flowsLoading}
+          resource="sale emails"
         />
       )}
       {categories.map((category) => (
@@ -177,8 +181,29 @@ export function TemplateList() {
 }
 
 export function EmailTemplatesPage() {
-  const { needsTenantSelection, needsPopupSelection } = useWorkspace()
+  const { needsTenantSelection, needsPopupSelection, selectedPopupId } =
+    useWorkspace()
   const { isOperatorOrAbove } = useAuth()
+  const navigate = useNavigate()
+  const { flow: flowParam } = Route.useSearch()
+
+  // The route owns the address. TemplateList only renders what it is given,
+  // which is also why it can be tested without a router around it.
+  const adoptFlow = useCallback(
+    (nextFlowId: string) => {
+      navigate({
+        to: "/email-templates",
+        search: { flow: nextFlowId },
+        replace: true,
+      })
+    },
+    [navigate],
+  )
+  const {
+    flows,
+    activeFlowId,
+    isLoading: flowsLoading,
+  } = useFlowScope(selectedPopupId ?? undefined, flowParam, adoptFlow)
 
   if (!isOperatorOrAbove) {
     return (
@@ -208,7 +233,18 @@ export function EmailTemplatesPage() {
       {!needsTenantSelection && (
         <QueryErrorBoundary>
           <Suspense fallback={<Skeleton className="h-64 w-full" />}>
-            <TemplateList />
+            <TemplateList
+              flowId={activeFlowId}
+              flows={flows}
+              flowsLoading={flowsLoading}
+              onSelectFlow={(nextFlowId) => {
+                if (selectedPopupId) rememberFlow(selectedPopupId, nextFlowId)
+                navigate({
+                  to: "/email-templates",
+                  search: { flow: nextFlowId },
+                })
+              }}
+            />
           </Suspense>
         </QueryErrorBoundary>
       )}

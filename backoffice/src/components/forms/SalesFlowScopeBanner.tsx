@@ -6,7 +6,11 @@ interface SalesFlowScopeBannerProps {
 
 /**
  * Makes the edit scope explicit: this form edits one flow, not the event.
- * Fields shown as "Inherited" here still follow the event's own settings.
+ *
+ * It used to add that fields left as "Inherited" follow the event. Since
+ * sdd/sales-flows-rediseno slice 7 a flow stores its own values and there
+ * is nothing to inherit, so saying so would be describing a mechanism that
+ * no longer exists.
  */
 export function SalesFlowScopeBanner({ flowName }: SalesFlowScopeBannerProps) {
   return (
@@ -15,8 +19,7 @@ export function SalesFlowScopeBanner({ flowName }: SalesFlowScopeBannerProps) {
       <div className="text-sm">
         <p className="font-medium">Editing sales flow: {flowName}</p>
         <p className="text-muted-foreground">
-          Changes here apply only to this flow. Fields left as Inherited follow
-          the event's configuration.
+          Changes here apply only to this flow. No other flow sees them.
         </p>
       </div>
     </div>
