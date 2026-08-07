@@ -149,6 +149,7 @@ def _make_ticketing_step(
     title: str = "Select Tickets",
     order: int = 0,
     is_enabled: bool = True,
+    product_category: str | None = "ticket",
     sales_flow_id: uuid.UUID | None = None,
 ) -> TicketingSteps:
     # Every step belongs to a flow (slice 2). Unless a test is specifically
@@ -164,6 +165,7 @@ def _make_ticketing_step(
         popup_id=popup.id,
         sales_flow_id=sales_flow_id,
         step_type=step_type,
+        product_category=product_category,
         title=title,
         order=order,
         is_enabled=is_enabled,
@@ -261,6 +263,7 @@ def test_runtime_products_use_popup_currency(
 ) -> None:
     """Runtime products inherit the popup currency."""
     popup = _make_direct_popup(db, tenant_a, currency="ARS")
+    _make_ticketing_step(db, popup)
     _make_product(db, popup, name="ARS Ticket")
     db.commit()
 
@@ -471,6 +474,7 @@ def test_runtime_only_active_products(
 ) -> None:
     """Only active products are included in the response."""
     popup = _make_direct_popup(db, tenant_a)
+    _make_ticketing_step(db, popup)
     _make_product(db, popup, name="Active GA", is_active=True)
     _make_product(db, popup, name="Inactive VIP", is_active=False)
     db.commit()
@@ -493,6 +497,7 @@ def test_runtime_exposes_sold_out_override(
     """Products carry sold_out_override so the portal can hide manually
     sold-out products instead of deriving on_sale as available."""
     popup = _make_direct_popup(db, tenant_a)
+    _make_ticketing_step(db, popup)
     _make_product(db, popup, name="Sold Out GA", sold_out_override=True)
     _make_product(db, popup, name="Available VIP")
     db.commit()

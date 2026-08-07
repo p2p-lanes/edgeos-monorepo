@@ -47,3 +47,59 @@ def provision_default_flow(db, popup, sale_type: str = "application"):
     )
     db.commit()
     return flow
+
+
+def seed_default_steps(db, popup, sale_type: str = "direct"):
+    """Seed a popup's default ticketing steps into its default flow.
+
+    Uses the same function `POST /popups` uses, so fixtures that build a
+    `Popups` row directly end up with the steps a real popup has. Since
+    sdd/sales-flows-rediseno slice 4 the steps decide what the flow can
+    sell, so a popup with no steps sells nothing — correct, but rarely what
+    a test about products means.
+    """
+    from app.api.ticketing_step.constants import seed_ticketing_steps_for_popup
+    from app.api.ticketing_step.models import TicketingSteps
+
+    flow = provision_default_flow(db, popup, sale_type=sale_type)
+
+    from sqlmodel import select
+
+    already = db.exec(
+        select(TicketingSteps).where(TicketingSteps.sales_flow_id == flow.id)
+    ).first()
+    if already is not None:
+        return flow
+
+    seed_ticketing_steps_for_popup(
+        db,
+        popup_id=popup.id,
+        tenant_id=popup.tenant_id,
+        sales_flow_id=flow.id,
+        flow_type=flow.type,
+    )
+    db.commit()
+    return flow
+
+
+def offer_category(db, popup, category: str):
+    """Give the popup's default flow a step offering `category`.
+
+    Since slice 4 a flow sells what its steps offer, so a test about a
+    category the default step set does not cover (meal_plan, for instance)
+    has to say so — the same thing an organizer would do in the builder.
+    """
+    from app.api.ticketing_step.models import TicketingSteps
+
+    flow = provision_default_flow(db, popup)
+    step = TicketingSteps(
+        tenant_id=popup.tenant_id,
+        popup_id=popup.id,
+        sales_flow_id=flow.id,
+        step_type=category,
+        product_category=category,
+        title=category,
+    )
+    db.add(step)
+    db.commit()
+    return step

@@ -34,6 +34,7 @@ from app.api.payment.crud import payments_crud
 from app.api.popup.models import Popups
 from app.api.product.models import Products
 from app.api.tenant.models import Tenants
+from tests._flow_helpers import offer_category
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -143,6 +144,7 @@ class TestAddProductEnforcement:
         popup_tenant_a: Popups,
     ) -> None:
         """add_product on product with total_stock_remaining=0 → 409."""
+        offer_category(db, popup_tenant_a, "ticket")
         product = _make_product(
             db,
             tenant_a,
@@ -164,6 +166,7 @@ class TestAddProductEnforcement:
         popup_tenant_a: Popups,
     ) -> None:
         """add_product call decrements 1 unit of total_stock_remaining."""
+        offer_category(db, popup_tenant_a, "ticket")
         product = _make_product(
             db,
             tenant_a,
@@ -191,6 +194,7 @@ class TestAddProductEnforcement:
         popup_tenant_a: Popups,
     ) -> None:
         """add_product with NULL stock (unlimited) → succeeds without decrement."""
+        offer_category(db, popup_tenant_a, "ticket")
         product = _make_product(
             db,
             tenant_a,
@@ -257,6 +261,7 @@ class TestAddProductEnforcement:
         """Concurrent add_product on remaining=1: exactly one 200, one 409."""
         from sqlmodel import Session as SyncSession
 
+        offer_category(db, popup_tenant_a, "ticket")
         product = _make_product(
             db,
             tenant_a,
@@ -619,6 +624,7 @@ class TestCreatePaymentEnforcement:
         """total_stock_remaining=0 via create_payment → 409, no payment row."""
         from app.api.payment.schemas import PaymentCreate, PaymentProductRequest
 
+        offer_category(db, popup_tenant_a, "ticket")
         product = _make_product(
             db,
             tenant_a,
@@ -660,6 +666,7 @@ class TestCreatePaymentEnforcement:
         """
         from app.api.payment.schemas import PaymentCreate, PaymentProductRequest
 
+        offer_category(db, popup_tenant_a, "ticket")
         product = _make_product(
             db,
             tenant_a,
@@ -696,6 +703,7 @@ class TestCreatePaymentEnforcement:
         that the cutoff check doesn't reject legitimate, on-time orders)."""
         from app.api.payment.schemas import PaymentCreate, PaymentProductRequest
 
+        offer_category(db, popup_tenant_a, "ticket")
         product = _make_product(
             db,
             tenant_a,
@@ -731,6 +739,7 @@ class TestCreatePaymentEnforcement:
         """qty > max_per_order via create_payment → 422."""
         from app.api.payment.schemas import PaymentCreate, PaymentProductRequest
 
+        offer_category(db, popup_tenant_a, "ticket")
         product = _make_product(
             db,
             tenant_a,

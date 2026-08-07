@@ -28,7 +28,7 @@ from app.api.product.models import Products
 from app.api.shared.enums import SaleType
 from app.api.tenant.models import Tenants
 from app.api.ticketing_step.models import TicketingSteps
-from tests._flow_helpers import default_flow_id, provision_default_flow
+from tests._flow_helpers import default_flow_id, offer_category, provision_default_flow
 
 # ---- Fixtures ---------------------------------------------------------------
 
@@ -69,6 +69,8 @@ def _make_popup(
     db.add(popup)
     db.flush()
     provision_default_flow(db, popup)
+    offer_category(db, popup, "patreon")
+    offer_category(db, popup, "ticket")
     return popup
 
 
@@ -87,6 +89,7 @@ def _make_patreon_product(db: Session, popup: Popups) -> Products:
     )
     db.add(product)
     db.flush()
+    offer_category(db, popup, "patreon")
     return product
 
 
@@ -103,6 +106,7 @@ def _make_ticket_product(db: Session, popup: Popups, price: str = "3000") -> Pro
     )
     db.add(product)
     db.flush()
+    offer_category(db, popup, "patreon")
     return product
 
 
@@ -116,6 +120,32 @@ def _make_patron_step(
 ) -> TicketingSteps:
     if presets is None:
         presets = [2500, 5000, 7500]
+
+    # A seeded popup already has its one enabled patron step
+    # (uq_ticketing_step_patron_flow), so reuse it instead of colliding.
+    from sqlmodel import select
+
+    flow_id = default_flow_id(db, popup.id)
+    existing = db.exec(
+        select(TicketingSteps).where(
+            TicketingSteps.sales_flow_id == flow_id,
+            TicketingSteps.template == "patron-preset",
+        )
+    ).first()
+    if existing is not None:
+        # Another test in the session may have left it disabled; this helper
+        # promises a resolvable patron step.
+        existing.is_enabled = True
+        existing.template_config = {
+            "minimum": minimum,
+            "presets": presets,
+            "allow_custom": allow_custom,
+        }
+        db.add(existing)
+        db.commit()
+        db.refresh(existing)
+        return existing
+
     step = TicketingSteps(
         id=uuid.uuid4(),
         tenant_id=popup.tenant_id,

@@ -16,9 +16,9 @@ from sqlmodel import Session
 from app.api.popup.models import Popups
 from app.api.product.models import Products
 from app.api.sales_flow.crud import sales_flows_crud
-from app.api.sales_flow.models import FlowProducts, SalesFlows
 from app.api.shared.enums import SaleType
 from app.api.tenant.models import Tenants
+from tests._flow_helpers import seed_default_steps
 
 
 def _make_direct_popup(db: Session, tenant: Tenants, *, slug_prefix: str) -> Popups:
@@ -31,22 +31,23 @@ def _make_direct_popup(db: Session, tenant: Tenants, *, slug_prefix: str) -> Pop
         currency="USD",
     )
     db.add(popup)
-    db.flush()
-    sales_flows_crud.provision_default_flow(
-        db, popup_id=popup.id, tenant_id=tenant.id, sale_type=SaleType.direct.value
-    )
-    db.flush()
+    db.commit()
+    db.refresh(popup)
+    # A real popup ships with its steps, and the steps decide what it sells.
+    seed_default_steps(db, popup, sale_type=SaleType.direct.value)
     return popup
 
 
-def _make_product(db: Session, popup: Popups, *, name: str) -> Products:
+def _make_product(
+    db: Session, popup: Popups, *, name: str, category: str = "ticket"
+) -> Products:
     product = Products(
         tenant_id=popup.tenant_id,
         popup_id=popup.id,
         name=name,
         slug=f"{name.lower().replace(' ', '-')}-{uuid.uuid4().hex[:6]}",
         price=Decimal("0"),
-        category="ticket",
+        category=category,
         is_active=True,
     )
     db.add(product)
@@ -55,28 +56,17 @@ def _make_product(db: Session, popup: Popups, *, name: str) -> Products:
 
 
 class TestCheckoutRuntimeCatalogFilter:
-    def test_flow_exclusive_product_hidden_from_default_flow_runtime(
+    def test_product_no_step_offers_is_absent_from_the_runtime(
         self, client: TestClient, db: Session, tenant_a: Tenants
     ) -> None:
+        """The runtime carries what the flow's steps offer, nothing else."""
         popup = _make_direct_popup(db, tenant_a, slug_prefix="cf")
-        other_flow = SalesFlows(
-            tenant_id=tenant_a.id,
-            popup_id=popup.id,
-            slug="other",
-            name="Other",
-            type="direct",
-        )
-        db.add(other_flow)
-        db.flush()
 
         shared_product = _make_product(db, popup, name="Shared Ticket")
-        exclusive_product = _make_product(db, popup, name="Exclusive Ticket")
-        db.add(
-            FlowProducts(
-                tenant_id=tenant_a.id,
-                flow_id=other_flow.id,
-                product_id=exclusive_product.id,
-            )
+        # No seeded step has product_category="sponsorship", so this flow
+        # never offers it and the buyer's payload must not carry it.
+        exclusive_product = _make_product(
+            db, popup, name="Unoffered Ticket", category="sponsorship"
         )
         db.commit()
 
@@ -111,7 +101,7 @@ class TestCheckoutRuntimeCatalogFilter:
         assert response.status_code == 200, response.text
         assert response.json()["products"] == []
 
-    def test_no_restriction_rule_and_no_exclusivity_shows_all_products(
+    def test_everything_the_steps_offer_is_shown(
         self, client: TestClient, db: Session, tenant_a: Tenants
     ) -> None:
         popup = _make_direct_popup(db, tenant_a, slug_prefix="cf-none")

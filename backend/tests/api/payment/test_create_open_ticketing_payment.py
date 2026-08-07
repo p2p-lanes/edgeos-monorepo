@@ -29,7 +29,7 @@ from app.api.product.models import Products
 from app.api.shared.enums import SaleType
 from app.api.tenant.models import Tenants
 from app.services.simplefi.client import CancelOutcome
-from tests._flow_helpers import default_flow_id, provision_default_flow
+from tests._flow_helpers import default_flow_id, seed_default_steps
 
 
 def _make_popup(
@@ -63,7 +63,7 @@ def _make_popup(
     )
     db.add(popup)
     db.flush()
-    provision_default_flow(db, popup)
+    seed_default_steps(db, popup)
     return popup
 
 

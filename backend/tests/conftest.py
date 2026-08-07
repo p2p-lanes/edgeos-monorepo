@@ -24,6 +24,7 @@ from app.core.security import (
 )
 from app.core.tenant_db import ensure_tenant_credentials, tenant_connection_manager
 from app.main import application
+from tests._flow_helpers import seed_default_steps
 
 
 @pytest.fixture(scope="session")
@@ -433,6 +434,7 @@ def popup_tenant_a(db: Session, tenant_a: Tenants) -> Popups:
         db.refresh(popup)
 
     _ensure_default_flow(db, popup)
+    seed_default_steps(db, popup)
     return popup
 
 
@@ -451,6 +453,7 @@ def popup_tenant_b(db: Session, tenant_b: Tenants) -> Popups:
         db.refresh(popup)
 
     _ensure_default_flow(db, popup)
+    seed_default_steps(db, popup)
     return popup
 
 

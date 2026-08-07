@@ -1,9 +1,10 @@
 """Task 13.1/13.2/13.4 — upsale-type flows on the checkout surface.
 
-Design: sdd/sales-flows D8, G0 #2/#3. The checkout runtime and purchase
-endpoints are public/anonymous by construction (module docstring in
-checkout/router.py), but an upsale-type flow additionally requires a
-portal-authenticated human with >=1 APPROVED payment in the popup.
+Design: sdd/sales-flows D8, G0 #2/#3, amended by product-owner decision.
+The checkout runtime and purchase endpoints are public/anonymous by
+construction (module docstring in checkout/router.py), but an upsale-type
+flow additionally requires a portal-authenticated human with >=1 product
+assigned OR >=1 APPROVED payment in the popup.
 
 Closes the slice-9 review gap: `resolve_flow`'s `require_types={direct,
 upsale}` let an upsale flow resolve and serve a full anonymous checkout
@@ -18,14 +19,14 @@ from decimal import Decimal
 from fastapi.testclient import TestClient
 from sqlmodel import Session
 
-from app.api.attendee.models import Attendees
+from app.api.attendee.models import AttendeeProducts, Attendees
 from app.api.human.models import Humans
 from app.api.payment.models import PaymentProducts, Payments
 from app.api.payment.schemas import PaymentStatus
 from app.api.popup.models import Popups
 from app.api.product.models import Products
 from app.api.sales_flow.crud import sales_flows_crud
-from app.api.sales_flow.models import FlowProducts, SalesFlows
+from app.api.sales_flow.models import SalesFlows
 from app.api.shared.enums import SaleType
 from app.api.tenant.models import Tenants
 from app.core.security import create_access_token
@@ -139,6 +140,43 @@ def _grant_approved_payment(
     db.flush()
 
 
+def _grant_admin_products(
+    db: Session, tenant: Tenants, popup: Popups, human: Humans
+) -> None:
+    """Admin-granted ticket: attendee_products row with NO payment at all."""
+    product = Products(
+        tenant_id=tenant.id,
+        popup_id=popup.id,
+        name="Granted Ticket",
+        slug=f"granted-{uuid.uuid4().hex[:6]}",
+        price=Decimal("50"),
+    )
+    db.add(product)
+    db.flush()
+
+    attendee = Attendees(
+        tenant_id=tenant.id,
+        application_id=None,
+        popup_id=popup.id,
+        human_id=human.id,
+        name="Granted Attendee",
+        category="main",
+    )
+    db.add(attendee)
+    db.flush()
+
+    db.add(
+        AttendeeProducts(
+            tenant_id=tenant.id,
+            attendee_id=attendee.id,
+            product_id=product.id,
+            check_in_code=f"GRANT-{uuid.uuid4().hex[:8]}",
+            payment_id=None,
+        )
+    )
+    db.flush()
+
+
 # ---------------------------------------------------------------------------
 # GET runtime
 # ---------------------------------------------------------------------------
@@ -182,6 +220,26 @@ class TestUpsaleRuntimeGate:
         flow = _make_upsale_flow(db, popup, slug="addon")
         human = _make_human(db, tenant_a, suffix="eligible")
         _grant_approved_payment(db, tenant_a, popup, human)
+        db.commit()
+
+        response = client.get(
+            f"/api/v1/checkout/{popup.slug}/{flow.slug}/runtime",
+            headers={
+                "X-Tenant-Id": str(tenant_a.id),
+                "Authorization": f"Bearer {_human_token(human)}",
+            },
+        )
+        assert response.status_code == 200, response.text
+
+    def test_admin_granted_human_with_zero_payments_sees_upsale_runtime(
+        self, client: TestClient, db: Session, tenant_a: Tenants
+    ) -> None:
+        """Product-owner amendment: admin-granted products qualify without
+        any payment ever existing."""
+        popup = _make_direct_popup(db, tenant_a, slug_prefix="rt-granted")
+        flow = _make_upsale_flow(db, popup, slug="addon")
+        human = _make_human(db, tenant_a, suffix="granted")
+        _grant_admin_products(db, tenant_a, popup, human)
         db.commit()
 
         response = client.get(
@@ -295,9 +353,14 @@ class TestFlowScopedProductPurchase:
     mix), re-add them here once their scope is recovered.
     """
 
-    def test_flow_exclusive_product_rejected_via_default_flow(
+    def test_product_only_the_upsale_flow_offers_is_rejected_elsewhere(
         self, client: TestClient, db: Session, tenant_a: Tenants
     ) -> None:
+        """Only the upsale flow has a step offering this category, so only
+        that flow can sell it — a direct POST through the default flow is
+        refused."""
+        from app.api.ticketing_step.models import TicketingSteps
+
         popup = _make_direct_popup(db, tenant_a, slug_prefix="fp-bypass")
         upsale_flow = _make_upsale_flow(db, popup, slug="addon")
         human = _make_human(db, tenant_a, suffix="fp-eligible")
@@ -308,18 +371,24 @@ class TestFlowScopedProductPurchase:
             name="Upsale-Only Addon",
             slug=f"exclusive-{uuid.uuid4().hex[:6]}",
             price=Decimal("0"),
+            category="addon",
         )
         db.add(product)
         db.flush()
         db.add(
-            FlowProducts(
-                tenant_id=tenant_a.id, flow_id=upsale_flow.id, product_id=product.id
+            TicketingSteps(
+                tenant_id=tenant_a.id,
+                popup_id=popup.id,
+                sales_flow_id=upsale_flow.id,
+                step_type="addon",
+                product_category="addon",
+                title="Add-ons",
             )
         )
         db.commit()
 
-        # Rejected through the default (direct) flow: the product is
-        # flow-exclusive to the upsale flow, not this one.
+        # Rejected through the default (direct) flow: none of its steps
+        # offer this category.
         default_response = client.post(
             f"/api/v1/checkout/{popup.slug}/purchase",
             headers={"X-Tenant-Id": str(tenant_a.id)},

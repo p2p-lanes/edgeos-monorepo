@@ -28,10 +28,13 @@ from app.api.payment.schemas import PaymentCreate, PaymentProductRequest
 from app.api.popup.models import Popups
 from app.api.product.models import Products
 from app.api.sales_flow.crud import sales_flows_crud
-from app.api.sales_flow.models import FlowProducts, SalesFlows
+from app.api.sales_flow.models import SalesFlows
 from app.api.shared.enums import SaleType
 from app.api.tenant.models import Tenants
-from tests._flow_helpers import default_flow_id, provision_default_flow
+from tests._flow_helpers import (
+    default_flow_id,
+    seed_default_steps,
+)
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -51,7 +54,7 @@ def _make_direct_popup_with_default_flow(
     )
     db.add(popup)
     db.flush()
-    provision_default_flow(db, popup)
+    seed_default_steps(db, popup)
     flow = sales_flows_crud.provision_default_flow(
         db, popup_id=popup.id, tenant_id=tenant.id, sale_type=SaleType.direct.value
     )
@@ -72,7 +75,7 @@ def _make_application_popup_with_default_flow(
     )
     db.add(popup)
     db.flush()
-    provision_default_flow(db, popup)
+    seed_default_steps(db, popup)
     flow = sales_flows_crud.provision_default_flow(
         db, popup_id=popup.id, tenant_id=tenant.id, sale_type=SaleType.application.value
     )
@@ -81,7 +84,12 @@ def _make_application_popup_with_default_flow(
 
 
 def _make_product(
-    db: Session, popup: Popups, *, price: str = "0", stock: int | None = None
+    db: Session,
+    popup: Popups,
+    *,
+    price: str = "0",
+    stock: int | None = None,
+    category: str = "ticket",
 ) -> Products:
     product = Products(
         tenant_id=popup.tenant_id,
@@ -89,7 +97,7 @@ def _make_product(
         name=f"Product {uuid.uuid4().hex[:6]}",
         slug=f"prod-{uuid.uuid4().hex[:8]}",
         price=Decimal(price),
-        category="ticket",
+        category=category,
         is_active=True,
         total_stock_cap=stock,
         total_stock_remaining=stock,
@@ -248,27 +256,16 @@ class TestOpenTicketingRestrictionGate:
         assert payment.id is not None
         assert payment.sales_flow_id == flow.id
 
-    def test_flow_exclusive_product_rejected_403_product_not_in_flow(
+    def test_product_no_step_offers_is_rejected_403(
         self, db: Session, tenant_a: Tenants
     ) -> None:
         popup, default_flow = _make_direct_popup_with_default_flow(
             db, tenant_a, slug_prefix="rg"
         )
-        other_flow = SalesFlows(
-            tenant_id=tenant_a.id,
-            popup_id=popup.id,
-            slug="other",
-            name="Other Flow",
-            type="direct",
-        )
-        db.add(other_flow)
-        db.flush()
-        product = _make_product(db, popup)
-        db.add(
-            FlowProducts(
-                tenant_id=tenant_a.id, flow_id=other_flow.id, product_id=product.id
-            )
-        )
+        # No seeded step has product_category="sponsorship", so a direct
+        # POST for it must be refused even though it is a real, active
+        # product of the same popup.
+        product = _make_product(db, popup, category="sponsorship")
         db.commit()
 
         obj = _purchase_create(
@@ -384,29 +381,15 @@ class TestAuthenticatedPaymentRestrictionGate:
         payment, _preview = payments_crud.create_payment(db, obj)
         assert payment.sales_flow_id == flow.id
 
-    def test_flow_exclusive_product_rejected_403(
+    def test_product_no_step_offers_is_rejected_403(
         self, db: Session, tenant_a: Tenants
     ) -> None:
         popup, default_flow = _make_application_popup_with_default_flow(
             db, tenant_a, slug_prefix="rg-app"
         )
-        other_flow = SalesFlows(
-            tenant_id=tenant_a.id,
-            popup_id=popup.id,
-            slug="other",
-            name="Other Flow",
-            type="application",
-        )
-        db.add(other_flow)
-        db.flush()
         human = _make_human(db, tenant_a)
         application = _make_application(db, popup, human, default_flow)
-        product = _make_product(db, popup)
-        db.add(
-            FlowProducts(
-                tenant_id=tenant_a.id, flow_id=other_flow.id, product_id=product.id
-            )
-        )
+        product = _make_product(db, popup, category="sponsorship")
         db.commit()
 
         obj = PaymentCreate(
@@ -444,7 +427,7 @@ class TestAuthenticatedPaymentRestrictionGate:
         )
         db.add(popup)
         db.flush()
-        provision_default_flow(db, popup)
+        seed_default_steps(db, popup)
         human = _make_human(db, tenant_a)
         application = Applications(
             tenant_id=popup.tenant_id,

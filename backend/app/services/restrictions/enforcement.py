@@ -1,13 +1,12 @@
-"""Restriction enforcement (sdd/sales-flows design D5/D6, D3 amendment).
+"""Restriction enforcement (sdd/sales-flows design D5/D6).
 
 Two checks, both gated behind ONE flow (design):
 1. `flow.restriction_rule` (if set) evaluates true for the request's
    `PurchaseContext` -> else the flow is closed to this buyer.
-2. Every requested product is a member of the flow's product set (D3:
-   `flow_products` empty for a flow = all active popup products; a product
-   with ANY `flow_products` row is purchasable/visible only through an
-   assigned flow — the per-product exclusivity ratified as the D3 amendment,
-   G3 #3, 2026-08-04).
+2. Every requested product is one this flow's ticketing steps actually
+   offer (sdd/sales-flows-rediseno slice 4). The offer is derived from the
+   steps — see `offering.py` — so there is nothing to keep in sync, and a
+   direct POST can only buy what the checkout displayed.
 
 `assert_products_allowed` is the hard-block call site (purchase paths):
 raises 403 with a stable machine code (design D6) so the portal can render
@@ -17,14 +16,13 @@ excluded product is simply absent from the returned list, never an error —
 matches every other portal listing's shape.
 
 Anti-enumeration (G3, standing rule): both failure modes ("the flow's own
-rule failed" vs "this product belongs to a different flow") stay distinct
+rule failed" vs "this flow does not offer that product") stay distinct
 machine codes at every call site, authenticated and anonymous alike — same
 precedent as `sales_flow/eligibility.py`'s deliberate 401/403 split. Neither
 code exposes WHICH leaf predicate inside the rule failed (the evaluator only
-ever returns a single boolean for the whole tree), and a flow's product
-assignment is not a secret: it is the same fact `flow_products` already
-exposes to any backoffice operator and that a determined buyer could infer
-from repeated purchase attempts regardless of the error code's precision.
+ever returns a single boolean for the whole tree), and which products a
+flow offers is not a secret: the checkout displays exactly that set to
+anyone who opens it.
 """
 
 import uuid
@@ -32,7 +30,7 @@ import uuid
 from fastapi import HTTPException, status
 from loguru import logger
 from pydantic import ValidationError
-from sqlmodel import Session, select
+from sqlmodel import Session
 
 from app.services.restrictions.context import PurchaseContext
 from app.services.restrictions.evaluator import evaluate
@@ -55,37 +53,20 @@ def _restriction_passes(flow, context: PurchaseContext) -> bool:
 
 
 def _flow_allowed_product_ids(
-    session: Session, flow_id: uuid.UUID, product_ids: list[uuid.UUID]
+    session: Session, flow, product_ids: list[uuid.UUID]
 ) -> set[uuid.UUID]:
-    """Product IDs (from `product_ids`) allowed for `flow_id` under the D3
-    exclusivity rule: unassigned everywhere; assigned only where assigned.
+    """Which of `product_ids` this flow's steps offer.
 
-    Two lightweight queries against `flow_products`, not a correlated
-    subquery against `Products` — this lets purchase-path callers run the
-    check with just the requested IDs, before any `Products` row is loaded.
+    Derived from the steps rather than stored, so the answer cannot drift
+    from what the checkout displays — see `offering.py` for the rules.
     """
-    from app.api.sales_flow.models import FlowProducts
+    from app.services.restrictions.offering import flow_offered_product_ids
 
     if not product_ids:
         return set()
 
-    unique_ids = set(product_ids)
-    rows = session.exec(
-        select(FlowProducts.product_id, FlowProducts.flow_id).where(
-            FlowProducts.product_id.in_(unique_ids)  # type: ignore[attr-defined]
-        )
-    ).all()
-
-    flows_by_product: dict[uuid.UUID, set[uuid.UUID]] = {}
-    for product_id, assigned_flow_id in rows:
-        flows_by_product.setdefault(product_id, set()).add(assigned_flow_id)
-
-    allowed: set[uuid.UUID] = set()
-    for product_id in unique_ids:
-        assigned_flows = flows_by_product.get(product_id)
-        if not assigned_flows or flow_id in assigned_flows:
-            allowed.add(product_id)
-    return allowed
+    offered = flow_offered_product_ids(session, flow.id, flow.popup_id)
+    return set(product_ids) & offered
 
 
 def assert_products_allowed(
@@ -105,7 +86,7 @@ def assert_products_allowed(
             detail={"code": RESTRICTION_RULE_VIOLATED},
         )
 
-    allowed_ids = _flow_allowed_product_ids(session, flow.id, product_ids)
+    allowed_ids = _flow_allowed_product_ids(session, flow, product_ids)
     if set(product_ids) - allowed_ids:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -122,9 +103,10 @@ def filter_allowed_products(
 ) -> list:
     """Silent filter — call at every catalog-read call site. A failing
     restriction_rule filters the WHOLE catalog to empty (the rule gates the
-    flow, not individual products); D3 exclusivity filters per-product."""
+    flow, not individual products); what the steps offer filters
+    per-product."""
     if not _restriction_passes(flow, context):
         return []
 
-    allowed_ids = _flow_allowed_product_ids(session, flow.id, [p.id for p in products])
+    allowed_ids = _flow_allowed_product_ids(session, flow, [p.id for p in products])
     return [p for p in products if p.id in allowed_ids]

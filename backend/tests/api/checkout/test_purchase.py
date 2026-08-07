@@ -24,7 +24,7 @@ from app.api.product.models import Products
 from app.api.shared.enums import SaleType
 from app.api.tenant.models import Tenants
 from app.utils.encryption import encrypt
-from tests._flow_helpers import default_flow_id, provision_default_flow
+from tests._flow_helpers import default_flow_id, seed_default_steps
 from tests.conftest import with_origin
 
 
@@ -60,7 +60,7 @@ def _make_popup(
     )
     db.add(popup)
     db.flush()
-    provision_default_flow(db, popup, sale_type=str(popup.sale_type))
+    seed_default_steps(db, popup, sale_type=str(popup.sale_type))
     return popup
 
 

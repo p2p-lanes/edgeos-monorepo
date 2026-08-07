@@ -39,6 +39,7 @@ from app.api.payment.schemas import (
 from app.api.popup.models import Popups
 from app.api.product.models import Products
 from app.api.tenant.models import Tenants
+from tests._flow_helpers import offer_category
 
 SAMPLE_METADATA = {
     "daily_choices": {
@@ -84,6 +85,7 @@ def _meal_plan_product(db: Session, popup: Popups, *, price: str = "75") -> Prod
     )
     db.add(p)
     db.flush()
+    offer_category(db, popup, "meal_plan")
     return p
 
 
@@ -100,6 +102,7 @@ def _ticket_product(db: Session, popup: Popups, *, price: str = "10") -> Product
     )
     db.add(p)
     db.flush()
+    offer_category(db, popup, "meal_plan")
     return p
 
 

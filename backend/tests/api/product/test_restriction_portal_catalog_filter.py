@@ -16,11 +16,10 @@ from sqlmodel import Session
 from app.api.human.models import Humans
 from app.api.popup.models import Popups
 from app.api.product.models import Products
-from app.api.sales_flow.crud import sales_flows_crud
-from app.api.sales_flow.models import FlowProducts, SalesFlows
 from app.api.shared.enums import SaleType
 from app.api.tenant.models import Tenants
 from app.core.security import create_access_token
+from tests._flow_helpers import seed_default_steps
 
 
 def _make_popup_with_default_flow(
@@ -35,22 +34,24 @@ def _make_popup_with_default_flow(
         currency="USD",
     )
     db.add(popup)
-    db.flush()
-    sales_flows_crud.provision_default_flow(
-        db, popup_id=popup.id, tenant_id=tenant.id, sale_type=SaleType.application.value
-    )
-    db.flush()
+    db.commit()
+    db.refresh(popup)
+    # A real popup is seeded with its steps, and since
+    # sdd/sales-flows-rediseno slice 4 those steps decide what it sells.
+    seed_default_steps(db, popup, sale_type=SaleType.application.value)
     return popup
 
 
-def _make_product(db: Session, popup: Popups, *, name: str) -> Products:
+def _make_product(
+    db: Session, popup: Popups, *, name: str, category: str = "ticket"
+) -> Products:
     product = Products(
         tenant_id=popup.tenant_id,
         popup_id=popup.id,
         name=name,
         slug=f"{name.lower().replace(' ', '-')}-{uuid.uuid4().hex[:6]}",
         price=Decimal("0"),
-        category="ticket",
+        category=category,
         is_active=True,
     )
     db.add(product)
@@ -72,28 +73,15 @@ def _human_token(human: Humans) -> str:
 
 
 class TestPortalProductListingCatalogFilter:
-    def test_flow_exclusive_product_hidden_from_scoped_listing(
+    def test_product_no_step_offers_is_hidden(
         self, client: TestClient, db: Session, tenant_a: Tenants
     ) -> None:
         popup = _make_popup_with_default_flow(db, tenant_a, slug_prefix="pcf")
-        other_flow = SalesFlows(
-            tenant_id=tenant_a.id,
-            popup_id=popup.id,
-            slug="other",
-            name="Other",
-            type="application",
-        )
-        db.add(other_flow)
-        db.flush()
-
-        shared_product = _make_product(db, popup, name="Shared Product")
-        exclusive_product = _make_product(db, popup, name="Exclusive Product")
-        db.add(
-            FlowProducts(
-                tenant_id=tenant_a.id,
-                flow_id=other_flow.id,
-                product_id=exclusive_product.id,
-            )
+        offered = _make_product(db, popup, name="Offered Product")
+        # No step of this flow has product_category="sponsorship", so the
+        # flow never offers it and the listing must not show it.
+        unoffered = _make_product(
+            db, popup, name="Unoffered Product", category="sponsorship"
         )
         human = _make_human(db, tenant_a)
         db.commit()
@@ -109,13 +97,13 @@ class TestPortalProductListingCatalogFilter:
         assert response.status_code == 200, response.text
         body = response.json()
         product_ids = {p["id"] for p in body["results"]}
-        assert str(shared_product.id) in product_ids
-        assert str(exclusive_product.id) not in product_ids
+        assert str(offered.id) in product_ids
+        assert str(unoffered.id) not in product_ids
         # rel-001/risk-002: paging.total must reflect the filtered count
         # (1 visible product here), not the raw pre-filter count (2).
         assert body["paging"]["total"] == len(body["results"]) == 1
 
-    def test_unassigned_products_visible_in_scoped_listing(
+    def test_product_an_enabled_step_offers_is_visible(
         self, client: TestClient, db: Session, tenant_a: Tenants
     ) -> None:
         popup = _make_popup_with_default_flow(db, tenant_a, slug_prefix="pcf-open")
