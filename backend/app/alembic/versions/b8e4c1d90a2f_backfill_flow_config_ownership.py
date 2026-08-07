@@ -14,10 +14,16 @@ whose sole flow is the default one behaves identically before and after.
 Removing the fallback is slice 2's job, and it can only be done safely once
 these rows exist.
 
-Scope — the seven configuration tables:
+Scope — the six configuration tables:
 
   ticketingsteps, formfields, formsections, basefieldconfigs,
-  approvalstrategies, popupreviewers, email_templates
+  approvalstrategies, email_templates
+
+`popupreviewers` is deliberately NOT among them. Its inheritance is
+explicit — `sales_flows.reviewers_mode`, where 'inherit' resolves the popup
+tier — so claiming those rows would empty the tier every inheriting flow
+reads, silently leaving every application with no designated reviewer.
+Reviewers stay at popup level.
 
 `applications` is already covered by `4e221ea1a2ee`. `payments` and
 `email_logs` are NOT touched: their `sales_flow_id` is provenance (which
@@ -70,7 +76,6 @@ CONFIG_TABLES: tuple[tuple[str, str], ...] = (
     ("formsections", ""),
     ("basefieldconfigs", ""),
     ("approvalstrategies", ""),
-    ("popupreviewers", ""),
     ("email_templates", " AND t.popup_id IS NOT NULL"),
 )
 
