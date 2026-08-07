@@ -56,17 +56,40 @@ class ApprovalStrategiesCRUD(
         sales_flow_id: uuid.UUID | None = None,
     ) -> ApprovalStrategies:
         """Create a strategy for a flow. Omitting `sales_flow_id` means the
-        popup's default flow, the one every popup has."""
-        if sales_flow_id is None:
-            from app.api.sales_flow.crud import sales_flows_crud
+        popup's default flow, the one every popup has.
 
+        Only `application` flows may have one: direct sales and upsales
+        never produce an application, so a review strategy there would be
+        configuration that can never run.
+        """
+        from app.api.sales_flow.crud import sales_flows_crud
+        from app.api.sales_flow.schemas import SalesFlowType
+
+        if sales_flow_id is None:
             default_flow = sales_flows_crud.get_default_flow(session, popup_id)
             if default_flow is None:
                 raise HTTPException(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                     detail="Popup has no default sales flow",
                 )
-            sales_flow_id = default_flow.id
+            flow = default_flow
+        else:
+            flow = sales_flows_crud.get(session, sales_flow_id)
+            if flow is None or flow.popup_id != popup_id:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Sales flow not found for this popup",
+                )
+
+        if flow.type != SalesFlowType.application:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=(
+                    "Only application flows can have an approval strategy. "
+                    f"This flow sells directly ({flow.type})."
+                ),
+            )
+        sales_flow_id = flow.id
 
         db_obj = ApprovalStrategies(
             popup_id=popup_id,

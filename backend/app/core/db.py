@@ -243,6 +243,10 @@ def _seed_approval_strategies(session: Session, popup_map: dict, tenant_id) -> N
                     f"Skipping approval strategy for {popup_key}: no default flow"
                 )
                 continue
+            # Only application flows review anything; a direct-sale or
+            # upsale flow never produces an application to review.
+            if default_flow.type != "application":
+                continue
             strategy = ApprovalStrategies(
                 tenant_id=tenant_id,
                 popup_id=popup.id,
