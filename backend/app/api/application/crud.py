@@ -2057,12 +2057,15 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         task 13.2). Returns every portal-listed, `type=upsale` sales flow of
         `popup_id` the human is currently eligible for.
 
-        Eligibility (D8, G0 #3) is "any APPROVED payment anywhere in the
-        popup", evaluated live via `has_approved_payment` — an accepted but
-        unpaid application does NOT qualify. This is a listing, not an
-        access gate: an ineligible or unknown human degrades to an empty
-        catalog rather than raising, matching `find_portal_listed`'s own
-        listing semantics elsewhere.
+        Eligibility (D8) is "any product assigned OR any APPROVED payment
+        anywhere in the popup", evaluated live via `is_upsale_eligible` —
+        the products leg is a product-owner amendment superseding G0 #3's
+        payment-only wording so admin-granted attendee products qualify.
+        An accepted but unpaid application STILL does not qualify unless
+        products were granted. This is a listing, not an access gate: an
+        ineligible or unknown human degrades to an empty catalog rather
+        than raising, matching `find_portal_listed`'s own listing
+        semantics elsewhere.
 
         Scope note: this resolves the ELIGIBLE UPSALE side of G0's "the
         catalog a person sees is their accepting flow's plus eligible
@@ -2074,10 +2077,10 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         needs it.
         """
         from app.api.sales_flow.crud import sales_flows_crud
-        from app.api.sales_flow.eligibility import has_approved_payment
+        from app.api.sales_flow.eligibility import is_upsale_eligible
         from app.api.sales_flow.schemas import SalesFlowType
 
-        if not has_approved_payment(session, human_id, popup_id):
+        if not is_upsale_eligible(session, human_id, popup_id):
             return []
         return sales_flows_crud.find_portal_listed(
             session, popup_id, type=SalesFlowType.upsale

@@ -1,4 +1,5 @@
 import { act, render, screen } from "@testing-library/react"
+import { ApiError } from "@/client"
 import {
   LANGUAGE_STORAGE_KEY,
   setActiveRequestLanguage,
@@ -37,6 +38,14 @@ const runtimeData = {
   products: [],
   buyer_form: [],
   ticketing_steps: [],
+}
+
+function runtimeApiError(status: number) {
+  return new ApiError(
+    { method: "GET", url: "/checkout" } as never,
+    { url: "/checkout", ok: false, status, statusText: "", body: null },
+    "runtime request failed",
+  )
 }
 
 function lastRuntimeOpts(): {
@@ -91,6 +100,47 @@ describe("CheckoutPageClient", () => {
     expect(
       screen.getByText("openCheckout.unavailable_description"),
     ).toBeTruthy()
+  })
+
+  it("renders the sign-in card with a redirect back to the checkout on 401", () => {
+    mockUseCheckoutRuntime.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isError: true,
+      error: runtimeApiError(401),
+    })
+
+    render(
+      <CheckoutPageClient popupSlug="festival-2026" flowSlug="upsale-2026" />,
+    )
+
+    expect(screen.getByText("openCheckout.sign_in_required_title")).toBeTruthy()
+    expect(
+      screen.getByText("openCheckout.sign_in_required_description"),
+    ).toBeTruthy()
+    const link = screen.getByRole("link", {
+      name: "openCheckout.sign_in_required_cta",
+    })
+    expect(link.getAttribute("href")).toBe(
+      "/auth?redirect=%2Fcheckout%2Ffestival-2026%2Fupsale-2026",
+    )
+    expect(screen.queryByText("openCheckout.unavailable_title")).toBeNull()
+  })
+
+  it("keeps the unavailable card for non-401 runtime errors", () => {
+    mockUseCheckoutRuntime.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isError: true,
+      error: runtimeApiError(404),
+    })
+
+    render(
+      <CheckoutPageClient popupSlug="festival-2026" flowSlug="upsale-2026" />,
+    )
+
+    expect(screen.getByText("openCheckout.unavailable_title")).toBeTruthy()
+    expect(screen.queryByText("openCheckout.sign_in_required_title")).toBeNull()
   })
 
   it("renders the shared runtime for the popup slug", () => {

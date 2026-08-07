@@ -1,9 +1,12 @@
 """Upsale flow eligibility (sdd/sales-flows design D8, G0 #2/#3, task 13.1).
 
 Eligibility for an upsale-type flow = the calling human has at least one
-APPROVED payment anywhere in the popup ("any approved payment in the popup"
-per G0 #3 — not scoped to a specific flow: `payments.sales_flow_id` stays
-provenance-only per design D7, never a request-path authorization filter).
+product assigned anywhere in the popup OR at least one APPROVED payment
+anywhere in the popup. The products leg is a product-owner amendment
+superseding design G0 #3's payment-only wording: admin-granted attendee
+products (no payment ever created) make a legitimate ticket-holder.
+Neither leg is scoped to a specific flow: `payments.sales_flow_id` stays
+provenance-only per design D7, never a request-path authorization filter.
 
 Evaluated LIVE at both catalog render and purchase time (design D8) — never
 snapshotted. A refund or cancellation must immediately revoke access, so
@@ -30,12 +33,36 @@ if TYPE_CHECKING:
     from app.api.sales_flow.models import SalesFlows
 
 
+def has_popup_products(
+    session: Session, human_id: uuid.UUID, popup_id: uuid.UUID
+) -> bool:
+    """Does `human_id` have >=1 product assigned anywhere in `popup_id`?
+
+    Covers admin-granted products: `attendee_products` rows exist without
+    any payment. One lightweight `EXISTS` probe — no full row is loaded.
+    """
+    from app.api.attendee.models import AttendeeProducts, Attendees
+
+    product_exists = select(
+        sa_exists().where(
+            AttendeeProducts.attendee_id.in_(  # type: ignore[union-attr]
+                select(Attendees.id).where(
+                    Attendees.human_id == human_id,
+                    Attendees.popup_id == popup_id,
+                )
+            )
+        )
+    )
+    return session.exec(product_exists).one()
+
+
 def has_approved_payment(
     session: Session, human_id: uuid.UUID, popup_id: uuid.UUID
 ) -> bool:
     """Does `human_id` have >=1 APPROVED payment anywhere in `popup_id`?
 
-    Mirrors `application/crud.py::resolve_popup_access`'s Step 5 payment
+    One of the two `is_upsale_eligible` legs. Mirrors
+    `application/crud.py::resolve_popup_access`'s Step 5 payment
     predicate (application-leg + direct-sale-leg), narrowed to
     `status=APPROVED`. Two lightweight `EXISTS` probes, short-circuited —
     no full row is loaded.
@@ -85,6 +112,20 @@ def has_approved_payment(
     return session.exec(direct_payment_exists).one()
 
 
+def is_upsale_eligible(
+    session: Session, human_id: uuid.UUID, popup_id: uuid.UUID
+) -> bool:
+    """Composed upsale eligibility: products leg OR approved-payment leg.
+
+    Single source of truth consumed by both `assert_upsale_eligible`
+    (checkout gate) and `ApplicationsCRUD.resolve_upsale_catalog`
+    (passes-page listing), so the two surfaces stay in lockstep.
+    """
+    return has_popup_products(session, human_id, popup_id) or has_approved_payment(
+        session, human_id, popup_id
+    )
+
+
 def assert_upsale_eligible(
     session: Session,
     flow: "SalesFlows",
@@ -99,9 +140,10 @@ def assert_upsale_eligible(
 
     Anonymous caller (no token, or a non-human token) -> 401: no
     credentials were presented at all, so "sign in" is the correct signal.
-    Authenticated but cross-tenant, or no approved payment in the popup ->
-    403: credentials were presented and are valid, they simply do not grant
-    access here. Neither response leaks new information about the flow: its
+    Authenticated but cross-tenant, or not upsale-eligible in the popup
+    (no product assigned AND no approved payment, per `is_upsale_eligible`)
+    -> 403: credentials were presented and are valid, they simply do not
+    grant access here. Neither response leaks new information about the flow: its
     existence is already URL-addressable (design Threat Matrix), so a
     uniform "sign in" / "no access" pair is enough — no need to collapse
     them further for anti-enumeration purposes.
@@ -116,7 +158,7 @@ def assert_upsale_eligible(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    if current_human.tenant_id != tenant_id or not has_approved_payment(
+    if current_human.tenant_id != tenant_id or not is_upsale_eligible(
         session, current_human.id, popup_id
     ):
         raise HTTPException(

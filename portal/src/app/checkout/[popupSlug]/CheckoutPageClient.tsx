@@ -1,12 +1,14 @@
 "use client"
 
+import Link from "next/link"
 import { useEffect, useState } from "react"
 import { useTranslation } from "react-i18next"
-import type { CheckoutRuntimeResponse } from "@/client"
+import { ApiError, type CheckoutRuntimeResponse } from "@/client"
 import { CheckoutBackgroundImage } from "@/components/CheckoutBackgroundImage"
 import { CheckoutBackgroundVideo } from "@/components/CheckoutBackgroundVideo"
 import { OpenCheckoutRuntime } from "@/components/checkout-flow/OpenCheckoutRuntime"
 import { SidebarProvider } from "@/components/Sidebar/SidebarComponents"
+import { Button } from "@/components/ui/button"
 import { Loader } from "@/components/ui/Loader"
 import useAuth from "@/hooks/useAuth"
 import { getCheckoutBackground } from "@/lib/background-image"
@@ -14,6 +16,7 @@ import {
   resolveRequestLanguage,
   subscribeRequestLanguage,
 } from "@/lib/language-storage"
+import { getAuthRedirectPath } from "@/lib/safe-return-to"
 import { useCheckoutRuntime } from "./hooks/useCheckoutRuntime"
 
 interface CheckoutPageClientProps {
@@ -59,6 +62,7 @@ export default function CheckoutPageClient({
     data: runtime,
     isLoading,
     isError,
+    error,
   } = useCheckoutRuntime(popupSlug, {
     language,
     flowSlug,
@@ -77,6 +81,32 @@ export default function CheckoutPageClient({
 
   if (isLoading) {
     return <Loader />
+  }
+
+  // The runtime endpoint returns 401 for flows restricted to signed-in
+  // attendees (e.g. upsale flows). The link is valid; the visitor just needs
+  // to sign in, so send them to the auth flow and back to this checkout.
+  if (error instanceof ApiError && error.status === 401) {
+    const checkoutPath = flowSlug
+      ? `/checkout/${popupSlug}/${flowSlug}`
+      : `/checkout/${popupSlug}`
+    return (
+      <div className="flex min-h-screen items-center justify-center p-6">
+        <div className="rounded-2xl border bg-card p-8 text-center shadow-sm">
+          <h1 className="text-2xl font-semibold">
+            {t("openCheckout.sign_in_required_title")}
+          </h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            {t("openCheckout.sign_in_required_description")}
+          </p>
+          <Button asChild className="mt-6">
+            <Link href={getAuthRedirectPath(checkoutPath)}>
+              {t("openCheckout.sign_in_required_cta")}
+            </Link>
+          </Button>
+        </div>
+      </div>
+    )
   }
 
   if (isError || !runtime) {
