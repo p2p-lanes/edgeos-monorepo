@@ -54,10 +54,9 @@ class TestSalesFlowCreate:
         assert data["type"] == "application"
         assert data["visibility"] == "portal_listed"
         assert data["reviewers_mode"] == "inherit"
-        # Class B — must be NULL (inherit popup), never copied (D1)
-        assert data["application_layout"] is None
-        assert data["allows_coupons"] is None
-        assert data["abandoned_cart_delay_days"] is None
+        # Channel configuration is copied from the popup at creation
+        # (slice 7): a flow owns it rather than reading through.
+        assert data["application_layout"] is not None
 
     def test_create_sales_flow_reserved_slug_rejected(
         self,

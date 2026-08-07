@@ -259,7 +259,12 @@ class TestResolveActiveDirectFlow:
 
 
 class TestBuildEffectiveConfig:
-    """Pure, no I/O — table-driven NULL-inherit matrix (D1/D2)."""
+    """Pure, no I/O — the flow's own configuration, never the popup's.
+
+    Since sdd/sales-flows-rediseno slice 7 a flow owns these columns: they
+    are seeded from the popup at creation and read straight from the flow
+    afterwards, so editing one flow cannot reach another.
+    """
 
     def _popup(self, **overrides) -> Popups:
         base = {
@@ -298,17 +303,7 @@ class TestBuildEffectiveConfig:
         base.update(overrides)
         return SalesFlows(**base)
 
-    def test_all_null_inherits_every_popup_value(self) -> None:
-        popup = self._popup(abandoned_cart_delay_days=42)
-        flow = self._flow(popup)
-
-        config = resolver.build_effective_config(flow, popup)
-
-        assert config.abandoned_cart_delay_days == 42
-        assert config.application_layout == popup.application_layout
-        assert config.allows_coupons == popup.allows_coupons
-
-    def test_flow_value_overrides_when_not_null(self) -> None:
+    def test_reads_the_flows_own_values(self) -> None:
         popup = self._popup(abandoned_cart_delay_days=42, allows_coupons=False)
         flow = self._flow(popup, abandoned_cart_delay_days=7, allows_coupons=True)
 
@@ -317,9 +312,20 @@ class TestBuildEffectiveConfig:
         assert config.abandoned_cart_delay_days == 7
         assert config.allows_coupons is True
 
-    def test_flow_false_boolean_overrides_popup_true(self) -> None:
-        """NULL vs False must not be conflated — explicit False on the flow
-        must win, not be treated as falsy-therefore-inherit."""
+    def test_the_popup_no_longer_shows_through(self) -> None:
+        """The removed inheritance: a popup value must not reappear when the
+        flow's own column is unset."""
+        popup = self._popup(abandoned_cart_delay_days=42, allows_coupons=True)
+        flow = self._flow(popup)
+
+        config = resolver.build_effective_config(flow, popup)
+
+        assert config.abandoned_cart_delay_days is None
+        assert config.allows_coupons is None
+
+    def test_false_is_a_value_not_an_absence(self) -> None:
+        """NULL vs False must not be conflated: an explicit False stays
+        False rather than being read as unset."""
         popup = self._popup(requires_application_fee=True)
         flow = self._flow(popup, requires_application_fee=False)
 
@@ -327,7 +333,7 @@ class TestBuildEffectiveConfig:
 
         assert config.requires_application_fee is False
 
-    def test_flow_zero_int_overrides_popup_nonzero(self) -> None:
+    def test_zero_is_a_value_not_an_absence(self) -> None:
         popup = self._popup(abandoned_cart_max_count=5)
         flow = self._flow(popup, abandoned_cart_max_count=0)
 

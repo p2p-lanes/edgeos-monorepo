@@ -144,20 +144,23 @@ def resolve_active_direct_flow(
     return popup.slug, flow.slug
 
 
-def build_effective_config(flow: SalesFlows, popup: Popups) -> EffectiveFlowConfig:
-    """Resolve every Class B (inheritable override) column: the flow's own
-    value when not NULL, else the popup's (design D1/D2).
+def build_effective_config(
+    flow: SalesFlows,
+    popup: Popups | None = None,  # noqa: ARG001 — kept so existing call sites still work
+) -> EffectiveFlowConfig:
+    """The flow's channel configuration.
 
-    Pure function — no I/O, no session. `flow`/`popup` may be transient
-    (unpersisted) objects, which is what keeps this table-driven unit
+    A flow owns these columns since sdd/sales-flows-rediseno slice 7: they
+    are seeded from the popup when the flow is created and never read
+    through to it afterwards, so editing one flow cannot change another.
+
+    `popup` is accepted and ignored, so the call sites that still pass it
+    keep working; it goes away with the popup columns themselves.
+
+    Pure function — no I/O, no session. `flow` may be a transient
+    (unpersisted) object, which is what keeps this table-driven unit
     testable without a database.
     """
-    resolved = {
-        name: (
-            flow_value
-            if (flow_value := getattr(flow, name)) is not None
-            else getattr(popup, name)
-        )
-        for name in EFFECTIVE_CONFIG_FIELDS
-    }
-    return EffectiveFlowConfig(**resolved)
+    return EffectiveFlowConfig(
+        **{name: getattr(flow, name) for name in EFFECTIVE_CONFIG_FIELDS}
+    )

@@ -276,13 +276,14 @@ EFFECTIVE_CONFIG_FIELDS: tuple[str, ...] = (
 
 
 class EffectiveFlowConfig(BaseModel):
-    """Read-through view of every Class B (inheritable override) column.
+    """A flow's own channel configuration.
 
-    Design: sdd/sales-flows D2/D1. NULL on the flow means "inherit the
-    popup column of the same name" — this model already carries the
-    RESOLVED value, never NULL for a field that's non-nullable on
-    PopupBase (both operands can't be NULL: the popup column always has a
-    concrete value).
+    Since sdd/sales-flows-rediseno slice 7 these columns belong to the
+    flow: seeded from the popup when the flow is created, read straight
+    from the flow afterwards. Every field is optional because a flow really
+    can have none set — a transient flow in a test, or one created through
+    a path that predates the seeding. Saying so here is what stops a
+    missing value being quietly replaced by someone else's.
 
     Slice 9 decision (design's "Open Questions" left this shape open):
     this is a **sibling** object, never merged into `PopupPublic`. It is
@@ -295,11 +296,11 @@ class EffectiveFlowConfig(BaseModel):
     this slice is actually chartered to deliver.
     """
 
-    application_layout: ApplicationLayout
-    requires_application_fee: bool
+    application_layout: ApplicationLayout | None = None
+    requires_application_fee: bool | None = None
     application_fee_amount: Decimal | None = None
-    allows_scholarship: bool
-    allows_incentive: bool
+    allows_scholarship: bool | None = None
+    allows_incentive: bool | None = None
     allows_coupons: bool | None = None
     open_checkout_success_url: str | None = None
     open_checkout_cancel_url: str | None = None

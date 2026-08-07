@@ -83,6 +83,12 @@ def _make_flow(
     type: str = SaleType.direct.value,  # noqa: A002
     allows_coupons: bool | None = None,
 ) -> SalesFlows:
+    # A flow built directly here skips the copy `create` performs, and an
+    # unset coupon setting means "no coupons" since slice 7 — so mirror what
+    # creation would have done unless the test says otherwise.
+    if allows_coupons is None:
+        allows_coupons = popup.allows_coupons
+
     flow = SalesFlows(
         tenant_id=popup.tenant_id,
         popup_id=popup.id,
@@ -115,25 +121,27 @@ def _make_coupon(db: Session, popup: Popups, *, code: str = "FLOWTEST") -> Coupo
 
 
 class TestValidateCouponInheritance:
-    def test_default_flow_null_override_inherits_popup_true(
+    def test_a_new_flow_starts_from_the_popups_setting(
         self, db: Session, tenant_a: Tenants
     ) -> None:
-        """G5: NULL flow override -> byte-identical to the pre-slice-11
-        popup-only check when the popup allows coupons."""
+        """Provisioning copies the popup's coupon setting into the flow
+        (slice 7), so the day it is created nothing changes for a buyer."""
         popup = _make_popup(db, tenant_a, allows_coupons=True)
         default_flow = _provision_flow_returning(db, popup, tenant_a)
         _make_coupon(db, popup, code="INHERITOK")
         db.commit()
-        assert default_flow.allows_coupons is None
+        assert default_flow.allows_coupons is True, (
+            "the copy happens at creation, not as a read-through"
+        )
 
         coupon = coupon_crud.coupons_crud.validate_coupon(db, "INHERITOK", popup.id)
         assert coupon.code == "INHERITOK"
 
-    def test_default_flow_null_override_inherits_popup_false(
+    def test_a_new_flow_copies_a_disallowing_popup_too(
         self, db: Session, tenant_a: Tenants
     ) -> None:
-        """G5, the other direction: NULL flow override + popup disallows ->
-        still rejected, unchanged from pre-slice-11 behavior."""
+        """The other direction: a flow copied from a popup that disallows
+        coupons still rejects them."""
         popup = _make_popup(db, tenant_a, allows_coupons=False)
         _provision_flow_returning(db, popup, tenant_a)
         _make_coupon(db, popup, code="INHERITBAD")

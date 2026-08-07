@@ -111,7 +111,8 @@ def _seed_popup_template(
     point is to seed an UNOWNED row and watch the backfill claim it. Steps
     went NOT NULL in slice 2, the form tables in slice 3 and approval
     strategies in slice 6. `popupreviewers` is not a candidate either: the
-    backfill deliberately leaves it alone (see `b6a4c9e05f21`).
+    backfill deliberately leaves it alone, because its inheritance is
+    driven by `reviewers_mode` rather than by an absent row.
     """
     template_id = uuid.uuid4()
     db.exec(
@@ -143,7 +144,6 @@ def _flow_of_template(db: Session, template_id: uuid.UUID):
 def _cleanup(db: Session, popup_id: uuid.UUID) -> None:
     for stmt in (
         "DELETE FROM ticketingsteps WHERE popup_id = :id",
-        "DELETE FROM email_templates WHERE popup_id = :id",
         "DELETE FROM email_templates WHERE popup_id = :id",
         "DELETE FROM sales_flows WHERE popup_id = :id",
         "DELETE FROM popups WHERE id = :id",

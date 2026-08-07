@@ -1,5 +1,5 @@
 import { useForm } from "@tanstack/react-form"
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { useNavigate } from "@tanstack/react-router"
 import {
   Hash,
@@ -14,7 +14,6 @@ import { useState } from "react"
 import {
   type ApiError,
   type PopupAdmin,
-  PopupsService,
   type SalesFlowCreate,
   type SalesFlowPublic,
   SalesFlowsService,
@@ -23,9 +22,9 @@ import {
 import { DangerZone } from "@/components/Common/DangerZone"
 import { FieldError } from "@/components/Common/FieldError"
 import {
-  type OverrideFieldKind,
-  OverrideFieldRow,
-} from "@/components/forms/OverrideFieldRow"
+  type ConfigFieldKind,
+  ConfigFieldRow,
+} from "@/components/forms/ConfigFieldRow"
 import { RestrictionRuleEditor } from "@/components/forms/RestrictionRuleEditor"
 import { SalesFlowVisibilityNote } from "@/components/forms/SalesFlowVisibilityNote"
 import { Button } from "@/components/ui/button"
@@ -52,25 +51,20 @@ import {
   useUnsavedChanges,
 } from "@/hooks/useUnsavedChanges"
 import {
-  getOverrideMode,
-  type OverrideMode,
-  resolveOverrideValue,
-} from "@/lib/salesFlowOverrides"
-import {
   draftsToRestrictionRule,
   parseRestrictionRuleToDrafts,
 } from "@/lib/salesFlowRestrictionRule"
 import { createErrorHandler } from "@/utils"
 
-interface OverrideFieldConfig {
+interface ConfigFieldConfig {
   key: keyof SalesFlowCreate & keyof PopupAdmin
   label: string
   description?: string
-  kind: OverrideFieldKind
+  kind: ConfigFieldKind
   options?: { value: string; label: string }[]
 }
 
-const OVERRIDE_SECTIONS: { title: string; fields: OverrideFieldConfig[] }[] = [
+const CONFIG_SECTIONS: { title: string; fields: ConfigFieldConfig[] }[] = [
   {
     title: "Application Settings",
     fields: [
@@ -170,44 +164,21 @@ const OVERRIDE_SECTIONS: { title: string; fields: OverrideFieldConfig[] }[] = [
   },
 ]
 
-const OVERRIDE_FIELDS = OVERRIDE_SECTIONS.flatMap((section) => section.fields)
+const CONFIG_FIELDS = CONFIG_SECTIONS.flatMap((section) => section.fields)
 
-interface OverrideDraft {
-  mode: OverrideMode
-  value: string
-}
-
-function draftFromRaw(
-  kind: OverrideFieldKind,
+function rawToInput(
+  kind: ConfigFieldKind,
   raw: string | number | boolean | null | undefined,
-): OverrideDraft {
-  const mode = getOverrideMode(raw)
-  if (mode === "inherit") {
-    return { mode, value: kind === "boolean" ? "false" : "" }
-  }
-  return { mode, value: String(raw) }
-}
-
-/**
- * Value to seed the draft with when a field switches from inherit to
- * override: the popup's current value, so the control starts in sync with
- * what the flow was already inheriting instead of silently resetting to a
- * falsy default (booleans in particular must seed from the popup's actual
- * true/false, not always false).
- */
-function seedDraftValue(
-  kind: OverrideFieldKind,
-  popupValue: string | number | boolean | null | undefined,
 ): string {
-  if (popupValue === null || popupValue === undefined) {
+  if (raw === null || raw === undefined) {
     return kind === "boolean" ? "false" : ""
   }
-  if (kind === "boolean") return String(Boolean(popupValue))
-  return String(popupValue)
+  if (kind === "boolean") return String(Boolean(raw))
+  return String(raw)
 }
 
 function parseDraftValue(
-  kind: OverrideFieldKind,
+  kind: ConfigFieldKind,
   draft: string,
 ): string | number | boolean | null {
   if (kind === "boolean") return draft === "true"
@@ -216,13 +187,18 @@ function parseDraftValue(
   return draft
 }
 
-function buildInitialOverrides(
+/**
+ * The flow's own values. There is no inherited value to fall back to since
+ * sdd/sales-flows-rediseno slice 7 — creating a flow copies the popup's
+ * configuration into it, so what the form shows is what the flow stores.
+ */
+function buildInitialConfig(
   defaultValues?: SalesFlowPublic,
-): Record<string, OverrideDraft> {
+): Record<string, string> {
   return Object.fromEntries(
-    OVERRIDE_FIELDS.map((field) => [
+    CONFIG_FIELDS.map((field) => [
       field.key,
-      draftFromRaw(
+      rawToInput(
         field.kind,
         defaultValues?.[field.key as keyof SalesFlowPublic] as never,
       ),
@@ -266,11 +242,6 @@ export function SalesFlowForm({
   const isEdit = !!defaultValues
   const readOnly = !isOperatorOrAbove
   const [restrictionRuleError, setRestrictionRuleError] = useState<string>()
-
-  const { data: popup } = useQuery({
-    queryKey: ["popups", popupId],
-    queryFn: () => PopupsService.getPopup({ popupId }),
-  })
 
   const handleMutationError = (err: ApiError) => {
     setRestrictionRuleError(extractRestrictionRuleError(err))
@@ -329,7 +300,7 @@ export function SalesFlowForm({
       order: defaultValues?.order?.toString() ?? "0",
       reviewers_mode: defaultValues?.reviewers_mode ?? "inherit",
       identity_mode: defaultValues?.identity_mode ?? "portal_auth",
-      overrides: buildInitialOverrides(defaultValues),
+      config: buildInitialConfig(defaultValues),
       restrictionRule: parseRestrictionRuleToDrafts(
         defaultValues?.restriction_rule ?? null,
       ),
@@ -337,17 +308,11 @@ export function SalesFlowForm({
     onSubmit: ({ value }) => {
       if (readOnly) return
       setRestrictionRuleError(undefined)
-      const overridePayload = Object.fromEntries(
-        OVERRIDE_FIELDS.map((field) => {
-          const draft = value.overrides[field.key]
-          return [
-            field.key,
-            resolveOverrideValue(
-              draft.mode,
-              parseDraftValue(field.kind, draft.value),
-            ),
-          ]
-        }),
+      const configPayload = Object.fromEntries(
+        CONFIG_FIELDS.map((field) => [
+          field.key,
+          parseDraftValue(field.kind, value.config[field.key]),
+        ]),
       )
       const basePayload = {
         slug: value.slug,
@@ -364,7 +329,7 @@ export function SalesFlowForm({
               value.restrictionRule.combinator,
               value.restrictionRule.leaves,
             ),
-        ...overridePayload,
+        ...configPayload,
       }
       if (isEdit) {
         updateMutation.mutate(basePayload)
@@ -597,44 +562,29 @@ export function SalesFlowForm({
           </form.Field>
         </InlineSection>
 
-        {OVERRIDE_SECTIONS.map((section) => (
+        {CONFIG_SECTIONS.map((section) => (
           <div key={section.title}>
             <Separator />
             <InlineSection title={section.title}>
               {section.fields.map((fieldConfig) => (
                 <form.Field
                   key={fieldConfig.key}
-                  name={`overrides.${fieldConfig.key}` as "overrides"}
+                  name={`config.${fieldConfig.key}` as "config"}
                 >
-                  {(field) => {
-                    const draft = field.state.value as unknown as OverrideDraft
-                    const popupValue = popup?.[fieldConfig.key] as never
-                    return (
-                      <OverrideFieldRow
-                        fieldKey={fieldConfig.key}
-                        label={fieldConfig.label}
-                        description={fieldConfig.description}
-                        kind={fieldConfig.kind}
-                        options={fieldConfig.options}
-                        popupValue={popupValue}
-                        mode={draft.mode}
-                        value={draft.value}
-                        onModeChange={(mode) =>
-                          field.handleChange({
-                            mode,
-                            value:
-                              mode === "override"
-                                ? seedDraftValue(fieldConfig.kind, popupValue)
-                                : draft.value,
-                          } as never)
-                        }
-                        onValueChange={(value) =>
-                          field.handleChange({ ...draft, value } as never)
-                        }
-                        readOnly={readOnly}
-                      />
-                    )
-                  }}
+                  {(field) => (
+                    <ConfigFieldRow
+                      fieldKey={fieldConfig.key}
+                      label={fieldConfig.label}
+                      description={fieldConfig.description}
+                      kind={fieldConfig.kind}
+                      options={fieldConfig.options}
+                      value={field.state.value as unknown as string}
+                      onValueChange={(value) =>
+                        field.handleChange(value as never)
+                      }
+                      readOnly={readOnly}
+                    />
+                  )}
                 </form.Field>
               ))}
             </InlineSection>

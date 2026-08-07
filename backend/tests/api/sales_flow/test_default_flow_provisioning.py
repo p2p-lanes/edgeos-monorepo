@@ -49,13 +49,15 @@ class TestPopupCreateProvisionsDefaultFlow:
         assert flow.visibility == "portal_listed"
         assert flow.reviewers_mode == "inherit"
 
-        # Class B (inheritable override) columns stay NULL (D1) — the popup
-        # row remains the single source of truth until a later cutover slice.
-        assert flow.application_layout is None
-        assert flow.requires_application_fee is None
-        assert flow.allows_coupons is None
-        assert flow.abandoned_cart_delay_days is None
-        assert flow.open_checkout_signing_secret is None
+        # The flow takes its own copy of the popup's channel configuration
+        # (slice 7), so it starts offering exactly what the popup offered and
+        # diverges from there rather than reading through.
+        from app.api.popup.models import Popups
+
+        popup = db.get(Popups, popup_id)
+        assert flow.application_layout == popup.application_layout
+        assert flow.allows_coupons == popup.allows_coupons
+        assert flow.allows_scholarship == popup.allows_scholarship
 
     def test_create_popup_default_flow_type_mirrors_sale_type_application(
         self,

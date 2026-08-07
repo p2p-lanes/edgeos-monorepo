@@ -873,7 +873,7 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
                       <DollarSign className="h-4 w-4 text-muted-foreground" />
                     }
                     label="Require Application Fee"
-                    description="Applicants must pay a refundable fee before their application is reviewed"
+                    description="Applicants must pay a refundable fee before their application is reviewed Sets the default for new sales flows; flows that already exist keep their own value."
                   >
                     <Switch
                       id="requires_application_fee"
@@ -900,7 +900,7 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
                             <DollarSign className="h-4 w-4 text-muted-foreground" />
                           }
                           label={`Fee Amount (${currency})`}
-                          description={`Amount in ${currency} that applicants must pay`}
+                          description={`Amount in ${currency} that applicants must pay. Sets the default for new sales flows; flows that already exist keep their own value.`}
                         >
                           <Input
                             id="application_fee_amount"
@@ -981,7 +981,7 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
                       <LinkIcon className="h-4 w-4 text-muted-foreground" />
                     }
                     label="Open checkout success URL"
-                    description="Where the buyer is redirected after a successful open-checkout payment. Defaults to the portal thank-you page."
+                    description="Where the buyer is redirected after a successful open-checkout payment. Defaults to the portal thank-you page. Sets the default for new sales flows; flows that already exist keep their own value."
                   >
                     <Input
                       id="open_checkout_success_url"
@@ -1002,7 +1002,7 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
                       <LinkIcon className="h-4 w-4 text-muted-foreground" />
                     }
                     label="Open checkout cancel URL"
-                    description="Where the buyer is redirected after a cancelled open-checkout payment. Defaults to the portal checkout page."
+                    description="Where the buyer is redirected after a cancelled open-checkout payment. Defaults to the portal checkout page. Sets the default for new sales flows; flows that already exist keep their own value."
                   >
                     <Input
                       id="open_checkout_cancel_url"
@@ -1021,7 +1021,7 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
                   <InlineRow
                     icon={<Key className="h-4 w-4 text-muted-foreground" />}
                     label="Open checkout signing secret"
-                    description="Shared secret to HMAC-sign the order data sent to the success URL. Set the same value on the external thank-you page to verify it. Leave empty to send the redirect without a signed payload."
+                    description="Shared secret to HMAC-sign the order data sent to the success URL. Set the same value on the external thank-you page to verify it. Leave empty to send the redirect without a signed payload. Sets the default for new sales flows; flows that already exist keep their own value."
                   >
                     <Input
                       id="open_checkout_signing_secret"
@@ -1500,7 +1500,7 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
                   <InlineRow
                     icon={<Ticket className="h-4 w-4 text-muted-foreground" />}
                     label="Discount Coupons"
-                    description="Enable discount coupons for this gathering"
+                    description="Enable discount coupons for this gathering Sets the default for new sales flows; flows that already exist keep their own value."
                   >
                     <Switch
                       id="allows_coupons"
@@ -1519,7 +1519,7 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
                       <GraduationCap className="h-4 w-4 text-muted-foreground" />
                     }
                     label="Scholarship Requests"
-                    description="Allow applicants to request financial assistance"
+                    description="Allow applicants to request financial assistance Sets the default for new sales flows; flows that already exist keep their own value."
                   >
                     <Switch
                       id="allows_scholarship"
@@ -1543,7 +1543,7 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
                             <DollarSign className="h-4 w-4 text-muted-foreground" />
                           }
                           label="Cash Incentives"
-                          description="Allow assigning a cash grant alongside scholarship approval"
+                          description="Allow assigning a cash grant alongside scholarship approval Sets the default for new sales flows; flows that already exist keep their own value."
                         >
                           <Switch
                             id="allows_incentive"
@@ -1631,7 +1631,7 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
                   <ShoppingCart className="h-4 w-4 text-muted-foreground" />
                 }
                 label="Abandoned Cart"
-                description="Email buyers who did not complete their purchase"
+                description="Email buyers who did not complete their purchase. Sets the default for new sales flows; flows that already exist keep their own value."
               >
                 <div className="flex flex-col items-end gap-2">
                   <div className="flex items-center gap-3">
@@ -1754,7 +1754,7 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
                           <CreditCard className="h-4 w-4 text-muted-foreground" />
                         }
                         label="Purchase Reminder"
-                        description="Email accepted applicants who have not purchased yet"
+                        description="Email accepted applicants who have not purchased yet. Sets the default for new sales flows; flows that already exist keep their own value."
                       >
                         <div className="flex flex-col items-end gap-2">
                           <div className="flex items-center gap-3">
@@ -1889,7 +1889,7 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
                           <FileText className="h-4 w-4 text-muted-foreground" />
                         }
                         label="Abandoned Application"
-                        description="Email applicants whose application is still in draft, counted from their last edit"
+                        description="Email applicants whose application is still in draft, counted from their last edit. Sets the default for new sales flows; flows that already exist keep their own value."
                       >
                         <div className="flex flex-col items-end gap-2">
                           <div className="flex items-center gap-3">

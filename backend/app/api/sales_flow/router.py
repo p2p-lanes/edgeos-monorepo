@@ -137,6 +137,8 @@ async def create_sales_flow(
         )
 
     try:
+        # `create` copies the popup's channel configuration into anything
+        # the caller left unset (sdd/sales-flows-rediseno slice 7).
         flow = crud.sales_flows_crud.create(db, flow_in, tenant_id=popup.tenant_id)
     except IntegrityError as exc:
         db.rollback()
