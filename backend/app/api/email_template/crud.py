@@ -100,6 +100,27 @@ class EmailTemplateCRUD(
         )
         return session.exec(statement).first()
 
+    def get_active_popup_template(
+        self, session: Session, popup_id: uuid.UUID, template_type: str
+    ) -> EmailTemplates | None:
+        """This popup's template, or None.
+
+        Owns the mails a gathering sends regardless of how anyone bought —
+        event invitations, schedule changes, the check-in pass. Those have
+        no sales flow at send time, which is why slice 6 deleting this tier
+        stopped them resolving anything (sdd/sales-flows-rediseno).
+
+        Scoped to `sales_flow_id IS NULL` so a flow-tier row of the same
+        type can never answer for the popup tier.
+        """
+        statement = select(EmailTemplates).where(
+            EmailTemplates.popup_id == popup_id,
+            EmailTemplates.sales_flow_id == None,  # noqa: E711
+            EmailTemplates.template_type == template_type,
+            EmailTemplates.is_active == True,  # noqa: E712
+        )
+        return session.exec(statement).first()
+
     def get_active_tenant_template(
         self, session: Session, tenant_id: uuid.UUID, template_type: str
     ) -> EmailTemplates | None:

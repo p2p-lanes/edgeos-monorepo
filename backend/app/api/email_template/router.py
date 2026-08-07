@@ -123,6 +123,23 @@ def _flow_scope_not_allowed_message(template_type: str) -> str:
     return f"The {template_label} template cannot be scoped to a sales flow"
 
 
+def _scope_needs_popup(template_scope: TemplateScope) -> bool:
+    """Both gathering-owned and flow-owned templates hang off a popup.
+
+    `ck_email_templates_scope` requires it, and so does every read path but
+    the tenant one.
+    """
+    return template_scope in (TemplateScope.POPUP, TemplateScope.FLOW)
+
+
+def _flow_required_message(template_type: str) -> str:
+    template_label = _get_template_label(template_type) or "email"
+    return (
+        f"The {template_label} template belongs to a sales flow. "
+        "Choose which flow this one is for."
+    )
+
+
 def _duplicate_template_message(
     template_type: str, template_scope: TemplateScope
 ) -> str:
@@ -179,10 +196,7 @@ async def preview_template(
             detail=_template_not_customizable_message(body.template_type),
         )
 
-    if (
-        get_template_scope(body.template_type) == TemplateScope.POPUP
-        and not body.popup_id
-    ):
+    if _scope_needs_popup(get_template_scope(body.template_type)) and not body.popup_id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=_template_scope_required_message(body.template_type),
@@ -254,10 +268,7 @@ async def send_test_email(
             detail=_template_not_customizable_message(body.template_type),
         )
 
-    if (
-        get_template_scope(body.template_type) == TemplateScope.POPUP
-        and not body.popup_id
-    ):
+    if _scope_needs_popup(get_template_scope(body.template_type)) and not body.popup_id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=_template_scope_required_message(body.template_type),
@@ -393,11 +404,19 @@ async def create_email_template(
 
     template_scope = get_template_scope(template_in.template_type)
 
-    if template_scope == TemplateScope.POPUP:
+    if _scope_needs_popup(template_scope):
         if not template_in.popup_id:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=_template_scope_required_message(template_in.template_type),
+            )
+
+        # A flow-owned template with no flow is a row the send path can
+        # never reach — the shape this whole repair exists to remove.
+        if template_scope == TemplateScope.FLOW and not template_in.sales_flow_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=_flow_required_message(template_in.template_type),
             )
 
         if template_in.sales_flow_id:

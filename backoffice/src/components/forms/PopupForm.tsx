@@ -1619,6 +1619,7 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
                     <Link
                       to="/email-templates/$type/edit"
                       params={{ type: "check_in_pass" }}
+                      search={{ flow: undefined }}
                       className="text-xs text-primary hover:underline"
                     >
                       Edit email template
@@ -1735,8 +1736,7 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
                   </div>
                   {cartReminderOn && (
                     <Link
-                      to="/email-templates/$type/edit"
-                      params={{ type: "abandoned_cart" }}
+                      to="/email-templates"
                       className="text-xs text-primary hover:underline"
                     >
                       Edit email template
@@ -1874,8 +1874,7 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
                           </div>
                           {purchaseReminderOn && (
                             <Link
-                              to="/email-templates/$type/edit"
-                              params={{ type: "purchase_reminder" }}
+                              to="/email-templates"
                               className="text-xs text-primary hover:underline"
                             >
                               Edit email template
@@ -2010,8 +2009,7 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
                           </div>
                           {applicationReminderOn && (
                             <Link
-                              to="/email-templates/$type/edit"
-                              params={{ type: "abandoned_application" }}
+                              to="/email-templates"
                               className="text-xs text-primary hover:underline"
                             >
                               Edit email template

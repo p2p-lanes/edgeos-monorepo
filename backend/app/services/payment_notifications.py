@@ -205,6 +205,7 @@ async def _send_payment_confirmed_email(payment, db_session=None) -> None:
         from_address=tenant.sender_email,
         from_name=tenant.sender_name,
         popup_id=popup.id,
+        sales_flow_id=payment.sales_flow_id,
         db_session=db_session,
         attachments=attachments,
     )

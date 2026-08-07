@@ -1,11 +1,12 @@
 import { useQuery } from "@tanstack/react-query"
 import { createFileRoute, Link } from "@tanstack/react-router"
 import { Pencil } from "lucide-react"
-import { Suspense } from "react"
+import { Suspense, useEffect, useState } from "react"
 
-import { EmailTemplatesService } from "@/client"
+import { EmailTemplatesService, SalesFlowsService } from "@/client"
 import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
+import { FlowScopePicker } from "@/components/EmailTemplates/FlowScopePicker"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -21,11 +22,29 @@ export const Route = createFileRoute("/_layout/email-templates/")({
 
 export function TemplateList() {
   const { selectedPopupId, effectiveTenantId } = useWorkspace()
+  const [flowId, setFlowId] = useState<string>()
 
   const { data: types } = useQuery({
     queryKey: ["email-template-types"],
     queryFn: () => EmailTemplatesService.listTemplateTypes(),
   })
+
+  const { data: flows } = useQuery({
+    queryKey: ["sales-flows", { popupId: selectedPopupId }],
+    queryFn: () =>
+      SalesFlowsService.listSalesFlows({
+        popupId: selectedPopupId!,
+        limit: 100,
+      }),
+    enabled: !!selectedPopupId,
+  })
+
+  // Land on the default flow so the page is never showing nobody's mails.
+  useEffect(() => {
+    if (flowId || !flows?.results?.length) return
+    const fallback = flows.results.find((f) => f.is_default) ?? flows.results[0]
+    setFlowId(fallback.id)
+  }, [flows, flowId])
 
   const { data: tenantTemplates } = useQuery({
     queryKey: ["email-templates", "tenant", effectiveTenantId],
@@ -44,8 +63,17 @@ export function TemplateList() {
   const tenantCustomByType = new Map(
     tenantTemplates?.results?.map((t) => [t.template_type, t]) ?? [],
   )
+  // Split by tier: a row carrying a flow answers only for that flow, and a
+  // row without one answers only for the gathering. Reading either through
+  // the other is the mix-up this page used to show.
+  const popupRows = popupTemplates?.results ?? []
   const popupCustomByType = new Map(
-    popupTemplates?.results?.map((t) => [t.template_type, t]) ?? [],
+    popupRows.filter((t) => !t.sales_flow_id).map((t) => [t.template_type, t]),
+  )
+  const flowCustomByType = new Map(
+    popupRows
+      .filter((t) => t.sales_flow_id === flowId)
+      .map((t) => [t.template_type, t]),
   )
 
   // Group by category, preserving the backend metadata order.
@@ -63,6 +91,13 @@ export function TemplateList() {
 
   return (
     <div className="space-y-6">
+      {selectedPopupId && (
+        <FlowScopePicker
+          popupId={selectedPopupId}
+          value={flowId}
+          onChange={setFlowId}
+        />
+      )}
       {categories.map((category) => (
         <div key={category} className="space-y-1">
           <h3 className="px-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">
@@ -70,13 +105,18 @@ export function TemplateList() {
           </h3>
           <div className="divide-y rounded-md border">
             {(byCategory.get(category) ?? []).map((tmpl) => {
-              const requiresPopup = tmpl.scope === "popup"
+              const isFlowScoped = tmpl.scope === "flow"
+              const requiresPopup = isFlowScoped || tmpl.scope === "popup"
               // Without a gathering selected we cannot know whether a
-              // popup-scoped template is customized, so show no badge.
-              const customUnknown = requiresPopup && !selectedPopupId
-              const custom = requiresPopup
-                ? popupCustomByType.get(tmpl.type)
-                : tenantCustomByType.get(tmpl.type)
+              // gathering-scoped template is customized, so show no badge.
+              // Same for a flow-scoped one before a flow is chosen.
+              const customUnknown =
+                (requiresPopup && !selectedPopupId) || (isFlowScoped && !flowId)
+              const custom = isFlowScoped
+                ? flowCustomByType.get(tmpl.type)
+                : requiresPopup
+                  ? popupCustomByType.get(tmpl.type)
+                  : tenantCustomByType.get(tmpl.type)
               return (
                 <div
                   key={tmpl.type}
@@ -118,6 +158,7 @@ export function TemplateList() {
                         <Link
                           to="/email-templates/$type/edit"
                           params={{ type: tmpl.type }}
+                          search={{ flow: isFlowScoped ? flowId : undefined }}
                         >
                           <Pencil className="mr-1.5 h-3.5 w-3.5" />
                           Edit

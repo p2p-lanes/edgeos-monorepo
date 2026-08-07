@@ -84,7 +84,7 @@ describe("FlowEmailTemplatesSection", () => {
     expect(screen.queryByText("Login Code")).not.toBeInTheDocument()
   })
 
-  it("shows 'Flow override' badge only for a row scoped to this flow", async () => {
+  it("shows 'Custom' only for a row scoped to this flow", async () => {
     mockListEmailTemplates.mockResolvedValue({
       results: [
         {
@@ -107,10 +107,10 @@ describe("FlowEmailTemplatesSection", () => {
       </Wrapper>,
     )
 
-    expect(await screen.findByText("Flow override")).toBeInTheDocument()
+    expect(await screen.findByText("Custom")).toBeInTheDocument()
   })
 
-  it("shows 'Inherited from event' when the custom row belongs to a different flow", async () => {
+  it("shows 'Built-in template' when the custom row belongs to a different flow", async () => {
     mockListEmailTemplates.mockResolvedValue({
       results: [
         {
@@ -133,7 +133,7 @@ describe("FlowEmailTemplatesSection", () => {
       </Wrapper>,
     )
 
-    expect(await screen.findByText("Inherited from event")).toBeInTheDocument()
+    expect(await screen.findByText("Built-in template")).toBeInTheDocument()
   })
 
   it("opens the editor for a template type on Edit click", async () => {

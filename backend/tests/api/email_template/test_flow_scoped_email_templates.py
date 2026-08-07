@@ -114,46 +114,81 @@ def test_flow_scope_rejected_for_tenant_scoped_template_type(
     assert "cannot be scoped to a sales flow" in response.json()["detail"]
 
 
-def test_flow_tier_and_popup_shared_tier_coexist(
+def test_a_flow_owned_type_refuses_a_popup_tier_row(
+    client, db: Session, tenant_a: Tenants, admin_token_tenant_a: str
+) -> None:
+    """A sale mail belongs to the flow that made the sale
+    (sdd/sales-flows-rediseno). Written without one it would sit in a tier
+    the send path never reads, which is the failure this repair removes.
+    """
+    popup = _make_popup(db, tenant_a)
+
+    response = client.post(
+        "/api/v1/email-templates",
+        headers=_admin_headers(admin_token_tenant_a),
+        json={
+            "popup_id": str(popup.id),
+            "template_type": "application_received",
+            "subject": "No flow",
+            "html_content": "<p>No flow</p>",
+        },
+    )
+
+    assert response.status_code == 400
+    assert "belongs to a sales flow" in response.json()["detail"]
+
+
+def test_two_flows_each_hold_their_own_copy(
     client, db: Session, tenant_a: Tenants, admin_token_tenant_a: str
 ) -> None:
     popup = _make_popup(db, tenant_a)
-    flow = _make_flow(db, tenant_a, popup, slug="flow-b")
+    flow_b = _make_flow(db, tenant_a, popup, slug="flow-b")
+    flow_c = _make_flow(db, tenant_a, popup, slug="flow-c")
 
-    popup_response = client.post(
+    for flow, wording in ((flow_b, "Warm"), (flow_c, "Brisk")):
+        response = client.post(
+            "/api/v1/email-templates",
+            headers=_admin_headers(admin_token_tenant_a),
+            json={
+                "popup_id": str(popup.id),
+                "sales_flow_id": str(flow.id),
+                "template_type": "application_received",
+                "subject": wording,
+                "html_content": f"<p>{wording}</p>",
+            },
+        )
+        assert response.status_code == 201, response.text
+
+    duplicate = client.post(
         "/api/v1/email-templates",
         headers=_admin_headers(admin_token_tenant_a),
         json={
             "popup_id": str(popup.id),
-            "template_type": "application_received",
-            "subject": "Popup subject",
-            "html_content": "<p>Popup content</p>",
-        },
-    )
-    assert popup_response.status_code == 201
-
-    flow_response = client.post(
-        "/api/v1/email-templates",
-        headers=_admin_headers(admin_token_tenant_a),
-        json={
-            "popup_id": str(popup.id),
-            "sales_flow_id": str(flow.id),
-            "template_type": "application_received",
-            "subject": "Flow subject",
-            "html_content": "<p>Flow content</p>",
-        },
-    )
-    assert flow_response.status_code == 201
-
-    duplicate_flow_response = client.post(
-        "/api/v1/email-templates",
-        headers=_admin_headers(admin_token_tenant_a),
-        json={
-            "popup_id": str(popup.id),
-            "sales_flow_id": str(flow.id),
+            "sales_flow_id": str(flow_b.id),
             "template_type": "application_received",
             "subject": "Duplicate",
             "html_content": "<p>Duplicate</p>",
         },
     )
-    assert duplicate_flow_response.status_code == 400
+    assert duplicate.status_code == 400
+
+
+def test_a_gathering_owned_type_lives_on_the_popup(
+    client, db: Session, tenant_a: Tenants, admin_token_tenant_a: str
+) -> None:
+    """An event invitation reaches everyone who is going, whatever they
+    bought, so its sender has no flow to pass."""
+    popup = _make_popup(db, tenant_a)
+
+    response = client.post(
+        "/api/v1/email-templates",
+        headers=_admin_headers(admin_token_tenant_a),
+        json={
+            "popup_id": str(popup.id),
+            "template_type": "event_invitation",
+            "subject": "Come along",
+            "html_content": "<p>Come along</p>",
+        },
+    )
+
+    assert response.status_code == 201, response.text

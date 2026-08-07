@@ -1,4 +1,4 @@
-type TemplateScope = "tenant" | "popup"
+import type { TemplateScope } from "@/client"
 
 type ScopedTemplatePayloadArgs = {
   scope: TemplateScope
@@ -8,8 +8,12 @@ type ScopedTemplatePayloadArgs = {
   subject?: string
 }
 
+/**
+ * Both gathering-owned and flow-owned templates hang off a popup; only a
+ * tenant-owned one does not. Mirrors `_scope_needs_popup` on the API.
+ */
 export function requirePopupForTemplateScope(scope: TemplateScope): boolean {
-  return scope === "popup"
+  return scope === "popup" || scope === "flow"
 }
 
 function maybeAttachPopupId<T extends Record<string, unknown>>(

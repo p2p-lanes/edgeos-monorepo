@@ -21197,8 +21197,14 @@ export const TaskVisibilitySchema = {
 
 export const TemplateScopeSchema = {
     type: 'string',
-    enum: ['tenant', 'popup'],
-    title: 'TemplateScope'
+    enum: ['tenant', 'popup', 'flow'],
+    title: 'TemplateScope',
+    description: `Who owns a template, and therefore where the send path looks for it.
+
+Exactly one tier per type — a scope is not a chain
+(sdd/sales-flows-rediseno R1). FLOW covers the mails a sale produces,
+POPUP the ones a gathering produces regardless of how anyone bought,
+and TENANT the ones that belong to no gathering at all.`
 } as const;
 
 export const TemplateTypeInfoSchema = {

@@ -4336,7 +4336,15 @@ export type TaskUpdate = {
 
 export type TaskVisibility = 'universal' | 'tenant' | 'internal';
 
-export type TemplateScope = 'tenant' | 'popup';
+/**
+ * Who owns a template, and therefore where the send path looks for it.
+ *
+ * Exactly one tier per type — a scope is not a chain
+ * (sdd/sales-flows-rediseno R1). FLOW covers the mails a sale produces,
+ * POPUP the ones a gathering produces regardless of how anyone bought,
+ * and TENANT the ones that belong to no gathering at all.
+ */
+export type TemplateScope = 'tenant' | 'popup' | 'flow';
 
 export type TemplateTypeInfo = {
     type: string;

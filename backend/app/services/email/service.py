@@ -16,7 +16,7 @@ from loguru import logger
 from premailer import transform
 from sqlmodel import Session
 
-from app.api.email_template.schemas import EmailTemplateType
+from app.api.email_template.schemas import EmailTemplateType, TemplateScope
 from app.core.config import settings
 from app.services.email.templates import (
     TEMPLATE_TYPE_TO_FILE,
@@ -214,20 +214,27 @@ class EmailService:
     ) -> tuple[str, str | None]:
         """Render email using DB-stored custom template or file-based fallback.
 
-        Three-tier resolution (sdd/sales-flows slice 10, design's
-        "flow -> popup -> tenant"): a flow-scoped custom template is tried
-        first when `sales_flow_id` is given; an inactive or missing
-        flow-tier row falls through to the popup tier, which falls through
-        to the tenant/file tier exactly as it did before this slice.
+        Every type has exactly ONE tier that owns it, decided by
+        `get_template_scope` — there is no chain between tiers. Mails a
+        sale produces belong to the flow that made the sale; mails a
+        gathering produces belong to the gathering; login codes belong to
+        the tenant. A missing row in the owning tier means the template
+        shipped with the product, and never someone else's customization.
 
-        A custom template row that FAILS to render (bad
-        Jinja syntax, SSTI-sandbox violation, etc.) also falls through to
-        the next tier instead of raising and blocking the send outright — a
-        broken flow-tier override must never take down the popup/tenant
-        template or the underlying transactional email. The error is
-        logged with the offending template's id/scope so an operator can
-        find and fix it; the file tier is the final backstop and is
-        expected to always render.
+        Slice 6 collapsed the old flow -> popup -> tenant chain by deleting
+        the popup tier outright. That silently stopped 16 of 19
+        popup-scoped types resolving anything at all, because their senders
+        never had a `sales_flow_id` to give. The tier is back, but as the
+        owner of the types that genuinely have no flow rather than as a
+        fallback for the ones that do.
+
+        A custom template row that FAILS to render (bad Jinja syntax,
+        SSTI-sandbox violation, etc.) falls through to the shipped file
+        template instead of raising and blocking the send outright — a
+        broken customization must never take down the transactional email
+        itself. The error is logged with the offending template's id so an
+        operator can find and fix it; the file template is the final
+        backstop and is expected to always render.
 
         Returns:
             Tuple of (rendered_html, custom_subject_or_none)
@@ -235,45 +242,35 @@ class EmailService:
         template_type_enum = coerce_email_template_type(template_type)
         template_scope = get_template_scope(template_type_enum)
 
-        if db_session and template_scope == "popup" and sales_flow_id:
+        custom = None
+        if db_session:
             from app.api.email_template.crud import email_template_crud
 
-            custom = email_template_crud.get_active_flow_template(
-                db_session, sales_flow_id, template_type_enum.value
-            )
-            if custom:
-                try:
-                    return self._render_custom(custom, context)
-                except Exception:
-                    logger.error(
-                        "Flow-tier custom template {} failed to render, "
-                        "falling back to the next tier",
-                        custom.id,
-                    )
+            if template_scope == TemplateScope.FLOW and sales_flow_id:
+                custom = email_template_crud.get_active_flow_template(
+                    db_session, sales_flow_id, template_type_enum.value
+                )
+            elif template_scope == TemplateScope.POPUP and popup_id:
+                custom = email_template_crud.get_active_popup_template(
+                    db_session, popup_id, template_type_enum.value
+                )
+            elif template_scope == TemplateScope.TENANT and tenant_id:
+                custom = email_template_crud.get_active_tenant_template(
+                    db_session, tenant_id, template_type_enum.value
+                )
 
-        if db_session and template_scope == "tenant" and tenant_id:
-            from app.api.email_template.crud import email_template_crud
+        if custom:
+            try:
+                return self._render_custom(custom, context)
+            except Exception:
+                logger.error(
+                    "Custom template {} ({}) failed to render, "
+                    "falling back to the template shipped with the product",
+                    custom.id,
+                    template_scope,
+                )
 
-            custom = email_template_crud.get_active_tenant_template(
-                db_session, tenant_id, template_type_enum.value
-            )
-            if custom:
-                try:
-                    return self._render_custom(custom, context)
-                except Exception:
-                    logger.error(
-                        "Tenant-tier custom template {} failed to render, "
-                        "falling back to the next tier",
-                        custom.id,
-                    )
-
-        # The popup tier is gone (sdd/sales-flows-rediseno slice 6): a
-        # popup-scoped template belongs to one flow, so two application
-        # flows can word their acceptance email differently. A flow with no
-        # template of its own falls straight through to the shipped file,
-        # not to a sibling's copy.
-
-        # Fallback to file-based template
+        # Fallback to the template shipped with the product
         file_path = TEMPLATE_TYPE_TO_FILE.get(template_type_enum)
         if not file_path:
             raise ValueError(f"No file mapping for template type: {template_type_enum}")
@@ -772,6 +769,7 @@ class EmailService:
         from_address: str | None = None,
         from_name: str | None = None,
         popup_id: uuid.UUID | None = None,
+        sales_flow_id: uuid.UUID | None = None,
         tenant_id: uuid.UUID | None = None,
         db_session: Session | None = None,
     ) -> bool:
@@ -785,6 +783,7 @@ class EmailService:
             from_address=from_address,
             from_name=from_name,
             popup_id=popup_id,
+            sales_flow_id=sales_flow_id,
             db_session=db_session,
         )
 
@@ -796,6 +795,7 @@ class EmailService:
         from_address: str | None = None,
         from_name: str | None = None,
         popup_id: uuid.UUID | None = None,
+        sales_flow_id: uuid.UUID | None = None,
         db_session: Session | None = None,
     ) -> bool:
         """Send application accepted email."""
@@ -808,6 +808,7 @@ class EmailService:
             from_address=from_address,
             from_name=from_name,
             popup_id=popup_id,
+            sales_flow_id=sales_flow_id,
             db_session=db_session,
         )
 
@@ -819,6 +820,7 @@ class EmailService:
         from_address: str | None = None,
         from_name: str | None = None,
         popup_id: uuid.UUID | None = None,
+        sales_flow_id: uuid.UUID | None = None,
         db_session: Session | None = None,
     ) -> bool:
         """Send application rejected email."""
@@ -831,6 +833,7 @@ class EmailService:
             from_address=from_address,
             from_name=from_name,
             popup_id=popup_id,
+            sales_flow_id=sales_flow_id,
             db_session=db_session,
         )
 
@@ -842,6 +845,7 @@ class EmailService:
         from_address: str | None = None,
         from_name: str | None = None,
         popup_id: uuid.UUID | None = None,
+        sales_flow_id: uuid.UUID | None = None,
         db_session: Session | None = None,
     ) -> bool:
         """Send application accepted email with scholarship discount (no cash incentive)."""
@@ -854,6 +858,7 @@ class EmailService:
             from_address=from_address,
             from_name=from_name,
             popup_id=popup_id,
+            sales_flow_id=sales_flow_id,
             db_session=db_session,
         )
 
@@ -865,6 +870,7 @@ class EmailService:
         from_address: str | None = None,
         from_name: str | None = None,
         popup_id: uuid.UUID | None = None,
+        sales_flow_id: uuid.UUID | None = None,
         db_session: Session | None = None,
     ) -> bool:
         """Send application accepted email with scholarship discount and cash incentive grant."""
@@ -877,6 +883,7 @@ class EmailService:
             from_address=from_address,
             from_name=from_name,
             popup_id=popup_id,
+            sales_flow_id=sales_flow_id,
             db_session=db_session,
         )
 
@@ -888,6 +895,7 @@ class EmailService:
         from_address: str | None = None,
         from_name: str | None = None,
         popup_id: uuid.UUID | None = None,
+        sales_flow_id: uuid.UUID | None = None,
         db_session: Session | None = None,
     ) -> bool:
         """Send application accepted email when scholarship request was not approved."""
@@ -900,6 +908,7 @@ class EmailService:
             from_address=from_address,
             from_name=from_name,
             popup_id=popup_id,
+            sales_flow_id=sales_flow_id,
             db_session=db_session,
         )
 
@@ -911,6 +920,7 @@ class EmailService:
         from_address: str | None = None,
         from_name: str | None = None,
         popup_id: uuid.UUID | None = None,
+        sales_flow_id: uuid.UUID | None = None,
         db_session: Session | None = None,
         attachments: list[EmailAttachment] | None = None,
     ) -> bool:
@@ -924,6 +934,7 @@ class EmailService:
             from_address=from_address,
             from_name=from_name,
             popup_id=popup_id,
+            sales_flow_id=sales_flow_id,
             db_session=db_session,
             attachments=attachments,
         )
@@ -1035,6 +1046,7 @@ class EmailService:
         from_address: str | None = None,
         from_name: str | None = None,
         popup_id: uuid.UUID | None = None,
+        sales_flow_id: uuid.UUID | None = None,
         db_session: Session | None = None,
     ) -> bool:
         """Send pass modification confirmed email."""
@@ -1047,6 +1059,7 @@ class EmailService:
             from_address=from_address,
             from_name=from_name,
             popup_id=popup_id,
+            sales_flow_id=sales_flow_id,
             db_session=db_session,
         )
 
@@ -1260,9 +1273,12 @@ class EmailService:
         """Send email using DB custom template if available, else file-based fallback."""
         try:
             enriched_context: Mapping[str, Any] = context
-            template_scope = get_template_scope(template_type)
 
-            if template_scope == "popup" and popup_id and db_session:
+            # Keyed on having a popup, not on who owns the template. A
+            # flow-scoped mail still needs the gathering's name and
+            # branding, and gating this on the scope would have quietly
+            # stripped that when the scopes split.
+            if popup_id and db_session:
                 enriched_context = _enrich_with_popup_data(
                     dict(context), popup_id, db_session
                 )

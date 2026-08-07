@@ -70,10 +70,18 @@ export function FlowEmailTemplatesSection({
                 <p className="truncate font-medium text-sm">{tmpl.label}</p>
               </div>
               <div className="flex shrink-0 items-center gap-2">
+                {/*
+                  A flow with no row of its own does NOT read the event's
+                  template. Since sdd/sales-flows slice 6 there is no popup
+                  tier for these: the mail renders from the one shipped with
+                  the product. "Inherited from event" said otherwise, and an
+                  operator who edited the event template to change this mail
+                  would have changed nothing.
+                */}
                 {custom ? (
-                  <Badge variant="default">Flow override</Badge>
+                  <Badge variant="default">Custom</Badge>
                 ) : (
-                  <Badge variant="secondary">Inherited from event</Badge>
+                  <Badge variant="secondary">Built-in template</Badge>
                 )}
                 <Button
                   variant="ghost"
