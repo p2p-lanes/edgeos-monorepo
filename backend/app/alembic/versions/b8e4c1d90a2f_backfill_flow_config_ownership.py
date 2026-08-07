@@ -31,11 +31,9 @@ flow produced this record), not configuration, and rewriting history would
 be a lie. Tenant-scoped `email_templates` rows (`popup_id IS NULL`) are
 skipped — they belong to no popup and therefore to no flow.
 
-`flow_products` is deliberately NOT backfilled, for the same reason
-`4a983282b8aa` gave: while "assigned to no flow" still means "available in
-every flow" (D3), writing explicit rows would make every product created
-afterwards invisible to the default flow. Assignment backfill and the
-removal of that rule ship together in slice 4, where one verifies the other.
+Which products a flow sells is not configuration and is not backfilled: it
+is derived from the flow's own ticketing steps
+(sdd/sales-flows-rediseno slice 4).
 
 Partial unique indexes: each affected table splits its uniqueness across a
 `sales_flow_id IS NULL` index and a `sales_flow_id IS NOT NULL` one. This

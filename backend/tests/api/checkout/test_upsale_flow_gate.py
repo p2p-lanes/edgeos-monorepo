@@ -330,8 +330,11 @@ class TestUpsalePurchaseGate:
 
 
 class TestFlowScopedProductPurchase:
-    """risk-001 bypass: a product assigned to a flow via flow_products must
-    not be purchasable through a different flow of the same popup.
+    """risk-001 bypass: a product one flow sells must not be purchasable
+    through a different flow of the same popup.
+
+    Which products a flow sells is derived from its ticketing steps
+    (sdd/sales-flows-rediseno slice 4).
 
     sdd/sales-flows slice 12: this check was relocated from an inline
     422 "not available" filter into `services/restrictions/enforcement.py`,

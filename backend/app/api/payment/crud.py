@@ -792,7 +792,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             # read-only check and must run BEFORE any side effect — before
             # humans_crud.find_or_create below, before the buyer/form
             # validation, and before the SUPERSEDE_PENDING_ENABLED machinery
-            # further down. Subsumes slice 13's inline flow_products EXISTS
+            # further down. Subsumes slice 13's inline product-assignment EXISTS
             # predicate (previously OR'd into the products_statement further
             # below, after find_or_create) into this properly-placed helper.
             from app.services.restrictions.context import build_context
@@ -847,7 +847,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         # Flow-scoped product restriction (design D3) is already enforced
         # above via `assert_products_allowed`, before any side effect — this
         # query only needs the ordinary active/in-popup/not-deleted validity
-        # gate now (sdd/sales-flows slice 12 subsumed the flow_products
+        # gate now (sdd/sales-flows slice 12 subsumed the product
         # membership check that used to live here, see above).
         product_ids = [line.product_id for line in obj.products]
         products_statement = select(Products).where(

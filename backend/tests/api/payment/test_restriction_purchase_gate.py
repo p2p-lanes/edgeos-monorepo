@@ -3,7 +3,7 @@ purchase call sites (design's call-site table): `create_open_ticketing_payment`
 (anonymous) and `create_payment` (authenticated).
 
 Placement is load-bearing (subsumes + relocates slice 13's inline
-flow_products check, per this slice's explicit mandate): enforcement must run
+product-assignment check, per this slice's explicit mandate): enforcement must run
 BEFORE any side effect — before `humans_crud.find_or_create` on the anonymous
 path, before `SUPERSEDE_PENDING_ENABLED`/the `FOR UPDATE` application lock on
 the authenticated path.

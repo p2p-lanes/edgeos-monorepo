@@ -6,7 +6,6 @@ from sqlmodel import Session, select
 from testcontainers.postgres import PostgresContainer
 
 from app.api.popup.models import Popups
-from app.api.product.models import Products
 from app.api.shared.enums import CredentialType
 from app.api.tenant.credential_models import TenantCredentials
 from app.api.tenant.models import Tenants
@@ -173,74 +172,3 @@ class TestSalesFlowsRLS:
                 "SELECT id FROM sales_flows WHERE id = %s", (str(flow_id),)
             ).fetchone()
         assert row is None
-
-
-class TestFlowProductsRLS:
-    """RLS coverage for the flow_products link table (task 1.7)."""
-
-    @pytest.fixture()
-    def product_tenant_a(self, db: Session, popup_tenant_a: Popups) -> Products:
-        suffix = uuid.uuid4().hex[:6]
-        product = Products(
-            tenant_id=popup_tenant_a.tenant_id,
-            popup_id=popup_tenant_a.id,
-            name=f"Product A {suffix}",
-            slug=f"product-a-{suffix}",
-            price=10,
-        )
-        db.add(product)
-        db.commit()
-        db.refresh(product)
-        return product
-
-    def test_tenant_role_can_insert_and_read_own_link(
-        self,
-        db: Session,
-        postgres_container: PostgresContainer,
-        tenant_a: Tenants,
-        sales_flow_tenant_a: uuid.UUID,
-        product_tenant_a: Products,
-    ) -> None:
-        """tenant_role can INSERT and SELECT its own tenant's flow_products row."""
-        dsn = _get_tenant_dsn(db, postgres_container, tenant_a.id, CredentialType.CRUD)
-        with psycopg.connect(dsn, autocommit=True) as conn:
-            conn.execute(
-                "INSERT INTO flow_products (tenant_id, flow_id, product_id) "
-                "VALUES (%s, %s, %s)",
-                (
-                    str(tenant_a.id),
-                    str(sales_flow_tenant_a),
-                    str(product_tenant_a.id),
-                ),
-            )
-            row = conn.execute(
-                "SELECT product_id FROM flow_products WHERE flow_id = %s",
-                (str(sales_flow_tenant_a),),
-            ).fetchone()
-        assert row is not None
-        assert row[0] == product_tenant_a.id
-
-    def test_tenant_viewer_role_cannot_insert(
-        self,
-        db: Session,
-        postgres_container: PostgresContainer,
-        tenant_a: Tenants,
-        sales_flow_tenant_a: uuid.UUID,
-        product_tenant_a: Products,
-    ) -> None:
-        """tenant_viewer_role has no INSERT grant on flow_products."""
-        dsn = _get_tenant_dsn(
-            db, postgres_container, tenant_a.id, CredentialType.READONLY
-        )
-        with psycopg.connect(dsn) as conn:
-            with pytest.raises(psycopg.errors.InsufficientPrivilege):
-                conn.execute(
-                    "INSERT INTO flow_products (tenant_id, flow_id, product_id) "
-                    "VALUES (%s, %s, %s)",
-                    (
-                        str(tenant_a.id),
-                        str(sales_flow_tenant_a),
-                        str(product_tenant_a.id),
-                    ),
-                )
-                conn.commit()

@@ -3,11 +3,10 @@
 Design: sdd/sales-flows D1 — creates exactly one default sales_flow per
 existing popup, with all Class B (inheritable override) columns left NULL
 so the popup row stays the single source of truth until each area's
-cutover slice re-points its read through the resolver (D1). No
-`flow_products` rows are backfilled: an empty product set for a flow means
-"all active popup products" (D3), so backfilling explicit rows would make
-every product created after this migration invisible to the default flow —
-a silent behavior change the design explicitly rejects.
+cutover slice re-points its read through the resolver (D1). Which
+products a flow sells is not backfilled here at all: it is derived from
+the flow's own ticketing steps (sdd/sales-flows-rediseno slice 4), so
+there is no product set to seed.
 
 `type` is copied from `popups.sale_type` (both enums share the
 'application'/'direct' values; sales_flows.type additionally allows
@@ -25,12 +24,12 @@ one default flow) before returning; a violation aborts the migration
 transaction.
 
 Downgrade is deliberately a no-op: deleting backfilled flows could orphan
-`flow_products`/application/payment rows a later slice may have already
-written against them. Mirrors the `open_checkout_signing_secret` backfill's
+application/payment rows a later slice may have already written against
+them. Mirrors the `open_checkout_signing_secret` backfill's
 downgrade contract (tests/migrations/test_backfill_open_checkout_signing_secret.py).
 
 Revision ID: 4a983282b8aa
-Revises: fa6808697ac1
+Revises: b79d252e79c2
 Create Date: 2026-08-03 18:08:09.244073
 
 """
@@ -40,7 +39,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "4a983282b8aa"
-down_revision = "fa6808697ac1"
+down_revision = "b79d252e79c2"
 branch_labels = None
 depends_on = None
 
@@ -135,6 +134,6 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     # Deliberate no-op — see module docstring. Deleting backfilled default
-    # flows here could orphan flow_products/application/payment rows a
-    # later slice has already written against them.
+    # flows here could orphan application/payment rows a later slice has
+    # already written against them.
     pass

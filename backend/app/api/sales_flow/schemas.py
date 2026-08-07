@@ -314,18 +314,3 @@ class EffectiveFlowConfig(BaseModel):
     abandoned_application_delay_days: int | None = None
     abandoned_application_repeat_days: int | None = None
     abandoned_application_max_count: int | None = None
-
-
-class FlowProductsBase(SQLModel):
-    """Base schema for the flow_products link table.
-
-    Near-verbatim GroupProductsBase (app/api/group/schemas.py). Empty product
-    set for a flow means "all active popup products" (D3) — resolved in
-    sales_flow/resolver.py, not represented here.
-    """
-
-    tenant_id: uuid.UUID = Field(foreign_key="tenants.id", index=True)
-    flow_id: uuid.UUID = Field(foreign_key="sales_flows.id", primary_key=True)
-    product_id: uuid.UUID = Field(
-        foreign_key="products.id", primary_key=True, index=True
-    )

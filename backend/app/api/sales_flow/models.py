@@ -5,13 +5,7 @@ from sqlalchemy import CheckConstraint, Index, UniqueConstraint, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlmodel import Column, DateTime, Field, func
 
-from app.api.sales_flow.schemas import FlowProductsBase, SalesFlowBase
-
-
-class FlowProducts(FlowProductsBase, table=True):
-    """Link table for flow-scoped product sets."""
-
-    __tablename__ = "flow_products"
+from app.api.sales_flow.schemas import SalesFlowBase
 
 
 class SalesFlows(SalesFlowBase, table=True):

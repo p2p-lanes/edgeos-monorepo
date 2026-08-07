@@ -322,7 +322,6 @@ def test_provenance_tables_are_out_of_scope() -> None:
     tables = {table for table, _ in module.CONFIG_TABLES}
     assert "payments" not in tables
     assert "email_logs" not in tables
-    assert "flow_products" not in tables
     assert "ticketingsteps" in tables
     assert "formfields" in tables
 
