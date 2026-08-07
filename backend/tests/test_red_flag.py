@@ -20,7 +20,10 @@ from app.api.shared.enums import HumanRating
 from app.api.tenant.models import Tenants
 from app.core.security import create_access_token
 from app.services.approval.calculator import ApprovalCalculator
-from tests._flow_helpers import default_flow_id
+from tests._flow_helpers import (
+    application_flow_id,
+    default_flow_id,
+)
 
 
 class TestRedFlagAutoReject:
@@ -87,6 +90,7 @@ class TestRedFlagAutoReject:
         db.flush()
 
         application = Applications(
+            sales_flow_id=application_flow_id(db, popup_tenant_a.id),
             tenant_id=tenant_a.id,
             popup_id=popup_tenant_a.id,
             human_id=human.id,
@@ -168,6 +172,7 @@ class TestRedFlagAPIEndpoints:
         db.flush()
 
         application = Applications(
+            sales_flow_id=application_flow_id(db, popup_tenant_a.id),
             tenant_id=tenant_a.id,
             popup_id=popup_tenant_a.id,
             human_id=human.id,
@@ -270,6 +275,7 @@ class TestRedFlagAPIEndpoints:
         db.flush()
 
         application = Applications(
+            sales_flow_id=application_flow_id(db, popup_tenant_a.id),
             tenant_id=tenant_a.id,
             popup_id=popup_tenant_a.id,
             human_id=human.id,
@@ -322,6 +328,7 @@ class TestRedFlagOnHumanUpdate:
         db.flush()
 
         application = Applications(
+            sales_flow_id=application_flow_id(db, popup_tenant_a.id),
             tenant_id=tenant_a.id,
             popup_id=popup_tenant_a.id,
             human_id=human.id,
@@ -365,6 +372,7 @@ class TestRedFlagOnHumanUpdate:
         db.flush()
 
         application = Applications(
+            sales_flow_id=application_flow_id(db, popup_tenant_a.id),
             tenant_id=tenant_a.id,
             popup_id=popup_tenant_a.id,
             human_id=human.id,

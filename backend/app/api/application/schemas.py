@@ -68,13 +68,12 @@ class ApplicationBase(SQLModel):
     group_id: uuid.UUID | None = Field(
         default=None, foreign_key="groups.id", nullable=True, index=True
     )
-    # Sales flow this application was submitted under. Nullable, backfilled
-    # to the popup's default flow (sdd/sales-flows slice 4). Read via
-    # `ApplicationsCRUD.get_by_human_flow` (duplicate-check gate). Uniqueness
-    # is re-keyed to (human_id, sales_flow_id) as uq_application_human_flow
-    # since slice 5 (G2 confirmed 2026-08-04).
-    sales_flow_id: uuid.UUID | None = Field(
-        default=None, foreign_key="sales_flows.id", nullable=True, index=True
+    # The flow this application was submitted under. Required
+    # (sdd/sales-flows-rediseno F4): uq_application_human_flow is keyed on
+    # (human_id, sales_flow_id), and a nullable column made that constraint
+    # enforce nothing, since Postgres treats two NULLs as distinct.
+    sales_flow_id: uuid.UUID = Field(
+        foreign_key="sales_flows.id", nullable=False, index=True
     )
 
     # Popup-specific fields
@@ -168,11 +167,11 @@ class ApplicationPublic(BaseModel):
     popup_id: uuid.UUID
     human_id: uuid.UUID
     group_id: uuid.UUID | None = None
-    # sdd/sales-flows slice 14: the flow this application belongs to, so
-    # callers can read it directly instead of re-deriving it. The portal's
-    # needsFlowChoice (task 9.4) still uses a flow-count check, not this
-    # field — see application/page.tsx for why (deferred, not missing).
-    sales_flow_id: uuid.UUID | None = None
+    # The flow this application belongs to, so callers read it instead of
+    # re-deriving it. Always present since sdd/sales-flows-rediseno F4. The
+    # portal's needsFlowChoice (task 9.4) still uses a flow-count check, not
+    # this field — see application/page.tsx for why (deferred, not missing).
+    sales_flow_id: uuid.UUID
 
     # Popup-specific
     referral: str | None = None
@@ -279,8 +278,7 @@ class ApplicationCreate(BaseModel):
     # sdd/sales-flows task 9.7: explicit target flow (URL-derived, e.g. from
     # the portal's FlowPicker — task 9.4). Must belong to this popup and be
     # type=application; validated server-side (ApplicationsCRUD.
-    # resolve_target_flow_id). Omitted keeps the pre-existing default-flow
-    # resolution.
+    # resolve_target_flow_id). Omitted means the popup's default flow.
     sales_flow_id: uuid.UUID | None = None
 
     # Attribution columns — groups-rework T-gr-032 (REQ-GR-009, REQ-GR-016)
@@ -358,8 +356,8 @@ class ApplicationAdminCreate(BaseModel):
     # sdd/sales-flows task 14.2: explicit target flow for backoffice-created
     # applications, mirroring ApplicationCreate.sales_flow_id (task 9.7).
     # Validated by ApplicationsCRUD.resolve_target_flow_id — must belong to
-    # popup_id and be type=application, otherwise 404. Omitted keeps the
-    # pre-existing default-flow resolution.
+    # popup_id and be type=application, otherwise 404. Omitted means the
+    # popup's default flow.
     sales_flow_id: uuid.UUID | None = None
 
     @field_validator("email")

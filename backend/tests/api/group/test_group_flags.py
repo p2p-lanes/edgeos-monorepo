@@ -25,6 +25,10 @@ from app.api.popup.models import Popups
 from app.api.shared.enums import HumanRating
 from app.api.tenant.models import Tenants
 from app.core.security import create_access_token
+from tests._flow_helpers import (
+    application_flow_id,
+    seed_default_steps,
+)
 
 # ---------------------------------------------------------------------------
 # Test helpers
@@ -48,6 +52,7 @@ def _make_popup(db: Session, tenant: Tenants) -> Popups:
     db.add(popup)
     db.commit()
     db.refresh(popup)
+    seed_default_steps(db, popup)
     return popup
 
 
@@ -244,6 +249,7 @@ class TestFlagTransitionRetroactive:
 
         # Create an application directly in ACCEPTED state (simulates prior accepted app)
         accepted_app = Applications(
+            sales_flow_id=application_flow_id(db, popup.id),
             tenant_id=tenant_a.id,
             popup_id=popup.id,
             human_id=human.id,

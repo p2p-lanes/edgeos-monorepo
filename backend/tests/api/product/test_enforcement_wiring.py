@@ -34,7 +34,10 @@ from app.api.payment.crud import payments_crud
 from app.api.popup.models import Popups
 from app.api.product.models import Products
 from app.api.tenant.models import Tenants
-from tests._flow_helpers import offer_category
+from tests._flow_helpers import (
+    application_flow_id,
+    offer_category,
+)
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -118,6 +121,7 @@ def _get_or_create_application(
     db.flush()
 
     app = Applications(
+        sales_flow_id=application_flow_id(db, popup.id),
         tenant_id=tenant.id,
         popup_id=popup.id,
         human_id=human.id,

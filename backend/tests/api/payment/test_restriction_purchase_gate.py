@@ -32,6 +32,7 @@ from app.api.sales_flow.models import SalesFlows
 from app.api.shared.enums import SaleType
 from app.api.tenant.models import Tenants
 from tests._flow_helpers import (
+    application_flow_id,
     default_flow_id,
     seed_default_steps,
 )
@@ -411,16 +412,20 @@ class TestAuthenticatedPaymentRestrictionGate:
         assert exc_info.value.status_code == 403
         assert exc_info.value.detail == {"code": "product_not_in_flow"}
 
-    def test_no_default_flow_skips_enforcement(
+    def test_payment_carries_the_application_flow(
         self, db: Session, tenant_a: Tenants
     ) -> None:
-        """Legacy fixture popups built directly in the DB without task 5.0's
-        default-flow provisioning must keep working unchanged (matches the
-        anonymous path's own degrade precedent, slice 13 deviation #2)."""
+        """A payment inherits the flow of the application it settles.
+
+        This used to be the popup-without-a-default-flow escape hatch, where
+        enforcement was skipped and `sales_flow_id` stayed NULL. Since
+        sdd/sales-flows-rediseno F4 an application cannot exist without a
+        flow, so there is nothing left to skip.
+        """
         popup = Popups(
             tenant_id=tenant_a.id,
-            name="Legacy No-Flow Popup",
-            slug=f"legacy-{uuid.uuid4().hex[:8]}",
+            name="Directly Built Popup",
+            slug=f"direct-{uuid.uuid4().hex[:8]}",
             sale_type=SaleType.application.value,
             status="active",
             currency="USD",
@@ -430,6 +435,7 @@ class TestAuthenticatedPaymentRestrictionGate:
         seed_default_steps(db, popup)
         human = _make_human(db, tenant_a)
         application = Applications(
+            sales_flow_id=application_flow_id(db, popup.id),
             tenant_id=popup.tenant_id,
             popup_id=popup.id,
             human_id=human.id,
@@ -442,7 +448,7 @@ class TestAuthenticatedPaymentRestrictionGate:
             popup_id=popup.id,
             human_id=human.id,
             application_id=application.id,
-            name="Legacy Attendee",
+            name="Direct Attendee",
             email=human.email,
             category="main",
         )
@@ -460,4 +466,4 @@ class TestAuthenticatedPaymentRestrictionGate:
             ],
         )
         payment, _preview = payments_crud.create_payment(db, obj)
-        assert payment.sales_flow_id is None
+        assert payment.sales_flow_id == application.sales_flow_id

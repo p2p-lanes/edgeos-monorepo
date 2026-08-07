@@ -28,6 +28,7 @@ from app.api.popup.models import Popups
 from app.api.product.models import Products
 from app.api.tenant.models import Tenants
 from app.services.checkin_pass_dispatch import dispatch_checkin_passes
+from tests._flow_helpers import application_flow_id
 
 QR_TARGET = "app.services.checkin_pass_dispatch.generate_checkin_qr_url"
 EMAIL_TARGET = "app.services.checkin_pass_dispatch.get_email_service"
@@ -139,6 +140,7 @@ def _make_due_popup_with_tickets(
     human = _make_human(db, tenant)
     product = _make_product(db, tenant, popup, requires_check_in=True)
     application = Applications(
+        sales_flow_id=application_flow_id(db, popup.id),
         id=uuid.uuid4(),
         tenant_id=tenant.id,
         popup_id=popup.id,

@@ -32,6 +32,7 @@ from app.api.sales_flow.eligibility import (
 )
 from app.api.sales_flow.models import SalesFlows
 from app.api.tenant.models import Tenants
+from tests._flow_helpers import application_flow_id
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -65,6 +66,7 @@ def _make_application(
     db: Session, tenant: Tenants, popup: Popups, human: Humans, *, status: str
 ) -> Applications:
     application = Applications(
+        sales_flow_id=application_flow_id(db, popup.id),
         id=uuid.uuid4(),
         tenant_id=tenant.id,
         popup_id=popup.id,

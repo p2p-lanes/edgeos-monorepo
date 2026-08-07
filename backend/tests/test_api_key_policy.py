@@ -20,6 +20,7 @@ from app.api.popup.models import Popups
 from app.api.product.models import Products
 from app.api.shared.enums import HumanRating
 from app.api.tenant.models import Tenants
+from tests._flow_helpers import application_flow_id
 
 # POST /api/v1/events/portal/events is temporarily disabled for API keys
 # (see ``_PAT_ROUTE_POLICIES`` in ``app/core/security.py``). When the route
@@ -162,6 +163,7 @@ def _accept_application(
 
     db.add(
         Applications(
+            sales_flow_id=application_flow_id(db, popup.id),
             tenant_id=tenant.id,
             popup_id=popup.id,
             human_id=human.id,

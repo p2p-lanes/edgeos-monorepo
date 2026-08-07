@@ -35,6 +35,7 @@ from app.api.shared.enums import SaleType
 from app.api.tenant.models import Tenants
 from app.api.user.models import Users
 from app.core.security import create_access_token
+from tests._flow_helpers import application_flow_id
 
 # ---------------------------------------------------------------------------
 # Fixtures / Helpers
@@ -119,6 +120,7 @@ def _make_payment_with_product(
     db.flush()
 
     application = Applications(
+        sales_flow_id=application_flow_id(db, popup.id),
         tenant_id=tenant.id,
         popup_id=popup.id,
         human_id=human.id,
@@ -531,6 +533,7 @@ class TestApplicationFlowEnforcement:
         db.flush()
 
         application = Applications(
+            sales_flow_id=application_flow_id(db, popup.id),
             tenant_id=tenant_a.id,
             popup_id=popup.id,
             human_id=human.id,

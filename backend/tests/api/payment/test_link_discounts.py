@@ -27,6 +27,7 @@ from app.api.referral.models import Referrals
 from app.api.shared.enums import SaleType
 from app.api.tenant.models import Tenants
 from app.api.user.models import Users
+from tests._flow_helpers import application_flow_id
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -136,6 +137,7 @@ def _make_application(
     group_id: uuid.UUID | None = None,
 ) -> Applications:
     application = Applications(
+        sales_flow_id=application_flow_id(db, popup.id),
         tenant_id=tenant.id,
         popup_id=popup.id,
         human_id=human.id,
@@ -228,12 +230,13 @@ class TestInviteDiscountAtPayment:
         popup = _make_popup(db, tenant_a)
         human = _make_human(db, tenant_a)
         invite = _make_invite(
-            db, tenant_a, popup, admin_user_tenant_a.id,
+            db,
+            tenant_a,
+            popup,
+            admin_user_tenant_a.id,
             discount_percentage=Decimal("30"),
         )
-        application = _make_application(
-            db, tenant_a, popup, human, invite_id=invite.id
-        )
+        application = _make_application(db, tenant_a, popup, human, invite_id=invite.id)
         attendee = _make_attendee(db, tenant_a, popup, application)
         product = _make_product(db, tenant_a, popup, price=Decimal("100"))
 
@@ -252,12 +255,13 @@ class TestInviteDiscountAtPayment:
         popup = _make_popup(db, tenant_a)
         human = _make_human(db, tenant_a)
         invite = _make_invite(
-            db, tenant_a, popup, admin_user_tenant_a.id,
+            db,
+            tenant_a,
+            popup,
+            admin_user_tenant_a.id,
             discount_percentage=Decimal("0"),
         )
-        application = _make_application(
-            db, tenant_a, popup, human, invite_id=invite.id
-        )
+        application = _make_application(db, tenant_a, popup, human, invite_id=invite.id)
         attendee = _make_attendee(db, tenant_a, popup, application)
         product = _make_product(db, tenant_a, popup, price=Decimal("100"))
 
@@ -274,11 +278,12 @@ class TestInviteDiscountAtPayment:
         """Best-of-N: invite 30% wins over group 10%; group marker cleared."""
         popup = _make_popup(db, tenant_a)
         human = _make_human(db, tenant_a)
-        group = _make_group(
-            db, tenant_a, popup, discount_percentage=Decimal("10")
-        )
+        group = _make_group(db, tenant_a, popup, discount_percentage=Decimal("10"))
         invite = _make_invite(
-            db, tenant_a, popup, admin_user_tenant_a.id,
+            db,
+            tenant_a,
+            popup,
+            admin_user_tenant_a.id,
             discount_percentage=Decimal("30"),
         )
         application = _make_application(
@@ -300,11 +305,12 @@ class TestInviteDiscountAtPayment:
     ) -> None:
         popup = _make_popup(db, tenant_a)
         human = _make_human(db, tenant_a)
-        group = _make_group(
-            db, tenant_a, popup, discount_percentage=Decimal("50")
-        )
+        group = _make_group(db, tenant_a, popup, discount_percentage=Decimal("50"))
         invite = _make_invite(
-            db, tenant_a, popup, admin_user_tenant_a.id,
+            db,
+            tenant_a,
+            popup,
+            admin_user_tenant_a.id,
             discount_percentage=Decimal("20"),
         )
         application = _make_application(
@@ -352,7 +358,10 @@ class TestReferralDiscountAtPayment:
         referrer = _make_human(db, tenant_a)
         buyer = _make_human(db, tenant_a)
         referral = _make_referral(
-            db, tenant_a, popup, referrer,
+            db,
+            tenant_a,
+            popup,
+            referrer,
             discount_percentage=Decimal("20"),
             is_disabled=True,
         )

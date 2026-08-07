@@ -49,7 +49,7 @@ def provision_default_flow(db, popup, sale_type: str = "application"):
     return flow
 
 
-def seed_default_steps(db, popup, sale_type: str = "direct"):
+def seed_default_steps(db, popup, sale_type: str | None = None):
     """Seed a popup's default ticketing steps into its default flow.
 
     Uses the same function `POST /popups` uses, so fixtures that build a
@@ -61,6 +61,8 @@ def seed_default_steps(db, popup, sale_type: str = "direct"):
     from app.api.ticketing_step.constants import seed_ticketing_steps_for_popup
     from app.api.ticketing_step.models import TicketingSteps
 
+    if sale_type is None:
+        sale_type = getattr(popup.sale_type, "value", popup.sale_type)
     flow = provision_default_flow(db, popup, sale_type=sale_type)
 
     from sqlmodel import select
@@ -103,3 +105,31 @@ def offer_category(db, popup, category: str):
     db.add(step)
     db.commit()
     return step
+
+
+def application_flow_id(db, popup_id: uuid.UUID) -> uuid.UUID:
+    """The flow an application belongs to when the test does not care which.
+
+    `applications.sales_flow_id` is NOT NULL since
+    sdd/sales-flows-rediseno F4, so a fixture that builds an `Applications`
+    row directly has to name a flow. Unlike `default_flow_id` this builds
+    the default flow when it is missing, because plenty of these fixtures
+    build their popup with `Popups(...)` and never went through the creation
+    path that would have given them one.
+
+    The flow is seeded with the same steps a real popup gets at creation.
+    Since slice 4 a flow sells what its steps offer, and a bare flow sells
+    nothing — which would fail every purchase in a test that is not about
+    restrictions at all.
+    """
+    from app.api.popup.crud import popups_crud
+    from app.api.sales_flow.crud import sales_flows_crud
+
+    flow = sales_flows_crud.get_default_flow(db, popup_id)
+    if flow is not None:
+        return flow.id
+
+    popup = popups_crud.get(db, popup_id)
+    if popup is None:
+        raise AssertionError(f"popup {popup_id} does not exist")
+    return seed_default_steps(db, popup, sale_type="application").id

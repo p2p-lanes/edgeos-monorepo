@@ -13,6 +13,7 @@ from app.api.human.models import Humans
 from app.api.popup.models import Popups
 from app.api.tenant.models import Tenants
 from app.core.security import create_access_token
+from tests._flow_helpers import seed_default_steps
 
 
 def test_group_application_creates_main_attendee(
@@ -28,6 +29,7 @@ def test_group_application_creates_main_attendee(
     )
     db.add(popup)
     db.flush()
+    seed_default_steps(db, popup)
 
     main_cat = attendee_categories_crud.seed_main_for_popup(db, popup.id, tenant_a.id)
     assert main_cat is not None

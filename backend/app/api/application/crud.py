@@ -265,9 +265,7 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         `explicit_flow_id` must belong to `popup_id` and be
         `type=application` — raises 404 otherwise (mirrors every other
         `_get_flow_or_404` in this SDD change; a client-supplied flow id is
-        always ownership-checked). Omitted falls back to
-        `resolve_creation_flow_id` (the popup's default flow, or None for
-        popups that predate task 5.0 provisioning).
+        always ownership-checked). Omitted means the popup's default flow.
         """
         if explicit_flow_id is None:
             return self.resolve_creation_flow_id(session, popup_id)
@@ -289,22 +287,25 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
 
     def resolve_creation_flow_id(
         self, session: Session, popup_id: uuid.UUID
-    ) -> uuid.UUID | None:
-        """Resolve the sales_flow_id to stamp on a newly created application.
+    ) -> uuid.UUID:
+        """The flow a new application is stamped with when none was named.
 
-        Returns the popup's default flow id, or None when the popup has no
-        default flow yet. None is a legitimate, expected outcome (not an
-        invariant breach) for any popup created before task 5.0 shipped, or
-        by fixtures/tests that bypass `PopupsCRUD.create` — the slice-9
-        resolver's "missing default is a 500-class invariant breach" rule
-        (design D2) applies to the real flow-resolution contract, not to
-        this creation-time guard. Callers must fall back to the legacy
-        popup-level duplicate check when this returns None.
+        Every popup is provisioned with a default flow, and since
+        sdd/sales-flows-rediseno F4 `applications.sales_flow_id` is NOT NULL,
+        so a popup without one cannot take applications at all. That is an
+        invariant breach rather than a case to handle, which is why this
+        raises instead of returning None — a caller that silently accepted
+        "no flow" is exactly what F4 removed.
         """
         from app.api.sales_flow.crud import sales_flows_crud
 
         default_flow = sales_flows_crud.get_default_flow(session, popup_id)
-        return default_flow.id if default_flow else None
+        if default_flow is None:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="This event is not ready to receive applications yet.",
+            )
+        return default_flow.id
 
     def find_by_human(
         self,
@@ -1015,11 +1016,9 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         }
         data["tenant_id"] = tenant_id
         data["human_id"] = human_id
-        # sdd/sales-flows slice 5 (G2) + task 9.7: stamp the target flow on
-        # every new application — an explicit `sales_flow_id` (e.g. from the
-        # portal FlowPicker) when given, else the popup's default flow. None
-        # when the popup has no default flow yet (see resolve_creation_flow_id)
-        # — the column stays NULL, same as before slice 5.
+        # Stamp the target flow on every new application — an explicit
+        # `sales_flow_id` (e.g. from the portal FlowPicker) when given, else
+        # the popup's default flow. Never absent (F4).
         data["sales_flow_id"] = self.resolve_target_flow_id(
             session, app_data.popup_id, getattr(app_data, "sales_flow_id", None)
         )
@@ -1303,12 +1302,8 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         flow_id = self.resolve_target_flow_id(
             session, app_data.popup_id, app_data.sales_flow_id
         )
-        existing = (
-            self.get_by_human_flow(session, human_id=human.id, sales_flow_id=flow_id)
-            if flow_id is not None
-            else self.get_by_human_popup(
-                session, human_id=human.id, popup_id=app_data.popup_id
-            )
+        existing = self.get_by_human_flow(
+            session, human_id=human.id, sales_flow_id=flow_id
         )
         if existing:
             raise HTTPException(
@@ -1414,13 +1409,9 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
             self.create_snapshot(session, application, "auto_rejected")
             return
 
-        # The strategy of the application's own flow (slice 6). An
-        # application with no flow is legacy data; fall back to the popup's
-        # default flow so it still resolves.
-        strategy = (
-            approval_strategies_crud.get_by_flow(session, application.sales_flow_id)
-            if application.sales_flow_id
-            else approval_strategies_crud.get_by_popup(session, application.popup_id)
+        # The strategy of the application's own flow (slice 6).
+        strategy = approval_strategies_crud.get_by_flow(
+            session, application.sales_flow_id
         )
         should_auto_accept = (
             strategy is None

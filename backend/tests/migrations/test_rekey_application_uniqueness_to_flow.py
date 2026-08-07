@@ -224,24 +224,23 @@ class TestFlowScopedUniqueness:
         finally:
             _cleanup(db, popup_id, human_id)
 
-    def test_null_sales_flow_id_never_conflicts(
+    def test_a_null_flow_can_no_longer_be_written(
         self, db: Session, tenant_a: Tenants
     ) -> None:
-        """Documents the deliberate NULL-exemption: two applications for the
-        same human/popup, both with NULL sales_flow_id, are NOT rejected —
-        Postgres treats every NULL as distinct in a unique index."""
+        """The NULL exemption this constraint used to carry is gone.
+
+        Two applications for the same human and popup both used to slip
+        through with a NULL sales_flow_id, because Postgres treats every
+        NULL in a unique index as distinct — so the constraint enforced
+        nothing at all. `f2a8c604b9e1` made the column NOT NULL, which is
+        what turns it into a real guard.
+        """
         popup_id = _insert_popup(db, tenant_a.id)
         human_id = _insert_human(db, tenant_a.id)
         try:
-            app_1 = _insert_application(db, tenant_a.id, popup_id, human_id, None)
-            app_2 = _insert_application(db, tenant_a.id, popup_id, human_id, None)
-
-            count = db.exec(
-                text(
-                    "SELECT COUNT(*) FROM applications WHERE id IN (:a, :b)"
-                ).bindparams(a=app_1, b=app_2)
-            ).scalar()
-            assert count == 2
+            with pytest.raises(IntegrityError):
+                _insert_application(db, tenant_a.id, popup_id, human_id, None)
+            db.rollback()
         finally:
             _cleanup(db, popup_id, human_id)
 

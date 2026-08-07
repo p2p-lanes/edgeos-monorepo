@@ -24,6 +24,7 @@ from app.api.payment.models import Payments
 from app.api.payment.schemas import PaymentStatus
 from app.api.popup.models import Popups
 from app.api.tenant.models import Tenants
+from tests._flow_helpers import application_flow_id
 
 
 def _make_popup(db: Session, tenant: Tenants) -> Popups:
@@ -49,6 +50,7 @@ def _make_application(db: Session, tenant: Tenants, popup: Popups) -> Applicatio
     db.flush()
 
     application = Applications(
+        sales_flow_id=application_flow_id(db, popup.id),
         tenant_id=tenant.id,
         popup_id=popup.id,
         human_id=human.id,

@@ -226,13 +226,9 @@ class ApprovalCalculator:
         if application.status != ApplicationStatus.IN_REVIEW.value:
             return application
 
-        # The strategy of the application's own flow (slice 6). An
-        # application with no flow is legacy data; read the popup's default
-        # flow so it still resolves.
-        strategy = (
-            approval_strategies_crud.get_by_flow(session, application.sales_flow_id)
-            if application.sales_flow_id
-            else approval_strategies_crud.get_by_popup(session, application.popup_id)
+        # The strategy of the application's own flow (slice 6).
+        strategy = approval_strategies_crud.get_by_flow(
+            session, application.sales_flow_id
         )
 
         # Get reviews - use find_all since we need all of them for calculation
@@ -252,12 +248,11 @@ class ApprovalCalculator:
         # only votes cast by that flow's own designated reviewers may count.
         # Without this, votes cast before an override flip (e.g. by the
         # popup-shared tier, now excluded) would keep driving the decision.
-        # Inherit-mode and flow-less applications are unaffected.
-        if application.sales_flow_id is not None:
-            flow = sales_flows_crud.get(session, application.sales_flow_id)
-            if flow and flow.reviewers_mode == SalesFlowReviewersMode.override:
-                designated_user_ids = {r.user_id for r in reviewers}
-                reviews = [r for r in reviews if r.reviewer_id in designated_user_ids]
+        # Inherit-mode flows are unaffected.
+        flow = sales_flows_crud.get(session, application.sales_flow_id)
+        if flow and flow.reviewers_mode == SalesFlowReviewersMode.override:
+            designated_user_ids = {r.user_id for r in reviewers}
+            reviews = [r for r in reviews if r.reviewer_id in designated_user_ids]
 
         # Calculate new status (human_red_flag is False here since we handled it above)
         new_status = self.calculate_status(

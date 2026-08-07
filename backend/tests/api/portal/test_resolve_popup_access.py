@@ -28,6 +28,7 @@ from app.api.payment.models import Payments
 from app.api.payment.schemas import PaymentStatus
 from app.api.popup.models import Popups
 from app.api.tenant.models import Tenants
+from tests._flow_helpers import application_flow_id
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -69,6 +70,7 @@ def _make_application(
     from app.api.application.models import Applications
 
     application = Applications(
+        sales_flow_id=application_flow_id(db, popup.id),
         id=uuid.uuid4(),
         tenant_id=tenant.id,
         popup_id=popup.id,
@@ -117,6 +119,7 @@ def _make_companion_attendee(
     from app.api.application.models import Applications
 
     application = Applications(
+        sales_flow_id=application_flow_id(db, popup.id),
         id=uuid.uuid4(),
         tenant_id=tenant.id,
         popup_id=popup.id,
@@ -160,6 +163,7 @@ def _make_payment_for_human(
     # Application owned by human with a non-standard status (withdrawn) so that
     # Steps 1-3 don't fire. Steps 1-3 only check accepted/submitted/in-review/rejected.
     application = Applications(
+        sales_flow_id=application_flow_id(db, popup.id),
         id=uuid.uuid4(),
         tenant_id=tenant.id,
         popup_id=popup.id,

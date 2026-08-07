@@ -29,6 +29,7 @@ from app.api.human.models import Humans
 from app.api.popup.models import Popups
 from app.api.product.models import Products
 from app.api.tenant.models import Tenants
+from tests._flow_helpers import application_flow_id
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -108,6 +109,7 @@ def _application(
     info_not_shared: list[str] | None = None,
 ) -> Applications:
     app = Applications(
+        sales_flow_id=application_flow_id(db, popup.id),
         id=uuid.uuid4(),
         tenant_id=popup.tenant_id,
         popup_id=popup.id,

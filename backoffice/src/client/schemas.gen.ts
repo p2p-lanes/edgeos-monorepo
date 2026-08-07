@@ -1185,15 +1185,8 @@ export const ApplicationPublicSchema = {
             title: 'Group Id'
         },
         sales_flow_id: {
-            anyOf: [
-                {
-                    type: 'string',
-                    format: 'uuid'
-                },
-                {
-                    type: 'null'
-                }
-            ],
+            type: 'string',
+            format: 'uuid',
             title: 'Sales Flow Id'
         },
         referral: {
@@ -1473,7 +1466,7 @@ export const ApplicationPublicSchema = {
         }
     },
     type: 'object',
-    required: ['id', 'tenant_id', 'popup_id', 'human_id', 'status'],
+    required: ['id', 'tenant_id', 'popup_id', 'human_id', 'sales_flow_id', 'status'],
     title: 'ApplicationPublic',
     description: 'Application schema for API responses.'
 } as const;

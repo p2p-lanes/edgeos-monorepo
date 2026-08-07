@@ -22,9 +22,7 @@ class TestGroupsReworkFoundationMigration:
     # groups table — new flag columns
     # -----------------------------------------------------------------------
 
-    def test_groups_auto_approve_applications_column_exists(
-        self, db: Session
-    ) -> None:
+    def test_groups_auto_approve_applications_column_exists(self, db: Session) -> None:
         """groups.auto_approve_applications must exist, be NOT NULL, default false."""
         conn = db.connection()
         row = conn.exec_driver_sql(
@@ -223,9 +221,7 @@ class TestGroupsReworkFoundationMigration:
             "Index 'ix_applications_invite_id' not found on applications."
         )
 
-    def test_applications_referral_id_partial_index_exists(
-        self, db: Session
-    ) -> None:
+    def test_applications_referral_id_partial_index_exists(self, db: Session) -> None:
         """ix_applications_referral_id partial index must exist on applications."""
         conn = db.connection()
         row = conn.exec_driver_sql(

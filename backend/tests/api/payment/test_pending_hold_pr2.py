@@ -36,6 +36,7 @@ from app.api.product.models import Products
 from app.api.shared.enums import SaleType
 from app.api.tenant.models import Tenants
 from app.services.simplefi.client import CancelOutcome, CancelOutcomeAmbiguousError
+from tests._flow_helpers import application_flow_id
 
 # ---------------------------------------------------------------------------
 # Shared helpers
@@ -77,6 +78,7 @@ def _make_application(
 ) -> Applications:
     """Create a minimal Application for testing."""
     application = Applications(
+        sales_flow_id=application_flow_id(db, popup.id),
         id=uuid.uuid4(),
         tenant_id=tenant.id,
         popup_id=popup.id,

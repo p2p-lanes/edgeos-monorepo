@@ -21,6 +21,7 @@ from app.api.popup.models import Popups
 from app.api.shared.enums import SaleType
 from app.api.tenant.models import Tenants
 from app.core.security import create_access_token
+from tests._flow_helpers import application_flow_id
 
 
 def _auth(human: Humans) -> dict[str, str]:
@@ -59,6 +60,7 @@ def _make_application(
     db: Session, tenant: Tenants, popup: Popups, human: Humans
 ) -> Applications:
     application = Applications(
+        sales_flow_id=application_flow_id(db, popup.id),
         id=uuid.uuid4(),
         tenant_id=tenant.id,
         popup_id=popup.id,

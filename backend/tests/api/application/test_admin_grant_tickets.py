@@ -31,6 +31,7 @@ from app.api.popup.models import Popups
 from app.api.product.models import Products
 from app.api.tenant.models import Tenants
 from app.api.user.models import Users
+from tests._flow_helpers import application_flow_id
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -258,6 +259,7 @@ def test_grant_promotes_existing_draft_application(
 
     primary_cat = _ensure_primary_category(db, grant_popup)
     application = Applications(
+        sales_flow_id=application_flow_id(db, grant_popup.id),
         id=uuid.uuid4(),
         tenant_id=tenant_a.id,
         popup_id=grant_popup.id,
@@ -642,6 +644,7 @@ def test_grant_existing_application_keeps_privacy_choices(
 
     primary_cat = _ensure_primary_category(db, grant_popup)
     application = Applications(
+        sales_flow_id=application_flow_id(db, grant_popup.id),
         id=uuid.uuid4(),
         tenant_id=tenant_a.id,
         popup_id=grant_popup.id,

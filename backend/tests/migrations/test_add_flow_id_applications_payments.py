@@ -170,35 +170,14 @@ def test_alembic_single_head_after_add_flow_id() -> None:
 
 
 class TestAddFlowIdBackfillDML:
-    """Mirrors the migration's UPDATE/invariant SQL against seeded rows."""
+    """Mirrors the migration's UPDATE/invariant SQL against seeded rows.
 
-    def test_backfill_sets_application_sales_flow_id_to_popup_default_flow(
-        self, db: Session, tenant_a: Tenants
-    ) -> None:
-        popup_id = _insert_popup(db, tenant_a.id)
-        human_id = _insert_human(db, tenant_a.id)
-        try:
-            flow_id = _insert_default_flow(db, tenant_a.id, popup_id)
-            application_id = _insert_application(db, tenant_a.id, popup_id, human_id)
-
-            db.exec(
-                text(
-                    "UPDATE applications a SET sales_flow_id = f.id "
-                    "FROM sales_flows f "
-                    "WHERE f.popup_id = a.popup_id AND f.is_default = true "
-                    "AND a.sales_flow_id IS NULL AND a.id = :aid"
-                ).bindparams(aid=application_id)
-            )
-            db.commit()
-
-            resolved = db.exec(
-                text(
-                    "SELECT sales_flow_id FROM applications WHERE id = :aid"
-                ).bindparams(aid=application_id)
-            ).scalar()
-            assert resolved == flow_id
-        finally:
-            _cleanup(db, popup_id, human_id)
+    The application-side cases are gone: `f2a8c604b9e1` made
+    `applications.sales_flow_id` NOT NULL, so the NULL row this backfill
+    existed to repair can no longer be written, and the scenario cannot be
+    set up at all. `payments.sales_flow_id` is still nullable, so the
+    payment cases below still describe something reachable.
+    """
 
     def test_backfill_sets_payment_sales_flow_id_to_popup_default_flow(
         self, db: Session, tenant_a: Tenants
@@ -225,94 +204,6 @@ class TestAddFlowIdBackfillDML:
                 )
             ).scalar()
             assert resolved == flow_id
-        finally:
-            _cleanup(db, popup_id, human_id)
-
-    def test_backfill_is_idempotent_never_overwrites_existing_value(
-        self, db: Session, tenant_a: Tenants
-    ) -> None:
-        """Triangulation: the WHERE sales_flow_id IS NULL guard means a row
-        already pointed at a non-default flow keeps that value, it is never
-        clobbered back to the default flow."""
-        popup_id = _insert_popup(db, tenant_a.id)
-        human_id = _insert_human(db, tenant_a.id)
-        try:
-            _insert_default_flow(db, tenant_a.id, popup_id)
-            other_flow_id = uuid.uuid4()
-            db.exec(
-                text(
-                    "INSERT INTO sales_flows "
-                    "(id, tenant_id, popup_id, type, slug, name, visibility, "
-                    'is_default, "order", reviewers_mode, identity_mode) '
-                    "VALUES (:id, :tid, :pid, 'application', 'other', 'Other', "
-                    "'portal_listed', false, 0, 'inherit', 'portal_auth')"
-                ).bindparams(id=other_flow_id, tid=tenant_a.id, pid=popup_id)
-            )
-            application_id = _insert_application(db, tenant_a.id, popup_id, human_id)
-            db.exec(
-                text(
-                    "UPDATE applications SET sales_flow_id = :fid WHERE id = :aid"
-                ).bindparams(fid=other_flow_id, aid=application_id)
-            )
-            db.commit()
-
-            db.exec(
-                text(
-                    "UPDATE applications a SET sales_flow_id = f.id "
-                    "FROM sales_flows f "
-                    "WHERE f.popup_id = a.popup_id AND f.is_default = true "
-                    "AND a.sales_flow_id IS NULL AND a.id = :aid"
-                ).bindparams(aid=application_id)
-            )
-            db.commit()
-
-            resolved = db.exec(
-                text(
-                    "SELECT sales_flow_id FROM applications WHERE id = :aid"
-                ).bindparams(aid=application_id)
-            ).scalar()
-            assert resolved == other_flow_id, (
-                "Idempotent guard must not overwrite an already-set sales_flow_id"
-            )
-        finally:
-            _cleanup(db, popup_id, human_id)
-
-    def test_coverage_query_reports_zero_null_after_backfill(
-        self, db: Session, tenant_a: Tenants
-    ) -> None:
-        popup_id = _insert_popup(db, tenant_a.id)
-        human_id = _insert_human(db, tenant_a.id)
-        try:
-            _insert_default_flow(db, tenant_a.id, popup_id)
-            application_id = _insert_application(db, tenant_a.id, popup_id, human_id)
-
-            missing_before = db.exec(
-                text(
-                    "SELECT COUNT(*) FROM applications a "
-                    "JOIN sales_flows f ON f.popup_id = a.popup_id AND f.is_default = true "
-                    "WHERE a.sales_flow_id IS NULL AND a.id = :aid"
-                ).bindparams(aid=application_id)
-            ).scalar()
-            assert missing_before == 1
-
-            db.exec(
-                text(
-                    "UPDATE applications a SET sales_flow_id = f.id "
-                    "FROM sales_flows f "
-                    "WHERE f.popup_id = a.popup_id AND f.is_default = true "
-                    "AND a.sales_flow_id IS NULL AND a.id = :aid"
-                ).bindparams(aid=application_id)
-            )
-            db.commit()
-
-            missing_after = db.exec(
-                text(
-                    "SELECT COUNT(*) FROM applications a "
-                    "JOIN sales_flows f ON f.popup_id = a.popup_id AND f.is_default = true "
-                    "WHERE a.sales_flow_id IS NULL AND a.id = :aid"
-                ).bindparams(aid=application_id)
-            ).scalar()
-            assert missing_after == 0
         finally:
             _cleanup(db, popup_id, human_id)
 

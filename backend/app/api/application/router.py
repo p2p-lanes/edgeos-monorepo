@@ -1109,35 +1109,25 @@ async def create_my_application(
 
     ensure_popup_writable(popups_crud.get(db, app_in.popup_id))
 
-    # Check for existing application. sdd/sales-flows slice 5 (G2, confirmed
-    # 2026-08-04): one application per person PER FLOW, not per popup.
-    # Task 9.7: `app_in.sales_flow_id` (e.g. from the portal FlowPicker,
-    # task 9.4) targets an explicit non-default flow — validated (ownership
-    # + type=application) by `resolve_target_flow_id`, which raises 404 for
-    # an invalid one. Omitted keeps the pre-existing default-flow
-    # resolution, falling back to the legacy popup-level check for popups
-    # that predate task 5.0 provisioning (or bypass PopupsCRUD.create).
+    # One application per person PER FLOW, not per popup. `sales_flow_id`
+    # (e.g. from the portal FlowPicker) targets an explicit non-default flow
+    # — validated for ownership and type=application by
+    # `resolve_target_flow_id`, which raises 404 for an invalid one. Omitted
+    # means the popup's default flow.
     flow_id = crud.applications_crud.resolve_target_flow_id(
         db, app_in.popup_id, app_in.sales_flow_id
     )
-    existing = (
-        crud.applications_crud.get_by_human_flow(
-            db, human_id=current_human.id, sales_flow_id=flow_id
-        )
-        if flow_id is not None
-        else crud.applications_crud.get_by_human_popup(
-            db, human_id=current_human.id, popup_id=app_in.popup_id
-        )
+    existing = crud.applications_crud.get_by_human_flow(
+        db, human_id=current_human.id, sales_flow_id=flow_id
     )
     if existing:
         # Wording: the portal string-matches "already have an application"
         # (useCheckoutState.ts:199) to recover the existing-application
         # state — that substring is preserved verbatim in BOTH branches.
-        # "for this sales flow" only surfaces once an explicit non-default
-        # flow was targeted (now a portal-facing concept via the
-        # FlowPicker); the single-flow-per-popup case keeps the original,
-        # jargon-free wording.
-        target_flow = sales_flows_crud.get(db, flow_id) if flow_id is not None else None
+        # "for this sales flow" only surfaces once a non-default flow was
+        # targeted (a portal-facing concept via the FlowPicker); the
+        # single-flow-per-popup case keeps the jargon-free wording.
+        target_flow = sales_flows_crud.get(db, flow_id)
         detail = (
             "You already have an application for this sales flow"
             if target_flow is not None and not target_flow.is_default

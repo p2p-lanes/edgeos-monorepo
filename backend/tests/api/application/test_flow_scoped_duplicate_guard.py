@@ -30,6 +30,7 @@ from app.api.popup.models import Popups
 from app.api.sales_flow.models import SalesFlows
 from app.api.tenant.models import Tenants
 from app.core.security import create_access_token
+from tests._flow_helpers import seed_default_steps
 
 
 def _headers(token: str) -> dict[str, str]:
@@ -58,6 +59,7 @@ def _make_legacy_popup(db: Session, tenant: Tenants) -> Popups:
     db.add(popup)
     db.commit()
     db.refresh(popup)
+    seed_default_steps(db, popup)
     return popup
 
 

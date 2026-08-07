@@ -31,6 +31,7 @@ from app.api.product.models import Products
 from app.api.tenant.models import Tenants
 from app.api.ticketing_step.models import TicketingSteps
 from app.core.security import create_access_token
+from tests._flow_helpers import application_flow_id
 
 # Week 1 coverage: 2026-06-01 (Mon) .. 2026-06-05 (Fri) — all weekdays.
 COVERAGE_START = "2026-06-01"
@@ -183,6 +184,7 @@ def _make_application(
     db: Session, tenant: Tenants, popup: Popups, human: Humans
 ) -> Applications:
     application = Applications(
+        sales_flow_id=application_flow_id(db, popup.id),
         id=uuid.uuid4(),
         tenant_id=tenant.id,
         popup_id=popup.id,

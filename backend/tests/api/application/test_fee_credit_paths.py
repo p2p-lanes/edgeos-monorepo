@@ -32,7 +32,11 @@ from app.api.popup.models import Popups
 from app.api.shared.enums import HumanRating, SaleType
 from app.api.tenant.models import Tenants
 from app.core.security import create_access_token
-from tests._flow_helpers import default_flow_id, provision_default_flow
+from tests._flow_helpers import (
+    application_flow_id,
+    default_flow_id,
+    provision_default_flow,
+)
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -106,6 +110,7 @@ def _make_application(
     status: str = ApplicationStatus.IN_REVIEW.value,
 ) -> Applications:
     application = Applications(
+        sales_flow_id=application_flow_id(db, popup.id),
         tenant_id=tenant.id,
         popup_id=popup.id,
         human_id=human.id,

@@ -33,6 +33,7 @@ from app.api.payment.schemas import PaymentStatus
 from app.api.popup.models import Popups
 from app.api.tenant.models import Tenants
 from app.core.security import create_access_token
+from tests._flow_helpers import application_flow_id
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -73,6 +74,7 @@ def _make_application(
     status: str,
 ) -> Applications:
     application = Applications(
+        sales_flow_id=application_flow_id(db, popup.id),
         id=uuid.uuid4(),
         tenant_id=tenant.id,
         popup_id=popup.id,
@@ -115,6 +117,7 @@ def _make_companion_attendee(
 ) -> None:
     """Companion: attendee linked to owner's application but with companion's human_id."""
     application = Applications(
+        sales_flow_id=application_flow_id(db, popup.id),
         id=uuid.uuid4(),
         tenant_id=tenant.id,
         popup_id=popup.id,
@@ -148,6 +151,7 @@ def _make_app_payment_no_attendees(
     This ensures step 4 (attendee check) doesn't fire and step 5 (payment) can fire.
     """
     application = Applications(
+        sales_flow_id=application_flow_id(db, popup.id),
         id=uuid.uuid4(),
         tenant_id=tenant.id,
         popup_id=popup.id,

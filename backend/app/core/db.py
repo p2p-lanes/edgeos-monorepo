@@ -700,6 +700,7 @@ def _seed_applications(
     product_map: dict,
     tenant_id,
 ) -> tuple[dict, dict]:
+    from app.api.sales_flow.crud import sales_flows_crud
     from app.models import Applications, AttendeeProducts, Attendees
 
     application_map: dict[str, Applications] = {}
@@ -744,10 +745,17 @@ def _seed_applications(
         if status == "accepted":
             accepted_at = datetime.now(UTC)
 
+        # Every application belongs to a flow (sdd/sales-flows-rediseno F4),
+        # and seeded popups are provisioned with a default one.
+        default_flow = sales_flows_crud.get_default_flow(session, popup.id)
+        if default_flow is None:
+            raise RuntimeError(f"seeded popup {popup.slug} has no default sales flow")
+
         application = Applications(
             tenant_id=tenant_id,
             popup_id=popup.id,
             human_id=human.id,
+            sales_flow_id=default_flow.id,
             group_id=group_id,
             referral=app_data.get("referral"),
             status=status,

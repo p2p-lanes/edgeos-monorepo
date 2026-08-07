@@ -40,6 +40,7 @@ from app.api.popup.models import Popups
 from app.api.product.models import Products
 from app.api.tenant.models import Tenants
 from app.core.security import create_access_token
+from tests._flow_helpers import application_flow_id
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -210,6 +211,7 @@ class TestPortalAttendeeCount:
         # The hider opted out of showing their name on their application.
         db.add(
             Applications(
+                sales_flow_id=application_flow_id(db, popup.id),
                 id=uuid.uuid4(),
                 tenant_id=tenant_a.id,
                 popup_id=popup.id,
@@ -294,6 +296,7 @@ class TestPortalAttendeeEmails:
         # them since this is the organiser reaching their own attendees.
         db.add(
             Applications(
+                sales_flow_id=application_flow_id(db, popup.id),
                 id=uuid.uuid4(),
                 tenant_id=tenant.id,
                 popup_id=popup.id,
@@ -587,6 +590,7 @@ class TestPortalRegisterEligibility:
         _give_ticket(db, tenant_a, popup, human)
         db.add(
             Applications(
+                sales_flow_id=application_flow_id(db, popup.id),
                 id=uuid.uuid4(),
                 tenant_id=tenant_a.id,
                 popup_id=popup.id,
@@ -618,6 +622,7 @@ class TestPortalRegisterEligibility:
         _give_ticket(db, tenant_a, popup, human)
         db.add(
             Applications(
+                sales_flow_id=application_flow_id(db, popup.id),
                 id=uuid.uuid4(),
                 tenant_id=tenant_a.id,
                 popup_id=popup.id,

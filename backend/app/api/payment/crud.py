@@ -2216,11 +2216,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 detail="Application not found",
             )
 
-        flow = (
-            sales_flows_crud.get(session, application.sales_flow_id)
-            if application.sales_flow_id is not None
-            else sales_flows_crud.get_default_flow(session, application.popup_id)
-        )
+        flow = sales_flows_crud.get(session, application.sales_flow_id)
         if flow is None:
             return
 

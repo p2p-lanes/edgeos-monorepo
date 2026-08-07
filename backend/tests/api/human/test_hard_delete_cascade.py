@@ -20,6 +20,7 @@ from app.api.human.models import Humans
 from app.api.payment.models import PaymentProducts, Payments
 from app.api.popup.models import Popups
 from app.api.tenant.models import Tenants
+from tests._flow_helpers import application_flow_id
 
 
 def _auth(token: str) -> dict[str, str]:
@@ -62,6 +63,7 @@ def test_cascade_removes_application_and_attendees(
     """Deleting a human drops their application and any attached attendees."""
     human = _make_human(db, tenant_a.id, "withapp")
     application = Applications(
+        sales_flow_id=application_flow_id(db, popup_tenant_a.id),
         id=uuid.uuid4(),
         tenant_id=tenant_a.id,
         human_id=human.id,
@@ -107,6 +109,7 @@ def test_cascade_removes_payments_and_product_snapshots(
 
     human = _make_human(db, tenant_a.id, "chain")
     application = Applications(
+        sales_flow_id=application_flow_id(db, popup_tenant_a.id),
         id=uuid.uuid4(),
         tenant_id=tenant_a.id,
         human_id=human.id,

@@ -28,7 +28,12 @@ from app.api.product.models import Products
 from app.api.shared.enums import SaleType
 from app.api.tenant.models import Tenants
 from app.api.ticketing_step.models import TicketingSteps
-from tests._flow_helpers import default_flow_id, offer_category, provision_default_flow
+from tests._flow_helpers import (
+    application_flow_id,
+    default_flow_id,
+    offer_category,
+    provision_default_flow,
+)
 
 # ---- Fixtures ---------------------------------------------------------------
 
@@ -173,6 +178,7 @@ def _make_application_with_attendee(
     human,
 ) -> tuple[Applications, Attendees]:
     app = Applications(
+        sales_flow_id=application_flow_id(db, popup.id),
         id=uuid.uuid4(),
         tenant_id=popup.tenant_id,
         popup_id=popup.id,

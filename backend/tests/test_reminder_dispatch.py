@@ -38,6 +38,7 @@ from app.api.popup.models import Popups
 from app.api.product.models import Products
 from app.api.tenant.models import Tenants
 from app.services.reminder_dispatch import dispatch_reminders
+from tests._flow_helpers import application_flow_id
 
 DELIVER_TARGET = "app.services.email.service.EmailService._deliver_smtp"
 ENGINE_TARGET = "app.core.db.engine"
@@ -103,6 +104,7 @@ def _make_application(
     now: datetime,
 ) -> Applications:
     application = Applications(
+        sales_flow_id=application_flow_id(db, popup.id),
         id=uuid.uuid4(),
         tenant_id=tenant.id,
         popup_id=popup.id,

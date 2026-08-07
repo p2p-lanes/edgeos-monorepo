@@ -270,7 +270,7 @@ export type ApplicationPublic = {
     popup_id: string;
     human_id: string;
     group_id?: (string | null);
-    sales_flow_id?: (string | null);
+    sales_flow_id: string;
     referral?: (string | null);
     invite_id?: (string | null);
     referral_id?: (string | null);

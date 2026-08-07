@@ -32,6 +32,7 @@ from app.api.popup.models import Popups
 from app.api.product.crud import products_crud
 from app.api.product.models import Products
 from app.api.tenant.models import Tenants
+from tests._flow_helpers import application_flow_id
 
 # ---------------------------------------------------------------------------
 # Fixtures / Helpers
@@ -92,6 +93,7 @@ def _make_pending_payment(
     from app.api.application.schemas import ApplicationStatus
 
     application = Applications(
+        sales_flow_id=application_flow_id(db, popup.id),
         tenant_id=tenant.id,
         popup_id=popup.id,
         human_id=human.id,
@@ -369,6 +371,7 @@ class TestUpdateStatusCancelledRejectedRestoration:
         db.add(human)
         db.flush()
         application = Applications(
+            sales_flow_id=application_flow_id(db, popup_tenant_a.id),
             tenant_id=tenant_a.id,
             popup_id=popup_tenant_a.id,
             human_id=human.id,

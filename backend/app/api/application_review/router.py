@@ -140,11 +140,7 @@ async def get_review_summary(
 
     # Calculate weighted score using SQL aggregation if applicable
     weighted_score = None
-    strategy = (
-        approval_strategies_crud.get_by_flow(db, application.sales_flow_id)
-        if application.sales_flow_id
-        else approval_strategies_crud.get_by_popup(db, application.popup_id)
-    )
+    strategy = approval_strategies_crud.get_by_flow(db, application.sales_flow_id)
     if strategy and strategy.strategy_type == ApprovalStrategyType.WEIGHTED:
         weighted_score = application_reviews_crud.calculate_weighted_score(
             db,
@@ -214,23 +210,22 @@ async def submit_review(
 
     # Override-tier exclusivity (risk-001): if the application's flow has
     # switched to its own reviewer list, only reviewers on THAT list may
-    # vote. Inherit-mode flows (and legacy applications with no flow) keep
-    # today's behavior unchanged — any operator can vote (G1).
-    if application.sales_flow_id is not None:
-        from app.api.popup_reviewer.crud import popup_reviewers_crud
-        from app.api.sales_flow.crud import sales_flows_crud
-        from app.api.sales_flow.schemas import SalesFlowReviewersMode
+    # vote. Inherit-mode flows keep today's behavior — any operator can
+    # vote (G1).
+    from app.api.popup_reviewer.crud import popup_reviewers_crud
+    from app.api.sales_flow.crud import sales_flows_crud
+    from app.api.sales_flow.schemas import SalesFlowReviewersMode
 
-        flow = sales_flows_crud.get(db, application.sales_flow_id)
-        if flow and flow.reviewers_mode == SalesFlowReviewersMode.override:
-            flow_reviewers = popup_reviewers_crud.resolve_for_flow(
-                db, application.popup_id, application.sales_flow_id
+    flow = sales_flows_crud.get(db, application.sales_flow_id)
+    if flow and flow.reviewers_mode == SalesFlowReviewersMode.override:
+        flow_reviewers = popup_reviewers_crud.resolve_for_flow(
+            db, application.popup_id, application.sales_flow_id
+        )
+        if current_user.id not in {r.user_id for r in flow_reviewers}:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You are not a reviewer for this sales flow",
             )
-            if current_user.id not in {r.user_id for r in flow_reviewers}:
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail="You are not a reviewer for this sales flow",
-                )
 
     # Create or update the review
     review = application_reviews_crud.upsert_review(

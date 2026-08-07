@@ -23,6 +23,7 @@ from app.api.human.models import Humans
 from app.api.popup.models import Popups
 from app.api.tenant.models import Tenants
 from app.api.user.models import Users
+from tests._flow_helpers import application_flow_id
 from tests.api.application_review.test_pending_reviews import (
     _auth,
     _make_admin,
@@ -63,6 +64,7 @@ def _make_application(
     db.flush()
 
     application = Applications(
+        sales_flow_id=application_flow_id(db, popup.id),
         tenant_id=tenant.id,
         popup_id=popup.id,
         human_id=human.id,
