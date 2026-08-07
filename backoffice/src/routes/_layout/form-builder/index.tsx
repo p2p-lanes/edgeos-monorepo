@@ -40,6 +40,7 @@ import { DragOverlayContent } from "@/components/form-builder/DragOverlayContent
 import { FieldConfigPanel } from "@/components/form-builder/FieldConfigPanel"
 import { FieldPalette } from "@/components/form-builder/FieldPalette"
 import { FormCanvas } from "@/components/form-builder/FormCanvas"
+import { CopyFormToFlowDialog } from "@/components/forms/CopyFormToFlowDialog"
 import { FlowScopeBar } from "@/components/SalesFlows/FlowScopeBar"
 import { Button } from "@/components/ui/button"
 import {
@@ -736,6 +737,12 @@ function FormBuilderContent({ popupId }: { popupId: string }) {
             <Sparkles className="h-4 w-4" />
             Add predefined fields
           </Button>
+          {activeFlowId && (
+            <CopyFormToFlowDialog
+              popupId={popupId}
+              targetFlowId={activeFlowId}
+            />
+          )}
         </div>
       </div>
 

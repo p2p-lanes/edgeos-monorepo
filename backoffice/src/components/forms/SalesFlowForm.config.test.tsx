@@ -155,6 +155,29 @@ describe("SalesFlowForm - flow-owned settings", () => {
     expect(payload.allows_coupons).toBe(false)
   })
 
+  it("hides the application settings on a flow that never has applications", async () => {
+    /* A direct sale produces no application, so a scholarship toggle there
+       is configuration that can never run. */
+    renderForm({ type: "direct" as never })
+
+    await screen.findByLabelText(/success url/i)
+
+    expect(screen.queryByLabelText(/scholarship/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/application settings/i)).not.toBeInTheDocument()
+    expect(
+      screen.queryByLabelText(/abandoned application delay/i),
+    ).not.toBeInTheDocument()
+  })
+
+  it("keeps the cadences that apply to any sale", async () => {
+    renderForm({ type: "direct" as never })
+
+    expect(
+      await screen.findByLabelText(/abandoned cart delay/i),
+    ).toBeInTheDocument()
+    expect(screen.getByLabelText(/allows coupons/i)).toBeInTheDocument()
+  })
+
   it("never renders the signing secret in clear text", async () => {
     renderForm()
 

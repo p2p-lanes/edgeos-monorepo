@@ -62,6 +62,14 @@ interface ConfigFieldConfig {
   description?: string
   kind: ConfigFieldKind
   options?: { value: string; label: string }[]
+  /**
+   * Only shown on flows of this type. Absent means every flow.
+   *
+   * A direct sale never produces an application, so a scholarship toggle or
+   * an abandoned-application cadence there is configuration that can never
+   * run — the same reason the API refuses an approval strategy on one.
+   */
+  appliesTo?: "application"
 }
 
 const CONFIG_SECTIONS: { title: string; fields: ConfigFieldConfig[] }[] = [
@@ -70,6 +78,7 @@ const CONFIG_SECTIONS: { title: string; fields: ConfigFieldConfig[] }[] = [
     fields: [
       {
         key: "application_layout",
+        appliesTo: "application",
         label: "Application Layout",
         kind: "select",
         options: [
@@ -79,20 +88,36 @@ const CONFIG_SECTIONS: { title: string; fields: ConfigFieldConfig[] }[] = [
       },
       {
         key: "requires_application_fee",
+        appliesTo: "application",
         label: "Requires Application Fee",
         kind: "boolean",
       },
       {
         key: "application_fee_amount",
+        appliesTo: "application",
         label: "Application Fee Amount",
         kind: "currency",
       },
       {
         key: "allows_scholarship",
+        appliesTo: "application",
         label: "Allows Scholarship",
         kind: "boolean",
       },
-      { key: "allows_incentive", label: "Allows Incentive", kind: "boolean" },
+      {
+        key: "allows_incentive",
+        label: "Allows Incentive",
+        kind: "boolean",
+        appliesTo: "application",
+      },
+    ],
+  },
+  {
+    // Coupons are redeemed at checkout, so they apply to any flow that
+    // sells. Sitting under "Application Settings" made the heading survive
+    // on flows that have no applications at all.
+    title: "Discounts",
+    fields: [
       { key: "allows_coupons", label: "Allows Coupons", kind: "boolean" },
     ],
   },
@@ -147,16 +172,19 @@ const CONFIG_SECTIONS: { title: string; fields: ConfigFieldConfig[] }[] = [
       },
       {
         key: "abandoned_application_delay_days",
+        appliesTo: "application",
         label: "Abandoned Application Delay (days)",
         kind: "number",
       },
       {
         key: "abandoned_application_repeat_days",
+        appliesTo: "application",
         label: "Abandoned Application Repeat (days)",
         kind: "number",
       },
       {
         key: "abandoned_application_max_count",
+        appliesTo: "application",
         label: "Abandoned Application Max Count",
         kind: "number",
       },
@@ -573,39 +601,55 @@ export function SalesFlowForm({
           </form.Field>
         </InlineSection>
 
-        {CONFIG_SECTIONS.map((section) => (
-          <div key={section.title}>
-            <Separator />
-            <InlineSection title={section.title}>
-              {section.fields.map((fieldConfig) => (
-                <form.Field
-                  key={fieldConfig.key}
-                  name={`config.${fieldConfig.key}` as "config"}
-                >
-                  {(field) => (
-                    <ConfigFieldRow
-                      fieldKey={fieldConfig.key}
-                      label={fieldConfig.label}
-                      description={fieldConfig.description}
-                      kind={fieldConfig.kind}
-                      options={fieldConfig.options}
-                      value={field.state.value as unknown as string}
-                      onValueChange={(value) =>
-                        field.handleChange(value as never)
-                      }
-                      readOnly={readOnly}
-                      isConfigured={Boolean(
-                        defaultValues?.[
-                          fieldConfig.key as keyof SalesFlowPublic
-                        ],
-                      )}
-                    />
-                  )}
-                </form.Field>
-              ))}
-            </InlineSection>
-          </div>
-        ))}
+        {/*
+          Sections follow the type chosen in this form, not the saved one, so
+          picking "direct" hides the application settings straight away
+          instead of after a save. A section whose every field is filtered
+          out is not rendered — an empty heading reads as a missing feature.
+        */}
+        <form.Subscribe selector={(state) => state.values.type}>
+          {(flowType) =>
+            CONFIG_SECTIONS.map((section) => {
+              const fields = section.fields.filter(
+                (f) => !f.appliesTo || f.appliesTo === flowType,
+              )
+              if (fields.length === 0) return null
+              return (
+                <div key={section.title}>
+                  <Separator />
+                  <InlineSection title={section.title}>
+                    {fields.map((fieldConfig) => (
+                      <form.Field
+                        key={fieldConfig.key}
+                        name={`config.${fieldConfig.key}` as "config"}
+                      >
+                        {(field) => (
+                          <ConfigFieldRow
+                            fieldKey={fieldConfig.key}
+                            label={fieldConfig.label}
+                            description={fieldConfig.description}
+                            kind={fieldConfig.kind}
+                            options={fieldConfig.options}
+                            value={field.state.value as unknown as string}
+                            onValueChange={(value) =>
+                              field.handleChange(value as never)
+                            }
+                            readOnly={readOnly}
+                            isConfigured={Boolean(
+                              defaultValues?.[
+                                fieldConfig.key as keyof SalesFlowPublic
+                              ],
+                            )}
+                          />
+                        )}
+                      </form.Field>
+                    ))}
+                  </InlineSection>
+                </div>
+              )
+            })
+          }
+        </form.Subscribe>
 
         <Separator />
 
