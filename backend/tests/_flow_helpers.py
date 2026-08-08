@@ -153,3 +153,12 @@ def group_flow_id(db, popup_id: uuid.UUID) -> uuid.UUID:
     fixture that builds a `Groups` row directly has to name one.
     """
     return application_flow_id(db, popup_id)
+
+
+def coupon_flow_id(db, popup_id: uuid.UUID) -> uuid.UUID:
+    """The flow a coupon discounts.
+
+    `coupons.sales_flow_id` is NOT NULL since sdd/sales-flows-rediseno, so a
+    fixture that builds a `Coupons` row directly has to name one.
+    """
+    return application_flow_id(db, popup_id)

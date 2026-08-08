@@ -517,6 +517,7 @@ def _seed_form_fields(
 def _seed_coupons(
     session: Session, seed_data: dict, popup_map: dict, tenant_id
 ) -> dict:
+    from app.api.sales_flow.crud import sales_flows_crud
     from app.models import Coupons
 
     coupon_map: dict[str, Coupons] = {}
@@ -538,9 +539,18 @@ def _seed_coupons(
         if existing_coupon:
             coupon_map[map_key] = existing_coupon
         else:
+            # Every coupon discounts a flow (sdd/sales-flows-rediseno),
+            # and seeded popups are provisioned with a default one.
+            default_flow = sales_flows_crud.get_default_flow(session, popup.id)
+            if default_flow is None:
+                raise RuntimeError(
+                    f"seeded popup {popup.slug} has no default sales flow"
+                )
+
             coupon = Coupons(
                 tenant_id=tenant_id,
                 popup_id=popup.id,
+                sales_flow_id=default_flow.id,
                 code=code,
                 discount_value=coupon_data["discount_value"],
                 max_uses=coupon_data.get("max_uses"),

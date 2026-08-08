@@ -47,9 +47,10 @@ class CouponsCRUD(BaseCRUD[Coupons, CouponCreate, CouponUpdate]):
           `popup.sale_type != "direct"` check with a flow-level gate (a
           popup can now have flows of mixed type), without leaking flow
           state to an anonymous caller.
-        - `allows_coupons` is read through the resolved flow's
-          `EffectiveFlowConfig` (design D1/D2): a NULL override inherits the
-          popup value; an explicit flow override wins either direction.
+        - `allows_coupons` is read from the resolved flow, which owns it
+          since sdd/sales-flows-rediseno slice 7.
+        - The code is looked up within that flow: a coupon belongs to one
+          flow, so the same word can mean a different discount in another.
         - ANY failure state (not found, inactive, expired, maxed-out) raises 400
           with the UNIFORM message "Invalid or expired coupon" — never differentiates.
         - On success, returns CouponValidatePublicResponse.
@@ -110,10 +111,10 @@ class CouponsCRUD(BaseCRUD[Coupons, CouponCreate, CouponUpdate]):
                 detail=_PUBLIC_COUPON_ERROR,
             )
 
-        # Attempt coupon lookup — any failure → uniform 400. Codes stay
-        # popup-scoped (design: "codes stay popup-scoped") — every flow of
-        # this popup shares the same code table.
-        coupon = self.get_by_code(session, code, popup.id)
+        # Attempt coupon lookup — any failure → uniform 400. Scoped to the
+        # resolved flow: a code written for one flow was never meant to be
+        # spent in another (sdd/sales-flows-rediseno).
+        coupon = self.get_by_code(session, code, flow.id)
         if coupon is None:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -154,11 +155,16 @@ class CouponsCRUD(BaseCRUD[Coupons, CouponCreate, CouponUpdate]):
         )
 
     def get_by_code(
-        self, session: Session, code: str, popup_id: uuid.UUID
+        self, session: Session, code: str, flow_id: uuid.UUID
     ) -> Coupons | None:
-        """Get a coupon by code and popup_id."""
+        """Get a coupon by code within one flow.
+
+        Keyed on the flow rather than the popup: the same word can mean a
+        different discount in two flows, and a coupon written for one of
+        them was never meant to be spent in the other.
+        """
         statement = select(Coupons).where(
-            Coupons.code == code.upper(), Coupons.popup_id == popup_id
+            Coupons.code == code.upper(), Coupons.sales_flow_id == flow_id
         )
         return session.exec(statement).first()
 
@@ -167,51 +173,38 @@ class CouponsCRUD(BaseCRUD[Coupons, CouponCreate, CouponUpdate]):
         session: Session,
         code: str,
         popup_id: uuid.UUID,
-        flow_id: uuid.UUID | None = None,
+        flow_id: uuid.UUID,
     ) -> Coupons:
-        """
-        Validate a coupon code and return it if valid.
+        """Validate a coupon code within one flow and return it if valid.
 
-        `allows_coupons` is read through the resolved flow's
-        `EffectiveFlowConfig` (design D1/D2, sdd/sales-flows slice 11): a
-        NULL override on the flow inherits the popup value; an explicit flow
-        override wins either direction. Every current caller omits
-        `flow_id`, which resolves to the popup's default flow — byte-identical
-        to the pre-slice-11 popup-only check for the single-default-flow
-        case (every popup created before this slice, and the common case
-        today). `flow_id` exists for a future caller that already knows a
-        specific non-default flow; it is not exposed on any client-suppliable
-        schema in this slice, so no cross-popup ownership check is needed yet
-        — a mismatched `flow_id` degrades to the raw popup value rather than
-        trusting it.
+        `flow_id` is required (sdd/sales-flows-rediseno). It used to be
+        optional and every caller omitted it, so `allows_coupons` was
+        answered against the popup's default flow however the buyer had
+        actually arrived — a flow with coupons switched off still took them.
+        A flow that does not belong to `popup_id` is refused rather than
+        degraded to the popup's own value.
 
         Raises:
-            HTTPException: If coupons are disabled for the popup/flow, or the
+            HTTPException: If coupons are disabled for the flow, or the
             coupon is invalid, expired, or maxed out.
         """
-        from app.api.popup.models import Popups
         from app.api.sales_flow.crud import sales_flows_crud
         from app.api.sales_flow.resolver import build_effective_config
 
-        popup = session.get(Popups, popup_id)
-        if popup is not None:
-            flow = (
-                sales_flows_crud.get(session, flow_id)
-                if flow_id is not None
-                else sales_flows_crud.get_default_flow(session, popup_id)
+        flow = sales_flows_crud.get(session, flow_id)
+        if flow is None or flow.popup_id != popup_id:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Sales flow not found for this popup",
             )
-            allows_coupons = (
-                build_effective_config(flow, popup).allows_coupons
-                if flow is not None and flow.popup_id == popup_id
-                else popup.allows_coupons
-            )
-            if not allows_coupons:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Coupons are not enabled for this event",
-                )
 
-        coupon = self.get_by_code(session, code, popup_id)
+        if not build_effective_config(flow).allows_coupons:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Coupons are not enabled for this event",
+            )
+
+        coupon = self.get_by_code(session, code, flow_id)
 
         if not coupon:
             raise HTTPException(

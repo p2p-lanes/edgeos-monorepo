@@ -21,7 +21,7 @@ import {
 import { DangerZone } from "@/components/Common/DangerZone"
 import { FieldError } from "@/components/Common/FieldError"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
-import { ApplicationFlowPicker } from "@/components/forms/ApplicationFlowPicker"
+import { FlowPicker } from "@/components/forms/FlowPicker"
 import { TranslationManager } from "@/components/translations/TranslationManager"
 import { Button } from "@/components/ui/button"
 import {
@@ -269,11 +269,13 @@ export function GroupForm({
           <form.Field name="sales_flow_id">
             {(field) => (
               <InlineSection title="Sales flow">
-                <ApplicationFlowPicker
+                <FlowPicker
                   popupId={selectedPopupId}
                   value={field.state.value}
                   onChange={(flowId) => field.handleChange(flowId)}
                   disabled={readOnly}
+                  restrictTo="application"
+                  hint="The recipient fills in this flow's form and gets its emails. It cannot be changed later."
                 />
               </InlineSection>
             )}

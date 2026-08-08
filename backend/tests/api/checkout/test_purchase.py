@@ -24,7 +24,11 @@ from app.api.product.models import Products
 from app.api.shared.enums import SaleType
 from app.api.tenant.models import Tenants
 from app.utils.encryption import encrypt
-from tests._flow_helpers import default_flow_id, seed_default_steps
+from tests._flow_helpers import (
+    coupon_flow_id,
+    default_flow_id,
+    seed_default_steps,
+)
 from tests.conftest import with_origin
 
 
@@ -98,6 +102,7 @@ def _make_coupon(
     discount_value: int,
 ) -> Coupons:
     coupon = Coupons(
+        sales_flow_id=coupon_flow_id(db, popup.id),
         id=uuid.uuid4(),
         tenant_id=popup.tenant_id,
         popup_id=popup.id,

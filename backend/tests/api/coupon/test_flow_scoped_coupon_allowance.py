@@ -30,6 +30,7 @@ from app.api.sales_flow.crud import sales_flows_crud
 from app.api.sales_flow.models import SalesFlows
 from app.api.shared.enums import SaleType
 from app.api.tenant.models import Tenants
+from tests._flow_helpers import coupon_flow_id
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -66,12 +67,16 @@ def _make_popup(
 def _provision_flow_returning(
     db: Session, popup: Popups, tenant: Tenants
 ) -> SalesFlows:
-    return sales_flows_crud.provision_default_flow(
+    flow = sales_flows_crud.provision_default_flow(
         db,
         popup_id=popup.id,
         tenant_id=tenant.id,
         sale_type=_sale_type_str(popup),
     )
+    # Persisted before anything points a foreign key at it — coupons now do.
+    db.commit()
+    db.refresh(flow)
+    return flow
 
 
 def _make_flow(
@@ -103,8 +108,15 @@ def _make_flow(
     return flow
 
 
-def _make_coupon(db: Session, popup: Popups, *, code: str = "FLOWTEST") -> Coupons:
+def _make_coupon(
+    db: Session,
+    popup: Popups,
+    *,
+    code: str = "FLOWTEST",
+    flow_id: uuid.UUID | None = None,
+) -> Coupons:
     coupon = Coupons(
+        sales_flow_id=flow_id or coupon_flow_id(db, popup.id),
         tenant_id=popup.tenant_id,
         popup_id=popup.id,
         code=code.upper(),
@@ -128,13 +140,15 @@ class TestValidateCouponInheritance:
         (slice 7), so the day it is created nothing changes for a buyer."""
         popup = _make_popup(db, tenant_a, allows_coupons=True)
         default_flow = _provision_flow_returning(db, popup, tenant_a)
-        _make_coupon(db, popup, code="INHERITOK")
+        _make_coupon(db, popup, code="INHERITOK", flow_id=default_flow.id)
         db.commit()
         assert default_flow.allows_coupons is True, (
             "the copy happens at creation, not as a read-through"
         )
 
-        coupon = coupon_crud.coupons_crud.validate_coupon(db, "INHERITOK", popup.id)
+        coupon = coupon_crud.coupons_crud.validate_coupon(
+            db, "INHERITOK", popup.id, default_flow.id
+        )
         assert coupon.code == "INHERITOK"
 
     def test_a_new_flow_copies_a_disallowing_popup_too(
@@ -143,12 +157,14 @@ class TestValidateCouponInheritance:
         """The other direction: a flow copied from a popup that disallows
         coupons still rejects them."""
         popup = _make_popup(db, tenant_a, allows_coupons=False)
-        _provision_flow_returning(db, popup, tenant_a)
-        _make_coupon(db, popup, code="INHERITBAD")
+        flow = _provision_flow_returning(db, popup, tenant_a)
+        _make_coupon(db, popup, code="INHERITBAD", flow_id=flow.id)
         db.commit()
 
         with pytest.raises(HTTPException) as exc_info:
-            coupon_crud.coupons_crud.validate_coupon(db, "INHERITBAD", popup.id)
+            coupon_crud.coupons_crud.validate_coupon(
+                db, "INHERITBAD", popup.id, flow.id
+            )
         assert exc_info.value.status_code == 400
         assert exc_info.value.detail == "Coupons are not enabled for this event"
 
@@ -156,23 +172,31 @@ class TestValidateCouponInheritance:
         self, db: Session, tenant_a: Tenants
     ) -> None:
         popup = _make_popup(db, tenant_a, allows_coupons=True)
-        _make_flow(db, popup, slug="default", is_default=True, allows_coupons=False)
-        _make_coupon(db, popup, code="OVERRIDEOFF")
+        flow = _make_flow(
+            db, popup, slug="default", is_default=True, allows_coupons=False
+        )
+        _make_coupon(db, popup, code="OVERRIDEOFF", flow_id=flow.id)
         db.commit()
 
         with pytest.raises(HTTPException) as exc_info:
-            coupon_crud.coupons_crud.validate_coupon(db, "OVERRIDEOFF", popup.id)
+            coupon_crud.coupons_crud.validate_coupon(
+                db, "OVERRIDEOFF", popup.id, flow.id
+            )
         assert exc_info.value.status_code == 400
 
     def test_flow_override_true_wins_over_popup_false(
         self, db: Session, tenant_a: Tenants
     ) -> None:
         popup = _make_popup(db, tenant_a, allows_coupons=False)
-        _make_flow(db, popup, slug="default", is_default=True, allows_coupons=True)
-        _make_coupon(db, popup, code="OVERRIDEON")
+        flow = _make_flow(
+            db, popup, slug="default", is_default=True, allows_coupons=True
+        )
+        _make_coupon(db, popup, code="OVERRIDEON", flow_id=flow.id)
         db.commit()
 
-        coupon = coupon_crud.coupons_crud.validate_coupon(db, "OVERRIDEON", popup.id)
+        coupon = coupon_crud.coupons_crud.validate_coupon(
+            db, "OVERRIDEON", popup.id, flow.id
+        )
         assert coupon.code == "OVERRIDEON"
 
 
@@ -300,27 +324,69 @@ class TestValidatePublicFlowResolution:
 
 
 # ---------------------------------------------------------------------------
-# Coupon codes stay popup-scoped (design: "codes stay popup-scoped")
+# A coupon belongs to one flow (sdd/sales-flows-rediseno)
 # ---------------------------------------------------------------------------
 
 
-class TestCouponCodesStayPopupScoped:
-    def test_same_code_validates_through_every_flow_of_its_popup(
+class TestCouponCodesBelongToOneFlow:
+    def test_a_code_is_not_spendable_in_another_flow(
+        self, client: TestClient, db: Session, tenant_a: Tenants
+    ) -> None:
+        """Codes used to be found by (code, popup), so one written for a
+        volunteer campaign was redeemable everywhere the gathering sold.
+
+        `current_uses` counts a single row, so a code spanning two flows
+        shared one allowance between them — "50 uses for volunteers" was
+        never 50. A code wanted in two places is two coupons now, each
+        counting its own.
+        """
+        popup = _make_popup(db, tenant_a, allows_coupons=True)
+        default_flow = _provision_flow_returning(db, popup, tenant_a)
+        secondary = _make_flow(db, popup, slug="secondary", type=SaleType.direct.value)
+        _make_coupon(db, popup, code="SHARED10", flow_id=default_flow.id)
+        db.commit()
+
+        response = client.post(
+            "/api/v1/coupons/validate-public",
+            json={"popup_slug": popup.slug, "code": "SHARED10"},
+            headers={"X-Tenant-Id": str(tenant_a.id)},
+        )
+        assert response.status_code == 200, response.text
+
+        response = client.post(
+            "/api/v1/coupons/validate-public",
+            json={
+                "popup_slug": popup.slug,
+                "code": "SHARED10",
+                "flow_slug": secondary.slug,
+            },
+            headers={"X-Tenant-Id": str(tenant_a.id)},
+        )
+        assert response.status_code == 400, response.text
+        assert response.json()["detail"] == "Invalid or expired coupon"
+
+    def test_the_same_word_can_mean_a_different_discount(
         self, client: TestClient, db: Session, tenant_a: Tenants
     ) -> None:
         popup = _make_popup(db, tenant_a, allows_coupons=True)
-        _provision_flow_returning(db, popup, tenant_a)
+        default_flow = _provision_flow_returning(db, popup, tenant_a)
         secondary = _make_flow(db, popup, slug="secondary", type=SaleType.direct.value)
-        _make_coupon(db, popup, code="SHARED10")
+        cheap = _make_coupon(db, popup, code="EARLY", flow_id=default_flow.id)
+        cheap.discount_value = 10
+        generous = _make_coupon(db, popup, code="EARLY", flow_id=secondary.id)
+        generous.discount_value = 40
         db.commit()
 
-        for flow_slug in (None, secondary.slug):
-            payload: dict[str, str] = {"popup_slug": popup.slug, "code": "SHARED10"}
-            if flow_slug:
-                payload["flow_slug"] = flow_slug
-            response = client.post(
-                "/api/v1/coupons/validate-public",
-                json=payload,
-                headers={"X-Tenant-Id": str(tenant_a.id)},
-            )
-            assert response.status_code == 200, response.text
+        response = client.post(
+            "/api/v1/coupons/validate-public",
+            json={
+                "popup_slug": popup.slug,
+                "code": "EARLY",
+                "flow_slug": secondary.slug,
+            },
+            headers={"X-Tenant-Id": str(tenant_a.id)},
+        )
+
+        assert response.status_code == 200, response.text
+        # The public response serializes the discount as a string.
+        assert int(response.json()["discount_value"]) == 40

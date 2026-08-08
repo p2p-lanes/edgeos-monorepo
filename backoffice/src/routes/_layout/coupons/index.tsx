@@ -10,6 +10,7 @@ import { EmptyState } from "@/components/Common/EmptyState"
 import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
 import { StatusBadge } from "@/components/Common/StatusBadge"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
+import { FlowNameCell } from "@/components/forms/FlowNameCell"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
@@ -56,6 +57,13 @@ function AddCouponButton() {
   )
 }
 
+function FlowCell({ coupon }: { coupon: CouponPublic }) {
+  const { selectedPopupId } = useWorkspace()
+  return (
+    <FlowNameCell popupId={selectedPopupId} flowId={coupon.sales_flow_id} />
+  )
+}
+
 const columns: ColumnDef<CouponPublic>[] = [
   {
     accessorKey: "code",
@@ -63,6 +71,13 @@ const columns: ColumnDef<CouponPublic>[] = [
     cell: ({ row }) => (
       <span className="font-mono font-medium">{row.original.code}</span>
     ),
+  },
+  {
+    // The same word can mean a different discount in two flows, and each
+    // carries its own use count.
+    accessorKey: "sales_flow_id",
+    header: "Sales flow",
+    cell: ({ row }) => <FlowCell coupon={row.original} />,
   },
   {
     accessorKey: "discount_value",

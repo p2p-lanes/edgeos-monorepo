@@ -36,7 +36,10 @@ from app.api.product.models import Products
 from app.api.shared.enums import SaleType
 from app.api.tenant.models import Tenants
 from app.services.simplefi.client import CancelOutcome, CancelOutcomeAmbiguousError
-from tests._flow_helpers import application_flow_id
+from tests._flow_helpers import (
+    application_flow_id,
+    coupon_flow_id,
+)
 
 # ---------------------------------------------------------------------------
 # Shared helpers
@@ -124,6 +127,7 @@ def _make_coupon(
     max_uses: int = 5,
 ) -> Coupons:
     coupon = Coupons(
+        sales_flow_id=coupon_flow_id(db, popup.id),
         id=uuid.uuid4(),
         tenant_id=popup.tenant_id,
         popup_id=popup.id,

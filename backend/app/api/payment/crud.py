@@ -1086,8 +1086,21 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             # coupon would land with zero effect and waste a single-use code.
             # Portal hides the input; this guards crafted requests.
             if obj.coupon_code and discountable_amount > Decimal("0"):
+                if target_flow is None:
+                    # Every popup is provisioned with a default flow, so
+                    # reaching here means the invariant is already broken.
+                    # Say so rather than fail on an attribute.
+                    raise HTTPException(
+                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        detail="This event is not ready to take coupons yet.",
+                    )
+                # The flow the buyer actually came through, not the popup's
+                # default: a flow with coupons off must not take one.
                 coupon = coupons_crud.validate_coupon(
-                    session, code=obj.coupon_code, popup_id=popup.id
+                    session,
+                    code=obj.coupon_code,
+                    popup_id=popup.id,
+                    flow_id=target_flow.id,
                 )
                 discount_value = Decimal(str(coupon.discount_value))
                 discountable_amount = _get_discounted_price(
@@ -1987,6 +2000,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 session,
                 code=obj.coupon_code,
                 popup_id=application.popup_id,
+                flow_id=application.sales_flow_id,
             )
             coupon_discount = Decimal(str(coupon.discount_value))
             discounted_amount, discounted_credit_applied = _calculate_price(

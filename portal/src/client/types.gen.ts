@@ -1254,6 +1254,7 @@ export type CopyStepsToFlowResponse = {
  */
 export type CouponCreate = {
     popup_id: string;
+    sales_flow_id?: (string | null);
     code: string;
     discount_value: number;
     max_uses?: (number | null);
@@ -1268,6 +1269,7 @@ export type CouponCreate = {
 export type CouponPublic = {
     tenant_id: string;
     popup_id: string;
+    sales_flow_id: string;
     code: string;
     discount_value?: number;
     max_uses?: (number | null);
@@ -1295,6 +1297,7 @@ export type CouponUpdate = {
  */
 export type CouponValidate = {
     popup_id: string;
+    sales_flow_id?: (string | null);
     code: string;
 };
 

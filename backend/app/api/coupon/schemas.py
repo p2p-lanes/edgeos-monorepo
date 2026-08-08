@@ -10,6 +10,10 @@ class CouponBase(SQLModel):
 
     tenant_id: uuid.UUID = Field(foreign_key="tenants.id", index=True)
     popup_id: uuid.UUID = Field(foreign_key="popups.id", index=True)
+    # The flow this coupon discounts. Required (sdd/sales-flows-rediseno):
+    # a code found by popup alone was redeemable in every flow the
+    # gathering sold through, including flows with coupons switched off.
+    sales_flow_id: uuid.UUID = Field(foreign_key="sales_flows.id", index=True)
     code: str = Field(index=True)
     discount_value: int = Field(default=0)  # Percentage: 0–100
     max_uses: int | None = Field(default=None, nullable=True)
@@ -35,6 +39,9 @@ class CouponCreate(BaseModel):
     """Coupon schema for creation."""
 
     popup_id: uuid.UUID
+    # Omitted means the popup's default flow, which is the only flow a
+    # coupon's `allows_coupons` check was ever read from.
+    sales_flow_id: uuid.UUID | None = None
     code: str
     discount_value: int
     max_uses: int | None = None
@@ -82,6 +89,9 @@ class CouponValidate(BaseModel):
     """Schema for validating a coupon code."""
 
     popup_id: uuid.UUID
+    # Which flow the buyer is in. Omitted means the popup's default flow,
+    # which is the only flow this check was ever answered against.
+    sales_flow_id: uuid.UUID | None = None
     code: str
 
     @field_validator("code")

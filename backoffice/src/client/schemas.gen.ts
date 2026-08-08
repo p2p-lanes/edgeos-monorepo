@@ -5405,6 +5405,18 @@ export const CouponCreateSchema = {
             format: 'uuid',
             title: 'Popup Id'
         },
+        sales_flow_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Sales Flow Id'
+        },
         code: {
             type: 'string',
             title: 'Code'
@@ -5472,6 +5484,11 @@ export const CouponPublicSchema = {
             format: 'uuid',
             title: 'Popup Id'
         },
+        sales_flow_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Sales Flow Id'
+        },
         code: {
             type: 'string',
             title: 'Code'
@@ -5533,7 +5550,7 @@ export const CouponPublicSchema = {
         }
     },
     type: 'object',
-    required: ['tenant_id', 'popup_id', 'code', 'id'],
+    required: ['tenant_id', 'popup_id', 'sales_flow_id', 'code', 'id'],
     title: 'CouponPublic',
     description: 'Coupon schema for API responses.'
 } as const;
@@ -5620,6 +5637,18 @@ export const CouponValidateSchema = {
             type: 'string',
             format: 'uuid',
             title: 'Popup Id'
+        },
+        sales_flow_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Sales Flow Id'
         },
         code: {
             type: 'string',

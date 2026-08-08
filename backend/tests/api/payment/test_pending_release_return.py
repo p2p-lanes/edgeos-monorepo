@@ -28,7 +28,10 @@ from app.api.popup.models import Popups
 from app.api.shared.enums import SaleType
 from app.api.tenant.models import Tenants
 from app.services.simplefi.client import CancelOutcome
-from tests._flow_helpers import application_flow_id
+from tests._flow_helpers import (
+    application_flow_id,
+    coupon_flow_id,
+)
 
 # ---------------------------------------------------------------------------
 # Shared helpers (copied from test_pending_hold_pr2 to remain autonomous)
@@ -118,6 +121,7 @@ def _make_coupon(
     max_uses: int = 5,
 ) -> Coupons:
     coupon = Coupons(
+        sales_flow_id=coupon_flow_id(db, popup.id),
         id=uuid.uuid4(),
         tenant_id=popup.tenant_id,
         popup_id=popup.id,

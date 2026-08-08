@@ -11,6 +11,7 @@ import {
 import { DangerZone } from "@/components/Common/DangerZone"
 import { FieldError } from "@/components/Common/FieldError"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
+import { FlowPicker } from "@/components/forms/FlowPicker"
 import { Button } from "@/components/ui/button"
 import { DatePicker } from "@/components/ui/date-picker"
 import {
@@ -105,6 +106,7 @@ export function CouponForm({ defaultValues, onSuccess }: CouponFormProps) {
       start_date: formatDateForInput(defaultValues?.start_date),
       end_date: formatDateForInput(defaultValues?.end_date),
       is_active: defaultValues?.is_active ?? true,
+      sales_flow_id: defaultValues?.sales_flow_id ?? "",
     },
     onSubmit: ({ value }) => {
       if (readOnly) return
@@ -128,6 +130,7 @@ export function CouponForm({ defaultValues, onSuccess }: CouponFormProps) {
         }
         createMutation.mutate({
           popup_id: selectedPopupId,
+          sales_flow_id: value.sales_flow_id || undefined,
           code: value.code.toUpperCase(),
           discount_value: Number(value.discount_value),
           max_uses: value.max_uses ? Number(value.max_uses) : undefined,
@@ -201,6 +204,32 @@ export function CouponForm({ defaultValues, onSuccess }: CouponFormProps) {
         <Separator />
 
         {/* Discount Settings */}
+        {/*
+          Which flow this code discounts. A code used to be found by
+          gathering, so one written for a volunteer campaign was spendable
+          everywhere — and `current_uses` counts one row, so the allowance
+          was shared. Any flow type may own one: discounting a sale is
+          something every flow does.
+
+          Locked after creation: moving a live code would change who can
+          spend it, and its use count came from the flow it was in.
+        */}
+        {!isEdit && selectedPopupId && (
+          <form.Field name="sales_flow_id">
+            {(field) => (
+              <InlineSection title="Sales flow">
+                <FlowPicker
+                  popupId={selectedPopupId}
+                  value={field.state.value}
+                  onChange={(flowId) => field.handleChange(flowId)}
+                  disabled={readOnly}
+                  hint="Only buyers in this flow can spend the code, and its use count is its own."
+                />
+              </InlineSection>
+            )}
+          </form.Field>
+        )}
+
         <InlineSection title="Discount Settings">
           <form.Field
             name="discount_value"
