@@ -58,7 +58,22 @@
     "no_active_popups": "Engir virkir viðburðir",
     "no_active_popups_description": "Engir virkir viðburðir eru í boði núna. Vinsamlegast athugaðu aftur síðar.",
     "no_profile": "Engar prófílupplýsingar í boði.",
-    "no_profile_contact": "Vinsamlegast hafðu samband við þjónustudeild ef þú telur þetta vera villu."
+    "no_profile_contact": "Vinsamlegast hafðu samband við þjónustudeild ef þú telur þetta vera villu.",
+    "door_generic": "Umsóknin þín",
+    "door_attendees_one": "{{count}} einstaklingur",
+    "door_attendees_other": "{{count}} einstaklingar",
+    "door_status": {
+      "accepted": "Samþykkt",
+      "in_review": "Í yfirferð",
+      "draft": "Drög",
+      "rejected": "Ekki samþykkt",
+      "none": "Opin"
+    },
+    "door_action": {
+      "passes": "Skoða passana mína",
+      "application": "Skoða umsókn",
+      "apply": "Sækja um"
+    }
   },
   "auth": {
     "sign_up_or_log_in": "Skráðu þig eða innskráðu",

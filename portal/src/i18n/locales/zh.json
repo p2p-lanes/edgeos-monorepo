@@ -58,7 +58,22 @@
     "no_active_popups": "暂无活动",
     "no_active_popups_description": "目前没有可用的活动。请稍后再来查看。",
     "no_profile": "没有可用的个人资料数据。",
-    "no_profile_contact": "如果您认为这是错误，请联系支持团队。"
+    "no_profile_contact": "如果您认为这是错误，请联系支持团队。",
+    "door_generic": "你的申请",
+    "door_attendees_one": "{{count}} 人",
+    "door_attendees_other": "{{count}} 人",
+    "door_status": {
+      "accepted": "已接受",
+      "in_review": "审核中",
+      "draft": "草稿",
+      "rejected": "未通过",
+      "none": "开放"
+    },
+    "door_action": {
+      "passes": "查看我的通行证",
+      "application": "查看申请",
+      "apply": "申请"
+    }
   },
   "auth": {
     "sign_up_or_log_in": "注册或登录",

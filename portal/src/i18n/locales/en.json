@@ -72,7 +72,22 @@
     "no_active_popups": "No Active Popups",
     "no_active_popups_description": "There are no active popups available at the moment. Please check back later.",
     "no_profile": "No profile data available.",
-    "no_profile_contact": "Please contact support if you believe this is an error."
+    "no_profile_contact": "Please contact support if you believe this is an error.",
+    "door_generic": "Your application",
+    "door_attendees_one": "{{count}} person",
+    "door_attendees_other": "{{count}} people",
+    "door_status": {
+      "accepted": "Accepted",
+      "in_review": "In review",
+      "draft": "Draft",
+      "rejected": "Not accepted",
+      "none": "Open"
+    },
+    "door_action": {
+      "passes": "View my passes",
+      "application": "View application",
+      "apply": "Apply"
+    }
   },
   "auth": {
     "sign_up_or_log_in": "Sign Up or Log In",

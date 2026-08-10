@@ -44,23 +44,13 @@ export function GatheringDoorCard({
   const isAccepted = door.status === "accepted"
   const hasApplied = door.application !== null
 
-  const statusLabel = t(`portal.door_status.${door.status.replace(" ", "_")}`, {
-    defaultValue: {
-      accepted: "Accepted",
-      "in review": "In review",
-      draft: "Draft",
-      rejected: "Not accepted",
-      none: "Open",
-    }[door.status],
-  })
+  const statusLabel = t(`portal.door_status.${door.status.replace(" ", "_")}`)
 
   const actionLabel = isAccepted
-    ? t("portal.door_action.passes", { defaultValue: "View my passes" })
+    ? t("portal.door_action.passes")
     : hasApplied
-      ? t("portal.door_action.application", {
-          defaultValue: "View application",
-        })
-      : t("portal.door_action.apply", { defaultValue: "Apply" })
+      ? t("portal.door_action.application")
+      : t("portal.door_action.apply")
 
   const onClick = () => {
     const flow = `?flow=${door.flowId}`
@@ -78,7 +68,7 @@ export function GatheringDoorCard({
           <p className="font-semibold">{door.name}</p>
         ) : (
           <p className="font-semibold text-muted-foreground">
-            {t("portal.door_generic", { defaultValue: "Your application" })}
+            {t("portal.door_generic")}
           </p>
         )}
         <span
@@ -90,9 +80,10 @@ export function GatheringDoorCard({
 
       {door.application?.attendees?.length ? (
         <p className="text-muted-foreground text-sm">
+          {/* `_one`/`_other` keys, not a bare defaultValue — that never
+              pluralizes, and one attendee read as "1 people". */}
           {t("portal.door_attendees", {
             count: door.application.attendees.length,
-            defaultValue: "{{count}} people",
           })}
         </p>
       ) : null}
