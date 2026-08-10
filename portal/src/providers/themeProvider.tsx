@@ -1,7 +1,7 @@
 "use client"
 
-import { type ReactNode, useEffect, useMemo } from "react"
-import { useCityProvider } from "./cityProvider"
+import { type ReactNode, useContext, useEffect, useMemo } from "react"
+import { CityContext } from "./cityProvider"
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Design-token theme system.
@@ -279,8 +279,12 @@ export default function ThemeProvider({
    */
   config?: ThemeConfig | null
 }) {
-  const { getCity } = useCityProvider()
-  const city = getCity()
+  // The raw context, not `useCityProvider`, which throws when there is no
+  // CityProvider above. The checkout mounts this provider with an explicit
+  // `config` and has no CityProvider of its own, so demanding one would
+  // take the page down to read a value it was never going to use.
+  const cityContext = useContext(CityContext)
+  const city = cityContext?.getCity()
   const themeConfig =
     config !== undefined
       ? config

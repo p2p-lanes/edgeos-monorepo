@@ -11,6 +11,7 @@ import CityProvider from "@/providers/cityProvider"
 import DiscountProvider from "@/providers/discountProvider"
 import { LanguageProvider } from "@/providers/languageProvider"
 import PassesProvider from "@/providers/passesProvider"
+import ThemeProvider from "@/providers/themeProvider"
 
 const CheckoutBridge = ({ children }: { children: ReactNode }) => {
   const { getAttendees } = useApplication()
@@ -24,24 +25,26 @@ const CheckoutBridge = ({ children }: { children: ReactNode }) => {
 }
 
 /**
- * ThemeProvider is deliberately NOT here.
+ * Despite the name, this wraps the invite, group and referral landing
+ * pages — `/invite`, `/groups`, `/r` — not `/checkout`, which mounts its
+ * own providers in `CheckoutPageClient`.
  *
- * A flow chooses how its checkout looks (sdd/sales-flows-rediseno), and
- * the flow is only known once the runtime has loaded — below this point.
- * `CheckoutPageClient` mounts the provider with the flow's theme, so there
- * is exactly one writer to the CSS variables instead of a parent and a
- * child racing on effect order.
+ * ThemeProvider belongs here because those pages have no sales flow in
+ * scope: they dress in the gathering's theme, the same as the portal. The
+ * checkout mounts its own with the flow's theme instead.
  */
 const PublicCheckoutProviders = ({ children }: { children: ReactNode }) => {
   return (
     <CityProvider public>
-      <LanguageProvider>
-        <ApplicationProvider>
-          <DiscountProvider>
-            <CheckoutBridge>{children}</CheckoutBridge>
-          </DiscountProvider>
-        </ApplicationProvider>
-      </LanguageProvider>
+      <ThemeProvider>
+        <LanguageProvider>
+          <ApplicationProvider>
+            <DiscountProvider>
+              <CheckoutBridge>{children}</CheckoutBridge>
+            </DiscountProvider>
+          </ApplicationProvider>
+        </LanguageProvider>
+      </ThemeProvider>
     </CityProvider>
   )
 }
