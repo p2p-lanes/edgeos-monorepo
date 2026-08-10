@@ -1,6 +1,6 @@
 "use client"
 
-import { useParams, useRouter } from "next/navigation"
+import { useParams, useRouter, useSearchParams } from "next/navigation"
 import { useEffect } from "react"
 import { CheckoutBackgroundImage } from "@/components/CheckoutBackgroundImage"
 import { CheckoutBackgroundVideo } from "@/components/CheckoutBackgroundVideo"
@@ -14,9 +14,17 @@ import PassesProvider, { usePassesProvider } from "@/providers/passesProvider"
 export default function BuyPassesContent() {
   const params = useParams()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { attendeePasses: attendees, products } = usePassesProvider()
   const { getCity } = useCityProvider()
   const background = getCheckoutBackground(getCity(), "passes")
+
+  // Which door into the gathering this purchase is for. Steps belong to a
+  // sales flow (sdd/sales-flows-rediseno), so without it someone accepted
+  // through a partner door bought through the default door's checkout —
+  // its steps, its products, its wording. Absent means the gathering has
+  // one door, which is almost all of them.
+  const flowId = searchParams.get("flow")
 
   // The portal layout owns the scroll container (<main id="portal-scroll">),
   // and the SnapDotNav indicator sits on the right edge of the viewport. The
@@ -31,14 +39,16 @@ export default function BuyPassesContent() {
   }, [])
 
   const handleBack = () => {
-    router.push(`/portal/${params.popupSlug}/passes`)
+    // Carry the door back, or the passes list starts guessing again.
+    const back = `/portal/${params.popupSlug}/passes`
+    router.push(flowId ? `${back}?flow=${flowId}` : back)
   }
 
   if (!attendees.length || !products.length) return <Loader />
 
   return (
     <PassesProvider attendees={attendees} restoreFromCart>
-      <CheckoutProvider initialStep="passes">
+      <CheckoutProvider initialStep="passes" salesFlowId={flowId}>
         {background.type === "image" && (
           <CheckoutBackgroundImage url={background.url} />
         )}

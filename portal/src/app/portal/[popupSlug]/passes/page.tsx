@@ -1,7 +1,7 @@
 "use client"
 
 import { AlertCircle, RefreshCw, Ticket } from "lucide-react"
-import { useParams, useRouter } from "next/navigation"
+import { useParams, useRouter, useSearchParams } from "next/navigation"
 import { useEffect } from "react"
 import { useTranslation } from "react-i18next"
 import { resolvePopupCheckoutPolicy } from "@/checkout/popupCheckoutPolicy"
@@ -22,6 +22,7 @@ export default function HomePasses() {
   const { t } = useTranslation()
   const params = useParams()
   const router = useRouter()
+  const flowId = useSearchParams().get("flow")
   const { participation } = useApplication()
   const { getCity } = useCityProvider()
   const { attendeePasses: attendees, products } = usePassesProvider()
@@ -113,9 +114,12 @@ export default function HomePasses() {
 
   // Empty state shared by both flows. The buy CTA is hidden when there are no
   // products to sell, so it never becomes a dead-end button.
+  // The door rides along, or the buy page starts guessing which
+  // application it is selling into (sdd/sales-flows-rediseno).
+  const flowQuery = flowId ? `?flow=${flowId}` : ""
   const buyHref = isDirectSale
     ? `/checkout/${params.popupSlug}`
-    : `/portal/${params.popupSlug}/passes/buy`
+    : `/portal/${params.popupSlug}/passes/buy${flowQuery}`
   const emptyState = (
     <div className="w-full md:mt-0 mx-auto items-center max-w-3xl p-6 bg-transparent">
       <div className="flex flex-col items-center justify-center rounded-2xl border bg-card p-10 text-center shadow-sm">
@@ -178,7 +182,7 @@ export default function HomePasses() {
           router.push(
             isDirectSale
               ? `/checkout/${params.popupSlug}`
-              : `/portal/${params.popupSlug}/passes/buy`,
+              : `/portal/${params.popupSlug}/passes/buy${flowQuery}`,
           )
         }
       />

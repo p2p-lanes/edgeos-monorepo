@@ -212,6 +212,15 @@ interface CheckoutProviderProps {
   productsOverride?: ProductsPass[]
   emptyCatalogReason?: string | null
   configuredStepsOverride?: TicketingStepPublic[]
+  /**
+   * Which door's checkout this is.
+   *
+   * Steps belong to a sales flow (sdd/sales-flows-rediseno), so a portal
+   * buyer accepted through a partner door must see that door's steps and
+   * not the gathering's default ones. Omitted resolves the default flow,
+   * which is what a single-door gathering has.
+   */
+  salesFlowId?: string | null
   accountCreditOverride?: number
   validatePromoCodeOverride?: (code: string) => Promise<number | null>
   submitMode?: "application" | "open-ticketing"
@@ -234,6 +243,7 @@ export function CheckoutProvider({
   productsOverride,
   emptyCatalogReason = null,
   configuredStepsOverride,
+  salesFlowId,
   accountCreditOverride,
   validatePromoCodeOverride,
   submitMode = "application",
@@ -261,7 +271,10 @@ export function CheckoutProvider({
     useGetPassesData()
   const products = productsOverride ?? queriedProducts
   const isAuthenticated = useIsAuthenticated()
-  const application = getRelevantApplication()
+  // The application of THIS door. It decides the attendees, the balance and
+  // the `application_id` the payment is created against, so answering with
+  // another door's would charge the wrong one (sdd/sales-flows-rediseno).
+  const application = getRelevantApplication(salesFlowId)
   const city = getCity()
   const editPassesEnabled = city?.edit_passes_enabled ?? false
   // The stored credit balance applies unconditionally (R-FE-02, R-BE-03):
@@ -282,10 +295,11 @@ export function CheckoutProvider({
 
   // Ticketing step configuration from API
   const { data: stepsData, isLoading: isLoadingSteps } = useQuery({
-    queryKey: ["ticketing-steps-portal", cityId],
+    queryKey: ["ticketing-steps-portal", cityId, salesFlowId ?? null],
     queryFn: () =>
       TicketingStepsService.listPortalTicketingSteps({
         popupId: cityId!,
+        salesFlowId: salesFlowId ?? undefined,
       }),
     enabled: !configuredStepsOverride && !!cityId && isAuthenticated,
   })
