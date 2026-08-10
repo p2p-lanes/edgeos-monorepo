@@ -7,10 +7,12 @@ import {
   Ticket,
   Users,
 } from "lucide-react"
+import { useSearchParams } from "next/navigation"
 import { useTranslation } from "react-i18next"
 import { OpenClaw } from "@/components/Icons/OpenClaw"
 import { buildEndedResources } from "@/hooks/endedResources"
 import useAuth from "@/hooks/useAuth"
+import { useGatheringDoors } from "@/hooks/useGatheringDoors"
 import { useHumanPopupAccess } from "@/hooks/useHumanPopupAccess"
 import { useApplication } from "@/providers/applicationProvider"
 import { useCityProvider } from "@/providers/cityProvider"
@@ -20,9 +22,25 @@ const useResources = () => {
   const { t } = useTranslation()
   const { getCity } = useCityProvider()
   const { getRelevantApplication, participation } = useApplication()
+  // Which door into the gathering the sidebar is describing. It is
+  // always on screen, so with two applications and no door named it
+  // would have to speak for both at once — one status, one passes link
+  // (sdd/sales-flows-rediseno). Absent means a single application,
+  // which is almost everyone.
+  const flowId = useSearchParams().get("flow")
+  // Every link keeps the door, so moving through the sidebar never
+  // drops back to guessing.
+  const flowQuery = flowId ? `?flow=${flowId}` : ""
   const { user } = useAuth()
-  const application = getRelevantApplication()
+  const application = getRelevantApplication(flowId)
   const city = getCity()
+  const { doors } = useGatheringDoors(city?.id ? String(city.id) : null)
+  // Named only when there is more than one way in. With a single door the
+  // sidebar has nothing to disambiguate and saying its name would be noise.
+  const doorName =
+    doors.length > 1
+      ? (doors.find((door) => door.flowId === flowId)?.name ?? null)
+      : null
   const endedAccess = useHumanPopupAccess(
     city?.status === "ended" && city?.id ? String(city.id) : null,
   )
@@ -33,7 +51,7 @@ const useResources = () => {
       city,
       participated: endedAccess.state === "allowed",
     })
-    return { resources }
+    return { resources, doorName: null }
   }
 
   // Popup-level feature flag: hides the entire events module when off.
@@ -61,17 +79,17 @@ const useResources = () => {
         name: t("sidebar.overview", { defaultValue: "Overview" }),
         icon: Ticket,
         status: "active",
-        path: `/portal/${city?.slug}`,
+        path: `/portal/${city?.slug}${flowQuery}`,
       },
       {
         name: t("sidebar.passes"),
         icon: Ticket,
         status: "active",
-        path: `/portal/${city?.slug}/passes`,
+        path: `/portal/${city?.slug}/passes${flowQuery}`,
       },
     ]
 
-    return { resources }
+    return { resources, doorName: null }
   }
 
   if (isCompanion) {
@@ -81,7 +99,7 @@ const useResources = () => {
         name: t("sidebar.companion"),
         icon: Users,
         status: "active",
-        path: `/portal/${city?.slug}`,
+        path: `/portal/${city?.slug}${flowQuery}`,
         children: [
           {
             name: t("sidebar.status"),
@@ -94,25 +112,25 @@ const useResources = () => {
         name: t("sidebar.passes"),
         icon: Ticket,
         status: companionCanSeePasses ? "active" : "hidden",
-        path: `/portal/${city?.slug}/passes`,
+        path: `/portal/${city?.slug}/passes${flowQuery}`,
       },
       {
         name: t("sidebar.events"),
         icon: CalendarDays,
         status: companionEventsVisible ? "active" : "hidden",
-        path: `/portal/${city?.slug}/events`,
+        path: `/portal/${city?.slug}/events${flowQuery}`,
         children: [
           {
             name: t("sidebar.tracks", { defaultValue: "Tracks" }),
             icon: Layers,
             status: companionEventsVisible ? "active" : "hidden",
-            path: `/portal/${city?.slug}/events/tracks`,
+            path: `/portal/${city?.slug}/events/tracks${flowQuery}`,
           },
           {
             name: t("sidebar.venues"),
             icon: MapPin,
             status: companionEventsVisible ? "active" : "hidden",
-            path: `/portal/${city?.slug}/events/venues`,
+            path: `/portal/${city?.slug}/events/venues${flowQuery}`,
           },
           {
             name: t("sidebar.agentic_access", {
@@ -126,7 +144,7 @@ const useResources = () => {
       },
     ]
 
-    return { resources }
+    return { resources, doorName: null }
   }
 
   const resources: Resource[] = [
@@ -134,7 +152,7 @@ const useResources = () => {
       name: t("sidebar.application"),
       icon: FileText,
       status: "active",
-      path: `/portal/${city?.slug}`,
+      path: `/portal/${city?.slug}${flowQuery}`,
       children: [
         {
           name: t("sidebar.status"),
@@ -147,31 +165,31 @@ const useResources = () => {
       name: t("sidebar.passes"),
       icon: Ticket,
       status: canSeeAttendees ? "active" : "hidden",
-      path: `/portal/${city?.slug}/passes`,
+      path: `/portal/${city?.slug}/passes${flowQuery}`,
     },
     {
       name: t("sidebar.attendee_directory"),
       icon: Users,
       status: canSeeAttendees && attendeeDirectoryEnabled ? "active" : "hidden",
-      path: `/portal/${city?.slug}/attendees`,
+      path: `/portal/${city?.slug}/attendees${flowQuery}`,
     },
     {
       name: t("sidebar.events"),
       icon: CalendarDays,
       status: canSeeAttendees && eventsEnabled ? "active" : "hidden",
-      path: `/portal/${city?.slug}/events`,
+      path: `/portal/${city?.slug}/events${flowQuery}`,
       children: [
         {
           name: t("sidebar.tracks", { defaultValue: "Tracks" }),
           icon: Layers,
           status: canSeeAttendees && eventsEnabled ? "active" : "hidden",
-          path: `/portal/${city?.slug}/events/tracks`,
+          path: `/portal/${city?.slug}/events/tracks${flowQuery}`,
         },
         {
           name: t("sidebar.venues"),
           icon: MapPin,
           status: canSeeAttendees && eventsEnabled ? "active" : "hidden",
-          path: `/portal/${city?.slug}/events/venues`,
+          path: `/portal/${city?.slug}/events/venues${flowQuery}`,
         },
         {
           name: t("sidebar.agentic_access", { defaultValue: "Agentic access" }),
@@ -185,10 +203,10 @@ const useResources = () => {
       name: t("sidebar.referrals"),
       icon: Link2,
       status: canSeeAttendees && referralsEnabled ? "active" : "hidden",
-      path: `/portal/${city?.slug}/referrals`,
+      path: `/portal/${city?.slug}/referrals${flowQuery}`,
     },
   ]
 
-  return { resources }
+  return { resources, doorName }
 }
 export default useResources

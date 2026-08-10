@@ -76,7 +76,7 @@ const ResourceItem: React.FC<{
 
 const ResourcesMenu = () => {
   const { t } = useTranslation()
-  const { resources } = useResources()
+  const { resources, doorName } = useResources()
   const router = useRouter()
   const pathname = usePathname()
 
@@ -90,7 +90,11 @@ const ResourcesMenu = () => {
   return (
     <SidebarContent>
       <SidebarGroup>
-        <SidebarGroupLabel>{t("sidebar.your_participation")}</SidebarGroupLabel>
+        {/* Says which way in the sidebar is describing. Only when there
+            is more than one — otherwise there is nothing to tell apart. */}
+        <SidebarGroupLabel>
+          {doorName ?? t("sidebar.your_participation")}
+        </SidebarGroupLabel>
         <SidebarGroupContent>
           <SidebarMenu>
             {resources
