@@ -1,6 +1,7 @@
 "use client"
 
 import { CalendarDays } from "lucide-react"
+import { useSearchParams } from "next/navigation"
 import type * as React from "react"
 import { useTranslation } from "react-i18next"
 import { useApplication } from "@/providers/applicationProvider"
@@ -16,7 +17,11 @@ export function useEventsApiAccess(): { allowed: boolean } {
   const { getCity } = useCityProvider()
   const { getRelevantApplication, participation } = useApplication()
   const city = getCity()
-  const application = getRelevantApplication()
+  // The door this screen is about. Without it, someone holding two
+  // applications was answered with whichever came last
+  // (sdd/sales-flows-rediseno).
+  const flowId = useSearchParams().get("flow")
+  const application = getRelevantApplication(flowId)
 
   const isDirectSale = city?.sale_type === "direct"
   const isCompanion = participation?.type === "companion"

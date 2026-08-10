@@ -1,6 +1,6 @@
 "use client"
 
-import { useParams, useRouter } from "next/navigation"
+import { useParams, useRouter, useSearchParams } from "next/navigation"
 import { useEffect } from "react"
 import { Loader } from "@/components/ui/Loader"
 import { useApplicationsQuery } from "@/hooks/useGetApplications"
@@ -35,7 +35,11 @@ export default function EventsLayout({
 
   const isDirectSale = city?.sale_type === "direct"
   const isCompanion = participation?.type === "companion"
-  const application = getRelevantApplication()
+  // The door this screen is about. Without it, someone holding two
+  // applications was answered with whichever came last
+  // (sdd/sales-flows-rediseno).
+  const flowId = useSearchParams().get("flow")
+  const application = getRelevantApplication(flowId)
 
   // Only an accepted application (or an accepted companion) may view events,
   // mirroring the sidebar gate. A draft/pending_fee/in-review application owns

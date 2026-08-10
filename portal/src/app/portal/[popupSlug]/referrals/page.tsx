@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Copy, Link2, Loader2, Trash2 } from "lucide-react"
+import { useSearchParams } from "next/navigation"
 import { useState } from "react"
 import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
@@ -151,7 +152,11 @@ const ReferralsPage = () => {
   const city = getCity()
   const queryClient = useQueryClient()
   const { getRelevantApplication } = useApplication()
-  const application = getRelevantApplication()
+  // The door this screen is about. Without it, someone holding two
+  // applications was answered with whichever came last
+  // (sdd/sales-flows-rediseno).
+  const flowId = useSearchParams().get("flow")
+  const application = getRelevantApplication(flowId)
   // Only attendees who actually hold a ticket for this popup may create a
   // referral link (anti-abuse — mirrors the backend gate). Acceptance alone is
   // not enough: invite/referral arrivals are auto-accepted without committing.
