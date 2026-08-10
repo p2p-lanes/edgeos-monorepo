@@ -71,6 +71,13 @@ interface CheckoutContextValue {
   currentStep: CheckoutStep
   availableSteps: CheckoutStep[]
   stepConfigs: TicketingStepPublic[]
+  /**
+   * The door this checkout is selling into. Sections below read it
+   * rather than the URL: on the checkout routes the flow is a path
+   * segment, not a query, so `?flow=` would find nothing there
+   * (sdd/sales-flows-rediseno).
+   */
+  salesFlowId: string | null
   cart: CheckoutCartState
   summary: CheckoutCartSummary
   allProducts: ProductsPass[]
@@ -1384,6 +1391,7 @@ export function CheckoutProvider({
     currentStep,
     availableSteps,
     stepConfigs: configuredSteps,
+    salesFlowId: salesFlowId ?? null,
     cart,
     summary,
     allProducts: products,

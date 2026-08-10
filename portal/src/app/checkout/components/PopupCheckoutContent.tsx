@@ -84,6 +84,13 @@ export const PopupCheckoutContent = ({
   const router = useRouter()
   const hasSkippedForm = useRef(false)
   const attendees = useResolvedAttendees()
+  // Left without a door on purpose. This is the anonymous checkout, whose
+  // flow travels as a path segment rather than `?flow=`, and whose buyers
+  // have no application at all — it is read here only to notice someone who
+  // already bought or is a companion on somebody else's. An application
+  // flow reaching this page is handed to the portal instead
+  // (ApplicationCheckoutRedirect), so the ambiguity this would resolve
+  // cannot arise here (sdd/sales-flows-rediseno).
   const existingApplication = getRelevantApplication()
 
   // Companion-on-someone-else's-application detection. Only active when the
