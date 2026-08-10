@@ -27,9 +27,16 @@ import type { AttendeePassState } from "@/types/Attendee"
  * When no city is loaded, no user is logged in, or required data is missing
  * for the direct-sale branch, the hook returns an empty list.
  *
- * The hook signature is unchanged for all consumers.
+ * `applicationId` narrows the list to one door into the gathering. The
+ * query behind it is popup-scoped, so someone accepted as a volunteer AND
+ * through general entry gets both sets mixed together without it — two
+ * people's worth of passes on one screen, with no way to tell which
+ * belongs to which (sdd/sales-flows-rediseno). Omitting it is correct only
+ * when the person holds a single application, which is almost everyone.
  */
-export function useResolvedAttendees(): AttendeePassState[] {
+export function useResolvedAttendees(
+  applicationId?: string | null,
+): AttendeePassState[] {
   const { getCity } = useCityProvider()
   const { user } = useAuth()
 
@@ -85,7 +92,14 @@ export function useResolvedAttendees(): AttendeePassState[] {
   // rows from the public passes view (see dedupTicketEntries for full
   // context and the day/meal_plan exceptions). The raw `products` field on
   // the attendee is left untouched for buy-mode / cart consumers.
-  const withTicketEntries = humanAttendees.map(
+  const scoped = applicationId
+    ? humanAttendees.filter(
+        (attendee: AttendeeWithOriginPublic) =>
+          attendee.application_id === applicationId,
+      )
+    : humanAttendees
+
+  const withTicketEntries = scoped.map(
     (attendee: AttendeeWithOriginPublic): AttendeePassState => ({
       ...(attendee as unknown as AttendeePassState),
       products: [],
