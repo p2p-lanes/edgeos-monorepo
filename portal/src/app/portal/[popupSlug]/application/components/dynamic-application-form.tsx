@@ -160,7 +160,10 @@ export function DynamicApplicationForm({
 }: DynamicApplicationFormProps) {
   const { t } = useTranslation()
   const { getRelevantApplication } = useApplication()
-  const application = getRelevantApplication()
+  // The application of the door this form is for. It already receives
+  // `salesFlowId`, so asking without it would answer about another way
+  // in (sdd/sales-flows-rediseno).
+  const application = getRelevantApplication(salesFlowId)
 
   const { values, errors, handleChange, validate, progress } =
     useApplicationForm(schema, existingApplication, popup.id)

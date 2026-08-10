@@ -81,14 +81,9 @@ export default function FormPage() {
   // Referral UUID carried from /r/{code} consumption page (REQ-GR-009)
   const referralId = searchParams.get("referral_id")
 
-  // sdd/sales-flows task 9.4: the FlowPicker is shown only when a popup has
-  // more than one portal-listed application flow — `needsFlowChoice` gates
-  // the form until the visitor picks one. Single/zero-flow popups never
-  // set it (FlowPicker renders nothing and auto-selects internally), so
-  // this is a no-op for the common case.
-  // Seeded from `?flow=`, which is how the gathering home hands over: the
-  // door card already asked which way in, so asking again with the
-  // FlowPicker would be asking twice (sdd/sales-flows-rediseno).
+  // Which way into the gathering this form is for. Seeded from `?flow=`,
+  // which is how the home hands over: the door card already asked, so the
+  // FlowPicker below would be asking twice (sdd/sales-flows-rediseno).
   const [selectedFlowId, setSelectedFlowId] = useState<string | null>(
     searchParams.get("flow"),
   )
@@ -100,17 +95,15 @@ export default function FormPage() {
   // before we know whether it's even safe to reach the JSX that mounts
   // FlowPicker. Same query, shared cache — no extra request.
   const { data: portalFlows } = usePortalSalesFlows(city?.id)
-  // `null` = not resolved yet (never gates a redirect). Deliberately still
-  // a flow-COUNT heuristic, not an `application.sales_flow_id` lookup:
-  // ApplicationPublic exposes sales_flow_id as of slice 14, but a terminal
-  // `application` fetched here is resolved by human+popup, independent of
-  // FlowPicker's (not-yet-made) selection — so even knowing the existing
-  // application's flow doesn't tell us it's the SAME flow this visitor is
-  // about to pick. Once a popup has more than one flow, redirecting on a
-  // terminal status is unsafe until the visitor has chosen. Simplifying
-  // this to a per-flow lookup was considered and deferred (task 14.x
-  // backlog) — it would change what "terminal" means for a multi-flow
-  // visitor, which is a product decision, not a mechanical refactor.
+  // Whether a door still has to be picked before the form means anything.
+  // Its only job now is holding the form back: without a door, the schema
+  // query falls to the default flow and would show the wrong questions.
+  //
+  // It used to gate the terminal-status redirect too, because `application`
+  // was resolved by human and gathering and might belong to another door —
+  // redirecting on it could send someone away from a door they had not
+  // applied through. That is decided per door now, so the redirect asks
+  // about the status and nothing else. `null` while the flows load.
   const needsFlowChoice = portalFlows ? portalFlows.length > 1 : null
 
   const {
@@ -134,19 +127,13 @@ export default function FormPage() {
   }, [importSource, existingApp])
 
   // Resolved applications are no longer accessible from the form.
-  // draft/pending_fee/in review stay editable so the applicant can still finish,
-  // retry the fee payment, or update details while the application is under review.
-  // Gated on needsFlowChoice === false: only single/zero-flow popups have an
-  // unambiguous `application` to redirect on (rel-002 correction) — for
-  // multi-flow popups the FlowPicker must get a chance to mount instead.
+  // draft/pending_fee/in review stay editable so the applicant can still
+  // finish, retry the fee payment, or update details while under review.
   useEffect(() => {
-    if (
-      application &&
-      shouldRedirectToStatus(needsFlowChoice, application.status)
-    ) {
+    if (application && shouldRedirectToStatus(application.status)) {
       router.replace(`/portal/${city?.slug}`)
     }
-  }, [application, city, router, needsFlowChoice])
+  }, [application, city, router])
 
   useEffect(() => {
     if (city?.sale_type === "direct") {
@@ -186,10 +173,10 @@ export default function FormPage() {
     return <Loader />
   }
 
-  // Resolved applications never render the form. The effect above redirects to
-  // the portal home; show a loader meanwhile to avoid flashing it. Same
-  // needsFlowChoice === false gate as the effect (rel-002 correction).
-  if (shouldRedirectToStatus(needsFlowChoice, application?.status)) {
+  // Resolved applications never render the form. The effect above
+  // redirects to the portal home; show a loader meanwhile so it does not
+  // flash. Same check as the effect, from the same function.
+  if (shouldRedirectToStatus(application?.status)) {
     return <Loader />
   }
 
