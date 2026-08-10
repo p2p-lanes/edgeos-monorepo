@@ -100,6 +100,11 @@ class CheckoutRuntimeResponse(BaseModel):
     # so the portal renders its own copy; None whenever products are present
     # or the flow simply has nothing set up.
     empty_catalog_reason: str | None = None
+    # How THIS flow's checkout looks (sdd/sales-flows-rediseno). Separate
+    # from `popup.theme_config`, which still dresses the gathering's own
+    # pages: outside checkout no flow is in scope, so there is nothing to
+    # read it from. Two surfaces, two owners — not a fallback chain.
+    theme_config: dict[str, Any] | None = None
 
 
 class CheckoutShareMeta(BaseModel):

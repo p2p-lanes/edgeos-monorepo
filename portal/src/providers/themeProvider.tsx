@@ -63,7 +63,7 @@ interface ThemeColors {
   card_foreground_color?: string
 }
 
-interface ThemeConfig {
+export interface ThemeConfig {
   colors?: ThemeColors & Record<string, string | undefined>
   typography?: ThemeTypography
   radius?: string
@@ -262,10 +262,29 @@ function buildThemeStyles(
   return styles
 }
 
-export default function ThemeProvider({ children }: { children: ReactNode }) {
+export default function ThemeProvider({
+  children,
+  config,
+}: {
+  children: ReactNode
+  /**
+   * The theme to apply instead of the gathering's own.
+   *
+   * A sales flow chooses how its checkout looks
+   * (sdd/sales-flows-rediseno), and outside checkout no flow is in scope,
+   * so the gathering's theme dresses its own pages. Passing this REPLACES
+   * the gathering's rather than layering on top: two writers to the same
+   * CSS variables would depend on effect ordering, and React runs child
+   * effects before parent ones.
+   */
+  config?: ThemeConfig | null
+}) {
   const { getCity } = useCityProvider()
   const city = getCity()
-  const themeConfig = city?.theme_config as ThemeConfig | null | undefined
+  const themeConfig =
+    config !== undefined
+      ? config
+      : (city?.theme_config as ThemeConfig | null | undefined)
 
   const themeStyles = useMemo(
     () => buildThemeStyles(themeConfig),

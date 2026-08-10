@@ -17,6 +17,7 @@ import {
   subscribeRequestLanguage,
 } from "@/lib/language-storage"
 import { getAuthRedirectPath } from "@/lib/safe-return-to"
+import ThemeProvider, { type ThemeConfig } from "@/providers/themeProvider"
 import { useCheckoutRuntime } from "./hooks/useCheckoutRuntime"
 
 interface CheckoutPageClientProps {
@@ -127,31 +128,35 @@ export default function CheckoutPageClient({
   const background = getCheckoutBackground(runtime.popup, "checkout")
 
   return (
-    <SidebarProvider
-      defaultOpen={false}
-      className="block min-h-0"
-      style={
-        {
-          "--sidebar-width": "0px",
-          "--sidebar-width-icon": "0px",
-        } as React.CSSProperties
-      }
-    >
-      <main
-        className={`h-svh overflow-y-auto no-scrollbar ${background.type === "none" ? "bg-background" : ""}`.trim()}
+    // The flow's own look, not the gathering's. Mounted here because the
+    // flow is only known once the runtime has loaded.
+    <ThemeProvider config={runtime.theme_config as ThemeConfig | null}>
+      <SidebarProvider
+        defaultOpen={false}
+        className="block min-h-0"
+        style={
+          {
+            "--sidebar-width": "0px",
+            "--sidebar-width-icon": "0px",
+          } as React.CSSProperties
+        }
       >
-        {background.type === "image" && (
-          <CheckoutBackgroundImage url={background.url} />
-        )}
-        {background.type === "video" && (
-          <CheckoutBackgroundVideo url={background.url} />
-        )}
-        <OpenCheckoutRuntime
-          runtime={runtime}
-          popupSlug={popupSlug}
-          prefilledBuyer={prefilledBuyer}
-        />
-      </main>
-    </SidebarProvider>
+        <main
+          className={`h-svh overflow-y-auto no-scrollbar ${background.type === "none" ? "bg-background" : ""}`.trim()}
+        >
+          {background.type === "image" && (
+            <CheckoutBackgroundImage url={background.url} />
+          )}
+          {background.type === "video" && (
+            <CheckoutBackgroundVideo url={background.url} />
+          )}
+          <OpenCheckoutRuntime
+            runtime={runtime}
+            popupSlug={popupSlug}
+            prefilledBuyer={prefilledBuyer}
+          />
+        </main>
+      </SidebarProvider>
+    </ThemeProvider>
   )
 }

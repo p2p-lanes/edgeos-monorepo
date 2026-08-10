@@ -299,6 +299,7 @@ def runtime_for_slug(
                         section_dict[key] = t_data[key]
 
     return CheckoutRuntimeResponse(
+        theme_config=flow.theme_config,
         popup=PopupPublic.model_validate(popup_data),
         products=[_product(p) for p in products],
         buyer_form=[

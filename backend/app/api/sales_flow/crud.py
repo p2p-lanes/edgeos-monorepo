@@ -212,6 +212,12 @@ class SalesFlowsCRUD(BaseCRUD[SalesFlows, SalesFlowCreate, SalesFlowUpdate]):
         for name in EFFECTIVE_CONFIG_FIELDS:
             if getattr(flow, name, None) is None:
                 setattr(flow, name, getattr(popup, name, None))
+
+        # Copied the same way but deliberately not in EFFECTIVE_CONFIG_FIELDS:
+        # that tuple is what the flow settings form renders, and a raw JSONB
+        # blob is not a setting anyone edits in a row of switches.
+        if flow.theme_config is None:
+            flow.theme_config = popup.theme_config
         return flow
 
     def ensure_reviewers_override(

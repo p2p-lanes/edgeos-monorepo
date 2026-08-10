@@ -5234,6 +5234,18 @@ export const CheckoutRuntimeResponseSchema = {
                 }
             ],
             title: 'Empty Catalog Reason'
+        },
+        theme_config: {
+            anyOf: [
+                {
+                    additionalProperties: true,
+                    type: 'object'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Theme Config'
         }
     },
     type: 'object',
@@ -19378,6 +19390,18 @@ export const SalesFlowCreateSchema = {
                 }
             ],
             title: 'Restriction Rule'
+        },
+        theme_config: {
+            anyOf: [
+                {
+                    additionalProperties: true,
+                    type: 'object'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Theme Config'
         }
     },
     type: 'object',
@@ -19462,6 +19486,18 @@ export const SalesFlowPublicSchema = {
                 }
             ],
             title: 'Restriction Rule'
+        },
+        theme_config: {
+            anyOf: [
+                {
+                    additionalProperties: true,
+                    type: 'object'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Theme Config'
         },
         application_layout: {
             anyOf: [
@@ -20058,6 +20094,18 @@ export const SalesFlowUpdateSchema = {
                 }
             ],
             title: 'Restriction Rule'
+        },
+        theme_config: {
+            anyOf: [
+                {
+                    additionalProperties: true,
+                    type: 'object'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Theme Config'
         }
     },
     type: 'object',

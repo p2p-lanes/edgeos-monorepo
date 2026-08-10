@@ -114,6 +114,14 @@ class SalesFlowBase(SQLModel):
         default=None, sa_column=Column(JSONB, nullable=True)
     )
 
+    # How this flow's checkout looks (sdd/sales-flows-rediseno). Copied from
+    # the popup when the flow is created, and read only from here after
+    # that. NULL means "no overrides", never "ask the popup" — that
+    # read-through is the shape this redesign removed everywhere else.
+    theme_config: dict | None = Field(
+        default=None, sa_column=Column(JSONB, nullable=True)
+    )
+
     # --- Class B: inheritable override (all NULLABLE — NULL = inherit popup) ---
     application_layout: ApplicationLayout | None = Field(default=None, nullable=True)
     requires_application_fee: bool | None = Field(default=None, nullable=True)
@@ -168,6 +176,7 @@ class SalesFlowCreate(BaseModel):
     abandoned_application_repeat_days: int | None = None
     abandoned_application_max_count: int | None = None
     restriction_rule: dict | None = None
+    theme_config: dict | None = None
 
     @field_validator("slug")
     @classmethod
@@ -222,6 +231,7 @@ class SalesFlowUpdate(BaseModel):
     abandoned_application_repeat_days: int | None = None
     abandoned_application_max_count: int | None = None
     restriction_rule: dict | None = None
+    theme_config: dict | None = None
 
     @field_validator("slug")
     @classmethod
