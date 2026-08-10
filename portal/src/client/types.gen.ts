@@ -1196,6 +1196,7 @@ export type CheckoutRuntimeResponse = {
     [key: string]: unknown;
 } | null);
     empty_catalog_reason?: (string | null);
+    flow_type?: (string | null);
     theme_config?: ({
     [key: string]: unknown;
 } | null);

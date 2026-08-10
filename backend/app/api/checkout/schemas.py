@@ -100,6 +100,11 @@ class CheckoutRuntimeResponse(BaseModel):
     # so the portal renders its own copy; None whenever products are present
     # or the flow simply has nothing set up.
     empty_catalog_reason: str | None = None
+    # Which kind of flow this is. The portal needs it to pick the payment
+    # call: an application flow's buyer pays through their application, and
+    # sending them down the anonymous path would create a second, unlinked
+    # purchase (sdd/sales-flows-rediseno).
+    flow_type: str | None = None
     # How THIS flow's checkout looks (sdd/sales-flows-rediseno). Separate
     # from `popup.theme_config`, which still dresses the gathering's own
     # pages: outside checkout no flow is in scope, so there is nothing to

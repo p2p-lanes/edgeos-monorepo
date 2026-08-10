@@ -18,6 +18,7 @@ import {
 } from "@/lib/language-storage"
 import { getAuthRedirectPath } from "@/lib/safe-return-to"
 import ThemeProvider, { type ThemeConfig } from "@/providers/themeProvider"
+import { ApplicationCheckoutRedirect } from "./ApplicationCheckoutRedirect"
 import { useCheckoutRuntime } from "./hooks/useCheckoutRuntime"
 
 interface CheckoutPageClientProps {
@@ -122,6 +123,22 @@ export default function CheckoutPageClient({
           </p>
         </div>
       </div>
+    )
+  }
+
+  // An application flow's buyer pays through their application, and this
+  // page only knows how to submit an anonymous purchase — sending them
+  // down that path would create a second, unlinked payment. The backend
+  // now serves these flows to the people they accepted
+  // (sdd/sales-flows-rediseno), so the link works; the purchase itself
+  // still belongs to the portal page that loads their attendees and
+  // credit. Sending them there is the whole of what the URL owed them.
+  if (runtime.flow_type === "application") {
+    return (
+      <ApplicationCheckoutRedirect
+        popupSlug={popupSlug}
+        flowSlug={flowSlug ?? undefined}
+      />
     )
   }
 

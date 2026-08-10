@@ -25,9 +25,11 @@ from app.api.form_section.models import FormSections
 from app.api.popup.models import Popups
 from app.api.popup.schemas import PopupPublic, PopupStatus
 from app.api.product.models import Products
-from app.api.sales_flow.eligibility import assert_upsale_eligible
+from app.api.sales_flow.eligibility import (
+    assert_application_flow_eligible,
+    assert_upsale_eligible,
+)
 from app.api.sales_flow.resolver import resolve_flow
-from app.api.sales_flow.schemas import SalesFlowType
 from app.api.shared.enums import SaleType
 from app.api.ticketing_step.crud import ticketing_steps_crud
 from app.api.ticketing_step.models import TicketingSteps
@@ -161,15 +163,18 @@ def runtime_for_slug(
     human with >=1 APPROVED payment in this popup (design D8, G0 #2/#3) —
     see `assert_upsale_eligible`. Direct-type flows are unaffected; this
     endpoint remains fully anonymous for them.
+
+    Application-type flows are served too, to the people they already
+    accepted (`assert_application_flow_eligible`). They used to be refused
+    by type, which asked the wrong question: what separates an anonymous
+    purchase from an application-backed one is who is buying, not what the
+    flow is called. Their buyers reach the same checkout through the portal
+    already, rendering the same components.
     """
     popup = _get_popup_by_slug_or_404(session, slug, tenant_id)
-    flow = resolve_flow(
-        session,
-        popup,
-        flow_slug,
-        require_types={SalesFlowType.direct, SalesFlowType.upsale},
-    )
+    flow = resolve_flow(session, popup, flow_slug)
     assert_upsale_eligible(session, flow, popup.id, tenant_id, current_human)
+    assert_application_flow_eligible(session, flow, tenant_id, current_human)
 
     # Load active products, then apply catalog-read enforcement (design D5/D6,
     # D3 amendment, sdd/sales-flows slice 12): D3 per-product exclusivity and
@@ -299,6 +304,7 @@ def runtime_for_slug(
                         section_dict[key] = t_data[key]
 
     return CheckoutRuntimeResponse(
+        flow_type=flow.type,
         theme_config=flow.theme_config,
         popup=PopupPublic.model_validate(popup_data),
         products=[_product(p) for p in products],

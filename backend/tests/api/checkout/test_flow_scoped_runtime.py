@@ -221,9 +221,18 @@ class TestFlowSlugRouting:
         )
         assert response.status_code == 404, response.text
 
-    def test_application_type_flow_returns_403(
+    def test_an_application_flow_asks_an_anonymous_caller_to_sign_in(
         self, client: TestClient, db: Session, tenant_a: Tenants
     ) -> None:
+        """An application flow is served to the people it accepted, so the
+        gate is who is asking rather than what the flow is called
+        (sdd/sales-flows-rediseno). 401 because nothing was presented; an
+        authenticated stranger gets 403.
+
+        This endpoint is public and rate limited, so an application flow's
+        catalog must not be enumerable without an accepted application in
+        that flow.
+        """
         popup = _make_direct_popup(db, tenant_a)
         flow = _make_flow(db, popup, slug="apply-only", type="application")
         db.commit()
@@ -232,7 +241,7 @@ class TestFlowSlugRouting:
             f"/api/v1/checkout/{popup.slug}/{flow.slug}/runtime",
             headers={"X-Tenant-Id": str(tenant_a.id)},
         )
-        assert response.status_code == 403, response.text
+        assert response.status_code == 401, response.text
 
 
 class TestSectionFieldTierParity:

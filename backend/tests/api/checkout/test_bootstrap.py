@@ -422,11 +422,17 @@ def test_runtime_unknown_slug_returns_404(
     assert response.status_code == 404, response.text
 
 
-def test_runtime_application_popup_returns_403(
+def test_runtime_application_popup_asks_an_anonymous_caller_to_sign_in(
     client: TestClient, db: Session, tenant_a: Tenants
 ) -> None:
-    """Application popup returns 403 (only direct/upsale sales flows served —
-    resolved via the default flow's own `type`, sdd/sales-flows slice 9)."""
+    """An application flow is served, but only to the people it accepted.
+
+    It used to be refused by type. That asked the wrong question: what
+    separates an anonymous purchase from an application-backed one is who
+    is buying (sdd/sales-flows-rediseno). 401 rather than 403 because no
+    credentials were presented at all — the same signal an upsale flow
+    gives.
+    """
     from app.api.sales_flow.crud import sales_flows_crud
 
     slug = f"app-boot-{uuid.uuid4().hex[:8]}"
@@ -452,7 +458,7 @@ def test_runtime_application_popup_returns_403(
         f"/api/v1/checkout/{popup.slug}/runtime",
         headers={"X-Tenant-Id": str(tenant_a.id)},
     )
-    assert response.status_code == 403, response.text
+    assert response.status_code == 401, response.text
 
 
 def test_runtime_inactive_direct_popup_returns_403(

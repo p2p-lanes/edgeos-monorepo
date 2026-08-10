@@ -165,3 +165,75 @@ def assert_upsale_eligible(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You don't have access to this checkout",
         )
+
+
+def has_accepted_application_in_flow(
+    session: Session,
+    human_id: uuid.UUID,
+    sales_flow_id: uuid.UUID,
+) -> bool:
+    """Whether `human_id` has been accepted into `sales_flow_id`.
+
+    Keyed on the flow, not the popup. Since F4 an application always names
+    one, so being accepted into the general intake says nothing about a
+    partner flow that asks its own questions.
+    """
+    from app.api.application.models import Applications
+    from app.api.application.schemas import ApplicationStatus
+
+    return bool(
+        session.exec(
+            select(
+                sa_exists().where(
+                    Applications.human_id == human_id,
+                    Applications.sales_flow_id == sales_flow_id,
+                    Applications.status == ApplicationStatus.ACCEPTED.value,
+                )
+            )
+        ).first()
+    )
+
+
+def assert_application_flow_eligible(
+    session: Session,
+    flow: "SalesFlows",
+    tenant_id: uuid.UUID,
+    current_human: "HumanPublic | None",
+) -> None:
+    """Gate an application-type flow to the people it already accepted.
+
+    An application flow used to be refused outright at the checkout route,
+    on the reading that its buyers go through the portal. They do, but the
+    two surfaces render the same `ScrollyCheckoutFlow`; the only real
+    difference is which payment call runs. Refusing by flow TYPE used the
+    wrong question — what decides an anonymous purchase from an
+    application-backed one is who is buying, not what the flow is called.
+
+    So this asks that instead, and mirrors `assert_upsale_eligible` exactly:
+
+    Anonymous -> 401, because no credentials were presented at all.
+    Authenticated but not accepted into THIS flow -> 403, because
+    credentials were presented, are valid, and simply do not grant access
+    here.
+
+    The distinction matters more than for upsales: this endpoint is public
+    and rate-limited, and an application flow's catalog is not something an
+    anonymous caller may enumerate.
+    """
+    if SalesFlowType(flow.type) != SalesFlowType.application:
+        return
+
+    if current_human is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Sign in to access this checkout",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    if current_human.tenant_id != tenant_id or not has_accepted_application_in_flow(
+        session, current_human.id, flow.id
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You don't have access to this checkout",
+        )

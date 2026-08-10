@@ -5235,6 +5235,17 @@ export const CheckoutRuntimeResponseSchema = {
             ],
             title: 'Empty Catalog Reason'
         },
+        flow_type: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Flow Type'
+        },
         theme_config: {
             anyOf: [
                 {
