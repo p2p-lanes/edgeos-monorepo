@@ -149,14 +149,6 @@ interface DynamicApplicationFormProps {
    * resolution.
    */
   salesFlowId?: string | null
-  /**
-   * True when the popup exposes more than one application flow (rel-001
-   * correction). ApplicationPublic carries no sales_flow_id, so when this is
-   * true `existingApplication` cannot be trusted to belong to `salesFlowId`
-   * — see useSubmitApplication, which uses this to avoid PATCHing a
-   * different flow's application.
-   */
-  needsFlowChoice?: boolean
 }
 
 export function DynamicApplicationForm({
@@ -165,7 +157,6 @@ export function DynamicApplicationForm({
   popup,
   referralId,
   salesFlowId,
-  needsFlowChoice,
 }: DynamicApplicationFormProps) {
   const { t } = useTranslation()
   const { getRelevantApplication } = useApplication()
@@ -188,7 +179,6 @@ export function DynamicApplicationForm({
     validate,
     referralId,
     salesFlowId,
-    needsFlowChoice,
   })
 
   const feeAlreadyPaid = Boolean(

@@ -59,7 +59,6 @@ interface UseSubmitApplicationArgs {
    * True when the popup has more than one application flow (rel-001
    * correction). Gates the create-vs-update branch below — see there.
    */
-  needsFlowChoice?: boolean
 }
 
 /** Owns the create-or-update mutation, the "submit" and "save draft" flows,
@@ -73,7 +72,6 @@ export function useSubmitApplication({
   validate,
   referralId,
   salesFlowId,
-  needsFlowChoice,
 }: UseSubmitApplicationArgs) {
   const { t, i18n } = useTranslation()
   const router = useRouter()
@@ -88,17 +86,19 @@ export function useSubmitApplication({
 
   const submitMutation = useMutation({
     mutationFn: async (status: "draft" | "in review") => {
-      // rel-001 correction: `application` is popup-scoped only —
-      // ApplicationPublic carries no sales_flow_id — so once a popup has
-      // more than one flow (needsFlowChoice), we cannot prove `application`
-      // belongs to the flow being submitted for. PATCHing it in that case
-      // risks silently overwriting a different flow's application. Single/
-      // zero-flow popups have no such ambiguity (only one flow can ever
-      // exist) and keep updating as before. Multi-flow popups always create
-      // instead: the backend's per-human-per-flow duplicate guard
-      // (create_my_application router) rejects a true same-flow resubmit
-      // with a clean 400 rather than us silently overwriting the wrong one.
-      if (application?.id && !needsFlowChoice) {
+      // `application` is the one belonging to the door being submitted
+      // for, or null (sdd/sales-flows-rediseno). That is what makes this a
+      // plain question again.
+      //
+      // It used to be popup-scoped, so with more than one flow it could
+      // not be proven to belong here, and this branch always created
+      // instead — leaning on the backend's per-human-per-flow guard to
+      // reject a same-flow resubmit with a 400 rather than overwrite the
+      // wrong application. That trade is no longer needed, and keeping it
+      // would now break editing a draft: the application in hand IS this
+      // door's, so creating a second one is exactly what the guard
+      // refuses.
+      if (application?.id) {
         return ApplicationsService.updateMyApplication({
           popupId: popup.id,
           requestBody: splitForUpdate({ values, status, schema }),

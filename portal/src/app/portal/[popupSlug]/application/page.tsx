@@ -20,12 +20,18 @@ import { FormHeader } from "./components/form-header"
 import { SectionSeparator } from "./components/section-separator"
 import { shouldRedirectToStatus } from "./lib/shouldRedirectToStatus"
 
-function useFormInitData() {
+/**
+ * @param flowId Which way into the gathering the form is for. Without it,
+ *   someone holding two applications would resume editing whichever the
+ *   provider picked, and could overwrite the wrong one
+ *   (sdd/sales-flows-rediseno).
+ */
+function useFormInitData(flowId: string | null) {
   const { getCity, getPopups } = useCityProvider()
   const { applications, getRelevantApplication } = useApplication()
   const city = getCity()
   const popups = getPopups()
-  const application = getRelevantApplication()
+  const application = getRelevantApplication(flowId)
 
   return useMemo(() => {
     if (!city || !applications) return { application: null, importSource: null }
@@ -65,7 +71,6 @@ export default function FormPage() {
   const { getCity } = useCityProvider()
   const { getRelevantApplication } = useApplication()
   const city = getCity()
-  const application = getRelevantApplication()
   const router = useRouter()
   const searchParams = useSearchParams()
   // Capture once on mount so a later URL change doesn't tear down the fee
@@ -81,7 +86,15 @@ export default function FormPage() {
   // the form until the visitor picks one. Single/zero-flow popups never
   // set it (FlowPicker renders nothing and auto-selects internally), so
   // this is a no-op for the common case.
-  const [selectedFlowId, setSelectedFlowId] = useState<string | null>(null)
+  // Seeded from `?flow=`, which is how the gathering home hands over: the
+  // door card already asked which way in, so asking again with the
+  // FlowPicker would be asking twice (sdd/sales-flows-rediseno).
+  const [selectedFlowId, setSelectedFlowId] = useState<string | null>(
+    searchParams.get("flow"),
+  )
+  // Declared after the door, not before it: asking which application this
+  // is without saying which way in used to answer with whichever came last.
+  const application = getRelevantApplication(selectedFlowId)
   // Resolved independently of the <FlowPicker> element below (not via its
   // onResolved callback): the terminal-status guards further down need this
   // before we know whether it's even safe to reach the JSX that mounts
@@ -105,7 +118,8 @@ export default function FormPage() {
     isLoading: schemaLoading,
     isError,
   } = useApplicationSchema(city?.id, selectedFlowId)
-  const { application: existingApp, importSource } = useFormInitData()
+  const { application: existingApp, importSource } =
+    useFormInitData(selectedFlowId)
 
   const [showImport, setShowImport] = useState(false)
   const [importedData, setImportedData] = useState<ApplicationPublic | null>(
@@ -238,7 +252,6 @@ export default function FormPage() {
             popup={city}
             referralId={referralId}
             salesFlowId={selectedFlowId}
-            needsFlowChoice={needsFlowChoice === true}
           />
         </FileUploadProvider>
       )}

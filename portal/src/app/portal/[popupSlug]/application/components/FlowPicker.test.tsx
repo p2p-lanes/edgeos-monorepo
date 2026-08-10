@@ -151,7 +151,6 @@ describe("useSubmitApplication create-vs-update (rel-001 correction)", () => {
           values: {},
           application: existing,
           validate: () => ({ isValid: true, errors: {} }),
-          needsFlowChoice: false,
         }),
       { wrapper },
     )
@@ -162,7 +161,36 @@ describe("useSubmitApplication create-vs-update (rel-001 correction)", () => {
     expect(ApplicationsService.createMyApplication).not.toHaveBeenCalled()
   })
 
-  it("never PATCHes across flows: creates instead when the flow is ambiguous", async () => {
+  it("creates when this door has no application yet", async () => {
+    /* The caller resolves `application` for the door being submitted for
+       (sdd/sales-flows-rediseno), so null means this door genuinely has
+       none — not that another door's is in hand.
+
+       This used to create whenever the gathering had more than one flow,
+       even with a draft open, because `application` was popup-scoped and
+       could not be proven to belong here. That trade would now break
+       editing: the backend's per-human-per-flow guard refuses the second
+       application. */
+    const { result } = renderHook(
+      () =>
+        useSubmitApplication({
+          popup,
+          schema,
+          values: {},
+          application: null,
+          validate: () => ({ isValid: true, errors: {} }),
+          salesFlowId: "flow-b",
+        }),
+      { wrapper },
+    )
+
+    await act(async () => result.current.handleDraft())
+
+    expect(ApplicationsService.createMyApplication).toHaveBeenCalled()
+    expect(ApplicationsService.updateMyApplication).not.toHaveBeenCalled()
+  })
+
+  it("edits this door's own draft instead of opening a second one", async () => {
     const existing = { id: "app-1" } as ApplicationPublic
     const { result } = renderHook(
       () =>
@@ -173,14 +201,13 @@ describe("useSubmitApplication create-vs-update (rel-001 correction)", () => {
           application: existing,
           validate: () => ({ isValid: true, errors: {} }),
           salesFlowId: "flow-b",
-          needsFlowChoice: true,
         }),
       { wrapper },
     )
 
     await act(async () => result.current.handleDraft())
 
-    expect(ApplicationsService.createMyApplication).toHaveBeenCalled()
-    expect(ApplicationsService.updateMyApplication).not.toHaveBeenCalled()
+    expect(ApplicationsService.updateMyApplication).toHaveBeenCalled()
+    expect(ApplicationsService.createMyApplication).not.toHaveBeenCalled()
   })
 })
