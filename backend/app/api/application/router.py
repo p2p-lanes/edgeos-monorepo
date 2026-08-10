@@ -10,6 +10,7 @@ from fastapi.responses import Response
 from loguru import logger
 
 from app.api.application import crud
+from app.api.application.history_crud import build_previous_applications
 from app.api.application.models import ApplicationComment
 from app.api.application.schemas import (
     AdminGrantTicketsRequest,
@@ -36,6 +37,7 @@ from app.api.application.schemas import (
     NoParticipation,
     ParticipationResponse,
     PopupAccessResponse,
+    PreviousApplicationSummary,
     ScholarshipDecisionRequest,
     parse_application_filters,
 )
@@ -749,6 +751,38 @@ async def get_application(
         comment_count=comment_count,
         skipped_by_me=my_skip is not None,
         my_skip_reason=my_skip.reason if my_skip else None,
+    )
+
+
+@router.get(
+    "/{application_id}/previous",
+    response_model=list[PreviousApplicationSummary],
+    summary="List this applicant's applications to other popups",
+)
+async def list_previous_applications(
+    application_id: uuid.UUID,
+    db: AdminOrApiKeySession_ApplicationsRead,
+) -> list[PreviousApplicationSummary]:
+    """List the same human's applications to the tenant's other popups (BO only).
+
+    Each entry carries the popup name, the application status, how many tickets
+    were purchased, and the approved spend — the history a reviewer needs to
+    judge a repeat applicant. Newest first, every status included.
+
+    Not paginated: one person applies to a handful of popups at most.
+    """
+    application = crud.applications_crud.get(db, application_id)
+
+    if not application:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Application not found",
+        )
+
+    return build_previous_applications(
+        db,
+        human_id=application.human_id,
+        exclude_popup_id=application.popup_id,
     )
 
 

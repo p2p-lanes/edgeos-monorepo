@@ -1147,6 +1147,40 @@ export type CheckoutBuyerSection = {
 
 export type CheckoutMode = 'pass_system' | 'simple_quantity';
 
+export type CheckoutPreviewLine = {
+    product_id: string;
+    quantity: number;
+    unit_price: string;
+    line_total: string;
+    discountable: boolean;
+};
+
+/**
+ * Request schema for POST /checkout/{slug}/preview.
+ */
+export type CheckoutPreviewRequest = {
+    products: Array<ProductLine>;
+    coupon_code?: (string | null);
+    insurance?: boolean;
+};
+
+/**
+ * Server-computed price breakdown for anonymous checkout (no side effects).
+ */
+export type CheckoutPreviewResponse = {
+    lines: Array<CheckoutPreviewLine>;
+    discountable_amount: string;
+    non_discountable_amount: string;
+    coupon_code?: (string | null);
+    discount_value?: (string | null);
+    discount_amount?: string;
+    post_discount_amount: string;
+    insurance_amount?: string;
+    contribution_amount?: string;
+    total: string;
+    currency: string;
+};
+
 /**
  * Public product available in the checkout runtime.
  */
@@ -3528,6 +3562,36 @@ export type PreviewResponse = {
 };
 
 /**
+ * One money total, in one currency.
+ *
+ * Payments carry their own currency, so an application's spend can span more
+ * than one. Collapsing them into a single number would misstate the amount.
+ */
+export type PreviousApplicationSpend = {
+    currency: string;
+    amount: string;
+};
+
+/**
+ * One application by the same human, in a different popup.
+ *
+ * Powers the "Previous applications" block of the BO application detail: it
+ * tells a reviewer whether this person already took part in other popups of
+ * the tenant, and how much they bought when they did.
+ */
+export type PreviousApplicationSummary = {
+    id: string;
+    popup_id: string;
+    popup_name?: (string | null);
+    popup_start_date?: (string | null);
+    status: string;
+    tickets_count?: number;
+    spend?: Array<PreviousApplicationSpend>;
+    submitted_at?: (string | null);
+    created_at?: (string | null);
+};
+
+/**
  * Schema for batch product creation.
  */
 export type ProductBatch = {
@@ -3733,6 +3797,37 @@ export type ProductWithQuantity = {
     sold_out_override?: boolean;
     id: string;
     quantity?: number;
+};
+
+export type PublishableKeyCreate = {
+    name: string;
+    allowed_origins?: Array<(string)>;
+};
+
+/**
+ * Returned only at creation — carries the raw browser-safe token once.
+ */
+export type PublishableKeyCreated = {
+    id: string;
+    popup_id?: (string | null);
+    name: string;
+    key_prefix: string;
+    allowed_origins: Array<(string)>;
+    created_at: string;
+    last_used_at?: (string | null);
+    revoked_at?: (string | null);
+    key: string;
+};
+
+export type PublishableKeyPublic = {
+    id: string;
+    popup_id?: (string | null);
+    name: string;
+    key_prefix: string;
+    allowed_origins: Array<(string)>;
+    created_at: string;
+    last_used_at?: (string | null);
+    revoked_at?: (string | null);
 };
 
 export type PublishPermission = 'admin_only' | 'everyone';
@@ -4958,6 +5053,13 @@ export type ApplicationsGetApplicationData = {
 
 export type ApplicationsGetApplicationResponse = (ApplicationPublic);
 
+export type ApplicationsListPreviousApplicationsData = {
+    applicationId: string;
+    xTenantId?: (string | null);
+};
+
+export type ApplicationsListPreviousApplicationsResponse = (Array<PreviousApplicationSummary>);
+
 export type ApplicationsGrantApplicationCreditData = {
     applicationId: string;
     requestBody: GrantCreditRequest;
@@ -5458,13 +5560,24 @@ export type CheckInListCheckInsResponse = (ListModel_CheckInListItem_);
 export type CheckoutGetRuntimeData = {
     acceptLanguage?: (string | null);
     slug: string;
+    xEdgeOsPublishableKey?: (string | null);
     xTenantId?: (string | null);
 };
 
 export type CheckoutGetRuntimeResponse = (CheckoutRuntimeResponse);
 
+export type CheckoutPreviewOpenTicketingData = {
+    requestBody: CheckoutPreviewRequest;
+    slug: string;
+    xEdgeOsPublishableKey?: (string | null);
+    xTenantId?: (string | null);
+};
+
+export type CheckoutPreviewOpenTicketingResponse = (CheckoutPreviewResponse);
+
 export type CheckoutGetCheckoutShareMetaData = {
     slug: string;
+    xEdgeOsPublishableKey?: (string | null);
     xTenantId?: (string | null);
 };
 
@@ -5473,6 +5586,7 @@ export type CheckoutGetCheckoutShareMetaResponse = (CheckoutShareMeta);
 export type CheckoutPurchaseOpenTicketingData = {
     requestBody: OpenTicketingPurchaseCreate;
     slug: string;
+    xEdgeOsPublishableKey?: (string | null);
     xTenantId?: (string | null);
 };
 
@@ -5481,6 +5595,7 @@ export type CheckoutPurchaseOpenTicketingResponse = (OpenTicketingPurchaseRespon
 export type CheckoutUpsertOpenCartData = {
     requestBody: OpenCartUpsert;
     slug: string;
+    xEdgeOsPublishableKey?: (string | null);
     xTenantId?: (string | null);
 };
 
@@ -5496,6 +5611,7 @@ export type CheckoutRestoreOpenCartData = {
      */
     sig: string;
     slug: string;
+    xEdgeOsPublishableKey?: (string | null);
     xTenantId?: (string | null);
 };
 
@@ -5504,6 +5620,7 @@ export type CheckoutRestoreOpenCartResponse = (OpenCartPublic);
 export type CheckoutReleasePendingOpenData = {
     requestBody: PendingReleaseOpenRequest;
     slug: string;
+    xEdgeOsPublishableKey?: (string | null);
     xTenantId?: (string | null);
 };
 
@@ -5511,6 +5628,7 @@ export type CheckoutReleasePendingOpenResponse = (PendingReleaseResponse);
 
 export type CouponsValidateCouponPublicData = {
     requestBody: CouponValidatePublicRequest;
+    xEdgeOsPublishableKey?: (string | null);
     xTenantId?: (string | null);
 };
 
@@ -5767,6 +5885,7 @@ export type EventsListPublicCalendarData = {
     startBefore?: (string | null);
     tags?: (Array<(string)> | null);
     trackIds?: (Array<(string)> | null);
+    xEdgeOsPublishableKey?: (string | null);
     xTenantId?: (string | null);
 };
 
@@ -5774,6 +5893,7 @@ export type EventsListPublicCalendarResponse = (EventPublicCalendarResponse);
 
 export type EventsGetPublicEventShareMetaData = {
     eventId: string;
+    xEdgeOsPublishableKey?: (string | null);
     xTenantId?: (string | null);
 };
 
@@ -7108,6 +7228,26 @@ export type ProductsListPortalProductsData = {
 };
 
 export type ProductsListPortalProductsResponse = (ListModel_ProductPublic_);
+
+export type PublishableKeysCreatePublishableKeyData = {
+    requestBody: PublishableKeyCreate;
+    xTenantId?: (string | null);
+};
+
+export type PublishableKeysCreatePublishableKeyResponse = (PublishableKeyCreated);
+
+export type PublishableKeysListPublishableKeysData = {
+    xTenantId?: (string | null);
+};
+
+export type PublishableKeysListPublishableKeysResponse = (Array<PublishableKeyPublic>);
+
+export type PublishableKeysRevokePublishableKeyData = {
+    keyId: string;
+    xTenantId?: (string | null);
+};
+
+export type PublishableKeysRevokePublishableKeyResponse = (void);
 
 export type ReferralsListMyReferralsData = {
     /**

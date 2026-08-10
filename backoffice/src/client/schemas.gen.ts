@@ -4933,6 +4933,151 @@ export const CheckoutModeSchema = {
     title: 'CheckoutMode'
 } as const;
 
+export const CheckoutPreviewLineSchema = {
+    properties: {
+        product_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Product Id'
+        },
+        quantity: {
+            type: 'integer',
+            title: 'Quantity'
+        },
+        unit_price: {
+            type: 'string',
+            pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$',
+            title: 'Unit Price'
+        },
+        line_total: {
+            type: 'string',
+            pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$',
+            title: 'Line Total'
+        },
+        discountable: {
+            type: 'boolean',
+            title: 'Discountable'
+        }
+    },
+    type: 'object',
+    required: ['product_id', 'quantity', 'unit_price', 'line_total', 'discountable'],
+    title: 'CheckoutPreviewLine'
+} as const;
+
+export const CheckoutPreviewRequestSchema = {
+    properties: {
+        products: {
+            items: {
+                '$ref': '#/components/schemas/ProductLine'
+            },
+            type: 'array',
+            minItems: 1,
+            title: 'Products'
+        },
+        coupon_code: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Coupon Code'
+        },
+        insurance: {
+            type: 'boolean',
+            title: 'Insurance',
+            default: false
+        }
+    },
+    type: 'object',
+    required: ['products'],
+    title: 'CheckoutPreviewRequest',
+    description: 'Request schema for POST /checkout/{slug}/preview.'
+} as const;
+
+export const CheckoutPreviewResponseSchema = {
+    properties: {
+        lines: {
+            items: {
+                '$ref': '#/components/schemas/CheckoutPreviewLine'
+            },
+            type: 'array',
+            title: 'Lines'
+        },
+        discountable_amount: {
+            type: 'string',
+            pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$',
+            title: 'Discountable Amount'
+        },
+        non_discountable_amount: {
+            type: 'string',
+            pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$',
+            title: 'Non Discountable Amount'
+        },
+        coupon_code: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Coupon Code'
+        },
+        discount_value: {
+            anyOf: [
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Discount Value'
+        },
+        discount_amount: {
+            type: 'string',
+            pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$',
+            title: 'Discount Amount',
+            default: '0'
+        },
+        post_discount_amount: {
+            type: 'string',
+            pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$',
+            title: 'Post Discount Amount'
+        },
+        insurance_amount: {
+            type: 'string',
+            pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$',
+            title: 'Insurance Amount',
+            default: '0'
+        },
+        contribution_amount: {
+            type: 'string',
+            pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$',
+            title: 'Contribution Amount',
+            default: '0'
+        },
+        total: {
+            type: 'string',
+            pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$',
+            title: 'Total'
+        },
+        currency: {
+            type: 'string',
+            title: 'Currency'
+        }
+    },
+    type: 'object',
+    required: ['lines', 'discountable_amount', 'non_discountable_amount', 'post_discount_amount', 'total', 'currency'],
+    title: 'CheckoutPreviewResponse',
+    description: 'Server-computed price breakdown for anonymous checkout (no side effects).'
+} as const;
+
 export const CheckoutRuntimeProductSchema = {
     properties: {
         tenant_id: {
@@ -16990,6 +17135,114 @@ export const PreviewResponseSchema = {
     title: 'PreviewResponse'
 } as const;
 
+export const PreviousApplicationSpendSchema = {
+    properties: {
+        currency: {
+            type: 'string',
+            title: 'Currency'
+        },
+        amount: {
+            type: 'string',
+            pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$',
+            title: 'Amount'
+        }
+    },
+    type: 'object',
+    required: ['currency', 'amount'],
+    title: 'PreviousApplicationSpend',
+    description: `One money total, in one currency.
+
+Payments carry their own currency, so an application's spend can span more
+than one. Collapsing them into a single number would misstate the amount.`
+} as const;
+
+export const PreviousApplicationSummarySchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        popup_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Popup Id'
+        },
+        popup_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Popup Name'
+        },
+        popup_start_date: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Popup Start Date'
+        },
+        status: {
+            type: 'string',
+            title: 'Status'
+        },
+        tickets_count: {
+            type: 'integer',
+            title: 'Tickets Count',
+            default: 0
+        },
+        spend: {
+            items: {
+                '$ref': '#/components/schemas/PreviousApplicationSpend'
+            },
+            type: 'array',
+            title: 'Spend',
+            default: []
+        },
+        submitted_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Submitted At'
+        },
+        created_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Created At'
+        }
+    },
+    type: 'object',
+    required: ['id', 'popup_id', 'status'],
+    title: 'PreviousApplicationSummary',
+    description: `One application by the same human, in a different popup.
+
+Powers the "Previous applications" block of the BO application detail: it
+tells a reviewer whether this person already took part in other popups of
+the tenant, and how much they bought when they did.`
+} as const;
+
 export const ProductBatchSchema = {
     properties: {
         popup_id: {
@@ -18287,6 +18540,170 @@ export const PublishPermissionSchema = {
     type: 'string',
     enum: ['admin_only', 'everyone'],
     title: 'PublishPermission'
+} as const;
+
+export const PublishableKeyCreateSchema = {
+    properties: {
+        name: {
+            type: 'string',
+            maxLength: 100,
+            minLength: 1,
+            title: 'Name'
+        },
+        allowed_origins: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Allowed Origins'
+        }
+    },
+    type: 'object',
+    required: ['name'],
+    title: 'PublishableKeyCreate'
+} as const;
+
+export const PublishableKeyCreatedSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        popup_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Popup Id'
+        },
+        name: {
+            type: 'string',
+            title: 'Name'
+        },
+        key_prefix: {
+            type: 'string',
+            title: 'Key Prefix'
+        },
+        allowed_origins: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Allowed Origins'
+        },
+        created_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Created At'
+        },
+        last_used_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Last Used At'
+        },
+        revoked_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Revoked At'
+        },
+        key: {
+            type: 'string',
+            title: 'Key'
+        }
+    },
+    type: 'object',
+    required: ['id', 'name', 'key_prefix', 'allowed_origins', 'created_at', 'key'],
+    title: 'PublishableKeyCreated',
+    description: 'Returned only at creation — carries the raw browser-safe token once.'
+} as const;
+
+export const PublishableKeyPublicSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        popup_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Popup Id'
+        },
+        name: {
+            type: 'string',
+            title: 'Name'
+        },
+        key_prefix: {
+            type: 'string',
+            title: 'Key Prefix'
+        },
+        allowed_origins: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Allowed Origins'
+        },
+        created_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Created At'
+        },
+        last_used_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Last Used At'
+        },
+        revoked_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Revoked At'
+        }
+    },
+    type: 'object',
+    required: ['id', 'name', 'key_prefix', 'allowed_origins', 'created_at'],
+    title: 'PublishableKeyPublic'
 } as const;
 
 export const RecurrenceRuleSchema = {
