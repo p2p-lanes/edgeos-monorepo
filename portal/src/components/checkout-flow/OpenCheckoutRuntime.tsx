@@ -216,9 +216,12 @@ export function OpenCheckoutRuntime({
         <LanguageProvider>
           <ApplicationContext.Provider
             value={{
+              // An anonymous checkout has no application at all, so every
+              // accessor answers empty rather than guessing.
               applications: null,
               participation: null,
               getRelevantApplication: () => null,
+              getApplicationsForPopup: () => [],
               getAttendees: () => [],
               updateApplication: () => {},
             }}
