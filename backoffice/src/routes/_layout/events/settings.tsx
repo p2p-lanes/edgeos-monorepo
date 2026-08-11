@@ -7,6 +7,7 @@ import { type EventSettingsCreate, EventSettingsService } from "@/client"
 import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
 import { ChipInput } from "@/components/forms/EventForm/ChipInput"
+import { TimezoneCombobox } from "@/components/forms/TimezoneCombobox"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { ImageUpload } from "@/components/ui/image-upload"
 import { Label } from "@/components/ui/label"
@@ -30,35 +31,6 @@ export const Route = createFileRoute("/_layout/events/settings")({
     meta: [{ title: "Event Settings - EdgeOS" }],
   }),
 })
-
-const TIMEZONES = [
-  "UTC",
-  "America/New_York",
-  "America/Chicago",
-  "America/Denver",
-  "America/Los_Angeles",
-  "America/Argentina/Buenos_Aires",
-  "America/Sao_Paulo",
-  "Europe/London",
-  "Europe/Paris",
-  "Europe/Berlin",
-  "Asia/Tokyo",
-  "Asia/Shanghai",
-  "Asia/Singapore",
-  "Australia/Sydney",
-]
-
-function gmtOffset(tz: string): string {
-  try {
-    const parts = new Intl.DateTimeFormat("en-US", {
-      timeZone: tz,
-      timeZoneName: "shortOffset",
-    }).formatToParts(new Date())
-    return parts.find((p) => p.type === "timeZoneName")?.value ?? ""
-  } catch {
-    return ""
-  }
-}
 
 function EventSettingsForm() {
   const { selectedPopupId } = useWorkspace()
@@ -205,31 +177,22 @@ function EventSettingsForm() {
 
       <div className="space-y-2">
         <Label>Default Timezone</Label>
-        <Select
-          value={currentSettings.timezone}
+        <TimezoneCombobox
+          value={currentSettings.timezone ?? "UTC"}
           disabled={readOnly}
-          onValueChange={(value) =>
+          onChange={(timezone) =>
             upsertMutation.mutate({
               ...currentSettings,
               popup_id: selectedPopupId!,
-              timezone: value,
+              timezone,
             })
           }
-        >
-          <SelectTrigger className="w-full">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {TIMEZONES.map((tz) => {
-              const offset = gmtOffset(tz)
-              return (
-                <SelectItem key={tz} value={tz}>
-                  {offset ? `${tz} (${offset})` : tz}
-                </SelectItem>
-              )
-            })}
-          </SelectContent>
-        </Select>
+        />
+        <p className="text-sm text-muted-foreground">
+          The zone this gathering's events and venues are scheduled and
+          displayed in, everywhere from the calendar to the portal. Search by
+          city, country or GMT offset.
+        </p>
       </div>
 
       <div className="space-y-2">
