@@ -71,6 +71,17 @@ export { Textarea } from "./components/Textarea"
 export type { Country } from "./data/countries"
 export { COUNTRIES } from "./data/countries"
 export type {
+  CheckoutIconEntry,
+  CheckoutIconGroup,
+  LucideLikeIcon,
+} from "./icons/checkoutStepIcons"
+export {
+  CHECKOUT_ICON_CATALOG,
+  CHECKOUT_ICON_GROUPS,
+  getRegistryIcon,
+  resolveStepIcon,
+} from "./icons/checkoutStepIcons"
+export type {
   ApplicationFormSchema,
   FormFieldSchema,
   FormSectionKind,
