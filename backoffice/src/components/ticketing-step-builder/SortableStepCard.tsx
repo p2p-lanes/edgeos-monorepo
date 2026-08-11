@@ -1,7 +1,11 @@
 import { useSortable } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
-import { resolveStepIcon } from "@edgeos/shared-form-ui"
+import {
+  getRegistryIcon,
+  type LucideLikeIcon,
+  resolveStepIcon,
+} from "@edgeos/shared-form-ui"
 import { GripVertical, Pencil } from "lucide-react"
 import { useRef, useState } from "react"
 
@@ -19,6 +23,34 @@ interface SortableStepCardProps {
   step: TicketingStepPublic
   onEdit: (step: TicketingStepPublic) => void
   selected?: boolean
+}
+
+export type StepCardIconResolution =
+  | { kind: "registry"; Icon: LucideLikeIcon }
+  | { kind: "literal"; emoji: string }
+  | { kind: "default"; Icon: LucideLikeIcon }
+
+/**
+ * Two ways an operator can specify the nav icon: a slug into the curated
+ * Lucide registry, or a literal emoji character. If neither is set, fall
+ * back to the step-type/template default. Mirrors the checkout nav
+ * (`ScrollySectionNav`) and the picker's own trigger (`StepIconPicker`), so
+ * the canvas, the picker, and the live checkout all agree on what renders.
+ */
+export function resolveStepCardIcon(
+  step: Pick<TicketingStepPublic, "step_type" | "template" | "emoji">,
+): StepCardIconResolution {
+  const emoji = step.emoji?.trim() || null
+  const RegistryIcon = getRegistryIcon(emoji)
+  if (RegistryIcon) return { kind: "registry", Icon: RegistryIcon }
+  if (emoji) return { kind: "literal", emoji }
+  return {
+    kind: "default",
+    Icon: resolveStepIcon({
+      stepType: step.step_type,
+      template: step.template,
+    }),
+  }
 }
 
 export function SortableStepCard({
@@ -61,12 +93,7 @@ export function SortableStepCard({
   })
 
   const templateDef = TEMPLATE_DEFINITIONS.find((v) => v.key === step.template)
-  // Resolved the same way the checkout does, so the canvas mirrors the nav.
-  const Icon = resolveStepIcon({
-    stepType: step.step_type,
-    template: step.template,
-    emoji: step.emoji,
-  })
+  const iconResolution = resolveStepCardIcon(step)
 
   const handleTitleClick = () => {
     setTitleDraft(step.title)
@@ -112,7 +139,16 @@ export function SortableStepCard({
       </button>
 
       {/* Step icon */}
-      <Icon className="h-4 w-4 text-muted-foreground shrink-0" />
+      {iconResolution.kind === "literal" ? (
+        <span
+          aria-hidden="true"
+          className="flex h-4 w-4 shrink-0 items-center justify-center text-sm leading-none"
+        >
+          {iconResolution.emoji}
+        </span>
+      ) : (
+        <iconResolution.Icon className="h-4 w-4 text-muted-foreground shrink-0" />
+      )}
 
       {/* Title (inline editable) */}
       <div className="flex-1 min-w-0">
