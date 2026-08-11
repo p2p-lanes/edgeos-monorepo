@@ -213,7 +213,7 @@ export const CHECKOUT_ICON_CATALOG: CheckoutIconEntry[] = [
  * the catalog so the picker shows one button per icon. Every value here must
  * name a catalog slug.
  */
-const ICON_ALIASES: Record<string, string> = {
+export const ICON_ALIASES: Record<string, string> = {
   profile: "user",
   house: "home",
   housing: "tent",

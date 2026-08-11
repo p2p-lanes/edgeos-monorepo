@@ -79,6 +79,7 @@ export {
   CHECKOUT_ICON_CATALOG,
   CHECKOUT_ICON_GROUPS,
   getRegistryIcon,
+  ICON_ALIASES,
   resolveStepIcon,
 } from "./icons/checkoutStepIcons"
 export type {

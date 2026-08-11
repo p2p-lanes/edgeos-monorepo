@@ -1,11 +1,11 @@
 import { useSortable } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
-import { useMutation, useQueryClient } from "@tanstack/react-query"
 import {
   getRegistryIcon,
   type LucideLikeIcon,
   resolveStepIcon,
 } from "@edgeos/shared-form-ui"
+import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { GripVertical, Pencil } from "lucide-react"
 import { useRef, useState } from "react"
 

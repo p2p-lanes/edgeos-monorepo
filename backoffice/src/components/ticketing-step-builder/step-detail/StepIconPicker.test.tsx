@@ -97,4 +97,35 @@ describe("StepIconPicker", () => {
       "",
     )
   })
+
+  it("marks the selected icon as pressed for screen readers", async () => {
+    const { user } = setup("mushroom")
+
+    await user.click(screen.getByRole("button", { name: "Step icon" }))
+
+    expect(screen.getByRole("button", { name: "Mushroom" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    )
+    expect(
+      screen.getByRole("button", { name: "Credit card" }),
+    ).toHaveAttribute("aria-pressed", "false")
+  })
+
+  it("resets the search query when the popover closes", async () => {
+    const { user } = setup("")
+
+    await user.click(screen.getByRole("button", { name: "Step icon" }))
+    await user.type(screen.getByLabelText("Search icons"), "mushroom")
+    expect(
+      screen.queryByRole("button", { name: "Credit card" }),
+    ).not.toBeInTheDocument()
+
+    // Close (Escape) and reopen the popover.
+    await user.keyboard("{Escape}")
+    await user.click(screen.getByRole("button", { name: "Step icon" }))
+
+    expect(screen.getByLabelText("Search icons")).toHaveValue("")
+    expect(screen.getByRole("button", { name: "Credit card" })).toBeVisible()
+  })
 })

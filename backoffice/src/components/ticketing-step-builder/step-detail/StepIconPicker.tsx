@@ -59,7 +59,13 @@ export function StepIconPicker({
   }
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next)
+        if (!next) setQuery("")
+      }}
+    >
       <PopoverTrigger asChild>
         <Button
           type="button"
@@ -137,6 +143,7 @@ export function StepIconPicker({
                             type="button"
                             title={label}
                             aria-label={label}
+                            aria-pressed={slug === trimmed}
                             onClick={() => select(slug)}
                             className={cn(
                               "flex aspect-square items-center justify-center rounded-md hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",

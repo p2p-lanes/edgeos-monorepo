@@ -2,6 +2,7 @@ import {
   CHECKOUT_ICON_CATALOG,
   CHECKOUT_ICON_GROUPS,
   getRegistryIcon,
+  ICON_ALIASES,
   resolveStepIcon,
 } from "@edgeos/shared-form-ui"
 import { describe, expect, it } from "vitest"
@@ -51,6 +52,13 @@ describe("checkout icon catalog", () => {
   it("resolves every catalog slug to that same component", () => {
     for (const entry of CHECKOUT_ICON_CATALOG) {
       expect(getRegistryIcon(entry.slug), entry.slug).toBe(entry.Icon)
+    }
+  })
+
+  it("resolves every alias to the same icon as its target slug", () => {
+    for (const [alias, target] of Object.entries(ICON_ALIASES)) {
+      expect(getRegistryIcon(alias), alias).not.toBeNull()
+      expect(getRegistryIcon(alias), alias).toBe(getRegistryIcon(target))
     }
   })
 
