@@ -175,6 +175,15 @@ export default function AuthForm() {
             repeatType: "loop",
             ease: "easeIn",
           }}
+          // Keeps the logo on one stable compositing layer for the whole loop.
+          // Framer writes `transform: none` whenever y hits 0 (twice per cycle)
+          // and emits no will-change, so the browser promotes the element to a
+          // GPU layer and tears it down again on every pass — some drivers skip
+          // invalidating the vacated region and leave a grey trail behind it.
+          // translateZ(0) keeps the transform 3D (never `none`), and
+          // will-change promotes the layer up front instead of mid-animation.
+          transformTemplate={(_, generated) => `${generated} translateZ(0)`}
+          style={{ willChange: "transform", backfaceVisibility: "hidden" }}
           className="relative aspect-square w-[180px] mx-auto mb-8"
         >
           {tenant?.logo_url ? (
