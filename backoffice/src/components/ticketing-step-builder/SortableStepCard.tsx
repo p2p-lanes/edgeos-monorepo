@@ -1,6 +1,7 @@
 import { useSortable } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
+import { resolveStepIcon } from "@edgeos/shared-form-ui"
 import { GripVertical, Pencil } from "lucide-react"
 import { useRef, useState } from "react"
 
@@ -12,7 +13,7 @@ import { Switch } from "@/components/ui/switch"
 import useCustomToast from "@/hooks/useCustomToast"
 import { cn } from "@/lib/utils"
 import { createErrorHandler } from "@/utils"
-import { getStepTypeDefinition, TEMPLATE_DEFINITIONS } from "./constants"
+import { TEMPLATE_DEFINITIONS } from "./constants"
 
 interface SortableStepCardProps {
   step: TicketingStepPublic
@@ -59,9 +60,13 @@ export function SortableStepCard({
     onError: createErrorHandler(showErrorToast),
   })
 
-  const stepDef = getStepTypeDefinition(step.step_type)
   const templateDef = TEMPLATE_DEFINITIONS.find((v) => v.key === step.template)
-  const Icon = stepDef?.icon ?? templateDef?.icon
+  // Resolved the same way the checkout does, so the canvas mirrors the nav.
+  const Icon = resolveStepIcon({
+    stepType: step.step_type,
+    template: step.template,
+    emoji: step.emoji,
+  })
 
   const handleTitleClick = () => {
     setTitleDraft(step.title)
@@ -107,7 +112,7 @@ export function SortableStepCard({
       </button>
 
       {/* Step icon */}
-      {Icon && <Icon className="h-4 w-4 text-muted-foreground shrink-0" />}
+      <Icon className="h-4 w-4 text-muted-foreground shrink-0" />
 
       {/* Title (inline editable) */}
       <div className="flex-1 min-w-0">

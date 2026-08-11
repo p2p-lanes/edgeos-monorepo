@@ -2,6 +2,7 @@ import {
   getStepTypeDefinition,
   TEMPLATE_DEFINITIONS,
 } from "@/components/ticketing-step-builder/constants"
+import { StepIconPicker } from "@/components/ticketing-step-builder/step-detail/StepIconPicker"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 
@@ -23,7 +24,6 @@ export function StepIdentityHeader({
   template,
 }: StepIdentityHeaderProps) {
   const stepTypeDef = getStepTypeDefinition(stepType)
-  const DefaultIcon = stepTypeDef?.icon
   const templateLabel = template
     ? TEMPLATE_DEFINITIONS.find((d) => d.key === template)?.label
     : undefined
@@ -32,28 +32,15 @@ export function StepIdentityHeader({
     <div className="flex flex-col gap-1.5">
       <Label htmlFor="step-title">Title</Label>
       <div className="flex gap-1.5">
-        <div className="relative w-16">
-          <Input
-            id="step-emoji"
-            aria-label="Step emoji"
-            value={emoji}
-            onChange={(e) => onEmojiChange(e.target.value.slice(0, 8))}
-            className="w-full text-center text-lg"
-          />
-          {/* When the operator hasn't picked a custom emoji, render the
-          step-type's resolved default icon inside the input so the
-          preview matches what the checkout nav will actually show.
-          Replaces the legacy hardcoded "🎟️" placeholder which made
-          every step look like Tickets by default. */}
-          {!emoji && DefaultIcon ? (
-            <DefaultIcon
-              className="absolute inset-0 m-auto h-4 w-4 text-muted-foreground pointer-events-none"
-              aria-hidden="true"
-            />
-          ) : null}
-        </div>
+        <StepIconPicker
+          value={emoji}
+          onChange={onEmojiChange}
+          stepType={stepType}
+          template={template || null}
+        />
         <Input
           id="step-title"
+          aria-label="Title"
           value={title}
           onChange={(e) => onTitleChange(e.target.value)}
           className="flex-1"
@@ -64,8 +51,8 @@ export function StepIdentityHeader({
         {templateLabel ? ` · ${templateLabel} template` : ""}
       </p>
       <p className="text-xs text-muted-foreground">
-        Optional emoji replaces the default icon in the checkout step nav. Leave
-        blank to keep the built-in icon (shown faded above).
+        Pick a curated icon — or an emoji — for the checkout step nav. Leave it
+        on the default to keep the built-in icon (shown faded above).
       </p>
     </div>
   )
