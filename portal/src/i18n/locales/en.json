@@ -74,8 +74,6 @@
     "no_profile": "No profile data available.",
     "no_profile_contact": "Please contact support if you believe this is an error.",
     "door_generic": "Your application",
-    "door_attendees_one": "{{count}} person",
-    "door_attendees_other": "{{count}} people",
     "door_status": {
       "accepted": "Accepted",
       "in_review": "In review",

@@ -74,8 +74,6 @@
     "no_profile": "No hay datos de perfil disponibles.",
     "no_profile_contact": "Por favor, contacta a soporte si crees que esto es un error.",
     "door_generic": "Tu postulación",
-    "door_attendees_one": "{{count}} persona",
-    "door_attendees_other": "{{count}} personas",
     "door_status": {
       "accepted": "Aceptada",
       "in_review": "En revisión",

@@ -60,8 +60,6 @@
     "no_profile": "Engar prófílupplýsingar í boði.",
     "no_profile_contact": "Vinsamlegast hafðu samband við þjónustudeild ef þú telur þetta vera villu.",
     "door_generic": "Umsóknin þín",
-    "door_attendees_one": "{{count}} einstaklingur",
-    "door_attendees_other": "{{count}} einstaklingar",
     "door_status": {
       "accepted": "Samþykkt",
       "in_review": "Í yfirferð",

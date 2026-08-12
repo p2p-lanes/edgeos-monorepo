@@ -78,15 +78,10 @@ export function GatheringDoorCard({
         </span>
       </div>
 
-      {door.application?.attendees?.length ? (
-        <p className="text-muted-foreground text-sm">
-          {/* `_one`/`_other` keys, not a bare defaultValue — that never
-              pluralizes, and one attendee read as "1 people". */}
-          {t("portal.door_attendees", {
-            count: door.application.attendees.length,
-          })}
-        </p>
-      ) : null}
+      {/* No party size here. People belong to the gathering, not to a door,
+          so counting a door's attendee rows described where each row
+          happened to be created — a family of two read as one person at one
+          door and none at the other (sdd/sales-flows-rediseno). */}
 
       {/* A door that is not accepted yet still needs a way in, and a
           rejected one deliberately offers none. */}

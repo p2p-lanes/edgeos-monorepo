@@ -60,8 +60,6 @@
     "no_profile": "没有可用的个人资料数据。",
     "no_profile_contact": "如果您认为这是错误，请联系支持团队。",
     "door_generic": "你的申请",
-    "door_attendees_one": "{{count}} 人",
-    "door_attendees_other": "{{count}} 人",
     "door_status": {
       "accepted": "已接受",
       "in_review": "审核中",
