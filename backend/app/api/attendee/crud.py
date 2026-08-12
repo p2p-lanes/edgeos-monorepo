@@ -327,30 +327,36 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
         ).first()
         return fallback
 
-    def find_direct_attendee(
+    def find_owned_attendee(
         self,
         session: Session,
         human_id: uuid.UUID,
         popup_id: uuid.UUID,
     ) -> Attendees | None:
-        """Find the direct-sale attendee for a (human, popup) pair.
+        """Find the attendee this human already is at this popup, if any.
 
-        Direct-sale attendees have application_id=NULL. Returns the existing
-        attendee so repeated direct purchases by the same human reuse the
-        same record (one attendee per human per popup for direct sales).
+        Ownership is the predicate of _human_popup_attendee_ids: an attendee
+        reached through the human's own application, or a direct-sale attendee
+        carrying their human_id. A companion row is owned by the application
+        holder, not by the companion, so it is never returned here.
+
+        The direct-sale row wins when both legs exist, so repeated direct
+        purchases keep landing on the row they created. Ties break on the
+        oldest row.
         """
+        union_ids = self._human_popup_attendee_ids(session, human_id, popup_id)
         statement = (
             select(Attendees)
-            .where(
-                Attendees.human_id == human_id,
-                Attendees.popup_id == popup_id,
-                Attendees.application_id.is_(None),  # type: ignore[union-attr]
+            .where(Attendees.id.in_(select(union_ids.c.id)))  # type: ignore[arg-type]
+            .order_by(
+                Attendees.application_id.is_(None).desc(),  # type: ignore[union-attr]
+                Attendees.created_at,  # type: ignore[arg-type]
             )
             .limit(1)
         )
         return session.exec(statement).first()
 
-    def create_direct_attendee(
+    def find_or_create_buyer_attendee(
         self,
         session: Session,
         human_id: uuid.UUID,
@@ -359,53 +365,20 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
         name: str,
         email: str | None = None,
     ) -> Attendees:
-        """Create a direct-sale attendee (no application).
+        """Return the attendee a direct purchase belongs to, creating it if new.
 
-        Used for popups with sale_type="direct". The attendee is bound to a
-        Human and a Popup directly — application_id remains NULL.
-
-        category_id is looked up from the popup's primary (main) category.
-        Check-in codes live on AttendeeProducts (one per purchased ticket).
-        """
-        from app.api.attendee_category.crud import attendee_categories_crud
-        from app.services.trial_limits import enforce_trial_attendee_cap
-
-        enforce_trial_attendee_cap(session, tenant_id)
-
-        main_cat = attendee_categories_crud.get_primary_for_popup(session, popup_id)
-        attendee = Attendees(
-            tenant_id=tenant_id,
-            application_id=None,
-            popup_id=popup_id,
-            human_id=human_id,
-            name=name,
-            category_id=main_cat.id if main_cat else None,
-            email=email.lower() if email else None,
-        )
-        session.add(attendee)
-        session.commit()
-        session.refresh(attendee)
-        return attendee
-
-    def find_or_create_direct_attendee(
-        self,
-        session: Session,
-        human_id: uuid.UUID,
-        popup_id: uuid.UUID,
-        tenant_id: uuid.UUID,
-        name: str,
-        email: str | None = None,
-    ) -> Attendees:
-        """Find or create the single direct-sale attendee for a (human, popup) pair.
+        A buyer who already attends this popup — because they applied, or
+        because they bought before — gets that row. Only a buyer with no row at
+        all gets a fresh application-less one.
 
         Implements SELECT → INSERT → IntegrityError → re-SELECT so concurrent
         purchases by the same human for the same popup converge on one row.
         Does NOT call session.commit() — callers control the transaction boundary.
 
-        One attendee is shared across all direct purchases by the same human for
-        the same popup. Tickets are tracked via AttendeeProducts rows.
+        Tickets are tracked via AttendeeProducts rows, so one attendee carries
+        every direct purchase the buyer makes.
         """
-        existing = self.find_direct_attendee(session, human_id, popup_id)
+        existing = self.find_owned_attendee(session, human_id, popup_id)
         if existing:
             return existing
 
@@ -430,7 +403,7 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
         except IntegrityError:
             session.rollback()
             # Concurrent INSERT — re-SELECT the winner
-            existing = self.find_direct_attendee(session, human_id, popup_id)
+            existing = self.find_owned_attendee(session, human_id, popup_id)
             if existing is None:
                 raise  # unexpected — re-raise original error
             return existing

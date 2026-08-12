@@ -1031,8 +1031,9 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             session.add(payment)
             session.flush()
 
-            # One attendee per (human, popup) for direct sales — Design §2.1
-            attendee = attendees_crud.find_or_create_direct_attendee(
+            # One attendee per (human, popup): a buyer who already attends gets
+            # their existing row, whichever door they came in by.
+            attendee = attendees_crud.find_or_create_buyer_attendee(
                 session,
                 human_id=buyer.id,
                 popup_id=popup.id,
