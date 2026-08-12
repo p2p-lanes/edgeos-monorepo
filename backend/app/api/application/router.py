@@ -560,18 +560,29 @@ async def grant_tickets_admin(
             application = crud.applications_crud.get_by_human_popup(
                 db, human_id=human.id, popup_id=payload.popup_id
             )
+            grant_attendee = None
             if application is None:
-                application = crud.applications_crud.create_for_admin_grant(
-                    db,
-                    tenant_id=tenant_id,
-                    popup_id=payload.popup_id,
-                    human=human,
+                # Someone can be at this popup without an application of their
+                # own — as somebody's companion, or from a direct purchase.
+                # Building them an application would give one person a second
+                # attendee: two QR codes for the same body at the door. Grant
+                # onto the row they already are instead.
+                grant_attendee = attendees_crud.find_attendee_for_human(
+                    db, human_id=human.id, popup_id=payload.popup_id
                 )
+                if grant_attendee is None:
+                    application = crud.applications_crud.create_for_admin_grant(
+                        db,
+                        tenant_id=tenant_id,
+                        popup_id=payload.popup_id,
+                        human=human,
+                    )
             else:
                 crud.applications_crud.promote_to_accepted(db, application)
 
-            main_attendee = attendees_crud.get_main_attendee(db, application.id)
-            if main_attendee is None:
+            if grant_attendee is None:
+                grant_attendee = attendees_crud.get_main_attendee(db, application.id)
+            if grant_attendee is None:
                 # Should be impossible — create_for_admin_grant always inserts
                 # one, and an existing application always has a main attendee.
                 raise HTTPException(
@@ -589,7 +600,9 @@ async def grant_tickets_admin(
 
             payment = Payments(
                 tenant_id=tenant_id,
-                application_id=application.id,
+                # None when the grant landed on a companion or direct-sale row:
+                # the ticket is that person's, not the host application's.
+                application_id=application.id if application is not None else None,
                 popup_id=payload.popup_id,
                 status=PaymentStatus.PENDING.value,
                 amount=Decimal("0"),
@@ -610,7 +623,7 @@ async def grant_tickets_admin(
                     tenant_id=tenant_id,
                     payment_id=payment.id,
                     product_id=item.product_id,
-                    attendee_id=main_attendee.id,
+                    attendee_id=grant_attendee.id,
                     quantity=item.quantity,
                     product_name=product.name,
                     product_description=product.description,
@@ -623,7 +636,7 @@ async def grant_tickets_admin(
                 finalize_lines.append(
                     PaymentProductRequest(
                         product_id=item.product_id,
-                        attendee_id=main_attendee.id,
+                        attendee_id=grant_attendee.id,
                         quantity=item.quantity,
                     )
                 )
@@ -642,8 +655,8 @@ async def grant_tickets_admin(
                 actor=actor_from_user(current_user),
                 action=AuditAction.TICKET_GRANT,
                 entity_type=AuditEntityType.ATTENDEE,
-                entity_id=main_attendee.id,
-                entity_label=main_attendee.name,
+                entity_id=grant_attendee.id,
+                entity_label=grant_attendee.name,
                 popup_id=payload.popup_id,
                 details={
                     "payment_id": str(payment.id),
@@ -662,7 +675,7 @@ async def grant_tickets_admin(
             granted.append(
                 GrantedPaymentInfo(
                     payment_id=payment.id,
-                    application_id=application.id,
+                    application_id=application.id if application is not None else None,
                     human_id=human.id,
                     email=human.email,
                     tickets_created=ticket_count,

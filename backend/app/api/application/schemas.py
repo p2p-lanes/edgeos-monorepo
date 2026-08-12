@@ -423,7 +423,9 @@ class GrantedPaymentInfo(BaseModel):
     """One $0 payment created by the admin bulk-grant flow."""
 
     payment_id: uuid.UUID
-    application_id: uuid.UUID
+    # None when the person was already at the popup without an application of
+    # their own — the grant went onto their existing attendee row.
+    application_id: uuid.UUID | None
     human_id: uuid.UUID
     email: str
     tickets_created: int

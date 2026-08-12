@@ -9761,8 +9761,15 @@ export const GrantedPaymentInfoSchema = {
             title: 'Payment Id'
         },
         application_id: {
-            type: 'string',
-            format: 'uuid',
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
             title: 'Application Id'
         },
         human_id: {

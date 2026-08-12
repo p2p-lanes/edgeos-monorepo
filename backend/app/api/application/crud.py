@@ -1359,6 +1359,22 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
                 detail="An application already exists for this human and sales flow",
             )
 
+        # An application brings its own primary attendee, and this person
+        # already has a row on somebody else's. Two rows is two QR codes for
+        # one body at the door. Mirrors the guard the portal applies to the
+        # same move in create_my_application.
+        companion = attendees_crud.find_companion_for_popup(
+            session, human_id=human.id, popup_id=app_data.popup_id
+        )
+        if companion:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    "This person is already attending this event as a companion "
+                    "on another application."
+                ),
+            )
+
         # Build application data
         app_fields = [
             "popup_id",
@@ -1818,6 +1834,21 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="Attendee with this email already exists",
+                )
+
+            # The same guard the other add-a-companion route applies
+            # (attendee/router.py). This one only looked inside the
+            # application, so a person already at the gathering through any
+            # other door came in a second time.
+            existing_human_id = attendees_crud._find_human_id_by_email(
+                session, email, application.tenant_id
+            )
+            if existing_human_id is not None and attendees_crud.human_attends_popup(
+                session, existing_human_id, application.popup_id
+            ):
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="This person is already attending this event.",
                 )
 
         attendee = attendees_crud.create_internal(

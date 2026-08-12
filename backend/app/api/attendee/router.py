@@ -368,26 +368,20 @@ async def create_my_attendee_for_popup(
     # acts on them.
     #
     # `create_internal` associates by email — it finds the Human with that
-    # address and stamps their id on the row. Adding someone who already
-    # attends this gathering in their own right would give one person two
-    # attendee records: two QR codes, two directory entries, and stock
-    # spendable twice (sdd/sales-flows-rediseno).
+    # address and stamps their id on the row. Adding someone who is already at
+    # this gathering would give one person two attendee records: two QR codes,
+    # two directory entries, and stock spendable twice
+    # (sdd/sales-flows-rediseno).
     if attendee_in.email:
         existing_human_id = crud.attendees_crud._find_human_id_by_email(
             db, attendee_in.email, application.tenant_id
         )
-        # It returns (rows, total) — the count is the answer, not the tuple.
-        _existing_rows, existing_count = (
-            crud.attendees_crud.find_by_human_popup(
-                db, human_id=existing_human_id, popup_id=popup_id, limit=1
-            )
-            if existing_human_id is not None
-            else ([], 0)
-        )
-        if existing_count:
+        if existing_human_id is not None and crud.attendees_crud.human_attends_popup(
+            db, existing_human_id, popup_id
+        ):
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail="This person is already attending this event on their own.",
+                detail="This person is already attending this event.",
             )
 
     attendee = crud.attendees_crud.create_internal(

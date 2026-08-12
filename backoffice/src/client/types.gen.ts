@@ -2077,7 +2077,7 @@ export type GrantCreditResponse = {
  */
 export type GrantedPaymentInfo = {
     payment_id: string;
-    application_id: string;
+    application_id: (string | null);
     human_id: string;
     email: string;
     tickets_created: number;

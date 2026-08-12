@@ -362,6 +362,27 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
         )
         return session.exec(statement).first()
 
+    def human_attends_popup(
+        self,
+        session: Session,
+        human_id: uuid.UUID,
+        popup_id: uuid.UUID,
+    ) -> bool:
+        """Whether this human is already at this popup, in any shape.
+
+        True when a row IS them — their own application's row, a direct-sale
+        row, or a row somebody added them to as a companion — and also when
+        they hold an application whose party is filed under them, which covers
+        the older rows that never got a human_id stamped on them.
+
+        The question every path that adds a person has to ask before adding
+        them again.
+        """
+        if self.find_attendee_for_human(session, human_id, popup_id) is not None:
+            return True
+        union_ids = self._human_popup_attendee_ids(session, human_id, popup_id)
+        return session.exec(select(union_ids.c.id).limit(1)).first() is not None
+
     def find_or_create_buyer_attendee(
         self,
         session: Session,
