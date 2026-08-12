@@ -130,9 +130,9 @@ class SalesFlowsCRUD(BaseCRUD[SalesFlows, SalesFlowCreate, SalesFlowUpdate]):
         """Create a sales flow. tenant_id is always derived server-side.
 
         Channel configuration the caller left unset is copied from the
-        popup here, so every creation path produces a usable flow — a flow
-        with no reminder cadence and no coupon setting is not a smaller
-        flow, it is a broken one.
+        popup's default flow here, so every creation path produces a usable
+        flow — a flow with no reminder cadence and no coupon setting is not a
+        smaller flow, it is a broken one.
         """
         data = obj_in.model_dump()
         data["tenant_id"] = tenant_id
@@ -160,9 +160,9 @@ class SalesFlowsCRUD(BaseCRUD[SalesFlows, SalesFlowCreate, SalesFlowUpdate]):
         the slice-2 backfill's own `WHERE NOT EXISTS` idempotency).
 
         The channel-configuration columns are copied from the popup
-        (sdd/sales-flows-rediseno slice 7). A flow owns its configuration
-        rather than reading through to the popup, so it starts with a copy
-        of whatever the popup was offering and diverges from there.
+        (sdd/sales-flows-rediseno slice 7). This is the one flow with no
+        sibling to copy from, so it is also the last caller that still reads
+        the popup's own copies of them — see `seed_config_from_popup`.
         """
         existing = self.get_default_flow(session, popup_id)
         if existing:
@@ -194,30 +194,43 @@ class SalesFlowsCRUD(BaseCRUD[SalesFlows, SalesFlowCreate, SalesFlowUpdate]):
     def seed_config_from_popup(
         self, session: Session, flow: SalesFlows, popup_id: uuid.UUID
     ) -> SalesFlows:
-        """Fill the flow's unset channel configuration from its popup.
+        """Fill the flow's unset channel configuration from a sibling flow.
 
-        A new flow has to start somewhere, and the popup is what its
-        checkout offered a moment ago. Only columns the caller left unset
-        are filled, so an explicit value always wins.
+        A new flow has to start somewhere. It starts from the popup's default
+        flow — the one an operator has actually been configuring — and only
+        falls back to the popup's own columns for the default flow itself,
+        which has no sibling to copy from and is created alongside the popup.
 
-        This is a one-time copy, not a read-through: editing the popup
-        afterwards never reaches the flow (slice 7).
+        That fallback is the last thing reading those popup columns. They are
+        no longer editable (the backoffice offers them per flow), so for a
+        popup created from now on they are empty and the default flow starts
+        blank, which is the intended end state: configure the default flow,
+        and every flow made afterwards begins as a copy of it.
+
+        Only columns the caller left unset are filled, so an explicit value
+        always wins. This is a one-time copy, not a read-through: editing the
+        source afterwards never reaches this flow (slice 7).
         """
         from app.api.popup.models import Popups
         from app.api.sales_flow.schemas import EFFECTIVE_CONFIG_FIELDS
 
-        popup = session.get(Popups, popup_id)
-        if popup is None:
+        source = self.get_default_flow(session, popup_id)
+        if source is not None and source.id == flow.id:
+            source = None
+        if source is None:
+            source = session.get(Popups, popup_id)
+        if source is None:
             return flow
+
         for name in EFFECTIVE_CONFIG_FIELDS:
             if getattr(flow, name, None) is None:
-                setattr(flow, name, getattr(popup, name, None))
+                setattr(flow, name, getattr(source, name, None))
 
         # Copied the same way but deliberately not in EFFECTIVE_CONFIG_FIELDS:
         # that tuple is what the flow settings form renders, and a raw JSONB
         # blob is not a setting anyone edits in a row of switches.
         if flow.theme_config is None:
-            flow.theme_config = popup.theme_config
+            flow.theme_config = getattr(source, "theme_config", None)
         return flow
 
     def ensure_reviewers_override(
