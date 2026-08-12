@@ -13,7 +13,6 @@ import {
   Flag,
   ListChecks,
   MessageSquare,
-  Plus,
   Rows3,
   Search,
   SkipForward,
@@ -66,6 +65,7 @@ import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
 import { SavedViewsMenu } from "@/components/Common/SavedViewsMenu"
 import { StatusBadge } from "@/components/Common/StatusBadge"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
+import { FlowNameCell } from "@/components/forms/FlowNameCell"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -935,6 +935,16 @@ function CommentsCell({
   )
 }
 
+function FlowCell({ application }: { application: ApplicationPublic }) {
+  const { selectedPopupId } = useWorkspace()
+  return (
+    <FlowNameCell
+      popupId={selectedPopupId}
+      flowId={application.sales_flow_id}
+    />
+  )
+}
+
 const getColumns = (
   isWeightedVoting: boolean,
   showReviewerDecision: boolean,
@@ -959,6 +969,15 @@ const getColumns = (
     cell: ({ row }) => (
       <span className="text-muted-foreground">{row.original.human?.email}</span>
     ),
+  },
+  {
+    // Two applications from the same person look identical without it —
+    // they are different ways into the gathering, with different forms
+    // and different reviewers.
+    accessorKey: "sales_flow_id",
+    header: "Sales flow",
+    meta: { label: "Sales flow", toggleable: true },
+    cell: ({ row }) => <FlowCell application={row.original} />,
   },
   {
     accessorKey: "status",
@@ -1723,19 +1742,8 @@ function ApplicationsTableContent({
   )
 }
 
-function AddApplicationButton() {
-  return (
-    <Button asChild>
-      <Link to="/applications/new">
-        <Plus className="mr-2 h-4 w-4" />
-        Create Application
-      </Link>
-    </Button>
-  )
-}
-
 function Applications() {
-  const { isOperatorOrAbove, isSuperadmin } = useAuth()
+  const { isOperatorOrAbove } = useAuth()
   const { isContextReady, selectedPopupId } = useWorkspace()
   const { search, filtersJson } = useApplicationsFilterParams()
   const { showSuccessToast, showErrorToast } = useCustomToast()
@@ -1920,7 +1928,6 @@ function Applications() {
                   : "Export CSV"}
             </Button>
           )}
-          {isSuperadmin && isContextReady && <AddApplicationButton />}
         </div>
       </div>
       {!isContextReady ? (
