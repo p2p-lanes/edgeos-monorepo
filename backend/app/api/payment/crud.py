@@ -20,6 +20,7 @@ if TYPE_CHECKING:
     from app.api.human.models import Humans
     from app.api.human.schemas import HumanPublic
     from app.api.popup.models import Popups
+    from app.api.sales_flow.models import SalesFlows
     from app.api.tenant.models import Tenants
 from app.api.application.schemas import ApplicationStatus, ScholarshipStatus
 from app.api.attendee.crud import attendees_crud, generate_check_in_code
@@ -172,11 +173,20 @@ def _build_purchase_thank_you_payload(
 
 
 def _resolve_open_checkout_success_url(
-    popup: "Popups", internal_thank_you_url: str, payload: dict, *, locale: str
+    flow: "SalesFlows | None",
+    internal_thank_you_url: str,
+    payload: dict,
+    *,
+    locale: str,
 ) -> str:
     """Resolve where a successful open-checkout buyer lands.
 
-    A custom popup success URL overrides the portal thank-you: signed with the
+    The landing page belongs to the flow the buyer came through, not to the
+    popup: two flows selling the same event can hand their buyers to two
+    different pages, which is the whole point of separating them. Every flow
+    carries its own copy of what the popup used to answer (`d4f1a72e9c85`).
+
+    A custom success URL overrides the portal thank-you: signed with the
     order payload when a signing secret is set (external page verifies it),
     plain otherwise. A ``{locale}`` placeholder in the custom URL is replaced
     with the checkout language (e.g. ``.../{locale}/gracias`` → ``.../es/gracias``).
@@ -188,11 +198,14 @@ def _resolve_open_checkout_success_url(
     external and internal alike — outside the signed payload, so the landing
     page can render in the buyer's language without touching HMAC verification.
     """
-    custom = popup.open_checkout_success_url
+    from app.api.sales_flow.resolver import build_effective_config  # noqa: PLC0415
+
+    config = build_effective_config(flow) if flow is not None else None
+    custom = config.open_checkout_success_url if config else None
     if custom:
         custom = custom.replace("{locale}", locale)
         custom = append_query_params(custom, [("lang", locale)])
-        secret = popup.open_checkout_signing_secret
+        secret = config.open_checkout_signing_secret if config else None
         return build_signed_redirect_url(custom, payload, secret) if secret else custom
     internal = append_query_params(internal_thank_you_url, [("lang", locale)])
     return build_unsigned_redirect_url(internal, payload)
@@ -748,7 +761,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         from app.api.popup.schemas import PopupStatus
         from app.api.sales_flow.crud import sales_flows_crud
         from app.api.sales_flow.eligibility import assert_upsale_eligible
-        from app.api.sales_flow.resolver import resolve_flow
+        from app.api.sales_flow.resolver import build_effective_config, resolve_flow
         from app.api.sales_flow.schemas import SalesFlowType
         from app.api.shared.enums import SaleType
         from app.api.tenant.utils import get_portal_url
@@ -1167,7 +1180,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 exp=int(now.timestamp()) + 30 * 60,
             )
             success_redirect = _resolve_open_checkout_success_url(
-                popup,
+                target_flow,
                 _internal_open_checkout_thank_you_url(
                     portal_base, landing_is_checkout, popup, payment
                 ),
@@ -1218,15 +1231,20 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
 
             # SimpleFi performs the redirect, so hand it the resolved success URL
             # (custom-signed, or the portal thank-you with the order data). The
-            # cancel URL stays the landing-aware portal page unless the popup
+            # cancel URL stays the landing-aware portal page unless the flow
             # overrides it. Application fee / pass purchase are untouched.
             success_url = success_redirect
             if landing_is_checkout:
                 cancel_url = f"{portal_base}/?cancelled=1"
             else:
                 cancel_url = f"{portal_base}/checkout/{popup.slug}?cancelled=1"
-            if popup.open_checkout_cancel_url:
-                cancel_url = popup.open_checkout_cancel_url
+            flow_cancel_url = (
+                build_effective_config(target_flow).open_checkout_cancel_url
+                if target_flow is not None
+                else None
+            )
+            if flow_cancel_url:
+                cancel_url = flow_cancel_url
             reference = {
                 "email": buyer.email,
                 "human_id": str(buyer.id),
@@ -3171,6 +3189,12 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         5. The cart's email matches the buyer email (case-insensitive).
 
         A valid token for a different email or a different popup is always invalid.
+
+        The secret is read from the popup on purpose, unlike the open-checkout
+        landing redirect, which now reads the flow's. A cart is popup-scoped and
+        its restore link is issued before any flow is resolved, so a per-flow
+        secret would have nothing to verify against. The popup's is
+        auto-provisioned at creation and never surfaced as a setting.
         """
         if cid is None or sig is None:
             return False
@@ -3367,6 +3391,8 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                        ALREADY_APPROVED redirect URL is constructed.
         """
         from app.api.popup.models import Popups as _Popups
+        from app.api.sales_flow.models import SalesFlows as _SalesFlows
+        from app.api.sales_flow.resolver import build_effective_config
         from app.api.tenant.models import Tenants as _Tenants
         from app.api.tenant.utils import get_portal_url
         from app.services.simplefi import get_simplefi_client
@@ -3456,8 +3482,27 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
 
             if anonymous and _popup is not None and _tenant is not None:
                 # Open-checkout path: signed external redirect only.
-                secret = _popup.open_checkout_signing_secret
-                if secret and _popup.open_checkout_success_url:
+                # The landing page belongs to the flow this payment was made
+                # through — the same one that answered on the way in, read
+                # back off the payment's own provenance column.
+                #
+                # A payment predating that column names no flow. It still went
+                # through one, so the popup's default answers for it rather
+                # than the buyer losing a redirect that worked when they paid.
+                _flow = (
+                    session.get(_SalesFlows, prior.sales_flow_id)
+                    if prior.sales_flow_id
+                    else None
+                )
+                if _flow is None:
+                    from app.api.sales_flow.crud import (  # noqa: PLC0415
+                        sales_flows_crud as _flows_crud,
+                    )
+
+                    _flow = _flows_crud.get_default_flow(session, prior.popup_id)
+                _config = build_effective_config(_flow) if _flow is not None else None
+                secret = _config.open_checkout_signing_secret if _config else None
+                if secret and _config and _config.open_checkout_success_url:
                     _now = datetime.now(UTC)
                     payload = build_thank_you_payload(
                         order_id=str(prior.id),
@@ -3483,7 +3528,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                         exp=int(_now.timestamp()) + 30 * 60,
                     )
                     lang = locale or _popup.default_language or "en"
-                    success_base = _popup.open_checkout_success_url.replace(
+                    success_base = _config.open_checkout_success_url.replace(
                         "{locale}", lang
                     )
                     success_base = append_query_params(success_base, [("lang", lang)])

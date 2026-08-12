@@ -31,6 +31,7 @@ from app.services.simplefi.client import CancelOutcome
 from tests._flow_helpers import (
     application_flow_id,
     coupon_flow_id,
+    set_open_checkout_landing,
 )
 
 # ---------------------------------------------------------------------------
@@ -381,9 +382,13 @@ class TestSupersedeLocatedPendingCore:
         cause a TypeError at runtime when both popup fields are configured.
         """
         popup = _make_popup(db, tenant_a, slug_prefix="slp06")
-        # Configure the popup for signed redirect (both fields required)
-        popup.open_checkout_signing_secret = "test-secret-32-chars-long-xxxxxxxx"
-        popup.open_checkout_success_url = "https://example.com/thank-you"
+        # Configure the flow for signed redirect (both fields required)
+        set_open_checkout_landing(
+            db,
+            popup,
+            success_url="https://example.com/thank-you",
+            signing_secret="test-secret-32-chars-long-xxxxxxxx",
+        )
         db.add(popup)
         db.flush()
         prior = _make_pending_payment(db, tenant_a, popup)

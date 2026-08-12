@@ -21,13 +21,16 @@ from app.api.form_section.models import FormSections
 from app.api.payment.models import Payments
 from app.api.popup.models import Popups
 from app.api.product.models import Products
+from app.api.sales_flow.models import SalesFlows
 from app.api.shared.enums import SaleType
 from app.api.tenant.models import Tenants
+from app.api.ticketing_step.constants import seed_ticketing_steps_for_popup
 from app.utils.encryption import encrypt
 from tests._flow_helpers import (
     coupon_flow_id,
     default_flow_id,
     seed_default_steps,
+    set_open_checkout_landing,
 )
 from tests.conftest import with_origin
 
@@ -637,7 +640,9 @@ def test_zero_amount_purchase_returns_custom_success_redirect_url(
     popup's custom open-checkout success URL in redirect_url for the portal to
     redirect to. checkout_url stays empty (no provider checkout)."""
     popup = _make_popup(db, tenant_a, slug_prefix="free-redirect")
-    popup.open_checkout_success_url = "https://brand.example.com/thank-you"
+    set_open_checkout_landing(
+        db, popup, success_url="https://brand.example.com/thank-you"
+    )
     db.add(popup)
     product = _make_product(db, popup, price="75.00")
     _make_coupon(db, popup, code="FREEPASS", discount_value=100)
@@ -690,8 +695,12 @@ def test_paid_purchase_signs_order_payload_into_simplefi_success_url(
     HMAC-signed order snapshot, so the external thank-you page can verify it."""
     secret = "amanita-secret"
     popup = _make_popup(db, tenant_a, slug_prefix="paid-signed")
-    popup.open_checkout_success_url = "https://brand.example.com/thank-you"
-    popup.open_checkout_signing_secret = secret
+    set_open_checkout_landing(
+        db,
+        popup,
+        success_url="https://brand.example.com/thank-you",
+        signing_secret=secret,
+    )
     db.add(popup)
     product = _make_product(db, popup, price="120.00")
     db.commit()
@@ -746,8 +755,12 @@ def test_signed_redirect_substitutes_locale_placeholder(
     popup language before signing (e.g. .../{locale}/gracias → .../es/gracias)."""
     secret = "amanita-secret"
     popup = _make_popup(db, tenant_a, slug_prefix="locale-signed")
-    popup.open_checkout_success_url = "https://amanita.example.com/{locale}/gracias"
-    popup.open_checkout_signing_secret = secret
+    set_open_checkout_landing(
+        db,
+        popup,
+        success_url="https://amanita.example.com/{locale}/gracias",
+        signing_secret=secret,
+    )
     popup.default_language = "es"  # fallback; the request locale must win
     db.add(popup)
     product = _make_product(db, popup, price="120.00")
@@ -786,6 +799,76 @@ def test_signed_redirect_substitutes_locale_placeholder(
     assert parse_qs(urlparse(success_url).query)["lang"] == ["en"]
 
 
+def test_each_flow_lands_its_buyers_on_its_own_page(
+    client: TestClient,
+    db: Session,
+    tenant_a: Tenants,
+) -> None:
+    """Two ways into one event can hand their buyers to two different pages.
+
+    The reason the landing config moved off the popup: a partner selling
+    through their own flow sends buyers back to the partner's site, while the
+    event's own checkout keeps its own thank-you. Reading the popup made both
+    answer the same, whatever each flow had been configured with.
+    """
+    secret = "partner-secret"
+    popup = _make_popup(db, tenant_a, slug_prefix="two-landings")
+    set_open_checkout_landing(
+        db, popup, success_url="https://event.example.com/thanks", signing_secret=secret
+    )
+    partner = SalesFlows(
+        tenant_id=popup.tenant_id,
+        popup_id=popup.id,
+        slug=f"partner-{uuid.uuid4().hex[:6]}",
+        name="Partner",
+        type=SaleType.direct.value,
+        open_checkout_success_url="https://partner.example.com/gracias",
+        open_checkout_signing_secret=secret,
+    )
+    db.add(partner)
+    db.flush()
+    # A flow sells what its steps offer (R6), so a bare one refuses every
+    # product with `product_not_in_flow` long before any redirect is built.
+    seed_ticketing_steps_for_popup(
+        db,
+        popup_id=popup.id,
+        tenant_id=popup.tenant_id,
+        sales_flow_id=partner.id,
+        flow_type=partner.type,
+    )
+    product = _make_product(db, popup, price="50.00")
+    db.commit()
+
+    with patch("app.services.simplefi.get_simplefi_client") as mock_get_client:
+        mock_get_client.return_value.create_payment.return_value = SimpleNamespace(
+            id="sf_partner_1",
+            status="pending",
+            checkout_url="https://simplefi.test/checkout/partner",
+            is_installment_plan=False,
+        )
+        response = client.post(
+            f"/api/v1/checkout/{popup.slug}/purchase?flow_slug={partner.slug}",
+            json={
+                "products": [{"product_id": str(product.id), "quantity": 1}],
+                "buyer": {
+                    "email": "buyer@test.com",
+                    "first_name": "Matias",
+                    "last_name": "Walter",
+                    "form_data": {},
+                },
+            },
+            headers={"X-Tenant-Id": str(tenant_a.id)},
+        )
+
+        assert response.status_code == 200, response.text
+        success_url = mock_get_client.return_value.create_payment.call_args.kwargs[
+            "success_path"
+        ]
+
+    assert success_url.startswith("https://partner.example.com/gracias")
+    assert "event.example.com" not in success_url
+
+
 def test_signed_redirect_forwards_lang_on_fixed_path_success_url(
     client: TestClient,
     db: Session,
@@ -796,8 +879,12 @@ def test_signed_redirect_forwards_lang_on_fixed_path_success_url(
     so signature verification is untouched."""
     secret = "amanita-secret"
     popup = _make_popup(db, tenant_a, slug_prefix="lang-fixed-path")
-    popup.open_checkout_success_url = "https://amanita.example.com/gracias"
-    popup.open_checkout_signing_secret = secret
+    set_open_checkout_landing(
+        db,
+        popup,
+        success_url="https://amanita.example.com/gracias",
+        signing_secret=secret,
+    )
     db.add(popup)
     product = _make_product(db, popup, price="120.00")
     db.commit()
@@ -844,8 +931,12 @@ def test_zero_amount_purchase_signs_order_payload_into_redirect_url(
     when the popup configures a signing secret."""
     secret = "amanita-secret"
     popup = _make_popup(db, tenant_a, slug_prefix="free-signed")
-    popup.open_checkout_success_url = "https://brand.example.com/thank-you"
-    popup.open_checkout_signing_secret = secret
+    set_open_checkout_landing(
+        db,
+        popup,
+        success_url="https://brand.example.com/thank-you",
+        signing_secret=secret,
+    )
     db.add(popup)
     product = _make_product(db, popup, price="75.00")
     _make_coupon(db, popup, code="FREEPASS", discount_value=100)

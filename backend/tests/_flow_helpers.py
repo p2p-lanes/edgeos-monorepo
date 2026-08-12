@@ -84,6 +84,34 @@ def seed_default_steps(db, popup, sale_type: str | None = None):
     return flow
 
 
+def set_open_checkout_landing(
+    db,
+    popup,
+    *,
+    success_url: str | None = None,
+    cancel_url: str | None = None,
+    signing_secret: str | None = None,
+):
+    """Configure where an open-checkout buyer lands after paying.
+
+    On the flow, which is what the checkout reads. The popup carries the same
+    three columns and every flow was given a copy of them (`d4f1a72e9c85`),
+    but nothing consults the popup's anymore — a fixture that sets them there
+    configures a column no code path reaches, and its assertion fails for a
+    reason that has nothing to do with what it is testing.
+    """
+    flow = provision_default_flow(db, popup)
+    if success_url is not None:
+        flow.open_checkout_success_url = success_url
+    if cancel_url is not None:
+        flow.open_checkout_cancel_url = cancel_url
+    if signing_secret is not None:
+        flow.open_checkout_signing_secret = signing_secret
+    db.add(flow)
+    db.commit()
+    return flow
+
+
 def offer_category(db, popup, category: str):
     """Give the popup's default flow a step offering `category`.
 
