@@ -92,10 +92,17 @@ export function useResolvedAttendees(
   // rows from the public passes view (see dedupTicketEntries for full
   // context and the day/meal_plan exceptions). The raw `products` field on
   // the attendee is left untouched for buy-mode / cart consumers.
+  // This door's people, plus this person's own direct purchases.
+  //
+  // A direct-sale attendee carries no application at all, so matching on
+  // application_id alone hid the passes someone bought without applying —
+  // they belong to the buyer whichever door they came through, and there
+  // is no door to file them under.
   const scoped = applicationId
     ? humanAttendees.filter(
         (attendee: AttendeeWithOriginPublic) =>
-          attendee.application_id === applicationId,
+          attendee.application_id === applicationId ||
+          attendee.application_id == null,
       )
     : humanAttendees
 
