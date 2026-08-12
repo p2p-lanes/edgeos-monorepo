@@ -12,6 +12,7 @@ import { Loader } from "@/components/ui/Loader"
 import useHumanAttendeesQuery from "@/hooks/useHumanAttendeesQuery"
 import { useHumanPopupAccess } from "@/hooks/useHumanPopupAccess"
 import { useProductsQuery } from "@/hooks/useProductsQuery"
+import { useRequireDoor } from "@/hooks/useRequireDoor"
 import { useApplication } from "@/providers/applicationProvider"
 import { useCityProvider } from "@/providers/cityProvider"
 import { usePassesProvider } from "@/providers/passesProvider"
@@ -28,6 +29,12 @@ export default function HomePasses() {
   const { attendeePasses: attendees, products } = usePassesProvider()
   const city = getCity()
   const policy = resolvePopupCheckoutPolicy(city)
+  // These passes belong to one application. Without a door, someone
+  // holding two saw both sets listed with nothing telling them apart.
+  const choosingDoor = useRequireDoor(
+    city?.id ? String(city.id) : null,
+    String(params.popupSlug),
+  )
 
   // Gate access via the unified 7-step access ladder. The hook does NOT
   // redirect — routing decisions are handled here so they remain testable
@@ -58,7 +65,7 @@ export default function HomePasses() {
 
   // Show loader while access is being resolved (and, for non-direct popups,
   // while redirecting after denial).
-  if (access.state === "loading") {
+  if (choosingDoor || access.state === "loading") {
     return <Loader />
   }
   if (!isDirectSale && access.state === "denied") {

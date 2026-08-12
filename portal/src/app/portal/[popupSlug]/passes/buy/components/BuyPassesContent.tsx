@@ -6,6 +6,7 @@ import { CheckoutBackgroundImage } from "@/components/CheckoutBackgroundImage"
 import { CheckoutBackgroundVideo } from "@/components/CheckoutBackgroundVideo"
 import ScrollyCheckoutFlow from "@/components/checkout-flow/ScrollyCheckoutFlow"
 import { Loader } from "@/components/ui/Loader"
+import { useRequireDoor } from "@/hooks/useRequireDoor"
 import { getCheckoutBackground } from "@/lib/background-image"
 import { CheckoutProvider } from "@/providers/checkoutProvider"
 import { useCityProvider } from "@/providers/cityProvider"
@@ -25,6 +26,12 @@ export default function BuyPassesContent() {
   // its steps, its products, its wording. Absent means the gathering has
   // one door, which is almost all of them.
   const flowId = searchParams.get("flow")
+  // Same rule as the passes list: this checkout sells into one
+  // application, so it will not open without knowing which.
+  const choosingDoor = useRequireDoor(
+    getCity()?.id ? String(getCity()?.id) : null,
+    String(params.popupSlug),
+  )
 
   // The portal layout owns the scroll container (<main id="portal-scroll">),
   // and the SnapDotNav indicator sits on the right edge of the viewport. The
@@ -44,7 +51,7 @@ export default function BuyPassesContent() {
     router.push(flowId ? `${back}?flow=${flowId}` : back)
   }
 
-  if (!attendees.length || !products.length) return <Loader />
+  if (choosingDoor || !attendees.length || !products.length) return <Loader />
 
   return (
     <PassesProvider attendees={attendees} restoreFromCart>

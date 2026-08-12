@@ -153,13 +153,20 @@ const useResources = () => {
       icon: FileText,
       status: "active",
       path: `/portal/${city?.slug}${flowQuery}`,
-      children: [
-        {
-          name: t("sidebar.status"),
-          status: "inactive",
-          value: application?.status ?? "not started",
-        },
-      ],
+      // The status is omitted rather than guessed when several doors are
+      // open and none is named: "not started" alongside two accepted
+      // applications is not an incomplete answer, it is a wrong one
+      // (sdd/sales-flows-rediseno).
+      children:
+        !application && doors.length > 1
+          ? []
+          : [
+              {
+                name: t("sidebar.status"),
+                status: "inactive",
+                value: application?.status ?? "not started",
+              },
+            ],
     },
     {
       name: t("sidebar.passes"),
