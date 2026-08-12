@@ -357,3 +357,56 @@ class TestApplicationAdoptsAnExistingRow:
         adopted = db.get(Attendees, bought_row.id)
         assert adopted is not None
         assert adopted.application_id == uuid.UUID(response.json()["id"])
+
+
+class TestRowsWithoutAHumanStamp:
+    """`create_internal` only stamps human_id when the email matched a Human at
+    the time. Rows from before that match still belong to an applicant, and the
+    guard has to see them."""
+
+    def test_a_row_with_no_human_id_still_counts_through_its_application(
+        self, client: TestClient, db: Session, tenant_a: Tenants
+    ) -> None:
+        popup = _make_popup(db, tenant_a, suffix="no-stamp")
+        holder = _make_human(db, tenant_a)
+        _make_application(db, tenant_a, popup, holder)
+        category = _make_companion_category(db, tenant_a, popup)
+
+        already = _make_human(db, tenant_a)
+        their_application = _make_application(db, tenant_a, popup, already)
+        db.add(
+            Attendees(
+                id=uuid.uuid4(),
+                tenant_id=tenant_a.id,
+                application_id=their_application.id,
+                popup_id=popup.id,
+                human_id=None,
+                name="Already Here",
+                email=already.email,
+                category="main",
+            )
+        )
+        db.commit()
+
+        response = client.post(
+            f"/api/v1/attendees/my/popup/{popup.id}",
+            headers=_auth(holder),
+            json={
+                "name": "Already Here",
+                "email": already.email,
+                "category_id": str(category.id),
+            },
+        )
+
+        assert response.status_code == 409, response.text
+        assert (
+            db.exec(
+                select(func.count())
+                .select_from(Attendees)
+                .where(
+                    Attendees.popup_id == popup.id,
+                    Attendees.email == already.email,
+                )
+            ).one()
+            == 1
+        )

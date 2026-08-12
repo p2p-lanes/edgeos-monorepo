@@ -244,3 +244,25 @@ class TestFindOrCreateBuyerAttendee:
         assert attendee.popup_id == popup.id
         assert _count_attendees(db, popup) == 1
         assert _count_attendees(db, other_popup) == 1
+
+
+class TestWhichRowWins:
+    def test_their_own_application_row_beats_an_older_companion_row(
+        self, db: Session, tenant_a: Tenants
+    ) -> None:
+        """Data from before the duplicate guards can hold both. The row on
+        their own application is the one that is theirs to spend on; the other
+        one lives in somebody else's party."""
+        popup = _make_popup(db, tenant_a, suffix="own-vs-companion")
+        buyer = _make_human(db, tenant_a)
+        host = _make_human(db, tenant_a)
+        companion_row = _make_app_attendee(
+            db, tenant_a, popup, host, attendee_human=buyer, name="As A Companion"
+        )
+        own_row = _make_app_attendee(db, tenant_a, popup, buyer, name="On Their Own")
+        db.commit()
+
+        attendee = _buy(db, tenant_a, popup, buyer)
+
+        assert attendee.id == own_row.id
+        assert attendee.id != companion_row.id

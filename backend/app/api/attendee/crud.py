@@ -345,17 +345,23 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
         must not be used here, because a party contains other people.
 
         Their own application-less row wins when several match, so a repeat
-        buyer keeps landing where they landed before. Ties break on the oldest
-        row.
+        buyer keeps landing where they landed before, and a row on an
+        application of their own beats one they are a companion on. Older
+        rows break what is left. Only data from before the duplicate guards
+        can offer more than one row to choose from.
         """
+        from app.api.application.models import Applications
+
         statement = (
             select(Attendees)
+            .outerjoin(Applications, Attendees.application_id == Applications.id)  # type: ignore[arg-type]
             .where(
                 Attendees.human_id == human_id,
                 Attendees.popup_id == popup_id,
             )
             .order_by(
                 Attendees.application_id.is_(None).desc(),  # type: ignore[union-attr]
+                (Applications.human_id == human_id).desc(),
                 Attendees.created_at,  # type: ignore[arg-type]
             )
             .limit(1)
