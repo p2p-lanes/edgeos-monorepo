@@ -278,8 +278,17 @@ class FormFieldsCRUD(BaseCRUD[FormFields, FormFieldCreate, FormFieldUpdate]):
         custom_fields: dict[str, Any] | None,
         skip_required: bool = False,
         is_express_checkout: bool = False,
+        sales_flow_id: uuid.UUID | None = None,
     ) -> tuple[bool, list[str]]:
         """Validate custom_fields against form field definitions.
+
+        `sales_flow_id` names the form the applicant actually filled in. A
+        form belongs to one flow (sdd/sales-flows-rediseno), so validating
+        against the popup meant validating against EVERY flow's fields at
+        once: someone applying through a partner door was told a question
+        from the general door was missing, one they were never shown and had
+        no way to answer. Omitted keeps the popup-wide behaviour for callers
+        that have no flow.
 
         When ``skip_required`` is True, presence/emptiness checks on required
         fields are bypassed (used for draft saves), but type and constraint
@@ -294,15 +303,25 @@ class FormFieldsCRUD(BaseCRUD[FormFields, FormFieldCreate, FormFieldUpdate]):
         if custom_fields is None:
             custom_fields = {}
 
-        # Get all form fields for this popup
-        fields, _ = self.find_by_popup(session, popup_id, skip=0, limit=1000)
+        # The fields of the form that was actually shown.
+        if sales_flow_id is not None:
+            fields, _ = self.find_by_flow(session, sales_flow_id, skip=0, limit=1000)
+        else:
+            fields, _ = self.find_by_popup(session, popup_id, skip=0, limit=1000)
         field_map = {f.name: f for f in fields}
 
         # Hidden sections aren't asked on the portal, so skip required-field
         # validation for fields belonging to them.
         from app.api.form_section.crud import form_sections_crud
 
-        sections, _ = form_sections_crud.find_by_popup(session, popup_id, limit=None)
+        if sales_flow_id is not None:
+            sections, _ = form_sections_crud.find_by_flow(
+                session, sales_flow_id, limit=None
+            )
+        else:
+            sections, _ = form_sections_crud.find_by_popup(
+                session, popup_id, limit=None
+            )
         hidden_section_ids = {s.id for s in sections if s.hidden}
 
         # When the request comes from the /groups Express Checkout, only

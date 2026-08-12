@@ -912,6 +912,14 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
                 app_data.custom_fields or {},
                 skip_required=is_draft,
                 is_express_checkout=is_express_checkout,
+                # The same flow this application will be stamped with, so it
+                # is judged against the form it was shown and not against
+                # every flow's questions at once.
+                sales_flow_id=self.resolve_target_flow_id(
+                    session,
+                    app_data.popup_id,
+                    getattr(app_data, "sales_flow_id", None),
+                ),
             )
             if not is_valid:
                 raise HTTPException(
@@ -1249,6 +1257,14 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
                 app_data.custom_fields or {},
                 skip_required=is_draft,
                 is_express_checkout=is_express_checkout,
+                # The same flow this application will be stamped with, so it
+                # is judged against the form it was shown and not against
+                # every flow's questions at once.
+                sales_flow_id=self.resolve_target_flow_id(
+                    session,
+                    app_data.popup_id,
+                    getattr(app_data, "sales_flow_id", None),
+                ),
             )
             if not is_valid:
                 raise HTTPException(
@@ -1539,6 +1555,7 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
             custom_fields,
             skip_required=is_draft,
             is_express_checkout=is_express_checkout,
+            sales_flow_id=application.sales_flow_id,
         )
         if not is_valid:
             raise HTTPException(
@@ -1593,7 +1610,10 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         # Validate custom_fields if being updated
         if validate_custom_fields and update_data.custom_fields is not None:
             is_valid, errors = form_fields_crud.validate_custom_fields(
-                session, application.popup_id, update_data.custom_fields
+                session,
+                application.popup_id,
+                update_data.custom_fields,
+                sales_flow_id=application.sales_flow_id,
             )
             if not is_valid:
                 raise HTTPException(
