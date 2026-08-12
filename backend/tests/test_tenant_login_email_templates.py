@@ -11,6 +11,28 @@ from app.services.email.service import EmailService
 from tests._flow_helpers import default_flow_id
 
 
+@pytest.fixture(autouse=True)
+def _remove_tenant_login_templates(db: Session):
+    """Take every tenant-scoped login template back out after each test.
+
+    `uq_email_template_tenant_scope_type` allows one row per (tenant, type)
+    while popup_id IS NULL, and every test here creates one on purpose. Each
+    test used to clear the way before itself and leave its own row behind, so
+    the last one to run broke the next insert anywhere in the suite — the
+    migration test that asserts a tenant-scoped row is still legal, for one.
+    """
+    yield
+    db.rollback()
+    for template in db.exec(
+        select(EmailTemplates).where(
+            EmailTemplates.popup_id == None,  # noqa: E711
+            EmailTemplates.template_type == "login_code_human",
+        )
+    ):
+        db.delete(template)
+    db.commit()
+
+
 def _admin_headers(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 

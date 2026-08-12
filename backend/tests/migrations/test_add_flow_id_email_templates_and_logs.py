@@ -267,6 +267,10 @@ class TestEmailTemplateScopeCheckConstraint:
             ).scalar()
             assert count >= 1
         finally:
+            # A failed INSERT leaves the transaction aborted, and then the
+            # cleanup below is the only error pytest reports — the constraint
+            # that actually broke never reaches the output.
+            db.rollback()
             db.exec(
                 text(
                     "DELETE FROM email_templates "
