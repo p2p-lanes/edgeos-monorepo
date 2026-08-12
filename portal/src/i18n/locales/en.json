@@ -405,6 +405,10 @@
   },
   "passes": {
     "your_passes": "Your Passes",
+    "companion_attending": "You are attending as a companion.",
+    "companion_attending_city": "You are attending {{city}} as a companion.",
+    "companion_no_passes": "No passes assigned yet. Check back later.",
+    "companion_waiting_acceptance": "Passes will be available once the application is accepted.",
     "buy_passes": "Buy Passes",
     "your_passes_description": "View and manage your order here.",
     "upsale_title": "More for you",

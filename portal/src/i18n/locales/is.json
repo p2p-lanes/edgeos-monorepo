@@ -328,6 +328,10 @@
   },
   "passes": {
     "your_passes": "Passarnir þínir",
+    "companion_attending": "Þú mætir sem fylgdarmaður.",
+    "companion_attending_city": "Þú mætir á {{city}} sem fylgdarmaður.",
+    "companion_no_passes": "Engir passar hafa verið úthlutaðir enn. Athugaðu aftur síðar.",
+    "companion_waiting_acceptance": "Passar verða aðgengilegir þegar umsóknin hefur verið samþykkt.",
     "buy_passes": "Kaupa passa",
     "your_passes_description": "Skoðaðu og stjórnaðu pöntuninni þinni hér.",
     "upsale_title": "Meira fyrir þig",

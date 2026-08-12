@@ -1031,8 +1031,8 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             session.add(payment)
             session.flush()
 
-            # One attendee per (human, popup): a buyer who already attends gets
-            # their existing row, whichever door they came in by.
+            # One attendee per (human, popup): a buyer who is already at this
+            # gathering gets their existing row, however they got there.
             attendee = attendees_crud.find_or_create_buyer_attendee(
                 session,
                 human_id=buyer.id,

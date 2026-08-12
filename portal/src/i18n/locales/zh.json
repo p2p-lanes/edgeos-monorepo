@@ -338,6 +338,10 @@
   },
   "passes": {
     "your_passes": "我的通行证",
+    "companion_attending": "您以同行人身份参加。",
+    "companion_attending_city": "您以同行人身份参加 {{city}}。",
+    "companion_no_passes": "尚未分配通行证。请稍后再查看。",
+    "companion_waiting_acceptance": "申请通过后即可查看通行证。",
     "buy_passes": "购买通行证",
     "your_passes_description": "在这里查看和管理您的订单。",
     "upsale_title": "为您推荐",

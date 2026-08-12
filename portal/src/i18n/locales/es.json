@@ -405,6 +405,10 @@
   },
   "passes": {
     "your_passes": "Tus Pases",
+    "companion_attending": "Asistís como acompañante.",
+    "companion_attending_city": "Asistís a {{city}} como acompañante.",
+    "companion_no_passes": "Todavía no tenés pases asignados. Volvé a consultar más tarde.",
+    "companion_waiting_acceptance": "Los pases estarán disponibles cuando se acepte la aplicación.",
     "buy_passes": "Comprar Pases",
     "your_passes_description": "Mirá y administrá tu orden acá.",
     "upsale_title": "Más para vos",

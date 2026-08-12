@@ -1,10 +1,10 @@
 """Tests for AttendeesCRUD.find_or_create_buyer_attendee.
 
-A direct purchase must land on the person the buyer already is at that popup,
-never on a second attendee row. Ownership is the predicate of
-_human_popup_attendee_ids: the buyer's own application, or a direct-sale row
-carrying their human_id. A companion row belongs to the application holder, so
-it is not the buyer's row.
+A direct purchase must land on the row the buyer already is at that popup,
+never on a second one. The test is identity — the row carries their human_id —
+so it covers the row they applied with, the row they bought with before, and
+the row somebody else added them to as a companion. It must never return
+another member of the buyer's own party.
 """
 
 import uuid
@@ -185,11 +185,11 @@ class TestFindOrCreateBuyerAttendee:
         assert attendee.id == direct.id
         assert _count_attendees(db, popup) == 2
 
-    def test_a_companion_row_is_not_the_buyer_row(
+    def test_reuses_the_row_a_buyer_was_added_to_as_a_companion(
         self, db: Session, tenant_a: Tenants
     ) -> None:
-        """A companion belongs to the application holder, and every ownership
-        query says so, so the buyer still needs a row of their own."""
+        """Somebody else's application holds the row, but the row is still the
+        buyer, so their own ticket goes on it."""
         popup = _make_popup(db, tenant_a, suffix="companion")
         holder = _make_human(db, tenant_a)
         companion = _make_human(db, tenant_a)
@@ -200,8 +200,34 @@ class TestFindOrCreateBuyerAttendee:
 
         attendee = _buy(db, tenant_a, popup, companion)
 
-        assert attendee.id != companion_row.id
-        assert attendee.application_id is None
+        assert attendee.id == companion_row.id
+        assert _count_attendees(db, popup) == 1
+
+    def test_never_returns_another_member_of_the_buyer_party(
+        self, db: Session, tenant_a: Tenants
+    ) -> None:
+        """The buyer's own application also holds their companions. Picking the
+        oldest row of that party would hand the buyer somebody else's row."""
+        popup = _make_popup(db, tenant_a, suffix="party")
+        buyer = _make_human(db, tenant_a)
+        child = _make_human(db, tenant_a)
+        party = _make_app_attendee(db, tenant_a, popup, buyer, attendee_human=child)
+        buyer_row = Attendees(
+            id=uuid.uuid4(),
+            tenant_id=tenant_a.id,
+            application_id=party.application_id,
+            popup_id=popup.id,
+            human_id=buyer.id,
+            name="The Buyer",
+            email=buyer.email,
+            category="main",
+        )
+        db.add(buyer_row)
+        db.commit()
+
+        attendee = _buy(db, tenant_a, popup, buyer)
+
+        assert attendee.id == buyer_row.id
         assert _count_attendees(db, popup) == 2
 
     def test_a_row_in_another_popup_is_not_reused(

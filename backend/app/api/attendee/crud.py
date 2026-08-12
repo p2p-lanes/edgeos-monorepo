@@ -327,27 +327,33 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
         ).first()
         return fallback
 
-    def find_owned_attendee(
+    def find_attendee_for_human(
         self,
         session: Session,
         human_id: uuid.UUID,
         popup_id: uuid.UUID,
     ) -> Attendees | None:
-        """Find the attendee this human already is at this popup, if any.
+        """Find the attendee row this human IS at this popup, if any.
 
-        Ownership is the predicate of _human_popup_attendee_ids: an attendee
-        reached through the human's own application, or a direct-sale attendee
-        carrying their human_id. A companion row is owned by the application
-        holder, not by the companion, so it is never returned here.
+        Identity, not ownership: the only test is that the row carries their
+        human_id. So it also returns the row somebody else added them to as a
+        companion — that row is still them at this gathering, and the tickets
+        they buy for themselves belong on it.
 
-        The direct-sale row wins when both legs exist, so repeated direct
-        purchases keep landing on the row they created. Ties break on the
-        oldest row.
+        Ownership (_human_popup_attendee_ids) answers a different question:
+        which rows a human holds, theirs plus their application's party. It
+        must not be used here, because a party contains other people.
+
+        Their own application-less row wins when several match, so a repeat
+        buyer keeps landing where they landed before. Ties break on the oldest
+        row.
         """
-        union_ids = self._human_popup_attendee_ids(session, human_id, popup_id)
         statement = (
             select(Attendees)
-            .where(Attendees.id.in_(select(union_ids.c.id)))  # type: ignore[arg-type]
+            .where(
+                Attendees.human_id == human_id,
+                Attendees.popup_id == popup_id,
+            )
             .order_by(
                 Attendees.application_id.is_(None).desc(),  # type: ignore[union-attr]
                 Attendees.created_at,  # type: ignore[arg-type]
@@ -367,9 +373,10 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
     ) -> Attendees:
         """Return the attendee a direct purchase belongs to, creating it if new.
 
-        A buyer who already attends this popup — because they applied, or
-        because they bought before — gets that row. Only a buyer with no row at
-        all gets a fresh application-less one.
+        A buyer who is already at this popup — because they applied, because
+        they bought before, or because somebody listed them as a companion —
+        gets that row. Only a buyer who is not there at all gets a fresh
+        application-less one.
 
         Implements SELECT → INSERT → IntegrityError → re-SELECT so concurrent
         purchases by the same human for the same popup converge on one row.
@@ -378,7 +385,7 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
         Tickets are tracked via AttendeeProducts rows, so one attendee carries
         every direct purchase the buyer makes.
         """
-        existing = self.find_owned_attendee(session, human_id, popup_id)
+        existing = self.find_attendee_for_human(session, human_id, popup_id)
         if existing:
             return existing
 
@@ -403,7 +410,7 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
         except IntegrityError:
             session.rollback()
             # Concurrent INSERT — re-SELECT the winner
-            existing = self.find_owned_attendee(session, human_id, popup_id)
+            existing = self.find_attendee_for_human(session, human_id, popup_id)
             if existing is None:
                 raise  # unexpected — re-raise original error
             return existing
