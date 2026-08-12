@@ -1038,6 +1038,35 @@ async def get_my_application(
     return _build_application_public(application)
 
 
+def _host_paid_for_any(db, attendee_products) -> bool:
+    """Whether any of these tickets was paid through an application.
+
+    A ticket bought through the host's application is the host's money, and
+    unwinding that is a support decision. A ticket whose payment carries no
+    application is this person's own — a direct purchase, or a grant made
+    straight to them. A ticket with no payment at all says nothing about who
+    paid, so it counts as the host's.
+    """
+    from sqlmodel import select
+
+    from app.api.payment.models import Payments
+
+    payment_ids = {ap.payment_id for ap in attendee_products}
+    if None in payment_ids:
+        return True
+    return (
+        db.exec(
+            select(Payments.id)
+            .where(
+                Payments.id.in_(payment_ids),  # type: ignore[union-attr]
+                Payments.application_id.is_not(None),  # type: ignore[union-attr]
+            )
+            .limit(1)
+        ).first()
+        is not None
+    )
+
+
 @router.post(
     "/my/detach-companion",
     status_code=status.HTTP_204_NO_CONTENT,
@@ -1045,8 +1074,8 @@ async def get_my_application(
     responses={
         409: {
             "description": (
-                "Tickets have already been purchased for this attendee on the "
-                "host application. Detach blocked; route to support."
+                "The host paid for tickets on this attendee. Detach blocked; "
+                "route to support."
             ),
         },
     },
@@ -1065,8 +1094,11 @@ async def detach_companion(
     to their own application via the group invite.
 
     Idempotent: returns 204 when the human is not actually a companion.
-    Returns 409 when tickets have already been purchased for this attendee
-    (money decisions handled by support, not by a checkout button).
+
+    A row carrying tickets the person paid for themselves is detached rather
+    than deleted, so those passes survive the move. Returns 409 when the host
+    paid for any of them — that is a money decision for support, not for a
+    checkout button.
     """
     from app.api.attendee.crud import attendees_crud
     from app.api.popup.crud import popups_crud
@@ -1080,8 +1112,12 @@ async def detach_companion(
     if not companion:
         return  # idempotent no-op
 
-    if companion.attendee_products:
-        host_human = companion.application.human if companion.application else None
+    host_application = companion.application
+
+    if companion.attendee_products and _host_paid_for_any(
+        db, companion.attendee_products
+    ):
+        host_human = host_application.human if host_application else None
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail={
@@ -1094,8 +1130,15 @@ async def detach_companion(
             },
         )
 
-    host_application = companion.application
-    db.delete(companion)
+    if companion.attendee_products:
+        # Every ticket on the row is theirs — bought or granted with no
+        # application behind it. Deleting the row would delete passes they
+        # paid for, so the row leaves the party instead and travels with them.
+        # Their own application adopts it when they file one.
+        companion.application_id = None
+        db.add(companion)
+    else:
+        db.delete(companion)
     if host_application:
         crud.applications_crud.create_snapshot(
             db, host_application, "companion_detached"

@@ -758,8 +758,11 @@ export class ApplicationsService {
      * to their own application via the group invite.
      *
      * Idempotent: returns 204 when the human is not actually a companion.
-     * Returns 409 when tickets have already been purchased for this attendee
-     * (money decisions handled by support, not by a checkout button).
+     *
+     * A row carrying tickets the person paid for themselves is detached rather
+     * than deleted, so those passes survive the move. Returns 409 when the host
+     * paid for any of them — that is a money decision for support, not for a
+     * checkout button.
      * @param data The data for the request.
      * @param data.requestBody
      * @returns void Successful Response
@@ -772,7 +775,7 @@ export class ApplicationsService {
             body: data.requestBody,
             mediaType: 'application/json',
             errors: {
-                409: 'Tickets have already been purchased for this attendee on the host application. Detach blocked; route to support.',
+                409: 'The host paid for tickets on this attendee. Detach blocked; route to support.',
                 422: 'Validation Error'
             }
         });

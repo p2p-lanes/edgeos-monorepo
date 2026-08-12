@@ -313,3 +313,47 @@ class TestAdminApplicationRoute:
 
         assert response.status_code == 409, response.text
         assert _count_rows(db, popup, already) == 1
+
+
+class TestApplicationAdoptsAnExistingRow:
+    """An application brings a primary attendee with it. If the applicant is
+    already here without one, it takes over that row instead."""
+
+    def test_buying_first_and_applying_later_stays_one_row(
+        self, client: TestClient, db: Session, tenant_a: Tenants
+    ) -> None:
+        popup = _make_popup(db, tenant_a, suffix="adopt-direct")
+        application_flow_id(db, popup.id)  # the door they will apply through
+        buyer = _make_human(db, tenant_a)
+        buyer.first_name = "Pat"
+        buyer.last_name = "Doe"
+        db.add(buyer)
+        bought_row = Attendees(
+            id=uuid.uuid4(),
+            tenant_id=tenant_a.id,
+            application_id=None,
+            popup_id=popup.id,
+            human_id=buyer.id,
+            name="Pat Doe",
+            email=buyer.email,
+            category="main",
+        )
+        db.add(bought_row)
+        db.commit()
+
+        response = client.post(
+            "/api/v1/applications/my",
+            headers=_auth(buyer),
+            json={
+                "popup_id": str(popup.id),
+                "first_name": "Pat",
+                "last_name": "Doe",
+            },
+        )
+
+        assert response.status_code in (200, 201), response.text
+        db.expire_all()
+        assert _count_rows(db, popup, buyer) == 1
+        adopted = db.get(Attendees, bought_row.id)
+        assert adopted is not None
+        assert adopted.application_id == uuid.UUID(response.json()["id"])

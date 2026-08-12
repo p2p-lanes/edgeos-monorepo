@@ -1122,7 +1122,7 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
             session, application.popup_id
         )
 
-        attendees_crud.create_internal(
+        attendees_crud.adopt_or_create_for_application(
             session,
             tenant_id=tenant_id,
             application_id=application.id,
@@ -1432,7 +1432,7 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
             session, application.popup_id
         )
 
-        attendees_crud.create_internal(
+        attendees_crud.adopt_or_create_for_application(
             session,
             tenant_id=tenant_id,
             application_id=application.id,

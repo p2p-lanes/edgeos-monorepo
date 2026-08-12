@@ -362,6 +362,59 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
         )
         return session.exec(statement).first()
 
+    def adopt_or_create_for_application(
+        self,
+        session: Session,
+        *,
+        tenant_id: uuid.UUID,
+        application_id: uuid.UUID,
+        popup_id: uuid.UUID,
+        human_id: uuid.UUID,
+        name: str,
+        email: str | None = None,
+        gender: str | None = None,
+        category_id: uuid.UUID | None = None,
+    ) -> Attendees:
+        """Give an application the attendee row of the person who filed it.
+
+        The applicant can already be at this popup without an application:
+        they bought a ticket before applying, or they left somebody else's
+        party carrying one. That row IS them, tickets and all, so the
+        application takes it over rather than making a second one.
+
+        A row that already belongs to an application is left alone — holding
+        one application per flow is deliberate, and a companion row belongs to
+        its host.
+
+        Flush-only on the adoption path; the caller owns the commit.
+        """
+        existing = self.find_attendee_for_human(session, human_id, popup_id)
+        if existing is None or existing.application_id is not None:
+            return self.create_internal(
+                session,
+                tenant_id=tenant_id,
+                application_id=application_id,
+                popup_id=popup_id,
+                name=name,
+                email=email,
+                gender=gender,
+                human_id=human_id,
+                category_id=category_id,
+            )
+
+        existing.application_id = application_id
+        existing.name = name
+        # They are the applicant here, whatever the row called them before.
+        if category_id is not None:
+            existing.category_id = category_id
+        if email and not existing.email:
+            existing.email = email.lower()
+        if gender and not existing.gender:
+            existing.gender = gender
+        session.add(existing)
+        session.flush()
+        return existing
+
     def human_attends_popup(
         self,
         session: Session,
