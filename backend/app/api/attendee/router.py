@@ -328,16 +328,12 @@ async def create_my_attendee_for_popup(
                 ],
             )
         if category_row.max_per_application is not None:
-            from sqlmodel import func, select  # noqa: PLC0415
-
-            from app.api.attendee.models import Attendees as _Attendees  # noqa: PLC0415
-
-            count = db.exec(
-                select(func.count()).where(
-                    _Attendees.application_id == application.id,
-                    _Attendees.category_id == category_row.id,
-                )
-            ).one()
+            count = crud.attendees_crud.count_party_by_category(
+                db,
+                human_id=current_human.id,
+                popup_id=popup_id,
+                category_id=category_row.id,
+            )
             if count >= category_row.max_per_application:
                 raise HTTPException(
                     status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,

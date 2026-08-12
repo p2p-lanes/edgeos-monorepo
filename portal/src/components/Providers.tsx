@@ -1,15 +1,12 @@
 "use client"
 
 import "@/i18n/config"
-import { useSearchParams } from "next/navigation"
 import type { ReactNode } from "react"
 import HelpButton from "@/components/HelpButton"
 import { SidebarProvider } from "@/components/Sidebar/SidebarComponents"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import useResolvedAttendees from "@/hooks/useResolvedAttendees"
-import ApplicationProvider, {
-  useApplication,
-} from "@/providers/applicationProvider"
+import ApplicationProvider from "@/providers/applicationProvider"
 import CityProvider from "@/providers/cityProvider"
 import DiscountProvider from "@/providers/discountProvider"
 import { LanguageProvider } from "@/providers/languageProvider"
@@ -21,19 +18,12 @@ import ThemeProvider from "@/providers/themeProvider"
  * `PassesProvider` `attendees` prop. Must live inside ApplicationProvider
  * and CityProvider so the hook can read both.
  *
- * `?flow=` names which door into the gathering the screen is about. The
- * attendee query is popup-scoped, so without it someone holding two
- * applications sees both sets of passes at once with nothing saying which
- * is which (sdd/sales-flows-rediseno). Absent, `getRelevantApplication`
- * answers only when there is a single application — the common case, left
- * exactly as it was.
+ * The door the screen is about (`?flow=`) selects configuration, never
+ * people: a person and their party are one set at a popup regardless of how
+ * many ways in they hold (sdd/sales-flows-rediseno).
  */
 const PassesBridge = ({ children }: { children: ReactNode }) => {
-  const searchParams = useSearchParams()
-  const { getRelevantApplication } = useApplication()
-  const flowId = searchParams.get("flow")
-  const application = getRelevantApplication(flowId)
-  const attendees = useResolvedAttendees(application?.id ?? null)
+  const attendees = useResolvedAttendees()
   return <PassesProvider attendees={attendees}>{children}</PassesProvider>
 }
 

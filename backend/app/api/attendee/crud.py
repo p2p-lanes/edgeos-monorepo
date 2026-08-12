@@ -684,6 +684,29 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
         results = list(session.exec(statement).all())
         return results, total
 
+    def count_party_by_category(
+        self,
+        session: Session,
+        human_id: uuid.UUID,
+        popup_id: uuid.UUID,
+        category_id: uuid.UUID,
+    ) -> int:
+        """How many of a human's party at this popup are of one category.
+
+        Counted over the whole party, not one application. A person has one
+        spouse at a gathering however many ways in they hold, so a cap read
+        per application let the second door hand out a second one
+        (sdd/sales-flows-rediseno).
+        """
+        union_ids = self._human_popup_attendee_ids(session, human_id, popup_id)
+
+        return session.exec(
+            select(func.count()).where(
+                Attendees.id.in_(select(union_ids.c.id)),  # type: ignore[arg-type]
+                Attendees.category_id == category_id,
+            )
+        ).one()
+
     def find_purchases_by_human_popup(
         self,
         session: Session,

@@ -11,6 +11,7 @@ and applications are seeded directly via db.add for speed.
 """
 
 import uuid
+from datetime import UTC, datetime
 
 from fastapi.testclient import TestClient
 from sqlmodel import Session
@@ -18,6 +19,7 @@ from sqlmodel import Session
 from app.api.application.models import Applications
 from app.api.application.schemas import ApplicationStatus
 from app.api.human.models import Humans
+from app.api.sales_flow.models import SalesFlows
 from app.api.tenant.models import Tenants
 from app.core.security import create_access_token
 from tests._flow_helpers import application_flow_id
@@ -64,6 +66,45 @@ def _make_accepted_application(
         popup_id=popup_id,
         human_id=human.id,
         status=ApplicationStatus.ACCEPTED.value,
+    )
+    db.add(application)
+    db.commit()
+    db.refresh(application)
+    return application
+
+
+def _make_accepted_application_in_second_flow(
+    db: Session,
+    tenant: Tenants,
+    popup_id: uuid.UUID,
+    human: Humans,
+) -> Applications:
+    """Give the human a second way into the same popup.
+
+    Two accepted applications for one popup is legitimate since the flow
+    re-key: one per flow. `submitted_at` is set so this one wins
+    `get_by_human_popup`'s ordering — otherwise which application the new
+    companion lands on is decided by a uuid tiebreak, and the test would
+    only catch the bug half the time.
+    """
+    flow = SalesFlows(
+        tenant_id=tenant.id,
+        popup_id=popup_id,
+        slug=f"second-{uuid.uuid4().hex[:8]}",
+        name="Second Door",
+        type="application",
+    )
+    db.add(flow)
+    db.commit()
+
+    application = Applications(
+        sales_flow_id=flow.id,
+        id=uuid.uuid4(),
+        tenant_id=tenant.id,
+        popup_id=popup_id,
+        human_id=human.id,
+        status=ApplicationStatus.ACCEPTED.value,
+        submitted_at=datetime.now(UTC),
     )
     db.add(application)
     db.commit()
@@ -195,6 +236,45 @@ class TestMaxPerApplicationEnforced:
         resp2 = _post_attendee(client, human, popup_id, cat_id, name="Second")
         assert resp2.status_code == 422, (
             f"Expected 422 on second creation, got {resp2.status_code}: {resp2.text}"
+        )
+        detail = resp2.json().get("detail", [])
+        codes = [d.get("code") for d in detail if isinstance(d, dict)]
+        assert "max_reached" in codes, f"Expected 'max_reached' code, got: {codes}"
+
+    def test_a_second_door_does_not_reopen_the_cap(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+        admin_token_tenant_a: str,
+    ) -> None:
+        """Holding two ways in does not entitle someone to two of a capped kind.
+
+        A person has one spouse at a gathering however many flows they
+        applied through. Counting the cap per application let the second
+        application hand out a second one (sdd/sales-flows-rediseno).
+        """
+        popup = _create_popup_via_api(client, admin_token_tenant_a)
+        popup_id = popup["id"]
+
+        capped_cat = _create_capped_category(
+            client, admin_token_tenant_a, popup_id, max_per_application=1
+        )
+        cat_id = capped_cat["id"]
+
+        human = _make_human(db, tenant_a, suffix="twodoors")
+        _make_accepted_application(db, tenant_a, uuid.UUID(popup_id), human)
+
+        resp1 = _post_attendee(client, human, popup_id, cat_id, name="First")
+        assert resp1.status_code == 200, resp1.text
+
+        _make_accepted_application_in_second_flow(
+            db, tenant_a, uuid.UUID(popup_id), human
+        )
+
+        resp2 = _post_attendee(client, human, popup_id, cat_id, name="Second")
+        assert resp2.status_code == 422, (
+            f"Second door reopened the cap: {resp2.status_code}: {resp2.text}"
         )
         detail = resp2.json().get("detail", [])
         codes = [d.get("code") for d in detail if isinstance(d, dict)]

@@ -27,16 +27,14 @@ import type { AttendeePassState } from "@/types/Attendee"
  * When no city is loaded, no user is logged in, or required data is missing
  * for the direct-sale branch, the hook returns an empty list.
  *
- * `applicationId` narrows the list to one door into the gathering. The
- * query behind it is popup-scoped, so someone accepted as a volunteer AND
- * through general entry gets both sets mixed together without it — two
- * people's worth of passes on one screen, with no way to tell which
- * belongs to which (sdd/sales-flows-rediseno). Omitting it is correct only
- * when the person holds a single application, which is almost everyone.
+ * The list is not narrowed by door. A sales flow scopes configuration; the
+ * popup scopes data, and people are data (sdd/sales-flows-rediseno). One
+ * person is one attendee row at a gathering however many ways in they used,
+ * so filing that row under the door it happened to be created through hid
+ * the person from themselves everywhere else — a volunteer looking at their
+ * passes saw their spouse and no sign of their own.
  */
-export function useResolvedAttendees(
-  applicationId?: string | null,
-): AttendeePassState[] {
+export function useResolvedAttendees(): AttendeePassState[] {
   const { getCity } = useCityProvider()
   const { user } = useAuth()
 
@@ -92,21 +90,7 @@ export function useResolvedAttendees(
   // rows from the public passes view (see dedupTicketEntries for full
   // context and the day/meal_plan exceptions). The raw `products` field on
   // the attendee is left untouched for buy-mode / cart consumers.
-  // This door's people, plus this person's own direct purchases.
-  //
-  // A direct-sale attendee carries no application at all, so matching on
-  // application_id alone hid the passes someone bought without applying —
-  // they belong to the buyer whichever door they came through, and there
-  // is no door to file them under.
-  const scoped = applicationId
-    ? humanAttendees.filter(
-        (attendee: AttendeeWithOriginPublic) =>
-          attendee.application_id === applicationId ||
-          attendee.application_id == null,
-      )
-    : humanAttendees
-
-  const withTicketEntries = scoped.map(
+  const withTicketEntries = humanAttendees.map(
     (attendee: AttendeeWithOriginPublic): AttendeePassState => ({
       ...(attendee as unknown as AttendeePassState),
       products: [],
