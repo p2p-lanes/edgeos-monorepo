@@ -164,17 +164,19 @@ describe("SalesFlowForm - flow-owned settings", () => {
 
     expect(screen.queryByLabelText(/scholarship/i)).not.toBeInTheDocument()
     expect(screen.queryByText(/application settings/i)).not.toBeInTheDocument()
-    expect(
-      screen.queryByLabelText(/abandoned application delay/i),
-    ).not.toBeInTheDocument()
+    // Every field of that cadence is application-only, so the whole heading
+    // goes with them — an empty section reads as a missing feature.
+    expect(screen.queryByText(/abandoned application/i)).not.toBeInTheDocument()
   })
 
   it("keeps the cadences that apply to any sale", async () => {
     renderForm({ type: "direct" as never })
 
-    expect(
-      await screen.findByLabelText(/abandoned cart delay/i),
-    ).toBeInTheDocument()
+    // Each cadence is its own headed group naming the email it paces, so
+    // "Delay (days)" is read through the heading above it rather than
+    // repeated into a label nobody could parse.
+    expect(await screen.findByText("Abandoned Cart")).toBeInTheDocument()
+    expect(screen.getByText("Purchase Reminder")).toBeInTheDocument()
     expect(screen.getByLabelText(/allows coupons/i)).toBeInTheDocument()
   })
 

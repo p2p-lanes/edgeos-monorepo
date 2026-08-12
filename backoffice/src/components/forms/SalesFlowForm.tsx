@@ -72,7 +72,11 @@ interface ConfigFieldConfig {
   appliesTo?: "application"
 }
 
-const CONFIG_SECTIONS: { title: string; fields: ConfigFieldConfig[] }[] = [
+const CONFIG_SECTIONS: {
+  title: string
+  description?: string
+  fields: ConfigFieldConfig[]
+}[] = [
   {
     title: "Application Settings",
     fields: [
@@ -80,6 +84,8 @@ const CONFIG_SECTIONS: { title: string; fields: ConfigFieldConfig[] }[] = [
         key: "application_layout",
         appliesTo: "application",
         label: "Application Layout",
+        description:
+          "Whether applicants answer the whole form on one page or step through it.",
         kind: "select",
         options: [
           { value: "single_page", label: "Single Page" },
@@ -90,23 +96,28 @@ const CONFIG_SECTIONS: { title: string; fields: ConfigFieldConfig[] }[] = [
         key: "requires_application_fee",
         appliesTo: "application",
         label: "Requires Application Fee",
+        description: "Charge applicants before their application is reviewed.",
         kind: "boolean",
       },
       {
         key: "application_fee_amount",
         appliesTo: "application",
         label: "Application Fee Amount",
+        description: "What that fee costs.",
         kind: "currency",
       },
       {
         key: "allows_scholarship",
         appliesTo: "application",
         label: "Allows Scholarship",
+        description:
+          "Let applicants ask for a reduced price as part of applying.",
         kind: "boolean",
       },
       {
         key: "allows_incentive",
         label: "Allows Incentive",
+        description: "Let applicants be offered a discount on acceptance.",
         kind: "boolean",
         appliesTo: "application",
       },
@@ -118,74 +129,120 @@ const CONFIG_SECTIONS: { title: string; fields: ConfigFieldConfig[] }[] = [
     // on flows that have no applications at all.
     title: "Discounts",
     fields: [
-      { key: "allows_coupons", label: "Allows Coupons", kind: "boolean" },
+      {
+        key: "allows_coupons",
+        label: "Allows Coupons",
+        description:
+          "Let buyers redeem a discount code at this flow's checkout.",
+        kind: "boolean",
+      },
     ],
   },
   {
     title: "Open Checkout Redirects",
+    description:
+      "Where a buyer lands after paying through this flow. Leave empty to keep them on the portal thank-you page.",
     fields: [
       {
         key: "open_checkout_success_url",
         label: "Success URL",
+        description:
+          "Your own page, shown after a successful payment. Write {locale} anywhere in it to have the buyer's language substituted in.",
         kind: "text",
       },
-      { key: "open_checkout_cancel_url", label: "Cancel URL", kind: "text" },
+      {
+        key: "open_checkout_cancel_url",
+        label: "Cancel URL",
+        description:
+          "Where a buyer goes after cancelling. Defaults to the portal checkout page.",
+        kind: "text",
+      },
       {
         key: "open_checkout_signing_secret",
         label: "Signing Secret",
+        description:
+          "Shared secret used to sign the order data sent to the success URL. Set the same value on that page so it can verify the order is really yours. Empty means the redirect carries no signed payload.",
         kind: "secret",
       },
     ],
   },
+  // Nine numbers under one "Reminder Cadence" heading said nothing about
+  // which email each one paced. Split into the three emails the popup form
+  // already names, each carrying the sentence that explains who receives it.
   {
-    title: "Reminder Cadence",
+    title: "Abandoned Cart",
+    description:
+      "Emails buyers who did not complete their purchase. Leave the delay empty to send nothing.",
     fields: [
       {
         key: "abandoned_cart_delay_days",
-        label: "Abandoned Cart Delay (days)",
+        label: "Delay (days)",
+        description: "How long after they left before the first email.",
         kind: "number",
       },
       {
         key: "abandoned_cart_repeat_days",
-        label: "Abandoned Cart Repeat (days)",
+        label: "Every (days)",
+        description: "How often to follow up. Empty sends once.",
         kind: "number",
       },
       {
         key: "abandoned_cart_max_count",
-        label: "Abandoned Cart Max Count",
+        label: "Max sends",
+        description: "Stop after this many emails.",
         kind: "number",
       },
+    ],
+  },
+  {
+    title: "Purchase Reminder",
+    description:
+      "Emails accepted applicants who have not bought a pass yet. Leave the delay empty to send nothing.",
+    fields: [
       {
         key: "purchase_reminder_delay_days",
-        label: "Purchase Reminder Delay (days)",
+        label: "Delay (days)",
+        description: "How long after acceptance before the first email.",
         kind: "number",
       },
       {
         key: "purchase_reminder_repeat_days",
-        label: "Purchase Reminder Repeat (days)",
+        label: "Every (days)",
+        description: "How often to follow up. Empty sends once.",
         kind: "number",
       },
       {
         key: "purchase_reminder_max_count",
-        label: "Purchase Reminder Max Count",
+        label: "Max sends",
+        description: "Stop after this many emails.",
         kind: "number",
       },
+    ],
+  },
+  {
+    title: "Abandoned Application",
+    description:
+      "Emails applicants whose application is still a draft, counted from their last edit. Leave the delay empty to send nothing.",
+    fields: [
       {
         key: "abandoned_application_delay_days",
         appliesTo: "application",
-        label: "Abandoned Application Delay (days)",
+        label: "Delay (days)",
+        description: "How long after their last edit before the first email.",
         kind: "number",
       },
       {
         key: "abandoned_application_repeat_days",
         appliesTo: "application",
-        label: "Abandoned Application Repeat (days)",
+        label: "Every (days)",
+        description: "How often to follow up. Empty sends once.",
         kind: "number",
       },
       {
         key: "abandoned_application_max_count",
         appliesTo: "application",
-        label: "Abandoned Application Max Count",
+        label: "Max sends",
+        description: "Stop after this many emails.",
         kind: "number",
       },
     ],
@@ -617,7 +674,10 @@ export function SalesFlowForm({
               return (
                 <div key={section.title}>
                   <Separator />
-                  <InlineSection title={section.title}>
+                  <InlineSection
+                    title={section.title}
+                    description={section.description}
+                  >
                     {fields.map((fieldConfig) => (
                       <form.Field
                         key={fieldConfig.key}
