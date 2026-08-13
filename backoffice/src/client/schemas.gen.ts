@@ -19412,6 +19412,28 @@ export const SalesFlowCreateSchema = {
             ],
             title: 'Installments Interval Count'
         },
+        invites_enabled: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Invites Enabled'
+        },
+        checkin_pass_lead_days: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Checkin Pass Lead Days'
+        },
         open_checkout_success_url: {
             anyOf: [
                 {
@@ -19889,6 +19911,28 @@ export const SalesFlowPublicSchema = {
                 }
             ],
             title: 'Installments Interval Count'
+        },
+        invites_enabled: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Invites Enabled'
+        },
+        checkin_pass_lead_days: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Checkin Pass Lead Days'
         },
         open_checkout_success_url: {
             anyOf: [
@@ -20404,6 +20448,28 @@ export const SalesFlowUpdateSchema = {
                 }
             ],
             title: 'Installments Interval Count'
+        },
+        invites_enabled: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Invites Enabled'
+        },
+        checkin_pass_lead_days: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Checkin Pass Lead Days'
         },
         open_checkout_success_url: {
             anyOf: [

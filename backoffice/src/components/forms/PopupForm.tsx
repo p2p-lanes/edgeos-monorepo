@@ -1,6 +1,6 @@
 import { useForm } from "@tanstack/react-form"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { Link, useNavigate } from "@tanstack/react-router"
+import { useNavigate } from "@tanstack/react-router"
 import {
   Building2,
   Calendar,
@@ -13,7 +13,6 @@ import {
   Image,
   Key,
   Languages,
-  Link2,
   Link as LinkIcon,
   Lock,
   Mail,
@@ -24,7 +23,6 @@ import {
   ShoppingCart,
   Users,
 } from "lucide-react"
-import { useState } from "react"
 import {
   ApprovalStrategiesService,
   type CheckoutMode,
@@ -191,9 +189,6 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
   // UI-only enable state per reminder type. The persisted switch is the delay
   // column (null = off); toggling on seeds a default delay, toggling off
   // clears the whole block so the save payload nulls it.
-  const [checkinPassOn, setCheckinPassOn] = useState(
-    Boolean(defaultValues?.checkin_pass_lead_days),
-  )
 
   const form = useForm({
     defaultValues: {
@@ -230,9 +225,6 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
       edit_passes_enabled: defaultValues?.edit_passes_enabled ?? false,
       self_check_in_enabled: defaultValues?.self_check_in_enabled ?? false,
       show_attendee_directory: defaultValues?.show_attendee_directory ?? false,
-      checkin_pass_lead_days:
-        defaultValues?.checkin_pass_lead_days?.toString() ?? "",
-      invites_enabled: defaultValues?.invites_enabled ?? false,
       referrals_enabled: defaultValues?.referrals_enabled ?? false,
       group_private_events_enabled:
         defaultValues?.group_private_events_enabled ?? false,
@@ -274,10 +266,6 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
         self_check_in_enabled: value.self_check_in_enabled,
         show_attendee_directory:
           value.sale_type === "application" && value.show_attendee_directory,
-        checkin_pass_lead_days: value.checkin_pass_lead_days
-          ? Number(value.checkin_pass_lead_days)
-          : null,
-        invites_enabled: value.invites_enabled,
         referrals_enabled: value.referrals_enabled,
         group_private_events_enabled: value.group_private_events_enabled,
         max_referrals_per_attendee: value.max_referrals_per_attendee
@@ -841,74 +829,6 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
           >
             {/* Event Options */}
 
-            {/* Automatic emails. The persisted on/off switch of each row is
-                its days column (null = off): the UI switch seeds a default
-                when enabled and clears the whole block when disabled. Max only
-                applies to repeating reminders, so it unlocks with Every. */}
-            <InlineSection title="Automatic Emails">
-              <InlineRow
-                icon={<QrCode className="h-4 w-4 text-muted-foreground" />}
-                label="Check-in Pass"
-                description="Email attendees their check-in QR code before the event starts"
-              >
-                <div className="flex flex-col items-end gap-2">
-                  <div className="flex items-center gap-3">
-                    {checkinPassOn && (
-                      <form.Field name="checkin_pass_lead_days">
-                        {(field) => (
-                          <div className="space-y-1">
-                            <p className="text-center text-[10px] text-muted-foreground">
-                              Days before
-                            </p>
-                            <Input
-                              id="checkin_pass_lead_days"
-                              type="number"
-                              min="1"
-                              step="1"
-                              placeholder="3"
-                              value={field.state.value}
-                              onChange={(e) =>
-                                field.handleChange(e.target.value)
-                              }
-                              disabled={readOnly}
-                              className="max-w-[80px] text-sm"
-                            />
-                          </div>
-                        )}
-                      </form.Field>
-                    )}
-                    <Switch
-                      id="checkin_pass_enabled"
-                      checked={checkinPassOn}
-                      onCheckedChange={(checked) => {
-                        setCheckinPassOn(checked)
-                        if (checked) {
-                          if (!form.getFieldValue("checkin_pass_lead_days")) {
-                            form.setFieldValue("checkin_pass_lead_days", "3")
-                          }
-                        } else {
-                          form.setFieldValue("checkin_pass_lead_days", "")
-                        }
-                      }}
-                      disabled={readOnly}
-                    />
-                  </div>
-                  {checkinPassOn && (
-                    <Link
-                      to="/email-templates/$type/edit"
-                      params={{ type: "check_in_pass" }}
-                      search={{ flow: undefined }}
-                      className="text-xs text-primary hover:underline"
-                    >
-                      Edit email template
-                    </Link>
-                  )}
-                </div>
-              </InlineRow>
-            </InlineSection>
-
-            <Separator />
-
             {/* Self-service check-in feature flag */}
             <InlineSection title="Self-service check-in">
               <form.Field name="self_check_in_enabled">
@@ -991,23 +911,6 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
 
             {/* Groups and Invites feature flags */}
             <InlineSection title="Groups and Invites">
-              <form.Field name="invites_enabled">
-                {(field) => (
-                  <InlineRow
-                    icon={<Link2 className="h-4 w-4 text-muted-foreground" />}
-                    label="Enable Invites"
-                    description="Allow admins to create invite links with discounts and automatic approvals"
-                  >
-                    <Switch
-                      id="invites_enabled"
-                      checked={field.state.value}
-                      onCheckedChange={(checked) => field.handleChange(checked)}
-                      disabled={readOnly}
-                    />
-                  </InlineRow>
-                )}
-              </form.Field>
-
               <form.Field name="referrals_enabled">
                 {(field) => (
                   <InlineRow

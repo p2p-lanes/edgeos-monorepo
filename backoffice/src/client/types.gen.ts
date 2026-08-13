@@ -3979,6 +3979,8 @@ export type SalesFlowCreate = {
     installments_max?: (number | null);
     installments_interval?: (InstallmentInterval | null);
     installments_interval_count?: (number | null);
+    invites_enabled?: (boolean | null);
+    checkin_pass_lead_days?: (number | null);
     open_checkout_success_url?: (string | null);
     open_checkout_cancel_url?: (string | null);
     open_checkout_signing_secret?: (string | null);
@@ -4064,6 +4066,8 @@ export type SalesFlowPublic = {
     installments_max?: (number | null);
     installments_interval?: (InstallmentInterval | null);
     installments_interval_count?: (number | null);
+    invites_enabled?: (boolean | null);
+    checkin_pass_lead_days?: (number | null);
     open_checkout_success_url?: (string | null);
     open_checkout_cancel_url?: (string | null);
     open_checkout_signing_secret?: (string | null);
@@ -4138,6 +4142,8 @@ export type SalesFlowUpdate = {
     installments_max?: (number | null);
     installments_interval?: (InstallmentInterval | null);
     installments_interval_count?: (number | null);
+    invites_enabled?: (boolean | null);
+    checkin_pass_lead_days?: (number | null);
     open_checkout_success_url?: (string | null);
     open_checkout_cancel_url?: (string | null);
     open_checkout_signing_secret?: (string | null);

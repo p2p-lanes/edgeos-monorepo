@@ -265,6 +265,32 @@ const CONFIG_SECTIONS: {
   // which email each one paced. Split into the three emails the popup form
   // already names, each carrying the sentence that explains who receives it.
   {
+    title: "Ways In",
+    fields: [
+      {
+        key: "invites_enabled",
+        label: "Accept Invites",
+        description:
+          "Let admins create invite links that land people in this flow. An invite already names the flow it opens, so this is that flow's answer.",
+        kind: "boolean",
+      },
+    ],
+  },
+  {
+    title: "Check-in Pass",
+    description:
+      "Emails ticket holders their check-in QR before the event starts. The wording is this flow's; so is the timing.",
+    fields: [
+      {
+        key: "checkin_pass_lead_days",
+        label: "Days before the event",
+        description:
+          "How far ahead of the start date to send. Empty sends nothing.",
+        kind: "number",
+      },
+    ],
+  },
+  {
     title: "Abandoned Cart",
     description:
       "Emails buyers who did not complete their purchase. Leave the delay empty to send nothing.",
