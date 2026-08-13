@@ -286,13 +286,15 @@ def validate_patron_amount(amount: Decimal, template_config: dict) -> None:
 
 
 def calculate_insurance_amount(
-    popup: "Any",
+    config: "Any",
     product_quantity_pairs: "list[tuple[Any, int]]",
 ) -> Decimal:
-    """Pure function: compute insurance amount from popup settings + eligible products.
+    """Pure function: compute insurance amount from a flow's fee settings.
 
     Args:
-        popup: Object with .insurance_enabled (bool) and .insurance_percentage (Decimal|None).
+        config: The flow's `EffectiveFlowConfig` — .insurance_enabled (bool)
+            and .insurance_percentage (Decimal|None). Duck-typed on purpose so
+            the function stays testable without a database.
         product_quantity_pairs: List of (product, quantity) where product has
             .price (Decimal) and .insurance_eligible (bool).
 
@@ -300,9 +302,9 @@ def calculate_insurance_amount(
         Total insurance amount rounded to 2 decimal places.
         Returns Decimal("0") if insurance is disabled or percentage is None.
     """
-    if not popup.insurance_enabled:
+    if not config.insurance_enabled:
         return Decimal("0")
-    if popup.insurance_percentage is None:
+    if config.insurance_percentage is None:
         return Decimal("0")
 
     eligible_subtotal = Decimal("0")
@@ -310,24 +312,24 @@ def calculate_insurance_amount(
         if product.insurance_eligible:
             eligible_subtotal += product.price * quantity
 
-    return (eligible_subtotal * popup.insurance_percentage / 100).quantize(
+    return (eligible_subtotal * config.insurance_percentage / 100).quantize(
         MONEY_PRECISION, rounding=ROUND_HALF_UP
     )
 
 
 def calculate_contribution_amount(
-    popup: "Any",
+    config: "Any",
     products_subtotal: Decimal,
 ) -> Decimal:
-    """Pure function: compute contribution amount from popup settings + pre-fee subtotal.
+    """Pure function: compute contribution amount from a flow's fee settings.
 
-    Contribution is MANDATORY when enabled at popup level — there is no buyer opt-in
-    flag. Mirrors `calculate_insurance_amount` shape but drops the per-product
+    Contribution is MANDATORY when the flow enables it — there is no buyer
+    opt-in flag. Mirrors `calculate_insurance_amount` shape but drops the per-product
     eligibility filter (contribution applies over the full pre-fee order subtotal).
 
     Args:
-        popup: Object with .contribution_enabled (bool) and
-            .contribution_percentage (Decimal|None).
+        config: The flow's `EffectiveFlowConfig` — .contribution_enabled
+            (bool) and .contribution_percentage (Decimal|None).
         products_subtotal: Pre-fee snapshot of the order amount
             (post-discount, pre-insurance, pre-contribution).
 
@@ -335,12 +337,12 @@ def calculate_contribution_amount(
         Contribution amount rounded to 2 decimal places.
         Returns Decimal("0") if contribution is disabled or percentage is None.
     """
-    if not popup.contribution_enabled:
+    if not config.contribution_enabled:
         return Decimal("0")
-    if popup.contribution_percentage is None:
+    if config.contribution_percentage is None:
         return Decimal("0")
 
-    return (products_subtotal * popup.contribution_percentage / 100).quantize(
+    return (products_subtotal * config.contribution_percentage / 100).quantize(
         MONEY_PRECISION, rounding=ROUND_HALF_UP
     )
 
@@ -1147,9 +1149,10 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             # subtotal at full price via the shared helper, matching the
             # authenticated flow and the portal display. Skipped when the cart
             # is already $0 (a fee on nothing makes no sense).
-            if obj.insurance and post_discount_amount > Decimal("0"):
+            flow_fees = build_effective_config(target_flow) if target_flow else None
+            if obj.insurance and post_discount_amount > Decimal("0") and flow_fees:
                 insurance_amount = calculate_insurance_amount(
-                    popup,
+                    flow_fees,
                     [
                         (products_map[line.product_id], line.quantity)
                         for line in obj.products
@@ -1158,13 +1161,17 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 payment.insurance_amount = insurance_amount
                 payment.amount += insurance_amount
 
-            # Contribution fee (mandatory when the popup enables it — no buyer
+            # Contribution fee (mandatory when the flow enables it — no buyer
             # opt-in). Its base is the post-discount subtotal, NOT the
             # insurance-inflated total, so the two fees stay independent.
             # Mirrors the application flow in _apply_discounts.
-            if popup.contribution_enabled and popup.contribution_percentage:
+            if (
+                flow_fees
+                and flow_fees.contribution_enabled
+                and flow_fees.contribution_percentage
+            ):
                 contribution_amount = calculate_contribution_amount(
-                    popup, post_discount_amount
+                    flow_fees, post_discount_amount
                 )
                 payment.contribution_amount = contribution_amount
                 payment.amount += contribution_amount
@@ -1955,12 +1962,14 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         session: Session,
         requested_products: list[PaymentProductRequest],
         popup: "Popups | None" = None,
+        sales_flow_id: uuid.UUID | None = None,
     ) -> Decimal:
-        """Calculate insurance amount using popup.insurance_percentage and product.insurance_eligible.
+        """Insurance for an order, from the fee settings of the flow it is in.
 
-        Uses popup-level insurance settings (POPUP-6). Falls back to zero if popup is not provided
-        or popup insurance is disabled. The legacy per-product insurance_percentage field is no
-        longer read from this path.
+        The rate belongs to the flow being bought through, so a door can sell
+        without insurance while another offers it. Zero when there is no popup
+        to resolve a flow against, or when that flow has insurance off. The
+        legacy per-product `insurance_percentage` is not read from this path.
         """
         if popup is None:
             return Decimal("0")
@@ -1977,7 +1986,16 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             for rp in requested_products
             if rp.product_id in product_models
         ]
-        return calculate_insurance_amount(popup, product_quantity_pairs)
+        from app.api.sales_flow.resolver import config_for  # noqa: PLC0415
+
+        return calculate_insurance_amount(
+            config_for(
+                session,
+                sales_flow_id=sales_flow_id,
+                popup_id=popup.id,
+            ),
+            product_quantity_pairs,
+        )
 
     def _apply_discounts(
         self,
@@ -1986,6 +2004,8 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         application: Applications,
     ) -> PaymentPreview:
         """Calculate all discounts and return payment preview."""
+        from app.api.sales_flow.resolver import config_for  # noqa: PLC0415
+
         discount_assigned = Decimal("0")
 
         response = PaymentPreview(
@@ -2132,15 +2152,29 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         # so skip the calc even when the toggle was persisted as true.
         if obj.insurance and pre_fee_amount > Decimal("0"):
             popup = application.popup if application else None
-            insurance_amount = self._calculate_insurance(session, obj.products, popup)
+            insurance_amount = self._calculate_insurance(
+                session,
+                obj.products,
+                popup,
+                sales_flow_id=application.sales_flow_id if application else None,
+            )
             response.insurance_amount = insurance_amount
             response.amount += insurance_amount
 
         # Calculate contribution fee (mandatory when popup enables it — no buyer opt-in).
         # Uses the pre-fee snapshot so contribution base does not include insurance.
         popup = application.popup if application else None
-        if popup and popup.contribution_enabled and popup.contribution_percentage:
-            contribution_amount = calculate_contribution_amount(popup, pre_fee_amount)
+        fees = (
+            config_for(
+                session,
+                sales_flow_id=application.sales_flow_id,
+                popup_id=application.popup_id,
+            )
+            if application
+            else None
+        )
+        if fees and fees.contribution_enabled and fees.contribution_percentage:
+            contribution_amount = calculate_contribution_amount(fees, pre_fee_amount)
             response.contribution_amount = contribution_amount
             response.amount += contribution_amount
 

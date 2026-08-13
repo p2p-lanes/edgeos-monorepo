@@ -131,6 +131,19 @@ class SalesFlowBase(SQLModel):
     allows_scholarship: bool | None = Field(default=None, nullable=True)
     allows_incentive: bool | None = Field(default=None, nullable=True)
     allows_coupons: bool | None = Field(default=None, nullable=True)
+    # Fees charged at this flow's checkout. A door that sells to volunteers
+    # does not add a contribution to their order just because the general
+    # one does.
+    insurance_enabled: bool | None = Field(default=None, nullable=True)
+    insurance_percentage: Decimal | None = Field(
+        default=None, sa_column=Column(Numeric(5, 2), nullable=True)
+    )
+    contribution_enabled: bool | None = Field(default=None, nullable=True)
+    contribution_percentage: Decimal | None = Field(
+        default=None, sa_column=Column(Numeric(5, 2), nullable=True)
+    )
+    contribution_label: str | None = Field(default=None, nullable=True)
+    contribution_description: str | None = Field(default=None, nullable=True)
     open_checkout_success_url: str | None = Field(default=None, nullable=True)
     open_checkout_cancel_url: str | None = Field(default=None, nullable=True)
     open_checkout_signing_secret: str | None = Field(default=None, nullable=True)
@@ -163,6 +176,12 @@ class SalesFlowCreate(BaseModel):
     allows_scholarship: bool | None = None
     allows_incentive: bool | None = None
     allows_coupons: bool | None = None
+    insurance_enabled: bool | None = None
+    insurance_percentage: Decimal | None = None
+    contribution_enabled: bool | None = None
+    contribution_percentage: Decimal | None = None
+    contribution_label: str | None = None
+    contribution_description: str | None = None
     open_checkout_success_url: str | None = None
     open_checkout_cancel_url: str | None = None
     open_checkout_signing_secret: str | None = None
@@ -218,6 +237,12 @@ class SalesFlowUpdate(BaseModel):
     allows_scholarship: bool | None = None
     allows_incentive: bool | None = None
     allows_coupons: bool | None = None
+    insurance_enabled: bool | None = None
+    insurance_percentage: Decimal | None = None
+    contribution_enabled: bool | None = None
+    contribution_percentage: Decimal | None = None
+    contribution_label: str | None = None
+    contribution_description: str | None = None
     open_checkout_success_url: str | None = None
     open_checkout_cancel_url: str | None = None
     open_checkout_signing_secret: str | None = None
@@ -288,6 +313,12 @@ EFFECTIVE_CONFIG_FIELDS: tuple[str, ...] = (
     "allows_scholarship",
     "allows_incentive",
     "allows_coupons",
+    "insurance_enabled",
+    "insurance_percentage",
+    "contribution_enabled",
+    "contribution_percentage",
+    "contribution_label",
+    "contribution_description",
     "open_checkout_success_url",
     "open_checkout_cancel_url",
     "open_checkout_signing_secret",
@@ -330,6 +361,12 @@ class EffectiveFlowConfig(BaseModel):
     allows_scholarship: bool | None = None
     allows_incentive: bool | None = None
     allows_coupons: bool | None = None
+    insurance_enabled: bool | None = None
+    insurance_percentage: Decimal | None = None
+    contribution_enabled: bool | None = None
+    contribution_percentage: Decimal | None = None
+    contribution_label: str | None = None
+    contribution_description: str | None = None
     open_checkout_success_url: str | None = None
     open_checkout_cancel_url: str | None = None
     open_checkout_signing_secret: str | None = None
