@@ -512,6 +512,27 @@ def _calculate_price(
     return discounted_standard + non_discountable_amount, credit_applied
 
 
+def _installment_interval(config: "Any | None") -> str:
+    """The billing cadence a flow bills its installments on.
+
+    The popup's column is NOT NULL with a `month` default; the flow's is
+    nullable like every other Class B column, so a flow that never named an
+    interval falls back to the same default rather than handing SimpleFi a
+    None it would have to guess at.
+    """
+    from app.api.shared.enums import InstallmentInterval  # noqa: PLC0415
+
+    interval = getattr(config, "installments_interval", None) if config else None
+    return interval or InstallmentInterval.month.value
+
+
+def _installment_interval_count(config: "Any | None") -> int:
+    """How many intervals apart the installments fall. See `_installment_interval`
+    for why a missing value becomes the popup column's own default of 1."""
+    count = getattr(config, "installments_interval_count", None) if config else None
+    return count or 1
+
+
 def _calculate_max_installments(
     deadline: datetime,
     ceiling: int,
@@ -1282,15 +1303,16 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             # is all SimpleFi needs to create a plan.
             max_installments: int | None = None
             if (
-                popup.installments_enabled
-                and popup.installments_deadline is not None
-                and popup.installments_max is not None
+                flow_fees
+                and flow_fees.installments_enabled
+                and flow_fees.installments_deadline is not None
+                and flow_fees.installments_max is not None
             ):
                 computed = _calculate_max_installments(
-                    popup.installments_deadline,
-                    popup.installments_max,
-                    popup.installments_interval,
-                    popup.installments_interval_count,
+                    flow_fees.installments_deadline,
+                    flow_fees.installments_max,
+                    _installment_interval(flow_fees),
+                    _installment_interval_count(flow_fees),
                 )
                 if computed >= 2:
                     max_installments = computed
@@ -1316,8 +1338,8 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 success_path=success_url,
                 cancel_path=cancel_url,
                 max_installments=max_installments,
-                installment_interval=popup.installments_interval,
-                installment_interval_count=popup.installments_interval_count,
+                installment_interval=_installment_interval(flow_fees),
+                installment_interval_count=_installment_interval_count(flow_fees),
                 user_email=buyer.email,
                 plan_name=popup.name,
                 success_behavior=popup.simplefi_success_behavior,
@@ -2347,6 +2369,8 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         omitted (e.g. in background flows or tests that do not have a portal
         user), the system actor is used as the fallback.
         """
+        from app.api.sales_flow.resolver import config_for  # noqa: PLC0415
+
         application_id = _require_application_id(obj.application_id)
 
         # sdd/sales-flows slice 12 (design D5/D6, call-site table): the
@@ -2705,18 +2729,23 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         # in-flight plans are blocked by the guard above so we only see fresh
         # purchases here.
         popup = application.popup
+        terms = config_for(
+            session,
+            sales_flow_id=application.sales_flow_id,
+            popup_id=application.popup_id,
+        )
         max_installments: int | None = None
         if (
             not obj.edit_passes
-            and popup.installments_enabled
-            and popup.installments_deadline is not None
-            and popup.installments_max is not None
+            and terms.installments_enabled
+            and terms.installments_deadline is not None
+            and terms.installments_max is not None
         ):
             computed = _calculate_max_installments(
-                popup.installments_deadline,
-                popup.installments_max,
-                popup.installments_interval,
-                popup.installments_interval_count,
+                terms.installments_deadline,
+                terms.installments_max,
+                _installment_interval(terms),
+                _installment_interval_count(terms),
             )
             if computed >= 2:
                 max_installments = computed
@@ -2746,8 +2775,8 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 memo=application.popup.tenant.name,
                 portal_base_override=get_portal_url(application.popup.tenant),
                 max_installments=max_installments,
-                installment_interval=popup.installments_interval,
-                installment_interval_count=popup.installments_interval_count,
+                installment_interval=_installment_interval(terms),
+                installment_interval_count=_installment_interval_count(terms),
                 user_email=application.human.email if application.human else None,
                 plan_name=popup.name,
                 success_behavior=popup.simplefi_success_behavior,

@@ -30,6 +30,7 @@ from tests._flow_helpers import (
     coupon_flow_id,
     default_flow_id,
     seed_default_steps,
+    set_installment_terms,
     set_open_checkout_landing,
 )
 from tests.conftest import with_origin
@@ -1241,11 +1242,15 @@ def test_purchase_creates_installment_plan_when_popup_enabled(
     """Open-ticketing checkout must honor the popup's installments config —
     the same eligibility the pass-purchase path applies."""
     popup = _make_popup(db, tenant_a, slug_prefix="instplan")
-    popup.installments_enabled = True
-    popup.installments_deadline = datetime.now(UTC) + timedelta(days=365)
-    popup.installments_max = 6
-    popup.installments_interval = "month"
-    popup.installments_interval_count = 1
+    set_installment_terms(
+        db,
+        popup,
+        installments_enabled=True,
+        installments_deadline=datetime.now(UTC) + timedelta(days=365),
+        installments_max=6,
+        installments_interval="month",
+        installments_interval_count=1,
+    )
     product = _make_product(db, popup, price="300.00")
     db.commit()
 

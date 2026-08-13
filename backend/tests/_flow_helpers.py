@@ -112,6 +112,23 @@ def set_open_checkout_landing(
     return flow
 
 
+def set_installment_terms(db, popup, **terms):
+    """Configure the payment plan a buyer is offered.
+
+    On the flow, which is what the checkout reads since
+    sdd/sales-flows-rediseno slice 3. Setting them on the popup only reaches a
+    flow that does not exist yet, through `seed_config_from_popup` — so a
+    fixture that builds its popup first and configures it afterwards silently
+    configures nothing.
+    """
+    flow = provision_default_flow(db, popup)
+    for name, value in terms.items():
+        setattr(flow, name, value)
+    db.add(flow)
+    db.commit()
+    return flow
+
+
 def offer_category(db, popup, category: str):
     """Give the popup's default flow a step offering `category`.
 

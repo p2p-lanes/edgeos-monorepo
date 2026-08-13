@@ -238,6 +238,13 @@ async def update_sales_flow(
                 ),
             )
 
+    # Installment terms are validated on the RESULT of the patch, not on the
+    # payload: a request that only flips `installments_enabled` would otherwise
+    # look valid on its own while leaving the flow promising a plan it has no
+    # ceiling or deadline for — which SimpleFi rejects at the checkout, in
+    # front of the buyer.
+    _assert_installments_valid(flow, flow_in)
+
     scholarship_enabling = (
         flow_in.allows_scholarship is True and not flow.allows_scholarship
     )
@@ -256,6 +263,32 @@ async def update_sales_flow(
         _ensure_scholarship_section(db, updated)
 
     return SalesFlowPublic.model_validate(updated)
+
+
+def _assert_installments_valid(flow: SalesFlows, flow_in: SalesFlowUpdate) -> None:
+    """Validate the installment terms a flow will hold once this patch lands."""
+    from app.api.popup.schemas import validate_popup_installments_config
+
+    def merged(name: str):
+        return (
+            getattr(flow_in, name)
+            if name in flow_in.model_fields_set
+            else getattr(flow, name)
+        )
+
+    if not merged("installments_enabled"):
+        return
+    try:
+        validate_popup_installments_config(
+            enabled=True,
+            max_installments=merged("installments_max"),
+            deadline=merged("installments_deadline"),
+            interval_count=merged("installments_interval_count") or 1,
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
 
 
 def _ensure_scholarship_section(db: Session, flow: SalesFlows) -> None:

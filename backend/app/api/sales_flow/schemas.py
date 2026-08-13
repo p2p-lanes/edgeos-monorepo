@@ -8,7 +8,7 @@ from sqlalchemy import Boolean, Column, Integer, Numeric
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlmodel import Field, SQLModel, String
 
-from app.api.shared.enums import ApplicationLayout
+from app.api.shared.enums import ApplicationLayout, InstallmentInterval
 from app.services.restrictions.schemas import (
     assert_restriction_rule_allowed_for_type,
     parse_restriction_rule,
@@ -144,6 +144,17 @@ class SalesFlowBase(SQLModel):
     )
     contribution_label: str | None = Field(default=None, nullable=True)
     contribution_description: str | None = Field(default=None, nullable=True)
+    # Payment terms offered at this flow's checkout. All nullable, unlike the
+    # popup's NOT NULL originals: a flow that says nothing about installments
+    # offers none, which is what a Class B column with no value has always
+    # meant here.
+    installments_enabled: bool | None = Field(default=None, nullable=True)
+    installments_deadline: datetime | None = Field(default=None, nullable=True)
+    installments_max: int | None = Field(default=None, nullable=True)
+    installments_interval: InstallmentInterval | None = Field(
+        default=None, sa_column=Column(String, nullable=True)
+    )
+    installments_interval_count: int | None = Field(default=None, nullable=True)
     open_checkout_success_url: str | None = Field(default=None, nullable=True)
     open_checkout_cancel_url: str | None = Field(default=None, nullable=True)
     open_checkout_signing_secret: str | None = Field(default=None, nullable=True)
@@ -182,6 +193,11 @@ class SalesFlowCreate(BaseModel):
     contribution_percentage: Decimal | None = None
     contribution_label: str | None = None
     contribution_description: str | None = None
+    installments_enabled: bool | None = None
+    installments_deadline: datetime | None = None
+    installments_max: int | None = None
+    installments_interval: InstallmentInterval | None = None
+    installments_interval_count: int | None = None
     open_checkout_success_url: str | None = None
     open_checkout_cancel_url: str | None = None
     open_checkout_signing_secret: str | None = None
@@ -243,6 +259,11 @@ class SalesFlowUpdate(BaseModel):
     contribution_percentage: Decimal | None = None
     contribution_label: str | None = None
     contribution_description: str | None = None
+    installments_enabled: bool | None = None
+    installments_deadline: datetime | None = None
+    installments_max: int | None = None
+    installments_interval: InstallmentInterval | None = None
+    installments_interval_count: int | None = None
     open_checkout_success_url: str | None = None
     open_checkout_cancel_url: str | None = None
     open_checkout_signing_secret: str | None = None
@@ -319,6 +340,11 @@ EFFECTIVE_CONFIG_FIELDS: tuple[str, ...] = (
     "contribution_percentage",
     "contribution_label",
     "contribution_description",
+    "installments_enabled",
+    "installments_deadline",
+    "installments_max",
+    "installments_interval",
+    "installments_interval_count",
     "open_checkout_success_url",
     "open_checkout_cancel_url",
     "open_checkout_signing_secret",
@@ -367,6 +393,11 @@ class EffectiveFlowConfig(BaseModel):
     contribution_percentage: Decimal | None = None
     contribution_label: str | None = None
     contribution_description: str | None = None
+    installments_enabled: bool | None = None
+    installments_deadline: datetime | None = None
+    installments_max: int | None = None
+    installments_interval: InstallmentInterval | None = None
+    installments_interval_count: int | None = None
     open_checkout_success_url: str | None = None
     open_checkout_cancel_url: str | None = None
     open_checkout_signing_secret: str | None = None
