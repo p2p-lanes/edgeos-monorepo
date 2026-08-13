@@ -19,7 +19,10 @@ vi.mock("@tanstack/react-router", () => ({
   useNavigate: () => navigate,
 }))
 
-const workspace = { selectedPopupId: "popup-1", isContextReady: true }
+const workspace: { selectedPopupId: string | null; isContextReady: boolean } = {
+  selectedPopupId: "popup-1",
+  isContextReady: true,
+}
 vi.mock("@/contexts/WorkspaceContext", () => ({
   useWorkspace: () => workspace,
 }))
