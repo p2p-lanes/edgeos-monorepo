@@ -9603,6 +9603,67 @@ export const FormSectionUpdateSchema = {
     title: 'FormSectionUpdate'
 } as const;
 
+export const GoogleFontSchema = {
+    properties: {
+        family: {
+            type: 'string',
+            title: 'Family'
+        },
+        category: {
+            type: 'string',
+            enum: ['sans-serif', 'serif', 'display', 'handwriting', 'monospace'],
+            title: 'Category'
+        },
+        variants: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Variants'
+        },
+        subsets: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Subsets'
+        }
+    },
+    type: 'object',
+    required: ['family', 'category', 'variants', 'subsets'],
+    title: 'GoogleFont',
+    description: `A single family, trimmed to what the picker actually renders.
+
+Google's payload carries a \`files\` map with one CDN URL per variant, which
+is ~80% of the response weight and useless to us — the portal loads fonts
+through the \`css2\` stylesheet endpoint, not the raw files.`
+} as const;
+
+export const GoogleFontsCatalogSchema = {
+    properties: {
+        source: {
+            type: 'string',
+            enum: ['google', 'fallback'],
+            title: 'Source'
+        },
+        fonts: {
+            items: {
+                '$ref': '#/components/schemas/GoogleFont'
+            },
+            type: 'array',
+            title: 'Fonts'
+        }
+    },
+    type: 'object',
+    required: ['source', 'fonts'],
+    title: 'GoogleFontsCatalog',
+    description: `Catalog response.
+
+\`source\` lets the backoffice tell a real catalog from the degraded one and
+surface a hint to the admin rather than silently offering 40 fonts when
+1800 were expected.`
+} as const;
+
 export const GrantCreditRequestSchema = {
     properties: {
         amount: {

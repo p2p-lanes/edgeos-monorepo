@@ -24,6 +24,7 @@ from app.api import (
     event_venue,
     form_field,
     form_section,
+    google_fonts,
     group,
     human,
     invite,
@@ -106,6 +107,7 @@ api_router.include_router(checkout.router)
 
 # Utility resources
 api_router.include_router(upload.router)
+api_router.include_router(google_fonts.router)
 
 # Events module
 api_router.include_router(event.router)

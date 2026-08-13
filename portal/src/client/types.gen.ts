@@ -2045,6 +2045,36 @@ export type FormSectionUpdate = {
 };
 
 /**
+ * A single family, trimmed to what the picker actually renders.
+ *
+ * Google's payload carries a `files` map with one CDN URL per variant, which
+ * is ~80% of the response weight and useless to us — the portal loads fonts
+ * through the `css2` stylesheet endpoint, not the raw files.
+ */
+export type GoogleFont = {
+    family: string;
+    category: 'sans-serif' | 'serif' | 'display' | 'handwriting' | 'monospace';
+    variants: Array<(string)>;
+    subsets: Array<(string)>;
+};
+
+export type category = 'sans-serif' | 'serif' | 'display' | 'handwriting' | 'monospace';
+
+/**
+ * Catalog response.
+ *
+ * `source` lets the backoffice tell a real catalog from the degraded one and
+ * surface a hint to the admin rather than silently offering 40 fonts when
+ * 1800 were expected.
+ */
+export type GoogleFontsCatalog = {
+    source: 'google' | 'fallback';
+    fonts: Array<GoogleFont>;
+};
+
+export type source2 = 'google' | 'fallback';
+
+/**
  * Request body for POST /applications/{id}/credit — manual admin credit grant.
  */
 export type GrantCreditRequest = {
@@ -6550,6 +6580,8 @@ export type FormSectionsDeleteFormSectionData = {
 };
 
 export type FormSectionsDeleteFormSectionResponse = (void);
+
+export type GoogleFontsListGoogleFontsResponse = (GoogleFontsCatalog);
 
 export type GroupsListGroupsData = {
     /**
