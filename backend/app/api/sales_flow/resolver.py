@@ -164,3 +164,33 @@ def build_effective_config(
     return EffectiveFlowConfig(
         **{name: getattr(flow, name) for name in EFFECTIVE_CONFIG_FIELDS}
     )
+
+
+def config_for(
+    session: Session,
+    *,
+    sales_flow_id: uuid.UUID | None,
+    popup_id: uuid.UUID,
+) -> EffectiveFlowConfig:
+    """The channel configuration in force for a row that names a flow.
+
+    The one place that turns "this application / section / field config
+    belongs to flow X" into "here is what X decided". Call sites hold rows,
+    not flows, and having each of them fetch and unwrap one is how a
+    fallback rule drifts apart across a codebase.
+
+    A row naming no flow predates the re-key. The popup's default flow
+    answers for it — the flow it would have been created under — rather than
+    the popup's own copies of these columns, which are on their way out and
+    which nothing else reads anymore.
+
+    A popup with no default flow at all cannot happen through the real
+    creation path, but a fixture can build one; that returns an all-null
+    config rather than raising, so a read never takes down a request.
+    """
+    flow = session.get(SalesFlows, sales_flow_id) if sales_flow_id is not None else None
+    if flow is None:
+        flow = sales_flows_crud.get_default_flow(session, popup_id)
+    if flow is None:
+        return EffectiveFlowConfig(**dict.fromkeys(EFFECTIVE_CONFIG_FIELDS))
+    return build_effective_config(flow)

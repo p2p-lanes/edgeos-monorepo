@@ -1,8 +1,7 @@
 import uuid
-from typing import Any
 
 from fastapi import APIRouter, HTTPException, status
-from sqlmodel import select
+from sqlmodel import Session, select
 
 from app.api.form_section import crud
 from app.api.form_section.models import FormSections
@@ -52,7 +51,7 @@ async def list_form_sections(
         all_sections, _ = crud.form_sections_crud.find_by_flow(db, flow_id, limit=None)
         # Gate special-kind sections by current popup flags so the backoffice
         # renders consistently with the portal after a flag is toggled off.
-        filtered = [s for s in all_sections if _section_allowed_by_flags(s, popup)]
+        filtered = [s for s in all_sections if _section_allowed_by_flags(db, s)]
         total = len(filtered)
         sections = filtered[skip : skip + limit]
     else:
@@ -64,9 +63,22 @@ async def list_form_sections(
     )
 
 
-def _section_allowed_by_flags(section: FormSections, popup: Any) -> bool:
+def _section_allowed_by_flags(db: Session, section: FormSections) -> bool:
+    """Whether a special-kind section is asked, per its own flow.
+
+    A section belongs to one flow, so the flag that hides it belongs to that
+    flow too.
+    """
+    from app.api.sales_flow.resolver import config_for  # noqa: PLC0415
+
     if section.kind == FormSectionKind.SCHOLARSHIP.value:
-        return bool(popup.allows_scholarship)
+        return bool(
+            config_for(
+                db,
+                sales_flow_id=section.sales_flow_id,
+                popup_id=section.popup_id,
+            ).allows_scholarship
+        )
     return True
 
 
@@ -94,6 +106,7 @@ async def create_form_section(
     current_user: AdminOrApiKey_FormsWrite,
 ) -> FormSectionPublic:
     from app.api.popup.crud import popups_crud
+    from app.api.sales_flow.resolver import config_for  # noqa: PLC0415
 
     popup = popups_crud.get(db, section_in.popup_id)
     if not popup:
@@ -116,7 +129,11 @@ async def create_form_section(
     if section_in.kind != FormSectionKind.STANDARD:
         if (
             section_in.kind == FormSectionKind.SCHOLARSHIP
-            and not popup.allows_scholarship
+            and not config_for(
+                db,
+                sales_flow_id=section_in.sales_flow_id,
+                popup_id=section_in.popup_id,
+            ).allows_scholarship
         ):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,

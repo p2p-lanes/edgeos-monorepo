@@ -7,7 +7,7 @@ from app.api.base_field_config.constants import BASE_FIELD_DEFINITIONS
 from app.api.base_field_config.crud import (
     base_field_configs_crud,
     ensure_base_field_update_allowed,
-    field_applies_to_popup,
+    field_applies_to_flow,
 )
 from app.api.base_field_config.models import BaseFieldConfigs
 from app.api.base_field_config.schemas import BaseFieldConfigUpdate, CatalogField
@@ -77,12 +77,15 @@ def _get_base_fields_as_public(
     db: "Session", popup: "Popups", flow_id: uuid.UUID
 ) -> list[FormFieldPublic]:
     """Build FormFieldPublic entries from one flow's BaseFieldConfigs,
-    filtered by the popup's current feature flags."""
+    filtered by what that same flow decided to ask."""
+    from app.api.sales_flow.resolver import config_for  # noqa: PLC0415
+
+    config = config_for(db, sales_flow_id=flow_id, popup_id=popup.id)
     configs = base_field_configs_crud.find_by_flow(db, flow_id)
     return [
         _base_config_to_public(c)
         for c in configs
-        if field_applies_to_popup(c.field_name, popup)
+        if field_applies_to_flow(c.field_name, config)
     ]
 
 
@@ -156,6 +159,7 @@ async def list_available_base_fields(
     fields disabled by the popup's feature flags.
     """
     from app.api.popup.crud import popups_crud
+    from app.api.sales_flow.resolver import config_for  # noqa: PLC0415
 
     popup = popups_crud.get(db, popup_id)
     if not popup:
@@ -167,6 +171,9 @@ async def list_available_base_fields(
     configured = {
         c.field_name for c in base_field_configs_crud.find_by_popup(db, popup_id)
     }
+    # This catalog is popup-scoped and names no flow, so it answers for the
+    # default one — the same flow its create endpoint writes into.
+    catalog_config = config_for(db, sales_flow_id=None, popup_id=popup_id)
 
     available: list[CatalogField] = []
     for field_name, definition in BASE_FIELD_DEFINITIONS.items():
@@ -176,7 +183,7 @@ async def list_available_base_fields(
             # Elementals must always be present — they're seeded and not
             # offered in the "add field" catalog.
             continue
-        if not field_applies_to_popup(field_name, popup):
+        if not field_applies_to_flow(field_name, catalog_config):
             continue
         available.append(
             CatalogField(
@@ -205,6 +212,7 @@ async def create_base_field_config(
 ) -> FormFieldPublic:
     """Add a catalog base field to a popup by creating its BaseFieldConfig."""
     from app.api.popup.crud import popups_crud
+    from app.api.sales_flow.resolver import config_for  # noqa: PLC0415
 
     popup = popups_crud.get(db, popup_id)
     if not popup:
@@ -220,7 +228,9 @@ async def create_base_field_config(
             detail=f"Field '{field_name}' is not in the catalog",
         )
 
-    if not field_applies_to_popup(field_name, popup):
+    if not field_applies_to_flow(
+        field_name, config_for(db, sales_flow_id=None, popup_id=popup_id)
+    ):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Popup does not allow field '{field_name}'",

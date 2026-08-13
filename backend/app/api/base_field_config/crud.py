@@ -12,16 +12,21 @@ from app.api.form_section.models import FormSections
 from app.api.shared.crud import BaseCRUD
 
 if TYPE_CHECKING:
-    from app.api.popup.models import Popups
+    from app.api.sales_flow.schemas import EffectiveFlowConfig
 
 SCHOLARSHIP_FIELDS = frozenset(
     {"scholarship_request", "scholarship_details", "scholarship_video_url"}
 )
 
 
-def field_applies_to_popup(field_name: str, popup: "Popups") -> bool:
-    """Return True if the given base field is allowed by the popup's flags."""
-    if field_name in SCHOLARSHIP_FIELDS and not popup.allows_scholarship:
+def field_applies_to_flow(field_name: str, config: "EffectiveFlowConfig") -> bool:
+    """Whether a base field is asked at all, given what its flow decided.
+
+    Base field configs belong to a flow, so the flag that hides one has to
+    come from the same flow — asking the popup meant a scholarship question
+    appeared or vanished on every way in at once.
+    """
+    if field_name in SCHOLARSHIP_FIELDS and not config.allows_scholarship:
         return False
     return True
 

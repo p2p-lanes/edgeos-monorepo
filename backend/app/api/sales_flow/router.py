@@ -3,9 +3,11 @@ from typing import NoReturn
 
 from fastapi import APIRouter, HTTPException, status
 from sqlalchemy.exc import IntegrityError
+from sqlmodel import Session, select
 
 from app.api.popup_reviewer.crud import popup_reviewers_crud
 from app.api.sales_flow import crud
+from app.api.sales_flow.models import SalesFlows
 from app.api.sales_flow.readiness import flow_readiness
 from app.api.sales_flow.schemas import (
     SalesFlowCreate,
@@ -236,13 +238,52 @@ async def update_sales_flow(
                 ),
             )
 
+    scholarship_enabling = (
+        flow_in.allows_scholarship is True and not flow.allows_scholarship
+    )
+
     try:
         updated = crud.sales_flows_crud.update(db, flow, flow_in)
     except IntegrityError as exc:
         db.rollback()
         _raise_on_default_conflict(exc)
 
+    # Turning scholarships on has to produce the questions that ask for one.
+    # The popup's PATCH used to do this, back when the flag was the event's;
+    # now the flag belongs to the flow, and so does the section it creates.
+    # Idempotent: re-enabling reuses the row left by a previous cycle.
+    if scholarship_enabling:
+        _ensure_scholarship_section(db, updated)
+
     return SalesFlowPublic.model_validate(updated)
+
+
+def _ensure_scholarship_section(db: Session, flow: SalesFlows) -> None:
+    """Give a flow the scholarship section its form needs, once."""
+    from app.api.form_section.models import FormSections
+    from app.api.popup.constants import DEFAULT_SECTIONS
+
+    section_def = DEFAULT_SECTIONS["scholarship"]
+    existing = db.exec(
+        select(FormSections).where(
+            FormSections.sales_flow_id == flow.id,
+            FormSections.kind == section_def["kind"],
+        )
+    ).first()
+    if existing is not None:
+        return
+    db.add(
+        FormSections(
+            tenant_id=flow.tenant_id,
+            popup_id=flow.popup_id,
+            sales_flow_id=flow.id,
+            label=section_def["label"],
+            order=section_def["order"],
+            protected=True,
+            kind=section_def["kind"],
+        )
+    )
+    db.commit()
 
 
 @router.delete("/{flow_id}", status_code=status.HTTP_204_NO_CONTENT)

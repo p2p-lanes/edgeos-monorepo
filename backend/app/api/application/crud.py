@@ -221,6 +221,7 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         last), then id as a tiebreaker — reads/mutations always resolve to
         the same row.
         """
+
         accepted_first = case(
             (Applications.status == ApplicationStatus.ACCEPTED.value, 0), else_=1
         )
@@ -247,6 +248,7 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         2026-08-04) — one application per person PER FLOW, not per popup.
         Used by the duplicate-creation guards.
         """
+
         statement = select(Applications).where(
             Applications.human_id == human_id,
             Applications.sales_flow_id == sales_flow_id,
@@ -267,6 +269,7 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         `_get_flow_or_404` in this SDD change; a client-supplied flow id is
         always ownership-checked). Omitted means the popup's default flow.
         """
+
         if explicit_flow_id is None:
             return self.resolve_creation_flow_id(session, popup_id)
 
@@ -297,6 +300,7 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         raises instead of returning None — a caller that silently accepted
         "no flow" is exactly what F4 removed.
         """
+
         from app.api.sales_flow.crud import sales_flows_crud
 
         default_flow = sales_flows_crud.get_default_flow(session, popup_id)
@@ -315,6 +319,7 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         limit: int = 100,
     ) -> tuple[list[Applications], int]:
         """Find applications by human_id with eager loading."""
+
         base_statement = select(Applications).where(Applications.human_id == human_id)
 
         count_statement = select(func.count()).select_from(base_statement.subquery())
@@ -368,6 +373,7 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         match=any. A value is ignored when its field is not set; with a
         field set and no value the NULL bucket is selected.
         """
+
         # Each grouped-view scope becomes a plain WHERE clause; either may
         # require the Humans join.
         scope_clauses = []
@@ -477,6 +483,7 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         bucket of an outer grouped view, so a subgrouped view can count
         within each expanded parent group.
         """
+
         group_expression, group_needs_human = _group_by_expression(group_by)
         bucket = func.nullif(group_expression, "")
 
@@ -538,6 +545,7 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         limit: int = 100,
     ) -> tuple[list[Applications], int]:
         """Find applications by status with optional popup filter and eager loading."""
+
         base_statement = select(Applications).where(
             Applications.status == status_filter.value
         )
@@ -600,6 +608,7 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         `approval_strategy/crud.py::get_by_flow`) — the same shape of gap
         as `reviewers_mode` above: backend-supported, admin-inaccessible.
         """
+
         already_reviewed = (
             exists()
             .where(ApplicationReviews.application_id == Applications.id)
@@ -660,6 +669,7 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         other categories) are excluded. Supports text search across the
         attendee's own human fields.
         """
+
         # Root on attendees so the spouse appears as their own row, not just
         # nested under the main applicant. Gate on an accepted parent
         # application, on the attendee holding at least one product, and on the
@@ -746,6 +756,7 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         the picker never renders a blank entry. Optional ``q`` does an ilike
         match on the human's first/last name.
         """
+
         has_products = exists().where(AttendeeProducts.attendee_id == Attendees.id)
         # info_not_shared is a Postgres text[] column, so name-hiding is detected
         # with the array-overlap operator (&&): true when the list shares any
@@ -809,6 +820,7 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         "first_name" or "last_name" in ``info_not_shared``. Used to drop those
         people from portal-facing participant/RSVP lists.
         """
+
         if not human_ids:
             return set()
 
@@ -838,6 +850,7 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         from app.api.form_field.crud import form_fields_crud
         from app.api.human.crud import humans_crud
         from app.api.popup.crud import popups_crud
+        from app.api.sales_flow.resolver import config_for  # noqa: PLC0415
 
         # Get popup for check-in code prefix
         popup = popups_crud.get(session, app_data.popup_id)
@@ -1139,8 +1152,13 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
             not data.get("group_id")
             and application.status == ApplicationStatus.IN_REVIEW.value
         ):
-            # Intercept: if popup requires application fee, gate on PENDING_FEE
-            if popup.requires_application_fee:
+            # Intercept: if the flow applied through charges a fee, gate on
+            # PENDING_FEE.
+            if config_for(
+                session,
+                sales_flow_id=application.sales_flow_id,
+                popup_id=application.popup_id,
+            ).requires_application_fee:
                 application.status = ApplicationStatus.PENDING_FEE.value
                 self.create_snapshot(session, application, "pending_fee")
             else:
@@ -1220,6 +1238,7 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         This will find or create a Human record based on email,
         then create the application with the specified status.
         """
+
         from app.api.form_field.crud import form_fields_crud
         from app.api.human.crud import humans_crud
         from app.api.popup.crud import popups_crud
@@ -1464,6 +1483,7 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         - No strategy or AUTO_ACCEPT → ACCEPTED
         - Other strategies → IN_REVIEW (unchanged)
         """
+
         from app.api.approval_strategy.crud import approval_strategies_crud
         from app.api.approval_strategy.schemas import ApprovalStrategyType
 
@@ -1532,6 +1552,7 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         Returns the resolved ``custom_fields`` the caller must store, or
         ``None`` when the payload does not update them.
         """
+
         from app.api.form_field.crud import form_fields_crud
 
         incoming_status = update_data.get("status")
@@ -1620,6 +1641,7 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         Profile fields in update_data are applied to the Human record.
         Application fields are applied to the Application record.
         """
+
         from app.api.form_field.crud import form_fields_crud
         from app.api.human.crud import humans_crud
 
@@ -1688,6 +1710,7 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
 
         Uses flush (not commit) — the caller owns the transaction boundary.
         """
+
         snapshot = application.create_snapshot(event)
         session.add(snapshot)
         session.flush()
@@ -1707,6 +1730,7 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
 
         Idempotent: a no-op when the application is already accepted.
         """
+
         if application.status == ApplicationStatus.ACCEPTED.value:
             return application
 
@@ -1736,6 +1760,7 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         Caller owns the transaction boundary so a sold-out failure mid-batch
         rolls back every Human/Application/Attendee created in this run.
         """
+
         from app.api.attendee_category.crud import attendee_categories_crud
         from app.api.form_field.crud import form_fields_crud
 
@@ -1796,6 +1821,7 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         Raises:
             RedFlaggedHumanError: If the human is red-flagged and cannot be accepted.
         """
+
         # Red-flagged humans cannot be accepted
         human_red_flag = application.human.red_flag if application.human else False
         if human_red_flag:
@@ -1827,6 +1853,7 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         The legacy category string is no longer accepted — callers must resolve
         a category_id against the popup's attendee_categories table.
         """
+
         # Check for duplicate emails
         if email:
             existing_emails = [a.email for a in application.attendees if a.email]
@@ -1872,6 +1899,7 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         attendee_id: uuid.UUID,
     ) -> None:
         """Delete an attendee from an application."""
+
         attendee = next((a for a in application.attendees if a.id == attendee_id), None)
         if not attendee:
             raise HTTPException(
@@ -1902,6 +1930,7 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         """
         from app.api.application.schemas import ScholarshipStatus
         from app.api.popup.crud import popups_crud
+        from app.api.sales_flow.resolver import config_for  # noqa: PLC0415
         from app.services.approval.calculator import approval_calculator
 
         # 1. Fetch application
@@ -1921,7 +1950,11 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
             )
 
         # 3. Validate popup allows scholarship
-        if not popup.allows_scholarship:
+        if not config_for(
+            session,
+            sales_flow_id=application.sales_flow_id,
+            popup_id=application.popup_id,
+        ).allows_scholarship:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Scholarship is not enabled for this popup",
@@ -1934,7 +1967,14 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
                     status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                     detail="discount_percentage is required when approving a scholarship",
                 )
-            if decision.incentive_amount is not None and not popup.allows_incentive:
+            if (
+                decision.incentive_amount is not None
+                and not config_for(
+                    session,
+                    sales_flow_id=application.sales_flow_id,
+                    popup_id=application.popup_id,
+                ).allows_incentive
+            ):
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="Incentives are not enabled for this popup",
@@ -2261,6 +2301,7 @@ def _maybe_grant_fee_credit(
     from app.api.audit_log.constants import AuditAction
     from app.api.payment.crud import adjust_application_credit, payments_crud
     from app.api.payment.schemas import PaymentStatus
+    from app.api.sales_flow.resolver import config_for  # noqa: PLC0415
 
     if application.status != ApplicationStatus.ACCEPTED.value:
         return
@@ -2268,12 +2309,11 @@ def _maybe_grant_fee_credit(
     if application.fee_credit_granted:
         return
 
-    # Load popup explicitly to avoid stale lazy-load after an internal commit
-    # (e.g. recalculate_status commits and refreshes the application row).
-    from app.api.popup.models import Popups
-
-    popup = session.get(Popups, application.popup_id)
-    if popup is None or not popup.requires_application_fee:
+    if not config_for(
+        session,
+        sales_flow_id=application.sales_flow_id,
+        popup_id=application.popup_id,
+    ).requires_application_fee:
         return
 
     fee_payment = payments_crud.get_latest_fee_payment(session, application.id)

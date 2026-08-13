@@ -567,11 +567,13 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
 
     def get_by_external_id(self, session: Session, external_id: str) -> Payments | None:
         """Get a payment by external ID."""
+
         statement = select(Payments).where(Payments.external_id == external_id)
         return session.exec(statement).first()
 
     def get_many(self, session: Session, ids: list[uuid.UUID]) -> list[Payments]:
         """Get payments by id in a single query. Missing ids are skipped."""
+
         if not ids:
             return []
         statement = select(Payments).where(Payments.id.in_(ids))  # type: ignore[attr-defined]
@@ -592,6 +594,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         Completed (paid==total), cancelled, rejected, and expired plans are
         treated as finalized and do NOT block subsequent payments.
         """
+
         statement = select(Payments).where(
             Payments.application_id == application_id,
             Payments.is_installment_plan == True,  # noqa: E712
@@ -611,6 +614,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         form_data: dict[str, Any],
     ) -> None:
         """Validate required custom buyer fields. form_data is keyed by raw field name; base fields (email/first_name/last_name) live top-level on BuyerInfo and are validated by Pydantic."""
+
         # Hidden sections are never rendered in the checkout, so their fields
         # can't be required here.
         required_field_names = {
@@ -660,6 +664,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         entry URL (utm_*, fbclid, landing_segment, anonymous_id). Stored under a
         namespaced key so an outbound purchase webhook can read it back later.
         """
+
         sections_snapshot: list[dict[str, Any]] = []
 
         ordered_sections = sorted(
@@ -722,6 +727,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         can participate in a larger atomic batch (admin grant) or be paired
         with caller-side commit + email dispatch (self-service flows).
         """
+
         payment.status = PaymentStatus.APPROVED.value
         if granted_by_user_id is not None:
             payment.granted_by_user_id = granted_by_user_id
@@ -761,7 +767,10 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         from app.api.popup.schemas import PopupStatus
         from app.api.sales_flow.crud import sales_flows_crud
         from app.api.sales_flow.eligibility import assert_upsale_eligible
-        from app.api.sales_flow.resolver import build_effective_config, resolve_flow
+        from app.api.sales_flow.resolver import (
+            build_effective_config,
+            resolve_flow,
+        )
         from app.api.sales_flow.schemas import SalesFlowType
         from app.api.shared.enums import SaleType
         from app.api.tenant.utils import get_portal_url
@@ -1419,6 +1428,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         limit: int = 100,
     ) -> tuple[list[Payments], int]:
         """Find payments by application_id."""
+
         statement = select(Payments).where(Payments.application_id == application_id)
 
         count_statement = select(func.count()).select_from(statement.subquery())
@@ -1436,6 +1446,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         application_id: uuid.UUID,
     ) -> Payments | None:
         """Get the most recent payment for an application."""
+
         statement = (
             select(Payments)
             .where(Payments.application_id == application_id)
@@ -1475,6 +1486,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         - Application payment: application.human_id matches current human.
         - Direct-sale payment: any snapshot attendee human_id matches current human.
         """
+
         statement = (
             select(Payments)
             .where(Payments.id == payment_id)
@@ -1517,6 +1529,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         """
         from app.api.application.schemas import ApplicationStatus
         from app.api.payment.schemas import PaymentStatus, PaymentType
+        from app.api.sales_flow.resolver import config_for  # noqa: PLC0415
         from app.api.tenant.utils import get_portal_url
 
         # 1. Validate application is pending fee
@@ -1526,10 +1539,15 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 detail="Application is not awaiting fee payment",
             )
 
-        # 2. Validate popup is configured for fee
-        application_fee_amount = popup.application_fee_amount
+        # 2. Validate the flow this application came through charges a fee
+        fee_config = config_for(
+            session,
+            sales_flow_id=application.sales_flow_id,
+            popup_id=application.popup_id,
+        )
+        application_fee_amount = fee_config.application_fee_amount
         if (
-            not popup.requires_application_fee
+            not fee_config.requires_application_fee
             or application_fee_amount is None
             or application_fee_amount <= 0
         ):

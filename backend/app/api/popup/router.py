@@ -92,6 +92,8 @@ def _create_form_section(
 
 
 def _seed_application_defaults(db: TenantSession, popup: Popups) -> None:
+    from app.api.sales_flow.resolver import build_effective_config  # noqa: PLC0415
+
     # The form belongs to the popup's default flow (slice 3): a section or
     # base-field config has no other place to live.
     default_flow = _default_flow_or_500(db, popup.id)
@@ -109,7 +111,12 @@ def _seed_application_defaults(db: TenantSession, popup: Popups) -> None:
     existing_sections = {section.label: section for section in popup.form_sections}
     section_map: dict[str, uuid.UUID] = {}
     for key, section_def in DEFAULT_SECTIONS.items():
-        if key == "scholarship" and not popup.allows_scholarship:
+        # The sections being seeded belong to the default flow, so the flag
+        # that decides whether to seed one comes from that same flow.
+        if (
+            key == "scholarship"
+            and not build_effective_config(default_flow).allows_scholarship
+        ):
             continue
 
         existing_section = existing_sections.get(section_def["label"])

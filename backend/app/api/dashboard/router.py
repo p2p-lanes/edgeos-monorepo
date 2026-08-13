@@ -32,6 +32,7 @@ from app.api.payment.schemas import PaymentStatus, PaymentType
 from app.api.popup.crud import popups_crud
 from app.api.product.models import Products
 from app.api.product.schemas import CATEGORY_HOUSING, CATEGORY_TICKET
+from app.api.sales_flow.models import SalesFlows
 from app.core.dependencies.users import CurrentOperator, TenantSession
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
@@ -63,10 +64,23 @@ async def get_enriched_dashboard(
     attendee_stats = _get_attendee_stats(db, popup_id)
     payment_stats = _get_payment_stats(db, popup_id)
 
-    # Popup fetched once and shared (currency + application-fee flag)
+    # Popup fetched once and shared (currency stays a property of the event,
+    # because it is the unit its product prices are in).
     popup = popups_crud.get(db, popup_id)
     currency = popup.currency if popup else "USD"
-    fee_enabled = bool(popup and popup.requires_application_fee)
+    # The fee is a per-flow decision now, and this panel counts the whole
+    # gathering: the funnel shows a fee stage when ANY way in charges one.
+    fee_enabled = (
+        db.exec(
+            select(SalesFlows.id)
+            .where(
+                SalesFlows.popup_id == popup_id,
+                SalesFlows.requires_application_fee.is_(True),  # type: ignore[attr-defined]
+            )
+            .limit(1)
+        ).first()
+        is not None
+    )
 
     # Daily buckets follow the popup's local calendar, not UTC (matches the
     # rest of the app's timezone handling).

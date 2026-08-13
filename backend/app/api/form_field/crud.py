@@ -558,7 +558,14 @@ class FormFieldsCRUD(BaseCRUD[FormFields, FormFieldCreate, FormFieldUpdate]):
         from app.api.base_field_config.constants import BASE_FIELD_DEFINITIONS
         from app.api.base_field_config.crud import (
             base_field_configs_crud,
-            field_applies_to_popup,
+            field_applies_to_flow,
+        )
+        from app.api.sales_flow.resolver import config_for
+
+        flow_config = (
+            config_for(session, sales_flow_id=flow_id, popup_id=popup.id)
+            if popup
+            else None
         )
 
         db_configs = base_field_configs_crud.find_by_flow(session, flow_id)
@@ -573,7 +580,9 @@ class FormFieldsCRUD(BaseCRUD[FormFields, FormFieldCreate, FormFieldUpdate]):
             # a flag off, but we stop surfacing them until it's re-enabled.
             # Sections left empty by this filter are skipped by the portal
             # (it drops sections with no base/custom fields).
-            if popup and not field_applies_to_popup(config.field_name, popup):
+            if flow_config and not field_applies_to_flow(
+                config.field_name, flow_config
+            ):
                 continue
             if config.section_id and config.section_id in hidden_section_ids:
                 continue

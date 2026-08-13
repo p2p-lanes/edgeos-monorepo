@@ -1162,6 +1162,7 @@ async def create_my_application(
     from app.api.popup.crud import popups_crud
     from app.api.popup.guards import ensure_popup_writable
     from app.api.sales_flow.crud import sales_flows_crud
+    from app.api.sales_flow.resolver import config_for  # noqa: PLC0415
 
     ensure_popup_writable(popups_crud.get(db, app_in.popup_id))
 
@@ -1206,10 +1207,13 @@ async def create_my_application(
             detail="You are already participating as a companion in this popup",
         )
 
-    # Validate scholarship request against popup settings
+    # Validate the scholarship request against the flow being applied to
     if app_in.scholarship_request is True:
-        popup = popups_crud.get(db, app_in.popup_id)
-        if not popup or not popup.allows_scholarship:
+        if not config_for(
+            db,
+            sales_flow_id=app_in.sales_flow_id,
+            popup_id=app_in.popup_id,
+        ).allows_scholarship:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail="This popup does not accept scholarship requests",
@@ -1244,6 +1248,7 @@ async def update_my_application(
     """Update current human's application (Portal)."""
     from app.api.popup.crud import popups_crud
     from app.api.popup.guards import ensure_popup_writable
+    from app.api.sales_flow.resolver import config_for  # noqa: PLC0415
 
     ensure_popup_writable(popups_crud.get(db, popup_id))
 
@@ -1393,11 +1398,13 @@ async def update_my_application(
         and application.human
     ):
         # Apply approval strategy when transitioning draft → IN_REVIEW
-        # Intercept: if popup requires application fee AND not already paid
-        from app.api.popup.crud import popups_crud
-
-        popup = popups_crud.get(db, application.popup_id)
-        if popup and popup.requires_application_fee:
+        # Intercept: if the flow applied through charges a fee AND it is not
+        # already paid.
+        if config_for(
+            db,
+            sales_flow_id=application.sales_flow_id,
+            popup_id=application.popup_id,
+        ).requires_application_fee:
             from app.api.payment.crud import payments_crud
             from app.api.payment.schemas import PaymentStatus as PmtStatus
 
