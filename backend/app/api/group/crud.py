@@ -62,6 +62,7 @@ class GroupsCRUD(BaseCRUD[Groups, GroupCreate, GroupUpdate]):
             .where(Groups.id == group_id)
             .options(
                 selectinload(Groups.members),  # type: ignore[arg-type]
+                selectinload(Groups.leaders),  # type: ignore[arg-type]
                 selectinload(Groups.applications)  # type: ignore[arg-type]
                 .selectinload(Applications.attendees)  # ty: ignore[invalid-argument-type]
                 .selectinload(Attendees.attendee_products)  # ty: ignore[invalid-argument-type]
@@ -101,6 +102,58 @@ class GroupsCRUD(BaseCRUD[Groups, GroupCreate, GroupUpdate]):
         results = list(session.exec(statement).all())
 
         return results, total
+
+    def find_by_member_or_leader(
+        self,
+        session: Session,
+        human_id: uuid.UUID,
+        skip: int = 0,
+        limit: int = 100,
+    ) -> tuple[list[Groups], int]:
+        """Find groups where human is a leader OR a member (DISTINCT)."""
+        from sqlalchemy import union
+
+        leader_q = (
+            select(Groups.id)
+            .join(GroupLeaders, GroupLeaders.group_id == Groups.id)  # type: ignore[arg-type]
+            .where(GroupLeaders.human_id == human_id)
+        )
+        member_q = (
+            select(Groups.id)
+            .join(GroupMembers, GroupMembers.group_id == Groups.id)  # type: ignore[arg-type]
+            .where(GroupMembers.human_id == human_id)
+        )
+        combined_ids = union(leader_q, member_q).subquery()
+
+        statement = select(Groups).where(Groups.id.in_(select(combined_ids)))  # type: ignore[arg-type]
+
+        count_statement = select(func.count()).select_from(statement.subquery())
+        total = session.exec(count_statement).one()
+
+        statement = (
+            statement.options(*_list_eager_load())
+            .order_by(desc(Groups.created_at))  # type: ignore[arg-type]
+            .offset(skip)
+            .limit(limit)
+        )
+        results = list(session.exec(statement).all())
+
+        return results, total
+
+    def get_leader_group_ids(
+        self,
+        session: Session,
+        human_id: uuid.UUID,
+    ) -> set[uuid.UUID]:
+        """Return the set of group IDs where human is a LEADER.
+
+        Used to compute is_leader per group without N+1 queries.
+        """
+        statement = select(GroupLeaders.group_id).where(
+            GroupLeaders.human_id == human_id
+        )
+        rows = session.exec(statement).all()
+        return set(rows)
 
     def find_by_popup(
         self,
@@ -192,15 +245,37 @@ class GroupsCRUD(BaseCRUD[Groups, GroupCreate, GroupUpdate]):
 
         if group.max_members is not None and len(group.members) >= group.max_members:
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Group has reached maximum members",
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Group has reached its maximum member limit",
             )
 
     def add_leader(
-        self, session: Session, group_id: uuid.UUID, human_id: uuid.UUID
+        self,
+        session: Session,
+        group_id: uuid.UUID,
+        human_id: uuid.UUID,
+        tenant_id: uuid.UUID | None = None,
     ) -> None:
-        """Add a leader to a group."""
-        leader = GroupLeaders(group_id=group_id, human_id=human_id)
+        """Add a leader to a group (idempotent)."""
+        existing = session.exec(
+            select(GroupLeaders).where(
+                GroupLeaders.group_id == group_id,
+                GroupLeaders.human_id == human_id,
+            )
+        ).first()
+        if existing:
+            return
+        group = session.exec(select(Groups).where(Groups.id == group_id)).first()
+        if group is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Group not found",
+            )
+        leader = GroupLeaders(
+            group_id=group_id,
+            human_id=human_id,
+            tenant_id=tenant_id or group.tenant_id,
+        )
         session.add(leader)
         session.commit()
 
@@ -216,6 +291,46 @@ class GroupsCRUD(BaseCRUD[Groups, GroupCreate, GroupUpdate]):
             session.delete(leader)
             session.commit()
 
+    def _insert_member_if_allowed(
+        self,
+        session: Session,
+        group: Groups,
+        human_id: uuid.UUID,
+    ) -> bool:
+        """Insert a GroupMembers row respecting idempotency and max_members cap.
+
+        Returns True if the row was inserted, False if skipped (already member
+        or group is full).  Does NOT commit — caller is responsible.
+        """
+        # Idempotency
+        existing = session.exec(
+            select(GroupMembers).where(
+                GroupMembers.group_id == group.id,
+                GroupMembers.human_id == human_id,
+            )
+        ).first()
+        if existing:
+            return False
+
+        # Cap check
+        if group.max_members is not None:
+            current_count = session.exec(
+                select(func.count(GroupMembers.human_id)).where(
+                    GroupMembers.group_id == group.id
+                )
+            ).one()
+            if current_count >= group.max_members:
+                return False
+
+        session.add(
+            GroupMembers(
+                group_id=group.id,
+                human_id=human_id,
+                tenant_id=group.tenant_id,
+            )
+        )
+        return True
+
     def add_member(
         self,
         session: Session,
@@ -223,8 +338,27 @@ class GroupsCRUD(BaseCRUD[Groups, GroupCreate, GroupUpdate]):
         human_id: uuid.UUID,
         tenant_id: uuid.UUID | None = None,
     ) -> None:
-        """Add a member to a group."""
-        member = GroupMembers(group_id=group_id, human_id=human_id, tenant_id=tenant_id)
+        """Add a member to a group (raises 409 if group is full)."""
+        group = session.exec(select(Groups).where(Groups.id == group_id)).first()
+        if group is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Group not found",
+            )
+        if group.max_members is not None:
+            current_count = session.exec(
+                select(func.count(GroupMembers.human_id)).where(
+                    GroupMembers.group_id == group_id
+                )
+            ).one()
+            if current_count >= group.max_members:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="Group has reached its maximum member limit",
+                )
+        member = GroupMembers(
+            group_id=group_id, human_id=human_id, tenant_id=tenant_id or group.tenant_id
+        )
         session.add(member)
         session.commit()
 
@@ -258,82 +392,28 @@ class GroupsCRUD(BaseCRUD[Groups, GroupCreate, GroupUpdate]):
             slug = f"{prefix}-{generate_random_slug()}"
         return slug
 
-    def create_ambassador_group(
+    def get_human_group_ids(
         self,
         session: Session,
-        *,
-        tenant_id: uuid.UUID,
-        popup_id: uuid.UUID,
-        popup_slug: str,
         human_id: uuid.UUID,
-        human_name: str,
-    ) -> Groups:
-        """Create an ambassador group for a human.
+        popup_id: uuid.UUID,
+    ) -> set[uuid.UUID]:
+        """Return the set of group IDs the human belongs to within a popup.
 
-        Args:
-            session: Database session
-            tenant_id: Tenant ID
-            popup_id: Popup ID
-            popup_slug: Popup slug (used as prefix for group slug)
-            human_id: Human ID (ambassador)
-            human_name: Human's full name
+        Used by the opacity chokepoint (project_event_for) to determine
+        visibility for group-scoped PRIVATE events. Fetches from GroupMembers
+        joined to Groups so the result is scoped to the correct popup.
 
-        Returns:
-            Created Groups model
+        One query per request — callers cache the result before iterating events.
         """
-        from loguru import logger
-
-        # Generate unique slug using popup slug as prefix
-        slug = f"{popup_slug}-{generate_random_slug()}"
-        while self.get_by_slug(session, slug, popup_id):
-            logger.info("Ambassador group slug already exists: {}", slug)
-            slug = f"{popup_slug}-{generate_random_slug()}"
-
-        description = (
-            "You're invited to skip the application process and proceed directly to checkout. "
-            "Provide your information below to secure your ticket(s)!"
+        statement = (
+            select(GroupMembers.group_id)
+            .join(Groups, Groups.id == GroupMembers.group_id)  # type: ignore[arg-type]
+            .where(GroupMembers.human_id == human_id)
+            .where(Groups.popup_id == popup_id)
         )
-        welcome_message = f"This is a personal invite link from {human_name}."
-
-        group = Groups(
-            tenant_id=tenant_id,
-            popup_id=popup_id,
-            name=f"{human_name} Invite List",
-            slug=slug,
-            description=description,
-            discount_percentage=0,
-            max_members=None,
-            welcome_message=welcome_message,
-            is_ambassador_group=True,
-            ambassador_id=human_id,
-        )
-        session.add(group)
-        session.flush()  # Get group ID
-
-        # Add human as leader
-        leader = GroupLeaders(
-            tenant_id=tenant_id,
-            group_id=group.id,
-            human_id=human_id,
-        )
-        session.add(leader)
-
-        logger.info("Ambassador group created: {} {}", group.id, group.slug)
-
-        return group
-
-    def get_ambassador_group(
-        self,
-        session: Session,
-        popup_id: uuid.UUID,
-        human_id: uuid.UUID,
-    ) -> Groups | None:
-        """Get existing ambassador group for a human in a popup."""
-        statement = select(Groups).where(
-            Groups.popup_id == popup_id,
-            Groups.ambassador_id == human_id,
-        )
-        return session.exec(statement).first()
+        rows = session.exec(statement).all()
+        return set(rows)
 
     def create(
         self,
@@ -371,19 +451,51 @@ class GroupsCRUD(BaseCRUD[Groups, GroupCreate, GroupUpdate]):
         emails: list[str],
         tenant_id: uuid.UUID,
     ) -> Groups:
-        """Update whitelisted emails for a group (replace all)."""
-        # Delete existing whitelisted emails
-        for wl in list(group.whitelisted_emails):
-            session.delete(wl)
+        """Update whitelisted emails for a group (replace all).
 
-        # Add new whitelisted emails
-        for email in emails:
+        After replacing the whitelist, back-resolves existing humans: for each
+        newly whitelisted email that matches an existing human in the same
+        tenant, the human is added to the group's members (idempotent, cap
+        respected) so that admins adding emails retroactively get the same
+        effect as if those humans had signed up after whitelisting.
+        """
+        from app.api.human.models import Humans
+
+        # Collect existing emails (lowercased) to detect new additions
+        existing_emails: set[str] = {
+            wl.email.lower() for wl in group.whitelisted_emails
+        }
+        new_emails_lower: set[str] = {e.lower().strip() for e in emails if e.strip()}
+        newly_added: set[str] = new_emails_lower - existing_emails
+
+        # Diff-based update: remove only emails dropped from the set and insert
+        # only the new ones. Deleting and re-inserting an unchanged email in the
+        # same flush would violate uq_group_whitelisted_email (SQLAlchemy emits
+        # INSERTs before DELETEs for the same table).
+        for wl in list(group.whitelisted_emails):
+            if wl.email.lower() not in new_emails_lower:
+                session.delete(wl)
+
+        for email in newly_added:
             wl_email = GroupWhitelistedEmails(
                 tenant_id=tenant_id,
                 group_id=group.id,
-                email=email.lower().strip(),
+                email=email,
             )
             session.add(wl_email)
+
+        session.flush()
+
+        # Back-resolve: add existing humans for newly whitelisted emails
+        for email in newly_added:
+            human = session.exec(
+                select(Humans).where(
+                    func.lower(Humans.email) == email,
+                    Humans.tenant_id == tenant_id,
+                )
+            ).first()
+            if human is not None:
+                self._insert_member_if_allowed(session, group, human.id)
 
         session.commit()
         session.refresh(group)
@@ -424,6 +536,30 @@ class GroupsCRUD(BaseCRUD[Groups, GroupCreate, GroupUpdate]):
             func.lower(GroupWhitelistedEmails.email) == email.lower(),
         )
         return session.exec(stmt).first() is not None
+
+    def add_whitelisted_email(
+        self,
+        session: Session,
+        group: Groups,
+        email: str,
+        tenant_id: uuid.UUID,
+    ) -> None:
+        """Whitelist a single email for a group (idempotent).
+
+        Used when a leader invites an email that has no registered human yet:
+        the human auto-joins via resolve_whitelist_memberships when they sign up.
+        """
+        email_lc = email.lower().strip()
+        if self.is_email_whitelisted(session, group.id, email_lc):
+            return
+        session.add(
+            GroupWhitelistedEmails(
+                tenant_id=tenant_id,
+                group_id=group.id,
+                email=email_lc,
+            )
+        )
+        session.commit()
 
 
 groups_crud = GroupsCRUD()

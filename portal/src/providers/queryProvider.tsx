@@ -18,6 +18,7 @@ function handleApiError(error: Error) {
       const isPublicRoute =
         pathname.startsWith("/checkout") ||
         pathname.startsWith("/groups/") ||
+        pathname.startsWith("/r/") ||
         pathname.includes("/invite/")
       const isAuthRoute = pathname === "/auth" || pathname.startsWith("/auth/")
       if (!isPublicRoute && !isAuthRoute) {

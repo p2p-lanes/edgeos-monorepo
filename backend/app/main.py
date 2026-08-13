@@ -152,7 +152,16 @@ application.add_middleware(
     allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allow_headers=["Authorization", "Content-Type", "X-Tenant-Id", "Accept-Language"],
+    allow_headers=[
+        "Authorization",
+        "Content-Type",
+        "X-Tenant-Id",
+        "Accept-Language",
+        # Browser-based external checkouts (the headless SDK) authenticate the
+        # popup with this header; it must be allowed through CORS preflight or
+        # every cross-origin request is blocked before it reaches the API.
+        "X-EdgeOS-Publishable-Key",
+    ],
 )
 
 # Compress responses for clients that advertise gzip support. Event/calendar

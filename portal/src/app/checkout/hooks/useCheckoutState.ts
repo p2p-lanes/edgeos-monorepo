@@ -2,6 +2,7 @@
 
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { useState } from "react"
+import { useTranslation } from "react-i18next"
 import {
   ApiError,
   type ApplicationCreate,
@@ -26,6 +27,8 @@ interface UseCheckoutStateProps {
   popupId: string
   saleType: "application" | "direct"
   groupId?: string | null
+  inviteId?: string | null
+  referralId?: string | null
   schema?: ApplicationFormSchema
 }
 
@@ -40,10 +43,59 @@ type CheckoutApplicationMutationPayload =
   | { kind: "create"; payload: ApplicationCreate }
   | { kind: "update"; payload: ApplicationUpdate }
 
-function getApiErrorDetail(error: ApiError): string | null {
-  if (typeof error.body !== "object" || error.body === null) return null
-  const detail = (error.body as Record<string, unknown>).detail
-  return typeof detail === "string" ? detail : null
+export interface CheckoutSubmitError {
+  /** The API said this human already has an application for this popup. */
+  isDuplicate: boolean
+  /** Human-readable detail the API sent, when it sent one. */
+  detailText: string | null
+}
+
+/**
+ * Read what the API actually reported about a failed checkout submit.
+ *
+ * Validation failures arrive as `{ detail: { message, errors[] } }`. A
+ * string-only reader drops those, so a rejected field used to surface as the
+ * generic "you already have an application" message and sent people to
+ * support over a form error.
+ */
+export function readCheckoutSubmitError(error: unknown): CheckoutSubmitError {
+  if (!(error instanceof ApiError)) {
+    return { isDuplicate: false, detailText: null }
+  }
+
+  const body =
+    typeof error.body === "object" && error.body !== null
+      ? (error.body as Record<string, unknown>)
+      : null
+  const detail = body?.detail
+
+  if (typeof detail === "string") {
+    return {
+      isDuplicate:
+        error.status === 409 || detail.includes("already have an application"),
+      detailText: detail,
+    }
+  }
+
+  if (typeof detail === "object" && detail !== null) {
+    const { message, errors } = detail as {
+      message?: unknown
+      errors?: unknown
+    }
+    const parts = [
+      typeof message === "string" ? message : null,
+      Array.isArray(errors)
+        ? errors.filter((e): e is string => typeof e === "string").join(", ")
+        : null,
+    ].filter((part): part is string => !!part)
+
+    return {
+      isDuplicate: error.status === 409,
+      detailText: parts.length > 0 ? parts.join(": ") : null,
+    }
+  }
+
+  return { isDuplicate: error.status === 409, detailText: null }
 }
 
 export function buildCheckoutApplicationMutationPayload({
@@ -80,8 +132,11 @@ const useCheckoutState = ({
   popupId,
   saleType,
   groupId,
+  inviteId,
+  referralId,
   schema,
 }: UseCheckoutStateProps) => {
+  const { t } = useTranslation()
   const queryClient = useQueryClient()
   const [checkoutState, setCheckoutState] = useState<CheckoutState>("form")
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
@@ -151,6 +206,8 @@ const useCheckoutState = ({
           requestBody: {
             ...mutationPayload.payload,
             group_id: groupId ?? undefined,
+            invite_id: inviteId ?? undefined,
+            referral_id: referralId ?? undefined,
           },
         })
       }
@@ -183,14 +240,14 @@ const useCheckoutState = ({
       setErrorMessage(null)
     },
     onError: async (error: unknown) => {
-      const detail = error instanceof ApiError ? getApiErrorDetail(error) : null
+      const { isDuplicate, detailText } = readCheckoutSubmitError(error)
 
+      // A 400/409 may mean this human already applied. Probe for that
+      // application: when it exists the flow just resumes at the passes step.
       if (
         saleType === "application" &&
         error instanceof ApiError &&
-        (error.status === 400 ||
-          error.status === 409 ||
-          detail?.includes("already have an application"))
+        (error.status === 400 || error.status === 409)
       ) {
         try {
           const token = window?.localStorage?.getItem("token")
@@ -212,18 +269,16 @@ const useCheckoutState = ({
         } catch (subError) {
           console.error("Error retrieving existing application:", subError)
         }
-
-        setErrorMessage(
-          "You already have a pending application for this pop-up. Please check your email or contact support.",
-        )
-      } else {
-        const msg =
-          detail ??
-          (error instanceof ApiError
-            ? "Something went wrong. Please try again."
-            : "Something went wrong. Please try again.")
-        setErrorMessage(msg)
       }
+
+      // No existing application, so the failure was something else — a
+      // rejected payload, an exhausted link. Report what the API said rather
+      // than claiming a duplicate.
+      setErrorMessage(
+        isDuplicate
+          ? t("checkout.duplicate_application")
+          : (detailText ?? t("checkout.submit_error")),
+      )
 
       setCheckoutState("form")
     },
@@ -256,8 +311,8 @@ const useCheckoutState = ({
       setErrorMessage(null)
     },
     onError: (error: unknown) => {
-      const detail = error instanceof ApiError ? getApiErrorDetail(error) : null
-      setErrorMessage(detail ?? "Something went wrong. Please try again.")
+      const { detailText } = readCheckoutSubmitError(error)
+      setErrorMessage(detailText ?? t("checkout.submit_error"))
       setCheckoutState("form")
     },
   })

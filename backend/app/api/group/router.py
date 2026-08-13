@@ -1,20 +1,32 @@
 import uuid
+from typing import TYPE_CHECKING
 
 from fastapi import APIRouter, HTTPException, status
+
+if TYPE_CHECKING:
+    from sqlmodel import Session
+
+    from app.api.invite.schemas import InvitePublicPreview
 
 from app.api.group import crud
 from app.api.group.models import Groups
 from app.api.group.schemas import (
+    AddMemberByApplicationRequest,
+    AddMemberResult,
     GroupAdminUpdate,
     GroupCreate,
+    GroupLeaderAssign,
     GroupMemberBatch,
     GroupMemberBatchResult,
-    GroupMemberCreate,
+    GroupMemberInvite,
     GroupMemberPublic,
     GroupMemberUpdate,
     GroupPublic,
+    GroupSlugResolution,
     GroupUpdate,
     GroupWithMembers,
+    MyGroupPublic,
+    MyGroupWithMembers,
 )
 from app.api.shared.enums import UserRole
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
@@ -49,6 +61,7 @@ def _build_members(group: Groups) -> list[GroupMemberPublic]:
     one exists (it should, given the sync in application creation).
     """
     apps_by_human = {app.human_id: app for app in group.applications}
+    leader_ids = {leader.id for leader in group.leaders}
 
     members: list[GroupMemberPublic] = []
     for human in group.members:
@@ -77,6 +90,7 @@ def _build_members(group: Groups) -> list[GroupMemberPublic]:
                 role=custom.get("role"),
                 gender=human.gender,
                 local_resident=None,
+                is_leader=human.id in leader_ids,
                 products=products,
             )
         )
@@ -227,31 +241,101 @@ async def delete_group(
     crud.groups_crud.delete(db, group)
 
 
-@router.get("/my/groups", response_model=ListModel[GroupPublic])
+@router.post(
+    "/{group_id}/leaders",
+    response_model=GroupWithMembers,
+    status_code=status.HTTP_201_CREATED,
+)
+async def assign_group_leader(
+    group_id: uuid.UUID,
+    body: GroupLeaderAssign,
+    db: AdminOrApiKeySession_GroupsWrite,
+    _current_user: AdminOrApiKey_GroupsWrite,
+) -> GroupWithMembers:
+    """Promote a group member to leader (BO admin only)."""
+    group = crud.groups_crud.get_with_members(db, group_id)
+    if not group:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Group not found",
+        )
+
+    # A leader must be a current member of the group.
+    if not any(member.id == body.human_id for member in group.members):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Only group members can be promoted to leader",
+        )
+
+    crud.groups_crud.add_leader(db, group_id, body.human_id, tenant_id=group.tenant_id)
+
+    group = crud.groups_crud.get_with_members(db, group_id)
+    return GroupWithMembers(
+        **GroupPublic.model_validate(group).model_dump(),
+        members=_build_members(group),
+    )
+
+
+@router.delete(
+    "/{group_id}/leaders/{human_id}",
+    response_model=GroupWithMembers,
+)
+async def remove_group_leader(
+    group_id: uuid.UUID,
+    human_id: uuid.UUID,
+    db: AdminOrApiKeySession_GroupsWrite,
+    _current_user: AdminOrApiKey_GroupsWrite,
+) -> GroupWithMembers:
+    """Demote a group leader back to a regular member (BO admin only)."""
+    group = crud.groups_crud.get(db, group_id)
+    if not group:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Group not found",
+        )
+
+    crud.groups_crud.remove_leader(db, group_id, human_id)
+
+    group = crud.groups_crud.get_with_members(db, group_id)
+    return GroupWithMembers(
+        **GroupPublic.model_validate(group).model_dump(),
+        members=_build_members(group),
+    )
+
+
+@router.get("/my/groups", response_model=ListModel[MyGroupPublic])
 async def list_my_groups(
     db: SessionDep,
     current_human: CurrentHuman,
     skip: PaginationSkip = 0,
     limit: PaginationLimit = 100,
-) -> ListModel[GroupPublic]:
-    """List groups where current human is a leader (Portal)."""
-    groups, total = crud.groups_crud.find_by_leader(
+) -> ListModel[MyGroupPublic]:
+    """List groups where current human is a leader or member (Portal)."""
+    groups, total = crud.groups_crud.find_by_member_or_leader(
         db, human_id=current_human.id, skip=skip, limit=limit
     )
 
-    return ListModel[GroupPublic](
-        results=[GroupPublic.model_validate(g) for g in groups],
+    leader_ids = crud.groups_crud.get_leader_group_ids(db, human_id=current_human.id)
+
+    return ListModel[MyGroupPublic](
+        results=[
+            MyGroupPublic(
+                **GroupPublic.model_validate(g).model_dump(),
+                is_leader=g.id in leader_ids,
+            )
+            for g in groups
+        ],
         paging=Paging(offset=skip, limit=limit, total=total),
     )
 
 
-@router.get("/my/{group_id}", response_model=GroupWithMembers)
+@router.get("/my/{group_id}", response_model=MyGroupWithMembers)
 async def get_my_group(
     group_id: uuid.UUID,
     db: SessionDep,
     current_human: CurrentHuman,
-) -> GroupWithMembers:
-    """Get a group where current human is a leader (Portal)."""
+) -> MyGroupWithMembers:
+    """Get a group where current human is a leader or member (Portal, read-only for members)."""
     group = crud.groups_crud.get_with_members(db, group_id)
 
     if not group:
@@ -260,11 +344,19 @@ async def get_my_group(
             detail="Group not found",
         )
 
-    _check_leader_permission(group, current_human.id)
+    is_leader = group.is_leader(current_human.id)
+    is_member = crud.groups_crud.is_member(db, group_id, current_human.id)
 
-    return GroupWithMembers(
+    if not is_leader and not is_member:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You are not a member of this group",
+        )
+
+    return MyGroupWithMembers(
         **GroupPublic.model_validate(group).model_dump(),
         members=_build_members(group),
+        is_leader=is_leader,
     )
 
 
@@ -297,16 +389,21 @@ async def update_my_group(
 
 @router.post(
     "/my/{group_id}/members",
-    response_model=GroupMemberPublic,
+    response_model=AddMemberResult,
     status_code=status.HTTP_201_CREATED,
 )
 async def add_group_member(
     group_id: uuid.UUID,
-    member_in: GroupMemberCreate,
+    member_in: GroupMemberInvite,
     db: SessionDep,
     current_human: CurrentHuman,
-) -> GroupMemberPublic:
-    """Add a member to a group (Portal - leader only)."""
+) -> AddMemberResult:
+    """Add a member to a group by email (Portal - leader only).
+
+    If the email belongs to an existing human, they are added to the group
+    immediately. If the email is not registered yet, it is whitelisted so the
+    human auto-joins the group when they sign up.
+    """
     from app.api.application.crud import applications_crud
     from app.api.application.schemas import ApplicationAdminCreate, ApplicationStatus
     from app.api.human.crud import humans_crud
@@ -325,14 +422,15 @@ async def add_group_member(
 
     ensure_popup_writable(popups_crud.get(db, group.popup_id))
 
-    # Get or create human (Human stores identity only, profile goes in Application)
+    # Human stores identity only; profile data goes in the Application.
     human = humans_crud.get_by_email(db, member_in.email, group.tenant_id)
     if not human:
-        from app.api.human.models import Humans
-
-        human = Humans(tenant_id=group.tenant_id, email=member_in.email)
-        db.add(human)
-        db.flush()
+        # Email not registered yet → whitelist it. The human auto-joins via
+        # resolve_whitelist_memberships when they eventually sign up.
+        crud.groups_crud.add_whitelisted_email(
+            db, group, member_in.email, group.tenant_id
+        )
+        return AddMemberResult(status="invited", email=member_in.email)
 
     # Validate member addition
     crud.groups_crud.validate_member_addition(group, human.id, update_existing=False)
@@ -348,17 +446,16 @@ async def add_group_member(
     application = applications_crud.get_by_human_popup(db, human.id, group.popup_id)
 
     if not application:
-        # Create new application with ACCEPTED status
-        # Note: local_resident and created_by_leader are not on ApplicationAdminCreate
-        # These would need schema changes to support
+        # Create an ACCEPTED application from the human's OWN profile — an
+        # email invite never carries (or overwrites) name/profile data.
         app_data = ApplicationAdminCreate(
             popup_id=group.popup_id,
             group_id=group.id,
-            first_name=member_in.first_name,
-            last_name=member_in.last_name,
-            email=member_in.email,
-            telegram=member_in.telegram,
-            gender=member_in.gender,
+            first_name=human.first_name or "",
+            last_name=human.last_name or "",
+            email=human.email,
+            telegram=human.telegram,
+            gender=human.gender,
             status=ApplicationStatus.ACCEPTED,
         )
         application = applications_crud.create_internal(
@@ -368,7 +465,8 @@ async def add_group_member(
             human.id,
         )
     else:
-        # Update existing application and human profile
+        # Attach the existing application to this group and accept it. The
+        # human's profile is left untouched — they own their own data.
         application.group_id = group.id
         try:
             applications_crud.accept(db, application)
@@ -377,12 +475,6 @@ async def add_group_member(
                 status_code=400,
                 detail="Cannot accept application from a red-flagged human.",
             )
-        # Update human profile
-        human.first_name = member_in.first_name
-        human.last_name = member_in.last_name
-        human.telegram = member_in.telegram
-        human.gender = member_in.gender
-        db.add(human)
 
     # Add to group members
     if not crud.groups_crud.is_member(db, group.id, human.id):
@@ -398,7 +490,7 @@ async def add_group_member(
         products.extend(attendee.products)
 
     custom = application.custom_fields or {}
-    return GroupMemberPublic(
+    member = GroupMemberPublic(
         id=human.id,
         first_name=human.first_name or "",
         last_name=human.last_name or "",
@@ -408,8 +500,10 @@ async def add_group_member(
         role=custom.get("role"),
         gender=human.gender,
         local_resident=None,
+        is_leader=group.is_leader(human.id),
         products=products,
     )
+    return AddMemberResult(status="added", email=human.email, member=member)
 
 
 @router.post(
@@ -606,6 +700,181 @@ async def remove_group_member(
     db.commit()
 
 
+def _add_member_by_application_logic(
+    db: "Session",
+    group: "Groups",
+    request: "AddMemberByApplicationRequest",
+) -> tuple["GroupMemberPublic", bool]:
+    """Core logic for POST .../members/by-application.
+
+    Returns (GroupMemberPublic, created) where created=True means the row was
+    inserted (201), created=False means the human was already a member (200).
+
+    Raises HTTPException on validation failures.
+    """
+    from sqlmodel import select
+
+    from app.api.application.models import Applications
+    from app.api.application.schemas import ApplicationStatus
+    from app.api.human.models import Humans
+
+    # Fetch the application
+    application = db.exec(
+        select(Applications).where(Applications.id == request.application_id)
+    ).first()
+    if not application:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Application not found",
+        )
+
+    # Application must belong to the same popup as the group
+    if application.popup_id != group.popup_id:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Application does not belong to the same popup as this group",
+        )
+
+    # Application must be ACCEPTED
+    if application.status != ApplicationStatus.ACCEPTED.value:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Application must be in ACCEPTED status to add human as group member",
+        )
+
+    human_id = application.human_id
+    human = db.exec(select(Humans).where(Humans.id == human_id)).first()
+    if not human:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Human not found",
+        )
+
+    # Idempotency: if already a member, return current state (200)
+    already_member = crud.groups_crud.is_member(db, group.id, human_id)
+    if not already_member:
+        from sqlalchemy import func as _func
+        from sqlmodel import select as _select
+
+        from app.api.group.models import GroupMembers
+
+        # Cap check: reject if group is full
+        if group.max_members is not None:
+            current_count = db.exec(
+                _select(_func.count(GroupMembers.human_id)).where(
+                    GroupMembers.group_id == group.id
+                )
+            ).one()
+            if current_count >= group.max_members:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="Group has reached its maximum member limit",
+                )
+
+        member_row = GroupMembers(
+            tenant_id=group.tenant_id,
+            group_id=group.id,
+            human_id=human_id,
+        )
+        db.add(member_row)
+        db.commit()
+
+    # Build response
+    custom = (application.custom_fields or {}) if application.custom_fields else {}
+    products: list = []
+    for attendee in application.attendees:
+        products.extend(attendee.products)
+
+    member_public = GroupMemberPublic(
+        id=human.id,
+        first_name=human.first_name or "",
+        last_name=human.last_name or "",
+        email=human.email,
+        telegram=human.telegram,
+        organization=custom.get("organization"),
+        role=custom.get("role"),
+        gender=human.gender,
+        local_resident=None,
+        products=products,
+    )
+    return member_public, not already_member
+
+
+@router.post(
+    "/{group_id}/members/by-application",
+    response_model=GroupMemberPublic,
+    status_code=status.HTTP_201_CREATED,
+    summary="Add an approved human to a group by application (admin)",
+)
+async def add_member_by_application_admin(
+    group_id: uuid.UUID,
+    request: AddMemberByApplicationRequest,
+    db: AdminOrApiKeySession_GroupsWrite,
+    _: AdminOrApiKey_GroupsWrite,
+) -> GroupMemberPublic:
+    """Add an existing approved human to a group without creating a duplicate application.
+
+    Guard: admin token (backoffice). For portal leaders, use /my/{group_id}/members/by-application.
+    The application must belong to the same popup as the group and have ACCEPTED status.
+    Idempotent: returns 200 if the human is already a member.
+    """
+    group = crud.groups_crud.get(db, group_id)
+    if not group:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Group not found",
+        )
+
+    member_public, created = _add_member_by_application_logic(db, group, request)
+    # Override FastAPI's default 201 with 200 when not created (already member)
+    if not created:
+        from fastapi.responses import JSONResponse
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content=member_public.model_dump(mode="json"),
+        )  # type: ignore[return-value]
+    return member_public
+
+
+@router.post(
+    "/my/{group_id}/members/by-application",
+    response_model=GroupMemberPublic,
+    status_code=status.HTTP_201_CREATED,
+    summary="Add an approved human to a group by application (leader)",
+)
+async def add_member_by_application_leader(
+    group_id: uuid.UUID,
+    request: AddMemberByApplicationRequest,
+    db: SessionDep,
+    current_human: CurrentHuman,
+) -> GroupMemberPublic:
+    """Add an existing approved human to a group without creating a duplicate application.
+
+    Guard: portal leader token. For admin, use /{group_id}/members/by-application.
+    The application must belong to the same popup as the group and have ACCEPTED status.
+    Idempotent: returns 200 if the human is already a member.
+    """
+    group = crud.groups_crud.get(db, group_id)
+    if not group:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Group not found",
+        )
+
+    _check_leader_permission(group, current_human.id)
+
+    member_public, created = _add_member_by_application_logic(db, group, request)
+    if not created:
+        from fastapi.responses import JSONResponse
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content=member_public.model_dump(mode="json"),
+        )  # type: ignore[return-value]
+    return member_public
+
+
 @router.get("/public/{group_slug}", response_model=GroupPublic)
 async def get_group_public(
     group_slug: str,
@@ -620,4 +889,141 @@ async def get_group_public(
             detail="Group not found",
         )
 
+    # Ended popup → group share link no longer valid (410)
+    from app.api.popup.crud import popups_crud
+    from app.api.popup.guards import ensure_popup_link_active
+
+    ensure_popup_link_active(popups_crud.get(db, group.popup_id))
+
     return GroupPublic.model_validate(group)
+
+
+# ---------------------------------------------------------------------------
+# Portal URL compat layer — T-gr-043, T-gr-044
+# Spec: REQ-GR-027, REQ-GR-028
+# Design: Decision 1e — GroupSlugResolution with kind discriminator
+# ---------------------------------------------------------------------------
+
+portal_router = APIRouter(prefix="/portal", tags=["portal"])
+
+
+@portal_router.get(
+    "/groups/{slug}",
+    response_model=GroupSlugResolution,
+    summary="Resolve group slug or invite token (URL compat layer)",
+)
+async def resolve_group_slug(
+    slug: str,
+    popup_id: uuid.UUID,
+    db: SessionDep,
+) -> GroupSlugResolution:
+    """Resolve /portal/groups/{slug} to either a group or an invite.
+
+    Resolution order (Design: Decision 1e):
+      1. Look up groups by slug within the popup → kind="group"
+      2. Look up invites by token within the popup → kind="invite"
+      3. 404 if neither found
+
+    Legacy email links that land on /groups/{slug} can be transparently
+    redirected to /invite/{token} by the portal when kind="invite".
+
+    Spec: REQ-GR-027 — fallback resolver for post-migration invite tokens.
+    """
+    from app.api.invite.crud import invites_crud
+    from app.api.invite.schemas import InvitePublicPreview
+
+    # Step 1: resolve as a group slug
+    group = crud.groups_crud.get_by_slug(db, slug, popup_id=popup_id)
+    if group:
+        return GroupSlugResolution(
+            kind="group",
+            group=GroupPublic.model_validate(group),
+            invite=None,
+        )
+
+    # Step 2: resolve as an invite token (migrated EE26 groups land here)
+    invite = invites_crud.get_by_token(db, popup_id=popup_id, token=slug)
+    if invite:
+        # Resolve inviter_name for the preview payload
+        from sqlmodel import select as _select
+
+        from app.api.user.models import Users
+
+        inviter_name: str | None = None
+        creator = db.exec(_select(Users).where(Users.id == invite.created_by)).first()
+        if creator:
+            inviter_name = creator.full_name or creator.email
+
+        preview = InvitePublicPreview(
+            id=invite.id,
+            popup_id=invite.popup_id,
+            token=invite.token,
+            inviter_name=inviter_name,
+            is_email_restricted=invite.recipient_email is not None,
+            discount_percentage=invite.discount_percentage,
+            max_uses=invite.max_uses,
+            current_uses=invite.current_uses,
+            expires_at=invite.expires_at,
+        )
+        return GroupSlugResolution(
+            kind="invite",
+            group=None,
+            invite=preview.model_dump(mode="json"),
+        )
+
+    raise HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail="Group or invite not found",
+    )
+
+
+@portal_router.get(
+    "/invite/{token}",
+    response_model=None,
+    summary="Canonical invite forward endpoint (redirect to redeem preview)",
+)
+async def canonical_invite_forward(
+    token: str,
+    db: SessionDep,
+) -> "InvitePublicPreview":
+    """Canonical forward endpoint for invite URLs.
+
+    This is the preferred URL for invite links going forward. It is a thin
+    proxy to GET /invites/redeem/{token} preview semantics.
+
+    Spec: REQ-GR-028 — /invite/{token} as canonical portal endpoint.
+    Design: Decision 1e — both /groups/{slug} (compat) and /invite/{token}
+    (canonical) support redemption during the migration window.
+    """
+    from app.api.invite.crud import invites_crud
+    from app.api.invite.schemas import InvitePublicPreview
+
+    invite = invites_crud.get_by_token_any_popup(db, token)
+    if not invite:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Invite not found"
+        )
+
+    # Apply guard chain for preview (expired/exhausted → 410 Gone)
+    invites_crud.validate_for_redemption(invite)
+
+    from sqlmodel import select as _select
+
+    from app.api.user.models import Users
+
+    inviter_name: str | None = None
+    creator = db.exec(_select(Users).where(Users.id == invite.created_by)).first()
+    if creator:
+        inviter_name = creator.full_name or creator.email
+
+    return InvitePublicPreview(
+        id=invite.id,
+        popup_id=invite.popup_id,
+        token=invite.token,
+        inviter_name=inviter_name,
+        is_email_restricted=invite.recipient_email is not None,
+        discount_percentage=invite.discount_percentage,
+        max_uses=invite.max_uses,
+        current_uses=invite.current_uses,
+        expires_at=invite.expires_at,
+    )

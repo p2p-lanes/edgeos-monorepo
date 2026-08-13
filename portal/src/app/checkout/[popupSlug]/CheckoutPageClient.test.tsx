@@ -1,4 +1,8 @@
-import { render, screen } from "@testing-library/react"
+import { act, render, screen } from "@testing-library/react"
+import {
+  LANGUAGE_STORAGE_KEY,
+  setActiveRequestLanguage,
+} from "@/lib/language-storage"
 import CheckoutPageClient from "./CheckoutPageClient"
 
 const mockUseCheckoutRuntime = vi.fn()
@@ -35,8 +39,22 @@ const runtimeData = {
   ticketing_steps: [],
 }
 
+function lastRuntimeOpts(): {
+  language?: string | null
+  initialDataUpdatedAt?: number
+} {
+  const calls = mockUseCheckoutRuntime.mock.calls
+  return (calls[calls.length - 1]?.[1] ?? {}) as {
+    language?: string | null
+    initialDataUpdatedAt?: number
+  }
+}
+
 describe("CheckoutPageClient", () => {
   beforeEach(() => {
+    localStorage.clear()
+    setActiveRequestLanguage(null)
+    mockUseCheckoutRuntime.mockClear()
     mockUseCheckoutRuntime.mockReturnValue({
       data: runtimeData,
       isLoading: false,
@@ -106,6 +124,78 @@ describe("CheckoutPageClient", () => {
     render(<CheckoutPageClient popupSlug="festival-2026" />)
 
     expect(screen.getByText("runtime:festival-2026")).toBeTruthy()
+  })
+
+  // --- Language / SSR payload agreement ---
+
+  it("keys the runtime query on the stored language", () => {
+    localStorage.setItem(LANGUAGE_STORAGE_KEY, "en")
+
+    render(<CheckoutPageClient popupSlug="festival-2026" />)
+
+    expect(lastRuntimeOpts().language).toBe("en")
+  })
+
+  it("keeps the server payload fresh when it was fetched in the same language", () => {
+    localStorage.setItem(LANGUAGE_STORAGE_KEY, "en")
+    const updatedAt = Date.now()
+
+    render(
+      <CheckoutPageClient
+        popupSlug="festival-2026"
+        initialRuntime={runtimeData as never}
+        initialDataUpdatedAt={updatedAt}
+        initialRuntimeLanguage="en"
+      />,
+    )
+
+    expect(lastRuntimeOpts().initialDataUpdatedAt).toBe(updatedAt)
+  })
+
+  it("hands over the server payload already stale when the stored language differs from the one SSR used", () => {
+    // The reported bug: no ?lang, so SSR fetched with no Accept-Language and
+    // returned the popup's source copy, while the visitor's stored choice is
+    // English. Without this the payload stays fresh for the whole staleTime.
+    localStorage.setItem(LANGUAGE_STORAGE_KEY, "en")
+
+    render(
+      <CheckoutPageClient
+        popupSlug="festival-2026"
+        initialRuntime={runtimeData as never}
+        initialDataUpdatedAt={Date.now()}
+        initialRuntimeLanguage={null}
+      />,
+    )
+
+    expect(lastRuntimeOpts().language).toBe("en")
+    expect(lastRuntimeOpts().initialDataUpdatedAt).toBe(0)
+  })
+
+  it("keeps the server payload fresh when the visitor has no stored language", () => {
+    render(
+      <CheckoutPageClient
+        popupSlug="festival-2026"
+        initialRuntime={runtimeData as never}
+        initialDataUpdatedAt={1234}
+        initialRuntimeLanguage={null}
+      />,
+    )
+
+    expect(lastRuntimeOpts().language).toBeNull()
+    expect(lastRuntimeOpts().initialDataUpdatedAt).toBe(1234)
+  })
+
+  it("re-keys when the provider switches the on-screen language", () => {
+    localStorage.setItem(LANGUAGE_STORAGE_KEY, "en")
+
+    render(<CheckoutPageClient popupSlug="festival-2026" />)
+    expect(lastRuntimeOpts().language).toBe("en")
+
+    act(() => {
+      setActiveRequestLanguage("es")
+    })
+
+    expect(lastRuntimeOpts().language).toBe("es")
   })
 
   it("prefilledBuyer is populated when useAuth returns a user", () => {

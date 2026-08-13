@@ -30,7 +30,7 @@ from tests.conftest import with_origin
 
 
 def _make_direct_popup(
-    db: Session, tenant: Tenants, *, slug_suffix: str = ""
+    db: Session, tenant: Tenants, *, slug_suffix: str = "", allows_coupons: bool = True
 ) -> Popups:
     slug = f"val-pub-direct-{uuid.uuid4().hex[:6]}{slug_suffix}"
     popup = Popups(
@@ -40,6 +40,7 @@ def _make_direct_popup(
         slug=slug,
         sale_type=SaleType.direct.value,
         status="active",
+        allows_coupons=allows_coupons,
     )
     db.add(popup)
     db.flush()
@@ -112,6 +113,24 @@ def test_validate_public_valid_coupon(
     assert body["discount_type"] == "percent"
     assert body["discount_value"] == "10"
     assert body["valid"] is True
+
+
+def test_validate_public_coupons_disallowed_returns_uniform_400(
+    client: TestClient, db: Session, tenant_a: Tenants
+) -> None:
+    """popup.allows_coupons=False → uniform 400, even for an otherwise valid code."""
+    popup = _make_direct_popup(db, tenant_a, allows_coupons=False)
+    _make_coupon(db, popup, code="NOPE10")
+    db.commit()
+
+    response = client.post(
+        "/api/v1/coupons/validate-public",
+        json={"popup_slug": popup.slug, "code": "NOPE10"},
+        headers={"X-Tenant-Id": str(tenant_a.id)},
+    )
+
+    assert response.status_code == 400, response.text
+    assert response.json()["detail"] == "Invalid or expired coupon"
 
 
 def test_validate_public_unknown_code_returns_400(

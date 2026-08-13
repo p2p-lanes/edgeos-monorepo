@@ -4,13 +4,13 @@ import MemberItem from "./MemberItem"
 interface MembersListProps {
   members: GroupMemberPublic[]
   onMemberUpdated?: () => void
-  isAmbassadorGroup?: boolean
+  isLeader?: boolean
 }
 
 const MembersList = ({
   members,
   onMemberUpdated,
-  isAmbassadorGroup,
+  isLeader,
 }: MembersListProps) => {
   if (members.length === 0) {
     return (
@@ -27,7 +27,7 @@ const MembersList = ({
           key={member.id}
           member={member}
           onMemberUpdated={onMemberUpdated}
-          isAmbassadorGroup={isAmbassadorGroup}
+          isLeader={isLeader}
         />
       ))}
     </div>

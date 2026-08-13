@@ -456,7 +456,6 @@
       "discount_percentage": "15.00",
       "max_members": 10,
       "welcome_message": "Welcome to the TechCorp team! We're excited to have you join us.",
-      "is_ambassador_group": false,
       "leader_keys": ["alice"],
       "member_keys": ["bob"]
     },
@@ -468,7 +467,6 @@
       "description": "Official speakers and presenters",
       "discount_percentage": "100.00",
       "max_members": 30,
-      "is_ambassador_group": false,
       "leader_keys": [],
       "member_keys": ["grace"]
     },
@@ -479,8 +477,6 @@
       "slug": "david-referrals",
       "description": "Friends referred by David",
       "discount_percentage": "10.00",
-      "is_ambassador_group": true,
-      "ambassador_key": "david",
       "leader_keys": ["david"],
       "member_keys": ["henry"]
     }

@@ -4,11 +4,18 @@ from typing import TYPE_CHECKING, Annotated
 
 from cachetools import TTLCache
 from fastapi import Depends, Header, HTTPException, status
+from fastapi.security import OAuth2PasswordBearer
 from sqlmodel import Session, func, select
 
 from app.api.shared.enums import UserRole
 from app.core.db import engine
-from app.core.security import ApiKeyScope, HumanScope, TokenPayload, get_token_payload
+from app.core.security import (
+    ApiKeyScope,
+    HumanScope,
+    TokenPayload,
+    decode_access_token,
+    get_token_payload,
+)
 
 if TYPE_CHECKING:
     from app.api.human.schemas import HumanPublic
@@ -126,6 +133,40 @@ def get_current_human(
     return HumanPublic.model_validate(human)
 
 
+_optional_oauth2_scheme = OAuth2PasswordBearer(
+    tokenUrl="/v1/auth/user/authenticate", auto_error=False
+)
+
+
+def get_optional_human(
+    token: Annotated[str | None, Depends(_optional_oauth2_scheme)],
+    db: SessionDep,
+) -> "HumanPublic | None":
+    """Resolve the portal human when a valid human token is present, else None.
+
+    For public endpoints that stay open to anonymous callers but tailor their
+    response to a known human (e.g. an already-redeemed invite preview points
+    the redeemer at the portal instead of returning 410).
+    """
+    from app.api.human.models import Humans
+    from app.api.human.schemas import HumanPublic
+
+    if not token:
+        return None
+    try:
+        payload = decode_access_token(token)
+    except Exception:  # noqa: BLE001 — optional auth: any bad token degrades to anonymous
+        return None
+    if payload.token_type != "human":
+        return None
+    try:
+        human_id = uuid.UUID(payload.sub)
+    except ValueError:
+        return None
+    human = db.exec(select(Humans).where(Humans.id == human_id)).first()
+    return HumanPublic.model_validate(human) if human else None
+
+
 def get_superadmin(
     current_user: Annotated["UserPublic", Depends(get_current_user)],
 ) -> "UserPublic":
@@ -192,6 +233,7 @@ def get_check_in_operator(
 
 CurrentUser = Annotated["UserPublic", Depends(get_current_user)]
 CurrentHuman = Annotated["HumanPublic", Depends(get_current_human)]
+OptionalHuman = Annotated["HumanPublic | None", Depends(get_optional_human)]
 CurrentSuperadmin = Annotated["UserPublic", Depends(get_superadmin)]
 CurrentAdmin = Annotated["UserPublic", Depends(get_admin)]
 CurrentOperator = Annotated["UserPublic", Depends(get_operator)]
