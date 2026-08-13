@@ -483,10 +483,18 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
         />
 
         <Tabs defaultValue="general" className="space-y-6">
-          <TabsList>
-            <TabsTrigger value="general">General</TabsTrigger>
-            <TabsTrigger value="commerce">Commerce</TabsTrigger>
-            <TabsTrigger value="features">Features</TabsTrigger>
+          {/* data-tour anchors let the product tour spotlight and switch the
+              tabs — see components/onboarding/tourSteps.ts. */}
+          <TabsList data-tour="popup-form-tabs">
+            <TabsTrigger value="general" data-tour="popup-tab-general">
+              General
+            </TabsTrigger>
+            <TabsTrigger value="commerce" data-tour="popup-tab-commerce">
+              Commerce
+            </TabsTrigger>
+            <TabsTrigger value="features" data-tour="popup-tab-features">
+              Features
+            </TabsTrigger>
             <TabsTrigger value="branding">Branding</TabsTrigger>
             <TabsTrigger value="languages">Languages</TabsTrigger>
           </TabsList>
