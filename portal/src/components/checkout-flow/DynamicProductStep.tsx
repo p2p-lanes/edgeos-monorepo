@@ -16,6 +16,39 @@ interface DynamicProductStepProps {
   isFirstSection?: boolean
 }
 
+/**
+ * Whether this step has anything to sell.
+ *
+ * `getProductsForStep` answers by category, but a step built from sections
+ * sells what its sections name. A door whose sections name nothing — the
+ * shape a flow has before anyone assigns products to it, since "unassigned"
+ * stopped meaning "in every flow" — passed that check on the strength of the
+ * gathering's catalog and then rendered as a bare heading with an Add button
+ * under it: no products, no explanation, nothing to tell it from a page that
+ * failed to load (sdd/sales-flows-rediseno F3).
+ */
+export function stepOffersSomething(
+  stepConfig: TicketingStepPublic,
+  products: { id: string }[],
+): boolean {
+  const sections = (
+    stepConfig.template_config as
+      | { sections?: { product_ids?: string[] }[] }
+      | null
+      | undefined
+  )?.sections
+
+  // No sections is not the same as empty sections: a step that never
+  // described itself that way is judged on its catalog, exactly as before.
+  if (!sections || sections.length === 0) return products.length > 0
+
+  const named = new Set(
+    sections.flatMap((section) => section.product_ids ?? []),
+  )
+  if (named.size === 0) return false
+  return products.some((product) => named.has(product.id))
+}
+
 export default function DynamicProductStep({
   stepConfig,
   onSkip,
@@ -60,7 +93,10 @@ export default function DynamicProductStep({
     ? VARIANT_REGISTRY[stepConfig.template]
     : VARIANT_REGISTRY["ticket-select"]
 
-  if (!VariantComponent || (!isContentOnly && filtered.length === 0)) {
+  if (
+    !VariantComponent ||
+    (!isContentOnly && !stepOffersSomething(stepConfig, filtered))
+  ) {
     // An empty step has more than one cause, and showing the same blank
     // message for all of them is what hid the original bug: a buyer turned
     // away by the flow's rule saw "no products", same as a flow nobody had
