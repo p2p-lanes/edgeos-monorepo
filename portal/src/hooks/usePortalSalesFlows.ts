@@ -1,7 +1,7 @@
 "use client"
 
 import { useQuery } from "@tanstack/react-query"
-import type { SalesFlowPublic } from "@/client"
+import type { SalesFlowPortalPublic } from "@/client"
 import { SalesFlowsService } from "@/client"
 import { queryKeys } from "@/lib/query-keys"
 
@@ -12,7 +12,7 @@ import { queryKeys } from "@/lib/query-keys"
  * appear (backend-filtered).
  */
 export function usePortalSalesFlows(popupId: string | undefined) {
-  return useQuery<SalesFlowPublic[]>({
+  return useQuery<SalesFlowPortalPublic[]>({
     queryKey: queryKeys.salesFlows.portal(popupId ?? ""),
     queryFn: async () => {
       const result = await SalesFlowsService.listPortalSalesFlows({

@@ -8160,7 +8160,7 @@ export class SalesFlowsService {
      * (see the checkout runtime and `resolve_flow`).
      * @param data The data for the request.
      * @param data.popupId
-     * @returns ListModel_SalesFlowPublic_ Successful Response
+     * @returns ListModel_SalesFlowPortalPublic_ Successful Response
      * @throws ApiError
      */
     public static listPortalSalesFlows(data: SalesFlowsListPortalSalesFlowsData): CancelablePromise<SalesFlowsListPortalSalesFlowsResponse> {
@@ -8189,7 +8189,7 @@ export class SalesFlowsService {
      * catalog here rather than an error, matching every other portal listing.
      * @param data The data for the request.
      * @param data.popupId
-     * @returns ListModel_SalesFlowPublic_ Successful Response
+     * @returns ListModel_SalesFlowPortalPublic_ Successful Response
      * @throws ApiError
      */
     public static listPortalUpsaleFlows(data: SalesFlowsListPortalUpsaleFlowsData): CancelablePromise<SalesFlowsListPortalUpsaleFlowsResponse> {

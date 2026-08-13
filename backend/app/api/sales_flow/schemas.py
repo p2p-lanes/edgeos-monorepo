@@ -305,6 +305,29 @@ class SalesFlowPublic(SalesFlowBase):
     model_config = ConfigDict(from_attributes=True)
 
 
+class SalesFlowPortalPublic(BaseModel):
+    """What a buyer is told about a way in.
+
+    Deliberately NOT `SalesFlowPublic`. That one extends `SalesFlowBase`, so it
+    carries every configuration column a flow owns — including
+    `open_checkout_signing_secret`, the HMAC key that signs the order payload
+    an external thank-you page verifies. The portal listing is readable by any
+    authenticated human of the tenant, which handed each of them the key to
+    forge a completed order against that page.
+
+    The portal needs a door's name, its slug and the order to list them in.
+    Anything a flow decides about selling is the organiser's business, so it is
+    added here one field at a time, on purpose, or not at all.
+    """
+
+    id: uuid.UUID
+    slug: str
+    name: str
+    order: int
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class SalesFlowReadiness(BaseModel):
     """What a flow is missing before it can sell
     (sdd/sales-flows-rediseno slice 8).

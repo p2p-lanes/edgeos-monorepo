@@ -2817,6 +2817,11 @@ export type ListModel_ReferralPublic_ = {
     paging: Paging;
 };
 
+export type ListModel_SalesFlowPortalPublic_ = {
+    results: Array<SalesFlowPortalPublic>;
+    paging: Paging;
+};
+
 export type ListModel_SalesFlowPublic_ = {
     results: Array<SalesFlowPublic>;
     paging: Paging;
@@ -3999,6 +4004,27 @@ export type SalesFlowCreate = {
  * for a future ticket-code lookup flow (spec: upsale-flow).
  */
 export type SalesFlowIdentityMode = 'portal_auth' | 'anonymous';
+
+/**
+ * What a buyer is told about a way in.
+ *
+ * Deliberately NOT `SalesFlowPublic`. That one extends `SalesFlowBase`, so it
+ * carries every configuration column a flow owns — including
+ * `open_checkout_signing_secret`, the HMAC key that signs the order payload
+ * an external thank-you page verifies. The portal listing is readable by any
+ * authenticated human of the tenant, which handed each of them the key to
+ * forge a completed order against that page.
+ *
+ * The portal needs a door's name, its slug and the order to list them in.
+ * Anything a flow decides about selling is the organiser's business, so it is
+ * added here one field at a time, on purpose, or not at all.
+ */
+export type SalesFlowPortalPublic = {
+    id: string;
+    slug: string;
+    name: string;
+    order: number;
+};
 
 /**
  * Sales flow schema for API responses.
@@ -7473,13 +7499,13 @@ export type SalesFlowsListPortalSalesFlowsData = {
     popupId: string;
 };
 
-export type SalesFlowsListPortalSalesFlowsResponse = (ListModel_SalesFlowPublic_);
+export type SalesFlowsListPortalSalesFlowsResponse = (ListModel_SalesFlowPortalPublic_);
 
 export type SalesFlowsListPortalUpsaleFlowsData = {
     popupId: string;
 };
 
-export type SalesFlowsListPortalUpsaleFlowsResponse = (ListModel_SalesFlowPublic_);
+export type SalesFlowsListPortalUpsaleFlowsResponse = (ListModel_SalesFlowPortalPublic_);
 
 export type SalesFlowsListSalesFlowsData = {
     /**

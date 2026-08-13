@@ -11,6 +11,7 @@ from app.api.sales_flow.models import SalesFlows
 from app.api.sales_flow.readiness import flow_readiness
 from app.api.sales_flow.schemas import (
     SalesFlowCreate,
+    SalesFlowPortalPublic,
     SalesFlowPublic,
     SalesFlowReadiness,
     SalesFlowReviewersMode,
@@ -29,12 +30,12 @@ from app.services.restrictions.schemas import assert_restriction_rule_allowed_fo
 router = APIRouter(prefix="/sales-flows", tags=["sales-flows"])
 
 
-@router.get("/portal", response_model=ListModel[SalesFlowPublic])
+@router.get("/portal", response_model=ListModel[SalesFlowPortalPublic])
 async def list_portal_sales_flows(
     db: HumanTenantSession,
     _: CurrentHuman,
     popup_id: uuid.UUID,
-) -> ListModel[SalesFlowPublic]:
+) -> ListModel[SalesFlowPortalPublic]:
     """List a popup's portal-listed application flows (Portal).
 
     Backs the FlowPicker (sdd/sales-flows G0, task 9.4) — shown only when
@@ -43,18 +44,18 @@ async def list_portal_sales_flows(
     (see the checkout runtime and `resolve_flow`).
     """
     flows = crud.sales_flows_crud.find_portal_listed(db, popup_id)
-    return ListModel[SalesFlowPublic](
-        results=[SalesFlowPublic.model_validate(f) for f in flows],
+    return ListModel[SalesFlowPortalPublic](
+        results=[SalesFlowPortalPublic.model_validate(f) for f in flows],
         paging=Paging(offset=0, limit=len(flows), total=len(flows)),
     )
 
 
-@router.get("/portal/upsale", response_model=ListModel[SalesFlowPublic])
+@router.get("/portal/upsale", response_model=ListModel[SalesFlowPortalPublic])
 async def list_portal_upsale_flows(
     db: HumanTenantSession,
     current_human: CurrentHuman,
     popup_id: uuid.UUID,
-) -> ListModel[SalesFlowPublic]:
+) -> ListModel[SalesFlowPortalPublic]:
     """List a popup's portal-listed upsale flows the current human is
     eligible for (Portal, sdd/sales-flows G0 #2/#3, D8, task 13.3).
 
@@ -68,8 +69,8 @@ async def list_portal_upsale_flows(
     from app.api.application.crud import applications_crud  # noqa: PLC0415
 
     flows = applications_crud.resolve_upsale_catalog(db, current_human.id, popup_id)
-    return ListModel[SalesFlowPublic](
-        results=[SalesFlowPublic.model_validate(f) for f in flows],
+    return ListModel[SalesFlowPortalPublic](
+        results=[SalesFlowPortalPublic.model_validate(f) for f in flows],
         paging=Paging(offset=0, limit=len(flows), total=len(flows)),
     )
 

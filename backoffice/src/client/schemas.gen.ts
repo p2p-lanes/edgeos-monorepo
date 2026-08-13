@@ -12950,6 +12950,24 @@ export const ListModel_ReferralPublic_Schema = {
     title: 'ListModel[ReferralPublic]'
 } as const;
 
+export const ListModel_SalesFlowPortalPublic_Schema = {
+    properties: {
+        results: {
+            items: {
+                '$ref': '#/components/schemas/SalesFlowPortalPublic'
+            },
+            type: 'array',
+            title: 'Results'
+        },
+        paging: {
+            '$ref': '#/components/schemas/Paging'
+        }
+    },
+    type: 'object',
+    required: ['results', 'paging'],
+    title: 'ListModel[SalesFlowPortalPublic]'
+} as const;
+
 export const ListModel_SalesFlowPublic_Schema = {
     properties: {
         results: {
@@ -19563,6 +19581,43 @@ export const SalesFlowIdentityModeSchema = {
     title: 'SalesFlowIdentityMode',
     description: `portal_auth is the only implemented mode in v1; anonymous is reserved
 for a future ticket-code lookup flow (spec: upsale-flow).`
+} as const;
+
+export const SalesFlowPortalPublicSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        slug: {
+            type: 'string',
+            title: 'Slug'
+        },
+        name: {
+            type: 'string',
+            title: 'Name'
+        },
+        order: {
+            type: 'integer',
+            title: 'Order'
+        }
+    },
+    type: 'object',
+    required: ['id', 'slug', 'name', 'order'],
+    title: 'SalesFlowPortalPublic',
+    description: `What a buyer is told about a way in.
+
+Deliberately NOT \`SalesFlowPublic\`. That one extends \`SalesFlowBase\`, so it
+carries every configuration column a flow owns — including
+\`open_checkout_signing_secret\`, the HMAC key that signs the order payload
+an external thank-you page verifies. The portal listing is readable by any
+authenticated human of the tenant, which handed each of them the key to
+forge a completed order against that page.
+
+The portal needs a door's name, its slug and the order to list them in.
+Anything a flow decides about selling is the organiser's business, so it is
+added here one field at a time, on purpose, or not at all.`
 } as const;
 
 export const SalesFlowPublicSchema = {
