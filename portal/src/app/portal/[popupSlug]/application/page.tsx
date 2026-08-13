@@ -18,6 +18,7 @@ import { FlowPicker } from "./components/FlowPicker"
 import { FeePaymentBanner } from "./components/fee-payment-banner"
 import { FormHeader } from "./components/form-header"
 import { SectionSeparator } from "./components/section-separator"
+import { resolvedApplicationDestination } from "./lib/resolvedApplicationDestination"
 import { shouldRedirectToStatus } from "./lib/shouldRedirectToStatus"
 
 /**
@@ -130,9 +131,8 @@ export default function FormPage() {
   // draft/pending_fee/in review stay editable so the applicant can still
   // finish, retry the fee payment, or update details while under review.
   useEffect(() => {
-    if (application && shouldRedirectToStatus(application.status)) {
-      router.replace(`/portal/${city?.slug}`)
-    }
+    if (!application || !shouldRedirectToStatus(application.status)) return
+    router.replace(resolvedApplicationDestination(city?.slug, application))
   }, [application, city, router])
 
   useEffect(() => {
