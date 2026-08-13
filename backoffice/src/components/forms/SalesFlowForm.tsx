@@ -187,6 +187,53 @@ const CONFIG_SECTIONS: {
     ],
   },
   {
+    title: "Installment Plans",
+    description:
+      "Let buyers of this flow split an order into scheduled payments. SimpleFi renders the per-cycle selector at checkout.",
+    fields: [
+      {
+        key: "installments_enabled",
+        label: "Offer Installments",
+        description:
+          "Off means one payment. Turning it on needs both a ceiling and a deadline below.",
+        kind: "boolean",
+      },
+      {
+        key: "installments_max",
+        label: "Max Installments",
+        description:
+          "The most a buyer may choose. SimpleFi accepts 2 to 12; the buyer picks the actual number at checkout.",
+        kind: "number",
+      },
+      {
+        key: "installments_deadline",
+        label: "Deadline",
+        description:
+          "Every installment has to be paid by this date. It caps the ceiling above: a plan that would run past it is shortened, and plans started after it fall back to one payment.",
+        kind: "date",
+      },
+      {
+        key: "installments_interval",
+        label: "Billing Interval",
+        description: "How far apart the payments fall.",
+        kind: "select",
+        options: [
+          { value: "day", label: "Day" },
+          { value: "week", label: "Week" },
+          { value: "month", label: "Month" },
+          { value: "year", label: "Year" },
+        ],
+      },
+      {
+        key: "installments_interval_count",
+        label: "Interval Count",
+        description:
+          "Multiplier on the interval — week x 2 bills fortnightly. Empty bills every interval.",
+        kind: "number",
+      },
+    ],
+  },
+  {
     title: "Open Checkout Redirects",
     description:
       "Where a buyer lands after paying through this flow. Leave empty to keep them on the portal thank-you page.",

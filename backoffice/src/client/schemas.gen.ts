@@ -19339,6 +19339,61 @@ export const SalesFlowCreateSchema = {
             ],
             title: 'Contribution Description'
         },
+        installments_enabled: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Installments Enabled'
+        },
+        installments_deadline: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Installments Deadline'
+        },
+        installments_max: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Installments Max'
+        },
+        installments_interval: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/InstallmentInterval'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        installments_interval_count: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Installments Interval Count'
+        },
         open_checkout_success_url: {
             anyOf: [
                 {
@@ -19724,6 +19779,61 @@ export const SalesFlowPublicSchema = {
                 }
             ],
             title: 'Contribution Description'
+        },
+        installments_enabled: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Installments Enabled'
+        },
+        installments_deadline: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Installments Deadline'
+        },
+        installments_max: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Installments Max'
+        },
+        installments_interval: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/InstallmentInterval'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        installments_interval_count: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Installments Interval Count'
         },
         open_checkout_success_url: {
             anyOf: [
@@ -20184,6 +20294,61 @@ export const SalesFlowUpdateSchema = {
                 }
             ],
             title: 'Contribution Description'
+        },
+        installments_enabled: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Installments Enabled'
+        },
+        installments_deadline: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Installments Deadline'
+        },
+        installments_max: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Installments Max'
+        },
+        installments_interval: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/InstallmentInterval'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        installments_interval_count: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Installments Interval Count'
         },
         open_checkout_success_url: {
             anyOf: [

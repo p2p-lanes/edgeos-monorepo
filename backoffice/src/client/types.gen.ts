@@ -3969,6 +3969,11 @@ export type SalesFlowCreate = {
     contribution_percentage?: (number | string | null);
     contribution_label?: (string | null);
     contribution_description?: (string | null);
+    installments_enabled?: (boolean | null);
+    installments_deadline?: (string | null);
+    installments_max?: (number | null);
+    installments_interval?: (InstallmentInterval | null);
+    installments_interval_count?: (number | null);
     open_checkout_success_url?: (string | null);
     open_checkout_cancel_url?: (string | null);
     open_checkout_signing_secret?: (string | null);
@@ -4028,6 +4033,11 @@ export type SalesFlowPublic = {
     contribution_percentage?: (string | null);
     contribution_label?: (string | null);
     contribution_description?: (string | null);
+    installments_enabled?: (boolean | null);
+    installments_deadline?: (string | null);
+    installments_max?: (number | null);
+    installments_interval?: (InstallmentInterval | null);
+    installments_interval_count?: (number | null);
     open_checkout_success_url?: (string | null);
     open_checkout_cancel_url?: (string | null);
     open_checkout_signing_secret?: (string | null);
@@ -4097,6 +4107,11 @@ export type SalesFlowUpdate = {
     contribution_percentage?: (number | string | null);
     contribution_label?: (string | null);
     contribution_description?: (string | null);
+    installments_enabled?: (boolean | null);
+    installments_deadline?: (string | null);
+    installments_max?: (number | null);
+    installments_interval?: (InstallmentInterval | null);
+    installments_interval_count?: (number | null);
     open_checkout_success_url?: (string | null);
     open_checkout_cancel_url?: (string | null);
     open_checkout_signing_secret?: (string | null);

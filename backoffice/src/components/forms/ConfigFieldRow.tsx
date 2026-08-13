@@ -15,6 +15,7 @@ export type ConfigFieldKind =
   | "text"
   | "secret"
   | "select"
+  | "date"
 
 interface ConfigFieldRowProps {
   fieldKey: string
@@ -78,6 +79,16 @@ export function ConfigFieldRow({
             onChange={(e) => onValueChange(e.target.value)}
             disabled={readOnly}
             className="w-28 text-sm"
+          />
+        )}
+        {kind === "date" && (
+          <Input
+            id={controlId}
+            type="date"
+            value={value ? value.slice(0, 10) : ""}
+            onChange={(e) => onValueChange(e.target.value)}
+            disabled={readOnly}
+            className="w-44 text-sm"
           />
         )}
         {kind === "text" && (
