@@ -111,6 +111,20 @@ def _portal_application_url(db: Session, popup: Popups) -> str | None:
     return f"{base}/portal/{popup.slug}/application"
 
 
+def _tenant_sender(db: Session, popup: Popups) -> tuple[str | None, str | None]:
+    """Return the tenant's configured ``(sender_email, sender_name)``.
+
+    Reminders must leave from the tenant's own sender, not the platform
+    default. ``None`` values let EmailService fall back to the global sender.
+    """
+    from app.api.tenant.models import Tenants
+
+    tenant = db.get(Tenants, popup.tenant_id)
+    if not tenant:
+        return None, None
+    return tenant.sender_email, tenant.sender_name
+
+
 def _payment_buyer(
     payment: Payments,
 ) -> tuple[str | None, str | None, uuid.UUID | None]:
@@ -188,6 +202,7 @@ async def _dispatch_abandoned_cart(
 
     service = get_email_service()
     passes_url = _portal_passes_url(db, popup)
+    sender_email, sender_name = _tenant_sender(db, popup)
     seen: set[str] = set()
     for payment in candidates:
         email, first_name, human_id = _payment_buyer(payment)
@@ -229,6 +244,8 @@ async def _dispatch_abandoned_cart(
             to=email,
             subject=f"Complete your purchase - {popup.name}",
             context=context,
+            from_address=sender_email,
+            from_name=sender_name,
             popup_id=popup.id,
             db_session=db,
             application_id=payment.application_id,
@@ -261,6 +278,7 @@ async def _dispatch_purchase_reminder(
     ).all()
 
     service = get_email_service()
+    sender_email, sender_name = _tenant_sender(db, popup)
     for application in candidates:
         human = application.human
         if not human or not human.email:
@@ -294,6 +312,8 @@ async def _dispatch_purchase_reminder(
             to=human.email,
             subject=f"Complete your registration for {popup.name}",
             context=context,
+            from_address=sender_email,
+            from_name=sender_name,
             popup_id=popup.id,
             db_session=db,
             application_id=application.id,
@@ -320,6 +340,7 @@ async def _dispatch_abandoned_application(
 
     service = get_email_service()
     application_url = _portal_application_url(db, popup)
+    sender_email, sender_name = _tenant_sender(db, popup)
     for application in candidates:
         human = application.human
         if not human or not human.email:
@@ -351,6 +372,8 @@ async def _dispatch_abandoned_application(
             to=human.email,
             subject=f"Finish your application for {popup.name}",
             context=context,
+            from_address=sender_email,
+            from_name=sender_name,
             popup_id=popup.id,
             db_session=db,
             application_id=application.id,
