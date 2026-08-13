@@ -5,6 +5,14 @@ channel concern. Class B columns are all NULLABLE by contract; NULL means
 "read the popup column of the same name" (D1). restriction_rule (Class C)
 is added by a later migration (add_flow_restriction_rule).
 
+Rebased onto dev's head (`b8e2d7f45a19`) rather than left as a parallel leg.
+`a3f8c1d94e27` copies referral rows into `invites` without naming a
+sales_flow_id, and `b7c5e2f849a1` further down this chain makes that column
+NOT NULL — as parallel branches, alembic could run them in the order that
+fails. Linear, the copy lands first and `b7c5e2f849a1`'s backfill gives those
+rows the popup's default flow, which is where a referral link was always
+sending people.
+
 Revision ID: b79d252e79c2
 Revises: b7c9d4a2f18e
 Create Date: 2026-08-03
@@ -21,7 +29,7 @@ from app.alembic.utils import (
 
 # revision identifiers, used by Alembic.
 revision = "b79d252e79c2"
-down_revision = "b7c9d4a2f18e"
+down_revision = "b8e2d7f45a19"
 branch_labels = None
 depends_on = None
 

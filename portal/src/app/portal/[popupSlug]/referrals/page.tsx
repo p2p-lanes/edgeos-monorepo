@@ -6,7 +6,7 @@ import { useSearchParams } from "next/navigation"
 import { useState } from "react"
 import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
-import { ApiError, ReferralsService } from "@/client"
+import { ApiError, InvitesService } from "@/client"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -26,7 +26,7 @@ function ReferralRow({
 }: {
   referral: {
     id: string
-    code: string
+    token: string
     discount_percentage: string
     current_uses: number
     max_uses?: number | null
@@ -39,8 +39,7 @@ function ReferralRow({
   const [deleteOpen, setDeleteOpen] = useState(false)
 
   const deleteMutation = useMutation({
-    mutationFn: () =>
-      ReferralsService.deleteMyReferral({ referralId: referral.id }),
+    mutationFn: () => InvitesService.deleteMyLink({ linkId: referral.id }),
     onSuccess: () => {
       toast.success(t("referrals.delete_success"))
       setDeleteOpen(false)
@@ -53,8 +52,8 @@ function ReferralRow({
 
   const referralUrl =
     typeof window !== "undefined"
-      ? `${window.location.origin}/r/${referral.code}`
-      : `/r/${referral.code}`
+      ? `${window.location.origin}/r/${referral.token}`
+      : `/r/${referral.token}`
 
   const handleCopy = () => {
     navigator.clipboard.writeText(referralUrl).then(() => {
@@ -71,7 +70,7 @@ function ReferralRow({
         <Link2 className="h-4 w-4 text-muted-foreground shrink-0" />
         <div className="min-w-0">
           <p className="text-sm font-medium truncate">
-            {referral.code}
+            {referral.token}
             {referral.is_disabled && (
               <span className="ml-2 rounded bg-destructive/10 px-1.5 py-0.5 text-xs font-medium text-destructive">
                 {t("referrals.disabled_badge")}
@@ -167,13 +166,13 @@ const ReferralsPage = () => {
   const { data, isLoading } = useQuery({
     queryKey: ["referrals", "mine", city?.id ?? ""],
     queryFn: () =>
-      ReferralsService.listMyReferrals({ popupId: city!.id, limit: 100 }),
+      InvitesService.listMyLinks({ popupId: city!.id, limit: 100 }),
     enabled: !!city?.id && hasTicket,
   })
 
   const createMutation = useMutation({
     mutationFn: () =>
-      ReferralsService.createReferral({
+      InvitesService.createMyLink({
         requestBody: { popup_id: city!.id },
       }),
     onSuccess: () => {

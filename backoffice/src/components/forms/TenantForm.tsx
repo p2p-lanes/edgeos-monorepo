@@ -24,6 +24,7 @@ import {
 } from "@/client"
 import { DangerZone } from "@/components/Common/DangerZone"
 import { FieldError } from "@/components/Common/FieldError"
+import { PublishableKeysSection } from "@/components/forms/PublishableKeysSection"
 import { TenantCredentialsSection } from "@/components/forms/TenantCredentialsSection"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
@@ -983,6 +984,12 @@ export function TenantForm({ defaultValues, onSuccess }: TenantFormProps) {
           </LoadingButton>
         </div>
       </form>
+
+      {isEdit && isAdmin && (
+        <div className="mx-auto max-w-2xl">
+          <PublishableKeysSection tenantId={defaultValues.id} />
+        </div>
+      )}
 
       {isEdit && isAdmin && (
         <div className="mx-auto max-w-2xl">

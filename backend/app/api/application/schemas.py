@@ -139,12 +139,14 @@ class ApplicationBase(SQLModel):
     )
     incentive_currency: str | None = Field(default=None, max_length=10, nullable=True)
 
-    # Groups-rework: attribution columns for invite/referral flows
+    # Groups-rework: attribution columns for invite/referral flows.
+    # Both name a row in `invites` since referrals were merged into it:
+    # invite_id for admin-created links, referral_id for portal-created ones.
     invite_id: uuid.UUID | None = Field(
         default=None, foreign_key="invites.id", nullable=True
     )
     referral_id: uuid.UUID | None = Field(
-        default=None, foreign_key="referrals.id", nullable=True
+        default=None, foreign_key="invites.id", nullable=True
     )
 
 

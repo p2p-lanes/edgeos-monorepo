@@ -23,7 +23,6 @@ from app.api.payment.crud import payments_crud
 from app.api.payment.schemas import PaymentCreate, PaymentProductRequest
 from app.api.popup.models import Popups
 from app.api.product.models import Products
-from app.api.referral.models import Referrals
 from app.api.shared.enums import SaleType
 from app.api.tenant.models import Tenants
 from app.api.user.models import Users
@@ -97,13 +96,16 @@ def _make_referral(
     *,
     discount_percentage: Decimal,
     is_disabled: bool = False,
-) -> Referrals:
-    referral = Referrals(
+) -> Invites:
+    """A referral is an Invite carrying a referrer_human_id."""
+    referral = Invites(
+        sales_flow_id=invite_flow_id(db, popup.id),
         tenant_id=tenant.id,
         popup_id=popup.id,
         referrer_human_id=referrer.id,
-        code=f"ref{uuid.uuid4().hex[:8]}",
+        token=f"ref{uuid.uuid4().hex[:8]}",
         discount_percentage=discount_percentage,
+        express_checkout=True,
         is_disabled=is_disabled,
     )
     db.add(referral)

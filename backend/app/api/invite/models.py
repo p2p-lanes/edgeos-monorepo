@@ -16,10 +16,14 @@ if TYPE_CHECKING:
 
 
 class Invites(SQLModel, table=True):
-    """Token-based admin offer for invite-only access to a popup.
+    """A shareable access link to a popup, carrying an access policy.
 
-    An invite is created by an admin and shared via a URL. A human redeems it
-    to create an application with the invite's discount and approval settings.
+    One entity, two issuers. An ADMIN link is created from the backoffice and
+    may be bound to a single recipient_email. A PORTAL link (what used to be a
+    Referral) is created by an attendee to share around, and is subject to the
+    popup's max_referrals_per_attendee quota. Tell them apart with
+    ``is_portal_created`` / ``referrer_human_id``; everything else -- discount,
+    auto-approve, express checkout, use limits, expiry -- behaves identically.
 
     Email stored lowercase via validator when setting recipient_email.
     """
@@ -35,6 +39,7 @@ class Invites(SQLModel, table=True):
         ),
         Index("ix_invites_tenant_id", "tenant_id"),
         Index("ix_invites_popup_recipient_email", "popup_id", "recipient_email"),
+        Index("ix_invites_referrer_human_id", "referrer_human_id"),
     )
 
     id: uuid.UUID = Field(
@@ -72,7 +77,17 @@ class Invites(SQLModel, table=True):
     legacy_migrated_from_group_id: uuid.UUID | None = Field(
         default=None, foreign_key="groups.id", nullable=True
     )
-    created_by: uuid.UUID = Field(foreign_key="users.id")
+    # Admin force-disable: a disabled link stops granting access and discounts
+    # immediately, without deleting its attribution history.
+    is_disabled: bool = Field(default=False)
+    # Exactly one issuer is set. created_by for backoffice links,
+    # referrer_human_id for links an attendee created from the portal.
+    created_by: uuid.UUID | None = Field(
+        default=None, foreign_key="users.id", nullable=True
+    )
+    referrer_human_id: uuid.UUID | None = Field(
+        default=None, foreign_key="humans.id", nullable=True
+    )
     expires_at: datetime | None = Field(
         default=None, nullable=True, sa_type=DateTime(timezone=True)
     )
@@ -103,6 +118,24 @@ class Invites(SQLModel, table=True):
             "foreign_keys": "[Invites.legacy_migrated_from_group_id]"
         },
     )
-    created_by_user: "Users" = Relationship(
+    created_by_user: Optional["Users"] = Relationship(
         sa_relationship_kwargs={"foreign_keys": "[Invites.created_by]"},
     )
+    referrer_human: Optional["Humans"] = Relationship(
+        sa_relationship_kwargs={"foreign_keys": "[Invites.referrer_human_id]"},
+    )
+
+    @property
+    def is_portal_created(self) -> bool:
+        """True when an attendee created this link from the portal."""
+        return self.referrer_human_id is not None
+
+    @property
+    def code(self) -> str:
+        """Alias for ``token``.
+
+        Portal-created links were called referrals and addressed their token as
+        ``code``. The public /r/{code} URLs and the referral response schemas
+        still speak that name.
+        """
+        return self.token

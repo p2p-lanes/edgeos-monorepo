@@ -1,4 +1,5 @@
 import uuid
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 from typing import TYPE_CHECKING, Any
@@ -16,7 +17,11 @@ from app.api.audit_log.crud import audit_logs_crud
 from app.api.human.models import Humans
 
 if TYPE_CHECKING:
-    from app.api.checkout.schemas import OpenTicketingPurchaseCreate
+    from app.api.checkout.schemas import (
+        CheckoutPreviewRequest,
+        CheckoutPreviewResponse,
+        OpenTicketingPurchaseCreate,
+    )
     from app.api.human.models import Humans
     from app.api.human.schemas import HumanPublic
     from app.api.popup.models import Popups
@@ -344,6 +349,141 @@ def calculate_contribution_amount(
 
     return (products_subtotal * config.contribution_percentage / 100).quantize(
         MONEY_PRECISION, rounding=ROUND_HALF_UP
+    )
+
+
+@dataclass
+class OpenTicketingAmountLine:
+    product_id: uuid.UUID
+    quantity: int
+    unit_price: Decimal
+    line_total: Decimal
+    discountable: bool
+
+
+@dataclass
+class OpenTicketingAmounts:
+    lines: list[OpenTicketingAmountLine]
+    discountable_amount: Decimal
+    non_discountable_amount: Decimal
+    coupon_id: uuid.UUID | None
+    coupon_code: str | None
+    discount_value: Decimal | None
+    discount_amount: Decimal
+    post_discount_amount: Decimal
+    insurance_amount: Decimal
+    contribution_amount: Decimal
+    total_amount: Decimal
+    currency: str
+
+
+def compute_open_ticketing_amounts(
+    session: Session,
+    popup: Any,
+    flow: Any,
+    products_map: "dict[uuid.UUID, Products]",
+    lines: Any,
+    coupon_code: str | None,
+    insurance: bool,
+) -> OpenTicketingAmounts:
+    """Authoritative open-ticketing money math, shared by /purchase and /preview.
+
+    Mirrors the inline computation in ``create_open_ticketing_payment``:
+    discountable/non-discountable split, single-coupon discount on the
+    discountable bucket, then insurance + contribution fees on the post-discount
+    subtotal (fees never compound). No side effects — computes only.
+
+    ``flow`` is the door being bought through, and it decides all three: whether
+    a coupon is taken at all, and both fee rates. Sharing this function is what
+    keeps the displayed total equal to the charged one, so it has to be the same
+    door on both sides — a popup-level answer here would quietly diverge for
+    every flow that is not the default.
+    """
+    amount_lines: list[OpenTicketingAmountLine] = []
+    discountable_amount = Decimal("0")
+    non_discountable_amount = Decimal("0")
+
+    for line in lines:
+        product = products_map[line.product_id]
+        line_total = product.price * line.quantity
+        is_discountable = not (
+            product.category == "patreon" or not product.discountable
+        )
+        if is_discountable:
+            discountable_amount += line_total
+        else:
+            non_discountable_amount += line_total
+        amount_lines.append(
+            OpenTicketingAmountLine(
+                product_id=product.id,
+                quantity=line.quantity,
+                unit_price=product.price,
+                line_total=line_total,
+                discountable=is_discountable,
+            )
+        )
+
+    discountable_amount = discountable_amount.quantize(
+        MONEY_PRECISION, rounding=ROUND_HALF_UP
+    )
+    non_discountable_amount = non_discountable_amount.quantize(
+        MONEY_PRECISION, rounding=ROUND_HALF_UP
+    )
+    pre_discount_discountable = discountable_amount
+
+    coupon_id: uuid.UUID | None = None
+    resolved_coupon_code: str | None = None
+    discount_value: Decimal | None = None
+    if coupon_code and discountable_amount > Decimal("0"):
+        if flow is None:
+            # Every popup is provisioned with a default flow, so reaching here
+            # means that invariant is already broken. Say so rather than fail
+            # on an attribute.
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="This event is not ready to take coupons yet.",
+            )
+        coupon = coupons_crud.validate_coupon(
+            session, code=coupon_code, popup_id=popup.id, flow_id=flow.id
+        )
+        discount_value = Decimal(str(coupon.discount_value))
+        discountable_amount = _get_discounted_price(discountable_amount, discount_value)
+        coupon_id = coupon.id
+        resolved_coupon_code = coupon.code
+
+    discount_amount = pre_discount_discountable - discountable_amount
+    post_discount_amount = discountable_amount + non_discountable_amount
+
+    from app.api.sales_flow.resolver import build_effective_config  # noqa: PLC0415
+
+    fees = build_effective_config(flow) if flow is not None else None
+
+    insurance_amount = Decimal("0")
+    if insurance and post_discount_amount > Decimal("0") and fees:
+        insurance_amount = calculate_insurance_amount(
+            fees,
+            [(products_map[line.product_id], line.quantity) for line in lines],
+        )
+
+    contribution_amount = Decimal("0")
+    if fees and fees.contribution_enabled and fees.contribution_percentage:
+        contribution_amount = calculate_contribution_amount(fees, post_discount_amount)
+
+    total_amount = post_discount_amount + insurance_amount + contribution_amount
+
+    return OpenTicketingAmounts(
+        lines=amount_lines,
+        discountable_amount=discountable_amount,
+        non_discountable_amount=non_discountable_amount,
+        coupon_id=coupon_id,
+        coupon_code=resolved_coupon_code,
+        discount_value=discount_value,
+        discount_amount=discount_amount,
+        post_discount_amount=post_discount_amount,
+        insurance_amount=insurance_amount,
+        contribution_amount=contribution_amount,
+        total_amount=total_amount,
+        currency=popup.currency,
     )
 
 
@@ -758,6 +898,88 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         session.flush()
         return payment
 
+    def preview_open_ticketing(
+        self,
+        session: Session,
+        obj: "CheckoutPreviewRequest",
+        popup: "Popups",
+        flow: "Any | None" = None,
+    ) -> "CheckoutPreviewResponse":
+        """Compute the authoritative price breakdown without creating anything.
+
+        Same product validation (membership + sale window) and same money math
+        as ``create_open_ticketing_payment``; no side effects.
+
+        ``flow`` is the door the buyer is looking through. Omitted, the popup's
+        default answers — which is what every caller meant before a door could
+        set its own fees, and is still right for a checkout that names none.
+        """
+        from app.api.sales_flow.crud import sales_flows_crud  # noqa: PLC0415
+
+        if flow is None:
+            flow = sales_flows_crud.get_default_flow(session, popup.id)
+        from app.api.checkout.schemas import (
+            CheckoutPreviewLine,
+            CheckoutPreviewResponse,
+        )
+
+        product_ids = [line.product_id for line in obj.products]
+        products_statement = select(Products).where(
+            Products.id.in_(product_ids),  # type: ignore[attr-defined]
+            Products.popup_id == popup.id,
+            Products.is_active == True,  # noqa: E712
+            Products.deleted_at.is_(None),  # type: ignore[attr-defined]
+        )
+        valid_products = list(session.exec(products_statement).all())
+        if {p.id for p in valid_products} != set(product_ids):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Some products are not available or inactive",
+            )
+        for product in valid_products:
+            state = derive_product_state(ProductPublic.model_validate(product))
+            if state != ProductSaleState.on_sale:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=(
+                        f"Product '{product.name}' is not on sale "
+                        f"(state: {state.value})"
+                    ),
+                )
+
+        products_map = {p.id: p for p in valid_products}
+        amounts = compute_open_ticketing_amounts(
+            session,
+            popup,
+            flow,
+            products_map,
+            obj.products,
+            coupon_code=obj.coupon_code,
+            insurance=obj.insurance,
+        )
+        return CheckoutPreviewResponse(
+            lines=[
+                CheckoutPreviewLine(
+                    product_id=line.product_id,
+                    quantity=line.quantity,
+                    unit_price=line.unit_price,
+                    line_total=line.line_total,
+                    discountable=line.discountable,
+                )
+                for line in amounts.lines
+            ],
+            discountable_amount=amounts.discountable_amount,
+            non_discountable_amount=amounts.non_discountable_amount,
+            coupon_code=amounts.coupon_code,
+            discount_value=amounts.discount_value,
+            discount_amount=amounts.discount_amount,
+            post_discount_amount=amounts.post_discount_amount,
+            insurance_amount=amounts.insurance_amount,
+            contribution_amount=amounts.contribution_amount,
+            total=amounts.total_amount,
+            currency=amounts.currency,
+        )
+
     def create_open_ticketing_payment(
         self,
         session: Session,
@@ -1087,25 +1309,15 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 email=obj.buyer.email,
             )
 
-            # Split products into discountable vs non-discountable buckets so
-            # admin-flagged products (and patreon donations, even though they
-            # don't appear in this flow today) bypass any coupon discount.
-            discountable_amount = Decimal("0")
-            non_discountable_amount = Decimal("0")
+            # Snapshot rows for the order (one PaymentProducts per unit).
+            # AttendeeProducts are created by approve_payment via
+            # _add_products_to_attendees when the webhook confirms the payment.
+            # Pre-creating them here caused duplicates (double the tickets) on
+            # every approved checkout.
             payment_products: list[PaymentProducts] = []
             for line in obj.products:
                 product = products_map[line.product_id]
-                line_total = product.price * line.quantity
-                if product.category == "patreon" or not product.discountable:
-                    non_discountable_amount += line_total
-                else:
-                    discountable_amount += line_total
-
                 for _ in range(line.quantity):
-                    # PaymentProducts snapshot only — AttendeeProducts are created
-                    # by approve_payment via _add_products_to_attendees when the
-                    # webhook confirms the payment. Pre-creating them here caused
-                    # duplicates (double the tickets) on every approved checkout.
                     pp = PaymentProducts(
                         tenant_id=tenant.id,
                         payment_id=payment.id,
@@ -1121,81 +1333,44 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                     session.add(pp)
                     payment_products.append(pp)
 
-            discountable_amount = discountable_amount.quantize(
-                MONEY_PRECISION, rounding=ROUND_HALF_UP
+            # Authoritative amounts — the SAME math POST /checkout/{slug}/preview
+            # serves, so the displayed total always matches what is charged.
+            # Coupon consumption stays deferred below (this computes only).
+            amounts = compute_open_ticketing_amounts(
+                session,
+                popup,
+                target_flow,
+                products_map,
+                obj.products,
+                coupon_code=obj.coupon_code,
+                insurance=obj.insurance,
             )
-            non_discountable_amount = non_discountable_amount.quantize(
-                MONEY_PRECISION, rounding=ROUND_HALF_UP
-            )
+            if amounts.coupon_id is not None:
+                payment.coupon_id = amounts.coupon_id
+                payment.coupon_code = amounts.coupon_code
+                payment.discount_value = amounts.discount_value
 
-            # Skip coupon when there is nothing in the discountable bucket — a
-            # coupon would land with zero effect and waste a single-use code.
-            # Portal hides the input; this guards crafted requests.
-            if obj.coupon_code and discountable_amount > Decimal("0"):
-                if target_flow is None:
-                    # Every popup is provisioned with a default flow, so
-                    # reaching here means the invariant is already broken.
-                    # Say so rather than fail on an attribute.
-                    raise HTTPException(
-                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                        detail="This event is not ready to take coupons yet.",
-                    )
-                # The flow the buyer actually came through, not the popup's
-                # default: a flow with coupons off must not take one.
-                coupon = coupons_crud.validate_coupon(
-                    session,
-                    code=obj.coupon_code,
-                    popup_id=popup.id,
-                    flow_id=target_flow.id,
-                )
-                discount_value = Decimal(str(coupon.discount_value))
-                discountable_amount = _get_discounted_price(
-                    discountable_amount, discount_value
-                )
-                payment.coupon_id = coupon.id
-                payment.coupon_code = coupon.code
-                payment.discount_value = discount_value
-                # Consumption is deferred until the payment is persisted (the
-                # zero-amount commit or the post-SimpleFi commit below) so a
-                # provider failure never burns a single-use code. Mirrors the
-                # application flow.
-
-            # Post-discount subtotal is the shared base for BOTH optional fees.
-            # Insurance and contribution each read this same baseline so they
-            # never compound on each other (mirrors _apply_discounts / ADR-2).
-            post_discount_amount = discountable_amount + non_discountable_amount
+            # Dev's shared math already applied the coupon and both fees, and
+            # sharing it with /preview is what keeps the displayed total equal
+            # to the charged one. The flow it was handed decided all three.
+            post_discount_amount = amounts.post_discount_amount
             payment.amount = post_discount_amount
 
-            # Insurance fee (buyer opt-in). Computed on the eligible-product
-            # subtotal at full price via the shared helper, matching the
-            # authenticated flow and the portal display. Skipped when the cart
-            # is already $0 (a fee on nothing makes no sense).
-            flow_fees = build_effective_config(target_flow) if target_flow else None
-            if obj.insurance and post_discount_amount > Decimal("0") and flow_fees:
-                insurance_amount = calculate_insurance_amount(
-                    flow_fees,
-                    [
-                        (products_map[line.product_id], line.quantity)
-                        for line in obj.products
-                    ],
-                )
-                payment.insurance_amount = insurance_amount
-                payment.amount += insurance_amount
+            # Preserve the ORIGINAL conditional field assignment EXACTLY so the
+            # persisted payment row is byte-identical to the pre-refactor code
+            # (no None -> 0.00 drift on insurance_amount / contribution_amount).
+            if obj.insurance and post_discount_amount > Decimal("0"):
+                payment.insurance_amount = amounts.insurance_amount
+                payment.amount += amounts.insurance_amount
 
-            # Contribution fee (mandatory when the flow enables it — no buyer
-            # opt-in). Its base is the post-discount subtotal, NOT the
-            # insurance-inflated total, so the two fees stay independent.
-            # Mirrors the application flow in _apply_discounts.
+            flow_fees = build_effective_config(target_flow) if target_flow else None
             if (
                 flow_fees
                 and flow_fees.contribution_enabled
                 and flow_fees.contribution_percentage
             ):
-                contribution_amount = calculate_contribution_amount(
-                    flow_fees, post_discount_amount
-                )
-                payment.contribution_amount = contribution_amount
-                payment.amount += contribution_amount
+                payment.contribution_amount = amounts.contribution_amount
+                payment.amount += amounts.contribution_amount
 
             # Resolve the open-checkout success redirect once, reused by the
             # zero-amount bypass (returned as redirect_url) and the paid path
@@ -2102,7 +2277,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         if application.invite_id:
             from app.api.invite.crud import invites_crud
 
-            invite = invites_crud.get(session, application.invite_id)
+            invite = invites_crud.get_admin_created(session, application.invite_id)
             if invite and invite.discount_percentage:
                 invite_discount = Decimal(str(invite.discount_percentage))
                 discounted_amount, discounted_credit_applied = _calculate_price(
@@ -2122,9 +2297,11 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
 
         # Check referral discount — read live; a disabled referral grants nothing.
         if application.referral_id:
-            from app.api.referral.crud import referrals_crud
+            from app.api.invite.crud import invites_crud as referrals_crud
 
-            referral = referrals_crud.get(session, application.referral_id)
+            referral = referrals_crud.get_portal_created(
+                session, application.referral_id
+            )
             if referral and not referral.is_disabled and referral.discount_percentage:
                 referral_discount = Decimal(str(referral.discount_percentage))
                 discounted_amount, discounted_credit_applied = _calculate_price(

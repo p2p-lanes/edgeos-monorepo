@@ -1,14 +1,15 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query"
 import { createFileRoute, useNavigate } from "@tanstack/react-router"
 import type { ColumnDef } from "@tanstack/react-table"
-import { Share2 } from "lucide-react"
+import { Info, Share2 } from "lucide-react"
 import { Suspense } from "react"
 
-import { type ReferralPublic, ReferralsService } from "@/client"
+import { type InvitePublic, InvitesService, PopupsService } from "@/client"
 import { DataTable, SortableHeader } from "@/components/Common/DataTable"
 import { EmptyState } from "@/components/Common/EmptyState"
 import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
@@ -24,8 +25,10 @@ function getReferralsQueryOptions(
 ) {
   return {
     queryFn: () =>
-      ReferralsService.listReferralsAdmin({
+      InvitesService.listInvites({
         popupId: popupId ?? undefined,
+        // Attendee-created links only: admin invites have their own screen.
+        issuer: "portal",
         skip: page * pageSize,
         limit: pageSize,
       }),
@@ -41,13 +44,13 @@ export const Route = createFileRoute("/_layout/referrals/")({
   }),
 })
 
-const columns: ColumnDef<ReferralPublic>[] = [
+const columns: ColumnDef<InvitePublic>[] = [
   {
-    accessorKey: "code",
+    accessorKey: "token",
     header: ({ column }) => <SortableHeader label="Code" column={column} />,
     cell: ({ row }) => (
       <span className="inline-flex items-center gap-2">
-        <span className="font-mono text-sm">{row.original.code}</span>
+        <span className="font-mono text-sm">{row.original.token}</span>
         {row.original.is_disabled && (
           <Badge variant="destructive">Disabled</Badge>
         )}
@@ -137,6 +140,13 @@ function ReferralsTableContent({ popupId }: { popupId: string | null }) {
 function Referrals() {
   const { selectedPopupId, isContextReady } = useWorkspace()
 
+  const { data: popup } = useQuery({
+    queryKey: ["popups", selectedPopupId],
+    queryFn: () => PopupsService.getPopup({ popupId: selectedPopupId ?? "" }),
+    enabled: !!selectedPopupId,
+  })
+  const referralsEnabled = popup?.referrals_enabled ?? false
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
@@ -147,6 +157,27 @@ function Referrals() {
           </p>
         </div>
       </div>
+      {isContextReady && (
+        <Alert>
+          <Info className="h-4 w-4" />
+          <AlertTitle>About referrals</AlertTitle>
+          <AlertDescription>
+            Referral codes are created by attendees in the portal to refer other
+            people. Each code can carry a discount and an automatic approval for
+            the referred person. Unlike invites, which admins create for
+            specific recipients, referrals grow from your attendees. Here you
+            can moderate them: disable codes or adjust their discount.
+          </AlertDescription>
+        </Alert>
+      )}
+      {isContextReady && popup && !referralsEnabled && (
+        <Alert>
+          <AlertDescription>
+            Referrals are disabled for this popup. Attendees cannot create or
+            redeem referral codes until you enable them in the popup settings.
+          </AlertDescription>
+        </Alert>
+      )}
       {!isContextReady ? (
         <WorkspaceAlert resource="referrals" />
       ) : (

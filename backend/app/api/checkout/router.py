@@ -29,6 +29,8 @@ from app.api.checkout.crud import (
     share_meta_for_slug,
 )
 from app.api.checkout.schemas import (
+    CheckoutPreviewRequest,
+    CheckoutPreviewResponse,
     CheckoutRuntimeResponse,
     CheckoutShareMeta,
     OpenTicketingPurchaseCreate,
@@ -172,6 +174,36 @@ async def get_flow_runtime(
         parse_accept_language(accept_language),
         current_human,
     )
+
+
+@router.post(
+    "/{slug}/preview",
+    response_model=CheckoutPreviewResponse,
+    dependencies=[
+        Depends(RateLimit(limit=60, window_sec=60, key_prefix="rl:checkout-preview")),
+    ],
+)
+async def preview_open_ticketing(
+    slug: str,
+    request_in: CheckoutPreviewRequest,
+    db: SessionDep,
+    tenant: PublicTenant,
+    flow_slug: Annotated[str | None, Query()] = None,
+) -> CheckoutPreviewResponse:
+    """Return a server-computed price breakdown for an anonymous cart.
+
+    Authoritative for display; identical math to POST /purchase. No side effects.
+    Rate-limited 60/min/IP.
+
+    ``flow_slug`` mirrors /purchase. A door sets its own fee rates and decides
+    whether it takes coupons, so a preview that named no door would quote the
+    default flow's prices for a buyer about to be charged another's.
+    """
+    from app.api.sales_flow.resolver import resolve_flow
+
+    popup = get_open_ticketing_popup(db, slug, tenant.id)
+    flow = resolve_flow(db, popup, flow_slug) if flow_slug else None
+    return payments_crud.preview_open_ticketing(db, request_in, popup, flow)
 
 
 @router.get(

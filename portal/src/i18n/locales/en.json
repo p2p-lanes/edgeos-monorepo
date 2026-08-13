@@ -224,6 +224,7 @@
     "send_code": "Send Code",
     "verify_code": "Verify Code",
     "submit_error": "An error occurred while submitting the form. Please try again.",
+    "duplicate_application": "You already have a pending application for this pop-up. Please check your email or contact support.",
     "application_required": "Application Required",
     "application_required_message": "Hi {{userName}}, before you can purchase a pass, we'd love to get to know you better!",
     "application_required_prompt": "Please visit the Edge Portal and apply to {{popupName}}, so we can review your information.",

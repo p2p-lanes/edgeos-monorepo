@@ -1,7 +1,14 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query"
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router"
 import type { ColumnDef } from "@tanstack/react-table"
-import { Copy, EllipsisVertical, ExternalLink, Plus, Users } from "lucide-react"
+import {
+  Copy,
+  EllipsisVertical,
+  ExternalLink,
+  Info,
+  Plus,
+  Users,
+} from "lucide-react"
 import { Suspense, useState } from "react"
 
 import { type GroupPublic, GroupsService } from "@/client"
@@ -10,6 +17,7 @@ import { EmptyState } from "@/components/Common/EmptyState"
 import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
 import { FlowNameCell } from "@/components/forms/FlowNameCell"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -328,6 +336,19 @@ function Groups() {
         </div>
         {isOperatorOrAbove && isContextReady && <AddGroupButton />}
       </div>
+      {isContextReady && (
+        <Alert>
+          <Info className="h-4 w-4" />
+          <AlertTitle>Groups vs Invites</AlertTitle>
+          <AlertDescription>
+            Groups gather multiple attendees under a shared link to manage team
+            registrations and group discounts, with leaders who manage their
+            members. Invites are individual links that grant a specific person a
+            discount or an automatic approval. Use groups for teams and invites
+            for one-off offers.
+          </AlertDescription>
+        </Alert>
+      )}
       {isContextReady && (
         <QueryErrorBoundary>
           <Suspense fallback={<Skeleton className="h-64 w-full" />}>

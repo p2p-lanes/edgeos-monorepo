@@ -344,7 +344,7 @@ export function InviteForm({ defaultValues, onSuccess }: InviteFormProps) {
               <InlineRow
                 icon={<Power className="h-4 w-4 text-muted-foreground" />}
                 label="Express Checkout"
-                description="Skip the review step and go directly to checkout on approval"
+                description="Skip the full application form and require only the essential fields"
               >
                 <Switch
                   id="express_checkout"

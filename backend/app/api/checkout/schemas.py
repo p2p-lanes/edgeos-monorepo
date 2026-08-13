@@ -208,6 +208,43 @@ class OpenTicketingPurchaseResponse(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Preview schemas (POST /checkout/{slug}/preview)
+# ---------------------------------------------------------------------------
+
+
+class CheckoutPreviewRequest(BaseModel):
+    """Request schema for POST /checkout/{slug}/preview."""
+
+    products: list[ProductLine] = Field(min_length=1)
+    coupon_code: str | None = None
+    insurance: bool = False
+
+
+class CheckoutPreviewLine(BaseModel):
+    product_id: uuid.UUID
+    quantity: int
+    unit_price: Decimal
+    line_total: Decimal
+    discountable: bool
+
+
+class CheckoutPreviewResponse(BaseModel):
+    """Server-computed price breakdown for anonymous checkout (no side effects)."""
+
+    lines: list[CheckoutPreviewLine]
+    discountable_amount: Decimal
+    non_discountable_amount: Decimal
+    coupon_code: str | None = None
+    discount_value: Decimal | None = None
+    discount_amount: Decimal = Decimal("0")
+    post_discount_amount: Decimal
+    insurance_amount: Decimal = Decimal("0")
+    contribution_amount: Decimal = Decimal("0")
+    total: Decimal
+    currency: str
+
+
+# ---------------------------------------------------------------------------
 # Release-on-return schemas (POST /checkout/{slug}/pending/release)
 # ---------------------------------------------------------------------------
 
