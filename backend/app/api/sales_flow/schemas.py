@@ -155,6 +155,10 @@ class SalesFlowBase(SQLModel):
         default=None, sa_column=Column(String, nullable=True)
     )
     installments_interval_count: int | None = Field(default=None, nullable=True)
+    # An invite already names the flow it lands its recipient in, and the
+    # check-in email's template is flow-owned, so the timing follows it.
+    invites_enabled: bool | None = Field(default=None, nullable=True)
+    checkin_pass_lead_days: int | None = Field(default=None, nullable=True)
     open_checkout_success_url: str | None = Field(default=None, nullable=True)
     open_checkout_cancel_url: str | None = Field(default=None, nullable=True)
     open_checkout_signing_secret: str | None = Field(default=None, nullable=True)
@@ -198,6 +202,8 @@ class SalesFlowCreate(BaseModel):
     installments_max: int | None = None
     installments_interval: InstallmentInterval | None = None
     installments_interval_count: int | None = None
+    invites_enabled: bool | None = None
+    checkin_pass_lead_days: int | None = None
     open_checkout_success_url: str | None = None
     open_checkout_cancel_url: str | None = None
     open_checkout_signing_secret: str | None = None
@@ -264,6 +270,8 @@ class SalesFlowUpdate(BaseModel):
     installments_max: int | None = None
     installments_interval: InstallmentInterval | None = None
     installments_interval_count: int | None = None
+    invites_enabled: bool | None = None
+    checkin_pass_lead_days: int | None = None
     open_checkout_success_url: str | None = None
     open_checkout_cancel_url: str | None = None
     open_checkout_signing_secret: str | None = None
@@ -368,6 +376,8 @@ EFFECTIVE_CONFIG_FIELDS: tuple[str, ...] = (
     "installments_max",
     "installments_interval",
     "installments_interval_count",
+    "invites_enabled",
+    "checkin_pass_lead_days",
     "open_checkout_success_url",
     "open_checkout_cancel_url",
     "open_checkout_signing_secret",
@@ -421,6 +431,8 @@ class EffectiveFlowConfig(BaseModel):
     installments_max: int | None = None
     installments_interval: InstallmentInterval | None = None
     installments_interval_count: int | None = None
+    invites_enabled: bool | None = None
+    checkin_pass_lead_days: int | None = None
     open_checkout_success_url: str | None = None
     open_checkout_cancel_url: str | None = None
     open_checkout_signing_secret: str | None = None

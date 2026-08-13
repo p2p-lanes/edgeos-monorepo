@@ -863,7 +863,14 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         # Popup feature-flag guards for invite/referral paths (T-gr-017).
         # These flags gate whether the invite/referral modules are active for
         # this popup. Checked early so we fail fast before any DB lookups.
-        if getattr(app_data, "invite_id", None) and not popup.invites_enabled:
+        if (
+            getattr(app_data, "invite_id", None)
+            and not config_for(
+                session,
+                sales_flow_id=getattr(app_data, "sales_flow_id", None),
+                popup_id=popup.id,
+            ).invites_enabled
+        ):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Invite-based applications are not enabled for this popup",

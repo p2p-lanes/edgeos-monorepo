@@ -22,14 +22,15 @@ from datetime import UTC, datetime, timedelta
 
 from loguru import logger
 from sqlalchemy import text
-from sqlmodel import Session
+from sqlalchemy.orm import selectinload
+from sqlmodel import Session, select
 
 from app.api.attendee.crud import attendees_crud
 from app.api.attendee.models import AttendeeProducts
 from app.api.email_template.schemas import EmailTemplateType
 from app.api.human.models import Humans
-from app.api.popup.crud import popups_crud
 from app.api.popup.models import Popups
+from app.api.sales_flow.models import SalesFlows
 from app.api.tenant.utils import get_portal_url
 from app.services.checkin_qr import generate_checkin_qr_url
 from app.services.email import CheckInPassContext, CheckInQrItem, get_email_service
@@ -59,17 +60,25 @@ def _resolve_buyer(ticket: AttendeeProducts) -> Humans | None:
     return attendee.human
 
 
-def _due_popups(db: Session, now: datetime) -> list[Popups]:
-    """Popups with check-in passes enabled and within the send window.
+def _due_flows(db: Session, now: datetime) -> list[tuple[SalesFlows, Popups]]:
+    """Doors with check-in passes enabled and within their send window.
+
+    The unit is a flow, not a popup: the check-in email's template has been
+    flow-owned since the redesign, so when it goes out follows the wording it
+    goes out in. A partner's door can write ahead of the event while the
+    general one writes the week of.
+
+    The window's other half stays the popup's, because the dates being counted
+    back from are the event's — a flow has no start or end of its own.
 
     Window: ``start_date - lead_days <= now`` and (no end_date or
     ``now < end_date``). The post-start tail is intentional — tickets bought
     after the event begins are picked up by the next run without needing a
     separate code path.
     """
-    due: list[Popups] = []
-    for popup in popups_crud.list_with_checkin_pass_enabled(db):
-        lead = popup.checkin_pass_lead_days
+    due: list[tuple[SalesFlows, Popups]] = []
+    for flow, popup in _flows_with_a_lead_time(db):
+        lead = flow.checkin_pass_lead_days
         if not lead or lead <= 0:
             continue
         start = _as_utc(popup.start_date)
@@ -81,13 +90,42 @@ def _due_popups(db: Session, now: datetime) -> list[Popups]:
             continue
         if end is not None and now >= end:
             continue
-        due.append(popup)
+        due.append((flow, popup))
     return due
 
 
-async def _send_popup_passes(db: Session, popup: Popups, now: datetime) -> dict:
-    """Send (and mark) all due check-in passes for a single popup."""
-    tickets = attendees_crud.find_unsent_checkin_pass_tickets(db, popup.id)
+def _flows_with_a_lead_time(db: Session) -> list[tuple[SalesFlows, Popups]]:
+    """Every flow that has asked for a check-in email, with its popup.
+
+    The popup is joined rather than lazy-loaded so the window check and the
+    tenant's sender details cost no extra query per flow.
+    """
+    statement = (
+        select(SalesFlows, Popups)
+        .join(Popups, SalesFlows.popup_id == Popups.id)  # type: ignore[arg-type]
+        .where(
+            SalesFlows.checkin_pass_lead_days.is_not(None),  # type: ignore[union-attr]
+            Popups.start_date.is_not(None),  # type: ignore[union-attr]
+        )
+        .options(selectinload(Popups.tenant))  # type: ignore[arg-type]
+    )
+    return list(db.exec(statement).all())
+
+
+async def _send_flow_passes(
+    db: Session, flow: SalesFlows, popup: Popups, now: datetime
+) -> dict:
+    """Send (and mark) all due check-in passes for a single door.
+
+    A direct purchase names no door, so the popup's default flow answers for
+    those tickets — otherwise nobody would, and the buyer would never get a QR.
+    """
+    tickets = attendees_crud.find_unsent_checkin_pass_tickets(
+        db,
+        popup.id,
+        sales_flow_id=flow.id,
+        include_flowless=bool(flow.is_default),
+    )
     if not tickets:
         return {"emails_sent": 0, "tickets_marked": 0, "failures": 0}
 
@@ -174,17 +212,21 @@ async def _send_popup_passes(db: Session, popup: Popups, now: datetime) -> dict:
 
 
 async def _run_dispatch(db: Session, now: datetime) -> dict:
-    due = _due_popups(db, now)
+    due = _due_flows(db, now)
     summary = {
         "status": "ok",
         "popups_processed": 0,
+        "flows_processed": 0,
         "emails_sent": 0,
         "tickets_marked": 0,
         "failures": 0,
     }
-    for popup in due:
-        result = await _send_popup_passes(db, popup, now)
-        summary["popups_processed"] += 1
+    seen_popups: set[uuid.UUID] = set()
+    for flow, popup in due:
+        result = await _send_flow_passes(db, flow, popup, now)
+        summary["flows_processed"] += 1
+        seen_popups.add(popup.id)
+        summary["popups_processed"] = len(seen_popups)
         summary["emails_sent"] += result["emails_sent"]
         summary["tickets_marked"] += result["tickets_marked"]
         summary["failures"] += result["failures"]

@@ -5,7 +5,8 @@ Mounts at:
   /invites/redeem/{token} — portal (GET: unauthenticated preview; POST: CurrentHuman)
 
 Design: Decision 1c (module layout), API surface table for invites.
-Spec: REQ-GR-001..007 (invites), REQ-GR-026 (popup.invites_enabled gate).
+Spec: REQ-GR-001..007 (invites), REQ-GR-026 (the invites gate, which
+belongs to the sales flow an invite lands its recipient in).
 """
 
 import uuid
@@ -57,6 +58,8 @@ async def preview_invite(
     redirects them to their checkout instead of re-redeeming the link.
     recipient_email is NEVER returned.
     """
+    from app.api.sales_flow.resolver import config_for  # noqa: PLC0415
+
     # Never cache the preview — it reflects mutable invite state (max_uses,
     # current_uses, expiry) that an admin can change at any time.
     response.headers["Cache-Control"] = "no-store"
@@ -96,7 +99,12 @@ async def preview_invite(
 
         popup = popups_crud.get(db, invite.popup_id)
         ensure_popup_link_active(popup)
-        if popup is not None and not popup.invites_enabled:
+        if (
+            popup is not None
+            and not config_for(
+                db, sales_flow_id=invite.sales_flow_id, popup_id=invite.popup_id
+            ).invites_enabled
+        ):
             raise HTTPException(
                 status_code=status.HTTP_410_GONE,
                 detail="Invites are not enabled for this event",
@@ -154,6 +162,7 @@ async def redeem_invite(
     from app.api.application.crud import applications_crud
     from app.api.application.schemas import ApplicationCreate, ApplicationStatus
     from app.api.popup.crud import popups_crud
+    from app.api.sales_flow.resolver import config_for  # noqa: PLC0415
 
     invite = invites_crud.get_by_token_any_popup(db, token)
     if not invite:
@@ -196,8 +205,11 @@ async def redeem_invite(
             detail="You have already redeemed this invite",
         )
 
-    # Check popup.invites_enabled guard (REQ-GR-026)
-    if not popup.invites_enabled:
+    # The flow this invite lands its recipient in decides whether it may
+    # (REQ-GR-026, now per flow).
+    if not config_for(
+        db, sales_flow_id=invite.sales_flow_id, popup_id=invite.popup_id
+    ).invites_enabled:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Invite-based applications are not enabled for this popup",
@@ -361,6 +373,7 @@ async def create_invite(
     409 if (popup_id, token) collides.
     """
     from app.api.popup.crud import popups_crud
+    from app.api.sales_flow.resolver import config_for  # noqa: PLC0415
 
     # Resolve popup to get tenant_id and check feature flag
     popup = popups_crud.get(db, body.popup_id)
@@ -369,14 +382,18 @@ async def create_invite(
             status_code=status.HTTP_404_NOT_FOUND, detail="Popup not found"
         )
 
-    # popup.invites_enabled gate (REQ-GR-026)
-    if not popup.invites_enabled:
+    # Resolve the target flow BEFORE the gate: the flow being invited into is
+    # the one that decides whether invites are allowed (REQ-GR-026, now per
+    # flow), so asking before resolving would ask the wrong door.
+    body.sales_flow_id = _resolve_invite_flow_id(db, popup.id, body.sales_flow_id)
+
+    if not config_for(
+        db, sales_flow_id=body.sales_flow_id, popup_id=popup.id
+    ).invites_enabled:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Invite-based applications are not enabled for this popup",
+            detail="Invite-based applications are not enabled for this sales flow",
         )
-
-    body.sales_flow_id = _resolve_invite_flow_id(db, popup.id, body.sales_flow_id)
 
     # Use admin's tenant_id if set, otherwise derive from popup (for superadmin)
     tenant_id = current_user.tenant_id or popup.tenant_id

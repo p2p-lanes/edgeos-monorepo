@@ -5,6 +5,7 @@ from datetime import datetime
 from typing import Any
 
 from fastapi import HTTPException, status
+from sqlalchemy import or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import selectinload
 from sqlmodel import Session, func, select
@@ -1222,6 +1223,9 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
         self,
         session: Session,
         popup_id: uuid.UUID,
+        *,
+        sales_flow_id: uuid.UUID | None = None,
+        include_flowless: bool = False,
     ) -> list[AttendeeProducts]:
         """Return scannable tickets in *popup_id* that have not been emailed yet.
 
@@ -1229,6 +1233,12 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
         - ``Attendees.popup_id == popup_id``
         - ``Products.requires_check_in IS TRUE``
         - ``AttendeeProducts.checkin_pass_sent_at IS NULL``
+
+        ``sales_flow_id`` narrows to the door a ticket was bought through, so
+        each flow can send on its own schedule. ``include_flowless`` adds
+        tickets on attendees with no application at all — direct purchases,
+        which name no door — and is meant for the popup's default flow, the
+        same absorption rule `reminder_dispatch._scoped_to_flow` applies.
 
         Eager-loads ``attendee → application → human`` and ``product`` so the
         check-in pass dispatcher can build per-ticket QR items and resolve the
@@ -1243,6 +1253,7 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
             select(AttendeeProducts)
             .join(Attendees, AttendeeProducts.attendee_id == Attendees.id)  # type: ignore[arg-type]
             .join(Products, AttendeeProducts.product_id == Products.id)  # type: ignore[arg-type]
+            .outerjoin(Applications, Attendees.application_id == Applications.id)  # type: ignore[arg-type]
             .where(
                 Attendees.popup_id == popup_id,
                 Products.requires_check_in.is_(True),  # type: ignore[union-attr]
@@ -1255,6 +1266,11 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
                 .selectinload(Applications.human),  # ty: ignore[invalid-argument-type]
             )
         )
+        if sales_flow_id is not None:
+            scope = Applications.sales_flow_id == sales_flow_id
+            if include_flowless:
+                scope = or_(scope, Attendees.application_id.is_(None))  # type: ignore[union-attr]
+            statement = statement.where(scope)
         return list(session.exec(statement).all())
 
     def mark_checkin_pass_sent(

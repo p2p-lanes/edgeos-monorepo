@@ -62,6 +62,10 @@ def _make_flow(
         slug=f"flow-{uuid.uuid4().hex[:8]}",
         name="Volunteers",
     )
+    # A flow created through the API copies its channel configuration from the
+    # one already selling. Built directly, it would start with every setting
+    # NULL — including the one that says whether it takes invites at all.
+    sales_flows_crud.seed_config_from_popup(db, flow, popup.id)
     db.add(flow)
     db.commit()
     db.refresh(flow)
