@@ -127,6 +127,17 @@ export default function FormPage() {
     }
   }, [importSource, existingApp])
 
+  // `?flow=` can name a way in that takes no applications — a direct-sale
+  // flow, or one the organiser has since unlisted. The id was trusted on
+  // sight, so the form rendered for a door the picker was still asking
+  // about: an empty card with a Submit button under an unanswered question.
+  // An id the picker does not offer is dropped, and the picker asks.
+  useEffect(() => {
+    if (!portalFlows || !selectedFlowId) return
+    if (portalFlows.some((flow) => flow.id === selectedFlowId)) return
+    setSelectedFlowId(null)
+  }, [portalFlows, selectedFlowId])
+
   // Resolved applications are no longer accessible from the form.
   // draft/pending_fee/in review stay editable so the applicant can still
   // finish, retry the fee payment, or update details while under review.
