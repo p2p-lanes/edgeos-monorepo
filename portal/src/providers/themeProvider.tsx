@@ -1,6 +1,7 @@
 "use client"
 
 import { type ReactNode, useEffect, useMemo } from "react"
+import { buildGoogleFontsUrl, toCssFontFamily } from "@/lib/google-font"
 import { useCityProvider } from "./cityProvider"
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -24,6 +25,12 @@ type ThemeMode = "light" | "dark"
 interface ThemeTypography {
   font_base_size?: string
   font_heading_scale?: number
+  /** Google Fonts family for body text, e.g. "Inter". Loaded at runtime from
+   *  fonts.googleapis.com — `next/font` can't help here because it resolves
+   *  families at build time and this one comes from the database. */
+  font_family?: string
+  /** Optional separate family for h1–h6. Falls back to `font_family`. */
+  font_heading_family?: string
 }
 
 interface ThemeColors {
@@ -256,6 +263,16 @@ function buildThemeStyles(
   if (config.typography?.font_base_size) {
     styles["--theme-font-base-size"] = config.typography.font_base_size
   }
+
+  // Font families are validated here rather than at the point of use so an
+  // invalid value from the database is dropped once, not partially applied.
+  const bodyFont = toCssFontFamily(config.typography?.font_family ?? "")
+  if (bodyFont) styles["--theme-font-family"] = bodyFont
+  const headingFont = toCssFontFamily(
+    config.typography?.font_heading_family ?? "",
+  )
+  if (headingFont) styles["--theme-font-heading-family"] = headingFont
+
   if (config.radius) styles["--radius"] = config.radius
   if (config.border_radius) styles["--border-radius"] = config.border_radius
 
@@ -291,14 +308,94 @@ export default function ThemeProvider({ children }: { children: ReactNode }) {
     const previousFontSize = fontSize ? root.style.fontSize : ""
     if (fontSize) root.style.fontSize = fontSize
 
+    // The body font has to be set as a real `font-family` on <body>, not just
+    // via `--font-sans`: layout.tsx puts `GeistSans.className` on <body>, and
+    // that class declares font-family directly, so it beats the Tailwind
+    // variable. `--font-sans` is set too, for elements that opt in with an
+    // explicit `font-sans` utility.
+    //
+    // Checkout skins are unaffected: they declare font-family on their own
+    // wrapper (`.checkout-amanita`), and a rule that matches an element always
+    // beats a value inherited from <body>. Do not make this `!important`.
+    const body = document.body
+    const bodyFont = themeStyles["--theme-font-family"]
+    const previousBodyFont = bodyFont ? body.style.fontFamily : ""
+    const previousFontSans = bodyFont
+      ? root.style.getPropertyValue("--font-sans")
+      : ""
+    if (bodyFont) {
+      body.style.fontFamily = bodyFont
+      root.style.setProperty("--font-sans", bodyFont)
+    }
+
     return () => {
       for (const key of keys) {
         if (previous[key]) root.style.setProperty(key, previous[key])
         else root.style.removeProperty(key)
       }
       if (fontSize) root.style.fontSize = previousFontSize
+      if (bodyFont) {
+        body.style.fontFamily = previousBodyFont
+        if (previousFontSans) {
+          root.style.setProperty("--font-sans", previousFontSans)
+        } else {
+          root.style.removeProperty("--font-sans")
+        }
+      }
     }
   }, [themeStyles])
+
+  // Load the picked families from Google. Separate from the effect above
+  // because it keys off the raw family names, not the derived CSS values, and
+  // because the <link> outlives a colour-only theme change.
+  //
+  // This runs client-side, so the webfont arrives after hydration and after
+  // the tenant fetch resolves — `display=swap` means a flash of the fallback
+  // stack rather than invisible text. Emitting the <link> from the server
+  // render would remove the flash; see docs/google-fonts-theme-plan.md.
+  useEffect(() => {
+    const typography = themeConfig?.typography
+    const href = buildGoogleFontsUrl([
+      typography?.font_family,
+      typography?.font_heading_family,
+    ])
+    if (!href) return
+
+    // Two popups on the same session can ask for the same family; a second
+    // identical <link> would be a redundant request. Compared by attribute
+    // rather than through a selector so the href never has to be escaped.
+    const alreadyLoaded = Array.from(
+      document.head.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"]'),
+    ).some((link) => link.getAttribute("href") === href)
+    if (alreadyLoaded) return
+
+    // Preconnect to the font CDN as well as the stylesheet host: the CSS and
+    // the woff2 files come from different origins, and the second handshake
+    // would otherwise start only once the CSS has parsed.
+    const preconnects = [
+      "https://fonts.googleapis.com",
+      "https://fonts.gstatic.com",
+    ].map((origin) => {
+      const link = document.createElement("link")
+      link.rel = "preconnect"
+      link.href = origin
+      // gstatic serves the fonts with CORS; the hint has to match the request
+      // mode or the warmed connection goes unused.
+      if (origin.includes("gstatic")) link.crossOrigin = "anonymous"
+      document.head.appendChild(link)
+      return link
+    })
+
+    const stylesheet = document.createElement("link")
+    stylesheet.rel = "stylesheet"
+    stylesheet.href = href
+    document.head.appendChild(stylesheet)
+
+    return () => {
+      stylesheet.remove()
+      for (const link of preconnects) link.remove()
+    }
+  }, [themeConfig?.typography])
 
   return <>{children}</>
 }
