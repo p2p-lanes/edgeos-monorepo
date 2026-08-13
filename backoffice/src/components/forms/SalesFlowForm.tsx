@@ -139,6 +139,54 @@ const CONFIG_SECTIONS: {
     ],
   },
   {
+    title: "Checkout Fees",
+    description:
+      "Extra charged on top of the order at this flow's checkout. Leave both off to sell at face value.",
+    fields: [
+      {
+        key: "insurance_enabled",
+        label: "Offer Insurance",
+        description:
+          "Let buyers add insurance to eligible products during checkout. Opt-in: nobody is charged unless they tick it.",
+        kind: "boolean",
+      },
+      {
+        key: "insurance_percentage",
+        label: "Insurance Rate (%)",
+        description:
+          "Percentage of the eligible products' price charged as the insurance fee.",
+        kind: "number",
+      },
+      {
+        key: "contribution_enabled",
+        label: "Add Contribution",
+        description:
+          "Add a contribution to every order through this flow. Not opt-in: buyers pay it, so say what it funds below.",
+        kind: "boolean",
+      },
+      {
+        key: "contribution_percentage",
+        label: "Contribution Rate (%)",
+        description:
+          "Percentage of the order total, taken before insurance so the two never compound.",
+        kind: "number",
+      },
+      {
+        key: "contribution_label",
+        label: "Contribution Label",
+        description: "The line item's name in the checkout summary.",
+        kind: "text",
+      },
+      {
+        key: "contribution_description",
+        label: "Contribution Description",
+        description:
+          "Shown under that line, where the buyer decides whether the charge is fair.",
+        kind: "text",
+      },
+    ],
+  },
+  {
     title: "Open Checkout Redirects",
     description:
       "Where a buyer lands after paying through this flow. Leave empty to keep them on the portal thank-you page.",

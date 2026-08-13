@@ -3963,6 +3963,12 @@ export type SalesFlowCreate = {
     allows_scholarship?: (boolean | null);
     allows_incentive?: (boolean | null);
     allows_coupons?: (boolean | null);
+    insurance_enabled?: (boolean | null);
+    insurance_percentage?: (number | string | null);
+    contribution_enabled?: (boolean | null);
+    contribution_percentage?: (number | string | null);
+    contribution_label?: (string | null);
+    contribution_description?: (string | null);
     open_checkout_success_url?: (string | null);
     open_checkout_cancel_url?: (string | null);
     open_checkout_signing_secret?: (string | null);
@@ -4016,6 +4022,12 @@ export type SalesFlowPublic = {
     allows_scholarship?: (boolean | null);
     allows_incentive?: (boolean | null);
     allows_coupons?: (boolean | null);
+    insurance_enabled?: (boolean | null);
+    insurance_percentage?: (string | null);
+    contribution_enabled?: (boolean | null);
+    contribution_percentage?: (string | null);
+    contribution_label?: (string | null);
+    contribution_description?: (string | null);
     open_checkout_success_url?: (string | null);
     open_checkout_cancel_url?: (string | null);
     open_checkout_signing_secret?: (string | null);
@@ -4079,6 +4091,12 @@ export type SalesFlowUpdate = {
     allows_scholarship?: (boolean | null);
     allows_incentive?: (boolean | null);
     allows_coupons?: (boolean | null);
+    insurance_enabled?: (boolean | null);
+    insurance_percentage?: (number | string | null);
+    contribution_enabled?: (boolean | null);
+    contribution_percentage?: (number | string | null);
+    contribution_label?: (string | null);
+    contribution_description?: (string | null);
     open_checkout_success_url?: (string | null);
     open_checkout_cancel_url?: (string | null);
     open_checkout_signing_secret?: (string | null);
