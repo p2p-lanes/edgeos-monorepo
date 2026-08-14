@@ -1,5 +1,5 @@
 import { useForm } from "@tanstack/react-form"
-import { useMutation, useQueryClient } from "@tanstack/react-query"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useNavigate } from "@tanstack/react-router"
 import {
   Hash,
@@ -144,6 +144,12 @@ export function SalesFlowForm({
   // Everything starts closed. The answers are all on screen either way, and
   // opening one is a decision to change it rather than to read it.
   const [openSections, setOpenSections] = useState<string[]>([])
+
+  const { data: settingsByType } = useQuery({
+    queryKey: ["sales-flows", "settings-by-type"],
+    queryFn: () => SalesFlowsService.listSettingsByType(),
+    staleTime: Number.POSITIVE_INFINITY,
+  })
   const [restrictionRuleError, setRestrictionRuleError] = useState<string>()
 
   const handleMutationError = (err: ApiError) => {
@@ -483,8 +489,14 @@ export function SalesFlowForm({
           {([flowType, config]) => (
             <div className="overflow-hidden rounded-xl border">
               {CONFIG_SECTIONS.map((section) => {
+                // Which settings this kind of flow can use is the server's
+                // answer, not a second opinion kept here. It already decides
+                // what a new flow is seeded with and what a copy carries
+                // across; a copy of it deciding what to render would drift,
+                // and the screen would offer settings the server never keeps.
+                const usable = settingsByType?.settings[flowType as string]
                 const fields = section.fields.filter(
-                  (f) => !f.appliesTo || f.appliesTo === flowType,
+                  (f) => !usable || usable.includes(f.key),
                 )
                 if (fields.length === 0) return null
 

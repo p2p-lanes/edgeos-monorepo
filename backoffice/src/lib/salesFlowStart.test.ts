@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest"
 import type { SalesFlowPublic } from "@/client"
 import {
   notCarriedAcross,
-  START_EMPTY,
   START_FRESH,
   slugifyFlowName,
   startChoicesFor,
@@ -33,17 +32,19 @@ const DOORS = [
 ]
 
 describe("startChoicesFor", () => {
-  it("always offers a fresh start and nothing at all", () => {
+  it("always offers starting from nothing", () => {
+    // One option, not two. "A fresh one" and "nothing at all" were the same
+    // thing under different names once a kind of flow stopped carrying
+    // preset values.
     const { offered } = startChoicesFor("application", [])
-    expect(offered.map((o) => o.id)).toEqual([START_FRESH, START_EMPTY])
+    expect(offered.map((o) => o.id)).toEqual([START_FRESH])
   })
 
   it("offers only doors that can produce the kind being opened", () => {
     const { offered } = startChoicesFor("direct", DOORS)
     expect(offered.map((o) => o.name)).toEqual([
-      "A fresh one",
-      "A copy of Sponsors",
       "Nothing at all",
+      "A copy of Sponsors",
     ])
   })
 

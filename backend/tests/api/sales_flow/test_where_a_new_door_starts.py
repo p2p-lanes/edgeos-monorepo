@@ -23,7 +23,6 @@ from sqlmodel import Session, select
 from app.api.popup.models import Popups
 from app.api.sales_flow.crud import sales_flows_crud
 from app.api.sales_flow.models import SalesFlows
-from app.api.sales_flow.templates import FLOW_TEMPLATES, TEMPLATABLE_FIELDS
 from app.api.shared.enums import SaleType
 from app.api.tenant.models import Tenants
 
@@ -90,36 +89,6 @@ def _partner_default(db: Session, popup: Popups) -> SalesFlows:
     )
 
 
-class TestTemplatesAreWellFormed:
-    def test_every_template_names_real_settings(self) -> None:
-        """A typo here is a default that silently never applies."""
-        for flow_type, template in FLOW_TEMPLATES.items():
-            unknown = set(template.values) - TEMPLATABLE_FIELDS
-            assert not unknown, f"{flow_type} names non-settings: {unknown}"
-
-    def test_a_template_only_sets_what_its_kind_can_read(self) -> None:
-        from app.api.sales_flow.schemas import fields_for
-
-        for flow_type, template in FLOW_TEMPLATES.items():
-            allowed = set(fields_for(flow_type))
-            assert set(template.values) <= allowed
-
-    def test_no_template_charges_money_or_sends_email(self) -> None:
-        """The rule that keeps these thin. A default nobody asked for must not
-        bill a buyer or mail an applicant."""
-        forbidden = {
-            "insurance_enabled",
-            "contribution_enabled",
-            "installments_enabled",
-            "requires_application_fee",
-            "abandoned_cart_delay_days",
-            "purchase_reminder_delay_days",
-            "abandoned_application_delay_days",
-        }
-        for flow_type, template in FLOW_TEMPLATES.items():
-            assert not (set(template.values) & forbidden), flow_type
-
-
 class TestStartingFresh:
     def test_fresh_ignores_the_door_already_selling(
         self, db: Session, tenant_a: Tenants
@@ -135,22 +104,14 @@ class TestStartingFresh:
         assert flow.installments_enabled is None
         assert flow.installments_max is None
 
-    def test_fresh_still_brings_its_own_kind_of_defaults(
-        self, db: Session, tenant_a: Tenants
-    ) -> None:
+    def test_fresh_brings_nothing_at_all(self, db: Session, tenant_a: Tenants) -> None:
+        """`fresh` and `empty` used to be different on the theory that a kind
+        of flow could carry preset values. It cannot carry many worth having,
+        so they were the same thing twice."""
         popup = _popup(db, tenant_a)
         _partner_default(db, popup)
 
         flow = _seed(db, popup, SaleType.application.value, "fresh")
-
-        assert flow.application_layout == "multi_step"
-        assert flow.allows_coupons is True
-
-    def test_empty_brings_nothing_at_all(self, db: Session, tenant_a: Tenants) -> None:
-        popup = _popup(db, tenant_a)
-        _partner_default(db, popup)
-
-        flow = _seed(db, popup, SaleType.application.value, "empty")
 
         assert flow.application_layout is None
         assert flow.allows_coupons is None
@@ -270,7 +231,7 @@ class TestThePreviewMatchesWhatYouGet:
         assert resp.status_code == 200, resp.text
         return resp.json()
 
-    @pytest.mark.parametrize("start_from", ["fresh", "empty", None])
+    @pytest.mark.parametrize("start_from", ["fresh", None])
     def test_the_preview_is_what_creation_produces(
         self,
         client: TestClient,
@@ -405,16 +366,14 @@ class TestCreatingThroughTheApi:
         assert resp.status_code == 201, resp.text
         body = resp.json()
         assert body["contribution_enabled"] is None
-        assert body["application_layout"] == "multi_step"
+        assert body["installments_enabled"] is None
 
-    @pytest.mark.parametrize("start_from", ["fresh", "empty"])
     def test_a_door_that_starts_clean_still_has_a_checkout(
         self,
         client: TestClient,
         db: Session,
         tenant_a: Tenants,
         admin_token_tenant_a: str,
-        start_from: str,
     ) -> None:
         """Somebody asking to start fresh is asking about settings. A door
         with no steps renders nothing and sells nothing, which is not what
@@ -432,7 +391,7 @@ class TestCreatingThroughTheApi:
                 "type": "application",
                 "slug": f"clean-{uuid.uuid4().hex[:6]}",
                 "name": "Clean",
-                "start_from": start_from,
+                "start_from": "fresh",
             },
         )
 
@@ -477,3 +436,55 @@ class TestCreatingThroughTheApi:
             )
         ).all()
         assert steps == []
+
+
+class TestWhatEachKindOfFlowOffers:
+    """The backoffice asks rather than deciding for itself.
+
+    Which settings a kind of flow can use already decides what a new one is
+    seeded with and what a copy carries across. A second copy of that
+    knowledge in the frontend, deciding what gets rendered, would eventually
+    disagree — and the screen would offer a setting the server never keeps.
+    """
+
+    def _ask(self, client: TestClient, token: str) -> dict[str, list[str]]:
+        resp = client.get(
+            "/api/v1/sales-flows/settings-by-type",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert resp.status_code == 200, resp.text
+        return resp.json()["settings"]
+
+    def test_it_answers_for_every_kind(
+        self, client: TestClient, admin_token_tenant_a: str
+    ) -> None:
+        settings = self._ask(client, admin_token_tenant_a)
+        assert set(settings) == {"application", "direct", "upsale"}
+
+    def test_it_matches_what_seeding_uses(
+        self, client: TestClient, admin_token_tenant_a: str
+    ) -> None:
+        """Served from `fields_for`, not from a second list beside it."""
+        from app.api.sales_flow.schemas import fields_for
+
+        settings = self._ask(client, admin_token_tenant_a)
+        for flow_type, names in settings.items():
+            assert names == list(fields_for(flow_type))
+
+    def test_a_flow_nobody_applies_to_is_not_asked_about_applications(
+        self, client: TestClient, admin_token_tenant_a: str
+    ) -> None:
+        settings = self._ask(client, admin_token_tenant_a)
+        assert "requires_application_fee" not in settings["direct"]
+        assert "allows_scholarship" not in settings["upsale"]
+
+    def test_a_reviewed_flow_is_not_asked_where_to_redirect(
+        self, client: TestClient, admin_token_tenant_a: str
+    ) -> None:
+        """The gap this endpoint closes. The purchase path refuses an
+        application flow outright, so its success URL and signing secret can
+        never be read — and the editor was offering all three."""
+        settings = self._ask(client, admin_token_tenant_a)
+        assert "open_checkout_success_url" not in settings["application"]
+        assert "open_checkout_signing_secret" not in settings["application"]
+        assert "open_checkout_signing_secret" in settings["direct"]

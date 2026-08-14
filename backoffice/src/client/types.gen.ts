@@ -1994,6 +1994,26 @@ export type EventVenueUpdate = {
 export type EventVisibility = 'public' | 'private' | 'unlisted';
 
 /**
+ * Which settings each kind of flow can use.
+ *
+ * What a kind of flow decides is not a set of preset values — it is which
+ * questions are worth asking at all. A flow nobody applies to has no
+ * application fee to charge and no half-finished draft to chase; one that
+ * never sells anonymously has nowhere to redirect a buyer and nothing to
+ * sign on the way.
+ *
+ * Served rather than duplicated in the backoffice. That knowledge already
+ * decides what gets seeded (`fields_for`) and what a copy carries across, so
+ * a second copy deciding what gets rendered would eventually disagree with
+ * it — and the screen would offer a setting the server would never keep.
+ */
+export type FlowSettingsByType = {
+    settings: {
+        [key: string]: Array<(string)>;
+    };
+};
+
+/**
  * What a way in would begin with, before anyone commits to opening it.
  *
  * Computed by the same code that seeds the flow, so a screen cannot promise
@@ -7605,6 +7625,12 @@ export type SalesFlowsListSalesFlowReadinessData = {
 };
 
 export type SalesFlowsListSalesFlowReadinessResponse = (Array<SalesFlowReadiness>);
+
+export type SalesFlowsListSettingsByTypeData = {
+    xTenantId?: (string | null);
+};
+
+export type SalesFlowsListSettingsByTypeResponse = (FlowSettingsByType);
 
 export type SalesFlowsPreviewSalesFlowStartData = {
     popupId: string;

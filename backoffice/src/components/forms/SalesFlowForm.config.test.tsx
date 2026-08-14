@@ -21,6 +21,7 @@ vi.mock("@/client", () => ({
   SalesFlowsService: {
     updateSalesFlow: vi.fn(),
     deleteSalesFlow: vi.fn(),
+    listSettingsByType: vi.fn(),
   },
 }))
 
@@ -48,6 +49,48 @@ import { SalesFlowsService } from "@/client"
 import { SalesFlowForm } from "./SalesFlowForm"
 
 const mockUpdateSalesFlow = vi.mocked(SalesFlowsService.updateSalesFlow)
+const mockSettingsByType = vi.mocked(SalesFlowsService.listSettingsByType)
+
+/**
+ * Which settings a kind of flow can use is the server's answer now, so the
+ * editor asks for it. Both sets are named here rather than sampled: the whole
+ * point is that a reviewed flow is never offered a signing secret it can
+ * never read, and a shop is never offered a scholarship toggle.
+ */
+const SETTINGS_BY_TYPE = {
+  settings: {
+    application: [
+      "application_layout",
+      "requires_application_fee",
+      "application_fee_amount",
+      "allows_scholarship",
+      "allows_incentive",
+      "allows_coupons",
+      "abandoned_cart_delay_days",
+      "abandoned_cart_repeat_days",
+      "abandoned_cart_max_count",
+      "purchase_reminder_delay_days",
+      "purchase_reminder_repeat_days",
+      "purchase_reminder_max_count",
+      "abandoned_application_delay_days",
+      "abandoned_application_repeat_days",
+      "abandoned_application_max_count",
+    ],
+    direct: [
+      "allows_coupons",
+      "open_checkout_success_url",
+      "open_checkout_cancel_url",
+      "open_checkout_signing_secret",
+      "abandoned_cart_delay_days",
+      "abandoned_cart_repeat_days",
+      "abandoned_cart_max_count",
+      "purchase_reminder_delay_days",
+      "purchase_reminder_repeat_days",
+      "purchase_reminder_max_count",
+    ],
+    upsale: ["allows_coupons"],
+  },
+}
 
 const FLOW_BASE = {
   id: "flow-1",
@@ -108,6 +151,7 @@ describe("SalesFlowForm - flow-owned settings", () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockUpdateSalesFlow.mockResolvedValue(FLOW_BASE as FlowDefaults)
+    mockSettingsByType.mockResolvedValue(SETTINGS_BY_TYPE as never)
   })
 
   it("never offers a settings value a second source", async () => {
@@ -184,6 +228,22 @@ describe("SalesFlowForm - flow-owned settings", () => {
     // Every field of that cadence is application-only, so the whole heading
     // goes with them — an empty section reads as a missing feature.
     expect(screen.queryByText(/abandoned application/i)).not.toBeInTheDocument()
+  })
+
+  it("never offers a reviewed flow somewhere to redirect", async () => {
+    /* The purchase path refuses an application flow outright, so its success
+       URL and signing secret can never be read. The editor offered all three
+       until the server started saying which settings each kind can use. */
+    renderForm({ type: "application" as never })
+    await openGroup("Application Settings")
+
+    await screen.findByLabelText(/scholarship/i)
+
+    expect(
+      screen.queryByText(/open checkout redirects/i),
+    ).not.toBeInTheDocument()
+    expect(screen.queryByLabelText(/success url/i)).not.toBeInTheDocument()
+    expect(screen.queryByLabelText(/signing secret/i)).not.toBeInTheDocument()
   })
 
   it("keeps the cadences that apply to any sale", async () => {

@@ -15,14 +15,6 @@ export interface ConfigFieldConfig {
   description?: string
   kind: ConfigFieldKind
   options?: { value: string; label: string }[]
-  /**
-   * Only shown on flows of this type. Absent means every flow.
-   *
-   * A direct sale never produces an application, so a scholarship toggle or
-   * an abandoned-application cadence there is configuration that can never
-   * run — the same reason the API refuses an approval strategy on one.
-   */
-  appliesTo?: "application"
 }
 
 export const CONFIG_SECTIONS: {
@@ -35,7 +27,6 @@ export const CONFIG_SECTIONS: {
     fields: [
       {
         key: "application_layout",
-        appliesTo: "application",
         label: "Application Layout",
         description:
           "Whether applicants answer the whole form on one page or step through it.",
@@ -47,21 +38,18 @@ export const CONFIG_SECTIONS: {
       },
       {
         key: "requires_application_fee",
-        appliesTo: "application",
         label: "Requires Application Fee",
         description: "Charge applicants before their application is reviewed.",
         kind: "boolean",
       },
       {
         key: "application_fee_amount",
-        appliesTo: "application",
         label: "Application Fee Amount",
         description: "What that fee costs.",
         kind: "currency",
       },
       {
         key: "allows_scholarship",
-        appliesTo: "application",
         label: "Allows Scholarship",
         description:
           "Let applicants ask for a reduced price as part of applying.",
@@ -72,7 +60,6 @@ export const CONFIG_SECTIONS: {
         label: "Allows Incentive",
         description: "Let applicants be offered a discount on acceptance.",
         kind: "boolean",
-        appliesTo: "application",
       },
     ],
   },
@@ -314,21 +301,18 @@ export const CONFIG_SECTIONS: {
     fields: [
       {
         key: "abandoned_application_delay_days",
-        appliesTo: "application",
         label: "Delay (days)",
         description: "How long after their last edit before the first email.",
         kind: "number",
       },
       {
         key: "abandoned_application_repeat_days",
-        appliesTo: "application",
         label: "Every (days)",
         description: "How often to follow up. Empty sends once.",
         kind: "number",
       },
       {
         key: "abandoned_application_max_count",
-        appliesTo: "application",
         label: "Max sends",
         description: "Stop after this many emails.",
         kind: "number",

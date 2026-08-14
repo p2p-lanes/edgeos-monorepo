@@ -18,9 +18,15 @@ from app.api.shared.crud import BaseCRUD
 
 DEFAULT_FLOW_SLUG = "default"
 
-# The two starting points that are not an existing way in.
+# The starting point that is not an existing flow: take nothing from anywhere.
+#
+# There used to be two, `fresh` and `empty`, on the theory that a kind of flow
+# could carry sensible preset values. It could not carry many: a default
+# nobody asked for must not charge a buyer or mail an applicant, and once
+# those are excluded almost nothing legitimate is left. What a kind of flow
+# actually decides is which settings it OFFERS — see `fields_for` — so the two
+# were the same thing under different names.
 START_FRESH = "fresh"
-START_EMPTY = "empty"
 
 
 @dataclass(frozen=True)
@@ -320,9 +326,8 @@ class SalesFlowsCRUD(BaseCRUD[SalesFlows, SalesFlowCreate, SalesFlowUpdate]):
         - ``None``   the way in this gathering already sells through. What
                      every caller did before this existed, so an API client
                      that has not moved keeps its behaviour exactly.
-        - ``fresh``  the defaults for this kind of door and nothing else — no
-                     sibling's contribution, no sibling's installment plan.
-        - ``empty``  nothing at all.
+        - ``fresh``  nothing carried over: no sibling's contribution, no
+                     sibling's installment plan, no sibling's landing page.
         - a flow id  that door, so this one inherits the decisions somebody
                      already made about this gathering.
 
@@ -332,15 +337,9 @@ class SalesFlowsCRUD(BaseCRUD[SalesFlows, SalesFlowCreate, SalesFlowUpdate]):
         external thank-you page verifies orders against.
         """
         from app.api.popup.models import Popups  # noqa: PLC0415
-        from app.api.sales_flow.templates import template_values  # noqa: PLC0415
-
-        if start_from == START_EMPTY:
-            return StartingPoint(kind=START_EMPTY, name=None, values={})
 
         if start_from == START_FRESH:
-            return StartingPoint(
-                kind=START_FRESH, name=None, values=template_values(flow_type)
-            )
+            return StartingPoint(kind=START_FRESH, name=None, values={})
 
         if start_from:
             try:

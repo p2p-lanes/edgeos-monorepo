@@ -15,13 +15,15 @@ import type { SalesFlowPublic, SalesFlowType } from "@/client"
  * partner's payment terms on a reviewed door has to retype them.
  */
 
+// The one starting point that is not an existing flow. There used to be two,
+// on the theory that a kind of flow could carry preset values; it cannot carry
+// many worth having, so they were the same thing twice.
 export const START_FRESH = "fresh"
-export const START_EMPTY = "empty"
 
 export interface StartOption {
   /** What goes in `start_from`: "fresh", "empty", or a flow id. */
   id: string
-  kind: "fresh" | "copy" | "empty"
+  kind: "fresh" | "copy"
   name: string
   description: string
   /** Only for copies: this door is of a different kind to the one being made. */
@@ -56,9 +58,9 @@ export const TYPE_COPY: Record<
 
 const FRESH_COPY: Record<SalesFlowType, string> = {
   application:
-    "A clean reviewed flow. Nothing carried over from your other flows.",
-  direct: "A clean shop. Nothing carried over from your other flows.",
-  upsale: "A clean add-on. Nothing carried over from your other flows.",
+    "Every setting empty. Only the ones a reviewed flow can use are offered.",
+  direct: "Every setting empty. Only the ones a shop can use are offered.",
+  upsale: "Every setting empty. Only the ones an add-on can use are offered.",
 }
 
 /** What a door of this kind cannot use, so a cross-kind copy leaves it behind. */
@@ -96,19 +98,10 @@ export function startChoicesFor(
   const fresh: StartOption = {
     id: START_FRESH,
     kind: "fresh",
-    name: "A fresh one",
+    name: "Nothing at all",
     description: FRESH_COPY[flowType],
     crossKind: false,
   }
-  const empty: StartOption = {
-    id: START_EMPTY,
-    kind: "empty",
-    name: "Nothing at all",
-    description:
-      "Every setting empty. The flow sells nothing until you say so.",
-    crossKind: false,
-  }
-
   const asCopy = (flow: SalesFlowPublic, crossKind: boolean): StartOption => ({
     id: flow.id,
     kind: "copy",
@@ -122,7 +115,7 @@ export function startChoicesFor(
   const otherKinds = flows.filter((f) => f.type !== flowType)
 
   return {
-    offered: [fresh, ...sameKind.map((f) => asCopy(f, false)), empty],
+    offered: [fresh, ...sameKind.map((f) => asCopy(f, false))],
     otherKinds: otherKinds.map((f) => asCopy(f, true)),
   }
 }

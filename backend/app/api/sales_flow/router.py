@@ -7,11 +7,12 @@ from sqlmodel import Session, select
 
 from app.api.popup_reviewer.crud import popup_reviewers_crud
 from app.api.sales_flow import crud
-from app.api.sales_flow.crud import START_EMPTY, START_FRESH
+from app.api.sales_flow.crud import START_FRESH
 from app.api.sales_flow.models import SalesFlows
 from app.api.sales_flow.readiness import flow_readiness
 from app.api.sales_flow.schemas import (
     EFFECTIVE_CONFIG_FIELDS,
+    FlowSettingsByType,
     FlowStartPreview,
     SalesFlowCreate,
     SalesFlowPortalPublic,
@@ -124,6 +125,28 @@ async def list_sales_flow_readiness(
         db, popup_id=popup_id, limit=100
     )
     return [flow_readiness(db, flow) for flow in flows]
+
+
+@router.get("/settings-by-type", response_model=FlowSettingsByType)
+async def list_settings_by_type(
+    _db: TenantSession,
+    _: CurrentOperator,
+) -> FlowSettingsByType:
+    """Which settings each kind of flow can use (BO only).
+
+    Static, and deliberately not a constant in the backoffice: the same
+    knowledge decides what a new flow is seeded with and what a copy carries
+    across, so the screen that renders the fields reads it from the one place
+    that already owns it.
+
+    Declared before `/{flow_id}`, like every other literal path here.
+    """
+    return FlowSettingsByType(
+        settings={
+            flow_type.value: list(fields_for(flow_type.value))
+            for flow_type in SalesFlowType
+        }
+    )
 
 
 @router.get("/preview", response_model=FlowStartPreview)
@@ -241,11 +264,10 @@ async def create_sales_flow(
     # about SETTINGS, and would not expect the answer to be a way in that
     # cannot open.
     #
-    # Only for those two, which are new values. A caller that omits
-    # `start_from` is on the historical path, where the client copies steps
-    # from a source flow itself — seeding here as well would give it two of
-    # everything.
-    if flow_in.start_from in (START_FRESH, START_EMPTY):
+    # Only for that value, which is new. A caller that omits `start_from` is
+    # on the historical path, where the client copies steps from a source flow
+    # itself — seeding here as well would give it two of everything.
+    if flow_in.start_from == START_FRESH:
         seed_ticketing_steps_for_popup(
             db,
             popup_id=flow.popup_id,
