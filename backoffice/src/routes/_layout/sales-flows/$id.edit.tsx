@@ -8,7 +8,6 @@ import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
 import { SalesFlowForm } from "@/components/forms/SalesFlowForm"
 import { SalesFlowScopeBanner } from "@/components/forms/SalesFlowScopeBanner"
 import { SalesFlowUrlCard } from "@/components/forms/SalesFlowUrlCard"
-import { FlowDiffCard } from "@/components/SalesFlows/FlowDiffCard"
 import { FlowSectionLinks } from "@/components/SalesFlows/FlowSectionLinks"
 import { InlineSection } from "@/components/ui/inline-form"
 import { Separator } from "@/components/ui/separator"
@@ -50,8 +49,6 @@ function EditSalesFlowContent({ flowId }: { flowId: string }) {
         popupSlug={popup?.slug}
         flow={salesFlow}
       />
-
-      <FlowDiffCard flow={salesFlow} popupId={salesFlow.popup_id} />
 
       <SalesFlowForm
         popupId={salesFlow.popup_id}

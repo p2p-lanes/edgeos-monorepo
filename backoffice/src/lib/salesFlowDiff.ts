@@ -5,26 +5,33 @@ import {
 } from "@/lib/salesFlowConfigSections"
 
 /**
- * What makes this way in different from the one it was copied from.
+ * How one way in differs from another, for the moment a starting point is
+ * being chosen.
  *
- * A flow is born as a copy: `seed_config_from_popup` fills every unset column
- * from the popup's default flow. So the useful question about a door is never
- * "what are the values of these thirty-three settings" — thirty of them say
- * exactly what the original said. It is "what did somebody change".
+ * WHERE THIS BELONGS: the creation screen, answering "what do I get if I
+ * start from this door" while somebody is deciding. Not the editor.
  *
- * That also answers the one question the editor could never answer on its
- * own: is this how I set it up, or is this just how it came?
+ * It was in the editor and came out, for a reason worth keeping written down.
+ * This compares two LIVE rows, so the answer is a property of a pair rather
+ * than of a door — and the other half moves. Sponsors reads "13 settings
+ * changed" today; edit Attendee's coupon policy tomorrow and Sponsors reads
+ * 14, with nobody having opened Sponsors. A number that changes when you did
+ * not touch the thing is worse than no number, and on a configuration screen
+ * it is actively misleading.
  *
- * The baseline is always the default flow, because that is what the backend
- * copies from. There is no stored lineage to consult and none is needed.
+ * At creation the same comparison is sound, because it is momentary: it
+ * describes a choice being made now, not a standing claim about a door.
  *
- * SCOPE, and it matters: this compares what the flow row holds — its identity
- * and its configuration. It does NOT compare steps or the products on sale,
- * which live in `ticketing_steps` behind another request. Running this against
- * real doors is what surfaced that: a volunteers door whose whole point is
- * "one pass, no merch" came back as an exact copy, because none of that is
- * configuration. The phrasing says "configured like" for exactly that reason,
- * and the steps comparison is the next piece.
+ * If "did I change this, or did it come this way" is ever asked for again,
+ * the answer is not this function. It is to store what the flow was seeded
+ * with when it was born and compare against that — stable, belonging to one
+ * door, and unmoved by edits elsewhere.
+ *
+ * SCOPE: compares what the flow row holds, its identity and its configuration.
+ * It does NOT compare steps or the products on sale, which live in
+ * `ticketing_steps` behind another request. Real doors are what surfaced
+ * that — a volunteers door whose whole point is "one pass, no merch" came
+ * back as an exact copy, because none of that is configuration.
  */
 
 export interface FlowDifference {
