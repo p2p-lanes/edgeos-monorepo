@@ -45,7 +45,9 @@ class TestPopupCreateProvisionsDefaultFlow:
         assert flow.is_default is True
         assert flow.type == "direct"
         assert flow.slug == "default"
-        assert flow.name == "Default"
+        # Named for what it does. The slug stays "default" — that one is a URL
+        # and an operator may already have shared it.
+        assert flow.name == "Checkout"
         assert flow.visibility == "portal_listed"
         assert flow.reviewers_mode == "inherit"
 

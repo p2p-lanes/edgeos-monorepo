@@ -15,7 +15,25 @@ from app.api.sales_flow.schemas import (
 from app.api.shared.crud import BaseCRUD
 
 DEFAULT_FLOW_SLUG = "default"
-DEFAULT_FLOW_NAME = "Default"
+
+# What a popup's first flow is called, by what it does. A buyer sees this name
+# on the door card, and "Default" told them nothing — it named the row's place
+# in the schema, not the way in.
+#
+# Keyed on the FLOW's type rather than the popup's sale_type on purpose. The
+# popup-level application/festival split is on its way out precisely because a
+# flow already carries that distinction, so the name has to come from the thing
+# that survives.
+DEFAULT_FLOW_NAMES = {
+    "application": "Attendee",
+    "direct": "Checkout",
+}
+DEFAULT_FLOW_NAME_FALLBACK = "Checkout"
+
+
+def default_flow_name(flow_type: str) -> str:
+    """The name a popup's first flow is created with."""
+    return DEFAULT_FLOW_NAMES.get(str(flow_type), DEFAULT_FLOW_NAME_FALLBACK)
 
 
 def resolve_default_flow_slug(
@@ -180,7 +198,7 @@ class SalesFlowsCRUD(BaseCRUD[SalesFlows, SalesFlowCreate, SalesFlowUpdate]):
             popup_id=popup_id,
             type=sale_type,
             slug=slug,
-            name=DEFAULT_FLOW_NAME,
+            name=default_flow_name(sale_type),
             visibility=SalesFlowVisibility.portal_listed,
             is_default=True,
             order=0,
