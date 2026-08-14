@@ -166,6 +166,8 @@ async def preview_link(
     never names its owner: it is a public URL and the owner is a private
     individual (spec: referral preview returns no PII of the referrer).
     """
+    from app.api.sales_flow.resolver import config_for  # noqa: PLC0415
+
     response.headers["Cache-Control"] = "no-store"
     _no_store = {"Cache-Control": "no-store"}
 
@@ -193,10 +195,15 @@ async def preview_link(
         popup = popups_crud.get(db, link.popup_id)
         ensure_popup_link_active(popup)
         if popup is not None:
+            # Both flags belong to the flow this link lands people in, not to
+            # the event: a door can share while another does not.
+            config = config_for(
+                db, sales_flow_id=link.sales_flow_id, popup_id=link.popup_id
+            )
             enabled = (
-                popup.referrals_enabled
+                config.referrals_enabled
                 if link.is_portal_created
-                else popup.invites_enabled
+                else config.invites_enabled
             )
             if not enabled:
                 raise HTTPException(
@@ -601,11 +608,13 @@ async def create_my_link(
 ) -> InvitePublic:
     """Portal: create this attendee's link for a popup.
 
-    Spec: REQ-GR-008 (entity), REQ-GR-026 (popup.referrals_enabled gate).
+    Spec: REQ-GR-008 (entity), REQ-GR-026 (the attendee-links gate,
+    which belongs to the flow the sharer came through).
     Token auto-generated when omitted. 409 if (popup_id, token) collides.
     """
     from app.api.attendee.crud import attendees_crud
     from app.api.popup.crud import popups_crud
+    from app.api.sales_flow.resolver import config_for  # noqa: PLC0415
 
     popup = popups_crud.get(db, body.popup_id)
     if not popup:
@@ -613,10 +622,16 @@ async def create_my_link(
             status_code=status.HTTP_404_NOT_FOUND, detail="Popup not found"
         )
 
-    if not popup.referrals_enabled:
+    # The door this attendee came through is the one they would be sharing,
+    # so it is the one that decides whether they may — and at what rate.
+    link_flow_id = invites_crud._flow_for_attendee_link(
+        db, body.popup_id, current_human.id
+    )
+    link_config = config_for(db, sales_flow_id=link_flow_id, popup_id=popup.id)
+    if not link_config.referrals_enabled:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Attendee links are not enabled for this popup",
+            detail="Attendee links are not enabled for this way in",
         )
 
     # Anti-abuse gate: only attendees who actually hold a ticket may create a
@@ -646,7 +661,7 @@ async def create_my_link(
         body,
         tenant_id=popup.tenant_id,
         referrer_human_id=current_human.id,
-        max_uses_override=popup.max_referrals_per_attendee,
+        max_uses_override=link_config.max_referrals_per_attendee,
     )
     return InvitePublic.model_validate(link)
 

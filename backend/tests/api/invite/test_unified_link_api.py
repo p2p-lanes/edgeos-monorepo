@@ -22,7 +22,7 @@ from app.api.product.models import Products
 from app.api.tenant.models import Tenants
 from app.api.user.models import Users
 from app.core.security import create_access_token
-from tests._flow_helpers import invite_flow_id, provision_default_flow
+from tests._flow_helpers import invite_flow_id, provision_default_flow, set_link_policy
 
 
 def _human_token(human: Humans) -> str:
@@ -181,7 +181,7 @@ class TestPortalLinkEndpoints:
     ) -> None:
         """max_referrals_per_attendee is the popup's call, not the attendee's."""
         popup = _make_popup(db, tenant_a)
-        popup.max_referrals_per_attendee = 3
+        set_link_policy(db, popup, max_referrals_per_attendee=3)
         db.add(popup)
         db.commit()
         human = _make_human(db, tenant_a)
@@ -293,7 +293,7 @@ class TestUnifiedPreview:
         )
         token = created.json()["token"]
 
-        popup.referrals_enabled = False
+        set_link_policy(db, popup, referrals_enabled=False)
         popup.invites_enabled = True
         db.add(popup)
         db.commit()

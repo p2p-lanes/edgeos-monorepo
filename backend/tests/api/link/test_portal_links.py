@@ -31,7 +31,7 @@ from app.api.product.models import Products
 from app.api.tenant.models import Tenants
 from app.api.user.models import Users
 from app.core.security import create_access_token
-from tests._flow_helpers import invite_flow_id, provision_default_flow
+from tests._flow_helpers import invite_flow_id, provision_default_flow, set_link_policy
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -865,10 +865,7 @@ class TestPerPopupReferralLimit:
     ) -> None:
         """Popup config max_referrals_per_attendee=5 sets max_uses=5 on the new referral."""
         popup = _make_popup(db, tenant_a)
-        popup.max_referrals_per_attendee = 5
-        db.add(popup)
-        db.commit()
-        db.refresh(popup)
+        set_link_policy(db, popup, max_referrals_per_attendee=5)
 
         human = _make_human(db, tenant_a)
         _give_ticket(db, popup, human)
@@ -890,10 +887,7 @@ class TestPerPopupReferralLimit:
     ) -> None:
         """Popup max_referrals_per_attendee=null → max_uses=null (unlimited)."""
         popup = _make_popup(db, tenant_a)
-        popup.max_referrals_per_attendee = None
-        db.add(popup)
-        db.commit()
-        db.refresh(popup)
+        set_link_policy(db, popup, max_referrals_per_attendee=None)
 
         human = _make_human(db, tenant_a)
         _give_ticket(db, popup, human)
@@ -913,12 +907,9 @@ class TestPerPopupReferralLimit:
         db: Session,
         tenant_a: Tenants,
     ) -> None:
-        """Popup config max_uses=3 overrides any body-provided max_uses."""
+        """The flow's ceiling overrides any body-provided max_uses."""
         popup = _make_popup(db, tenant_a)
-        popup.max_referrals_per_attendee = 3
-        db.add(popup)
-        db.commit()
-        db.refresh(popup)
+        set_link_policy(db, popup, max_referrals_per_attendee=3)
 
         human = _make_human(db, tenant_a)
         _give_ticket(db, popup, human)

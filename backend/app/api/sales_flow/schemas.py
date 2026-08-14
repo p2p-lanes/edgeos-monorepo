@@ -158,6 +158,8 @@ class SalesFlowBase(SQLModel):
     # An invite already names the flow it lands its recipient in, and the
     # check-in email's template is flow-owned, so the timing follows it.
     invites_enabled: bool | None = Field(default=None, nullable=True)
+    referrals_enabled: bool | None = Field(default=None, nullable=True)
+    max_referrals_per_attendee: int | None = Field(default=None, nullable=True)
     checkin_pass_lead_days: int | None = Field(default=None, nullable=True)
     open_checkout_success_url: str | None = Field(default=None, nullable=True)
     open_checkout_cancel_url: str | None = Field(default=None, nullable=True)
@@ -203,6 +205,8 @@ class SalesFlowCreate(BaseModel):
     installments_interval: InstallmentInterval | None = None
     installments_interval_count: int | None = None
     invites_enabled: bool | None = None
+    referrals_enabled: bool | None = None
+    max_referrals_per_attendee: int | None = None
     checkin_pass_lead_days: int | None = None
     open_checkout_success_url: str | None = None
     open_checkout_cancel_url: str | None = None
@@ -271,6 +275,8 @@ class SalesFlowUpdate(BaseModel):
     installments_interval: InstallmentInterval | None = None
     installments_interval_count: int | None = None
     invites_enabled: bool | None = None
+    referrals_enabled: bool | None = None
+    max_referrals_per_attendee: int | None = None
     checkin_pass_lead_days: int | None = None
     open_checkout_success_url: str | None = None
     open_checkout_cancel_url: str | None = None
@@ -377,6 +383,8 @@ EFFECTIVE_CONFIG_FIELDS: tuple[str, ...] = (
     "installments_interval",
     "installments_interval_count",
     "invites_enabled",
+    "referrals_enabled",
+    "max_referrals_per_attendee",
     "checkin_pass_lead_days",
     "open_checkout_success_url",
     "open_checkout_cancel_url",
@@ -432,6 +440,8 @@ class EffectiveFlowConfig(BaseModel):
     installments_interval: InstallmentInterval | None = None
     installments_interval_count: int | None = None
     invites_enabled: bool | None = None
+    referrals_enabled: bool | None = None
+    max_referrals_per_attendee: int | None = None
     checkin_pass_lead_days: int | None = None
     open_checkout_success_url: str | None = None
     open_checkout_cancel_url: str | None = None

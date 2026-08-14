@@ -495,7 +495,11 @@ class TestPopupFlagGuards:
         popup = _make_popup(db, tenant_a)
         human = _make_human(db, tenant_a)
 
-        assert not popup.referrals_enabled
+        from app.api.sales_flow.crud import sales_flows_crud
+
+        flow = sales_flows_crud.get_default_flow(db, popup.id)
+        assert flow is not None
+        assert not flow.referrals_enabled, "copied from a popup that has them off"
 
         app_data = MagicMock()
         app_data.popup_id = popup.id
@@ -504,6 +508,7 @@ class TestPopupFlagGuards:
         app_data.group_id = None
         app_data.status = None
         app_data.custom_fields = None
+        app_data.sales_flow_id = flow.id
 
         crud_instance = ApplicationsCRUD()
         with pytest.raises(HTTPException) as exc_info:

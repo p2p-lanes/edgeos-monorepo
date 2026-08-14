@@ -129,6 +129,22 @@ def set_installment_terms(db, popup, **terms):
     return flow
 
 
+def set_link_policy(db, popup, **values):
+    """Who may share this way in, and how widely.
+
+    On the flow, which is what the gates read since
+    sdd/sales-flows-rediseno slice 5. Setting `referrals_enabled` or
+    `max_referrals_per_attendee` on the popup only reaches a flow that does
+    not exist yet, through `seed_config_from_popup`.
+    """
+    flow = provision_default_flow(db, popup)
+    for name, value in values.items():
+        setattr(flow, name, value)
+    db.add(flow)
+    db.commit()
+    return flow
+
+
 def offer_category(db, popup, category: str):
     """Give the popup's default flow a step offering `category`.
 

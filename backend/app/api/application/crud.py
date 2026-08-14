@@ -875,7 +875,14 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Invite-based applications are not enabled for this popup",
             )
-        if getattr(app_data, "referral_id", None) and not popup.referrals_enabled:
+        if (
+            getattr(app_data, "referral_id", None)
+            and not config_for(
+                session,
+                sales_flow_id=getattr(app_data, "sales_flow_id", None),
+                popup_id=popup.id,
+            ).referrals_enabled
+        ):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Referral-based applications are not enabled for this popup",
