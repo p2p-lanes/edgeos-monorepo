@@ -338,6 +338,10 @@ class SalesFlowPortalPublic(BaseModel):
     slug: str
     name: str
     order: int
+    # Added deliberately, as this schema's docstring asks. Not configuration:
+    # it is whether this way in asks you to apply or lets you buy, which the
+    # screen reveals the moment it renders.
+    type: SalesFlowType
 
     model_config = ConfigDict(from_attributes=True)
 

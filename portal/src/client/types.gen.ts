@@ -4043,6 +4043,7 @@ export type SalesFlowPortalPublic = {
     slug: string;
     name: string;
     order: number;
+    type: SalesFlowType;
 };
 
 /**

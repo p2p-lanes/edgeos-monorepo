@@ -44,6 +44,9 @@ vi.mock("@/providers/checkoutProvider", () => ({
     editCredit: mockEditCredit,
     isEditing: mockIsEditing,
     editPassesEnabled: true,
+    // The provider resolves this from the door it was told to serve, so the
+    // hook reads it here rather than asking the gathering.
+    checkoutMode: mockCheckoutMode,
     cart: { dynamicItems: mockDynamicItems },
     addDynamicItem: mockAddDynamicItem,
     removeDynamicItem: mockRemoveDynamicItem,

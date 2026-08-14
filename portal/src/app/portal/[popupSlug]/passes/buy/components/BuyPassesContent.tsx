@@ -6,6 +6,8 @@ import { CheckoutBackgroundImage } from "@/components/CheckoutBackgroundImage"
 import { CheckoutBackgroundVideo } from "@/components/CheckoutBackgroundVideo"
 import ScrollyCheckoutFlow from "@/components/checkout-flow/ScrollyCheckoutFlow"
 import { Loader } from "@/components/ui/Loader"
+import { usePortalSalesFlows } from "@/hooks/usePortalSalesFlows"
+import { usePortalUpsaleFlows } from "@/hooks/usePortalUpsaleFlows"
 import { useRequireDoor } from "@/hooks/useRequireDoor"
 import { getCheckoutBackground } from "@/lib/background-image"
 import { CheckoutProvider } from "@/providers/checkoutProvider"
@@ -26,6 +28,17 @@ export default function BuyPassesContent() {
   // its steps, its products, its wording. Absent means the gathering has
   // one door, which is almost all of them.
   const flowId = searchParams.get("flow")
+  // Which kind of door this is. Both listings are already cached by the pages
+  // that brought the buyer here, so this costs no extra request — and an
+  // upsale sells like a shop while an application door sells passes one per
+  // attendee (sdd/sales-flows-rediseno slice 6).
+  const popupIdForFlows = getCity()?.id ? String(getCity()?.id) : undefined
+  const { data: applicationFlows } = usePortalSalesFlows(popupIdForFlows)
+  const { data: upsaleFlows } = usePortalUpsaleFlows(popupIdForFlows)
+  const flowType =
+    [...(applicationFlows ?? []), ...(upsaleFlows ?? [])].find(
+      (flow) => flow.id === flowId,
+    )?.type ?? null
   // Same rule as the passes list: this checkout sells into one
   // application, so it will not open without knowing which.
   const choosingDoor = useRequireDoor(
@@ -55,7 +68,11 @@ export default function BuyPassesContent() {
 
   return (
     <PassesProvider attendees={attendees} restoreFromCart>
-      <CheckoutProvider initialStep="passes" salesFlowId={flowId}>
+      <CheckoutProvider
+        initialStep="passes"
+        salesFlowId={flowId}
+        flowType={flowType}
+      >
         {background.type === "image" && (
           <CheckoutBackgroundImage url={background.url} />
         )}

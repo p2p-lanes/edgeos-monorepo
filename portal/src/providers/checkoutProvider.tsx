@@ -16,7 +16,8 @@ import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 import {
   CHECKOUT_MODE,
-  resolvePopupCheckoutPolicy,
+  type CheckoutMode,
+  resolveFlowCheckoutPolicy,
 } from "@/checkout/popupCheckoutPolicy"
 import {
   ApiError,
@@ -78,6 +79,9 @@ interface CheckoutContextValue {
    * (sdd/sales-flows-rediseno).
    */
   salesFlowId: string | null
+  /** How that door sells. Resolved once here so no section has to ask the
+   *  gathering, which cannot answer for a door that differs from it. */
+  checkoutMode: CheckoutMode
   cart: CheckoutCartState
   summary: CheckoutCartSummary
   allProducts: ProductsPass[]
@@ -228,6 +232,9 @@ interface CheckoutProviderProps {
    * which is what a single-door gathering has.
    */
   salesFlowId?: string | null
+  /** How that door sells. `null` while it is still being resolved, which is
+   *  the same default the portal has always started from. */
+  flowType?: string | null
   accountCreditOverride?: number
   validatePromoCodeOverride?: (code: string) => Promise<number | null>
   submitMode?: "application" | "open-ticketing"
@@ -251,6 +258,7 @@ export function CheckoutProvider({
   emptyCatalogReason = null,
   configuredStepsOverride,
   salesFlowId,
+  flowType = null,
   accountCreditOverride,
   validatePromoCodeOverride,
   submitMode = "application",
@@ -287,7 +295,10 @@ export function CheckoutProvider({
   // The stored credit balance applies unconditionally (R-FE-02, R-BE-03):
   // edit_passes_enabled gates only the edit-passes in-flow UI, not credit application.
   const appCredit = accountCreditOverride ?? application?.credit ?? 0
-  const checkoutPolicy = resolvePopupCheckoutPolicy(city)
+  // The door decides how its checkout behaves, not the gathering: one that
+  // takes applications can still have a door that sells directly
+  // (sdd/sales-flows-rediseno slice 6).
+  const checkoutPolicy = resolveFlowCheckoutPolicy(flowType)
   const cityId = city?.id ? String(city.id) : null
 
   const hasRestoredCheckoutRef = useRef(false)
@@ -1388,6 +1399,7 @@ export function CheckoutProvider({
   })
 
   const value: CheckoutContextValue = {
+    checkoutMode: checkoutPolicy.checkoutMode,
     currentStep,
     availableSteps,
     stepConfigs: configuredSteps,

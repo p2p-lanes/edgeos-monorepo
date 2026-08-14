@@ -247,6 +247,7 @@ export function OpenCheckoutRuntime({
               >
                 <CheckoutProvider
                   initialStep="passes"
+                  flowType={runtime.flow_type ?? null}
                   productsOverride={products}
                   emptyCatalogReason={runtime.empty_catalog_reason ?? null}
                   configuredStepsOverride={runtime.ticketing_steps}

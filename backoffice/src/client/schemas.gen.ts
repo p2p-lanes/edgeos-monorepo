@@ -19763,10 +19763,13 @@ export const SalesFlowPortalPublicSchema = {
         order: {
             type: 'integer',
             title: 'Order'
+        },
+        type: {
+            '$ref': '#/components/schemas/SalesFlowType'
         }
     },
     type: 'object',
-    required: ['id', 'slug', 'name', 'order'],
+    required: ['id', 'slug', 'name', 'order', 'type'],
     title: 'SalesFlowPortalPublic',
     description: `What a buyer is told about a way in.
 
