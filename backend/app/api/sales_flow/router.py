@@ -7,6 +7,7 @@ from sqlmodel import Session, select
 
 from app.api.popup_reviewer.crud import popup_reviewers_crud
 from app.api.sales_flow import crud
+from app.api.sales_flow.crud import START_EMPTY, START_FRESH
 from app.api.sales_flow.models import SalesFlows
 from app.api.sales_flow.readiness import flow_readiness
 from app.api.sales_flow.schemas import (
@@ -22,6 +23,7 @@ from app.api.sales_flow.schemas import (
     fields_for,
 )
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
+from app.api.ticketing_step.constants import seed_ticketing_steps_for_popup
 from app.core.dependencies.users import (
     CurrentHuman,
     CurrentOperator,
@@ -233,6 +235,26 @@ async def create_sales_flow(
     except IntegrityError as exc:
         db.rollback()
         _raise_on_default_conflict(exc)
+
+    # A door with no steps has no checkout: it renders nothing and sells
+    # nothing. Somebody who asked to start fresh or start empty is asking
+    # about SETTINGS, and would not expect the answer to be a way in that
+    # cannot open.
+    #
+    # Only for those two, which are new values. A caller that omits
+    # `start_from` is on the historical path, where the client copies steps
+    # from a source flow itself — seeding here as well would give it two of
+    # everything.
+    if flow_in.start_from in (START_FRESH, START_EMPTY):
+        seed_ticketing_steps_for_popup(
+            db,
+            popup_id=flow.popup_id,
+            tenant_id=flow.tenant_id,
+            sales_flow_id=flow.id,
+            flow_type=flow.type,
+        )
+        db.commit()
+        db.refresh(flow)
 
     return SalesFlowPublic.model_validate(flow)
 

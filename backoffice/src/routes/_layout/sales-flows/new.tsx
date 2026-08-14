@@ -3,7 +3,7 @@ import { useEffect } from "react"
 
 import { FormPageLayout } from "@/components/Common/FormPageLayout"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
-import { NewSalesFlowForm } from "@/components/forms/NewSalesFlowForm"
+import { NewSalesFlowWizard } from "@/components/forms/NewSalesFlowWizard"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
 import useAuth from "@/hooks/useAuth"
 
@@ -32,14 +32,14 @@ function NewSalesFlow() {
 
   return (
     <FormPageLayout
-      title="Create Sales Flow"
-      description="Name it and pick where it starts from. Everything else is configured afterwards."
+      title="A new way in"
+      description="Three questions. Everything else is configured once the door exists."
       backTo="/sales-flows"
     >
       {!isContextReady || !selectedPopupId ? (
         <WorkspaceAlert resource="sales flow" action="create" />
       ) : (
-        <NewSalesFlowForm popupId={selectedPopupId} />
+        <NewSalesFlowWizard popupId={selectedPopupId} />
       )}
     </FormPageLayout>
   )

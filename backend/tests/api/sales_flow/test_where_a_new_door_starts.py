@@ -18,7 +18,7 @@ import uuid
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlmodel import Session
+from sqlmodel import Session, select
 
 from app.api.popup.models import Popups
 from app.api.sales_flow.crud import sales_flows_crud
@@ -406,3 +406,74 @@ class TestCreatingThroughTheApi:
         body = resp.json()
         assert body["contribution_enabled"] is None
         assert body["application_layout"] == "multi_step"
+
+    @pytest.mark.parametrize("start_from", ["fresh", "empty"])
+    def test_a_door_that_starts_clean_still_has_a_checkout(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+        admin_token_tenant_a: str,
+        start_from: str,
+    ) -> None:
+        """Somebody asking to start fresh is asking about settings. A door
+        with no steps renders nothing and sells nothing, which is not what
+        they meant."""
+        from app.api.ticketing_step.models import TicketingSteps
+
+        popup = _popup(db, tenant_a)
+        _partner_default(db, popup)
+
+        resp = client.post(
+            "/api/v1/sales-flows",
+            headers={"Authorization": f"Bearer {admin_token_tenant_a}"},
+            json={
+                "popup_id": str(popup.id),
+                "type": "application",
+                "slug": f"clean-{uuid.uuid4().hex[:6]}",
+                "name": "Clean",
+                "start_from": start_from,
+            },
+        )
+
+        assert resp.status_code == 201, resp.text
+        steps = db.exec(
+            select(TicketingSteps).where(
+                TicketingSteps.sales_flow_id == uuid.UUID(resp.json()["id"])
+            )
+        ).all()
+        assert steps, "a way in with no steps cannot open"
+
+    def test_the_historical_path_seeds_no_steps(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+        admin_token_tenant_a: str,
+    ) -> None:
+        """Omitting `start_from` leaves step seeding to the caller, which is
+        what the old creation form does — seeding here too would give it two
+        of everything."""
+        from app.api.ticketing_step.models import TicketingSteps
+
+        popup = _popup(db, tenant_a)
+        _partner_default(db, popup)
+
+        resp = client.post(
+            "/api/v1/sales-flows",
+            headers={"Authorization": f"Bearer {admin_token_tenant_a}"},
+            json={
+                "popup_id": str(popup.id),
+                "type": "direct",
+                "slug": f"legacy-{uuid.uuid4().hex[:6]}",
+                "name": "Legacy",
+            },
+        )
+
+        assert resp.status_code == 201, resp.text
+        steps = db.exec(
+            select(TicketingSteps).where(
+                TicketingSteps.sales_flow_id == uuid.UUID(resp.json()["id"])
+            )
+        ).all()
+        assert steps == []
