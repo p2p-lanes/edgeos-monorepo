@@ -2,9 +2,9 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query"
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router"
 import type { ColumnDef } from "@tanstack/react-table"
 import { Info, Link2, Plus } from "lucide-react"
-import { Suspense } from "react"
+import { Suspense, useState } from "react"
 
-import { type InvitePublic, InvitesService, PopupsService } from "@/client"
+import { type InvitePublic, InvitesService } from "@/client"
 import { CopyLinkButton } from "@/components/Common/CopyLinkButton"
 import { DataTable, SortableHeader } from "@/components/Common/DataTable"
 import { EmptyState } from "@/components/Common/EmptyState"
@@ -23,19 +23,32 @@ import {
 } from "@/hooks/useTableSearchParams"
 import { getInvitePortalUrl, getPortalBaseUrl } from "@/lib/portal-urls"
 
+/** Who made the link. The backend has answered for both since referrals
+ *  stopped being their own table — an attendee's link is an invite that
+ *  carries a referrer instead of a creator. */
+type Issuer = "all" | "admin" | "portal"
+
+const ISSUERS: { value: Issuer; label: string }[] = [
+  { value: "all", label: "All links" },
+  { value: "admin", label: "Made by the team" },
+  { value: "portal", label: "Shared by attendees" },
+]
+
 function getInvitesQueryOptions(
   popupId: string | null,
   page: number,
   pageSize: number,
+  issuer: Issuer,
 ) {
   return {
     queryFn: () =>
       InvitesService.listInvites({
         popupId: popupId ?? undefined,
+        issuer,
         skip: page * pageSize,
         limit: pageSize,
       }),
-    queryKey: ["invites", { popupId, page, pageSize }],
+    queryKey: ["invites", { popupId, page, pageSize, issuer }],
   }
 }
 
@@ -47,15 +60,7 @@ export const Route = createFileRoute("/_layout/invites/")({
   }),
 })
 
-function AddInviteButton({ disabled }: { disabled: boolean }) {
-  if (disabled) {
-    return (
-      <Button disabled title="Enable invites in popup settings first">
-        <Plus className="mr-2 h-4 w-4" />
-        Add Invite
-      </Button>
-    )
-  }
+function AddInviteButton() {
   return (
     <Button asChild>
       <Link to="/invites/new">
@@ -95,6 +100,16 @@ const columns: ColumnDef<InvitePublic>[] = [
     accessorKey: "sales_flow_id",
     header: "Sales flow",
     cell: ({ row }) => <FlowCell invite={row.original} />,
+  },
+  {
+    // The one thing that used to justify a second screen for the same table.
+    accessorKey: "referrer_human_id",
+    header: "Issued by",
+    cell: ({ row }) => (
+      <span className="text-sm">
+        {row.original.referrer_human_id ? "Attendee" : "Team"}
+      </span>
+    ),
   },
   {
     accessorKey: "recipient_email",
@@ -145,13 +160,7 @@ const columns: ColumnDef<InvitePublic>[] = [
   },
 ]
 
-function InvitesTableContent({
-  popupId,
-  canAddInvites,
-}: {
-  popupId: string | null
-  canAddInvites: boolean
-}) {
+function InvitesTableContent({ popupId }: { popupId: string | null }) {
   const navigate = useNavigate()
   const searchParams = Route.useSearch()
   const { pagination, setPagination } = useTableSearchParams(
@@ -159,11 +168,14 @@ function InvitesTableContent({
     "/invites",
   )
 
+  const [issuer, setIssuer] = useState<Issuer>("all")
+
   const { data: invites } = useQuery({
     ...getInvitesQueryOptions(
       popupId,
       pagination.pageIndex,
       pagination.pageSize,
+      issuer,
     ),
     placeholderData: keepPreviousData,
   })
@@ -171,43 +183,51 @@ function InvitesTableContent({
   if (!invites) return <Skeleton className="h-64 w-full" />
 
   return (
-    <DataTable
-      columns={columns}
-      data={invites.results}
-      hiddenOnMobile={["current_uses", "expires_at"]}
-      onRowClick={(invite) =>
-        navigate({
-          to: "/invites/$inviteId/edit",
-          params: { inviteId: invite.id },
-        })
-      }
-      serverPagination={{
-        total: invites.paging.total,
-        pagination: pagination,
-        onPaginationChange: setPagination,
-      }}
-      emptyState={
-        <EmptyState
-          icon={Link2}
-          title="No invites yet"
-          description="Create invite links to offer discounts or automatic approvals to specific attendees."
-          action={<AddInviteButton disabled={!canAddInvites} />}
-        />
-      }
-    />
+    <div className="space-y-3">
+      <div className="flex flex-wrap gap-2">
+        {ISSUERS.map((option) => (
+          <Button
+            key={option.value}
+            type="button"
+            size="sm"
+            variant={issuer === option.value ? "default" : "outline"}
+            onClick={() => setIssuer(option.value)}
+          >
+            {option.label}
+          </Button>
+        ))}
+      </div>
+      <DataTable
+        columns={columns}
+        data={invites.results}
+        hiddenOnMobile={["current_uses", "expires_at"]}
+        onRowClick={(invite) =>
+          navigate({
+            to: "/invites/$inviteId/edit",
+            params: { inviteId: invite.id },
+          })
+        }
+        serverPagination={{
+          total: invites.paging.total,
+          pagination: pagination,
+          onPaginationChange: setPagination,
+        }}
+        emptyState={
+          <EmptyState
+            icon={Link2}
+            title="No links yet"
+            description="Create a link to offer a discount or an automatic approval, or let attendees share their own from the portal."
+            action={<AddInviteButton />}
+          />
+        }
+      />
+    </div>
   )
 }
 
 function Invites() {
   const { isOperatorOrAbove } = useAuth()
   const { selectedPopupId, isContextReady } = useWorkspace()
-
-  const { data: popup } = useQuery({
-    queryKey: ["popups", selectedPopupId],
-    queryFn: () => PopupsService.getPopup({ popupId: selectedPopupId ?? "" }),
-    enabled: !!selectedPopupId,
-  })
-  const invitesEnabled = popup?.invites_enabled ?? false
 
   return (
     <div className="flex flex-col gap-6">
@@ -218,27 +238,18 @@ function Invites() {
             Manage invite links with discounts and approval rules
           </p>
         </div>
-        {isOperatorOrAbove && isContextReady && (
-          <AddInviteButton disabled={!invitesEnabled} />
-        )}
+        {isOperatorOrAbove && isContextReady && <AddInviteButton />}
       </div>
       {isContextReady && (
         <Alert>
           <Info className="h-4 w-4" />
-          <AlertTitle>Invites vs Groups</AlertTitle>
+          <AlertTitle>Links into this event</AlertTitle>
           <AlertDescription>
-            Invites are individual links that grant a specific person a discount
-            or an automatic approval. Groups gather multiple attendees under a
-            shared link to manage team registrations and group discounts. Use
-            invites for one-off offers and groups for teams.
-          </AlertDescription>
-        </Alert>
-      )}
-      {isContextReady && popup && !invitesEnabled && (
-        <Alert>
-          <AlertDescription>
-            Invites are disabled for this popup. Enable them in the popup
-            settings to create invite links.
+            One link, whoever made it: your team creates them here, attendees
+            share their own from the portal. Each one names the way in it opens,
+            and that way in decides whether it may be created at all — look in
+            the sales flow, not here. Groups are the other thing: a shared link
+            for a whole team rather than one person.
           </AlertDescription>
         </Alert>
       )}
@@ -247,10 +258,7 @@ function Invites() {
       ) : (
         <QueryErrorBoundary>
           <Suspense fallback={<Skeleton className="h-64 w-full" />}>
-            <InvitesTableContent
-              popupId={selectedPopupId}
-              canAddInvites={invitesEnabled}
-            />
+            <InvitesTableContent popupId={selectedPopupId} />
           </Suspense>
         </QueryErrorBoundary>
       )}

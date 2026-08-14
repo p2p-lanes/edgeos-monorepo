@@ -61,7 +61,6 @@ import { Route as LayoutAdminNewRouteImport } from './routes/_layout/admin/new'
 import { Route as LayoutEventsVenuesIndexRouteImport } from './routes/_layout/events/venues/index'
 import { Route as LayoutEventsTracksIndexRouteImport } from './routes/_layout/events/tracks/index'
 import { Route as LayoutSalesFlowsIdEditRouteImport } from './routes/_layout/sales-flows/$id.edit'
-import { Route as LayoutReferralsReferralIdEditRouteImport } from './routes/_layout/referrals/$referralId/edit'
 import { Route as LayoutProductsIdEditRouteImport } from './routes/_layout/products/$id.edit'
 import { Route as LayoutPopupsIdEditRouteImport } from './routes/_layout/popups/$id.edit'
 import { Route as LayoutPopupsIdBulkGrantRouteImport } from './routes/_layout/popups/$id.bulk-grant'
@@ -346,12 +345,6 @@ const LayoutSalesFlowsIdEditRoute = LayoutSalesFlowsIdEditRouteImport.update({
   path: '/sales-flows/$id/edit',
   getParentRoute: () => LayoutRoute,
 } as any)
-const LayoutReferralsReferralIdEditRoute =
-  LayoutReferralsReferralIdEditRouteImport.update({
-    id: '/referrals/$referralId/edit',
-    path: '/referrals/$referralId/edit',
-    getParentRoute: () => LayoutRoute,
-  } as any)
 const LayoutProductsIdEditRoute = LayoutProductsIdEditRouteImport.update({
   id: '/products/$id/edit',
   path: '/products/$id/edit',
@@ -514,7 +507,6 @@ export interface FileRoutesByFullPath {
   '/popups/$id/bulk-grant': typeof LayoutPopupsIdBulkGrantRoute
   '/popups/$id/edit': typeof LayoutPopupsIdEditRoute
   '/products/$id/edit': typeof LayoutProductsIdEditRoute
-  '/referrals/$referralId/edit': typeof LayoutReferralsReferralIdEditRoute
   '/sales-flows/$id/edit': typeof LayoutSalesFlowsIdEditRoute
   '/events/tracks/': typeof LayoutEventsTracksIndexRoute
   '/events/venues/': typeof LayoutEventsVenuesIndexRoute
@@ -586,7 +578,6 @@ export interface FileRoutesByTo {
   '/popups/$id/bulk-grant': typeof LayoutPopupsIdBulkGrantRoute
   '/popups/$id/edit': typeof LayoutPopupsIdEditRoute
   '/products/$id/edit': typeof LayoutProductsIdEditRoute
-  '/referrals/$referralId/edit': typeof LayoutReferralsReferralIdEditRoute
   '/sales-flows/$id/edit': typeof LayoutSalesFlowsIdEditRoute
   '/events/tracks': typeof LayoutEventsTracksIndexRoute
   '/events/venues': typeof LayoutEventsVenuesIndexRoute
@@ -660,7 +651,6 @@ export interface FileRoutesById {
   '/_layout/popups/$id/bulk-grant': typeof LayoutPopupsIdBulkGrantRoute
   '/_layout/popups/$id/edit': typeof LayoutPopupsIdEditRoute
   '/_layout/products/$id/edit': typeof LayoutProductsIdEditRoute
-  '/_layout/referrals/$referralId/edit': typeof LayoutReferralsReferralIdEditRoute
   '/_layout/sales-flows/$id/edit': typeof LayoutSalesFlowsIdEditRoute
   '/_layout/events/tracks/': typeof LayoutEventsTracksIndexRoute
   '/_layout/events/venues/': typeof LayoutEventsVenuesIndexRoute
@@ -734,7 +724,6 @@ export interface FileRouteTypes {
     | '/popups/$id/bulk-grant'
     | '/popups/$id/edit'
     | '/products/$id/edit'
-    | '/referrals/$referralId/edit'
     | '/sales-flows/$id/edit'
     | '/events/tracks/'
     | '/events/venues/'
@@ -806,7 +795,6 @@ export interface FileRouteTypes {
     | '/popups/$id/bulk-grant'
     | '/popups/$id/edit'
     | '/products/$id/edit'
-    | '/referrals/$referralId/edit'
     | '/sales-flows/$id/edit'
     | '/events/tracks'
     | '/events/venues'
@@ -879,7 +867,6 @@ export interface FileRouteTypes {
     | '/_layout/popups/$id/bulk-grant'
     | '/_layout/popups/$id/edit'
     | '/_layout/products/$id/edit'
-    | '/_layout/referrals/$referralId/edit'
     | '/_layout/sales-flows/$id/edit'
     | '/_layout/events/tracks/'
     | '/_layout/events/venues/'
@@ -1260,13 +1247,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LayoutSalesFlowsIdEditRouteImport
       parentRoute: typeof LayoutRoute
     }
-    '/_layout/referrals/$referralId/edit': {
-      id: '/_layout/referrals/$referralId/edit'
-      path: '/referrals/$referralId/edit'
-      fullPath: '/referrals/$referralId/edit'
-      preLoaderRoute: typeof LayoutReferralsReferralIdEditRouteImport
-      parentRoute: typeof LayoutRoute
-    }
     '/_layout/products/$id/edit': {
       id: '/_layout/products/$id/edit'
       path: '/products/$id/edit'
@@ -1458,7 +1438,6 @@ interface LayoutRouteChildren {
   LayoutPopupsIdBulkGrantRoute: typeof LayoutPopupsIdBulkGrantRoute
   LayoutPopupsIdEditRoute: typeof LayoutPopupsIdEditRoute
   LayoutProductsIdEditRoute: typeof LayoutProductsIdEditRoute
-  LayoutReferralsReferralIdEditRoute: typeof LayoutReferralsReferralIdEditRoute
   LayoutSalesFlowsIdEditRoute: typeof LayoutSalesFlowsIdEditRoute
   LayoutEventsTracksIndexRoute: typeof LayoutEventsTracksIndexRoute
   LayoutEventsVenuesIndexRoute: typeof LayoutEventsVenuesIndexRoute
@@ -1530,7 +1509,6 @@ const LayoutRouteChildren: LayoutRouteChildren = {
   LayoutPopupsIdBulkGrantRoute: LayoutPopupsIdBulkGrantRoute,
   LayoutPopupsIdEditRoute: LayoutPopupsIdEditRoute,
   LayoutProductsIdEditRoute: LayoutProductsIdEditRoute,
-  LayoutReferralsReferralIdEditRoute: LayoutReferralsReferralIdEditRoute,
   LayoutSalesFlowsIdEditRoute: LayoutSalesFlowsIdEditRoute,
   LayoutEventsTracksIndexRoute: LayoutEventsTracksIndexRoute,
   LayoutEventsVenuesIndexRoute: LayoutEventsVenuesIndexRoute,
