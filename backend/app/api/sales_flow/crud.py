@@ -1,4 +1,6 @@
 import uuid
+from dataclasses import dataclass
+from typing import Any
 
 from sqlmodel import Session, select
 
@@ -15,6 +17,33 @@ from app.api.sales_flow.schemas import (
 from app.api.shared.crud import BaseCRUD
 
 DEFAULT_FLOW_SLUG = "default"
+
+# The two starting points that are not an existing way in.
+START_FRESH = "fresh"
+START_EMPTY = "empty"
+
+
+@dataclass(frozen=True)
+class StartingPoint:
+    """Where a new way in gets its configuration, resolved.
+
+    `values` is a plain dict rather than the source row, so a template, a
+    sibling flow and a popup are all the same thing to the caller — and so
+    nothing downstream can accidentally hold a reference to another flow.
+    """
+
+    kind: str
+    name: str | None
+    values: dict[str, Any]
+
+
+def _attrs(source: Any) -> dict[str, Any]:
+    """Every effective-config column a source has, plus the theme blob."""
+    from app.api.sales_flow.schemas import EFFECTIVE_CONFIG_FIELDS  # noqa: PLC0415
+
+    names = (*EFFECTIVE_CONFIG_FIELDS, "theme_config")
+    return {name: getattr(source, name, None) for name in names}
+
 
 # What a popup's first flow is called, by what it does. A buyer sees this name
 # on the door card, and "Default" told them nothing — it named the row's place
@@ -218,9 +247,10 @@ class SalesFlowsCRUD(BaseCRUD[SalesFlows, SalesFlowCreate, SalesFlowUpdate]):
         smaller flow, it is a broken one.
         """
         data = obj_in.model_dump()
+        start_from = data.pop("start_from", None)
         data["tenant_id"] = tenant_id
         flow = SalesFlows(**data)
-        self.seed_config_from_popup(session, flow, flow.popup_id)
+        self.seed_config(session, flow, flow.popup_id, start_from=start_from)
         session.add(flow)
         session.commit()
         session.refresh(flow)
@@ -245,7 +275,7 @@ class SalesFlowsCRUD(BaseCRUD[SalesFlows, SalesFlowCreate, SalesFlowUpdate]):
         The channel-configuration columns are copied from the popup
         (sdd/sales-flows-rediseno slice 7). This is the one flow with no
         sibling to copy from, so it is also the last caller that still reads
-        the popup's own copies of them — see `seed_config_from_popup`.
+        the popup's own copies of them — see `seed_config`.
         """
         existing = self.get_default_flow(session, popup_id)
         if existing:
@@ -270,62 +300,117 @@ class SalesFlowsCRUD(BaseCRUD[SalesFlows, SalesFlowCreate, SalesFlowUpdate]):
             reviewers_mode=SalesFlowReviewersMode.inherit,
             identity_mode=SalesFlowIdentityMode.portal_auth,
         )
-        self.seed_config_from_popup(session, flow, popup_id)
+        self.seed_config(session, flow, popup_id)
         session.add(flow)
         return flow
 
-    def seed_config_from_popup(
-        self, session: Session, flow: SalesFlows, popup_id: uuid.UUID
+    def resolve_start(
+        self,
+        session: Session,
+        popup_id: uuid.UUID,
+        flow_type: str | None,
+        start_from: str | None,
+        *,
+        exclude_flow_id: uuid.UUID | None = None,
+    ) -> "StartingPoint":
+        """Where a new way in takes its configuration from.
+
+        `start_from` is what the organiser chose:
+
+        - ``None``   the way in this gathering already sells through. What
+                     every caller did before this existed, so an API client
+                     that has not moved keeps its behaviour exactly.
+        - ``fresh``  the defaults for this kind of door and nothing else — no
+                     sibling's contribution, no sibling's installment plan.
+        - ``empty``  nothing at all.
+        - a flow id  that door, so this one inherits the decisions somebody
+                     already made about this gathering.
+
+        A flow id is looked up scoped to this popup. Without that scoping the
+        parameter would copy any flow whose id you could name, including
+        another gathering's `open_checkout_signing_secret` — the key an
+        external thank-you page verifies orders against.
+        """
+        from app.api.popup.models import Popups  # noqa: PLC0415
+        from app.api.sales_flow.templates import template_values  # noqa: PLC0415
+
+        if start_from == START_EMPTY:
+            return StartingPoint(kind=START_EMPTY, name=None, values={})
+
+        if start_from == START_FRESH:
+            return StartingPoint(
+                kind=START_FRESH, name=None, values=template_values(flow_type)
+            )
+
+        if start_from:
+            try:
+                source_id = uuid.UUID(str(start_from))
+            except ValueError:
+                raise ValueError("start_from is not a way in") from None
+            source = session.exec(
+                select(SalesFlows).where(
+                    SalesFlows.id == source_id,
+                    SalesFlows.popup_id == popup_id,
+                )
+            ).first()
+            if source is None:
+                raise ValueError("start_from is not a way into this gathering")
+            return StartingPoint(kind="flow", name=source.name, values=_attrs(source))
+
+        # The historical path: the door this gathering already sells through,
+        # falling back to the popup's own columns for the default flow itself,
+        # which has no sibling and is created alongside the popup. That
+        # fallback is the last thing reading those popup columns.
+        source = self.get_default_flow(session, popup_id)
+        if source is not None and exclude_flow_id and source.id == exclude_flow_id:
+            source = None
+        if source is None:
+            popup = session.get(Popups, popup_id)
+            if popup is None:
+                return StartingPoint(kind="none", name=None, values={})
+            return StartingPoint(kind="popup", name=None, values=_attrs(popup))
+        return StartingPoint(kind="default", name=source.name, values=_attrs(source))
+
+    def seed_config(
+        self,
+        session: Session,
+        flow: SalesFlows,
+        popup_id: uuid.UUID,
+        *,
+        start_from: str | None = None,
     ) -> SalesFlows:
-        """Fill the flow's unset channel configuration from a sibling flow.
-
-        A new flow has to start somewhere. It starts from the popup's default
-        flow — the one an operator has actually been configuring — and only
-        falls back to the popup's own columns for the default flow itself,
-        which has no sibling to copy from and is created alongside the popup.
-
-        That fallback is the last thing reading those popup columns. They are
-        no longer editable (the backoffice offers them per flow), so for a
-        popup created from now on they are empty and the default flow starts
-        blank, which is the intended end state: configure the default flow,
-        and every flow made afterwards begins as a copy of it.
+        """Fill the flow's unset channel configuration from its starting point.
 
         Only columns the caller left unset are filled, so an explicit value
         always wins. This is a one-time copy, not a read-through: editing the
         source afterwards never reaches this flow (slice 7).
 
         What it copies depends on the NEW flow's type, not the source's. The
-        source is whatever this popup happens to sell through today, and it
-        can be of a different kind entirely: an event that sells directly
-        gaining a way in people apply to. Copying blind handed that flow the
-        source's success URL, cancel URL and signing secret — settings it can
-        never read — while leaving every application setting empty, because
-        the source had none to give. The wrong half arrived and the right half
-        did not.
+        source can be a different kind of door entirely: an event that sells
+        directly gaining a way in people apply to. Copying blind handed that
+        flow the source's success URL, cancel URL and signing secret —
+        settings it can never read — while leaving every application setting
+        empty, because the source had none to give. The wrong half arrived and
+        the right half did not.
 
         Anything a flow of this type cannot use is left NULL, which is the
         honest state: nobody has decided it yet.
         """
-        from app.api.popup.models import Popups
-        from app.api.sales_flow.schemas import fields_for
+        from app.api.sales_flow.schemas import fields_for  # noqa: PLC0415
 
-        source = self.get_default_flow(session, popup_id)
-        if source is not None and source.id == flow.id:
-            source = None
-        if source is None:
-            source = session.get(Popups, popup_id)
-        if source is None:
-            return flow
+        start = self.resolve_start(
+            session, popup_id, flow.type, start_from, exclude_flow_id=flow.id
+        )
 
         for name in fields_for(flow.type):
             if getattr(flow, name, None) is None:
-                setattr(flow, name, getattr(source, name, None))
+                setattr(flow, name, start.values.get(name))
 
         # Copied the same way but deliberately not in EFFECTIVE_CONFIG_FIELDS:
         # that tuple is what the flow settings form renders, and a raw JSONB
         # blob is not a setting anyone edits in a row of switches.
         if flow.theme_config is None:
-            flow.theme_config = getattr(source, "theme_config", None)
+            flow.theme_config = start.values.get("theme_config")
         return flow
 
     def ensure_reviewers_override(

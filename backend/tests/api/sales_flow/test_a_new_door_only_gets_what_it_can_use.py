@@ -78,7 +78,7 @@ def _seed_new_flow(db: Session, popup: Popups, flow_type: str) -> SalesFlows:
         name="New way in",
         type=flow_type,
     )
-    sales_flows_crud.seed_config_from_popup(db, flow, popup.id)
+    sales_flows_crud.seed_config(db, flow, popup.id)
     return flow
 
 
@@ -241,6 +241,6 @@ class TestSameKindIsUntouched:
             type=SaleType.application.value,
             allows_coupons=False,
         )
-        sales_flows_crud.seed_config_from_popup(db, flow, popup.id)
+        sales_flows_crud.seed_config(db, flow, popup.id)
 
         assert flow.allows_coupons is False

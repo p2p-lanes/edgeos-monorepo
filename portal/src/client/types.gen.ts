@@ -1993,6 +1993,26 @@ export type EventVenueUpdate = {
 
 export type EventVisibility = 'public' | 'private' | 'unlisted';
 
+/**
+ * What a way in would begin with, before anyone commits to opening it.
+ *
+ * Computed by the same code that seeds the flow, so a screen cannot promise
+ * something creation will not deliver. Deriving this in the frontend would
+ * mean a second opinion about which settings a kind of door can read, and
+ * the two would eventually disagree — at which point the preview becomes the
+ * most confident wrong thing on screen.
+ */
+export type FlowStartPreview = {
+    flow_type: SalesFlowType;
+    source_kind: string;
+    source_name?: (string | null);
+    starts_with: {
+        [key: string]: unknown;
+    };
+    left_empty: Array<(string)>;
+    not_carried_over: Array<(string)>;
+};
+
 export type FormFieldCreate = {
     popup_id: string;
     sales_flow_id: string;
@@ -3973,6 +3993,7 @@ export type ReviewSummary = {
  */
 export type SalesFlowCreate = {
     popup_id: string;
+    start_from?: (string | null);
     type?: SalesFlowType;
     slug: string;
     name: string;
@@ -7584,6 +7605,15 @@ export type SalesFlowsListSalesFlowReadinessData = {
 };
 
 export type SalesFlowsListSalesFlowReadinessResponse = (Array<SalesFlowReadiness>);
+
+export type SalesFlowsPreviewSalesFlowStartData = {
+    popupId: string;
+    startFrom?: (string | null);
+    type?: SalesFlowType;
+    xTenantId?: (string | null);
+};
+
+export type SalesFlowsPreviewSalesFlowStartResponse = (FlowStartPreview);
 
 export type SalesFlowsGetSalesFlowData = {
     flowId: string;

@@ -10,12 +10,16 @@ from app.api.sales_flow import crud
 from app.api.sales_flow.models import SalesFlows
 from app.api.sales_flow.readiness import flow_readiness
 from app.api.sales_flow.schemas import (
+    EFFECTIVE_CONFIG_FIELDS,
+    FlowStartPreview,
     SalesFlowCreate,
     SalesFlowPortalPublic,
     SalesFlowPublic,
     SalesFlowReadiness,
     SalesFlowReviewersMode,
+    SalesFlowType,
     SalesFlowUpdate,
+    fields_for,
 )
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
 from app.core.dependencies.users import (
@@ -118,6 +122,69 @@ async def list_sales_flow_readiness(
         db, popup_id=popup_id, limit=100
     )
     return [flow_readiness(db, flow) for flow in flows]
+
+
+@router.get("/preview", response_model=FlowStartPreview)
+async def preview_sales_flow_start(
+    db: TenantSession,
+    _: CurrentOperator,
+    popup_id: uuid.UUID,
+    type: SalesFlowType = SalesFlowType.application,  # noqa: A002
+    start_from: str | None = None,
+) -> FlowStartPreview:
+    """What a way in would begin with, before anyone opens it (BO only).
+
+    The creation screen asks somebody to choose a starting point, and the only
+    way to choose well is to see what each one brings. This answers that with
+    the same code that will do the seeding, so the screen cannot promise
+    something creation will not deliver.
+
+    Declared before `/{flow_id}`: FastAPI matches in declaration order, so a
+    literal path a UUID converter would also accept has to come first.
+    """
+    from app.api.popup.crud import popups_crud  # noqa: PLC0415
+
+    if popups_crud.get(db, popup_id) is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Popup not found",
+        )
+
+    try:
+        start = crud.sales_flows_crud.resolve_start(
+            db, popup_id, type.value, start_from
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from exc
+
+    usable = fields_for(type.value)
+    starts_with = {
+        name: start.values.get(name)
+        for name in usable
+        if start.values.get(name) is not None
+    }
+    left_empty = [name for name in usable if name not in starts_with]
+
+    # Only what the source actually holds, so the screen says "the signing
+    # secret will not come across" rather than listing settings the source
+    # never had either.
+    not_carried_over = [
+        name
+        for name in EFFECTIVE_CONFIG_FIELDS
+        if name not in usable and start.values.get(name) is not None
+    ]
+
+    return FlowStartPreview(
+        flow_type=type,
+        source_kind=start.kind,
+        source_name=start.name,
+        starts_with=starts_with,
+        left_empty=left_empty,
+        not_carried_over=not_carried_over,
+    )
 
 
 @router.get("/{flow_id}", response_model=SalesFlowPublic)

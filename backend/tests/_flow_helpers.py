@@ -117,7 +117,7 @@ def set_installment_terms(db, popup, **terms):
 
     On the flow, which is what the checkout reads since
     sdd/sales-flows-rediseno slice 3. Setting them on the popup only reaches a
-    flow that does not exist yet, through `seed_config_from_popup` — so a
+    flow that does not exist yet, through `seed_config` — so a
     fixture that builds its popup first and configures it afterwards silently
     configures nothing.
     """
@@ -135,7 +135,7 @@ def set_link_policy(db, popup, **values):
     On the flow, which is what the gates read since
     sdd/sales-flows-rediseno slice 5. Setting `referrals_enabled` or
     `max_referrals_per_attendee` on the popup only reaches a flow that does
-    not exist yet, through `seed_config_from_popup`.
+    not exist yet, through `seed_config`.
     """
     flow = provision_default_flow(db, popup)
     for name, value in values.items():

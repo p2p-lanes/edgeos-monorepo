@@ -9167,6 +9167,58 @@ export const EventVisibilitySchema = {
     title: 'EventVisibility'
 } as const;
 
+export const FlowStartPreviewSchema = {
+    properties: {
+        flow_type: {
+            '$ref': '#/components/schemas/SalesFlowType'
+        },
+        source_kind: {
+            type: 'string',
+            title: 'Source Kind'
+        },
+        source_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Source Name'
+        },
+        starts_with: {
+            additionalProperties: true,
+            type: 'object',
+            title: 'Starts With'
+        },
+        left_empty: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Left Empty'
+        },
+        not_carried_over: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Not Carried Over'
+        }
+    },
+    type: 'object',
+    required: ['flow_type', 'source_kind', 'starts_with', 'left_empty', 'not_carried_over'],
+    title: 'FlowStartPreview',
+    description: `What a way in would begin with, before anyone commits to opening it.
+
+Computed by the same code that seeds the flow, so a screen cannot promise
+something creation will not deliver. Deriving this in the frontend would
+mean a second opinion about which settings a kind of door can read, and
+the two would eventually disagree — at which point the preview becomes the
+most confident wrong thing on screen.`
+} as const;
+
 export const FormFieldCreateSchema = {
     properties: {
         popup_id: {
@@ -19317,6 +19369,17 @@ export const SalesFlowCreateSchema = {
             type: 'string',
             format: 'uuid',
             title: 'Popup Id'
+        },
+        start_from: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Start From'
         },
         type: {
             '$ref': '#/components/schemas/SalesFlowType',

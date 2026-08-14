@@ -2,6 +2,7 @@ import uuid
 from datetime import datetime
 from decimal import Decimal
 from enum import StrEnum
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 from sqlalchemy import Boolean, Column, Integer, Numeric
@@ -179,6 +180,13 @@ class SalesFlowCreate(BaseModel):
     """Sales flow creation payload (BO). tenant_id is derived server-side."""
 
     popup_id: uuid.UUID
+    # Where this way in takes its configuration from: "fresh" for the defaults
+    # of its kind, "empty" for nothing, or the id of a way in to copy.
+    #
+    # Omitting it keeps the behaviour every caller had before this existed —
+    # copy the door this gathering already sells through — so no client that
+    # has not moved changes what it produces.
+    start_from: str | None = None
     type: SalesFlowType = SalesFlowType.application
     slug: str
     name: str
@@ -446,6 +454,30 @@ def fields_for(flow_type: str | None) -> tuple[str, ...]:
         else APPLICATION_ONLY_FIELDS
     )
     return tuple(name for name in EFFECTIVE_CONFIG_FIELDS if name not in excluded)
+
+
+class FlowStartPreview(BaseModel):
+    """What a way in would begin with, before anyone commits to opening it.
+
+    Computed by the same code that seeds the flow, so a screen cannot promise
+    something creation will not deliver. Deriving this in the frontend would
+    mean a second opinion about which settings a kind of door can read, and
+    the two would eventually disagree — at which point the preview becomes the
+    most confident wrong thing on screen.
+    """
+
+    flow_type: SalesFlowType
+    # What was resolved: "fresh", "empty", "flow" (a sibling), or "default"
+    # (the way in this gathering already sells through).
+    source_kind: str
+    source_name: str | None = None
+    # Settings that would be filled in, and with what.
+    starts_with: dict[str, Any]
+    # Settings this kind of door can read that nobody has decided yet.
+    left_empty: list[str]
+    # Settings the source holds that this kind of door can never read, so they
+    # are not carried over. Empty unless copying across kinds.
+    not_carried_over: list[str]
 
 
 class EffectiveFlowConfig(BaseModel):
