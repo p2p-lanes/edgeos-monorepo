@@ -75,10 +75,10 @@ describe("startChoicesFor", () => {
     expect(sponsors?.description).toContain("offers installments")
   })
 
-  it("marks the door everything else started from", () => {
+  it("marks the flow everything else started from", () => {
     const { offered } = startChoicesFor("application", DOORS)
     const attendee = offered.find((o) => o.name === "A copy of Attendee")
-    expect(attendee?.description).toContain("the door others started from")
+    expect(attendee?.description).toContain("the flow others started from")
   })
 })
 

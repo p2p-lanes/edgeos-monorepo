@@ -17,7 +17,7 @@ import { groupByReach } from "@/lib/salesFlowReach"
 export const Route = createFileRoute("/_layout/sales-flows/")({
   component: SalesFlows,
   head: () => ({
-    meta: [{ title: "Ways in - EdgeOS" }],
+    meta: [{ title: "Sales Flows - EdgeOS" }],
   }),
 })
 
@@ -26,7 +26,7 @@ function AddSalesFlowButton() {
     <Button asChild>
       <Link to="/sales-flows/new">
         <Plus className="mr-2 h-4 w-4" />
-        Open a way in
+        Add Sales Flow
       </Link>
     </Button>
   )
@@ -66,13 +66,13 @@ function FlowMap({ popupId }: { popupId: string }) {
     return (
       <EmptyState
         icon={Workflow}
-        title="No ways in yet"
-        description="Open one to decide how people apply for or buy into this gathering."
+        title="No sales flows yet"
+        description="Create one to decide how people apply for or buy into this gathering."
         action={
           <Button asChild>
             <Link to="/sales-flows/new">
               <Plus className="mr-2 h-4 w-4" />
-              Open a way in
+              Add Sales Flow
             </Link>
           </Button>
         }
@@ -93,8 +93,8 @@ function FlowMap({ popupId }: { popupId: string }) {
     <div className="flex flex-col gap-8">
       {blockedCount > 0 && (
         <p className="text-sm text-destructive">
-          {blockedCount} of {salesFlows.results.length} ways in cannot take a
-          purchase right now.
+          {blockedCount} of {salesFlows.results.length} sales flows cannot take
+          a purchase right now.
         </p>
       )}
       {groups.map((group) => (
@@ -131,9 +131,9 @@ function SalesFlows() {
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Ways in</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Sales Flows</h1>
           <p className="text-muted-foreground">
-            Every door into this gathering, grouped by who can reach it
+            Every sales flow of this gathering, grouped by who can reach it
           </p>
         </div>
         {isOperatorOrAbove && isContextReady && <AddSalesFlowButton />}

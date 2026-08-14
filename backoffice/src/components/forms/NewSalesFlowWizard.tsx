@@ -112,7 +112,7 @@ export function NewSalesFlowWizard({ popupId }: { popupId: string }) {
     },
     onSuccess: (created) => {
       queryClient.invalidateQueries({ queryKey: ["sales-flows"] })
-      showSuccessToast("The door is open")
+      showSuccessToast("Sales flow created")
       navigate({ to: "/sales-flows/$id/edit", params: { id: created.id } })
     },
     onError: createErrorHandler(showErrorToast),
@@ -187,7 +187,7 @@ export function NewSalesFlowWizard({ popupId }: { popupId: string }) {
         <section className="flex flex-col gap-4">
           <header className="flex flex-col gap-1">
             <h2 className="text-xl font-semibold tracking-tight">
-              What does this way in do?
+              What does this sales flow do?
             </h2>
             <p className="text-sm text-muted-foreground">
               Everything else follows from this, so it is the only question
@@ -315,7 +315,8 @@ export function NewSalesFlowWizard({ popupId }: { popupId: string }) {
               What do people call it?
             </h2>
             <p className="text-sm text-muted-foreground">
-              Buyers read this name on the door card, and it becomes the link.
+              Buyers read this name when they pick a way in, and it becomes the
+              link.
             </p>
           </header>
 
@@ -381,7 +382,7 @@ export function NewSalesFlowWizard({ popupId }: { popupId: string }) {
               disabled={!slug || createMutation.isPending}
               onClick={() => createMutation.mutate()}
             >
-              {createMutation.isPending ? "Opening..." : "Open the door"}
+              {createMutation.isPending ? "Creating..." : "Create the flow"}
             </Button>
           </div>
         </section>

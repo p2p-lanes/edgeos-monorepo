@@ -56,9 +56,9 @@ export const TYPE_COPY: Record<
 
 const FRESH_COPY: Record<SalesFlowType, string> = {
   application:
-    "A clean reviewed way in. Nothing carried over from your other doors.",
-  direct: "A clean shop. Nothing carried over from your other doors.",
-  upsale: "A clean add-on. Nothing carried over from your other doors.",
+    "A clean reviewed flow. Nothing carried over from your other flows.",
+  direct: "A clean shop. Nothing carried over from your other flows.",
+  upsale: "A clean add-on. Nothing carried over from your other flows.",
 }
 
 /** What a door of this kind cannot use, so a cross-kind copy leaves it behind. */
@@ -74,7 +74,7 @@ export function notCarriedAcross(flowType: SalesFlowType): string[] {
 
 function describeFlow(flow: SalesFlowPublic): string {
   const bits: string[] = []
-  if (flow.is_default) bits.push("the door others started from")
+  if (flow.is_default) bits.push("the flow others started from")
   if (flow.contribution_enabled) bits.push("adds a contribution")
   if (flow.installments_enabled) bits.push("offers installments")
   if (flow.requires_application_fee) bits.push("charges to apply")
@@ -105,7 +105,7 @@ export function startChoicesFor(
     kind: "empty",
     name: "Nothing at all",
     description:
-      "Every setting empty. The door sells nothing until you say so.",
+      "Every setting empty. The flow sells nothing until you say so.",
     crossKind: false,
   }
 

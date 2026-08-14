@@ -32,8 +32,8 @@ function NewSalesFlow() {
 
   return (
     <FormPageLayout
-      title="A new way in"
-      description="Three questions. Everything else is configured once the door exists."
+      title="New sales flow"
+      description="Three questions. Everything else is configured once the flow exists."
       backTo="/sales-flows"
     >
       {!isContextReady || !selectedPopupId ? (

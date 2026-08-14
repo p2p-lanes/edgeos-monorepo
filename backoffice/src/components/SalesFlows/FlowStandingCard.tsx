@@ -42,7 +42,8 @@ export function FlowStandingCard({
       <div className="flex items-center gap-3 rounded-xl border border-success/30 bg-success-soft px-4 py-3">
         <CircleCheck className="h-4 w-4 shrink-0 text-success" />
         <p className="text-sm">
-          This way in is ready. Buyers can reach it and pay through it today.
+          This sales flow is ready. Buyers can reach it and pay through it
+          today.
         </p>
       </div>
     )
@@ -52,8 +53,8 @@ export function FlowStandingCard({
     <div className="overflow-hidden rounded-xl border">
       <div className="border-b bg-muted/40 px-4 py-2.5 text-sm font-semibold">
         {blockers.length > 0
-          ? "This way in cannot sell yet"
-          : "This way in works, with something worth knowing"}
+          ? "This sales flow cannot sell yet"
+          : "This sales flow works, with something worth knowing"}
       </div>
       <ul className="divide-y">
         {blockers.map((code) => (
