@@ -915,9 +915,21 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         set its own fees, and is still right for a checkout that names none.
         """
         from app.api.sales_flow.crud import sales_flows_crud  # noqa: PLC0415
+        from app.api.sales_flow.schemas import SalesFlowType  # noqa: PLC0415
 
         if flow is None:
             flow = sales_flows_crud.get_default_flow(session, popup.id)
+        # Same gate the purchase applies. A quote for something this door
+        # cannot sell is a price nobody can pay, and the two staying in step is
+        # the reason this math is shared at all.
+        if flow is not None and flow.type not in (
+            SalesFlowType.direct.value,
+            SalesFlowType.upsale.value,
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="This way in does not support open ticketing",
+            )
         from app.api.checkout.schemas import (
             CheckoutPreviewLine,
             CheckoutPreviewResponse,
@@ -1017,7 +1029,6 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             resolve_flow,
         )
         from app.api.sales_flow.schemas import SalesFlowType
-        from app.api.shared.enums import SaleType
         from app.api.tenant.utils import get_portal_url
         from app.services.simplefi import get_simplefi_client
 
@@ -1034,12 +1045,10 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Popup is not active",
             )
-        if popup.sale_type != SaleType.direct.value:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Popup does not support open ticketing",
-            )
-
+        # The door decides, not the gathering. A named flow is checked by
+        # `resolve_flow`; an unnamed one falls to the popup's default, which
+        # has to be able to sell without an application or there is nothing
+        # for an anonymous buyer to do here.
         if flow_slug is not None:
             target_flow = resolve_flow(
                 session,
@@ -1049,6 +1058,14 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             )
         else:
             target_flow = sales_flows_crud.get_default_flow(session, popup.id)
+            if target_flow is not None and target_flow.type not in (
+                SalesFlowType.direct.value,
+                SalesFlowType.upsale.value,
+            ):
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="This way in does not support open ticketing",
+                )
         if target_flow is not None:
             assert_upsale_eligible(
                 session, target_flow, popup.id, tenant.id, current_human

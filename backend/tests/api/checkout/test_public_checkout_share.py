@@ -21,6 +21,7 @@ from sqlmodel import Session
 from app.api.popup.models import Popups
 from app.api.shared.enums import SaleType
 from app.api.tenant.models import Tenants
+from tests._flow_helpers import provision_default_flow
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -53,6 +54,10 @@ def _make_popup(
     db.add(popup)
     db.commit()
     db.refresh(popup)
+    # A popup created through the API gets a default flow of its own type, and
+    # whether a checkout link exists is a question about doors now.
+    provision_default_flow(db, popup, sale_type=sale_type.value)
+    db.commit()
     return popup
 
 

@@ -252,17 +252,12 @@ async def create_popup(
             )
         raise
 
-    # Direct-sale popups skip the application-centric bootstrap (no approval
-    # strategy, no form sections, no base field configs). Only ticketing steps
-    # are seeded so the ticketing flow is always available.
-    if popup.sale_type == SaleType.application.value:
-        _seed_application_defaults(db, popup)
-
     # The default flow was provisioned in the same transaction as the popup
     # (task 5.0), and since sdd/sales-flows-rediseno slice 2 it owns the
     # seeded steps: a step has nowhere else to live. Its `type` also drives
-    # the buyer-step gate.
+    # the buyer-step gate, and what gets bootstrapped below.
     from app.api.sales_flow.crud import sales_flows_crud
+    from app.api.sales_flow.schemas import SalesFlowType
 
     default_flow = sales_flows_crud.get_default_flow(db, popup.id)
     if default_flow is None:
@@ -270,6 +265,12 @@ async def create_popup(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Popup was created without a default sales flow",
         )
+
+    # A door that sells directly skips the application-centric bootstrap (no
+    # approval strategy, no form sections, no base field configs). Only
+    # ticketing steps are seeded, so there is always something to sell.
+    if default_flow.type == SalesFlowType.application.value:
+        _seed_application_defaults(db, popup)
     seed_ticketing_steps_for_popup(
         db,
         popup_id=popup.id,

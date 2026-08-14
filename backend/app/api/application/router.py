@@ -50,7 +50,7 @@ from app.api.attendee.schemas import (
     AttendeeUpdate,
     AttendeeWithTickets,
 )
-from app.api.shared.enums import SaleType, UserRole
+from app.api.shared.enums import UserRole
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
 from app.core.dependencies.users import (
     AdminOrApiKey_ApplicationsRead,
@@ -1503,14 +1503,28 @@ def _build_directory_entry(attendee) -> AttendeesDirectoryEntry:
 def _ensure_attendee_directory_enabled(
     db: HumanTenantSession, popup_id: uuid.UUID
 ) -> None:
+    from sqlmodel import select as _select
+
     from app.api.popup.crud import popups_crud
+    from app.api.sales_flow.models import SalesFlows
+    from app.api.sales_flow.schemas import SalesFlowType
 
     popup = popups_crud.get(db, popup_id)
-    if (
-        not popup
-        or popup.sale_type == SaleType.direct.value
-        or not popup.show_attendee_directory
-    ):
+    # A directory exists where people applied. Asked of the popup, a gathering
+    # that takes applications through one door and sells through another had
+    # no directory at all — or had one for buyers who never applied.
+    takes_applications = (
+        db.exec(
+            _select(SalesFlows.id)
+            .where(
+                SalesFlows.popup_id == popup_id,
+                SalesFlows.type == SalesFlowType.application.value,
+            )
+            .limit(1)
+        ).first()
+        is not None
+    )
+    if not popup or not takes_applications or not popup.show_attendee_directory:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Attendee directory not found",

@@ -90,11 +90,11 @@ def get_open_ticketing_popup(
             detail="Popup not found",
         )
 
-    if popup.sale_type != SaleType.direct.value:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="This endpoint is only available for direct-sale popups",
-        )
+    # No sale_type check here. A gathering that takes applications can still
+    # have a door that sells directly — a sponsor's, a partner's — and asking
+    # the popup turned that door away before its flow was ever resolved. The
+    # flow answers for itself: `resolve_flow(require_types=...)` for a named
+    # one, `assert_sells_directly` for the default.
 
     if popup.status != PopupStatus.active.value:
         raise HTTPException(
@@ -324,11 +324,43 @@ def runtime_for_slug(
     )
 
 
+def popup_sells_directly(session: Session, popup_id: uuid.UUID) -> bool:
+    """Whether any way into this gathering sells without an application."""
+    from app.api.sales_flow.models import SalesFlows
+    from app.api.sales_flow.schemas import SalesFlowType
+
+    return (
+        session.exec(
+            select(SalesFlows.id)
+            .where(
+                SalesFlows.popup_id == popup_id,
+                SalesFlows.type.in_(  # type: ignore[union-attr]
+                    (SalesFlowType.direct.value, SalesFlowType.upsale.value)
+                ),
+            )
+            .limit(1)
+        ).first()
+        is not None
+    )
+
+
 def share_meta_for_slug(
     session: Session, slug: str, tenant_id: uuid.UUID
 ) -> CheckoutShareMeta:
-    """Load the minimal popup projection for social/OpenGraph share previews."""
+    """Load the minimal popup projection for social/OpenGraph share previews.
+
+    A share card describes a checkout link, so it exists only where something
+    can actually be bought without applying. That used to be a popup-level
+    question; it is a question about doors now, and a gathering that takes
+    applications through one and sells through another has a link worth
+    previewing.
+    """
     popup = get_open_ticketing_popup(session, slug, tenant_id)
+    if not popup_sells_directly(session, popup.id):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Popup not found",
+        )
     return CheckoutShareMeta(
         id=popup.id,
         name=popup.name,
