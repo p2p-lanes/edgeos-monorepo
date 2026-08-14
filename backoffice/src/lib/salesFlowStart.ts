@@ -128,3 +128,26 @@ export function slugifyFlowName(name: string): string {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
 }
+
+/**
+ * The starting point to take without asking, or null when there is a real
+ * choice to make.
+ *
+ * Asking is only worth somebody's time when the answers differ. With nothing
+ * of this kind to copy there is one possible answer; with exactly one, that
+ * one is almost always right — it is the same gathering, so its terms carry
+ * over, and it is what the backend did before `start_from` existed.
+ *
+ * The question earns its screen at the third flow, which is also when the
+ * reason for `fresh` first appears: a partner's five percent contribution is
+ * only worth refusing once some flow has one.
+ *
+ * Flows of another kind never force the question. Copying across kinds is the
+ * deliberate path, reached by changing the answer rather than by being asked
+ * for it.
+ */
+export function autoStart(choices: StartChoices): StartOption | null {
+  const copies = choices.offered.filter((option) => option.kind === "copy")
+  if (copies.length > 1) return null
+  return copies[0] ?? choices.offered[0] ?? null
+}

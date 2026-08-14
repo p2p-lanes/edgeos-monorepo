@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 import type { SalesFlowPublic } from "@/client"
 import {
+  autoStart,
   notCarriedAcross,
   START_FRESH,
   slugifyFlowName,
@@ -109,5 +110,51 @@ describe("slugifyFlowName", () => {
   it("is empty when there is nothing to slug", () => {
     expect(slugifyFlowName("   ")).toBe("")
     expect(slugifyFlowName("!!!")).toBe("")
+  })
+})
+
+describe("autoStart", () => {
+  const decide = (
+    type: Parameters<typeof startChoicesFor>[0],
+    flows: SalesFlowPublic[],
+  ) => autoStart(startChoicesFor(type, flows))
+
+  it("takes the only sensible answer when there is nothing to copy", () => {
+    // No add-on exists yet, so there is nothing of that kind to copy.
+    expect(
+      decide("upsale", [flow({ name: "Attendee", type: "application" })])?.id,
+    ).toBe(START_FRESH)
+  })
+
+  it("copies the one flow of that kind rather than asking", () => {
+    // At launch every gathering has exactly one flow, so this is the case
+    // that decides whether the step is worth a screen. It is not: the answers
+    // do not differ, and copying the sibling is what the backend did before
+    // `start_from` existed.
+    const decision = decide("application", [
+      flow({ name: "Attendee", type: "application", is_default: true }),
+    ])
+    expect(decision?.name).toBe("A copy of Attendee")
+  })
+
+  it("asks once there are two flows of that kind", () => {
+    // Which is also when the reason for starting clean first appears: a
+    // partner's contribution is only worth refusing once some flow has one.
+    expect(decide("application", DOORS)).toBeNull()
+  })
+
+  it("is not forced into a question by flows of another kind", () => {
+    // Copying across kinds is the deliberate path, reached by changing the
+    // answer rather than by being asked for it.
+    const decision = decide("direct", [
+      flow({ name: "Attendee", type: "application" }),
+      flow({ name: "Volunteers", type: "application" }),
+      flow({ name: "Sponsors", type: "direct" }),
+    ])
+    expect(decision?.name).toBe("A copy of Sponsors")
+  })
+
+  it("has an answer even for a gathering with no flows at all", () => {
+    expect(decide("application", [])?.id).toBe(START_FRESH)
   })
 })

@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import useCustomToast from "@/hooks/useCustomToast"
 import {
+  autoStart,
   notCarriedAcross,
   type StartOption,
   slugifyFlowName,
@@ -129,13 +130,26 @@ export function NewSalesFlowWizard({ popupId }: { popupId: string }) {
   ]
 
   function chooseType(next: SalesFlowType) {
-    // A source that can no longer produce this kind of door stops being the
+    // A source that can no longer produce this kind of flow stops being the
     // answer, rather than waiting to be rejected at submit.
     if (chosen?.kind === "copy" && chosen.sourceType !== next) {
       setStartFrom(null)
     }
     setFlowType(next)
     setShowOtherKinds(false)
+
+    // Step two is skipped when its answers do not differ: nothing of this
+    // kind to copy, or exactly one thing, which is almost always right. It
+    // stays on the step rail with its answer, and the review says where the
+    // flow starts with a way to change it, so nothing is decided behind
+    // anyone's back — it is just not made into a question.
+    const automatic = autoStart(startChoicesFor(next, flows))
+    if (automatic) {
+      setStartFrom(automatic.id)
+      setStep(3)
+      return
+    }
+    setStartFrom(null)
     setStep(2)
   }
 
@@ -341,7 +355,11 @@ export function NewSalesFlowWizard({ popupId }: { popupId: string }) {
             </div>
             <dl className="divide-y">
               <Row k="What it does" v={TYPE_COPY[flowType].label} />
-              <Row k="Starting from" v={chosen.name} />
+              <Row
+                k="Starting from"
+                v={chosen.name}
+                onChange={() => setStep(2)}
+              />
               {preview && (
                 <>
                   <Row
@@ -367,7 +385,7 @@ export function NewSalesFlowWizard({ popupId }: { popupId: string }) {
               {chosen.kind === "copy" && (
                 <Row
                   k="Also copied"
-                  v="Its checkout steps and its buyer form, once. The two doors are independent afterwards."
+                  v="Its checkout steps and its buyer form, once. The two flows are independent afterwards."
                 />
               )}
             </dl>
@@ -417,11 +435,31 @@ function StartRow({
   )
 }
 
-function Row({ k, v, warn }: { k: string; v: string; warn?: boolean }) {
+function Row({
+  k,
+  v,
+  warn,
+  onChange,
+}: {
+  k: string
+  v: string
+  warn?: boolean
+  /** Present when this answer was taken without being asked for. */
+  onChange?: () => void
+}) {
   return (
-    <div className="flex flex-wrap gap-x-4 gap-y-1 px-4 py-2.5 text-sm">
+    <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 px-4 py-2.5 text-sm">
       <dt className="w-40 shrink-0 text-muted-foreground">{k}</dt>
       <dd className={cn("min-w-0 flex-1", warn && "text-warning")}>{v}</dd>
+      {onChange && (
+        <button
+          type="button"
+          onClick={onChange}
+          className="shrink-0 text-xs font-semibold text-primary hover:underline"
+        >
+          Change
+        </button>
+      )}
     </div>
   )
 }
