@@ -6807,7 +6807,8 @@ export class InvitesService {
      * Create My Link
      * Portal: create this attendee's link for a popup.
      *
-     * Spec: REQ-GR-008 (entity), REQ-GR-026 (popup.referrals_enabled gate).
+     * Spec: REQ-GR-008 (entity), REQ-GR-026 (the attendee-links gate,
+     * which belongs to the flow the sharer came through).
      * Token auto-generated when omitted. 409 if (popup_id, token) collides.
      * @param data The data for the request.
      * @param data.requestBody

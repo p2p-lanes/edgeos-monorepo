@@ -19,7 +19,6 @@ import {
   MapPin,
   QrCode,
   Scale,
-  Share2,
   ShoppingCart,
   Users,
 } from "lucide-react"
@@ -225,11 +224,8 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
       edit_passes_enabled: defaultValues?.edit_passes_enabled ?? false,
       self_check_in_enabled: defaultValues?.self_check_in_enabled ?? false,
       show_attendee_directory: defaultValues?.show_attendee_directory ?? false,
-      referrals_enabled: defaultValues?.referrals_enabled ?? false,
       group_private_events_enabled:
         defaultValues?.group_private_events_enabled ?? false,
-      max_referrals_per_attendee:
-        defaultValues?.max_referrals_per_attendee?.toString() ?? "10",
     },
     onSubmit: ({ value }) => {
       if (readOnly) return
@@ -266,11 +262,7 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
         self_check_in_enabled: value.self_check_in_enabled,
         show_attendee_directory:
           value.sale_type === "application" && value.show_attendee_directory,
-        referrals_enabled: value.referrals_enabled,
         group_private_events_enabled: value.group_private_events_enabled,
-        max_referrals_per_attendee: value.max_referrals_per_attendee
-          ? Number(value.max_referrals_per_attendee)
-          : null,
       }
       if (value.status === "active") {
         const missing = getMissingLaunchFields(value)
@@ -911,55 +903,6 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
 
             {/* Groups and Invites feature flags */}
             <InlineSection title="Groups and Invites">
-              <form.Field name="referrals_enabled">
-                {(field) => (
-                  <InlineRow
-                    icon={<Share2 className="h-4 w-4 text-muted-foreground" />}
-                    label="Enable Referrals"
-                    description="Allow attendees to create referral codes and refer others"
-                  >
-                    <Switch
-                      id="referrals_enabled"
-                      checked={field.state.value}
-                      onCheckedChange={(checked) => field.handleChange(checked)}
-                      disabled={readOnly}
-                    />
-                  </InlineRow>
-                )}
-              </form.Field>
-
-              <form.Subscribe
-                selector={(state) => state.values.referrals_enabled}
-              >
-                {(referralsEnabled) =>
-                  referralsEnabled ? (
-                    <form.Field name="max_referrals_per_attendee">
-                      {(field) => (
-                        <InlineRow
-                          icon={
-                            <Share2 className="h-4 w-4 text-muted-foreground" />
-                          }
-                          label="Max referrals per attendee"
-                          description="How many people each attendee can refer (their referral link's use limit). Leave empty for unlimited."
-                        >
-                          <Input
-                            id="max_referrals_per_attendee"
-                            type="number"
-                            min="1"
-                            step="1"
-                            placeholder="e.g. 10"
-                            value={field.state.value}
-                            onChange={(e) => field.handleChange(e.target.value)}
-                            disabled={readOnly}
-                            className="max-w-[120px] text-sm"
-                          />
-                        </InlineRow>
-                      )}
-                    </form.Field>
-                  ) : null
-                }
-              </form.Subscribe>
-
               <form.Field name="group_private_events_enabled">
                 {(field) => (
                   <InlineRow

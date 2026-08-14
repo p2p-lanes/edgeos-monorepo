@@ -19541,6 +19541,28 @@ export const SalesFlowCreateSchema = {
             ],
             title: 'Invites Enabled'
         },
+        referrals_enabled: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Referrals Enabled'
+        },
+        max_referrals_per_attendee: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Max Referrals Per Attendee'
+        },
         checkin_pass_lead_days: {
             anyOf: [
                 {
@@ -20040,6 +20062,28 @@ export const SalesFlowPublicSchema = {
                 }
             ],
             title: 'Invites Enabled'
+        },
+        referrals_enabled: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Referrals Enabled'
+        },
+        max_referrals_per_attendee: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Max Referrals Per Attendee'
         },
         checkin_pass_lead_days: {
             anyOf: [
@@ -20577,6 +20621,28 @@ export const SalesFlowUpdateSchema = {
                 }
             ],
             title: 'Invites Enabled'
+        },
+        referrals_enabled: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Referrals Enabled'
+        },
+        max_referrals_per_attendee: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Max Referrals Per Attendee'
         },
         checkin_pass_lead_days: {
             anyOf: [

@@ -274,6 +274,20 @@ const CONFIG_SECTIONS: {
           "Let admins create invite links that land people in this flow. An invite already names the flow it opens, so this is that flow's answer.",
         kind: "boolean",
       },
+      {
+        key: "referrals_enabled",
+        label: "Let Attendees Share",
+        description:
+          "Let people who came in this way create a link of their own. They share the door they entered by, so it is this flow they bring others into.",
+        kind: "boolean",
+      },
+      {
+        key: "max_referrals_per_attendee",
+        label: "Uses Per Shared Link",
+        description:
+          "How many people one attendee's link may bring in. Empty means no limit.",
+        kind: "number",
+      },
     ],
   },
   {
