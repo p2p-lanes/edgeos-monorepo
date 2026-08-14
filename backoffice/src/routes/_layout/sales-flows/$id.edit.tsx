@@ -9,6 +9,7 @@ import { SalesFlowForm } from "@/components/forms/SalesFlowForm"
 import { SalesFlowScopeBanner } from "@/components/forms/SalesFlowScopeBanner"
 import { SalesFlowUrlCard } from "@/components/forms/SalesFlowUrlCard"
 import { FlowSectionLinks } from "@/components/SalesFlows/FlowSectionLinks"
+import { FlowStandingCard } from "@/components/SalesFlows/FlowStandingCard"
 import { InlineSection } from "@/components/ui/inline-form"
 import { Separator } from "@/components/ui/separator"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -50,31 +51,35 @@ function EditSalesFlowContent({ flowId }: { flowId: string }) {
         flow={salesFlow}
       />
 
-      <SalesFlowForm
-        popupId={salesFlow.popup_id}
-        defaultValues={salesFlow}
-        onSuccess={goBack}
-      />
-
-      <Separator />
+      <FlowStandingCard popupId={salesFlow.popup_id} flowId={flowId} />
 
       {/*
-        The form, the emails and the reviewers used to be edited here as
-        well as in their own sections. Two places for one resource, and
-        neither said which flow it meant. They live in their own sections
-        now, and this points at them with the flow already selected.
+        What it sells comes before how it behaves, and the order is not
+        cosmetic. A door can be configured exactly like every other one and
+        still be a completely different door, because what it puts on sale is
+        the difference — a volunteers way in with one pass and no merch reads
+        as an identical copy until you look here.
 
-        Reviewers are not among them: they belong to the gathering, and a
-        flow opts out of that list through `reviewers_mode` in the form
-        above, which is a decision rather than a place to keep a list.
+        These live in their own sections; this points at them with the flow
+        already selected. Reviewers are not among them: they belong to the
+        gathering, and a flow opts out through `reviewers_mode` below, which
+        is a decision rather than a place to keep a list.
       */}
-      <InlineSection title="Where this flow's things live">
+      <InlineSection title="What it sells">
         <FlowSectionLinks
           popupId={salesFlow.popup_id}
           flowId={flowId}
           flowType={salesFlow.type}
         />
       </InlineSection>
+
+      <Separator />
+
+      <SalesFlowForm
+        popupId={salesFlow.popup_id}
+        defaultValues={salesFlow}
+        onSuccess={goBack}
+      />
     </div>
   )
 }

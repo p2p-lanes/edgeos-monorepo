@@ -24,6 +24,7 @@ import {
   type ConfigFieldKind,
   ConfigFieldRow,
 } from "@/components/forms/ConfigFieldRow"
+import { ConfigSectionRow } from "@/components/forms/ConfigSectionRow"
 import { RestrictionRuleEditor } from "@/components/forms/RestrictionRuleEditor"
 import { SalesFlowVisibilityNote } from "@/components/forms/SalesFlowVisibilityNote"
 import { Button } from "@/components/ui/button"
@@ -54,6 +55,7 @@ import {
   draftsToRestrictionRule,
   parseRestrictionRuleToDrafts,
 } from "@/lib/salesFlowRestrictionRule"
+import { summarizeSection } from "@/lib/salesFlowSectionSummary"
 import { createErrorHandler } from "@/utils"
 
 function rawToInput(
@@ -138,6 +140,10 @@ export function SalesFlowForm({
   const { isOperatorOrAbove } = useAuth()
   const isEdit = !!defaultValues
   const readOnly = !isOperatorOrAbove
+
+  // Everything starts closed. The answers are all on screen either way, and
+  // opening one is a decision to change it rather than to read it.
+  const [openSections, setOpenSections] = useState<string[]>([])
   const [restrictionRuleError, setRestrictionRuleError] = useState<string>()
 
   const handleMutationError = (err: ApiError) => {
@@ -469,19 +475,60 @@ export function SalesFlowForm({
           instead of after a save. A section whose every field is filtered
           out is not rendered — an empty heading reads as a missing feature.
         */}
-        <form.Subscribe selector={(state) => state.values.type}>
-          {(flowType) =>
-            CONFIG_SECTIONS.map((section) => {
-              const fields = section.fields.filter(
-                (f) => !f.appliesTo || f.appliesTo === flowType,
-              )
-              if (fields.length === 0) return null
-              return (
-                <div key={section.title}>
-                  <Separator />
-                  <InlineSection
+        <form.Subscribe
+          selector={(state) =>
+            [state.values.type, state.values.config] as const
+          }
+        >
+          {([flowType, config]) => (
+            <div className="overflow-hidden rounded-xl border">
+              {CONFIG_SECTIONS.map((section) => {
+                const fields = section.fields.filter(
+                  (f) => !f.appliesTo || f.appliesTo === flowType,
+                )
+                if (fields.length === 0) return null
+
+                // Summarized from the draft, not the saved row, so the answer
+                // on the line follows an edit instead of waiting for a save.
+                const parsed = Object.fromEntries(
+                  section.fields.map((f) => {
+                    const draft =
+                      (config as Record<string, string>)[f.key] ?? ""
+                    // A secret is never loaded into the form, so its draft is
+                    // empty even when one is stored. Reading the draft would
+                    // have the summary announce "unsigned" about a handover
+                    // that is signed — confidently, and wrongly.
+                    if (f.kind === "secret" && draft === "") {
+                      return [
+                        f.key,
+                        defaultValues?.[f.key as keyof SalesFlowPublic]
+                          ? "stored"
+                          : null,
+                      ]
+                    }
+                    return [f.key, parseDraftValue(f.kind, draft)]
+                  }),
+                )
+                const { answer, active } = summarizeSection(
+                  section.title,
+                  parsed,
+                )
+
+                return (
+                  <ConfigSectionRow
+                    key={section.title}
                     title={section.title}
                     description={section.description}
+                    answer={answer}
+                    active={active}
+                    open={openSections.includes(section.title)}
+                    onToggle={() =>
+                      setOpenSections((current) =>
+                        current.includes(section.title)
+                          ? current.filter((t) => t !== section.title)
+                          : [...current, section.title],
+                      )
+                    }
                   >
                     {fields.map((fieldConfig) => (
                       <form.Field
@@ -509,11 +556,11 @@ export function SalesFlowForm({
                         )}
                       </form.Field>
                     ))}
-                  </InlineSection>
-                </div>
-              )
-            })
-          }
+                  </ConfigSectionRow>
+                )
+              })}
+            </div>
+          )}
         </form.Subscribe>
 
         <Separator />

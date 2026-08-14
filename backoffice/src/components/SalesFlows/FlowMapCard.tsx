@@ -4,6 +4,7 @@ import { AlertTriangle, CircleAlert, CircleCheck, EyeOff } from "lucide-react"
 import type { SalesFlowPublic, SalesFlowReadiness } from "@/client"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
+import { BLOCKER_TEXT, WARNING_TEXT } from "@/lib/salesFlowReadiness"
 
 /**
  * One flow on the map (sdd/sales-flows-rediseno slice 8).
@@ -13,17 +14,6 @@ import { Card, CardContent } from "@/components/ui/card"
  * exactly like a working one there. What an operator needs to see first is
  * whether the flow can take money today.
  */
-
-const BLOCKER_TEXT: Record<string, string> = {
-  no_steps: "The checkout has no steps, so buyers see an empty page",
-  sells_nothing: "The steps offer no product that is on sale",
-  no_form: "The application form has no questions",
-}
-
-const WARNING_TEXT: Record<string, string> = {
-  unlisted: "Not listed in the portal, reachable only by its link",
-  accepts_everyone: "No approval rules, so every application is accepted",
-}
 
 interface FlowMapCardProps {
   flow: SalesFlowPublic

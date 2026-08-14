@@ -92,6 +92,18 @@ function renderForm(overrides: Partial<typeof FLOW_BASE> = {}) {
   )
 }
 
+/**
+ * Settings groups are closed until somebody opens one, so a test that wants a
+ * field has to do what a person does. The closed row still carries the
+ * group's answer, which is asserted separately below.
+ */
+async function openGroup(title: string) {
+  const user = userEvent.setup()
+  await user.click(
+    await screen.findByRole("button", { name: new RegExp(title, "i") }),
+  )
+}
+
 describe("SalesFlowForm - flow-owned settings", () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -100,6 +112,7 @@ describe("SalesFlowForm - flow-owned settings", () => {
 
   it("never offers a settings value a second source", async () => {
     renderForm()
+    await openGroup("Application Settings")
 
     await waitFor(() =>
       expect(screen.getByLabelText(/scholarship/i)).toBeInTheDocument(),
@@ -117,6 +130,7 @@ describe("SalesFlowForm - flow-owned settings", () => {
 
   it("shows the flow's own boolean value as a plain control", async () => {
     renderForm({ allows_scholarship: true })
+    await openGroup("Application Settings")
 
     const control = await screen.findByLabelText(/scholarship/i)
 
@@ -126,6 +140,7 @@ describe("SalesFlowForm - flow-owned settings", () => {
   it("sends the edited value straight through on save", async () => {
     const user = userEvent.setup()
     renderForm({ allows_scholarship: true })
+    await openGroup("Application Settings")
 
     const control = await screen.findByLabelText(/scholarship/i)
     await user.click(control)
@@ -142,6 +157,7 @@ describe("SalesFlowForm - flow-owned settings", () => {
   it("keeps an untouched value instead of clearing it", async () => {
     const user = userEvent.setup()
     renderForm({ allows_scholarship: true, allows_coupons: false })
+    await openGroup("Application Settings")
 
     await screen.findByLabelText(/scholarship/i)
     await user.click(screen.getByRole("button", { name: /save/i }))
@@ -159,6 +175,7 @@ describe("SalesFlowForm - flow-owned settings", () => {
     /* A direct sale produces no application, so a scholarship toggle there
        is configuration that can never run. */
     renderForm({ type: "direct" as never })
+    await openGroup("Open Checkout Redirects")
 
     await screen.findByLabelText(/success url/i)
 
@@ -172,16 +189,21 @@ describe("SalesFlowForm - flow-owned settings", () => {
   it("keeps the cadences that apply to any sale", async () => {
     renderForm({ type: "direct" as never })
 
-    // Each cadence is its own headed group naming the email it paces, so
-    // "Delay (days)" is read through the heading above it rather than
-    // repeated into a label nobody could parse.
+    // Each cadence is its own group naming the email it paces, and the group
+    // says what it currently does without being opened.
     expect(await screen.findByText("Abandoned Cart")).toBeInTheDocument()
     expect(screen.getByText("Purchase Reminder")).toBeInTheDocument()
-    expect(screen.getByLabelText(/allows coupons/i)).toBeInTheDocument()
+    expect(
+      screen.getByText("Nobody is chased about an unfinished cart"),
+    ).toBeInTheDocument()
+
+    await openGroup("Discounts")
+    expect(await screen.findByLabelText(/allows coupons/i)).toBeInTheDocument()
   })
 
   it("never renders the signing secret in clear text", async () => {
     renderForm()
+    await openGroup("Application Settings")
 
     await screen.findByLabelText(/scholarship/i)
 
