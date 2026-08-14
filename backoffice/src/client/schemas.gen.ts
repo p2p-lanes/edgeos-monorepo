@@ -15620,6 +15620,16 @@ export const PopupAdminSchema = {
             type: 'string',
             format: 'uuid',
             title: 'Id'
+        },
+        takes_applications: {
+            type: 'boolean',
+            title: 'Takes Applications',
+            default: true
+        },
+        sells_directly: {
+            type: 'boolean',
+            title: 'Sells Directly',
+            default: false
         }
     },
     type: 'object',

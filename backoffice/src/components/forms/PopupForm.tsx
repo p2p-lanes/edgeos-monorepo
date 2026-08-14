@@ -14,7 +14,6 @@ import {
   Key,
   Languages,
   Link as LinkIcon,
-  Lock,
   Mail,
   MapPin,
   QrCode,
@@ -136,6 +135,10 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
   const { isOperatorOrAbove } = useAuth()
   const isEdit = !!defaultValues
   const readOnly = !isOperatorOrAbove
+  // Does anybody apply to this event? Answered by its doors, because one of
+  // them can review applicants while another sells. On a new event there are
+  // no doors yet, so the choice made below in the form is the answer.
+  const takesApplications = defaultValues?.takes_applications !== false
 
   const createMutation = useMutation({
     mutationFn: (data: PopupCreate) =>
@@ -256,12 +259,16 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
         invoice_company_email: value.invoice_company_email || null,
         default_language: value.default_language,
         supported_languages: value.supported_languages,
-        sale_type: value.sale_type,
+        // Only on create, where it seeds the event's first door. On an
+        // existing event the door owns its own type, and sending this would
+        // retype it from a screen that never asked.
+        ...(isEdit ? {} : { sale_type: value.sale_type }),
         events_enabled: value.events_enabled,
         edit_passes_enabled: value.edit_passes_enabled,
         self_check_in_enabled: value.self_check_in_enabled,
         show_attendee_directory:
-          value.sale_type === "application" && value.show_attendee_directory,
+          (isEdit ? takesApplications : value.sale_type === "application") &&
+          value.show_attendee_directory,
         group_private_events_enabled: value.group_private_events_enabled,
       }
       if (value.status === "active") {
@@ -534,33 +541,27 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
             </InlineSection>
 
             {/* Application review — approval strategy + reviewers (edit only,
-            application sale_type only — direct-sale popups have no application
-            flow, so these are meaningless) */}
-            {isEdit && (
-              <form.Subscribe selector={(state) => state.values.sale_type}>
-                {(saleType) =>
-                  saleType === "application" ? (
-                    <>
-                      <Separator />
+            and only where somebody actually applies: with nothing to review
+            these are meaningless) */}
+            {isEdit && takesApplications && (
+              <>
+                <Separator />
 
-                      <ApprovalStrategyForm
-                        popupId={defaultValues!.id}
-                        readOnly={readOnly}
-                        variant="inline"
-                      />
+                <ApprovalStrategyForm
+                  popupId={defaultValues!.id}
+                  readOnly={readOnly}
+                  variant="inline"
+                />
 
-                      <Separator />
+                <Separator />
 
-                      <ConditionalReviewersManager
-                        popupId={defaultValues!.id}
-                        tenantId={defaultValues!.tenant_id}
-                        readOnly={readOnly}
-                        variant="inline"
-                      />
-                    </>
-                  ) : null
-                }
-              </form.Subscribe>
+                <ConditionalReviewersManager
+                  popupId={defaultValues!.id}
+                  tenantId={defaultValues!.tenant_id}
+                  readOnly={readOnly}
+                  variant="inline"
+                />
+              </>
             )}
 
             {isEdit && !readOnly && (
@@ -589,76 +590,78 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
                   Commerce setup
                 </h3>
                 <p className="text-sm text-muted-foreground">
-                  Decide how people will access this event. This is the primary
-                  identity of the popup. Checkout mode is always derived from
-                  this choice by the backend.
+                  {isEdit
+                    ? "Each way into this event decides for itself whether people apply or buy. Edit a sales flow to change what its door does."
+                    : "Decide how people will first access this event. This becomes the event's main way in, and you can add more later."}
                 </p>
               </div>
 
-              <InlineSection title="How this event sells">
-                <form.Field name="sale_type">
-                  {(field) => (
-                    <InlineRow
-                      icon={
-                        isEdit ? (
-                          <Lock className="h-4 w-4 text-muted-foreground" />
-                        ) : (
+              {/* Only while creating. Once the event exists this is a property
+              of each sales flow, and offering it here would edit one door
+              from a screen that looks like it edits the event. */}
+              {!isEdit && (
+                <InlineSection title="How this event sells">
+                  <form.Field name="sale_type">
+                    {(field) => (
+                      <InlineRow
+                        icon={
                           <ShoppingCart className="h-4 w-4 text-muted-foreground" />
-                        )
-                      }
-                      label="Sale Type"
-                      description={
-                        isEdit
-                          ? "Change sale type only if this gathering has no approved payments yet"
-                          : "Choose whether people apply first or buy tickets directly"
-                      }
-                    >
-                      <Select
-                        value={field.state.value}
-                        onValueChange={(value) =>
-                          field.handleChange(value as SaleType)
                         }
-                        disabled={readOnly}
+                        label="Main way in"
+                        description="Choose whether people apply first or buy tickets directly"
                       >
-                        <SelectTrigger className="w-[220px] text-sm" size="sm">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="application">
-                            {SALE_TYPE_COPY.application.label}
-                          </SelectItem>
-                          <SelectItem value="direct">
-                            {SALE_TYPE_COPY.direct.label}
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </InlineRow>
-                  )}
-                </form.Field>
-              </InlineSection>
+                        <Select
+                          value={field.state.value}
+                          onValueChange={(value) =>
+                            field.handleChange(value as SaleType)
+                          }
+                          disabled={readOnly}
+                        >
+                          <SelectTrigger
+                            className="w-[220px] text-sm"
+                            size="sm"
+                          >
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="application">
+                              {SALE_TYPE_COPY.application.label}
+                            </SelectItem>
+                            <SelectItem value="direct">
+                              {SALE_TYPE_COPY.direct.label}
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </InlineRow>
+                    )}
+                  </form.Field>
+                </InlineSection>
+              )}
 
-              <form.Subscribe selector={(state) => state.values.sale_type}>
-                {(saleType) => {
-                  const copy = SALE_TYPE_COPY[saleType]
-                  const guidance = getSaleTypeGuidance(saleType)
-                  return (
-                    <div className="rounded-xl border bg-muted/30 p-4">
-                      <p className="text-sm font-semibold">{copy.label}</p>
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        {copy.description}
-                      </p>
-                      <div className="mt-3 border-t pt-3">
-                        <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                          {guidance.title}
-                        </p>
+              {!isEdit && (
+                <form.Subscribe selector={(state) => state.values.sale_type}>
+                  {(saleType) => {
+                    const copy = SALE_TYPE_COPY[saleType]
+                    const guidance = getSaleTypeGuidance(saleType)
+                    return (
+                      <div className="rounded-xl border bg-muted/30 p-4">
+                        <p className="text-sm font-semibold">{copy.label}</p>
                         <p className="mt-1 text-sm text-muted-foreground">
-                          {guidance.description}
+                          {copy.description}
                         </p>
+                        <div className="mt-3 border-t pt-3">
+                          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                            {guidance.title}
+                          </p>
+                          <p className="mt-1 text-sm text-muted-foreground">
+                            {guidance.description}
+                          </p>
+                        </div>
                       </div>
-                    </div>
-                  )
-                }}
-              </form.Subscribe>
+                    )
+                  }}
+                </form.Subscribe>
+              )}
 
               <InlineSection>
                 <form.Field name="currency">
@@ -846,7 +849,9 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
             {/* Attendee directory feature flag */}
             <form.Subscribe selector={(state) => state.values.sale_type}>
               {(saleType) =>
-                saleType === "application" ? (
+                // On an existing event the doors answer; while creating one
+                // the choice being made in this form is the answer.
+                (isEdit ? takesApplications : saleType === "application") ? (
                   <>
                     <InlineSection title="Attendee directory">
                       <form.Field name="show_attendee_directory">

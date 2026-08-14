@@ -67,6 +67,40 @@ def flow_kinds_for_popups(
     return kinds
 
 
+def popup_takes_applications(session: Session, popup_id: uuid.UUID) -> bool:
+    """Whether any way into this gathering asks people to apply first."""
+    return _has_flow_of_type(session, popup_id, (SalesFlowType.application.value,))
+
+
+def popup_sells_directly(session: Session, popup_id: uuid.UUID) -> bool:
+    """Whether any way into this gathering sells without an application.
+
+    Upsale counts: it sells, it just refuses strangers. Callers that need a
+    door a stranger can walk through want the default flow's type instead.
+    """
+    return _has_flow_of_type(
+        session,
+        popup_id,
+        (SalesFlowType.direct.value, SalesFlowType.upsale.value),
+    )
+
+
+def _has_flow_of_type(
+    session: Session, popup_id: uuid.UUID, types: "tuple[str, ...]"
+) -> bool:
+    return (
+        session.exec(
+            select(SalesFlows.id)
+            .where(
+                SalesFlows.popup_id == popup_id,
+                SalesFlows.type.in_(types),  # type: ignore[union-attr]
+            )
+            .limit(1)
+        ).first()
+        is not None
+    )
+
+
 def resolve_default_flow_slug(
     candidate: str,
     taken: frozenset[str] = frozenset(),

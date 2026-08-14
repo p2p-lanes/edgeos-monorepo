@@ -263,20 +263,23 @@ async def create_my_attendee_for_popup(
     """Create a companion attendee (spouse/child) for the current Human's application.
 
     Requires:
-    - Application popup (sale_type check enforced as defense-in-depth)
+    - A gathering where somebody applies (defense-in-depth; the application
+      lookup below is the real gate)
     - Valid accepted Application for (current_human, popup_id)
 
-    Returns 422 with code='application_required' if no application exists or the
-    popup is not an application popup.
+    Returns 422 with code='application_required' if no application exists or
+    nobody applies to this gathering at all.
     """
     from app.api.application.crud import applications_crud
     from app.api.popup.guards import ensure_popup_writable
     from app.api.popup.models import Popups
-    from app.api.shared.enums import SaleType
+    from app.api.sales_flow.crud import popup_takes_applications
 
-    # Validate popup exists and is an application popup
+    # Asked of the doors: a gathering that sells through its main way in can
+    # still review applicants through another, and those applicants are
+    # entitled to bring a companion.
     popup = db.get(Popups, popup_id)
-    if popup is None or getattr(popup, "sale_type", None) == SaleType.direct.value:
+    if popup is None or not popup_takes_applications(db, popup_id):
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=[

@@ -679,3 +679,7 @@ class PopupAdmin(PopupBase):
     """Admin popup schema — all fields including sensitive ones."""
 
     id: uuid.UUID
+    # Same derived pair the portal reads, so the backoffice list can say what
+    # a gathering actually does instead of echoing a column nothing honours.
+    takes_applications: bool = True
+    sells_directly: bool = False

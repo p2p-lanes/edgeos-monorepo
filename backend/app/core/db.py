@@ -8,7 +8,7 @@ from dateutil.parser import parse as parse_datetime
 from loguru import logger
 from sqlmodel import Session, create_engine, select
 
-from app.api.shared.enums import HumanRating, UserRole
+from app.api.shared.enums import HumanRating, SaleType, UserRole
 from app.core.config import settings
 
 engine = create_engine(
@@ -132,7 +132,9 @@ def _seed_popups(session: Session, seed_data: dict, tenant_id) -> dict:
                 session,
                 popup_id=popup.id,
                 tenant_id=tenant_id,
-                sale_type=popup.sale_type.value,
+                # From the seed file, not from the column it lands in: what a
+                # gathering's first door does is a fact about the door.
+                sale_type=popup_data.get("sale_type", SaleType.application.value),
             )
 
             session.commit()

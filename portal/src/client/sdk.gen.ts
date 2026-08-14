@@ -1356,11 +1356,12 @@ export class AttendeesService {
      * Create a companion attendee (spouse/child) for the current Human's application.
      *
      * Requires:
-     * - Application popup (sale_type check enforced as defense-in-depth)
+     * - A gathering where somebody applies (defense-in-depth; the application
+     * lookup below is the real gate)
      * - Valid accepted Application for (current_human, popup_id)
      *
-     * Returns 422 with code='application_required' if no application exists or the
-     * popup is not an application popup.
+     * Returns 422 with code='application_required' if no application exists or
+     * nobody applies to this gathering at all.
      * @param data The data for the request.
      * @param data.popupId
      * @param data.requestBody
@@ -7747,11 +7748,12 @@ export class PortalService {
      * Create a companion attendee (spouse/child) for the current Human's application.
      *
      * Requires:
-     * - Application popup (sale_type check enforced as defense-in-depth)
+     * - A gathering where somebody applies (defense-in-depth; the application
+     * lookup below is the real gate)
      * - Valid accepted Application for (current_human, popup_id)
      *
-     * Returns 422 with code='application_required' if no application exists or the
-     * popup is not an application popup.
+     * Returns 422 with code='application_required' if no application exists or
+     * nobody applies to this gathering at all.
      * @param data The data for the request.
      * @param data.popupId
      * @param data.requestBody

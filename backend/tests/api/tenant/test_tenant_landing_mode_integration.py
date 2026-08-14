@@ -16,6 +16,7 @@ from app.api.popup.models import Popups
 from app.api.popup.schemas import PopupStatus
 from app.api.shared.enums import LandingMode, SaleType
 from app.api.tenant.models import Tenants
+from tests._flow_helpers import provision_default_flow
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -60,6 +61,11 @@ def _make_active_direct_popup(db: Session, tenant: Tenants, *, slug: str) -> Pop
     db.add(p)
     db.commit()
     db.refresh(p)
+    # Which gathering a tenant's checkout lands on is answered by the default
+    # flow's type now, and a popup built straight into the session skips the
+    # provisioning PopupsCRUD.create does.
+    provision_default_flow(db, p, sale_type=SaleType.direct.value)
+    db.commit()
     return p
 
 

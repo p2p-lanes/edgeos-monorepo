@@ -29,7 +29,8 @@ from app.api.popup.schemas import (
     PopupStatus,
     PopupUpdate,
 )
-from app.api.shared.enums import LandingMode, SaleType, UserRole
+from app.api.sales_flow.crud import default_flow_name, popup_takes_applications
+from app.api.shared.enums import LandingMode, UserRole
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
 from app.api.ticketing_step.constants import seed_ticketing_steps_for_popup
 from app.api.translation.service import (
@@ -164,7 +165,9 @@ async def list_popups(
     )
 
     return ListModel[PopupAdmin](
-        results=[PopupAdmin.model_validate(p) for p in popups],
+        results=_with_flow_kinds(
+            db, popups, [PopupAdmin.model_validate(p) for p in popups]
+        ),
         paging=Paging(
             offset=skip,
             limit=limit,
@@ -217,7 +220,7 @@ async def get_popup(
             detail="Popup not found",
         )
 
-    return PopupAdmin.model_validate(popup)
+    return _with_flow_kinds(db, [popup], [PopupAdmin.model_validate(popup)])[0]
 
 
 @router.post("", response_model=PopupAdmin, status_code=status.HTTP_201_CREATED)
@@ -327,21 +330,30 @@ async def update_popup(
     # Snapshot status before update for cache invalidation hook (ADR-2, cache event #4)
     old_status = popup.status
 
-    sale_type_change_requested = (
-        popup_in.sale_type is not None and popup_in.sale_type != popup.sale_type
-    )
-    if sale_type_change_requested:
-        approved_payments, _ = payments_crud.find_by_popup(
-            db,
-            popup.id,
-            status_filter=PaymentStatus.APPROVED,
-            limit=1,
-        )
-        if approved_payments:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="sale_type cannot change after an approved payment exists",
+    # `sale_type` is still accepted here, but it is a statement about the
+    # DEFAULT FLOW's type. Nothing reads the popup column any more, so a change
+    # that stopped at the column would be a change the product does not
+    # honour: the form would show one thing and every buyer would get the
+    # other. Compared against the flow, and applied to it below.
+    door_to_retype = None
+    if popup_in.sale_type is not None:
+        current_door = _default_flow_or_500(db, popup.id)
+        if popup_in.sale_type != current_door.type:
+            approved_payments, _ = payments_crud.find_by_popup(
+                db,
+                popup.id,
+                status_filter=PaymentStatus.APPROVED,
+                limit=1,
             )
+            if approved_payments:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=(
+                        "The main way into this event cannot change "
+                        "after an approved payment exists"
+                    ),
+                )
+            door_to_retype = current_door
 
     # Detect feature flags being enabled for the first time
     scholarship_enabling = (
@@ -375,7 +387,16 @@ async def update_popup(
             )
         raise
 
-    if updated.sale_type == SaleType.application.value:
+    if door_to_retype is not None:
+        # The name follows the type while it is still the one we gave it. A
+        # door the organiser named themselves keeps their name.
+        if door_to_retype.name == default_flow_name(door_to_retype.type):
+            door_to_retype.name = default_flow_name(popup_in.sale_type)
+        door_to_retype.type = popup_in.sale_type
+        db.add(door_to_retype)
+        db.commit()
+
+    if popup_takes_applications(db, updated.id):
         _seed_application_defaults(db, updated)
 
     # Create gated sections and base field configs on first enable.

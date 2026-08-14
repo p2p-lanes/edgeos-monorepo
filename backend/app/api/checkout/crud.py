@@ -30,7 +30,6 @@ from app.api.sales_flow.eligibility import (
     assert_upsale_eligible,
 )
 from app.api.sales_flow.resolver import resolve_flow
-from app.api.shared.enums import SaleType
 from app.api.ticketing_step.crud import ticketing_steps_crud
 from app.api.ticketing_step.models import TicketingSteps
 from app.api.ticketing_step.schemas import TicketingStepPublic
@@ -44,22 +43,36 @@ from app.api.translation.service import (
 
 
 def resolve_active_direct_popup_slug(db: Session, tenant_id: uuid.UUID) -> str | None:
-    """Return the slug of the earliest active direct-sale popup for a tenant.
+    """Return the slug of the earliest active gathering whose main way in sells.
 
-    Resolution rule (ADR, OI-4, OI-5):
-      WHERE status='active' AND sale_type='direct' AND tenant_id=:tid
+    This answers a bare `/checkout` with no slug: which of a tenant's
+    gatherings is its storefront. Resolution rule (ADR, OI-4, OI-5), with the
+    popup's `sale_type` replaced by the type of its default flow:
+
+      WHERE status='active' AND tenant_id=:tid
+        AND the default sales_flow is of type 'direct'
       ORDER BY start_date ASC NULLS LAST, id ASC
       LIMIT 1
+
+    The DEFAULT flow, not any flow. A conference that reviews applicants and
+    also happens to have a sponsor's door is not a storefront, and matching on
+    "has some door that sells" would let it steal the landing from the
+    tenant's actual shop on start_date order alone.
 
     Returns None when no matching popup exists — callers handle None gracefully
     (signals the Coming Soon path in the portal). Never raises.
     """
+    from app.api.sales_flow.models import SalesFlows  # noqa: PLC0415
+    from app.api.sales_flow.schemas import SalesFlowType  # noqa: PLC0415
+
     popup = db.exec(
         select(Popups)
+        .join(SalesFlows, SalesFlows.popup_id == Popups.id)  # type: ignore[arg-type]
         .where(
             Popups.tenant_id == tenant_id,
             Popups.status == PopupStatus.active,
-            Popups.sale_type == SaleType.direct,
+            SalesFlows.is_default == True,  # noqa: E712
+            SalesFlows.type == SalesFlowType.direct.value,
         )
         .order_by(
             Popups.start_date.asc().nulls_last(),  # type: ignore[attr-defined]
@@ -74,11 +87,11 @@ def resolve_active_direct_popup_slug(db: Session, tenant_id: uuid.UUID) -> str |
 def get_open_ticketing_popup(
     session: Session, slug: str, tenant_id: uuid.UUID
 ) -> Popups:
-    """Resolve an active direct-sale popup by slug and tenant for open ticketing.
+    """Resolve an active popup by slug and tenant for open ticketing.
 
     Raises:
         404 — popup not found by slug + tenant_id
-        403 — popup is not sale_type=direct OR is not active
+        403 — popup is not active
     """
     popup = session.exec(
         select(Popups).where(Popups.slug == slug, Popups.tenant_id == tenant_id)
@@ -113,9 +126,9 @@ def _get_popup_by_slug_or_404(
     sdd/sales-flows slice 9: the runtime's type/status gating moved to the
     flow resolver (`resolve_flow`, keyed off the RESOLVED flow, not the raw
     popup columns) — this helper only proves the popup exists, matching
-    `get_open_ticketing_popup`'s first gate without duplicating its
-    popup.sale_type/popup.status checks, which every OTHER checkout
-    endpoint (purchase, cart, share, pending/release) still uses unchanged.
+    `get_open_ticketing_popup`'s first gate without duplicating its status
+    check, which every OTHER checkout endpoint (purchase, cart, share,
+    pending/release) still uses unchanged.
     """
     popup = session.exec(
         select(Popups).where(Popups.slug == slug, Popups.tenant_id == tenant_id)
@@ -324,26 +337,6 @@ def runtime_for_slug(
     )
 
 
-def popup_sells_directly(session: Session, popup_id: uuid.UUID) -> bool:
-    """Whether any way into this gathering sells without an application."""
-    from app.api.sales_flow.models import SalesFlows
-    from app.api.sales_flow.schemas import SalesFlowType
-
-    return (
-        session.exec(
-            select(SalesFlows.id)
-            .where(
-                SalesFlows.popup_id == popup_id,
-                SalesFlows.type.in_(  # type: ignore[union-attr]
-                    (SalesFlowType.direct.value, SalesFlowType.upsale.value)
-                ),
-            )
-            .limit(1)
-        ).first()
-        is not None
-    )
-
-
 def share_meta_for_slug(
     session: Session, slug: str, tenant_id: uuid.UUID
 ) -> CheckoutShareMeta:
@@ -355,6 +348,8 @@ def share_meta_for_slug(
     applications through one and sells through another has a link worth
     previewing.
     """
+    from app.api.sales_flow.crud import popup_sells_directly  # noqa: PLC0415
+
     popup = get_open_ticketing_popup(session, slug, tenant_id)
     if not popup_sells_directly(session, popup.id):
         raise HTTPException(

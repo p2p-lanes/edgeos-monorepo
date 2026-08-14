@@ -3376,6 +3376,8 @@ export type PopupAdmin = {
     abandoned_application_repeat_days?: (number | null);
     abandoned_application_max_count?: (number | null);
     id: string;
+    takes_applications?: boolean;
+    sells_directly?: boolean;
 };
 
 export type PopupCreate = {

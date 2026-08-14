@@ -42,11 +42,14 @@ class PopupsCRUD(BaseCRUD[Popups, PopupCreate, PopupUpdate]):
         # sales_flow (design D2 — a missing default is a 500-class invariant
         # breach for the resolver). Mirrors the slice-2 backfill migration's
         # guarantee for pre-existing popups. Class B columns stay NULL (D1).
+        # Seeded from the creation request rather than from the column it was
+        # written to. What the organiser chose here is a decision about the
+        # first door, and the flow is where that decision lives from now on.
         sales_flows_crud.provision_default_flow(
             session,
             popup_id=popup.id,
             tenant_id=popup.tenant_id,
-            sale_type=popup.sale_type.value,
+            sale_type=obj_in.sale_type.value,
         )
 
         session.commit()
