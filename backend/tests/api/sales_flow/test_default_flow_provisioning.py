@@ -57,9 +57,14 @@ class TestPopupCreateProvisionsDefaultFlow:
         from app.api.popup.models import Popups
 
         popup = db.get(Popups, popup_id)
-        assert flow.application_layout == popup.application_layout
         assert flow.allows_coupons == popup.allows_coupons
-        assert flow.allows_scholarship == popup.allows_scholarship
+
+        # But only the settings this kind of door can read. Nobody applies
+        # through a direct sale, so an application layout and a scholarship
+        # toggle are not "inherited as false" — they are undecided, and the
+        # column says so (docs/sales-flows-templates.md, slice 1).
+        assert flow.application_layout is None
+        assert flow.allows_scholarship is None
 
     def test_create_popup_default_flow_type_mirrors_sale_type_application(
         self,

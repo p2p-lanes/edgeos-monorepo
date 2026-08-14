@@ -293,9 +293,21 @@ class SalesFlowsCRUD(BaseCRUD[SalesFlows, SalesFlowCreate, SalesFlowUpdate]):
         Only columns the caller left unset are filled, so an explicit value
         always wins. This is a one-time copy, not a read-through: editing the
         source afterwards never reaches this flow (slice 7).
+
+        What it copies depends on the NEW flow's type, not the source's. The
+        source is whatever this popup happens to sell through today, and it
+        can be of a different kind entirely: an event that sells directly
+        gaining a way in people apply to. Copying blind handed that flow the
+        source's success URL, cancel URL and signing secret — settings it can
+        never read — while leaving every application setting empty, because
+        the source had none to give. The wrong half arrived and the right half
+        did not.
+
+        Anything a flow of this type cannot use is left NULL, which is the
+        honest state: nobody has decided it yet.
         """
         from app.api.popup.models import Popups
-        from app.api.sales_flow.schemas import EFFECTIVE_CONFIG_FIELDS
+        from app.api.sales_flow.schemas import fields_for
 
         source = self.get_default_flow(session, popup_id)
         if source is not None and source.id == flow.id:
@@ -305,7 +317,7 @@ class SalesFlowsCRUD(BaseCRUD[SalesFlows, SalesFlowCreate, SalesFlowUpdate]):
         if source is None:
             return flow
 
-        for name in EFFECTIVE_CONFIG_FIELDS:
+        for name in fields_for(flow.type):
             if getattr(flow, name, None) is None:
                 setattr(flow, name, getattr(source, name, None))
 

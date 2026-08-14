@@ -404,6 +404,49 @@ EFFECTIVE_CONFIG_FIELDS: tuple[str, ...] = (
     "abandoned_application_max_count",
 )
 
+# Settings that can only ever do something on a flow people apply to. A door
+# that sells has no application to charge for, nobody to award a scholarship
+# to, and no half-finished draft to chase.
+APPLICATION_ONLY_FIELDS: frozenset[str] = frozenset(
+    {
+        "application_layout",
+        "requires_application_fee",
+        "application_fee_amount",
+        "allows_scholarship",
+        "allows_incentive",
+        "abandoned_application_delay_days",
+        "abandoned_application_repeat_days",
+        "abandoned_application_max_count",
+    }
+)
+
+# The mirror: a buyer who applied first is returned to the portal, so there is
+# nowhere external to send them and nothing to sign on the way.
+SELLS_ONLY_FIELDS: frozenset[str] = frozenset(
+    {
+        "open_checkout_success_url",
+        "open_checkout_cancel_url",
+        "open_checkout_signing_secret",
+    }
+)
+
+
+def fields_for(flow_type: str | None) -> tuple[str, ...]:
+    """The configuration a flow of this type can actually use.
+
+    Everything outside the two sets above applies to every kind of way in:
+    fees, installments, coupons, invites, cart reminders. Only the eleven
+    listed are type-bound, and handing a flow the ones it cannot use is worse
+    than leaving them empty — an organiser who finds a signing secret on their
+    volunteers door has no way to know it was never going to be read.
+    """
+    excluded = (
+        SELLS_ONLY_FIELDS
+        if flow_type == SalesFlowType.application.value
+        else APPLICATION_ONLY_FIELDS
+    )
+    return tuple(name for name in EFFECTIVE_CONFIG_FIELDS if name not in excluded)
+
 
 class EffectiveFlowConfig(BaseModel):
     """A flow's own channel configuration.
