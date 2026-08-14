@@ -51,7 +51,11 @@ function EditSalesFlowContent({ flowId }: { flowId: string }) {
         flow={salesFlow}
       />
 
-      <FlowStandingCard popupId={salesFlow.popup_id} flowId={flowId} />
+      <FlowStandingCard
+        popupId={salesFlow.popup_id}
+        flowId={flowId}
+        flowType={salesFlow.type}
+      />
 
       {/*
         What it sells comes before how it behaves, and the order is not

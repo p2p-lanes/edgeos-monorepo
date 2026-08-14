@@ -75,7 +75,7 @@ const onboardingItem: Item = {
 
 const popupItems: Item[] = [
   { icon: Calendar, title: "Gatherings", path: "/popups" },
-  { icon: Workflow, title: "Sales Flows", path: "/sales-flows" },
+  { icon: Workflow, title: "Ways in", path: "/sales-flows" },
   { icon: Package, title: "Products", path: "/products" },
   { icon: Tag, title: "Coupons", path: "/coupons" },
   { icon: UsersRound, title: "Groups", path: "/groups" },

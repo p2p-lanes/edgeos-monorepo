@@ -4,7 +4,7 @@ import { AlertTriangle, CircleAlert, CircleCheck, EyeOff } from "lucide-react"
 import type { SalesFlowPublic, SalesFlowReadiness } from "@/client"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
-import { BLOCKER_TEXT, WARNING_TEXT } from "@/lib/salesFlowReadiness"
+import { BLOCKER_TEXT, warningText } from "@/lib/salesFlowReadiness"
 
 /**
  * One flow on the map (sdd/sales-flows-rediseno slice 8).
@@ -89,7 +89,7 @@ export function FlowMapCard({ flow, readiness }: FlowMapCardProps) {
                 ) : (
                   <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                 )}
-                {WARNING_TEXT[code] ?? code}
+                {warningText(code, flow.type)}
               </p>
             ))}
             {readiness && !isBlocked && warnings.length === 0 && (

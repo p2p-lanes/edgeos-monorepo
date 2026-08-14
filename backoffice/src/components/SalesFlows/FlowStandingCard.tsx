@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query"
 import { CircleAlert, CircleCheck, TriangleAlert } from "lucide-react"
 
 import { SalesFlowsService } from "@/client"
-import { BLOCKER_TEXT, WARNING_TEXT } from "@/lib/salesFlowReadiness"
+import { BLOCKER_TEXT, warningText } from "@/lib/salesFlowReadiness"
 
 /**
  * Where this way in stands, before any of its settings.
@@ -18,9 +18,12 @@ import { BLOCKER_TEXT, WARNING_TEXT } from "@/lib/salesFlowReadiness"
 export function FlowStandingCard({
   popupId,
   flowId,
+  flowType,
 }: {
   popupId: string
   flowId: string
+  /** Some warnings mean something different depending on the kind of door. */
+  flowType?: string
 }) {
   const { data: readiness } = useQuery({
     queryKey: ["sales-flows", "readiness", { popupId }],
@@ -63,7 +66,7 @@ export function FlowStandingCard({
           <li key={code} className="flex items-start gap-3 px-4 py-3">
             <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
             <span className="text-sm text-muted-foreground">
-              {WARNING_TEXT[code] ?? code}
+              {warningText(code, flowType)}
             </span>
           </li>
         ))}
