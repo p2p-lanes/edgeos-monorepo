@@ -12,6 +12,8 @@ const city = (over: Partial<PopupPublic>): PopupPublic =>
     events_enabled: true,
     show_attendee_directory: true,
     sale_type: "application",
+    takes_applications: true,
+    sells_directly: false,
     ...over,
   }) as PopupPublic
 
@@ -52,5 +54,34 @@ describe("buildEndedResources", () => {
       }),
     )
     expect(rs["sidebar.attendee_directory"]).toBe("hidden")
+  })
+
+  it("hides the directory where nobody applies", () => {
+    const rs = byName(
+      buildEndedResources({
+        t,
+        city: city({ takes_applications: false, sells_directly: true }),
+        participated: true,
+      }),
+    )
+    expect(rs["sidebar.attendee_directory"]).toBe("hidden")
+  })
+
+  it("keeps the directory when a gathering both takes applications and sells", () => {
+    // The case the popup's `sale_type` could never express, and the reason
+    // this stopped reading it: one door reviews people, another sells to
+    // them. The reviewed people still have a directory.
+    const rs = byName(
+      buildEndedResources({
+        t,
+        city: city({
+          sale_type: "direct",
+          takes_applications: true,
+          sells_directly: true,
+        }),
+        participated: true,
+      }),
+    )
+    expect(rs["sidebar.attendee_directory"]).toBe("active")
   })
 })

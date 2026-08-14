@@ -29,7 +29,8 @@ export function buildEndedResources({
 }): Resource[] {
   const eventsEnabled = city?.events_enabled ?? true
   const directoryEnabled =
-    city?.sale_type !== "direct" && (city?.show_attendee_directory ?? false)
+    city?.takes_applications !== false &&
+    (city?.show_attendee_directory ?? false)
   const eventsVisible = participated && eventsEnabled
   const directoryVisible = participated && directoryEnabled
   const eventsStatus = eventsVisible ? "active" : "hidden"

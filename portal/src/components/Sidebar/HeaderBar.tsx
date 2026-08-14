@@ -141,7 +141,7 @@ const HeaderBar = () => {
 
   const pathSegments = pathname.split("/").filter(Boolean).slice(2)
   const fallbackSegments =
-    city?.sale_type === "direct" ? ["checkout"] : ["application"]
+    city?.takes_applications === false ? ["checkout"] : ["application"]
   const pathsToDisplay =
     pathSegments.length > 0 ? pathSegments : fallbackSegments
 

@@ -14,7 +14,7 @@ import PassesProvider from "@/providers/passesProvider"
 import ThemeProvider from "@/providers/themeProvider"
 
 /**
- * Bridges `useResolvedAttendees` (which branches on sale_type) into the
+ * Bridges `useResolvedAttendees` (which branches on whether anybody applies) into the
  * `PassesProvider` `attendees` prop. Must live inside ApplicationProvider
  * and CityProvider so the hook can read both.
  *

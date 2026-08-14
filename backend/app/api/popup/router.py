@@ -557,11 +557,16 @@ async def get_portal_popup(
                 detail="Event not found",
             )
 
-    lang = parse_accept_language(accept_language)
-    if lang is None:
-        return PopupPublic.model_validate(popup)
+    model = PopupPublic.model_validate(popup)
 
-    translation = get_translations_for_entity(db, "popup", popup.id, lang)
-    data = PopupPublic.model_validate(popup).model_dump()
-    data = apply_translation_overlay(data, translation, TRANSLATABLE_FIELDS["popup"])
-    return PopupPublic.model_validate(data)
+    lang = parse_accept_language(accept_language)
+    if lang is not None:
+        translation = get_translations_for_entity(db, "popup", popup.id, lang)
+        data = apply_translation_overlay(
+            model.model_dump(), translation, TRANSLATABLE_FIELDS["popup"]
+        )
+        model = PopupPublic.model_validate(data)
+
+    # Stamped after the overlay, so a round trip through model_dump cannot
+    # quietly reset the flags to their defaults.
+    return _with_flow_kinds(db, [popup], [model])[0]

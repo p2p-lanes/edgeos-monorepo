@@ -20,13 +20,13 @@ export default function Home() {
 
   if (!city) return null
 
-  const isDirectSale = city.sale_type === "direct"
+  const nobodyApplies = city?.takes_applications === false
 
   // One relationship is unambiguous, so nothing has to be named and the
   // page stays exactly as it was. This is almost every gathering.
   const relevantApplication = getRelevantApplication()
 
-  if (!isDirectSale && participation?.type === "companion") {
+  if (!nobodyApplies && participation?.type === "companion") {
     return (
       <section className="container mx-auto">
         <div className="space-y-6 max-w-5xl p-6 mx-auto">
@@ -43,7 +43,7 @@ export default function Home() {
   // states, two sets of attendees and two different next steps. Drawing
   // them side by side is also the only place a person can find out they
   // hold both (sdd/sales-flows-rediseno).
-  if (!isDirectSale && doors.length > 1) {
+  if (!nobodyApplies && doors.length > 1) {
     return (
       <section className="container mx-auto">
         <div className="mx-auto max-w-5xl space-y-6 p-6">
@@ -71,12 +71,12 @@ export default function Home() {
     )
   }
 
-  const status: EventStatus = isDirectSale
+  const status: EventStatus = nobodyApplies
     ? "not_started"
     : ((relevantApplication?.status as EventStatus) ?? "not_started")
 
   const onClickApply = () => {
-    if (isDirectSale) {
+    if (nobodyApplies) {
       router.push(`/checkout/${city.slug}`)
       return
     }
@@ -97,8 +97,8 @@ export default function Home() {
             <EventCard.Tagline />
             <EventCard.Location />
             <EventCard.DateRange />
-            {!isDirectSale && <EventCard.Progress />}
-            {!isDirectSale && relevantApplication && (
+            {!nobodyApplies && <EventCard.Progress />}
+            {!nobodyApplies && relevantApplication && (
               <ScholarshipStatusBadge
                 application={relevantApplication}
                 popup={city}
@@ -107,7 +107,7 @@ export default function Home() {
             {city.status !== "ended" && (
               <EventCard.ApplyButton
                 onClick={onClickApply}
-                labelKey={isDirectSale ? "cta.buy_tickets" : undefined}
+                labelKey={nobodyApplies ? "cta.buy_tickets" : undefined}
               />
             )}
           </EventCard.Content>

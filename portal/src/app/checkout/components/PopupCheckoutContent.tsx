@@ -198,9 +198,10 @@ export const PopupCheckoutContent = ({
 
   useEffect(() => {
     if (hasSkippedForm.current) return
-    // Branch guarded by sale_type=application. Direct-checkout (landing_mode=checkout)
-    // only resolves direct-sale popups (backend resolve_active_direct_popup_slug),
-    // so this redirect to /portal is structurally unreachable in checkout mode.
+    // Branch guarded on the gathering taking applications. Direct-checkout
+    // (landing_mode=checkout) only resolves gatherings that sell (backend
+    // resolve_active_direct_popup_slug), so this redirect to /portal is
+    // structurally unreachable in checkout mode.
     if (!takesApplications) return
     if (!existingApplication || checkoutState !== "form") return
     // In a group flow, wait for participation to resolve and never auto-skip a

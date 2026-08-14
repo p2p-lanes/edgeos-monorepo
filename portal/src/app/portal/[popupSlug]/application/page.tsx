@@ -147,7 +147,7 @@ export default function FormPage() {
   }, [application, city, router])
 
   useEffect(() => {
-    if (city?.sale_type === "direct") {
+    if (city?.takes_applications === false) {
       router.replace(`/portal/${city.slug}`)
     }
   }, [city, router])
@@ -176,7 +176,7 @@ export default function FormPage() {
     return <Loader />
   }
 
-  if (city.sale_type === "direct") {
+  if (city.takes_applications === false) {
     return <Loader />
   }
 

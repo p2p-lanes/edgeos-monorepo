@@ -23,7 +23,9 @@ export function useEventsApiAccess(): { allowed: boolean } {
   const flowId = useSearchParams().get("flow")
   const application = getRelevantApplication(flowId)
 
-  const isDirectSale = city?.sale_type === "direct"
+  // Agentic access hangs off an accepted application, so it is gated on
+  // whether anybody applies here rather than on how the popup sells.
+  const nobodyApplies = city?.takes_applications === false
   const isCompanion = participation?.type === "companion"
   const eventsEnabled = city?.events_enabled ?? true
   const applicationAccepted = isCompanion
@@ -31,7 +33,7 @@ export function useEventsApiAccess(): { allowed: boolean } {
     : application?.status === "accepted"
 
   return {
-    allowed: !isDirectSale && eventsEnabled && applicationAccepted,
+    allowed: !nobodyApplies && eventsEnabled && applicationAccepted,
   }
 }
 

@@ -41,13 +41,13 @@ export default function HomePasses() {
   // A gathering nobody applies to has no access ladder to pass and no
   // application to hang passes on. Asked of the flows, not of a popup-level
   // sale_type that cannot describe a gathering doing both.
-  const isDirectSale = city?.takes_applications === false
+  const nobodyApplies = city?.takes_applications === false
 
   // Subscribe to the same attendees query that PassesProvider drives off so
   // a backend failure shows an inline error UI instead of an infinite loader.
   // Disabled for direct-sale popups (matches useResolvedAttendees behavior).
   const popupId = city?.id ? String(city.id) : null
-  const attendeesQuery = useHumanAttendeesQuery(isDirectSale ? null : popupId)
+  const attendeesQuery = useHumanAttendeesQuery(nobodyApplies ? null : popupId)
 
   // Track the products query loading state so the page can distinguish
   // "still loading" from "loaded but empty". Without this, an empty products
@@ -59,23 +59,23 @@ export default function HomePasses() {
     // For direct-sale popups we keep /passes accessible even when the human
     // hasn't bought yet — the page renders an empty state with a CTA back to
     // /checkout. Application popups still gate via the access ladder.
-    if (!isDirectSale && access.state === "denied") {
+    if (!nobodyApplies && access.state === "denied") {
       router.replace(`/portal/${params.popupSlug}`)
     }
-  }, [access.state, isDirectSale, params.popupSlug, router])
+  }, [access.state, nobodyApplies, params.popupSlug, router])
 
   // Show loader while access is being resolved (and, for non-direct popups,
   // while redirecting after denial).
   if (choosingDoor || access.state === "loading") {
     return <Loader />
   }
-  if (!isDirectSale && access.state === "denied") {
+  if (!nobodyApplies && access.state === "denied") {
     return <Loader />
   }
 
   // Surface attendees-query failures so the page does not get stuck in a
   // loader. Direct-sale popups skip this branch (their query is disabled).
-  if (!isDirectSale && attendeesQuery.isError) {
+  if (!nobodyApplies && attendeesQuery.isError) {
     return (
       <div className="w-full md:mt-0 mx-auto items-center max-w-3xl p-6 bg-transparent">
         <div className="flex flex-col items-center justify-center rounded-2xl border bg-card p-10 text-center shadow-sm">
@@ -125,7 +125,7 @@ export default function HomePasses() {
   // The door rides along, or the buy page starts guessing which
   // application it is selling into (sdd/sales-flows-rediseno).
   const flowQuery = flowId ? `?flow=${flowId}` : ""
-  const buyHref = isDirectSale
+  const buyHref = nobodyApplies
     ? `/checkout/${params.popupSlug}`
     : `/portal/${params.popupSlug}/passes/buy${flowQuery}`
   const emptyState = (
@@ -158,7 +158,7 @@ export default function HomePasses() {
   // Once access resolves, surface explicit empty states instead of an infinite
   // loader. We only render the loader while a query is genuinely in-flight;
   // after queries resolve we render either the passes or the empty state.
-  if (isDirectSale) {
+  if (nobodyApplies) {
     // Direct-sale attendeePasses only build once products exist, so an empty
     // `attendees` here means "no purchases yet" (or the popup has no products).
     if (access.state === "denied" || !attendees.length) {
@@ -188,7 +188,7 @@ export default function HomePasses() {
         access={access}
         onSwitchToBuy={() =>
           router.push(
-            isDirectSale
+            nobodyApplies
               ? `/checkout/${params.popupSlug}`
               : `/portal/${params.popupSlug}/passes/buy${flowQuery}`,
           )

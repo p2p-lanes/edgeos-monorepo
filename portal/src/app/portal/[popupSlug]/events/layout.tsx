@@ -33,7 +33,7 @@ export default function EventsLayout({
   const applicationsQuery = useApplicationsQuery()
   const participationQuery = useParticipationQuery(popupId)
 
-  const isDirectSale = city?.sale_type === "direct"
+  const nobodyApplies = city?.takes_applications === false
   const isCompanion = participation?.type === "companion"
   // The door this screen is about. Without it, someone holding two
   // applications was answered with whichever came last
@@ -60,7 +60,7 @@ export default function EventsLayout({
     participationQuery.isLoading ||
     (isEnded && endedAccess.state === "loading")
 
-  const blocked = !isDirectSale && !stillLoading && !isEligible
+  const blocked = !nobodyApplies && !stillLoading && !isEligible
 
   useEffect(() => {
     if (blocked) {
@@ -68,7 +68,7 @@ export default function EventsLayout({
     }
   }, [blocked, params.popupSlug, router])
 
-  if (isDirectSale) return <>{children}</>
+  if (nobodyApplies) return <>{children}</>
   if (stillLoading || !isEligible) return <Loader />
 
   return <>{children}</>

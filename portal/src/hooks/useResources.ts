@@ -45,7 +45,12 @@ const useResources = () => {
     city?.status === "ended" && city?.id ? String(city.id) : null,
   )
 
-  if (city?.status === "ended" && city?.sale_type !== "direct") {
+  // What the sidebar actually branches on: whether anybody applies here. A
+  // gathering can take applications through one door and sell through
+  // another, so the popup's `sale_type` can no longer answer it.
+  const nobodyApplies = city?.takes_applications === false
+
+  if (city?.status === "ended" && !nobodyApplies) {
     const resources = buildEndedResources({
       t,
       city,
@@ -59,7 +64,7 @@ const useResources = () => {
   // inside the events page itself (event_settings.event_enabled).
   const eventsEnabled = city?.events_enabled ?? true
   const attendeeDirectoryEnabled =
-    city?.sale_type !== "direct" && (city?.show_attendee_directory ?? false)
+    !nobodyApplies && (city?.show_attendee_directory ?? false)
   const referralsEnabled = city?.referrals_enabled === true
 
   const isCompanion = participation?.type === "companion"
@@ -69,11 +74,11 @@ const useResources = () => {
     participation?.type === "companion" &&
     participation?.application_status === "accepted"
 
-  // Direct-sale popups have no application and no reviewer-controlled
-  // attendees — just an event overview that links to checkout, plus a
+  // Where nobody applies there is no application and no reviewer-controlled
+  // attendee list, just an event overview that links to checkout plus a
   // passes view for managing existing purchases. The events module
   // (and its API Keys/Docs subsections) is not exposed in this flow.
-  if (city?.sale_type === "direct" && user) {
+  if (nobodyApplies && user) {
     const resources: Resource[] = [
       {
         name: t("sidebar.overview", { defaultValue: "Overview" }),

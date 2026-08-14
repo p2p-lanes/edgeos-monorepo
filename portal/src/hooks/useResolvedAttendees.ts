@@ -11,13 +11,13 @@ import type { AttendeePassState } from "@/types/Attendee"
 /**
  * Resolves the attendees list the PassesProvider should drive off.
  *
- * - For direct-sale popups (`sale_type === "direct"`): returns a synthetic
+ * - Where nobody applies (`takes_applications === false`): returns a synthetic
  *   "main" attendee derived from the authenticated human. The direct-sale
  *   flow does not create a real Attendee row until the payment POST hits
  *   the backend, so we fabricate a virtual one here to keep the existing
  *   PassesProvider machinery working unchanged.
  *
- * - For application-flow popups (all other `sale_type` values): calls
+ * - Where applications exist: calls
  *   `GET /attendees/my/popup/{popup_id}` via `useHumanAttendeesQuery` and
  *   returns the unified flat list (application-linked + direct-sale attendees).
  *   This replaces the previous read of `application.attendees[]` through the
