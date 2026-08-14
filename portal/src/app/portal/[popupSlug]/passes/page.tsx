@@ -4,7 +4,6 @@ import { AlertCircle, RefreshCw, Ticket } from "lucide-react"
 import { useParams, useRouter, useSearchParams } from "next/navigation"
 import { useEffect } from "react"
 import { useTranslation } from "react-i18next"
-import { resolvePopupCheckoutPolicy } from "@/checkout/popupCheckoutPolicy"
 import type { CompanionParticipation } from "@/client"
 import { CompanionPasses } from "@/components/CompanionPasses"
 import { Button, ButtonAnimated } from "@/components/ui/button"
@@ -28,7 +27,6 @@ export default function HomePasses() {
   const { getCity } = useCityProvider()
   const { attendeePasses: attendees, products } = usePassesProvider()
   const city = getCity()
-  const policy = resolvePopupCheckoutPolicy(city)
   // These passes belong to one application. Without a door, someone
   // holding two saw both sets listed with nothing telling them apart.
   const choosingDoor = useRequireDoor(
@@ -40,7 +38,10 @@ export default function HomePasses() {
   // redirect — routing decisions are handled here so they remain testable
   // in isolation from the query logic.
   const access = useHumanPopupAccess(city?.id ? String(city.id) : null)
-  const isDirectSale = policy.saleType === "direct"
+  // A gathering nobody applies to has no access ladder to pass and no
+  // application to hang passes on. Asked of the flows, not of a popup-level
+  // sale_type that cannot describe a gathering doing both.
+  const isDirectSale = city?.takes_applications === false
 
   // Subscribe to the same attendees query that PassesProvider drives off so
   // a backend failure shows an inline error UI instead of an infinite loader.

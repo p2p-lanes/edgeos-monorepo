@@ -1,7 +1,6 @@
 "use client"
 
 import { dedupTicketEntries } from "@/app/portal/[popupSlug]/passes/utils/dedupTickets"
-import { resolvePopupCheckoutPolicy } from "@/checkout/popupCheckoutPolicy"
 import type { AttendeeWithOriginPublic } from "@/client"
 import { sortAttendees } from "@/helpers/filters"
 import useAuth from "@/hooks/useAuth"
@@ -39,16 +38,21 @@ export function useResolvedAttendees(): AttendeePassState[] {
   const { user } = useAuth()
 
   const city = getCity()
-  const policy = resolvePopupCheckoutPolicy(city)
+  // Not "is this a direct-sale popup" any more: a gathering can take
+  // applications through one door and sell through another, so what matters
+  // here is whether anybody applies at all. Nobody does → there are no
+  // attendee rows to read and the buyer is built from the logged-in human
+  // (sdd/sales-flows-rediseno slice 6).
+  const nobodyApplies = city?.takes_applications === false
 
   // Always call the hook — conditional hooks are forbidden by Rules of Hooks.
   // The hook disables the query when popupId is null/falsy.
   const popupId = city ? String(city.id) : null
   const { data: humanAttendees, isLoading } = useHumanAttendeesQuery(
-    policy.saleType === "direct" ? null : popupId,
+    nobodyApplies ? null : popupId,
   )
 
-  if (policy.saleType === "direct") {
+  if (nobodyApplies) {
     if (!city || !user) return []
 
     const firstName = user.first_name?.trim() ?? ""

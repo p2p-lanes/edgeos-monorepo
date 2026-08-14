@@ -1,10 +1,10 @@
-import type { PopupPublic } from "@/client"
-
 /**
- * Popup checkout policy — resolves how a popup's checkout UI should behave
- * from the backend popup contract. `checkout_mode` is authoritative when the
- * API provides it; deriving from `sale_type` remains only as a stale-client
- * fallback.
+ * How a way into a gathering sells.
+ *
+ * This used to resolve from the popup's `sale_type` / `checkout_mode`, which
+ * cannot answer for a gathering whose doors differ — one that takes
+ * applications may still have a partner's door that sells directly. The
+ * question belongs to the door (sdd/sales-flows-rediseno slice 6).
  */
 
 export const CHECKOUT_MODE = {
@@ -32,25 +32,11 @@ export const SALE_TYPE = {
 
 export type PopupSaleType = (typeof SALE_TYPE)[keyof typeof SALE_TYPE]
 
-export type PopupCheckoutPolicySource = Pick<
-  PopupPublic,
-  "sale_type" | "checkout_mode"
->
-
 export interface PopupCheckoutPolicy {
   saleType: PopupSaleType
   checkoutMode: CheckoutMode
   isPassSystem: boolean
   isSimpleQuantity: boolean
-}
-
-const DEFAULT_SALE_TYPE: PopupSaleType = SALE_TYPE.APPLICATION
-const DEFAULT_CHECKOUT_MODE: CheckoutMode = CHECKOUT_MODE.PASS_SYSTEM
-
-function deriveCheckoutModeFromSaleType(saleType: PopupSaleType): CheckoutMode {
-  return saleType === SALE_TYPE.DIRECT
-    ? CHECKOUT_MODE.SIMPLE_QUANTITY
-    : CHECKOUT_MODE.PASS_SYSTEM
 }
 
 /**
@@ -76,36 +62,6 @@ export function resolveFlowCheckoutPolicy(
 
   return {
     saleType: sellsDirectly ? SALE_TYPE.DIRECT : SALE_TYPE.APPLICATION,
-    checkoutMode,
-    isPassSystem: checkoutMode === CHECKOUT_MODE.PASS_SYSTEM,
-    isSimpleQuantity: checkoutMode === CHECKOUT_MODE.SIMPLE_QUANTITY,
-  }
-}
-
-/**
- * Resolve the checkout policy for a popup. Safe to call with `null` or
- * `undefined` — returns the application / pass-system defaults, which match
- * the legacy behavior of the portal before `sale_type` was introduced.
- *
- * @deprecated Ask the door instead — `resolveFlowCheckoutPolicy`. A popup's
- * `sale_type` cannot describe a gathering that both takes applications and
- * sells directly, which is the whole point of having flows. Kept while the
- * last call sites move over.
- */
-export function resolvePopupCheckoutPolicy(
-  popup: PopupCheckoutPolicySource | null | undefined,
-): PopupCheckoutPolicy {
-  const saleType: PopupSaleType =
-    popup?.sale_type === SALE_TYPE.DIRECT ? SALE_TYPE.DIRECT : DEFAULT_SALE_TYPE
-
-  const checkoutMode: CheckoutMode =
-    popup?.checkout_mode === CHECKOUT_MODE.PASS_SYSTEM ||
-    popup?.checkout_mode === CHECKOUT_MODE.SIMPLE_QUANTITY
-      ? popup.checkout_mode
-      : (deriveCheckoutModeFromSaleType(saleType) ?? DEFAULT_CHECKOUT_MODE)
-
-  return {
-    saleType,
     checkoutMode,
     isPassSystem: checkoutMode === CHECKOUT_MODE.PASS_SYSTEM,
     isSimpleQuantity: checkoutMode === CHECKOUT_MODE.SIMPLE_QUANTITY,

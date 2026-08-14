@@ -11,7 +11,7 @@ import {
 import {
   CHECKOUT_MODE,
   type CheckoutMode,
-  resolvePopupCheckoutPolicy,
+  resolveFlowCheckoutPolicy,
 } from "@/checkout/popupCheckoutPolicy"
 import type { AttendeePurchases } from "@/client"
 import { useCart } from "@/hooks/useCartApi"
@@ -51,6 +51,9 @@ interface PassesProviderProps {
    */
   attendees: AttendeePassState[]
   restoreFromCart?: boolean
+  /** How the door being shopped sells. Absent means none is in scope — the
+   *  portal's own passes list — which reads the same as it always has. */
+  flowType?: string | null
   productsOverride?: ProductsPass[]
   purchasesOverride?: AttendeePurchases[]
 }
@@ -252,6 +255,7 @@ const PassesProvider = ({
   children,
   attendees,
   restoreFromCart = false,
+  flowType = null,
   productsOverride,
   purchasesOverride,
 }: PassesProviderProps) => {
@@ -263,7 +267,7 @@ const PassesProvider = ({
   const products = productsOverride ?? queriedProducts
   const { getCity } = useCityProvider()
   const city = getCity()
-  const checkoutPolicy = resolvePopupCheckoutPolicy(city)
+  const checkoutPolicy = resolveFlowCheckoutPolicy(flowType)
   const cityId = city?.id ? String(city.id) : null
   const previousCityIdRef = useRef(cityId)
   const hasInitializedRef = useRef(false)

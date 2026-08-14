@@ -67,7 +67,7 @@ export default function BuyPassesContent() {
   if (choosingDoor || !attendees.length || !products.length) return <Loader />
 
   return (
-    <PassesProvider attendees={attendees} restoreFromCart>
+    <PassesProvider attendees={attendees} restoreFromCart flowType={flowType}>
       <CheckoutProvider
         initialStep="passes"
         salesFlowId={flowId}

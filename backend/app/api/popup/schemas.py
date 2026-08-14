@@ -628,6 +628,12 @@ class PopupPublic(SQLModel):
     status: PopupStatus = PopupStatus.draft
     sale_type: SaleType = SaleType.application
     checkout_mode: CheckoutMode = CheckoutMode.pass_system
+    # What the gathering's doors do, which `sale_type` cannot say once a
+    # gathering can both take applications and sell directly
+    # (sdd/sales-flows-rediseno slice 6). Derived from the flows, never
+    # stored. The defaults match what a popup with no doors used to imply.
+    takes_applications: bool = True
+    sells_directly: bool = False
     start_date: datetime | None = None
     end_date: datetime | None = None
     image_url: str | None = None

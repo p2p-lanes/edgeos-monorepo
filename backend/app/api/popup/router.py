@@ -173,6 +173,23 @@ async def list_popups(
     )
 
 
+def _with_flow_kinds(db, popups: list, models: list) -> list:
+    """Stamp each serialized popup with what its doors do.
+
+    One grouped query for the page (`flow_kinds_for_popups`), because this is
+    read on every portal list and a lazy lookup per row would be an N+1 nobody
+    notices until it is slow.
+    """
+    from app.api.sales_flow.crud import flow_kinds_for_popups
+
+    kinds = flow_kinds_for_popups(db, [p.id for p in popups])
+    for popup, model in zip(popups, models, strict=True):
+        takes, sells = kinds.get(popup.id, (True, False))
+        model.takes_applications = takes
+        model.sells_directly = sells
+    return models
+
+
 @router.get("/public/list", response_model=list[PopupPublic])
 async def list_public_popups(
     session: SessionDep,
@@ -181,7 +198,9 @@ async def list_public_popups(
     """List active popups for a tenant (public, no auth required). Used by checkout flow."""
     tenant_id = uuid.UUID(x_tenant_id)
     popups, _ = crud.find(session, status=PopupStatus.active, tenant_id=tenant_id)
-    return [PopupPublic.model_validate(p) for p in popups]
+    return _with_flow_kinds(
+        session, popups, [PopupPublic.model_validate(p) for p in popups]
+    )
 
 
 @router.get("/{popup_id}", response_model=PopupAdmin)
@@ -493,7 +512,9 @@ async def list_portal_popups(
 
     lang = parse_accept_language(accept_language)
     if lang is None:
-        return [PopupPublic.model_validate(p) for p in popups]
+        return _with_flow_kinds(
+            db, popups, [PopupPublic.model_validate(p) for p in popups]
+        )
 
     popup_ids = [p.id for p in popups]
     translations_map = get_translations_bulk(db, "popup", popup_ids, lang)
@@ -505,7 +526,7 @@ async def list_portal_popups(
             data, translations_map.get(p.id), TRANSLATABLE_FIELDS["popup"]
         )
         results.append(PopupPublic.model_validate(data))
-    return results
+    return _with_flow_kinds(db, popups, results)
 
 
 @router.get("/portal/{slug}", response_model=PopupPublic)

@@ -3456,6 +3456,8 @@ export type PopupPublic = {
     status?: PopupStatus;
     sale_type?: SaleType;
     checkout_mode?: CheckoutMode;
+    takes_applications?: boolean;
+    sells_directly?: boolean;
     start_date?: (string | null);
     end_date?: (string | null);
     image_url?: (string | null);

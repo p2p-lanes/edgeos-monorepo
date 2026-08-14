@@ -16260,6 +16260,16 @@ export const PopupPublicSchema = {
             '$ref': '#/components/schemas/CheckoutMode',
             default: 'pass_system'
         },
+        takes_applications: {
+            type: 'boolean',
+            title: 'Takes Applications',
+            default: true
+        },
+        sells_directly: {
+            type: 'boolean',
+            title: 'Sells Directly',
+            default: false
+        },
         start_date: {
             anyOf: [
                 {

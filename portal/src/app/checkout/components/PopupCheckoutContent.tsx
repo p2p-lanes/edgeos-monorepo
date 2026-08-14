@@ -5,7 +5,6 @@ import { AnimatePresence, motion } from "framer-motion"
 import { UserRound } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { type CSSProperties, useEffect, useRef, useState } from "react"
-import { resolvePopupCheckoutPolicy } from "@/checkout/popupCheckoutPolicy"
 import { ApiError, ApplicationsService, type PopupPublic } from "@/client"
 import ScrollyCheckoutFlow from "@/components/checkout-flow/ScrollyCheckoutFlow"
 import { SidebarProvider } from "@/components/Sidebar/SidebarComponents"
@@ -54,13 +53,13 @@ export const PopupCheckoutContent = ({
   inviteId?: string | null
   referralId?: string | null
 }) => {
-  const policy = resolvePopupCheckoutPolicy(popup)
+  // Whether this gathering asks anybody to apply. The anonymous checkout only
+  // fetches an application schema where that is true.
+  const takesApplications = popup.takes_applications !== false
   const isAuthenticated = useIsAuthenticated()
   const { data: applicationSchema, isLoading: isLoadingApplicationSchema } =
     useApplicationSchema(
-      policy.saleType === "application" && isAuthenticated
-        ? popup.id
-        : undefined,
+      takesApplications && isAuthenticated ? popup.id : undefined,
     )
   const {
     checkoutState,
@@ -71,7 +70,7 @@ export const PopupCheckoutContent = ({
     joinGroupAsApplicant,
   } = useCheckoutState({
     popupId: popup.id,
-    saleType: resolvePopupCheckoutPolicy(popup).saleType,
+    saleType: takesApplications ? "application" : "direct",
     groupId,
     inviteId,
     referralId,
@@ -96,7 +95,7 @@ export const PopupCheckoutContent = ({
   // Companion-on-someone-else's-application detection. Only active when the
   // user arrived via a group invite link (groupId set) and is authenticated;
   // the participation endpoint is portal-only and would 401 otherwise.
-  const isGroupFlow = !!groupId && policy.saleType === "application"
+  const isGroupFlow = !!groupId && takesApplications
   const { data: participation } = useQuery({
     queryKey: queryKeys.participation.byPopup(popup.id),
     queryFn: () =>
@@ -190,19 +189,19 @@ export const PopupCheckoutContent = ({
 
   useEffect(() => {
     if (hasSkippedForm.current) return
-    if (policy.saleType !== "direct") return
+    if (takesApplications) return
     if (!isAuthenticated) return
 
     hasSkippedForm.current = true
     setCheckoutState("passes")
-  }, [policy.saleType, isAuthenticated, setCheckoutState])
+  }, [takesApplications, isAuthenticated, setCheckoutState])
 
   useEffect(() => {
     if (hasSkippedForm.current) return
     // Branch guarded by sale_type=application. Direct-checkout (landing_mode=checkout)
     // only resolves direct-sale popups (backend resolve_active_direct_popup_slug),
     // so this redirect to /portal is structurally unreachable in checkout mode.
-    if (policy.saleType !== "application") return
+    if (!takesApplications) return
     if (!existingApplication || checkoutState !== "form") return
     // In a group flow, wait for participation to resolve and never auto-skip a
     // companion — the CompanionSwitchPrompt drives that case.
@@ -244,7 +243,7 @@ export const PopupCheckoutContent = ({
 
     setCheckoutState("passes")
   }, [
-    policy.saleType,
+    takesApplications,
     existingApplication,
     checkoutState,
     setCheckoutState,
@@ -277,7 +276,7 @@ export const PopupCheckoutContent = ({
   }
 
   const directSessionBanner =
-    policy.saleType === "direct" && user?.email ? (
+    !takesApplications && user?.email ? (
       <div className="flex justify-end">
         <Popover>
           <PopoverTrigger asChild>
@@ -310,7 +309,7 @@ export const PopupCheckoutContent = ({
       </div>
     ) : null
 
-  if (policy.saleType === "application") {
+  if (takesApplications) {
     if (!isAuthenticated) {
       return (
         <div
@@ -325,16 +324,12 @@ export const PopupCheckoutContent = ({
     }
   }
 
-  if (
-    policy.saleType === "direct" &&
-    checkoutState === "form" &&
-    isAuthenticated
-  ) {
+  if (!takesApplications && checkoutState === "form" && isAuthenticated) {
     return <Loader />
   }
 
   if (
-    policy.saleType === "application" &&
+    takesApplications &&
     isAuthenticated &&
     checkoutState === "form" &&
     !existingApplication &&

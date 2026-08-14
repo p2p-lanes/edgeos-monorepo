@@ -36,6 +36,37 @@ def default_flow_name(flow_type: str) -> str:
     return DEFAULT_FLOW_NAMES.get(str(flow_type), DEFAULT_FLOW_NAME_FALLBACK)
 
 
+def flow_kinds_for_popups(
+    session: Session, popup_ids: "list[uuid.UUID]"
+) -> "dict[uuid.UUID, tuple[bool, bool]]":
+    """Per popup, whether any door takes applications and whether any sells.
+
+    One grouped query for a whole page of popups rather than a lazy property
+    per row: this is read on every portal list, and a hidden N+1 in a
+    serializer is exactly the kind of thing nobody notices until it is slow.
+
+    Returns `{popup_id: (takes_applications, sells_directly)}`.
+    """
+    if not popup_ids:
+        return {}
+
+    rows = session.exec(
+        select(SalesFlows.popup_id, SalesFlows.type).where(
+            SalesFlows.popup_id.in_(popup_ids)  # type: ignore[attr-defined]
+        )
+    ).all()
+
+    kinds: dict[uuid.UUID, tuple[bool, bool]] = {}
+    for popup_id, flow_type in rows:
+        takes, sells = kinds.get(popup_id, (False, False))
+        if flow_type == SalesFlowType.application.value:
+            takes = True
+        else:
+            sells = True
+        kinds[popup_id] = (takes, sells)
+    return kinds
+
+
 def resolve_default_flow_slug(
     candidate: str,
     taken: frozenset[str] = frozenset(),
