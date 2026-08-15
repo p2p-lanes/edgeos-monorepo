@@ -8,6 +8,7 @@ import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
 import { SalesFlowForm } from "@/components/forms/SalesFlowForm"
 import { SalesFlowScopeBanner } from "@/components/forms/SalesFlowScopeBanner"
 import { SalesFlowUrlCard } from "@/components/forms/SalesFlowUrlCard"
+import { FlowClosureCard } from "@/components/SalesFlows/FlowClosureCard"
 import { FlowSectionLinks } from "@/components/SalesFlows/FlowSectionLinks"
 import { FlowStandingCard } from "@/components/SalesFlows/FlowStandingCard"
 import { InlineSection } from "@/components/ui/inline-form"
@@ -51,11 +52,15 @@ function EditSalesFlowContent({ flowId }: { flowId: string }) {
         flow={salesFlow}
       />
 
-      <FlowStandingCard
-        popupId={salesFlow.popup_id}
-        flowId={flowId}
-        flowType={salesFlow.type}
-      />
+      {salesFlow.status === "closed" ? (
+        <FlowClosureCard flow={salesFlow} />
+      ) : (
+        <FlowStandingCard
+          popupId={salesFlow.popup_id}
+          flowId={flowId}
+          flowType={salesFlow.type}
+        />
+      )}
 
       {/*
         What it sells comes before how it behaves, and the order is not
@@ -84,6 +89,8 @@ function EditSalesFlowContent({ flowId }: { flowId: string }) {
         defaultValues={salesFlow}
         onSuccess={goBack}
       />
+
+      {salesFlow.status !== "closed" && <FlowClosureCard flow={salesFlow} />}
     </div>
   )
 }

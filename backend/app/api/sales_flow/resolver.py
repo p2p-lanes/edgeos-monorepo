@@ -73,8 +73,16 @@ def resolve_flow(
                 detail="Sales flow not found",
             )
 
-    effective_status = flow.status or popup.status
-    if effective_status != PopupStatus.active.value:
+    # Which of the two is shut matters to whoever reads this. It could only
+    # ever be the gathering while `flow.status` was always NULL; a flow can be
+    # closed on its own now, and saying "Popup is not active" about an active
+    # gathering sends somebody looking in the wrong place.
+    if flow.status is not None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="This way in is closed",
+        )
+    if popup.status != PopupStatus.active.value:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Popup is not active",

@@ -20436,6 +20436,21 @@ export const SalesFlowReviewersModeSchema = {
     description: 'Whether a flow uses the popup-level reviewer list or its own (D4).'
 } as const;
 
+export const SalesFlowStatusSchema = {
+    type: 'string',
+    enum: ['closed'],
+    title: 'SalesFlowStatus',
+    description: `A flow's own standing, when it differs from the gathering's.
+
+One value, and that is the point. \`resolve_flow\` reads
+\`flow.status or popup.status\`, so a flow that named itself active would
+keep selling into an event that had ended — the column can only ever be
+used to close something, never to hold it open.
+
+NULL is the normal state and means the flow follows the gathering. It is
+also how a closed flow is reopened.`
+} as const;
+
 export const SalesFlowTypeSchema = {
     type: 'string',
     enum: ['application', 'direct', 'upsale'],
@@ -20445,6 +20460,16 @@ export const SalesFlowTypeSchema = {
 
 export const SalesFlowUpdateSchema = {
     properties: {
+        status: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/SalesFlowStatus'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
         type: {
             anyOf: [
                 {

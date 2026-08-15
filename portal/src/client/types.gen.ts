@@ -4174,6 +4174,19 @@ export type SalesFlowReadiness = {
 export type SalesFlowReviewersMode = 'inherit' | 'override';
 
 /**
+ * A flow's own standing, when it differs from the gathering's.
+ *
+ * One value, and that is the point. `resolve_flow` reads
+ * `flow.status or popup.status`, so a flow that named itself active would
+ * keep selling into an event that had ended — the column can only ever be
+ * used to close something, never to hold it open.
+ *
+ * NULL is the normal state and means the flow follows the gathering. It is
+ * also how a closed flow is reopened.
+ */
+export type SalesFlowStatus = 'closed';
+
+/**
  * Sale model of a flow. Mirrors PopupBase.sale_type plus 'upsale'.
  */
 export type SalesFlowType = 'application' | 'direct' | 'upsale';
@@ -4182,6 +4195,7 @@ export type SalesFlowType = 'application' | 'direct' | 'upsale';
  * Partial update payload (BO). Only provided fields are applied.
  */
 export type SalesFlowUpdate = {
+    status?: (SalesFlowStatus | null);
     type?: (SalesFlowType | null);
     slug?: (string | null);
     name?: (string | null);

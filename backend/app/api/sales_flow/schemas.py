@@ -39,6 +39,21 @@ class SalesFlowReviewersMode(StrEnum):
     override = "override"
 
 
+class SalesFlowStatus(StrEnum):
+    """A flow's own standing, when it differs from the gathering's.
+
+    One value, and that is the point. `resolve_flow` reads
+    `flow.status or popup.status`, so a flow that named itself active would
+    keep selling into an event that had ended — the column can only ever be
+    used to close something, never to hold it open.
+
+    NULL is the normal state and means the flow follows the gathering. It is
+    also how a closed flow is reopened.
+    """
+
+    closed = "closed"
+
+
 class SalesFlowIdentityMode(StrEnum):
     """portal_auth is the only implemented mode in v1; anonymous is reserved
     for a future ticket-code lookup flow (spec: upsale-flow)."""
@@ -102,8 +117,14 @@ class SalesFlowBase(SQLModel):
         sa_column=Column(String, nullable=False, server_default="portal_auth"),
     )
 
-    # --- Class C: flow-only, reserved. Always NULL in v1 (G0 #5) — the flow
-    # inherits popup.status until a later change activates this column. ---
+    # --- Class C: flow-only. NULL means the flow follows the gathering, which
+    # is the normal state; "closed" takes this one way in out of circulation
+    # while the gathering carries on. `resolve_flow` reads
+    # `flow.status or popup.status`, so this can only ever close something.
+    #
+    # It exists because a flow somebody has already applied through cannot be
+    # deleted — that would discard what they did — and until now there was no
+    # other way to stop it selling. ---
     status: str | None = Field(default=None, nullable=True)
 
     # --- Class C: flow-only. NULL = restrictions feature off (design D5/D6,
@@ -257,6 +278,10 @@ class SalesFlowCreate(BaseModel):
 class SalesFlowUpdate(BaseModel):
     """Partial update payload (BO). Only provided fields are applied."""
 
+    # Omitted leaves it alone; `null` reopens; "closed" takes it out of
+    # circulation. `SalesFlowStatus` has one member on purpose — see its
+    # docstring for why "active" must never be settable here.
+    status: SalesFlowStatus | None = None
     type: SalesFlowType | None = None
     slug: str | None = None
     name: str | None = None

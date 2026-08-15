@@ -2,7 +2,7 @@ import uuid
 from dataclasses import dataclass
 from typing import Any
 
-from sqlmodel import Session, select
+from sqlmodel import Session, col, select
 
 from app.api.sales_flow.models import SalesFlows
 from app.api.sales_flow.schemas import (
@@ -284,6 +284,11 @@ class SalesFlowsCRUD(BaseCRUD[SalesFlows, SalesFlowCreate, SalesFlowUpdate]):
                 SalesFlows.popup_id == popup_id,
                 SalesFlows.visibility == SalesFlowVisibility.portal_listed,
                 SalesFlows.type == type,
+                # A closed flow answers 403 at the door (`resolve_flow`).
+                # Listing it anyway would show a buyer a way in, let them
+                # click it, and refuse them there — so it stops being listed
+                # at the same moment it stops being enterable.
+                col(SalesFlows.status).is_(None),
             )
             .order_by(SalesFlows.order, SalesFlows.created_at)  # type: ignore[union-attr]
         )

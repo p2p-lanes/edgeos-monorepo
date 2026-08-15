@@ -21,8 +21,11 @@ interface FlowMapCardProps {
 }
 
 export function FlowMapCard({ flow, readiness }: FlowMapCardProps) {
-  const blockers = readiness?.blockers ?? []
-  const warnings = readiness?.warnings ?? []
+  const closed = flow.status === "closed"
+  // A closed flow is not broken and should not be dressed as broken. Nothing
+  // it is missing matters while nobody can reach it.
+  const blockers = closed ? [] : (readiness?.blockers ?? [])
+  const warnings = closed ? [] : (readiness?.warnings ?? [])
   const isBlocked = blockers.length > 0
 
   return (
@@ -49,6 +52,7 @@ export function FlowMapCard({ flow, readiness }: FlowMapCardProps) {
               </p>
             </div>
             <div className="flex shrink-0 items-center gap-1.5">
+              {closed && <Badge variant="outline">Closed</Badge>}
               {flow.is_default && <Badge variant="secondary">Default</Badge>}
               <Badge variant="outline" className="capitalize">
                 {flow.type}

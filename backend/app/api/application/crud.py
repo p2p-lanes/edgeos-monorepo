@@ -286,6 +286,15 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Sales flow not found for this popup",
             )
+        # A closed way in stops taking new applications. It is dropped from
+        # the portal listing at the same time, so nobody arrives here by
+        # clicking — but this endpoint takes the flow id from the client, and
+        # a link somebody kept is enough to reach it.
+        if flow.status is not None:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="This way in is closed and is not taking applications",
+            )
         return flow.id
 
     def resolve_creation_flow_id(
