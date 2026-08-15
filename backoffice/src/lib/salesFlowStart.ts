@@ -34,54 +34,42 @@ export interface StartOption {
 
 export const TYPE_COPY: Record<
   SalesFlowType,
-  { label: string; description: string; aside: string }
+  { label: string; description: string }
 > = {
   application: {
     label: "People apply first",
-    description:
-      "They fill in a form, you review them, and only then do they buy.",
-    aside: "Reviewers, applications, scholarships",
+    description: "They apply, you review, then they buy.",
   },
   direct: {
     label: "People buy directly",
-    description:
-      "No review and no waiting. Anyone who can reach it picks products and pays.",
-    aside: "Anonymous checkout, no application",
+    description: "No review. Anyone who reaches it pays.",
   },
   upsale: {
     label: "An add-on",
-    description:
-      "Sells only to people already coming. Everyone else is turned away.",
-    aside: "Shown on the passes page to buyers who already paid",
+    description: "Only for people already coming.",
   },
 }
 
-const FRESH_COPY: Record<SalesFlowType, string> = {
-  application:
-    "Every setting empty. Only the ones a reviewed flow can use are offered.",
-  direct: "Every setting empty. Only the ones a shop can use are offered.",
-  upsale: "Every setting empty. Only the ones an add-on can use are offered.",
-}
+// It is not "nothing": the flow still gets its kind's checkout steps, and
+// that is the one thing worth saying about starting clean.
+const FRESH_DESCRIPTION = "No settings copied. Checkout steps included."
 
 /** What a door of this kind cannot use, so a cross-kind copy leaves it behind. */
-export function notCarriedAcross(flowType: SalesFlowType): string[] {
-  if (flowType === "application") {
-    return ["The redirect after paying, and the signing secret with it"]
-  }
-  return [
-    "The application form's layout, its fee, scholarships and incentives",
-    "Reminders that chase half-finished applications",
-  ]
+export function notCarriedAcross(flowType: SalesFlowType): string {
+  return flowType === "application"
+    ? "Its redirect and signing secret will not be copied."
+    : "Its application settings will not be copied."
 }
 
+/** Facts, and silence when there are none. The fallback prose read as filler
+ * because that is what it was. */
 function describeFlow(flow: SalesFlowPublic): string {
   const bits: string[] = []
-  if (flow.is_default) bits.push("the flow others started from")
-  if (flow.contribution_enabled) bits.push("adds a contribution")
-  if (flow.installments_enabled) bits.push("offers installments")
-  if (flow.requires_application_fee) bits.push("charges to apply")
+  if (flow.requires_application_fee) bits.push("fee to apply")
+  if (flow.contribution_enabled) bits.push("contribution")
+  if (flow.installments_enabled) bits.push("installments")
   if (flow.allows_coupons === false) bits.push("no coupons")
-  return bits.length ? bits.join(" · ") : "its settings as they stand"
+  return bits.join(" · ")
 }
 
 export interface StartChoices {
@@ -98,8 +86,8 @@ export function startChoicesFor(
   const fresh: StartOption = {
     id: START_FRESH,
     kind: "fresh",
-    name: "Nothing at all",
-    description: FRESH_COPY[flowType],
+    name: "Start from scratch",
+    description: FRESH_DESCRIPTION,
     crossKind: false,
   }
   const asCopy = (flow: SalesFlowPublic, crossKind: boolean): StartOption => ({

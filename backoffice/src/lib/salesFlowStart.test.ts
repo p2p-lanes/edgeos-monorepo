@@ -44,7 +44,7 @@ describe("startChoicesFor", () => {
   it("offers only doors that can produce the kind being opened", () => {
     const { offered } = startChoicesFor("direct", DOORS)
     expect(offered.map((o) => o.name)).toEqual([
-      "Nothing at all",
+      "Start from scratch",
       "A copy of Sponsors",
     ])
   })
@@ -70,31 +70,34 @@ describe("startChoicesFor", () => {
     expect(offered.filter((o) => o.kind === "copy")).toEqual([])
   })
 
-  it("describes a door by what it would bring", () => {
+  it("describes a flow in facts, briefly", () => {
     const { offered } = startChoicesFor("direct", DOORS)
     const sponsors = offered.find((o) => o.name === "A copy of Sponsors")
-    expect(sponsors?.description).toContain("adds a contribution")
-    expect(sponsors?.description).toContain("offers installments")
+    expect(sponsors?.description).toBe("contribution · installments")
   })
 
-  it("marks the flow everything else started from", () => {
+  it("says nothing rather than filling the line", () => {
+    // The fallback used to read "its settings as they stand", which is a
+    // sentence that costs a line and answers nothing.
     const { offered } = startChoicesFor("application", DOORS)
     const attendee = offered.find((o) => o.name === "A copy of Attendee")
-    expect(attendee?.description).toContain("the flow others started from")
+    expect(attendee?.description).toBe("")
   })
 })
 
 describe("notCarriedAcross", () => {
-  it("warns a reviewed door about the signing secret", () => {
-    expect(notCarriedAcross("application").join(" ")).toContain(
-      "signing secret",
-    )
+  it("warns a reviewed flow about the signing secret", () => {
+    expect(notCarriedAcross("application")).toContain("signing secret")
   })
 
-  it("warns a selling door about the application settings", () => {
-    const said = notCarriedAcross("direct").join(" ")
-    expect(said).toContain("application form")
-    expect(said).toContain("scholarships")
+  it("warns a selling flow about the application settings", () => {
+    expect(notCarriedAcross("direct")).toContain("application settings")
+  })
+
+  it("is one line, because the warning is one fact", () => {
+    for (const type of ["application", "direct", "upsale"] as const) {
+      expect(notCarriedAcross(type).split(".").filter(Boolean)).toHaveLength(1)
+    }
   })
 })
 

@@ -223,9 +223,6 @@ export function NewSalesFlowWizard({ popupId }: { popupId: string }) {
                 <span className="text-sm text-muted-foreground">
                   {TYPE_COPY[t].description}
                 </span>
-                <span className="mt-2 border-t pt-2 text-xs text-muted-foreground">
-                  {TYPE_COPY[t].aside}
-                </span>
               </button>
             ))}
           </div>
@@ -239,10 +236,6 @@ export function NewSalesFlowWizard({ popupId }: { popupId: string }) {
             <h2 className="text-xl font-semibold tracking-tight">
               Where should it start?
             </h2>
-            <p className="text-sm text-muted-foreground">
-              You said {TYPE_COPY[flowType].label.toLowerCase()}. Everything
-              offered here can be that.
-            </p>
           </header>
 
           <div className="flex flex-col gap-2">
@@ -272,29 +265,13 @@ export function NewSalesFlowWizard({ popupId }: { popupId: string }) {
                     showOtherKinds && "rotate-90",
                   )}
                 />
-                Copy a door of a different kind (
-                {choices.otherKinds.length === 1
-                  ? "1 door"
-                  : `${choices.otherKinds.length} doors`}
-                )
+                Copy a flow of a different kind ({choices.otherKinds.length})
               </button>
               {showOtherKinds && (
                 <div className="flex flex-col gap-3 border-t p-4">
-                  <div className="rounded-lg border border-warning/40 bg-warning-soft p-3">
-                    <p className="text-sm font-semibold text-warning">
-                      These are doors of another kind
-                    </p>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      Their settings can still be copied, but not the ones a{" "}
-                      {TYPE_COPY[flowType].label.toLowerCase()} door can never
-                      use:
-                    </p>
-                    <ul className="mt-2 list-disc pl-5 text-sm text-muted-foreground">
-                      {notCarriedAcross(flowType).map((line) => (
-                        <li key={line}>{line}</li>
-                      ))}
-                    </ul>
-                  </div>
+                  <p className="text-sm text-warning">
+                    {notCarriedAcross(flowType)}
+                  </p>
                   <div className="flex flex-col gap-2">
                     {choices.otherKinds.map((option) => (
                       <StartRow
@@ -328,10 +305,6 @@ export function NewSalesFlowWizard({ popupId }: { popupId: string }) {
             <h2 className="text-xl font-semibold tracking-tight">
               What do people call it?
             </h2>
-            <p className="text-sm text-muted-foreground">
-              Buyers read this name when they pick a way in, and it becomes the
-              link.
-            </p>
           </header>
 
           <div className="flex flex-col gap-1.5">
@@ -383,10 +356,7 @@ export function NewSalesFlowWizard({ popupId }: { popupId: string }) {
                 </>
               )}
               {chosen.kind === "copy" && (
-                <Row
-                  k="Also copied"
-                  v="Its checkout steps and its buyer form, once. The two flows are independent afterwards."
-                />
+                <Row k="Also copied" v="Its checkout steps and buyer form" />
               )}
             </dl>
           </div>
