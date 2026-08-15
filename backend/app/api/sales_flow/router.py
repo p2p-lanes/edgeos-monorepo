@@ -449,11 +449,35 @@ async def delete_sales_flow(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Cannot delete a popup's default sales flow",
         )
+
+    # Deleting used to fail on anything at all that pointed at the flow, which
+    # in practice meant the checkout steps the product had seeded into it
+    # seconds earlier — so a flow nobody had ever sold through could not be
+    # removed, and the reason given was "configuration attached", which named
+    # our own doing as the obstacle.
+    #
+    # What must stop a delete is a record of something somebody did. Those are
+    # counted and named, because "cannot be deleted" tells an operator nothing
+    # about what to do next.
+    blocking = crud.history_blocking_delete(db, flow.id)
+    if blocking:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "This sales flow cannot be deleted because people have used it: "
+                + ", ".join(
+                    f"{count} {noun}{'' if count == 1 else 's'}"
+                    for noun, count in blocking
+                )
+                + "."
+            ),
+        )
+
     try:
-        crud.sales_flows_crud.delete(db, flow)
+        crud.delete_flow_and_its_configuration(db, flow)
     except IntegrityError as exc:
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="This sales flow has configuration attached and cannot be deleted",
+            detail="This sales flow is still in use and cannot be deleted",
         ) from exc

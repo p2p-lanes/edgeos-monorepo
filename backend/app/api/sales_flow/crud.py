@@ -136,6 +136,80 @@ def _has_flow_of_type(
     )
 
 
+# What a flow leaves behind when it is deleted, and what it may not.
+#
+# The line is not "does anything reference this row" — that was the old
+# question, and it refused to delete a flow because of the checkout steps the
+# product had seeded into it seconds earlier. The line is who made the rows.
+#
+# The flow's own configuration is ours: its steps, its form, its wording, its
+# review rules. None of it means anything without the flow, and none of it is
+# a record of anything happening. It goes with the flow.
+#
+# A record of what somebody did is not ours to discard. An application was
+# filled in, a payment was taken, an invitation was sent, a coupon was shared.
+# Those refuse the delete and say so.
+BELONGINGS: "tuple[tuple[str, str], ...]" = (
+    ("app.api.ticketing_step.models", "TicketingSteps"),
+    ("app.api.form_field.models", "FormFields"),
+    ("app.api.form_section.models", "FormSections"),
+    ("app.api.base_field_config.models", "BaseFieldConfigs"),
+    ("app.api.email_template.models", "EmailTemplates"),
+    ("app.api.approval_strategy.models", "ApprovalStrategies"),
+    ("app.api.popup_reviewer.models", "PopupReviewers"),
+)
+
+HISTORY: "tuple[tuple[str, str, str], ...]" = (
+    ("app.api.application.models", "Applications", "application"),
+    ("app.api.payment.models", "Payments", "payment"),
+    ("app.api.invite.models", "Invites", "invitation"),
+    ("app.api.group.models", "Groups", "group"),
+    ("app.api.coupon.models", "Coupons", "coupon"),
+)
+
+
+def _model(module: str, name: str):
+    from importlib import import_module  # noqa: PLC0415
+
+    return getattr(import_module(module), name)
+
+
+def history_blocking_delete(
+    session: Session, flow_id: uuid.UUID
+) -> "list[tuple[str, int]]":
+    """What people did through this flow, which deleting it would discard.
+
+    Returns `[(noun, count)]`, empty when nothing is in the way.
+    """
+    from sqlmodel import func  # noqa: PLC0415
+
+    found: list[tuple[str, int]] = []
+    for module, name, noun in HISTORY:
+        model = _model(module, name)
+        count = session.exec(
+            select(func.count()).where(model.sales_flow_id == flow_id)
+        ).one()
+        if count:
+            found.append((noun, count))
+    return found
+
+
+def delete_flow_and_its_configuration(session: Session, flow: SalesFlows) -> None:
+    """Delete a flow together with the configuration that only it uses.
+
+    Callers must have checked `history_blocking_delete` first; this does not
+    ask, and the foreign keys are the last line of defence rather than the
+    first.
+    """
+    from sqlmodel import delete as sql_delete  # noqa: PLC0415
+
+    for module, name in BELONGINGS:
+        model = _model(module, name)
+        session.exec(sql_delete(model).where(model.sales_flow_id == flow.id))
+    session.delete(flow)
+    session.commit()
+
+
 def resolve_default_flow_slug(
     candidate: str,
     taken: frozenset[str] = frozenset(),

@@ -346,7 +346,7 @@ class TestSalesFlowReviewersModeGuard:
         )
         assert response.status_code == 400
 
-    def test_delete_flow_with_attached_reviewer_rejected(
+    def test_delete_flow_with_attached_reviewer_takes_the_assignment_with_it(
         self,
         client: TestClient,
         db: Session,
@@ -359,6 +359,15 @@ class TestSalesFlowReviewersModeGuard:
             headers={"Authorization": f"Bearer {admin_token_tenant_a}"},
             json=_create_payload(popup_tenant_a.id),
         )
+        """A reviewer assigned to a flow used to refuse the delete, along with
+        every other row that pointed at it — the same rule that refused because
+        of the checkout steps we had seeded ourselves.
+
+        The assignment is configuration, not history: it says this person
+        reviews this flow, and once the flow is gone it says nothing. The
+        person is a user of the gathering and is untouched. Making an operator
+        detach reviewers one at a time before deleting bought nothing.
+        """
         flow_id = created.json()["id"]
         reviewer = _make_reviewer_candidate(db, tenant_a)
         _add_flow_reviewer(
@@ -369,8 +378,4 @@ class TestSalesFlowReviewersModeGuard:
             f"/api/v1/sales-flows/{flow_id}",
             headers={"Authorization": f"Bearer {admin_token_tenant_a}"},
         )
-        assert response.status_code == 400
-        assert (
-            response.json()["detail"]
-            == "This sales flow has configuration attached and cannot be deleted"
-        )
+        assert response.status_code == 204, response.text
