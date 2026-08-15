@@ -458,6 +458,7 @@ export function SalesFlowForm({
           <form.Field name="restrictionRule">
             {(field) => (
               <RestrictionRuleEditor
+                popupId={popupId}
                 combinator={field.state.value.combinator}
                 leaves={field.state.value.leaves}
                 unsupported={field.state.value.unsupported}

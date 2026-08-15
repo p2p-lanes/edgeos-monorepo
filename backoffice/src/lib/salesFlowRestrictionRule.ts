@@ -16,8 +16,8 @@ export type RestrictionCombinator = "all_of" | "any_of"
 export type RestrictionPredicateKind =
   | "form_answer"
   | "human_profile_field"
-  | "has_purchased"
-export type HasPurchasedScope = "product" | "category"
+  | "has_product"
+export type HasProductScope = "product" | "category"
 
 export interface RestrictionLeafDraft {
   kind: RestrictionPredicateKind
@@ -25,8 +25,8 @@ export interface RestrictionLeafDraft {
   field_name?: string
   /** human_profile_field only */
   field?: string
-  /** has_purchased only */
-  scope?: HasPurchasedScope
+  /** has_product only */
+  scope?: HasProductScope
   op: RestrictionOp
   value: string | null
   negate: boolean
@@ -43,7 +43,7 @@ export interface RestrictionRuleDraft {
 function isLeafShape(node: Record<string, unknown>): boolean {
   return (
     typeof node.kind === "string" &&
-    ["form_answer", "human_profile_field", "has_purchased"].includes(node.kind)
+    ["form_answer", "human_profile_field", "has_product"].includes(node.kind)
   )
 }
 
@@ -53,7 +53,7 @@ function toLeafDraft(node: Record<string, unknown>): RestrictionLeafDraft {
     field_name:
       typeof node.field_name === "string" ? node.field_name : undefined,
     field: typeof node.field === "string" ? node.field : undefined,
-    scope: (node.scope as HasPurchasedScope | undefined) ?? undefined,
+    scope: (node.scope as HasProductScope | undefined) ?? undefined,
     op: (node.op as RestrictionOp) ?? "eq",
     value:
       node.value === undefined || node.value === null
@@ -118,11 +118,16 @@ function leafDraftToPayload(
   }
   if (leaf.kind === "form_answer") base.field_name = leaf.field_name
   if (leaf.kind === "human_profile_field") base.field = leaf.field
-  if (leaf.kind === "has_purchased") {
+  if (leaf.kind === "has_product") {
     base.scope = leaf.scope
-    // has_purchased's op defaults server-side to "exists" and value is a
-    // required string (product uuid or category name) — never the
+    // `has_product`'s op defaults server-side to "exists" and value is a
+    // required string (a product id or a category name) — never the
     // free-typed comparison value the other two kinds use.
+    //
+    // The name matters: the backend calls this `has_product` and its enum is
+    // closed, so the `has_purchased` this used to send was rejected outright.
+    // It was renamed there when an admin-granted product started counting,
+    // since "has purchased" implied money had changed hands.
   }
   return base
 }

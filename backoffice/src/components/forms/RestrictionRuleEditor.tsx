@@ -1,4 +1,6 @@
+import { useQuery } from "@tanstack/react-query"
 import { Plus, Trash2 } from "lucide-react"
+import { ProductsService } from "@/client"
 import { FieldError } from "@/components/Common/FieldError"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -11,7 +13,7 @@ import {
 } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import type {
-  HasPurchasedScope,
+  HasProductScope,
   RestrictionCombinator,
   RestrictionLeafDraft,
   RestrictionOp,
@@ -36,7 +38,7 @@ const HUMAN_PROFILE_FIELDS = [
 const KIND_LABELS: Record<RestrictionPredicateKind, string> = {
   form_answer: "Form Answer",
   human_profile_field: "Profile Field",
-  has_purchased: "Has Purchased",
+  has_product: "Already holds",
 }
 
 const OP_LABELS: Record<RestrictionOp, string> = {
@@ -48,7 +50,7 @@ const OP_LABELS: Record<RestrictionOp, string> = {
 }
 
 function emptyLeaf(kind: RestrictionPredicateKind): RestrictionLeafDraft {
-  if (kind === "has_purchased") {
+  if (kind === "has_product") {
     return { kind, scope: "product", op: "exists", value: "", negate: false }
   }
   if (kind === "human_profile_field") {
@@ -63,7 +65,93 @@ function emptyLeaf(kind: RestrictionPredicateKind): RestrictionLeafDraft {
   return { kind, field_name: "", op: "eq", value: "", negate: false }
 }
 
+/**
+ * Which product, or which category, chosen from the ones this gathering has.
+ *
+ * This was a text box asking for a "product id". Nobody knows a product's id,
+ * so the only way to fill it in was to open another screen, find the product,
+ * copy a UUID out of the address bar and paste it here — and a typo produced
+ * a rule that matched nothing and turned every buyer away, silently, because
+ * restrictions fail closed.
+ *
+ * Categories come from the products rather than from a list of their own:
+ * a category with nothing in it can restrict nothing.
+ */
+function ProductOrCategorySelect({
+  popupId,
+  scope,
+  value,
+  onValueChange,
+  readOnly,
+}: {
+  popupId?: string
+  scope: HasProductScope
+  value: string
+  onValueChange: (value: string) => void
+  readOnly?: boolean
+}) {
+  const { data: products } = useQuery({
+    queryKey: ["products", { popupId }],
+    queryFn: () => ProductsService.listProducts({ popupId, limit: 200 }),
+    enabled: !!popupId,
+  })
+
+  const rows = products?.results ?? []
+  const options =
+    scope === "product"
+      ? rows.map((product) => ({ value: product.id, label: product.name }))
+      : [...new Set(rows.map((p) => p.category).filter(Boolean))].map(
+          (category) => ({
+            value: category as string,
+            label: category as string,
+          }),
+        )
+
+  // A rule saved before this list loaded, or naming something since deleted,
+  // must not be silently dropped by rendering an empty select.
+  const orphaned = value !== "" && !options.some((o) => o.value === value)
+
+  return (
+    <div className="flex min-w-0 flex-col gap-1">
+      <Select
+        value={value || undefined}
+        onValueChange={onValueChange}
+        disabled={readOnly || options.length === 0}
+      >
+        <SelectTrigger className="w-56 text-sm" size="sm">
+          <SelectValue
+            placeholder={
+              options.length === 0
+                ? scope === "product"
+                  ? "No products yet"
+                  : "No categories yet"
+                : scope === "product"
+                  ? "Pick a product"
+                  : "Pick a category"
+            }
+          />
+        </SelectTrigger>
+        <SelectContent>
+          {options.map((option) => (
+            <SelectItem key={option.value} value={option.value}>
+              {option.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      {orphaned && (
+        <span className="text-xs text-warning">
+          Set to something that is no longer on sale here. Pick again, or this
+          rule will turn everyone away.
+        </span>
+      )}
+    </div>
+  )
+}
+
 interface RestrictionRuleEditorProps {
+  /** The gathering whose products a `has_product` condition can name. */
+  popupId?: string
   combinator: RestrictionCombinator
   leaves: RestrictionLeafDraft[]
   unsupported: boolean
@@ -82,6 +170,7 @@ interface RestrictionRuleEditorProps {
  * `backend/app/services/restrictions/schemas.py` enforces server-side.
  */
 export function RestrictionRuleEditor({
+  popupId,
   combinator,
   leaves,
   unsupported,
@@ -210,11 +299,11 @@ export function RestrictionRuleEditor({
                 </Select>
               )}
 
-              {leaf.kind === "has_purchased" && (
+              {leaf.kind === "has_product" && (
                 <Select
                   value={leaf.scope ?? "product"}
                   onValueChange={(value) =>
-                    updateLeaf(index, { scope: value as HasPurchasedScope })
+                    updateLeaf(index, { scope: value as HasProductScope })
                   }
                   disabled={readOnly}
                 >
@@ -228,7 +317,7 @@ export function RestrictionRuleEditor({
                 </Select>
               )}
 
-              {leaf.kind !== "has_purchased" && (
+              {leaf.kind !== "has_product" && (
                 <Select
                   value={leaf.op}
                   onValueChange={(value) =>
@@ -249,7 +338,7 @@ export function RestrictionRuleEditor({
                 </Select>
               )}
 
-              {leaf.kind !== "has_purchased" && leaf.op !== "exists" && (
+              {leaf.kind !== "has_product" && leaf.op !== "exists" && (
                 <Input
                   placeholder="value"
                   value={leaf.value ?? ""}
@@ -259,15 +348,13 @@ export function RestrictionRuleEditor({
                 />
               )}
 
-              {leaf.kind === "has_purchased" && (
-                <Input
-                  placeholder={
-                    leaf.scope === "product" ? "product id" : "category"
-                  }
+              {leaf.kind === "has_product" && (
+                <ProductOrCategorySelect
+                  popupId={popupId}
+                  scope={leaf.scope ?? "product"}
                   value={leaf.value ?? ""}
-                  onChange={(e) => updateLeaf(index, { value: e.target.value })}
-                  disabled={readOnly}
-                  className="w-48 text-sm"
+                  onValueChange={(value) => updateLeaf(index, { value })}
+                  readOnly={readOnly}
                 />
               )}
 

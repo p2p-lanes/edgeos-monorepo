@@ -18,7 +18,7 @@ describe("parseRestrictionRuleToDrafts", () => {
       all_of: [
         { kind: "form_answer", field_name: "vip", op: "eq", value: "yes" },
         {
-          kind: "has_purchased",
+          kind: "has_product",
           scope: "category",
           value: "ticket",
           op: "exists",
@@ -112,7 +112,7 @@ describe("draftsToRestrictionRule", () => {
     const rule = {
       all_of: [
         {
-          kind: "has_purchased",
+          kind: "has_product",
           scope: "product",
           value: "3fa85f64-5717-4562-b3fc-2c963f66afa6",
           op: "exists",
@@ -123,5 +123,53 @@ describe("draftsToRestrictionRule", () => {
     const parsed = parseRestrictionRuleToDrafts(rule)
     const serialized = draftsToRestrictionRule(parsed.combinator, parsed.leaves)
     expect(serialized).toEqual(rule)
+  })
+})
+
+describe("the predicate the backend actually accepts", () => {
+  it("is called has_product on the way out", () => {
+    // It used to send `has_purchased`, which the backend's closed enum
+    // rejected outright — so no product condition could ever be saved from
+    // the backoffice, and the 422 read "Extra inputs are not permitted".
+    const payload = draftsToRestrictionRule("all_of", [
+      {
+        kind: "has_product",
+        scope: "category",
+        op: "exists",
+        value: "ticket",
+        negate: false,
+      },
+    ])
+    expect(payload).toEqual({
+      all_of: [
+        {
+          kind: "has_product",
+          scope: "category",
+          op: "exists",
+          value: "ticket",
+          negate: false,
+        },
+      ],
+    })
+  })
+
+  it("is recognised on the way in", () => {
+    // A saved rule the builder does not recognise renders as "uses a nested
+    // condition structure this builder doesn't support editing", which was
+    // untrue: the rule is flat, the name was wrong.
+    const draft = parseRestrictionRuleToDrafts({
+      all_of: [
+        {
+          kind: "has_product",
+          scope: "product",
+          op: "exists",
+          value: "a-product-id",
+          negate: false,
+        },
+      ],
+    })
+    expect(draft.unsupported).toBe(false)
+    expect(draft.leaves).toHaveLength(1)
+    expect(draft.leaves[0].kind).toBe("has_product")
   })
 })
