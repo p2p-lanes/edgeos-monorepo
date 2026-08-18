@@ -147,7 +147,8 @@ export function StepIconPicker({
                             onClick={() => select(slug)}
                             className={cn(
                               "flex aspect-square items-center justify-center rounded-md hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                              slug === trimmed && "bg-muted ring-1 ring-primary",
+                              slug === trimmed &&
+                                "bg-muted ring-1 ring-primary",
                             )}
                           >
                             <Icon className="h-4 w-4" aria-hidden="true" />

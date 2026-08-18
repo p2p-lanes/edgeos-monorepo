@@ -4,11 +4,7 @@ import userEvent from "@testing-library/user-event"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import type { TicketingStepPublic } from "@/client"
-import {
-  PopupsService,
-  ProductsService,
-  TicketingStepsService,
-} from "@/client"
+import { PopupsService, ProductsService, TicketingStepsService } from "@/client"
 import { StepDetailPanel } from "./StepDetailPanel"
 
 vi.mock("@/client", async (importOriginal) => {

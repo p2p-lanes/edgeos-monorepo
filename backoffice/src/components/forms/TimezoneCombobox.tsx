@@ -2,12 +2,12 @@ import { useMemo } from "react"
 
 import { Combobox, type ComboboxOption } from "@/components/ui/combobox"
 import {
-  type TimezoneOption,
   canonicalizeTimezone,
   formatTimezoneLabel,
   getBrowserTimezone,
   getTimezoneOptions,
   syntheticTimezoneOption,
+  type TimezoneOption,
 } from "@/lib/timezones"
 
 interface TimezoneComboboxProps {

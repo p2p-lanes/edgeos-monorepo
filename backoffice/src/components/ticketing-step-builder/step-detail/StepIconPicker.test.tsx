@@ -107,9 +107,10 @@ describe("StepIconPicker", () => {
       "aria-pressed",
       "true",
     )
-    expect(
-      screen.getByRole("button", { name: "Credit card" }),
-    ).toHaveAttribute("aria-pressed", "false")
+    expect(screen.getByRole("button", { name: "Credit card" })).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    )
   })
 
   it("resets the search query when the popover closes", async () => {
