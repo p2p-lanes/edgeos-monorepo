@@ -276,6 +276,23 @@ describe("StepperCheckoutFlow", () => {
       expect(container.querySelector(".checkout-amanita")).toBeNull()
     })
 
+    it("marks amanita as owning its typography so the theme font skips it", () => {
+      // globals.css exempts `[data-skin-typography] *` from the theme heading
+      // font. Without this attribute an admin's Google Font pick would leak
+      // into amanita's headings and override the skin's own faces.
+      cityOverride = {
+        terms_and_conditions_url: null,
+        theme_config: { checkout_skin: "amanita" },
+      }
+      const { container } = render(<StepperCheckoutFlow />)
+      expect(container.querySelector("[data-skin-typography]")).toBeTruthy()
+    })
+
+    it("leaves the default skin open to the theme font", () => {
+      const { container } = render(<StepperCheckoutFlow />)
+      expect(container.querySelector("[data-skin-typography]")).toBeNull()
+    })
+
     it("paints the amanita nav gradient full-bleed, with only the pills constrained", () => {
       cityOverride = AMANITA_CITY
       stepConfigsOverride = [PASSES_STEP_CONFIG]

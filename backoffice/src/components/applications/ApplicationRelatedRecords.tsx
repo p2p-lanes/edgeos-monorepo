@@ -1,51 +1,22 @@
 import { useQuery } from "@tanstack/react-query"
 import { Link } from "@tanstack/react-router"
 import { ChevronRight, CreditCard, User, Users } from "lucide-react"
-import type { ReactNode } from "react"
 
 import {
   type ApplicationPublic,
   type PaymentPublic,
   PaymentsService,
 } from "@/client"
+import { PreviousApplicationsSection } from "@/components/applications/PreviousApplicationsSection"
+import {
+  ResourceHeader,
+  resourceActionClassName,
+} from "@/components/applications/ResourceHeader"
 import { StatusBadge } from "@/components/Common/StatusBadge"
 import { HumanRatingBadge } from "@/components/Humans/HumanRatingBadge"
 import { Button } from "@/components/ui/button"
 
 export const RELATED_PAYMENTS_LIMIT = 3
-
-function ResourceHeader({
-  id,
-  icon,
-  title,
-  count,
-  action,
-}: {
-  id: string
-  icon: ReactNode
-  title: string
-  count?: number
-  action?: ReactNode
-}) {
-  return (
-    <div className="mb-2 flex items-center justify-between gap-3 px-1">
-      <h3
-        id={id}
-        className="flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-muted-foreground"
-      >
-        {icon}
-        {title}
-        {count !== undefined && (
-          <span className="font-mono text-[11px] tabular-nums">{count}</span>
-        )}
-      </h3>
-      {action}
-    </div>
-  )
-}
-
-const resourceActionClassName =
-  "inline-flex items-center gap-0.5 text-xs font-medium text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
 
 function PaymentsRows({
   payments,
@@ -325,6 +296,8 @@ export function ApplicationRelatedRecords({
           </table>
         </div>
       </section>
+
+      <PreviousApplicationsSection applicationId={application.id} />
     </section>
   )
 }

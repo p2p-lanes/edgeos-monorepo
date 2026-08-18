@@ -173,7 +173,7 @@ class TicketingStepBase(SQLModel):
     show_title: bool = Field(default=True)
     show_watermark: bool = Field(default=True)
     show_in_navbar: bool = Field(default=True)
-    emoji: str | None = Field(default=None, nullable=True, max_length=8)
+    emoji: str | None = Field(default=None, nullable=True, max_length=32)
 
 
 class TicketingStepPublic(BaseModel):

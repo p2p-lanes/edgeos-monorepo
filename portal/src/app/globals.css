@@ -386,6 +386,21 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
+  /* Optional separate heading font from the popup theme
+     (`theme_config.typography.font_heading_family`, applied by
+     ThemeProvider). The chain falls through to the body font and finally to
+     the portal default, so this rule is a no-op until an admin picks one.
+
+     `:not([data-skin-typography] *)` exempts checkout skins. A skin declares
+     its font-family on its own wrapper and lets it inherit down; without the
+     exemption this rule would match every heading inside the skin and win,
+     because inheritance always loses to a rule that matches the element. */
+  :is(h1, h2, h3, h4, h5, h6):not([data-skin-typography] *) {
+    font-family: var(
+      --theme-font-heading-family,
+      var(--theme-font-family, var(--font-sans))
+    );
+  }
   button,
   [role="button"],
   a,

@@ -16,6 +16,8 @@ export type Item = {
   title: string
   path: string
   badge?: number
+  /** `data-tour` anchor, so the product tour can spotlight this entry. */
+  tourId?: string
 }
 
 interface MainProps {
@@ -41,7 +43,7 @@ export function Main({ items }: MainProps) {
             const isActive = currentPath === item.path
 
             return (
-              <SidebarMenuItem key={item.title}>
+              <SidebarMenuItem key={item.title} data-tour={item.tourId}>
                 <SidebarMenuButton
                   tooltip={item.title}
                   isActive={isActive}

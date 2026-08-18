@@ -9603,6 +9603,67 @@ export const FormSectionUpdateSchema = {
     title: 'FormSectionUpdate'
 } as const;
 
+export const GoogleFontSchema = {
+    properties: {
+        family: {
+            type: 'string',
+            title: 'Family'
+        },
+        category: {
+            type: 'string',
+            enum: ['sans-serif', 'serif', 'display', 'handwriting', 'monospace'],
+            title: 'Category'
+        },
+        variants: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Variants'
+        },
+        subsets: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Subsets'
+        }
+    },
+    type: 'object',
+    required: ['family', 'category', 'variants', 'subsets'],
+    title: 'GoogleFont',
+    description: `A single family, trimmed to what the picker actually renders.
+
+Google's payload carries a \`files\` map with one CDN URL per variant, which
+is ~80% of the response weight and useless to us — the portal loads fonts
+through the \`css2\` stylesheet endpoint, not the raw files.`
+} as const;
+
+export const GoogleFontsCatalogSchema = {
+    properties: {
+        source: {
+            type: 'string',
+            enum: ['google', 'fallback'],
+            title: 'Source'
+        },
+        fonts: {
+            items: {
+                '$ref': '#/components/schemas/GoogleFont'
+            },
+            type: 'array',
+            title: 'Fonts'
+        }
+    },
+    type: 'object',
+    required: ['source', 'fonts'],
+    title: 'GoogleFontsCatalog',
+    description: `Catalog response.
+
+\`source\` lets the backoffice tell a real catalog from the degraded one and
+surface a hint to the admin rather than silently offering 40 fonts when
+1800 were expected.`
+} as const;
+
 export const GrantCreditRequestSchema = {
     properties: {
         amount: {
@@ -17236,6 +17297,114 @@ export const PreviewResponseSchema = {
     type: 'object',
     required: ['rendered_html'],
     title: 'PreviewResponse'
+} as const;
+
+export const PreviousApplicationSpendSchema = {
+    properties: {
+        currency: {
+            type: 'string',
+            title: 'Currency'
+        },
+        amount: {
+            type: 'string',
+            pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$',
+            title: 'Amount'
+        }
+    },
+    type: 'object',
+    required: ['currency', 'amount'],
+    title: 'PreviousApplicationSpend',
+    description: `One money total, in one currency.
+
+Payments carry their own currency, so an application's spend can span more
+than one. Collapsing them into a single number would misstate the amount.`
+} as const;
+
+export const PreviousApplicationSummarySchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        popup_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Popup Id'
+        },
+        popup_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Popup Name'
+        },
+        popup_start_date: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Popup Start Date'
+        },
+        status: {
+            type: 'string',
+            title: 'Status'
+        },
+        tickets_count: {
+            type: 'integer',
+            title: 'Tickets Count',
+            default: 0
+        },
+        spend: {
+            items: {
+                '$ref': '#/components/schemas/PreviousApplicationSpend'
+            },
+            type: 'array',
+            title: 'Spend',
+            default: []
+        },
+        submitted_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Submitted At'
+        },
+        created_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Created At'
+        }
+    },
+    type: 'object',
+    required: ['id', 'popup_id', 'status'],
+    title: 'PreviousApplicationSummary',
+    description: `One application by the same human, in a different popup.
+
+Powers the "Previous applications" block of the BO application detail: it
+tells a reviewer whether this person already took part in other popups of
+the tenant, and how much they bought when they did.`
 } as const;
 
 export const ProductBatchSchema = {

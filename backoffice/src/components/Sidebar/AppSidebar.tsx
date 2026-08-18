@@ -75,13 +75,23 @@ const onboardingItem: Item = {
 
 const popupItems: Item[] = [
   { icon: Calendar, title: "Gatherings", path: "/popups" },
-  { icon: Package, title: "Products", path: "/products" },
-  { icon: Tag, title: "Coupons", path: "/coupons" },
+  {
+    icon: Package,
+    title: "Products",
+    path: "/products",
+    tourId: "nav-products",
+  },
+  { icon: Tag, title: "Coupons", path: "/coupons", tourId: "nav-coupons" },
   { icon: UsersRound, title: "Groups", path: "/groups" },
   { icon: Link2, title: "Invites", path: "/invites" },
   { icon: Share2, title: "Referrals", path: "/referrals" },
   { icon: FormInput, title: "Form Builder", path: "/form-builder" },
-  { icon: LayoutList, title: "Ticketing Steps", path: "/ticketing-steps" },
+  {
+    icon: LayoutList,
+    title: "Ticketing Steps",
+    path: "/ticketing-steps",
+    tourId: "nav-ticketing-steps",
+  },
   { icon: Palette, title: "Theme", path: "/theme" },
   { icon: Mail, title: "Email Templates", path: "/email-templates" },
   { icon: MailCheck, title: "Email Logs", path: "/email-logs" },
@@ -161,8 +171,14 @@ export function AppSidebar() {
         title: "Applications",
         path: "/applications",
         badge: pendingReviewCount,
+        tourId: "nav-applications",
       },
-      { icon: Users, title: "Attendees", path: "/attendees" },
+      {
+        icon: Users,
+        title: "Attendees",
+        path: "/attendees",
+        tourId: "nav-attendees",
+      },
       { icon: ClipboardCheck, title: "Check In", path: "/check-in" },
       { icon: User, title: "Humans", path: "/humans" },
       {
@@ -170,6 +186,7 @@ export function AppSidebar() {
         title: "Payments",
         path: "/payments",
         badge: pendingPaymentCount,
+        tourId: "nav-payments",
       },
       {
         icon: ShoppingCart,

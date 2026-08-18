@@ -239,6 +239,39 @@ class ApplicationCommentPublic(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class PreviousApplicationSpend(BaseModel):
+    """One money total, in one currency.
+
+    Payments carry their own currency, so an application's spend can span more
+    than one. Collapsing them into a single number would misstate the amount.
+    """
+
+    currency: str
+    amount: Decimal
+
+
+class PreviousApplicationSummary(BaseModel):
+    """One application by the same human, in a different popup.
+
+    Powers the "Previous applications" block of the BO application detail: it
+    tells a reviewer whether this person already took part in other popups of
+    the tenant, and how much they bought when they did.
+    """
+
+    id: uuid.UUID
+    popup_id: uuid.UUID
+    popup_name: str | None = None
+    popup_start_date: datetime | None = None
+    status: str
+    # Purchased tickets: one attendee_products row per ticket, across every
+    # attendee of the application.
+    tickets_count: int = 0
+    # Approved payments only, grouped by currency.
+    spend: list[PreviousApplicationSpend] = []
+    submitted_at: datetime | None = None
+    created_at: datetime | None = None
+
+
 class ApplicationCreate(BaseModel):
     """Application schema for creation.
 

@@ -105,6 +105,11 @@ class Settings(BaseSettings):
     # AI Translation (Gemini)
     GEMINI_API_KEY: str | None = None
 
+    # Google Fonts Developer API — powers the font picker in the backoffice
+    # theme editor. Optional: without it the catalog endpoint serves a small
+    # curated fallback list instead of failing.
+    GOOGLE_FONTS_API_KEY: str | None = None
+
     # SimpleFI payment provider
     BACKEND_URL: str = "http://localhost:8000"
     PORTAL_URL: str = "http://localhost:3000"
