@@ -194,6 +194,7 @@
     "send_code": "发送验证码",
     "verify_code": "验证代码",
     "submit_error": "提交表单时出错，请重试。",
+    "duplicate_application": "您已有该活动的待处理申请。请查看您的邮箱或联系客服。",
     "application_required": "需要申请",
     "application_required_message": "您好 {{userName}}，在购买通行证之前，我们想更好地了解您！",
     "application_required_prompt": "请访问 Edge Portal 并申请 {{popupName}}，以便我们审核您的信息。",

@@ -6,7 +6,7 @@ import { useParams } from "next/navigation"
 import { useEffect } from "react"
 import { useTranslation } from "react-i18next"
 import { PopupCheckoutContent } from "@/app/checkout/components/PopupCheckoutContent"
-import { ApiError, ReferralsService } from "@/client"
+import { ApiError, InvitesService } from "@/client"
 import { CheckoutBackgroundImage } from "@/components/CheckoutBackgroundImage"
 import { CheckoutBackgroundVideo } from "@/components/CheckoutBackgroundVideo"
 import { getCheckoutBackground } from "@/lib/background-image"
@@ -42,7 +42,10 @@ export default function ReferralCodePage() {
     error,
   } = useQuery({
     queryKey: ["referral-preview-top", code],
-    queryFn: () => ReferralsService.getReferralPreview({ code }),
+    // The code in the URL is the link's token. /r/{code} stays the attendee
+    // link shape -- people have shared these -- but it now resolves through
+    // the unified preview.
+    queryFn: () => InvitesService.previewLink({ token: code }),
     enabled: !!code,
     retry: (failureCount, err) => {
       if (

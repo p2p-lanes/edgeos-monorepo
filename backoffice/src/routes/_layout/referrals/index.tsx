@@ -4,7 +4,7 @@ import type { ColumnDef } from "@tanstack/react-table"
 import { Info, Share2 } from "lucide-react"
 import { Suspense } from "react"
 
-import { PopupsService, type ReferralPublic, ReferralsService } from "@/client"
+import { type InvitePublic, InvitesService, PopupsService } from "@/client"
 import { DataTable, SortableHeader } from "@/components/Common/DataTable"
 import { EmptyState } from "@/components/Common/EmptyState"
 import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
@@ -25,8 +25,10 @@ function getReferralsQueryOptions(
 ) {
   return {
     queryFn: () =>
-      ReferralsService.listReferralsAdmin({
+      InvitesService.listInvites({
         popupId: popupId ?? undefined,
+        // Attendee-created links only: admin invites have their own screen.
+        issuer: "portal",
         skip: page * pageSize,
         limit: pageSize,
       }),
@@ -42,13 +44,13 @@ export const Route = createFileRoute("/_layout/referrals/")({
   }),
 })
 
-const columns: ColumnDef<ReferralPublic>[] = [
+const columns: ColumnDef<InvitePublic>[] = [
   {
-    accessorKey: "code",
+    accessorKey: "token",
     header: ({ column }) => <SortableHeader label="Code" column={column} />,
     cell: ({ row }) => (
       <span className="inline-flex items-center gap-2">
-        <span className="font-mono text-sm">{row.original.code}</span>
+        <span className="font-mono text-sm">{row.original.token}</span>
         {row.original.is_disabled && (
           <Badge variant="destructive">Disabled</Badge>
         )}

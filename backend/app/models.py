@@ -129,7 +129,6 @@ from app.api.popup_reviewer.schemas import (
 from app.api.product.models import Products
 from app.api.product.schemas import ProductCreate, ProductPublic, ProductUpdate
 from app.api.publishable_key.models import PopupPublishableKeys
-from app.api.referral.models import Referrals
 
 # Task tracker
 from app.api.task.models import Task, TaskAttachment, TaskComment
@@ -249,9 +248,8 @@ __all__ = [
     "GroupCreate",
     "GroupPublic",
     "GroupUpdate",
-    # Invites and Referrals (groups-rework)
+    # Access links (groups-rework)
     "Invites",
-    "Referrals",
     # Application & Attendee
     "Applications",
     "ApplicationSnapshots",

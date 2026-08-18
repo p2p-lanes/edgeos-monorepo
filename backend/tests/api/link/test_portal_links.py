@@ -24,10 +24,10 @@ from sqlmodel import Session
 
 from app.api.attendee.models import AttendeeProducts, Attendees
 from app.api.human.models import Humans
+from app.api.invite.models import Invites
 from app.api.popup.models import Popups
 from app.api.popup.schemas import PopupStatus
 from app.api.product.models import Products
-from app.api.referral.models import Referrals
 from app.api.tenant.models import Tenants
 from app.api.user.models import Users
 from app.core.security import create_access_token
@@ -130,16 +130,22 @@ def _make_referral(
     discount_percentage: Decimal = Decimal("0"),
     expires_at: datetime | None = None,
     is_disabled: bool = False,
-) -> Referrals:
+) -> Invites:
+    """Build a referral: an Invite carrying a referrer_human_id.
+
+    Referrals were merged into `invites` (migration a3f8c1d94e27), so a row in
+    the old `referrals` table is invisible to every code path now.
+    """
     ref_code = code or f"ref-{uuid.uuid4().hex[:12]}"
-    ref = Referrals(
+    ref = Invites(
         tenant_id=popup.tenant_id,
         popup_id=popup.id,
         referrer_human_id=referrer.id,
-        code=ref_code,
+        token=ref_code,
         max_uses=max_uses,
         current_uses=current_uses,
         auto_approve=auto_approve,
+        express_checkout=True,
         discount_percentage=discount_percentage,
         expires_at=expires_at,
         is_disabled=is_disabled,
@@ -169,7 +175,7 @@ class TestReferralModel:
         human = _make_human(db, tenant_a)
         referral = _make_referral(db, popup, human, code="model-test-ref")
 
-        fetched = db.get(Referrals, referral.id)
+        fetched = db.get(Invites, referral.id)
         assert fetched is not None
         assert fetched.code == "model-test-ref"
         assert fetched.popup_id == popup.id
@@ -186,7 +192,7 @@ class TestReferralModel:
         referral = _make_referral(
             db, popup, human, code="disc-test-ref", discount_percentage=Decimal("15.50")
         )
-        fetched = db.get(Referrals, referral.id)
+        fetched = db.get(Invites, referral.id)
         assert fetched is not None
         assert fetched.discount_percentage == Decimal("15.50")
 
@@ -215,13 +221,13 @@ class TestReferralPortalCRUD:
         htok = _human_token(human)
 
         resp = client.post(
-            "/api/v1/portal/referrals",
+            "/api/v1/portal/invites",
             json={"popup_id": str(popup.id)},
             headers=_auth(htok),
         )
         assert resp.status_code in (200, 201), resp.json()
         body = resp.json()
-        assert "code" in body
+        assert "token" in body
         assert body["current_uses"] == 0
         assert body["popup_id"] == str(popup.id)
         assert body["referrer_human_id"] == str(human.id)
@@ -238,7 +244,7 @@ class TestReferralPortalCRUD:
         htok = _human_token(human)
 
         resp = client.post(
-            "/api/v1/portal/referrals",
+            "/api/v1/portal/invites",
             json={"popup_id": str(popup.id)},
             headers=_auth(htok),
         )
@@ -258,12 +264,12 @@ class TestReferralPortalCRUD:
         explicit_code = f"custom-{uuid.uuid4().hex[:12]}"
 
         resp = client.post(
-            "/api/v1/portal/referrals",
-            json={"popup_id": str(popup.id), "code": explicit_code},
+            "/api/v1/portal/invites",
+            json={"popup_id": str(popup.id), "token": explicit_code},
             headers=_auth(htok),
         )
         assert resp.status_code in (200, 201), resp.json()
-        assert resp.json()["code"] == explicit_code
+        assert resp.json()["token"] == explicit_code
 
     def test_duplicate_code_returns_409(
         self,
@@ -280,8 +286,8 @@ class TestReferralPortalCRUD:
 
         htok = _human_token(human)
         resp = client.post(
-            "/api/v1/portal/referrals",
-            json={"popup_id": str(popup.id), "code": dup_code},
+            "/api/v1/portal/invites",
+            json={"popup_id": str(popup.id), "token": dup_code},
             headers=_auth(htok),
         )
         assert resp.status_code == 409, resp.json()
@@ -298,7 +304,7 @@ class TestReferralPortalCRUD:
         htok = _human_token(human)
 
         resp = client.post(
-            "/api/v1/portal/referrals",
+            "/api/v1/portal/invites",
             json={"popup_id": str(popup.id)},
             headers=_auth(htok),
         )
@@ -318,7 +324,7 @@ class TestReferralPortalCRUD:
         htok = _human_token(human)
 
         resp = client.get(
-            f"/api/v1/portal/referrals?popup_id={popup.id}",
+            f"/api/v1/portal/invites?popup_id={popup.id}",
             headers=_auth(htok),
         )
         assert resp.status_code == 200, resp.json()
@@ -339,7 +345,7 @@ class TestReferralPortalCRUD:
         htok = _human_token(human)
 
         resp = client.patch(
-            f"/api/v1/portal/referrals/{ref.id}",
+            f"/api/v1/portal/invites/{ref.id}",
             json={"max_uses": 20},
             headers=_auth(htok),
         )
@@ -360,7 +366,7 @@ class TestReferralPortalCRUD:
         other_tok = _human_token(other)
 
         resp = client.patch(
-            f"/api/v1/portal/referrals/{ref.id}",
+            f"/api/v1/portal/invites/{ref.id}",
             json={"max_uses": 5},
             headers=_auth(other_tok),
         )
@@ -379,7 +385,7 @@ class TestReferralPortalCRUD:
         htok = _human_token(human)
 
         resp = client.delete(
-            f"/api/v1/portal/referrals/{ref.id}",
+            f"/api/v1/portal/invites/{ref.id}",
             headers=_auth(htok),
         )
         assert resp.status_code in (200, 204), resp.json()
@@ -399,7 +405,7 @@ class TestReferralPortalCRUD:
         htok = _human_token(human)
 
         resp = client.delete(
-            f"/api/v1/portal/referrals/{ref.id}",
+            f"/api/v1/portal/invites/{ref.id}",
             headers=_auth(htok),
         )
         assert resp.status_code == 409, resp.json()
@@ -430,10 +436,10 @@ class TestReferralPublicLookup:
             db, popup, human, code=code, discount_percentage=Decimal("10.00")
         )
 
-        resp = client.get(f"/api/v1/referrals/r/{code}")
+        resp = client.get(f"/api/v1/invites/preview/{code}")
         assert resp.status_code == 200, resp.json()
         body = resp.json()
-        assert body["code"] == code
+        assert body["token"] == code
         assert "referrer_human_id" not in body, "PII leak: referrer_human_id present"
         assert "discount_percentage" in body
         assert body["discount_percentage"] == "10.00"
@@ -443,7 +449,7 @@ class TestReferralPublicLookup:
         client: TestClient,
     ) -> None:
         """Unknown code → 404."""
-        resp = client.get("/api/v1/referrals/r/does-not-exist-xyz")
+        resp = client.get("/api/v1/invites/preview/does-not-exist-xyz")
         assert resp.status_code == 404, resp.json()
 
     def test_ended_popup_returns_410(
@@ -458,7 +464,7 @@ class TestReferralPublicLookup:
         code = f"ended-{uuid.uuid4().hex[:12]}"
         _make_referral(db, popup, human, code=code)
 
-        resp = client.get(f"/api/v1/referrals/r/{code}")
+        resp = client.get(f"/api/v1/invites/preview/{code}")
         assert resp.status_code == 410, resp.json()
 
     def test_disabled_referral_returns_410(
@@ -473,7 +479,7 @@ class TestReferralPublicLookup:
         code = f"dis-{uuid.uuid4().hex[:12]}"
         _make_referral(db, popup, human, code=code, is_disabled=True)
 
-        resp = client.get(f"/api/v1/referrals/r/{code}")
+        resp = client.get(f"/api/v1/invites/preview/{code}")
         assert resp.status_code == 410, resp.json()
 
     def test_referrals_flag_off_returns_410(
@@ -488,7 +494,7 @@ class TestReferralPublicLookup:
         code = f"floff-{uuid.uuid4().hex[:12]}"
         _make_referral(db, popup, human, code=code)
 
-        resp = client.get(f"/api/v1/referrals/r/{code}")
+        resp = client.get(f"/api/v1/invites/preview/{code}")
         assert resp.status_code == 410, resp.json()
 
 
@@ -518,7 +524,7 @@ class TestReferralAdminCRUD:
         atk = _admin_token(admin_user_tenant_a)
 
         resp = client.get(
-            f"/api/v1/admin/referrals?popup_id={popup.id}",
+            f"/api/v1/invites?issuer=portal&popup_id={popup.id}",
             headers={**_auth(atk), "X-Tenant-Id": str(tenant_a.id)},
         )
         assert resp.status_code == 200, resp.json()
@@ -542,22 +548,22 @@ class TestReferralAdminCRUD:
         headers = {**_auth(atk), "X-Tenant-Id": str(tenant_a.id)}
 
         resp = client.patch(
-            f"/api/v1/admin/referrals/{ref.id}",
+            f"/api/v1/invites/{ref.id}",
             json={"is_disabled": True},
             headers=headers,
         )
         assert resp.status_code == 200, resp.json()
         assert resp.json()["is_disabled"] is True
 
-        assert client.get(f"/api/v1/referrals/r/{code}").status_code == 410
+        assert client.get(f"/api/v1/invites/preview/{code}").status_code == 410
 
         resp = client.patch(
-            f"/api/v1/admin/referrals/{ref.id}",
+            f"/api/v1/invites/{ref.id}",
             json={"is_disabled": False},
             headers=headers,
         )
         assert resp.status_code == 200, resp.json()
-        assert client.get(f"/api/v1/referrals/r/{code}").status_code == 200
+        assert client.get(f"/api/v1/invites/preview/{code}").status_code == 200
 
     def test_admin_can_update_discount_and_auto_approve(
         self,
@@ -573,7 +579,7 @@ class TestReferralAdminCRUD:
         atk = _admin_token(admin_user_tenant_a)
 
         resp = client.patch(
-            f"/api/v1/admin/referrals/{ref.id}",
+            f"/api/v1/invites/{ref.id}",
             json={"discount_percentage": "25.00", "auto_approve": True},
             headers={**_auth(atk), "X-Tenant-Id": str(tenant_a.id)},
         )
@@ -805,8 +811,8 @@ class TestReferralRLS:
         ref_b = _make_referral(db, popup_b, human_b, code=shared_code)
 
         # Both exist independently
-        fetched_a = db.get(Referrals, ref_a.id)
-        fetched_b = db.get(Referrals, ref_b.id)
+        fetched_a = db.get(Invites, ref_a.id)
+        fetched_b = db.get(Invites, ref_b.id)
         assert fetched_a is not None
         assert fetched_b is not None
         assert fetched_a.popup_id != fetched_b.popup_id
@@ -841,12 +847,12 @@ class TestPerPopupReferralLimit:
         htok = _human_token(human)
 
         resp = client.post(
-            "/api/v1/portal/referrals",
+            "/api/v1/portal/invites",
             json={"popup_id": str(popup.id)},
             headers=_auth(htok),
         )
         assert resp.status_code == 409, resp.json()
-        assert "already have a referral" in resp.json()["detail"]
+        assert "already have a link" in resp.json()["detail"]
 
     def test_created_referral_gets_max_uses_from_popup_config(
         self,
@@ -866,7 +872,7 @@ class TestPerPopupReferralLimit:
         htok = _human_token(human)
 
         resp = client.post(
-            "/api/v1/portal/referrals",
+            "/api/v1/portal/invites",
             json={"popup_id": str(popup.id)},
             headers=_auth(htok),
         )
@@ -891,7 +897,7 @@ class TestPerPopupReferralLimit:
         htok = _human_token(human)
 
         resp = client.post(
-            "/api/v1/portal/referrals",
+            "/api/v1/portal/invites",
             json={"popup_id": str(popup.id)},
             headers=_auth(htok),
         )
@@ -917,7 +923,7 @@ class TestPerPopupReferralLimit:
 
         # Even if body passes max_uses=100, popup config (3) wins
         resp = client.post(
-            "/api/v1/portal/referrals",
+            "/api/v1/portal/invites",
             json={"popup_id": str(popup.id), "max_uses": 100},
             headers=_auth(htok),
         )

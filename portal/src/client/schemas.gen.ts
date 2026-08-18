@@ -11942,6 +11942,89 @@ token: auto-generated via secrets.token_urlsafe(16) when omitted.
 recipient_email: stored lowercase; NULL means open invite.`
 } as const;
 
+export const InvitePortalCreateSchema = {
+    properties: {
+        popup_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Popup Id'
+        },
+        token: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Token'
+        },
+        max_uses: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Max Uses'
+        },
+        expires_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Expires At'
+        }
+    },
+    type: 'object',
+    required: ['popup_id'],
+    title: 'InvitePortalCreate',
+    description: `Attendee request body for POST /portal/invites.
+
+An attendee sets far less than an admin: the policy fields (discount,
+auto_approve) stay admin-only, and max_uses is dictated by the popup's
+max_referrals_per_attendee quota.`
+} as const;
+
+export const InvitePortalUpdateSchema = {
+    properties: {
+        expires_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Expires At'
+        },
+        max_uses: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Max Uses'
+        }
+    },
+    type: 'object',
+    title: 'InvitePortalUpdate',
+    description: 'Attendee request body for PATCH /portal/invites/{id} — owner-mutable only.'
+} as const;
+
 export const InvitePublicSchema = {
     properties: {
         id: {
@@ -11981,6 +12064,11 @@ export const InvitePublicSchema = {
         express_checkout: {
             type: 'boolean',
             title: 'Express Checkout'
+        },
+        is_disabled: {
+            type: 'boolean',
+            title: 'Is Disabled',
+            default: false
         },
         max_uses: {
             anyOf: [
@@ -12034,9 +12122,28 @@ export const InvitePublicSchema = {
             title: 'Expires At'
         },
         created_by: {
-            type: 'string',
-            format: 'uuid',
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
             title: 'Created By'
+        },
+        referrer_human_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Referrer Human Id'
         },
         created_at: {
             type: 'string',
@@ -12050,12 +12157,15 @@ export const InvitePublicSchema = {
         }
     },
     type: 'object',
-    required: ['id', 'popup_id', 'token', 'discount_percentage', 'auto_approve', 'express_checkout', 'current_uses', 'created_by', 'created_at', 'updated_at'],
+    required: ['id', 'popup_id', 'token', 'discount_percentage', 'auto_approve', 'express_checkout', 'current_uses', 'created_at', 'updated_at'],
     title: 'InvitePublic',
-    description: `Full invite detail — admin-only response.
+    description: `Full link detail — admin, or the owning attendee for their own link.
 
 Exposes all fields including token and recipient_email.
-Never sent to unauthenticated callers.`
+Never sent to unauthenticated callers.
+
+Exactly one issuer is set: \`\`created_by\`\` for a backoffice link,
+\`\`referrer_human_id\`\` for one an attendee created from the portal.`
 } as const;
 
 export const InvitePublicPreviewSchema = {
@@ -12238,6 +12348,17 @@ export const InviteUpdateSchema = {
                 }
             ],
             title: 'Express Checkout'
+        },
+        is_disabled: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Is Disabled'
         }
     },
     type: 'object',
@@ -12865,24 +12986,6 @@ export const ListModel_ProductPublic_Schema = {
     type: 'object',
     required: ['results', 'paging'],
     title: 'ListModel[ProductPublic]'
-} as const;
-
-export const ListModel_ReferralPublic_Schema = {
-    properties: {
-        results: {
-            items: {
-                '$ref': '#/components/schemas/ReferralPublic'
-            },
-            type: 'array',
-            title: 'Results'
-        },
-        paging: {
-            '$ref': '#/components/schemas/Paging'
-        }
-    },
-    type: 'object',
-    required: ['results', 'paging'],
-    title: 'ListModel[ReferralPublic]'
 } as const;
 
 export const ListModel_SavedViewPublic_Schema = {
@@ -18849,300 +18952,6 @@ export const RecurrenceUpdateSchema = {
     description: `Body for PATCH /events/{id}/recurrence.
 
 \`\`recurrence=None\`\` clears the RRULE (series becomes a one-off).`
-} as const;
-
-export const ReferralAdminUpdateSchema = {
-    properties: {
-        expires_at: {
-            anyOf: [
-                {
-                    type: 'string',
-                    format: 'date-time'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Expires At'
-        },
-        max_uses: {
-            anyOf: [
-                {
-                    type: 'integer'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Max Uses'
-        },
-        discount_percentage: {
-            anyOf: [
-                {
-                    type: 'number'
-                },
-                {
-                    type: 'string',
-                    pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Discount Percentage'
-        },
-        auto_approve: {
-            anyOf: [
-                {
-                    type: 'boolean'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Auto Approve'
-        },
-        is_disabled: {
-            anyOf: [
-                {
-                    type: 'boolean'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Is Disabled'
-        }
-    },
-    type: 'object',
-    title: 'ReferralAdminUpdate',
-    description: `Admin request body for PATCH /admin/referrals/{id}.
-
-Extends owner fields with admin-only fields (discount_percentage, auto_approve).`
-} as const;
-
-export const ReferralCreateSchema = {
-    properties: {
-        popup_id: {
-            type: 'string',
-            format: 'uuid',
-            title: 'Popup Id'
-        },
-        code: {
-            anyOf: [
-                {
-                    type: 'string'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Code'
-        },
-        max_uses: {
-            anyOf: [
-                {
-                    type: 'integer'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Max Uses'
-        },
-        expires_at: {
-            anyOf: [
-                {
-                    type: 'string',
-                    format: 'date-time'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Expires At'
-        }
-    },
-    type: 'object',
-    required: ['popup_id'],
-    title: 'ReferralCreate',
-    description: `Human request body for POST /portal/referrals.
-
-code: auto-generated via secrets.token_urlsafe(16) when omitted.
-discount_percentage: defaults to 0. Only admin can change after creation.
-auto_approve: defaults to False. Only admin can change.`
-} as const;
-
-export const ReferralPublicSchema = {
-    properties: {
-        id: {
-            type: 'string',
-            format: 'uuid',
-            title: 'Id'
-        },
-        popup_id: {
-            type: 'string',
-            format: 'uuid',
-            title: 'Popup Id'
-        },
-        referrer_human_id: {
-            type: 'string',
-            format: 'uuid',
-            title: 'Referrer Human Id'
-        },
-        code: {
-            type: 'string',
-            title: 'Code'
-        },
-        discount_percentage: {
-            type: 'string',
-            pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$',
-            title: 'Discount Percentage'
-        },
-        auto_approve: {
-            type: 'boolean',
-            title: 'Auto Approve'
-        },
-        is_disabled: {
-            type: 'boolean',
-            title: 'Is Disabled',
-            default: false
-        },
-        max_uses: {
-            anyOf: [
-                {
-                    type: 'integer'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Max Uses'
-        },
-        current_uses: {
-            type: 'integer',
-            title: 'Current Uses'
-        },
-        expires_at: {
-            anyOf: [
-                {
-                    type: 'string',
-                    format: 'date-time'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Expires At'
-        },
-        created_at: {
-            type: 'string',
-            format: 'date-time',
-            title: 'Created At'
-        },
-        updated_at: {
-            type: 'string',
-            format: 'date-time',
-            title: 'Updated At'
-        }
-    },
-    type: 'object',
-    required: ['id', 'popup_id', 'referrer_human_id', 'code', 'discount_percentage', 'auto_approve', 'current_uses', 'created_at', 'updated_at'],
-    title: 'ReferralPublic',
-    description: 'Full referral detail — owner/admin response.'
-} as const;
-
-export const ReferralPublicPreviewSchema = {
-    properties: {
-        id: {
-            type: 'string',
-            format: 'uuid',
-            title: 'Id'
-        },
-        popup_id: {
-            type: 'string',
-            format: 'uuid',
-            title: 'Popup Id'
-        },
-        code: {
-            type: 'string',
-            title: 'Code'
-        },
-        discount_percentage: {
-            type: 'string',
-            pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$',
-            title: 'Discount Percentage'
-        },
-        max_uses: {
-            anyOf: [
-                {
-                    type: 'integer'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Max Uses'
-        },
-        current_uses: {
-            type: 'integer',
-            title: 'Current Uses'
-        },
-        expires_at: {
-            anyOf: [
-                {
-                    type: 'string',
-                    format: 'date-time'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Expires At'
-        }
-    },
-    type: 'object',
-    required: ['id', 'popup_id', 'code', 'discount_percentage', 'current_uses'],
-    title: 'ReferralPublicPreview',
-    description: `Public lookup — GET /referrals/r/{code}.
-
-Spec: Design API surface table — returns no PII of referrer.
-id is included so the portal can pass referral_id on application create
-(REQ-GR-009 — attribution on application).`
-} as const;
-
-export const ReferralUpdateSchema = {
-    properties: {
-        expires_at: {
-            anyOf: [
-                {
-                    type: 'string',
-                    format: 'date-time'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Expires At'
-        },
-        max_uses: {
-            anyOf: [
-                {
-                    type: 'integer'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Max Uses'
-        }
-    },
-    type: 'object',
-    title: 'ReferralUpdate',
-    description: `Human request body for PATCH /portal/referrals/{id}.
-
-Only expires_at and max_uses are mutable by the referral owner.
-discount_percentage and auto_approve are admin-only.`
 } as const;
 
 export const RegisterRequestSchema = {
