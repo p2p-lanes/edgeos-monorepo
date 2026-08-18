@@ -73,6 +73,8 @@
     "no_active_popups_description": "There are no active popups available at the moment. Please check back later.",
     "no_profile": "No profile data available.",
     "no_profile_contact": "Please contact support if you believe this is an error.",
+    "direct_sales_title": "Purchase options",
+    "direct_sales_description": "Choose an available option for this event.",
     "door_generic": "Your application",
     "door_status": {
       "accepted": "Accepted",

@@ -12,7 +12,7 @@ function noteFor(type: SalesFlowType, visibility: SalesFlowVisibility): string {
   if (type === "direct") {
     return visibility === "direct_url_only"
       ? "This flow is reachable only through its direct link shown above."
-      : "This flow is reachable through its direct link shown above. Portal listing for direct flows isn't wired up yet, so this setting has no listing effect today."
+      : "This flow appears on the portal event overview and remains reachable through its direct link shown above."
   }
   return "This flow appears in the portal's application flow picker whenever the event lists more than one application flow. With a single application flow, buyers land here directly."
 }

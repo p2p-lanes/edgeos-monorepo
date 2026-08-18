@@ -13,6 +13,7 @@ from app.api.sales_flow.schemas import (
     SalesFlowType,
     SalesFlowUpdate,
     SalesFlowVisibility,
+    recommended_visibility_for_type,
 )
 from app.api.shared.crud import BaseCRUD
 
@@ -379,7 +380,7 @@ class SalesFlowsCRUD(BaseCRUD[SalesFlows, SalesFlowCreate, SalesFlowUpdate]):
             type=sale_type,
             slug=slug,
             name=default_flow_name(sale_type),
-            visibility=SalesFlowVisibility.portal_listed,
+            visibility=recommended_visibility_for_type(sale_type),
             is_default=True,
             order=0,
             reviewers_mode=SalesFlowReviewersMode.inherit,

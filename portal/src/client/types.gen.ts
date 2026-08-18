@@ -7611,6 +7611,12 @@ export type SalesFlowsListPortalUpsaleFlowsData = {
 
 export type SalesFlowsListPortalUpsaleFlowsResponse = (ListModel_SalesFlowPortalPublic_);
 
+export type SalesFlowsListPortalDirectSalesFlowsData = {
+    popupId: string;
+};
+
+export type SalesFlowsListPortalDirectSalesFlowsResponse = (ListModel_SalesFlowPortalPublic_);
+
 export type SalesFlowsListSalesFlowsData = {
     /**
      * Maximum number of items to return

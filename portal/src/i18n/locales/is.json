@@ -59,6 +59,8 @@
     "no_active_popups_description": "Engir virkir viðburðir eru í boði núna. Vinsamlegast athugaðu aftur síðar.",
     "no_profile": "Engar prófílupplýsingar í boði.",
     "no_profile_contact": "Vinsamlegast hafðu samband við þjónustudeild ef þú telur þetta vera villu.",
+    "direct_sales_title": "Kaupmöguleikar",
+    "direct_sales_description": "Veldu einn af tiltækum möguleikum fyrir þennan viðburð.",
     "door_generic": "Umsóknin þín",
     "door_status": {
       "accepted": "Samþykkt",

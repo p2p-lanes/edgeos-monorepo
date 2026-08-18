@@ -125,3 +125,30 @@ class TestPortalFlowListing:
         assert "the-key-that-signs-orders" not in resp.text
         for flow in resp.json()["results"]:
             assert set(flow) == ALLOWED_KEYS
+
+    def test_the_direct_listing_is_just_as_narrow(
+        self, client: TestClient, db: Session, tenant_a: Tenants
+    ) -> None:
+        popup = _popup_with_flows(db, tenant_a)
+        direct = SalesFlows(
+            tenant_id=popup.tenant_id,
+            popup_id=popup.id,
+            slug=f"direct-{uuid.uuid4().hex[:8]}",
+            name="Direct sale",
+            type="direct",
+            visibility="portal_listed",
+            open_checkout_signing_secret="the-key-that-signs-orders",
+        )
+        db.add(direct)
+        db.commit()
+
+        resp = client.get(
+            f"/api/v1/sales-flows/portal/direct?popup_id={popup.id}",
+            headers={"Authorization": f"Bearer {_human_token(db, tenant_a)}"},
+        )
+
+        assert resp.status_code == 200, resp.text
+        assert "the-key-that-signs-orders" not in resp.text
+        assert resp.json()["results"]
+        for flow in resp.json()["results"]:
+            assert set(flow) == ALLOWED_KEYS

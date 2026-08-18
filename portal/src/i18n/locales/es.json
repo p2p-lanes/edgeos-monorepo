@@ -73,6 +73,8 @@
     "no_active_popups_description": "No hay eventos activos disponibles en este momento. Por favor, vuelve más tarde.",
     "no_profile": "No hay datos de perfil disponibles.",
     "no_profile_contact": "Por favor, contacta a soporte si crees que esto es un error.",
+    "direct_sales_title": "Opciones de compra",
+    "direct_sales_description": "Elige una opción disponible para este evento.",
     "door_generic": "Tu postulación",
     "door_status": {
       "accepted": "Aceptada",

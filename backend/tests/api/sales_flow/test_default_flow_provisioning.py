@@ -48,7 +48,7 @@ class TestPopupCreateProvisionsDefaultFlow:
         # Named for what it does. The slug stays "default" — that one is a URL
         # and an operator may already have shared it.
         assert flow.name == "Checkout"
-        assert flow.visibility == "portal_listed"
+        assert flow.visibility == "direct_url_only"
         assert flow.reviewers_mode == "inherit"
 
         # The flow takes its own copy of the popup's channel configuration
@@ -88,6 +88,7 @@ class TestPopupCreateProvisionsDefaultFlow:
 
         flow = db.exec(select(SalesFlows).where(SalesFlows.popup_id == popup_id)).one()
         assert flow.type == "application"
+        assert flow.visibility == "portal_listed"
 
 
 class TestResolveDefaultFlowSlugDecollision:

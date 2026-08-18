@@ -5,6 +5,7 @@ import type { CompanionParticipation } from "@/client"
 import { EventCard } from "@/components/Card/EventCard"
 import type { EventStatus } from "@/components/Card/EventProgressBar"
 import { CompanionView } from "@/components/CompanionView"
+import { DirectSalesFlowsPanel } from "@/components/Portal/DirectSalesFlowsPanel"
 import { GatheringDoorCard } from "@/components/Portal/GatheringDoorCard"
 import { ScholarshipStatusBadge } from "@/components/ScholarshipStatusBadge"
 import { useGatheringDoors } from "@/hooks/useGatheringDoors"
@@ -33,6 +34,10 @@ export default function Home() {
           <CompanionView
             participation={participation as CompanionParticipation}
           />
+          <DirectSalesFlowsPanel
+            popupSlug={city.slug}
+            popupId={String(city.id)}
+          />
         </div>
       </section>
     )
@@ -56,6 +61,10 @@ export default function Home() {
               <EventCard.DateRange />
             </EventCard.Content>
           </EventCard>
+          <DirectSalesFlowsPanel
+            popupSlug={city.slug}
+            popupId={String(city.id)}
+          />
           <div className="grid gap-4 sm:grid-cols-2">
             {doors.map((door) => (
               <GatheringDoorCard
@@ -112,6 +121,10 @@ export default function Home() {
             )}
           </EventCard.Content>
         </EventCard>
+        <DirectSalesFlowsPanel
+          popupSlug={city.slug}
+          popupId={String(city.id)}
+        />
       </div>
     </section>
   )

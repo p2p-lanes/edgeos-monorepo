@@ -23,10 +23,11 @@ describe("SalesFlowVisibilityNote", () => {
     ).toBeInTheDocument()
   })
 
-  it("notes portal listing isn't wired up yet for a portal_listed direct flow", () => {
+  it("explains where a portal_listed direct flow appears", () => {
     render(<SalesFlowVisibilityNote type="direct" visibility="portal_listed" />)
 
-    expect(screen.getByText(/isn't wired up yet/i)).toBeInTheDocument()
+    expect(screen.getByText(/portal event overview/i)).toBeInTheDocument()
+    expect(screen.getByText(/direct link/i)).toBeInTheDocument()
   })
 
   it("explains application flows surface in the portal's flow picker", () => {

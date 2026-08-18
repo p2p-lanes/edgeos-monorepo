@@ -9,7 +9,7 @@ import {
   User,
   Workflow,
 } from "lucide-react"
-import { useState } from "react"
+import { useRef, useState } from "react"
 
 import {
   type ApiError,
@@ -79,6 +79,10 @@ function parseDraftValue(
   return draft
 }
 
+function recommendedVisibilityForType(type: SalesFlowCreate["type"]) {
+  return type === "direct" ? "direct_url_only" : "portal_listed"
+}
+
 /**
  * The flow's own values. There is no inherited value to fall back to since
  * sdd/sales-flows-rediseno slice 7 — creating a flow copies the popup's
@@ -140,6 +144,7 @@ export function SalesFlowForm({
   const { isOperatorOrAbove } = useAuth()
   const isEdit = !!defaultValues
   const readOnly = !isOperatorOrAbove
+  const visibilityAutoManaged = useRef(!isEdit)
 
   // Everything starts closed. The answers are all on screen either way, and
   // opening one is a decision to change it rather than to read it.
@@ -330,12 +335,24 @@ export function SalesFlowForm({
               >
                 <Select
                   value={field.state.value}
-                  onValueChange={(value) =>
+                  onValueChange={(value) => {
                     field.handleChange(value as typeof field.state.value)
-                  }
+                    if (visibilityAutoManaged.current) {
+                      form.setFieldValue(
+                        "visibility",
+                        recommendedVisibilityForType(
+                          value as SalesFlowCreate["type"],
+                        ),
+                      )
+                    }
+                  }}
                   disabled={readOnly}
                 >
-                  <SelectTrigger className="w-40 text-sm" size="sm">
+                  <SelectTrigger
+                    aria-label="Flow type"
+                    className="w-40 text-sm"
+                    size="sm"
+                  >
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -357,12 +374,17 @@ export function SalesFlowForm({
               >
                 <Select
                   value={field.state.value}
-                  onValueChange={(value) =>
+                  onValueChange={(value) => {
+                    visibilityAutoManaged.current = false
                     field.handleChange(value as typeof field.state.value)
-                  }
+                  }}
                   disabled={readOnly}
                 >
-                  <SelectTrigger className="w-48 text-sm" size="sm">
+                  <SelectTrigger
+                    aria-label="Flow visibility"
+                    className="w-48 text-sm"
+                    size="sm"
+                  >
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>

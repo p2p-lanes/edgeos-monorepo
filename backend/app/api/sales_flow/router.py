@@ -82,6 +82,22 @@ async def list_portal_upsale_flows(
     )
 
 
+@router.get("/portal/direct", response_model=ListModel[SalesFlowPortalPublic])
+async def list_portal_direct_sales_flows(
+    db: HumanTenantSession,
+    _: CurrentHuman,
+    popup_id: uuid.UUID,
+) -> ListModel[SalesFlowPortalPublic]:
+    """List a popup's open, portal-listed direct sales options (Portal)."""
+    flows = crud.sales_flows_crud.find_portal_listed(
+        db, popup_id, type=SalesFlowType.direct
+    )
+    return ListModel[SalesFlowPortalPublic](
+        results=[SalesFlowPortalPublic.model_validate(f) for f in flows],
+        paging=Paging(offset=0, limit=len(flows), total=len(flows)),
+    )
+
+
 def _raise_on_default_conflict(exc: IntegrityError) -> NoReturn:
     if "uq_sales_flows_default_per_popup" in str(getattr(exc, "orig", exc)):
         raise HTTPException(

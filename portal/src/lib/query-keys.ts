@@ -72,6 +72,8 @@ export const queryKeys = {
   },
   salesFlows: {
     portal: (popupId: string) => ["sales-flows", "portal", popupId] as const,
+    portalDirect: (popupId: string) =>
+      ["sales-flows", "portal", "direct", popupId] as const,
     portalUpsale: (popupId: string) =>
       ["sales-flows", "portal", "upsale", popupId] as const,
   },

@@ -32,6 +32,14 @@ class SalesFlowVisibility(StrEnum):
     direct_url_only = "direct_url_only"
 
 
+def recommended_visibility_for_type(
+    flow_type: SalesFlowType | str,
+) -> SalesFlowVisibility:
+    if flow_type == SalesFlowType.direct:
+        return SalesFlowVisibility.direct_url_only
+    return SalesFlowVisibility.portal_listed
+
+
 class SalesFlowReviewersMode(StrEnum):
     """Whether a flow uses the popup-level reviewer list or its own (D4)."""
 
@@ -264,6 +272,12 @@ class SalesFlowCreate(BaseModel):
             return v
         parse_restriction_rule(v)  # raises ValueError -> 422 on any bad shape
         return v
+
+    @model_validator(mode="after")
+    def apply_recommended_visibility(self) -> "SalesFlowCreate":
+        if "visibility" not in self.model_fields_set:
+            self.visibility = recommended_visibility_for_type(self.type)
+        return self
 
     @model_validator(mode="after")
     def validate_restriction_rule_for_type(self) -> "SalesFlowCreate":

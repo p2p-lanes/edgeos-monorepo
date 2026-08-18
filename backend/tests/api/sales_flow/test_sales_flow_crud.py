@@ -1,5 +1,6 @@
 import uuid
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session
 
@@ -34,6 +35,60 @@ def _create_popup(client: TestClient, admin_token: str) -> str:
 
 
 class TestSalesFlowCreate:
+    @pytest.mark.parametrize(
+        ("flow_type", "expected_visibility"),
+        [
+            ("application", "portal_listed"),
+            ("direct", "direct_url_only"),
+            ("upsale", "portal_listed"),
+        ],
+    )
+    def test_omitted_visibility_uses_type_recommendation(
+        self,
+        client: TestClient,
+        admin_token_tenant_a: str,
+        popup_tenant_a: Popups,
+        flow_type: str,
+        expected_visibility: str,
+    ) -> None:
+        response = client.post(
+            "/api/v1/sales-flows",
+            headers={"Authorization": f"Bearer {admin_token_tenant_a}"},
+            json=_create_payload(popup_tenant_a.id, type=flow_type),
+        )
+
+        assert response.status_code == 201, response.text
+        assert response.json()["visibility"] == expected_visibility
+
+    @pytest.mark.parametrize(
+        ("flow_type", "visibility"),
+        [
+            ("application", "direct_url_only"),
+            ("direct", "portal_listed"),
+            ("upsale", "direct_url_only"),
+        ],
+    )
+    def test_explicit_visibility_overrides_type_recommendation(
+        self,
+        client: TestClient,
+        admin_token_tenant_a: str,
+        popup_tenant_a: Popups,
+        flow_type: str,
+        visibility: str,
+    ) -> None:
+        response = client.post(
+            "/api/v1/sales-flows",
+            headers={"Authorization": f"Bearer {admin_token_tenant_a}"},
+            json=_create_payload(
+                popup_tenant_a.id,
+                type=flow_type,
+                visibility=visibility,
+            ),
+        )
+
+        assert response.status_code == 201, response.text
+        assert response.json()["visibility"] == visibility
+
     def test_create_sales_flow_success(
         self,
         client: TestClient,

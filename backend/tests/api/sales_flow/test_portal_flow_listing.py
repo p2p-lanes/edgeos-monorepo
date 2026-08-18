@@ -40,6 +40,7 @@ def _make_flow(
     visibility: str = "portal_listed",
     type: str = "application",  # noqa: A002
     order: int = 0,
+    status: str | None = None,
 ) -> SalesFlows:
     flow = SalesFlows(
         tenant_id=popup.tenant_id,
@@ -49,6 +50,7 @@ def _make_flow(
         visibility=visibility,
         type=type,
         order=order,
+        status=status,
     )
     db.add(flow)
     db.flush()
@@ -147,5 +149,74 @@ class TestPortalFlowListing:
             params={"popup_id": str(popup_b.id)},
             headers={"Authorization": f"Bearer {token}"},
         )
+        assert response.status_code == 200, response.text
+        assert response.json()["results"] == []
+
+
+class TestPortalDirectFlowListing:
+    def test_lists_only_open_portal_listed_direct_flows_ordered(
+        self, client: TestClient, db: Session, tenant_a: Tenants
+    ) -> None:
+        popup = _make_popup(db, tenant_a)
+        _make_flow(db, popup, slug="second", type="direct", order=2)
+        _make_flow(db, popup, slug="first", type="direct", order=1)
+        _make_flow(
+            db,
+            popup,
+            slug="hidden",
+            type="direct",
+            visibility="direct_url_only",
+        )
+        _make_flow(db, popup, slug="application", type="application")
+        _make_flow(db, popup, slug="upsale", type="upsale")
+        _make_flow(db, popup, slug="closed", type="direct", status="closed")
+        db.commit()
+        token = _human_token(db, tenant_a)
+
+        response = client.get(
+            "/api/v1/sales-flows/portal/direct",
+            params={"popup_id": str(popup.id)},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+        assert response.status_code == 200, response.text
+        assert [flow["slug"] for flow in response.json()["results"]] == [
+            "first",
+            "second",
+        ]
+
+    def test_anonymous_caller_rejected(
+        self, client: TestClient, db: Session, tenant_a: Tenants
+    ) -> None:
+        popup = _make_popup(db, tenant_a)
+        db.commit()
+
+        response = client.get(
+            "/api/v1/sales-flows/portal/direct",
+            params={"popup_id": str(popup.id)},
+        )
+
+        assert response.status_code in (401, 403), response.text
+
+    def test_cross_tenant_popup_returns_empty(
+        self, client: TestClient, db: Session, tenant_a: Tenants
+    ) -> None:
+        tenant_b = Tenants(
+            name=f"Direct Listing Tenant B {uuid.uuid4().hex[:6]}",
+            slug=f"direct-listing-b-{uuid.uuid4().hex[:6]}",
+        )
+        db.add(tenant_b)
+        db.commit()
+        popup_b = _make_popup(db, tenant_b)
+        _make_flow(db, popup_b, slug="other-tenant", type="direct")
+        db.commit()
+        token = _human_token(db, tenant_a)
+
+        response = client.get(
+            "/api/v1/sales-flows/portal/direct",
+            params={"popup_id": str(popup_b.id)},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
         assert response.status_code == 200, response.text
         assert response.json()["results"] == []
