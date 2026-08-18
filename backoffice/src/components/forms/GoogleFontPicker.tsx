@@ -1,5 +1,4 @@
 import { useQuery } from "@tanstack/react-query"
-import { useVirtualizer } from "@tanstack/react-virtual"
 import { Check, ChevronsUpDown, X } from "lucide-react"
 import { useEffect, useMemo, useRef, useState } from "react"
 
@@ -18,9 +17,8 @@ import {
 } from "@/lib/google-font"
 import { cn } from "@/lib/utils"
 
-const ROW_HEIGHT = 44
-const LIST_WIDTH = 320
 const LIST_HEIGHT = 280
+const PAGE_SIZE = 20
 
 const CATEGORIES = [
   { value: "", label: "All" },
@@ -50,12 +48,8 @@ interface GoogleFontPickerProps {
  * Single-select over the Google Fonts catalog (~1950 families), served by our
  * own backend so the API key stays server-side.
  *
- * Two things drive the shape of this component:
- *  - The list is virtualized. Rendering 1950 rows makes the search input drop
- *    keystrokes.
- *  - Each row renders in its own face, which means actually loading that font.
- *    Only the rows on screen are fetched, and only at weight 400 — loading the
- *    whole catalog would be hundreds of megabytes.
+ * The full catalog remains searchable, but only a small, progressively
+ * disclosed page is rendered and preview-loaded at a time.
  */
 export function GoogleFontPicker({
   value,
@@ -67,6 +61,7 @@ export function GoogleFontPicker({
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState("")
   const [category, setCategory] = useState<string>("")
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
   const scrollRef = useRef<HTMLDivElement>(null)
 
   const { data, isLoading, isError } = useQuery({
@@ -90,28 +85,22 @@ export function GoogleFontPicker({
     })
   }, [fonts, query, category])
 
-  const virtualizer = useVirtualizer({
-    count: matches.length,
-    getScrollElement: () => scrollRef.current,
-    estimateSize: () => ROW_HEIGHT,
-    overscan: 6,
-    // Viewport size to assume before the first measurement lands. Without it
-    // the first paint after the popover opens has a zero-height viewport and
-    // renders no rows at all — briefly in the browser, permanently under
-    // jsdom, which has no layout to measure.
-    initialRect: { width: LIST_WIDTH, height: LIST_HEIGHT },
-  })
+  const visibleMatches = useMemo(
+    () => matches.slice(0, visibleCount),
+    [matches, visibleCount],
+  )
 
-  const virtualRows = virtualizer.getVirtualItems()
+  const resetVisibleResults = () => {
+    setVisibleCount(PAGE_SIZE)
+    if (scrollRef.current) scrollRef.current.scrollTop = 0
+  }
 
-  // Load the preview face for whatever is on screen. Debounced because
-  // scrolling and typing both churn this list several times a second, and each
-  // change would otherwise be a stylesheet request.
+  // Load previews only for rows the operator has chosen to reveal.
   useEffect(() => {
     if (!open) return
     const timer = window.setTimeout(() => {
-      const pending = virtualRows
-        .map((row) => matches[row.index]?.family)
+      const pending = visibleMatches
+        .map((font) => font.family)
         .filter(
           (family): family is string =>
             isValidFontFamily(family) && !requestedPreviews.has(family),
@@ -130,12 +119,13 @@ export function GoogleFontPicker({
       // rest of the session, and `requestedPreviews` assumes they persist.
     }, 200)
     return () => window.clearTimeout(timer)
-  }, [open, virtualRows, matches])
+  }, [open, visibleMatches])
 
   const pick = (family: string) => {
     onChange(family)
     setOpen(false)
     setQuery("")
+    resetVisibleResults()
   }
 
   const selectedCss = toCssFontFamily(value)
@@ -146,7 +136,10 @@ export function GoogleFontPicker({
         open={open}
         onOpenChange={(next) => {
           setOpen(next)
-          if (!next) setQuery("")
+          if (!next) {
+            setQuery("")
+            resetVisibleResults()
+          }
         }}
       >
         <PopoverTrigger asChild>
@@ -176,7 +169,10 @@ export function GoogleFontPicker({
             <Input
               placeholder="Search Google Fonts…"
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              onChange={(e) => {
+                setQuery(e.target.value)
+                resetVisibleResults()
+              }}
               className="h-8 text-xs"
               autoFocus
             />
@@ -185,7 +181,11 @@ export function GoogleFontPicker({
                 <button
                   key={entry.value || "all"}
                   type="button"
-                  onClick={() => setCategory(entry.value)}
+                  onClick={() => {
+                    setCategory(entry.value)
+                    resetVisibleResults()
+                  }}
+                  aria-pressed={category === entry.value}
                   className={cn(
                     "rounded-full border px-2 py-0.5 text-[11px] transition-colors",
                     category === entry.value
@@ -227,56 +227,61 @@ export function GoogleFontPicker({
               </p>
             )}
             {matches.length > 0 && (
-              <div
-                style={{
-                  height: `${virtualizer.getTotalSize()}px`,
-                  position: "relative",
-                  width: "100%",
-                }}
-              >
-                {virtualRows.map((virtualRow) => {
-                  const font = matches[virtualRow.index]
-                  if (!font) return null
-                  const css = toCssFontFamily(font.family)
-                  return (
-                    <button
-                      key={font.family}
-                      type="button"
-                      // Without this the accessible name is the family and
-                      // the category run together ("Intersans-serif").
-                      aria-label={font.family}
-                      onClick={() => pick(font.family)}
-                      className="absolute left-0 flex w-full items-center gap-2 px-3 text-left hover:bg-muted"
-                      style={{
-                        top: 0,
-                        height: `${ROW_HEIGHT}px`,
-                        transform: `translateY(${virtualRow.start}px)`,
-                      }}
-                    >
-                      <Check
-                        className={cn(
-                          "h-3.5 w-3.5 shrink-0",
-                          font.family === value ? "opacity-100" : "opacity-0",
-                        )}
-                      />
-                      <span className="flex min-w-0 flex-col">
-                        {/* The family name in its own face — the whole point
+              <>
+                <div role="listbox" aria-label="Google Fonts">
+                  {visibleMatches.map((font) => {
+                    const css = toCssFontFamily(font.family)
+                    return (
+                      <button
+                        key={font.family}
+                        type="button"
+                        role="option"
+                        aria-selected={font.family === value}
+                        // Without this the accessible name is the family and
+                        // the category run together ("Intersans-serif").
+                        aria-label={font.family}
+                        onClick={() => pick(font.family)}
+                        className="flex h-11 w-full items-center gap-2 px-3 text-left hover:bg-muted"
+                      >
+                        <Check
+                          className={cn(
+                            "h-3.5 w-3.5 shrink-0",
+                            font.family === value ? "opacity-100" : "opacity-0",
+                          )}
+                        />
+                        <span className="flex min-w-0 flex-col">
+                          {/* The family name in its own face — the whole point
                             of a font picker. Falls back to the UI font until
                             the preview stylesheet lands. */}
-                        <span
-                          className="truncate text-sm leading-tight"
-                          style={css ? { fontFamily: css } : undefined}
-                        >
-                          {font.family}
+                          <span
+                            className="truncate text-sm leading-tight"
+                            style={css ? { fontFamily: css } : undefined}
+                          >
+                            {font.family}
+                          </span>
+                          <span className="truncate text-[10px] text-muted-foreground">
+                            {font.category}
+                          </span>
                         </span>
-                        <span className="truncate text-[10px] text-muted-foreground">
-                          {font.category}
-                        </span>
-                      </span>
-                    </button>
-                  )
-                })}
-              </div>
+                      </button>
+                    )
+                  })}
+                </div>
+                {visibleCount < matches.length && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="h-9 w-full rounded-none border-t text-xs"
+                    onClick={() =>
+                      setVisibleCount((current) =>
+                        Math.min(current + PAGE_SIZE, matches.length),
+                      )
+                    }
+                  >
+                    Show more
+                  </Button>
+                )}
+              </>
             )}
           </div>
 
