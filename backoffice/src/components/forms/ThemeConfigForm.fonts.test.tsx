@@ -74,7 +74,7 @@ function expandTypography() {
 async function pickFont(pickerLabel: RegExp, family: string) {
   const user = userEvent.setup()
   await user.click(screen.getByRole("combobox", { name: pickerLabel }))
-  await user.click(await screen.findByRole("button", { name: family }))
+  await user.click(await screen.findByRole("option", { name: family }))
 }
 
 describe("ThemeConfigForm google font pickers", () => {
