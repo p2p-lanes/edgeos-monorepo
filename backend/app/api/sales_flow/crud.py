@@ -253,12 +253,7 @@ class SalesFlowsCRUD(BaseCRUD[SalesFlows, SalesFlowCreate, SalesFlowUpdate]):
     def get_default_flow(
         self, session: Session, popup_id: uuid.UUID
     ) -> SalesFlows | None:
-        """Get the default flow for a popup (is_default = true).
-
-        A missing default flow after the backfill migration is an invariant
-        breach handled by callers (see resolver.py's `resolve_flow` /
-        `get_default_flow`, which raise a 500 for this case).
-        """
+        """Get the optional compatibility fallback for a popup."""
         statement = select(SalesFlows).where(
             SalesFlows.popup_id == popup_id,
             SalesFlows.is_default == True,  # noqa: E712

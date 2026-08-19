@@ -38,10 +38,9 @@ class PopupsCRUD(BaseCRUD[Popups, PopupCreate, PopupUpdate]):
         # Seed main category in same transaction
         attendee_categories_crud.seed_main_for_popup(session, popup.id, popup.tenant_id)
 
-        # sdd/sales-flows task 5.0: every popup must have exactly one default
-        # sales_flow (design D2 — a missing default is a 500-class invariant
-        # breach for the resolver). Mirrors the slice-2 backfill migration's
-        # guarantee for pre-existing popups. Class B columns stay NULL (D1).
+        # sdd/sales-flows task 5.0: new popups receive a compatibility default
+        # sales flow. Mirrors the slice-2 backfill behavior for pre-existing
+        # popups. Class B columns stay NULL (D1).
         # Seeded from the creation request rather than from the column it was
         # written to. What the organiser chose here is a decision about the
         # first door, and the flow is where that decision lives from now on.

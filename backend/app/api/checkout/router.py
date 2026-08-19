@@ -202,7 +202,7 @@ async def preview_open_ticketing(
     from app.api.sales_flow.resolver import resolve_flow
 
     popup = get_open_ticketing_popup(db, slug, tenant.id)
-    flow = resolve_flow(db, popup, flow_slug) if flow_slug else None
+    flow = resolve_flow(db, popup, flow_slug)
     return payments_crud.preview_open_ticketing(db, request_in, popup, flow)
 
 

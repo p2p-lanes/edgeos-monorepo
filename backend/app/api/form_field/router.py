@@ -456,9 +456,8 @@ def _resolve_schema_flow_id(
 
     An explicit ``sales_flow_id`` must belong to this popup (mirrors
     ``ticketing_step/router.py::_get_flow_or_404`` — rejects cross-popup
-    flow injection via a client-supplied id). Every popup has a default
-    flow, so a missing one means the popup is unusable rather than
-    form-less: say so instead of returning an empty schema.
+    flow injection via a client-supplied id). A missing compatibility default
+    makes the legacy, unscoped schema unavailable rather than silently empty.
     """
     from app.api.sales_flow.crud import sales_flows_crud
 
@@ -475,7 +474,7 @@ def _resolve_schema_flow_id(
     if default_flow is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="This popup has no default sales flow",
+            detail="Default sales flow not found",
         )
     return default_flow.id
 
@@ -498,7 +497,7 @@ async def copy_form_to_flow(
     trusted from the client. `source_flow_id` (body) names the flow to copy
     from and must belong to the SAME popup as the target — mirrors
     `_resolve_schema_flow_id`'s cross-popup rejection. Omitted copies from
-    the popup's default flow, the only form guaranteed to exist.
+    the popup's compatibility default when one exists.
     """
     from app.api.sales_flow.crud import sales_flows_crud
 

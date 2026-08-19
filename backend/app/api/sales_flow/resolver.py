@@ -41,9 +41,8 @@ def resolve_flow(
     """Resolve a sales flow for `popup` per the design's gate order.
 
     1. popup missing -> 404
-    2. flow_slug is None -> the popup's default flow; missing default is a
-       500-class invariant breach (guaranteed by task 5.0 provisioning for
-       every popup created through the real API)
+    2. flow_slug is None -> the popup's compatibility default; missing default
+       -> 404 because the legacy entry point is unavailable
     3. flow_slug unknown for this popup -> 404 (never a silent fallback —
        a typo must never resolve to the wrong flow)
     4. effective status (`flow.status ?? popup.status`) != active -> 403
@@ -62,8 +61,8 @@ def resolve_flow(
         flow = sales_flows_crud.get_default_flow(session, popup.id)
         if flow is None:
             raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Popup is missing its default sales flow",
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Default sales flow not found",
             )
     else:
         flow = sales_flows_crud.get_by_slug(session, popup.id, flow_slug)
@@ -100,20 +99,17 @@ def resolve_flow(
 
 
 def get_default_flow(session: Session, popup_id: uuid.UUID) -> SalesFlows:
-    """Return a popup's default flow, or raise 500 — the resolver's own
-    invariant (a missing default is a breach, not a legitimate outcome).
+    """Return a popup's compatibility default, or raise 404 when absent.
 
     Distinct from `SalesFlowsCRUD.get_default_flow`, which stays Optional:
-    creation-time guards (application duplicate checks, custom-domain
-    fallback resolution before this contract existed) legitimately treat a
-    missing default as "this popup predates task 5.0 provisioning" and
-    degrade gracefully instead of erroring.
+    callers that can operate without a legacy fallback legitimately treat a
+    missing default as an empty result and degrade gracefully.
     """
     flow = sales_flows_crud.get_default_flow(session, popup_id)
     if flow is None:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Popup is missing its default sales flow",
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Default sales flow not found",
         )
     return flow
 
@@ -126,17 +122,17 @@ def resolve_active_direct_flow(
     Extends `checkout/crud.py::resolve_active_direct_popup_slug` with the
     same ordering (`start_date ASC NULLS LAST, id ASC`), then returns that
     popup's default flow slug alongside it. Returns None when no active
-    direct-sale popup exists for the tenant (Coming Soon path) — never
-    raises for that case. A missing default flow on an otherwise-matching
-    popup IS an invariant breach (`get_default_flow` raises 500) — task 5.0
-    guarantees every real popup has one.
+    direct-sale popup with a compatibility default exists for the tenant
+    (Coming Soon path).
     """
-    popup = session.exec(
-        select(Popups)
+    resolved = session.exec(
+        select(Popups, SalesFlows)
+        .join(SalesFlows, SalesFlows.popup_id == Popups.id)
         .where(
             Popups.tenant_id == tenant_id,
             Popups.status == PopupStatus.active,
             Popups.sale_type == SaleType.direct,
+            SalesFlows.is_default == True,  # noqa: E712
         )
         .order_by(
             Popups.start_date.asc().nulls_last(),  # type: ignore[attr-defined]
@@ -145,10 +141,10 @@ def resolve_active_direct_flow(
         .limit(1)
     ).first()
 
-    if popup is None:
+    if resolved is None:
         return None
 
-    flow = get_default_flow(session, popup.id)
+    popup, flow = resolved
     return popup.slug, flow.slug
 
 
@@ -192,9 +188,8 @@ def config_for(
     the popup's own copies of these columns, which are on their way out and
     which nothing else reads anymore.
 
-    A popup with no default flow at all cannot happen through the real
-    creation path, but a fixture can build one; that returns an all-null
-    config rather than raising, so a read never takes down a request.
+    A popup with no default flow returns an all-null config rather than
+    raising, so a read never takes down a request.
     """
     flow = session.get(SalesFlows, sales_flow_id) if sales_flow_id is not None else None
     if flow is None:

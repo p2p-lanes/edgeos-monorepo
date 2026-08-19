@@ -317,8 +317,8 @@ class InvitesCRUD(BaseCRUD[Invites, InviteCreate, InviteUpdate]):
         default_flow = sales_flows_crud.get_default_flow(session, popup_id)
         if default_flow is None:
             raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="This event is not ready to share links yet.",
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Default sales flow not found",
             )
         return default_flow.id
 

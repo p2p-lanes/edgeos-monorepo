@@ -79,7 +79,7 @@ class TestResolveFlowGateOrder:
         flow = resolver.resolve_flow(db, popup, None)
         assert flow.id == default_flow.id
 
-    def test_none_slug_missing_default_raises_500(
+    def test_none_slug_missing_default_raises_404(
         self, db: Session, tenant_a: Tenants
     ) -> None:
         popup = _make_popup(db, tenant_a)
@@ -87,7 +87,19 @@ class TestResolveFlowGateOrder:
 
         with pytest.raises(HTTPException) as exc_info:
             resolver.resolve_flow(db, popup, None)
-        assert exc_info.value.status_code == 500
+        assert exc_info.value.status_code == 404
+        assert exc_info.value.detail == "Default sales flow not found"
+
+    def test_named_flow_resolves_without_a_default(
+        self, db: Session, tenant_a: Tenants
+    ) -> None:
+        popup = _make_popup(db, tenant_a)
+        named_flow = _make_flow(db, popup, slug="volunteers")
+        db.commit()
+
+        resolved = resolver.resolve_flow(db, popup, named_flow.slug)
+
+        assert resolved.id == named_flow.id
 
     def test_unknown_slug_raises_404(self, db: Session, tenant_a: Tenants) -> None:
         popup = _make_popup(db, tenant_a)
@@ -193,13 +205,14 @@ class TestGetDefaultFlow:
         flow = resolver.get_default_flow(db, popup.id)
         assert flow.id == default_flow.id
 
-    def test_missing_default_raises_500(self, db: Session, tenant_a: Tenants) -> None:
+    def test_missing_default_raises_404(self, db: Session, tenant_a: Tenants) -> None:
         popup = _make_popup(db, tenant_a)
         db.commit()
 
         with pytest.raises(HTTPException) as exc_info:
             resolver.get_default_flow(db, popup.id)
-        assert exc_info.value.status_code == 500
+        assert exc_info.value.status_code == 404
+        assert exc_info.value.detail == "Default sales flow not found"
 
 
 class TestResolveActiveDirectFlow:
@@ -235,6 +248,16 @@ class TestResolveActiveDirectFlow:
         self, db: Session, tenant: Tenants
     ) -> None:
         result = resolver.resolve_active_direct_flow(db, tenant.id)
+        assert result is None
+
+    def test_active_direct_popup_without_default_returns_none(
+        self, db: Session, tenant: Tenants
+    ) -> None:
+        _make_popup(db, tenant, status="active", sale_type="direct")
+        db.commit()
+
+        result = resolver.resolve_active_direct_flow(db, tenant.id)
+
         assert result is None
 
     def test_earliest_start_date_wins(self, db: Session, tenant: Tenants) -> None:

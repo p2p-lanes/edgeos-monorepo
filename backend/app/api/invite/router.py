@@ -447,8 +447,8 @@ def _resolve_invite_flow_id(
         default_flow = sales_flows_crud.get_default_flow(db, popup_id)
         if default_flow is None:
             raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="This event is not ready to send invites yet.",
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Default sales flow not found",
             )
         flow = default_flow
     else:

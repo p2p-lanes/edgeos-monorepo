@@ -56,7 +56,7 @@ class ApprovalStrategiesCRUD(
         sales_flow_id: uuid.UUID | None = None,
     ) -> ApprovalStrategies:
         """Create a strategy for a flow. Omitting `sales_flow_id` means the
-        popup's default flow, the one every popup has.
+        popup's optional compatibility default.
 
         Only `application` flows may have one: direct sales and upsales
         never produce an application, so a review strategy there would be
@@ -69,8 +69,8 @@ class ApprovalStrategiesCRUD(
             default_flow = sales_flows_crud.get_default_flow(session, popup_id)
             if default_flow is None:
                 raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail="Popup has no default sales flow",
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Default sales flow not found",
                 )
             flow = default_flow
         else:

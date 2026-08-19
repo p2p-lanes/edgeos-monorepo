@@ -302,12 +302,9 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
     ) -> uuid.UUID:
         """The flow a new application is stamped with when none was named.
 
-        Every popup is provisioned with a default flow, and since
-        sdd/sales-flows-rediseno F4 `applications.sales_flow_id` is NOT NULL,
-        so a popup without one cannot take applications at all. That is an
-        invariant breach rather than a case to handle, which is why this
-        raises instead of returning None — a caller that silently accepted
-        "no flow" is exactly what F4 removed.
+        Since sdd/sales-flows-rediseno F4 `applications.sales_flow_id` is NOT
+        NULL, a popup without a compatibility default cannot serve this legacy
+        entry point. Named application flows remain available.
         """
 
         from app.api.sales_flow.crud import sales_flows_crud
@@ -315,8 +312,8 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         default_flow = sales_flows_crud.get_default_flow(session, popup_id)
         if default_flow is None:
             raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="This event is not ready to receive applications yet.",
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Default sales flow not found",
             )
         return default_flow.id
 

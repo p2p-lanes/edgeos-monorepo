@@ -211,8 +211,8 @@ class TestWhatPeopleDidDoesBlock:
         assert "configuration" not in detail
 
 
-class TestTheDefaultFlowIsStillProtected:
-    def test_it_cannot_be_deleted(
+class TestDefaultFlowsFollowTheSameRules:
+    def test_an_unused_default_and_its_configuration_can_be_deleted(
         self,
         client: TestClient,
         db: Session,
@@ -224,8 +224,61 @@ class TestTheDefaultFlowIsStillProtected:
         popup = _popup(db, tenant_a)
         default = sales_flows_crud.get_default_flow(db, popup.id)
         assert default is not None
+        seed_ticketing_steps_for_popup(
+            db,
+            popup_id=popup.id,
+            tenant_id=popup.tenant_id,
+            sales_flow_id=default.id,
+            flow_type=default.type,
+        )
+        db.commit()
+        default_id = default.id
+        assert _count(db, TicketingSteps, default_id) > 0
 
         resp = _delete(client, admin_token_tenant_a, default)
 
-        assert resp.status_code == 400
-        assert "default" in resp.json()["detail"]
+        assert resp.status_code == 204, resp.text
+        assert not _flow_exists(db, default_id)
+        assert _count(db, TicketingSteps, default_id) == 0
+
+    def test_a_used_default_is_blocked_by_its_history(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+        admin_token_tenant_a: str,
+    ) -> None:
+        from app.api.application.models import Applications
+        from app.api.human.models import Humans
+        from app.api.sales_flow.crud import sales_flows_crud
+
+        popup = _popup(db, tenant_a)
+        default = sales_flows_crud.get_default_flow(db, popup.id)
+        assert default is not None
+        human = Humans(
+            id=uuid.uuid4(),
+            tenant_id=tenant_a.id,
+            email=f"default-applicant-{uuid.uuid4().hex[:8]}@test.com",
+        )
+        db.add(human)
+        db.commit()
+        db.add(
+            Applications(
+                id=uuid.uuid4(),
+                tenant_id=tenant_a.id,
+                popup_id=popup.id,
+                human_id=human.id,
+                sales_flow_id=default.id,
+                status="in review",
+            )
+        )
+        db.commit()
+
+        resp = _delete(client, admin_token_tenant_a, default)
+
+        assert resp.status_code == 400, resp.text
+        assert resp.json()["detail"] == (
+            "This sales flow cannot be deleted because people have used it: "
+            "1 application."
+        )
+        assert _flow_exists(db, default.id)

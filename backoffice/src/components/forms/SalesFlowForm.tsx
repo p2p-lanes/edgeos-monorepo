@@ -432,7 +432,7 @@ export function SalesFlowForm({
               <InlineRow
                 icon={<ShieldCheck className="h-4 w-4 text-muted-foreground" />}
                 label="Default Flow"
-                description="The default flow is used when no flow slug is given in the URL"
+                description="Used as the fallback when a link or request does not specify a flow"
               >
                 <Switch
                   checked={field.state.value}
@@ -619,7 +619,7 @@ export function SalesFlowForm({
       {isEdit && !readOnly && (
         <div className="mx-auto max-w-2xl">
           <DangerZone
-            description="Once you delete this sales flow, it will be permanently removed. The default flow of a popup cannot be deleted."
+            description="Once you delete this unused sales flow, it and its configuration will be permanently removed."
             onDelete={() => deleteMutation.mutate()}
             isDeleting={deleteMutation.isPending}
             confirmText="Delete Sales Flow"

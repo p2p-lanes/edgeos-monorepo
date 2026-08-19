@@ -127,9 +127,6 @@ def _resolve_coupon_flow_id(
     if explicit_flow_id is None:
         default_flow = sales_flows_crud.get_default_flow(db, popup_id)
         if default_flow is None:
-            # Tell the two cases apart. A popup that does not exist is the
-            # caller's mistake; one that exists without a default flow is
-            # ours, and answering both with 500 hides the first.
             from app.api.popup.crud import popups_crud
 
             if popups_crud.get(db, popup_id) is None:
@@ -138,8 +135,8 @@ def _resolve_coupon_flow_id(
                     detail="Popup not found",
                 )
             raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="This event is not ready to take coupons yet.",
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Default sales flow not found",
             )
         return default_flow.id
 

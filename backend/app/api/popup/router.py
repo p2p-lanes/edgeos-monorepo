@@ -54,17 +54,15 @@ from app.services.image_ingestion import ImageIngestionService
 router = APIRouter(prefix="/popups", tags=["popups"])
 
 
-def _default_flow_or_500(db, popup_id: uuid.UUID):
-    """The popup's default flow, which every popup has (provisioned at
-    creation, backfilled by `4a983282b8aa`). Its absence is a broken popup,
-    not an empty one — say so rather than writing a form row nowhere."""
+def _default_flow_or_404(db, popup_id: uuid.UUID):
+    """The compatibility default targeted by legacy popup-level settings."""
     from app.api.sales_flow.crud import sales_flows_crud
 
     flow = sales_flows_crud.get_default_flow(db, popup_id)
     if flow is None:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Popup has no default sales flow",
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Default sales flow not found",
         )
     return flow
 
@@ -93,11 +91,14 @@ def _create_form_section(
 
 
 def _seed_application_defaults(db: TenantSession, popup: Popups) -> None:
+    from app.api.sales_flow.crud import sales_flows_crud  # noqa: PLC0415
     from app.api.sales_flow.resolver import build_effective_config  # noqa: PLC0415
 
     # The form belongs to the popup's default flow (slice 3): a section or
     # base-field config has no other place to live.
-    default_flow = _default_flow_or_500(db, popup.id)
+    default_flow = sales_flows_crud.get_default_flow(db, popup.id)
+    if default_flow is None:
+        return
 
     if popup.approval_strategy is None:
         approval_strategies_crud.create_for_popup(
@@ -337,7 +338,7 @@ async def update_popup(
     # other. Compared against the flow, and applied to it below.
     door_to_retype = None
     if popup_in.sale_type is not None:
-        current_door = _default_flow_or_500(db, popup.id)
+        current_door = _default_flow_or_404(db, popup.id)
         if popup_in.sale_type != current_door.type:
             approved_payments, _ = payments_crud.find_by_popup(
                 db,
@@ -427,7 +428,7 @@ async def update_popup(
             section_map[key] = existing_section.id
             continue
         if default_flow is None:
-            default_flow = _default_flow_or_500(db, updated.id)
+            default_flow = _default_flow_or_404(db, updated.id)
         section = FormSections(
             tenant_id=updated.tenant_id,
             popup_id=updated.id,
@@ -444,7 +445,7 @@ async def update_popup(
 
     if section_map:
         if default_flow is None:
-            default_flow = _default_flow_or_500(db, updated.id)
+            default_flow = _default_flow_or_404(db, updated.id)
         base_field_configs_crud.create_defaults_for_popup(
             db,
             popup_id=updated.id,

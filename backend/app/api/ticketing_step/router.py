@@ -136,9 +136,8 @@ def _resolve_flow_or_404(db, popup_id: uuid.UUID, flow_id: uuid.UUID | None):
     """The flow a step read is scoped to: the requested one, or the popup's
     default flow when none was named.
 
-    Every popup has a default flow (`4a983282b8aa`), so a missing one means
-    the popup is unusable rather than empty — say so instead of returning a
-    silently empty step list.
+    A missing compatibility default makes the legacy, unscoped step list
+    unavailable rather than silently empty.
     """
     if flow_id is not None:
         return _get_flow_or_404(db, popup_id, flow_id)
@@ -149,7 +148,7 @@ def _resolve_flow_or_404(db, popup_id: uuid.UUID, flow_id: uuid.UUID | None):
     if default_flow is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="This popup has no default sales flow",
+            detail="Default sales flow not found",
         )
     return default_flow
 

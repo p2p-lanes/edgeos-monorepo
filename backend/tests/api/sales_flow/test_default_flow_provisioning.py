@@ -1,10 +1,8 @@
 """Task 5.0 — auto-provision a default sales_flow on popup creation.
 
-Design gap closed: slice 9's resolver (design D2, `resolve_flow` gate order)
-treats a missing default flow as a 500-class invariant breach. The slice-2
-backfill migration guarantees this for popups that existed before it ran,
-but nothing guaranteed it for popups created AFTER slice 1 shipped — until
-this task. Mirrors `PopupsCRUD.create`'s existing
+New popups receive a compatibility fallback for legacy requests that omit a
+flow. The slice-2 backfill added the same fallback to popups that existed
+before it ran. This mirrors `PopupsCRUD.create`'s existing
 `AttendeeCategoriesCRUD.seed_main_for_popup` auto-provisioning pattern:
 same transaction, no commit inside the seed helper, caller owns the
 transaction boundary.

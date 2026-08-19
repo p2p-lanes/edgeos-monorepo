@@ -5388,7 +5388,7 @@ export class FormFieldsService {
      * trusted from the client. `source_flow_id` (body) names the flow to copy
      * from and must belong to the SAME popup as the target — mirrors
      * `_resolve_schema_flow_id`'s cross-popup rejection. Omitted copies from
-     * the popup's default flow, the only form guaranteed to exist.
+     * the popup's compatibility default when one exists.
      * @param data The data for the request.
      * @param data.targetFlowId
      * @param data.requestBody
@@ -8487,7 +8487,7 @@ export class SalesFlowsService {
     
     /**
      * Delete Sales Flow
-     * Delete a sales flow (BO only). The default flow of a popup cannot be deleted.
+     * Delete an unused sales flow and its owned configuration (BO only).
      * @param data The data for the request.
      * @param data.flowId
      * @param data.xTenantId

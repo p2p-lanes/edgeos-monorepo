@@ -1,8 +1,8 @@
 """Every popup produced by `init_db`'s dev-seed must end up with exactly
 one default sales_flow — the seed builds Popups directly (not through
 `PopupsCRUD.create`), so it has to provision the flow itself in the same
-transaction. A missing default flow is a 500-class invariant breach for
-`resolve_flow`/`get_default_flow` (see app/api/sales_flow/resolver.py).
+transaction. Provisioning remains the creation behavior even though a popup
+may later have no compatibility default.
 """
 
 from fastapi import HTTPException
@@ -35,9 +35,8 @@ def test_seeded_popups_each_get_exactly_one_default_flow(db: Session) -> None:
         # the DB (its column is a raw String, not a native Postgres enum).
         assert default_flow.type == str(popup.sale_type)
 
-        # The checkout runtime's resolver must never 500 for a seeded popup
-        # (a missing default flow is the only thing that raises 500 here —
-        # "not active" is a legitimate 403 for draft popups).
+        # The checkout runtime can reject a draft popup with 403, but a seeded
+        # popup still has a compatibility entry point to resolve.
         try:
             resolve_flow(db, popup)
         except HTTPException as exc:

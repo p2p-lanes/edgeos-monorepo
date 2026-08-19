@@ -911,14 +911,14 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         as ``create_open_ticketing_payment``; no side effects.
 
         ``flow`` is the door the buyer is looking through. Omitted, the popup's
-        default answers — which is what every caller meant before a door could
-        set its own fees, and is still right for a checkout that names none.
+        compatibility default answers; if none exists, the legacy entry point
+        is unavailable.
         """
-        from app.api.sales_flow.crud import sales_flows_crud  # noqa: PLC0415
+        from app.api.sales_flow.resolver import resolve_flow  # noqa: PLC0415
         from app.api.sales_flow.schemas import SalesFlowType  # noqa: PLC0415
 
         if flow is None:
-            flow = sales_flows_crud.get_default_flow(session, popup.id)
+            flow = resolve_flow(session, popup)
         # Same gate the purchase applies. A quote for something this door
         # cannot sell is a price nobody can pay, and the two staying in step is
         # the reason this math is shared at all.
@@ -1011,18 +1011,13 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         SimpleFi and return None.
 
         sdd/sales-flows slice 13 (task 13.1/13.2): mirrors the checkout
-        runtime's upsale eligibility gate (design D8). An explicit
-        ``flow_slug`` always resolves through the full `resolve_flow`
-        contract (unknown/inactive/wrong-type -> 404/403, never a silent
-        fallback). Omitted -> the popup's default flow resolved via
-        `SalesFlowsCRUD.get_default_flow` (Optional, graceful degrade) so
-        popups built directly in tests/fixtures without task 5.0
-        provisioning keep working exactly as before this slice — every
-        REAL popup always has a default flow. `assert_upsale_eligible` is a
-        no-op unless the resolved flow is upsale-type.
+        runtime's upsale eligibility gate (design D8). Named and omitted
+        ``flow_slug`` values resolve through the full `resolve_flow` contract
+        (unknown, unavailable, inactive, or wrong-type -> 404/403, never a
+        silent fallback). `assert_upsale_eligible` is a no-op unless the
+        resolved flow is upsale-type.
         """
         from app.api.popup.schemas import PopupStatus
-        from app.api.sales_flow.crud import sales_flows_crud
         from app.api.sales_flow.eligibility import assert_upsale_eligible
         from app.api.sales_flow.resolver import (
             build_effective_config,
@@ -1049,56 +1044,42 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         # `resolve_flow`; an unnamed one falls to the popup's default, which
         # has to be able to sell without an application or there is nothing
         # for an anonymous buyer to do here.
-        if flow_slug is not None:
-            target_flow = resolve_flow(
-                session,
-                popup,
-                flow_slug,
-                require_types={SalesFlowType.direct, SalesFlowType.upsale},
-            )
-        else:
-            target_flow = sales_flows_crud.get_default_flow(session, popup.id)
-            if target_flow is not None and target_flow.type not in (
-                SalesFlowType.direct.value,
-                SalesFlowType.upsale.value,
-            ):
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail="This way in does not support open ticketing",
-                )
-        if target_flow is not None:
-            assert_upsale_eligible(
-                session, target_flow, popup.id, tenant.id, current_human
-            )
+        target_flow = resolve_flow(
+            session,
+            popup,
+            flow_slug,
+            require_types={SalesFlowType.direct, SalesFlowType.upsale},
+        )
+        assert_upsale_eligible(session, target_flow, popup.id, tenant.id, current_human)
 
-            # sdd/sales-flows slice 12 (design D5/D6, call-site table): the
-            # restriction gate (restriction_rule + D3 flow-exclusivity) is a
-            # read-only check and must run BEFORE any side effect — before
-            # humans_crud.find_or_create below, before the buyer/form
-            # validation, and before the SUPERSEDE_PENDING_ENABLED machinery
-            # further down. Subsumes slice 13's inline product-assignment EXISTS
-            # predicate (previously OR'd into the products_statement further
-            # below, after find_or_create) into this properly-placed helper.
-            from app.services.restrictions.context import build_context
-            from app.services.restrictions.enforcement import (
-                assert_products_allowed,
-            )
+        # sdd/sales-flows slice 12 (design D5/D6, call-site table): the
+        # restriction gate (restriction_rule + D3 flow-exclusivity) is a
+        # read-only check and must run BEFORE any side effect — before
+        # humans_crud.find_or_create below, before the buyer/form
+        # validation, and before the SUPERSEDE_PENDING_ENABLED machinery
+        # further down. Subsumes slice 13's inline product-assignment EXISTS
+        # predicate (previously OR'd into the products_statement further
+        # below, after find_or_create) into this properly-placed helper.
+        from app.services.restrictions.context import build_context
+        from app.services.restrictions.enforcement import (
+            assert_products_allowed,
+        )
 
-            _restriction_context = build_context(
-                session,
-                popup,
-                target_flow,
-                human=current_human,
-                buyer_form_data=obj.buyer.form_data,
-                buyer_email=obj.buyer.email,
-            )
-            assert_products_allowed(
-                session,
-                target_flow,
-                popup,
-                [line.product_id for line in obj.products],
-                _restriction_context,
-            )
+        _restriction_context = build_context(
+            session,
+            popup,
+            target_flow,
+            human=current_human,
+            buyer_form_data=obj.buyer.form_data,
+            buyer_email=obj.buyer.email,
+        )
+        assert_products_allowed(
+            session,
+            target_flow,
+            popup,
+            [line.product_id for line in obj.products],
+            _restriction_context,
+        )
 
         buyer = humans_crud.find_or_create(
             session,

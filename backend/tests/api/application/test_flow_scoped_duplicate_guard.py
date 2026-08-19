@@ -10,10 +10,7 @@ checking `(human_id, popup_id)`.
 Graceful degradation: popups that bypass `PopupsCRUD.create` (e.g. legacy
 fixtures inserting `Popups(...)` directly, common across this test suite)
 have no default sales_flow. The guard must fall back to the legacy
-popup-level check in that case rather than raising an internal error —
-`resolve_flow`'s "missing default is a 500-class invariant breach" rule
-(design D2) belongs to the slice-9 resolver for popups reachable through
-the real flow-resolution contract, not to this creation-time guard.
+popup-level check in that case rather than rejecting an optional read path.
 """
 
 import uuid

@@ -154,6 +154,19 @@ describe("SalesFlowForm - flow-owned settings", () => {
     mockSettingsByType.mockResolvedValue(SETTINGS_BY_TYPE as never)
   })
 
+  it("allows an unused default flow to be deleted", async () => {
+    renderForm()
+
+    expect(
+      await screen.findByText(
+        "Once you delete this unused sales flow, it and its configuration will be permanently removed.",
+      ),
+    ).toBeInTheDocument()
+    expect(
+      screen.queryByText(/default flow of a popup cannot be deleted/i),
+    ).not.toBeInTheDocument()
+  })
+
   it("never offers a settings value a second source", async () => {
     renderForm()
     await openGroup("Application Settings")

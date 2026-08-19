@@ -453,19 +453,13 @@ async def delete_sales_flow(
     db: TenantSession,
     _current_user: CurrentWriter,
 ) -> None:
-    """Delete a sales flow (BO only). The default flow of a popup cannot be deleted."""
+    """Delete an unused sales flow and its owned configuration (BO only)."""
     flow = crud.sales_flows_crud.get(db, flow_id)
     if not flow:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Sales flow not found",
         )
-    if flow.is_default:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cannot delete a popup's default sales flow",
-        )
-
     # Deleting used to fail on anything at all that pointed at the flow, which
     # in practice meant the checkout steps the product had seeded into it
     # seconds earlier — so a flow nobody had ever sold through could not be

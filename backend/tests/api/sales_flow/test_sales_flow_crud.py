@@ -209,6 +209,30 @@ class TestSalesFlowCreate:
 
 
 class TestSalesFlowUpdate:
+    def test_default_can_be_unset_without_replacement(
+        self,
+        client: TestClient,
+        admin_token_tenant_a: str,
+    ) -> None:
+        popup_id = _create_popup(client, admin_token_tenant_a)
+        listed = client.get(
+            "/api/v1/sales-flows",
+            params={"popup_id": popup_id},
+            headers={"Authorization": f"Bearer {admin_token_tenant_a}"},
+        )
+        default_flow = next(
+            flow for flow in listed.json()["results"] if flow["is_default"]
+        )
+
+        response = client.patch(
+            f"/api/v1/sales-flows/{default_flow['id']}",
+            headers={"Authorization": f"Bearer {admin_token_tenant_a}"},
+            json={"is_default": False},
+        )
+
+        assert response.status_code == 200, response.text
+        assert response.json()["is_default"] is False
+
     def test_update_sales_flow_reserved_slug_rejected(
         self,
         client: TestClient,
@@ -285,31 +309,6 @@ class TestSalesFlowReadDelete:
             headers={"Authorization": f"Bearer {admin_token_tenant_a}"},
         )
         assert response.status_code == 404
-
-    def test_delete_default_flow_rejected(
-        self,
-        client: TestClient,
-        admin_token_tenant_a: str,
-    ) -> None:
-        """Popup creation now auto-provisions the default flow (task 5.0);
-        fetch it via the list endpoint instead of creating a second one."""
-        popup_id = _create_popup(client, admin_token_tenant_a)
-
-        listed = client.get(
-            "/api/v1/sales-flows",
-            params={"popup_id": popup_id},
-            headers={"Authorization": f"Bearer {admin_token_tenant_a}"},
-        )
-        assert listed.status_code == 200
-        default_flow = next(
-            f for f in listed.json()["results"] if f["is_default"] is True
-        )
-
-        response = client.delete(
-            f"/api/v1/sales-flows/{default_flow['id']}",
-            headers={"Authorization": f"Bearer {admin_token_tenant_a}"},
-        )
-        assert response.status_code == 400
 
     def test_delete_non_default_flow_succeeds(
         self,

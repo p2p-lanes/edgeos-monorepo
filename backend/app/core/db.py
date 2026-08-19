@@ -123,11 +123,10 @@ def _seed_popups(session: Session, seed_data: dict, tenant_id) -> dict:
             session.add(popup)
             session.flush()  # get the popup id without committing
 
-            # Every popup must have exactly one default sales_flow (design
-            # D2 — a missing default is a 500-class invariant breach for the
-            # resolver). This seed bypasses PopupsCRUD.create's direct-API
-            # path, so it has to provision the flow itself, in the same
-            # transaction, mirroring popup/crud.py::PopupsCRUD.create.
+            # Dev-seeded popups receive the same compatibility default as
+            # popups created through the API. This seed bypasses
+            # PopupsCRUD.create, so it provisions that flow itself in the
+            # same transaction.
             sales_flows_crud.provision_default_flow(
                 session,
                 popup_id=popup.id,
