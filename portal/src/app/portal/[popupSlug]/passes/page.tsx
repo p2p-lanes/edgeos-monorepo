@@ -35,9 +35,8 @@ export default function HomePasses() {
 
   // Subscribe to the same attendees query that PassesProvider drives off so
   // a backend failure shows an inline error UI instead of an infinite loader.
-  // Disabled for direct-sale popups (matches useResolvedAttendees behavior).
   const popupId = city?.id ? String(city.id) : null
-  const attendeesQuery = useHumanAttendeesQuery(isDirectSale ? null : popupId)
+  const attendeesQuery = useHumanAttendeesQuery(popupId)
 
   // Track the products query loading state so the page can distinguish
   // "still loading" from "loaded but empty". Without this, an empty products
@@ -63,9 +62,8 @@ export default function HomePasses() {
     return <Loader />
   }
 
-  // Surface attendees-query failures so the page does not get stuck in a
-  // loader. Direct-sale popups skip this branch (their query is disabled).
-  if (!isDirectSale && attendeesQuery.isError) {
+  // Surface initial failures, but keep rendering retained data after a failed refetch.
+  if (attendeesQuery.isError && attendeesQuery.data === undefined) {
     return (
       <div className="w-full md:mt-0 mx-auto items-center max-w-3xl p-6 bg-transparent">
         <div className="flex flex-col items-center justify-center rounded-2xl border bg-card p-10 text-center shadow-sm">
@@ -146,10 +144,10 @@ export default function HomePasses() {
   // loader. We only render the loader while a query is genuinely in-flight;
   // after queries resolve we render either the passes or the empty state.
   if (isDirectSale) {
+    if (attendeesQuery.isLoading || productsQuery.isLoading) return <Loader />
     // Direct-sale attendeePasses only build once products exist, so an empty
-    // `attendees` here means "no purchases yet" (or the popup has no products).
+    // `attendees` here means the popup has no products or no attendee can be resolved.
     if (access.state === "denied" || !attendees.length) {
-      if (productsQuery.isLoading) return <Loader />
       return emptyState
     }
   } else {
