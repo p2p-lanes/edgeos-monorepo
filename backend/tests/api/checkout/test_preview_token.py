@@ -263,9 +263,7 @@ def test_a_regular_user_token_does_not_unlock_a_draft(
     assert response.status_code == 403
 
 
-def test_preview_header_survives_cors_preflight(
-    client: TestClient, tenant_a: Tenants
-) -> None:
+def test_preview_header_survives_cors_preflight(client: TestClient) -> None:
     """The preview runs in an iframe on the portal's origin, so the runtime call
     is cross-origin. A custom header triggers a preflight; if the API does not
     advertise it, the browser blocks the request before it is ever sent and the
