@@ -132,6 +132,9 @@ interface CheckoutContextValue {
   canProceedToStep: (step: CheckoutStep) => boolean
   isStepComplete: (step: CheckoutStep) => boolean
   submitPayment: () => Promise<{ success: boolean; error?: string }>
+  /** True when the flow renders inside the backoffice live preview, where
+   *  submitPayment is inert. Flows use it to label the CTA. */
+  previewMode: boolean
   isEditing: boolean
   toggleEditing: (editing?: boolean) => void
   editCredit: number
@@ -221,6 +224,10 @@ interface CheckoutProviderProps {
   openCartCid?: string | null
   /** HMAC restore token (?sig=). Only relevant when openCartPopupSlug is set. */
   openCartSig?: string | null
+  /** Backoffice live preview: renders the real flow for an operator, so
+   *  checking out is inert. Exposed on the context so the flows can label the
+   *  CTA accordingly. */
+  previewMode?: boolean
 }
 
 export function CheckoutProvider({
@@ -239,6 +246,7 @@ export function CheckoutProvider({
   openCartPopupSlug = null,
   openCartCid = null,
   openCartSig = null,
+  previewMode = false,
 }: CheckoutProviderProps) {
   const { t } = useTranslation()
   const {
@@ -1342,6 +1350,7 @@ export function CheckoutProvider({
     popupName: city?.name ?? null,
     openCartMetaRef,
     flushOpenCartSave: openCartEnabled ? flushOpenCartSave : null,
+    previewMode,
     buyerData:
       submitMode === "open-ticketing"
         ? {
@@ -1398,6 +1407,7 @@ export function CheckoutProvider({
     canProceedToStep: canProceedToStepFn,
     isStepComplete: isStepCompleteFn,
     submitPayment,
+    previewMode,
     isEditing,
     toggleEditing,
     editCredit,

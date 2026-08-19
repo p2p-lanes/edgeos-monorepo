@@ -3,17 +3,14 @@
 import { useEffect, useState } from "react"
 import { useTranslation } from "react-i18next"
 import type { CheckoutRuntimeResponse } from "@/client"
-import { CheckoutBackgroundImage } from "@/components/CheckoutBackgroundImage"
-import { CheckoutBackgroundVideo } from "@/components/CheckoutBackgroundVideo"
 import { OpenCheckoutRuntime } from "@/components/checkout-flow/OpenCheckoutRuntime"
-import { SidebarProvider } from "@/components/Sidebar/SidebarComponents"
 import { Loader } from "@/components/ui/Loader"
 import useAuth from "@/hooks/useAuth"
-import { getCheckoutBackground } from "@/lib/background-image"
 import {
   resolveRequestLanguage,
   subscribeRequestLanguage,
 } from "@/lib/language-storage"
+import { CheckoutShell } from "./CheckoutShell"
 import { useCheckoutRuntime } from "./hooks/useCheckoutRuntime"
 
 interface CheckoutPageClientProps {
@@ -86,34 +83,13 @@ export default function CheckoutPageClient({
     )
   }
 
-  const background = getCheckoutBackground(runtime.popup, "checkout")
-
   return (
-    <SidebarProvider
-      defaultOpen={false}
-      className="block min-h-0"
-      style={
-        {
-          "--sidebar-width": "0px",
-          "--sidebar-width-icon": "0px",
-        } as React.CSSProperties
-      }
-    >
-      <main
-        className={`h-svh overflow-y-auto no-scrollbar ${background.type === "none" ? "bg-background" : ""}`.trim()}
-      >
-        {background.type === "image" && (
-          <CheckoutBackgroundImage url={background.url} />
-        )}
-        {background.type === "video" && (
-          <CheckoutBackgroundVideo url={background.url} />
-        )}
-        <OpenCheckoutRuntime
-          runtime={runtime}
-          popupSlug={popupSlug}
-          prefilledBuyer={prefilledBuyer}
-        />
-      </main>
-    </SidebarProvider>
+    <CheckoutShell popup={runtime.popup}>
+      <OpenCheckoutRuntime
+        runtime={runtime}
+        popupSlug={popupSlug}
+        prefilledBuyer={prefilledBuyer}
+      />
+    </CheckoutShell>
   )
 }
