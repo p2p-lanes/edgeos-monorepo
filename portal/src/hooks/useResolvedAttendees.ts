@@ -12,11 +12,9 @@ import type { AttendeePassState } from "@/types/Attendee"
 /**
  * Resolves the attendees list the PassesProvider should drive off.
  *
- * - For direct-sale popups (`sale_type === "direct"`): returns a synthetic
- *   "main" attendee derived from the authenticated human. The direct-sale
- *   flow does not create a real Attendee row until the payment POST hits
- *   the backend, so we fabricate a virtual one here to keep the existing
- *   PassesProvider machinery working unchanged.
+ * - For direct-sale popups (`sale_type === "direct"`): uses the persisted
+ *   attendee when one exists. After a successful empty response, it returns a
+ *   synthetic "main" attendee so pre-purchase checkout still has an attendee.
  *
  * - For application-flow popups (all other `sale_type` values): calls
  *   `GET /attendees/my/popup/{popup_id}` via `useHumanAttendeesQuery` and
@@ -24,8 +22,8 @@ import type { AttendeePassState } from "@/types/Attendee"
  *   This replaces the previous read of `application.attendees[]` through the
  *   ApplicationProvider aggregate.
  *
- * When no city is loaded, no user is logged in, or required data is missing
- * for the direct-sale branch, the hook returns an empty list.
+ * Queries without attendee data return an empty list. Retained data remains
+ * usable when a background refetch fails.
  *
  * The hook signature is unchanged for all consumers.
  */
@@ -37,15 +35,24 @@ export function useResolvedAttendees(): AttendeePassState[] {
   const policy = resolvePopupCheckoutPolicy(city)
 
   // Always call the hook — conditional hooks are forbidden by Rules of Hooks.
-  // The hook disables the query when popupId is null/falsy.
+  // The hook disables the query when popupId is null/falsy or no human is logged in.
   const popupId = city ? String(city.id) : null
-  const { data: humanAttendees, isLoading } = useHumanAttendeesQuery(
-    policy.saleType === "direct" ? null : popupId,
-  )
+  const { data: humanAttendees } = useHumanAttendeesQuery(popupId)
 
-  if (policy.saleType === "direct") {
-    if (!city || !user) return []
+  if (humanAttendees === undefined) return []
 
+  if (humanAttendees.length > 0) {
+    const withTicketEntries = humanAttendees.map(
+      (attendee: AttendeeWithOriginPublic): AttendeePassState => ({
+        ...(attendee as unknown as AttendeePassState),
+        products: [],
+        ticket_entries: dedupTicketEntries(attendee.products ?? []),
+      }),
+    )
+    return sortAttendees(withTicketEntries)
+  }
+
+  if (policy.saleType === "direct" && city && user) {
     const firstName = user.first_name?.trim() ?? ""
     const lastName = user.last_name?.trim() ?? ""
     const fullName = [firstName, lastName].filter(Boolean).join(" ").trim()
@@ -70,29 +77,7 @@ export function useResolvedAttendees(): AttendeePassState[] {
     return [virtualAttendee]
   }
 
-  // Application-flow popup: use the unified human-popup query.
-  // While loading, return empty to avoid stale partial lists.
-  if (isLoading || !humanAttendees) return []
-
-  // Map AttendeeWithOriginPublic[] to AttendeePassState[].
-  // PassesProvider replaces products via buildBaseAttendeePasses anyway,
-  // so the product field is overwritten. ticket_entries carries the raw
-  // per-ticket AttendeeProductPublic rows — all denormalized product fields
-  // (product_name, product_category, start_date, end_date, duration_type)
-  // are populated by the backend, so no client-side join is needed.
-  //
-  // ticket_entries is deduped here to hide historical double-Payment-APPROVED
-  // rows from the public passes view (see dedupTicketEntries for full
-  // context and the day/meal_plan exceptions). The raw `products` field on
-  // the attendee is left untouched for buy-mode / cart consumers.
-  const withTicketEntries = humanAttendees.map(
-    (attendee: AttendeeWithOriginPublic): AttendeePassState => ({
-      ...(attendee as unknown as AttendeePassState),
-      products: [],
-      ticket_entries: dedupTicketEntries(attendee.products ?? []),
-    }),
-  )
-  return sortAttendees(withTicketEntries)
+  return []
 }
 
 export default useResolvedAttendees

@@ -196,6 +196,43 @@ function createProduct(overrides: Partial<ProductsPass>): ProductsPass {
 }
 
 describe("buildBaseAttendeePasses", () => {
+  it("projects a purchase keyed by the persisted attendee ID as purchased", () => {
+    const attendee = {
+      id: "attendee-1",
+      human_id: "human-1",
+      category: "main",
+    } as AttendeePassState
+    const product = createProduct({ id: "direct-ticket" })
+    const purchasesMap = buildPurchasesMap([
+      {
+        attendee_id: "attendee-1",
+        attendee_name: "Direct Buyer",
+        attendee_category: "main",
+        products: [
+          {
+            ...product,
+            quantity: 1,
+          } as unknown as ProductWithQuantity,
+        ],
+      },
+    ])
+
+    const result = buildBaseAttendeePasses(
+      [attendee],
+      [product],
+      0,
+      purchasesMap,
+      CHECKOUT_MODE.SIMPLE_QUANTITY,
+    )
+
+    expect(result[0]?.id).toBe("attendee-1")
+    expect(result[0]?.products[0]).toMatchObject({
+      id: "direct-ticket",
+      attendee_id: "attendee-1",
+      purchased: true,
+    })
+  })
+
   it("keeps purchased inactive products in the attendee passes state", () => {
     const attendees = [
       { id: "attendee-1", category: "main" },
