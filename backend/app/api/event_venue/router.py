@@ -817,19 +817,126 @@ async def get_portal_availability(
     """Portal-side availability query — same shape as the backoffice one,
     used by the event-creation form to show open/busy slots per day.
 
-    Redacts other humans' private/unlisted event titles to keep the slot
-    visible as occupied without leaking what it is.
+    PRIVATE event busy slots are opacity-filtered through the chokepoint: the
+    slot timing (start/end/event_start/event_end) stays visible as occupied but
+    the label (event title) is masked to None for viewers who cannot see it.
+    Members, invitees, the owner, and managers (host/collaborators) see the
+    full label.
     """
+    from sqlmodel import select as _select
+
+    from app.api.event.models import EventInvitations as _EventInvitations
+    from app.api.event.models import Events as _Events
+    from app.api.event.schemas import EventVisibility as _EventVisibility
+    from app.api.group.crud import groups_crud
+    from app.services.event_visibility import project_event_for
+
     venue = _get_venue_or_404(db, venue_id)
     ensure_api_key_popup(token_payload, venue.popup_id)
-    return _compute_availability(
-        db,
-        venue,
-        start,
-        end,
-        exclude_event_id,
-        redact_private=True,
-        viewer_human_id=current_human.id,
+    availability = _compute_availability(db, venue, start, end, exclude_event_id)
+
+    # Fast path: if there are no event-sourced busy slots, nothing to filter.
+    event_busy = [s for s in availability.busy if s.source == "event" and s.event_id]
+    if not event_busy:
+        return availability
+
+    # Fetch the full event rows for the busy slots so we can apply the
+    # chokepoint (visibility, group_id, owner_id).
+    event_ids = [s.event_id for s in event_busy if s.event_id is not None]
+    events_by_id: dict[uuid.UUID, _Events] = {}
+    for ev in db.exec(_select(_Events).where(_Events.id.in_(event_ids))).all():
+        events_by_id[ev.id] = ev
+
+    # Pre-compute viewer's group membership once (one query per request).
+    viewer_group_ids = groups_crud.get_human_group_ids(
+        db, current_human.id, venue.popup_id
+    )
+
+    # Build invitee set for invitation-based PRIVATE events (group_id IS NULL).
+    private_invitation_event_ids = [
+        ev.id
+        for ev in events_by_id.values()
+        if ev.visibility == _EventVisibility.PRIVATE and ev.group_id is None
+    ]
+    invited_set: set[uuid.UUID] = set()
+    if private_invitation_event_ids:
+        invs = db.exec(
+            _select(_EventInvitations).where(
+                _EventInvitations.event_id.in_(private_invitation_event_ids),
+                _EventInvitations.human_id == current_human.id,
+            )
+        ).all()
+        for inv in invs:
+            invited_set.add(inv.event_id)
+
+    class _Viewer:
+        id = current_human.id
+
+    viewer = _Viewer()
+
+    # Apply opacity filtering: replace label with None for events the viewer
+    # cannot see. Timing fields (start, end, event_start, event_end) are kept
+    # so the calendar can render the venue as busy.
+    filtered_busy: list[VenueBusySlot] = []
+    for slot in availability.busy:
+        if slot.source != "event" or slot.event_id is None:
+            filtered_busy.append(slot)
+            continue
+
+        ev = events_by_id.get(slot.event_id)
+        if ev is None:
+            # Should not happen (we fetched all IDs), but be defensive.
+            filtered_busy.append(slot)
+            continue
+
+        if ev.visibility != _EventVisibility.PRIVATE:
+            filtered_busy.append(slot)
+            continue
+
+        # Managers (owner/host/collaborators) always see the label — mirrors
+        # `_human_id_manages_event` (event/router.py). Taking the chokepoint
+        # alone would regress the host/collaborator visibility added on dev.
+        is_manager = current_human.id in (ev.owner_id, ev.host_id) or (
+            current_human.id in (ev.collaborator_ids or [])
+        )
+        if is_manager:
+            filtered_busy.append(slot)
+            continue
+
+        # Apply the chokepoint for this PRIVATE event.
+        result = project_event_for(
+            viewer=viewer,
+            event=ev,
+            viewer_group_ids=viewer_group_ids,
+            is_admin_in_popup=False,
+            mode="availability",
+            invitee_ids={current_human.id} if ev.id in invited_set else set(),
+        )
+
+        if result is None or getattr(result, "is_opaque", False):
+            # Opaque: keep timing, mask label and highlighted flag.
+            filtered_busy.append(
+                VenueBusySlot(
+                    start=slot.start,
+                    end=slot.end,
+                    source=slot.source,
+                    label=None,
+                    visibility=ev.visibility.value,
+                    event_id=slot.event_id,
+                    event_start=slot.event_start,
+                    event_end=slot.event_end,
+                    highlighted=False,
+                )
+            )
+        else:
+            # Full visibility: return the slot unchanged.
+            filtered_busy.append(slot)
+
+    return VenueAvailability(
+        venue_id=availability.venue_id,
+        timezone=availability.timezone,
+        open_ranges=availability.open_ranges,
+        busy=filtered_busy,
     )
 
 

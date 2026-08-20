@@ -17,6 +17,7 @@ from app.api.router import api_router
 from app.core.config import Environment, settings
 from app.core.logging import RequestContextMiddleware, configure_logging
 from app.core.rate_limit import RateLimitExceeded
+from app.utils.checkout_preview import CHECKOUT_PREVIEW_TOKEN_HEADER
 
 configure_logging()
 
@@ -152,7 +153,20 @@ application.add_middleware(
     allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allow_headers=["Authorization", "Content-Type", "X-Tenant-Id", "Accept-Language"],
+    allow_headers=[
+        "Authorization",
+        "Content-Type",
+        "X-Tenant-Id",
+        "Accept-Language",
+        # Browser-based external checkouts (the headless SDK) authenticate the
+        # popup with this header; it must be allowed through CORS preflight or
+        # every cross-origin request is blocked before it reaches the API.
+        "X-EdgeOS-Publishable-Key",
+        # The backoffice's live preview loads the portal checkout in an iframe,
+        # which reads the runtime cross-origin with this header. Same rule: not
+        # listed here, the preflight fails and the preview never loads.
+        CHECKOUT_PREVIEW_TOKEN_HEADER,
+    ],
 )
 
 # Compress responses for clients that advertise gzip support. Event/calendar

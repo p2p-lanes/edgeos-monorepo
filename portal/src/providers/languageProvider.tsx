@@ -14,6 +14,7 @@ import { useTranslation } from "react-i18next"
 import { SUPPORTED_LANGUAGES } from "@/i18n/config"
 import {
   LANGUAGE_STORAGE_KEY,
+  persistLanguage,
   setActiveRequestLanguage,
 } from "@/lib/language-storage"
 import { CityContext } from "./cityProvider"
@@ -128,8 +129,8 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
     // class as the manual selector), so persist it: the language must survive
     // in-session navigations that drop the query param, e.g. returning from
     // the payment provider after a cancel.
-    if (urlLanguage && typeof window !== "undefined") {
-      localStorage.setItem(STORAGE_KEY, urlLanguage)
+    if (urlLanguage) {
+      persistLanguage(urlLanguage)
     }
     const storedLanguage =
       typeof window === "undefined"
@@ -152,9 +153,10 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
     }
   }, [searchParams, supportedLanguages, defaultLanguage, currentLanguage])
 
-  // localStorage is written only on explicit signals — setLanguage (manual
-  // choice) and an incoming ?lang= param — never by auto-resolve, to avoid
-  // clobbering the popup default and bouncing back on next render.
+  // The stores (localStorage + cookie) are written only on explicit signals —
+  // setLanguage (manual choice) and an incoming ?lang= param — never by
+  // auto-resolve, to avoid clobbering the popup default and bouncing back on
+  // next render.
   useEffect(() => {
     if (i18n.language !== currentLanguage) {
       i18n.changeLanguage(currentLanguage)
@@ -178,9 +180,7 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
   const setLanguage = (lang: string) => {
     const resolvedLanguage = resolveLanguageCandidate(lang, supportedLanguages)
     if (!resolvedLanguage) return
-    if (typeof window !== "undefined") {
-      localStorage.setItem(STORAGE_KEY, resolvedLanguage)
-    }
+    persistLanguage(resolvedLanguage)
     // Apply immediately so the UI switches on click instead of waiting for the
     // navigation round-trip. The ?lang write below only keeps the choice
     // forwardable in the URL and persistent across navigations; pendingLanguageRef

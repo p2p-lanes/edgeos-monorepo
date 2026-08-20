@@ -132,6 +132,16 @@ class ApplicationBase(SQLModel):
     )
     incentive_currency: str | None = Field(default=None, max_length=10, nullable=True)
 
+    # Groups-rework: attribution columns for invite/referral flows.
+    # Both name a row in `invites` since referrals were merged into it:
+    # invite_id for admin-created links, referral_id for portal-created ones.
+    invite_id: uuid.UUID | None = Field(
+        default=None, foreign_key="invites.id", nullable=True
+    )
+    referral_id: uuid.UUID | None = Field(
+        default=None, foreign_key="invites.id", nullable=True
+    )
+
 
 class ApplicationReviewerVote(BaseModel):
     """Compact reviewer + decision pair for the applications list."""
@@ -155,6 +165,11 @@ class ApplicationPublic(BaseModel):
 
     # Popup-specific
     referral: str | None = None
+    # Attribution (groups-rework): which invite/referral this application came
+    # through, plus a resolved display name of the referrer for the BO.
+    invite_id: uuid.UUID | None = None
+    referral_id: uuid.UUID | None = None
+    referred_by_name: str | None = None
     info_not_shared: list[str] = []
     status: str
     custom_fields: dict = {}
@@ -224,6 +239,39 @@ class ApplicationCommentPublic(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class PreviousApplicationSpend(BaseModel):
+    """One money total, in one currency.
+
+    Payments carry their own currency, so an application's spend can span more
+    than one. Collapsing them into a single number would misstate the amount.
+    """
+
+    currency: str
+    amount: Decimal
+
+
+class PreviousApplicationSummary(BaseModel):
+    """One application by the same human, in a different popup.
+
+    Powers the "Previous applications" block of the BO application detail: it
+    tells a reviewer whether this person already took part in other popups of
+    the tenant, and how much they bought when they did.
+    """
+
+    id: uuid.UUID
+    popup_id: uuid.UUID
+    popup_name: str | None = None
+    popup_start_date: datetime | None = None
+    status: str
+    # Purchased tickets: one attendee_products row per ticket, across every
+    # attendee of the application.
+    tickets_count: int = 0
+    # Approved payments only, grouped by currency.
+    spend: list[PreviousApplicationSpend] = []
+    submitted_at: datetime | None = None
+    created_at: datetime | None = None
+
+
 class ApplicationCreate(BaseModel):
     """Application schema for creation.
 
@@ -249,6 +297,10 @@ class ApplicationCreate(BaseModel):
     status: UserSettableStatus | None = None
     human_id: uuid.UUID | None = None
     group_id: uuid.UUID | None = None  # Optional group to join
+
+    # Attribution columns — groups-rework T-gr-032 (REQ-GR-009, REQ-GR-016)
+    invite_id: uuid.UUID | None = None
+    referral_id: uuid.UUID | None = None
 
     # Scholarship request (human-submittable fields only)
     scholarship_request: bool = False

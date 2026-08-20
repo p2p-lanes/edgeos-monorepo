@@ -5,7 +5,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 from app.api.attendee_category.schemas import AttendeeCategoryPublic
 from app.api.popup.schemas import PopupPublic
@@ -130,6 +130,11 @@ class BuyerInfo(BaseModel):
     last_name: str
     form_data: dict[str, Any] = {}
 
+    @field_validator("email", mode="after")
+    @classmethod
+    def normalize_email(cls, value: str) -> str:
+        return value.lower().strip()
+
 
 class Attribution(BaseModel):
     """Marketing attribution captured from the checkout entry URL.
@@ -187,6 +192,43 @@ class OpenTicketingPurchaseResponse(BaseModel):
     # success URL. Null for paid flows — SimpleFi performs that redirect itself.
     redirect_url: str | None = None
     amount: Decimal
+    currency: str
+
+
+# ---------------------------------------------------------------------------
+# Preview schemas (POST /checkout/{slug}/preview)
+# ---------------------------------------------------------------------------
+
+
+class CheckoutPreviewRequest(BaseModel):
+    """Request schema for POST /checkout/{slug}/preview."""
+
+    products: list[ProductLine] = Field(min_length=1)
+    coupon_code: str | None = None
+    insurance: bool = False
+
+
+class CheckoutPreviewLine(BaseModel):
+    product_id: uuid.UUID
+    quantity: int
+    unit_price: Decimal
+    line_total: Decimal
+    discountable: bool
+
+
+class CheckoutPreviewResponse(BaseModel):
+    """Server-computed price breakdown for anonymous checkout (no side effects)."""
+
+    lines: list[CheckoutPreviewLine]
+    discountable_amount: Decimal
+    non_discountable_amount: Decimal
+    coupon_code: str | None = None
+    discount_value: Decimal | None = None
+    discount_amount: Decimal = Decimal("0")
+    post_discount_amount: Decimal
+    insurance_amount: Decimal = Decimal("0")
+    contribution_amount: Decimal = Decimal("0")
+    total: Decimal
     currency: str
 
 

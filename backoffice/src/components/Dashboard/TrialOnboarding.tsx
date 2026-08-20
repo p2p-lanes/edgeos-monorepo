@@ -17,6 +17,7 @@ import {
   Building2,
   CalendarPlus,
   Check,
+  Compass,
   ListOrdered,
   MapPin,
   Package,
@@ -36,6 +37,7 @@ import {
   type TenantPublic,
   TicketingStepsService,
 } from "@/client"
+import { useOptionalTour } from "@/components/onboarding/TourProvider"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -70,6 +72,8 @@ export function TrialOnboarding({
 }) {
   const { user: currentUser } = useAuth()
   const { selectedPopupId, effectiveTenantId } = useWorkspace()
+  // Absent when this renders outside the authenticated layout (e.g. in tests).
+  const tour = useOptionalTour()
 
   // The trial provisions exactly one draft popup; selectedPopupId resolves to
   // it automatically via the workspace context.
@@ -230,9 +234,22 @@ export function TrialOnboarding({
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
       {/* Header */}
       <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-bold tracking-tight">
-          Welcome, {currentUser?.full_name || currentUser?.email}
-        </h1>
+        <div className="flex items-start justify-between gap-4">
+          <h1 className="text-2xl font-bold tracking-tight">
+            Welcome, {currentUser?.full_name || currentUser?.email}
+          </h1>
+          {tour && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="shrink-0"
+              onClick={tour.start}
+            >
+              <Compass className="h-4 w-4" />
+              Take the tour
+            </Button>
+          )}
+        </div>
         <p className="text-muted-foreground text-sm">
           Let's get {popup?.name ?? tenant.name} up and running. Complete these
           steps in order — each one unlocks a piece of your gathering.

@@ -5,12 +5,13 @@ import {
   useSuspenseQuery,
 } from "@tanstack/react-query"
 import { Trash2 } from "lucide-react"
-import { Suspense, useEffect, useRef, useState } from "react"
+import { Suspense, useEffect, useMemo, useRef, useState } from "react"
 
 import {
   type ApiError,
   PopupsService,
   ProductsService,
+  type TicketingStepPublic,
   TicketingStepsService,
 } from "@/client"
 import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
@@ -54,6 +55,10 @@ const WIDE_CONFIG_TEMPLATES = new Set([
 interface StepDetailPanelProps {
   stepId: string
   onClose: () => void
+  /** Reports the step as currently edited, unsaved changes included, so the
+   *  page's checkout preview can render it before it is saved. Called with
+   *  null when the editor closes. */
+  onDraftChange?: (step: TicketingStepPublic | null) => void
 }
 
 function getStepQueryOptions(stepId: string) {
@@ -63,17 +68,29 @@ function getStepQueryOptions(stepId: string) {
   }
 }
 
-export function StepDetailPanel({ stepId, onClose }: StepDetailPanelProps) {
+export function StepDetailPanel({
+  stepId,
+  onClose,
+  onDraftChange,
+}: StepDetailPanelProps) {
   return (
     <QueryErrorBoundary>
       <Suspense fallback={<Skeleton className="h-96 w-full" />}>
-        <StepDetailContent stepId={stepId} onClose={onClose} />
+        <StepDetailContent
+          stepId={stepId}
+          onClose={onClose}
+          onDraftChange={onDraftChange}
+        />
       </Suspense>
     </QueryErrorBoundary>
   )
 }
 
-function StepDetailContent({ stepId, onClose }: StepDetailPanelProps) {
+function StepDetailContent({
+  stepId,
+  onClose,
+  onDraftChange,
+}: StepDetailPanelProps) {
   const queryClient = useQueryClient()
   const { showSuccessToast, showErrorToast } = useCustomToast()
   const { data: step } = useSuspenseQuery(getStepQueryOptions(stepId))
@@ -236,6 +253,45 @@ function StepDetailContent({ stepId, onClose }: StepDetailPanelProps) {
   }
 
   const hasTranslations = (popup?.supported_languages?.length ?? 0) > 1
+
+  // What the checkout preview should render for this step: the saved row with
+  // the editor's current values on top, so unsaved work shows up.
+  const draftStep: TicketingStepPublic = useMemo(
+    () => ({
+      ...step,
+      title,
+      description: description || null,
+      watermark: watermark || null,
+      product_category: productCategory || null,
+      template: template || null,
+      template_config: templateConfig,
+      show_title: showTitle,
+      show_watermark: showWatermark,
+      show_in_navbar: showInNavbar,
+      emoji: emoji.trim() || null,
+    }),
+    [
+      step,
+      title,
+      description,
+      watermark,
+      productCategory,
+      template,
+      templateConfig,
+      showTitle,
+      showWatermark,
+      showInNavbar,
+      emoji,
+    ],
+  )
+
+  useEffect(() => {
+    onDraftChange?.(draftStep)
+  }, [draftStep, onDraftChange])
+
+  // Closing the editor drops the overlay: a preview left open should fall back
+  // to what is saved rather than keep showing a step nobody is editing.
+  useEffect(() => () => onDraftChange?.(null), [onDraftChange])
 
   return (
     <div

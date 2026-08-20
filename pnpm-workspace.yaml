@@ -4,6 +4,9 @@ packages:
   - e2e
   - packages/shared-form-ui
   - packages/shared-events
+  - packages/checkout-core
+  - packages/checkout-react
+  - examples/custom-checkout
 
 onlyBuiltDependencies:
   - '@swc/core'

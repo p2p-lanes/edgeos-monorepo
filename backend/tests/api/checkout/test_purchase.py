@@ -6,6 +6,7 @@ import hmac
 import json
 import uuid
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 from types import SimpleNamespace
 from unittest.mock import patch
 from urllib.parse import parse_qs, urlparse
@@ -38,6 +39,112 @@ def disable_purchase_rate_limit() -> None:
         yield
 
 
+def test_compute_open_ticketing_amounts_splits_and_totals(
+    db: Session,
+    tenant_a: Tenants,
+) -> None:
+    from app.api.payment.crud import compute_open_ticketing_amounts
+
+    popup = _make_popup(db, tenant_a, slug_prefix="amounts")
+    product = _make_product(db, popup, price="120.00")
+    db.commit()
+
+    products_map = {product.id: product}
+    lines = [SimpleNamespace(product_id=product.id, quantity=2)]
+
+    amounts = compute_open_ticketing_amounts(
+        db, popup, products_map, lines, coupon_code=None, insurance=False
+    )
+
+    assert amounts.discountable_amount == Decimal("240.00")
+    assert amounts.non_discountable_amount == Decimal("0")
+    assert amounts.post_discount_amount == Decimal("240.00")
+    assert amounts.total_amount == Decimal("240.00")
+    assert amounts.currency == "USD"
+    assert len(amounts.lines) == 1
+    assert amounts.lines[0].line_total == Decimal("240.00")
+
+
+def test_compute_open_ticketing_amounts_applies_coupon(
+    db: Session,
+    tenant_a: Tenants,
+) -> None:
+    from app.api.payment.crud import compute_open_ticketing_amounts
+
+    popup = _make_popup(db, tenant_a, slug_prefix="amt-coupon")
+    product = _make_product(db, popup, price="100.00")
+    _make_coupon(db, popup, code="HALF", discount_value=50)
+    db.commit()
+
+    amounts = compute_open_ticketing_amounts(
+        db,
+        popup,
+        {product.id: product},
+        [SimpleNamespace(product_id=product.id, quantity=1)],
+        coupon_code="HALF",
+        insurance=False,
+    )
+
+    assert amounts.discountable_amount == Decimal("50.00")
+    assert amounts.discount_amount == Decimal("50.00")
+    assert amounts.discount_value == Decimal("50")
+    assert amounts.coupon_code == "HALF"
+    assert amounts.total_amount == Decimal("50.00")
+
+
+def test_compute_open_ticketing_amounts_applies_insurance(
+    db: Session,
+    tenant_a: Tenants,
+) -> None:
+    from app.api.payment.crud import compute_open_ticketing_amounts
+
+    popup = _make_popup(db, tenant_a, slug_prefix="amt-ins")
+    popup.insurance_enabled = True
+    popup.insurance_percentage = Decimal("10")
+    product = _make_product(db, popup, price="100.00")
+    product.insurance_eligible = True
+    db.commit()
+
+    amounts = compute_open_ticketing_amounts(
+        db,
+        popup,
+        {product.id: product},
+        [SimpleNamespace(product_id=product.id, quantity=2)],
+        coupon_code=None,
+        insurance=True,
+    )
+
+    # 2 * 100 = 200 eligible subtotal; 10% insurance = 20.
+    assert amounts.insurance_amount == Decimal("20.00")
+    assert amounts.total_amount == Decimal("220.00")
+
+
+def test_compute_open_ticketing_amounts_applies_contribution(
+    db: Session,
+    tenant_a: Tenants,
+) -> None:
+    from app.api.payment.crud import compute_open_ticketing_amounts
+
+    popup = _make_popup(db, tenant_a, slug_prefix="amt-contrib")
+    popup.contribution_enabled = True
+    popup.contribution_percentage = Decimal("5")
+    product = _make_product(db, popup, price="100.00")
+    db.commit()
+
+    amounts = compute_open_ticketing_amounts(
+        db,
+        popup,
+        {product.id: product},
+        [SimpleNamespace(product_id=product.id, quantity=1)],
+        coupon_code=None,
+        insurance=False,
+    )
+
+    # 100 * 5% contribution = 5.
+    assert amounts.contribution_amount == Decimal("5.00")
+    assert amounts.total_amount == Decimal("105.00")
+
+
 def _make_popup(
     db: Session,
     tenant: Tenants,
@@ -55,6 +162,7 @@ def _make_popup(
         status=status,
         simplefi_api_key="simplefi_test_key",
         currency="USD",
+        allows_coupons=True,
     )
     db.add(popup)
     db.flush()

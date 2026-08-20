@@ -85,10 +85,17 @@ def resolve_public_tenant(
     request: Request,
     db: SessionDep,
     x_tenant_id: Annotated[str | None, Header(alias="X-Tenant-Id")] = None,
+    x_publishable_key: Annotated[
+        str | None, Header(alias="X-EdgeOS-Publishable-Key")
+    ] = None,
 ) -> Tenants:
     """Resolve the tenant for an anonymous public request.
 
     Header resolution order:
+      0. X-EdgeOS-Publishable-Key — an externally-hosted checkout UI on a
+         non-tenant domain. Resolves the tenant from the key's popup binding,
+         gated by the key's origin allowlist. Invalid/revoked → 401; origin not
+         allowed → 403.
       1. Origin — extract host, strip port, resolve via DomainCache + resolve_by_host.
       2. Referer — fallback when Origin is absent or opaque (sandboxed iframe,
          privacy proxies stripping Origin).
@@ -98,6 +105,30 @@ def resolve_public_tenant(
     Returns the live ORM Tenants instance so callers can access .id and other fields.
     """
     portal_domain = settings.PORTAL_DOMAIN
+
+    if x_publishable_key:
+        from app.api.publishable_key import crud as pk_crud
+
+        row = pk_crud.lookup_active_by_raw(db, x_publishable_key)
+        if row is None:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid or revoked publishable key",
+            )
+        if row.allowed_origins:
+            origin_host = _extract_host(request.headers.get("origin"))
+            allowed_hosts = {_extract_host(o) for o in row.allowed_origins}
+            if origin_host is None or origin_host not in allowed_hosts:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Origin not allowed for this publishable key",
+                )
+        tenant = tenants_crud.get(db, row.tenant_id)
+        if tenant is None or tenant.deleted:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Not found"
+            )
+        return tenant
 
     for header_name in ("origin", "referer"):
         host = _extract_host(request.headers.get(header_name))

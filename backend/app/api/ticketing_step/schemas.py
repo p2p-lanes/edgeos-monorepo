@@ -173,7 +173,7 @@ class TicketingStepBase(SQLModel):
     show_title: bool = Field(default=True)
     show_watermark: bool = Field(default=True)
     show_in_navbar: bool = Field(default=True)
-    emoji: str | None = Field(default=None, nullable=True, max_length=8)
+    emoji: str | None = Field(default=None, nullable=True, max_length=32)
 
 
 class TicketingStepPublic(BaseModel):
@@ -241,6 +241,16 @@ class TicketingStepUpdate(BaseModel):
 
     @model_validator(mode="after")
     def _validate_template_config(self) -> "TicketingStepUpdate":
+        # A PATCH that never mentioned template_config must not be written to
+        # here. Assigning to the attribute — even the same value back — puts it
+        # in model_fields_set, and BaseCRUD.update dumps with exclude_unset=True:
+        # a payload as small as {"order": 2} would then carry
+        # template_config=None and blank the column. Reordering steps, renaming
+        # one inline, or toggling one on and off all send exactly that.
+        # An explicit {"template_config": null} still clears it, as before.
+        if "template_config" not in self.model_fields_set:
+            return self
+
         # Note: when template is None (PATCH without template field), validation is skipped.
         # To trigger validation, send both template and template_config in the same request.
         self.template_config = _validate_sections_in_template_config(

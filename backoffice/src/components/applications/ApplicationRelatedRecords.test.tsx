@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import {
   type ApplicationPublic,
+  ApplicationsService,
   type PaymentPublic,
   PaymentsService,
 } from "@/client"
@@ -20,6 +21,9 @@ vi.mock("@/client", async (importOriginal) => {
     ...actual,
     PaymentsService: {
       listPayments: vi.fn(),
+    },
+    ApplicationsService: {
+      listPreviousApplications: vi.fn(),
     },
   }
 })
@@ -106,6 +110,9 @@ function renderRelatedRecords() {
 describe("ApplicationRelatedRecords", () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    vi.mocked(ApplicationsService.listPreviousApplications).mockResolvedValue(
+      [],
+    )
   })
 
   it("requests only the preview rows and displays the real payment total", async () => {

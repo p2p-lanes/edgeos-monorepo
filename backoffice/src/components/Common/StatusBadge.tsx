@@ -42,7 +42,6 @@ const statusMap: Record<
     label: "⭐ Star",
     className: "bg-info-soft text-info border-info/25",
   },
-  ambassador: { variant: "default" },
   regular: { variant: "outline" },
   strong_yes: { variant: "default", label: "Strong Yes" },
   yes: { variant: "default", label: "Yes" },

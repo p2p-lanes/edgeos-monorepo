@@ -1,15 +1,22 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query"
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router"
 import type { ColumnDef } from "@tanstack/react-table"
-import { EllipsisVertical, ExternalLink, Plus, Users } from "lucide-react"
+import {
+  Copy,
+  EllipsisVertical,
+  ExternalLink,
+  Info,
+  Plus,
+  Users,
+} from "lucide-react"
 import { Suspense, useState } from "react"
 
 import { type GroupPublic, GroupsService } from "@/client"
 import { DataTable, SortableHeader } from "@/components/Common/DataTable"
 import { EmptyState } from "@/components/Common/EmptyState"
 import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
-import { StatusBadge } from "@/components/Common/StatusBadge"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -29,7 +36,9 @@ import {
 import { Skeleton } from "@/components/ui/skeleton"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
 import useAuth from "@/hooks/useAuth"
+import { useCopyToClipboard } from "@/hooks/useCopyToClipboard"
 import { useCurrentTenant } from "@/hooks/useCurrentTenant"
+import useCustomToast from "@/hooks/useCustomToast"
 import {
   useTableSearchParams,
   validateTableSearch,
@@ -143,8 +152,21 @@ function GroupActionsMenu({ group }: { group: GroupPublic }) {
   const [open, setOpen] = useState(false)
   const [membersOpen, setMembersOpen] = useState(false)
   const { data: tenant } = useCurrentTenant()
+  const [, copy] = useCopyToClipboard()
+  const { showSuccessToast } = useCustomToast()
   const baseUrl = getPortalBaseUrl(tenant)
   const hasPortalLink = baseUrl && group.slug
+  const portalUrl = hasPortalLink
+    ? getGroupPortalUrl(baseUrl, group.slug)
+    : null
+
+  const handleCopyLink = async () => {
+    if (!portalUrl) return
+    const ok = await copy(portalUrl)
+    if (ok) {
+      showSuccessToast("Link copied to clipboard")
+    }
+  }
 
   return (
     <>
@@ -166,16 +188,28 @@ function GroupActionsMenu({ group }: { group: GroupPublic }) {
             View Members
           </DropdownMenuItem>
           {hasPortalLink && (
-            <DropdownMenuItem asChild>
-              <a
-                href={getGroupPortalUrl(baseUrl, group.slug)}
-                target="_blank"
-                rel="noopener noreferrer"
+            <>
+              <DropdownMenuItem
+                onSelect={(e) => e.preventDefault()}
+                onClick={() => {
+                  setOpen(false)
+                  handleCopyLink()
+                }}
               >
-                <ExternalLink className="mr-2 h-4 w-4" />
-                Open Portal
-              </a>
-            </DropdownMenuItem>
+                <Copy className="mr-2 h-4 w-4" />
+                Copy link
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <a
+                  href={getGroupPortalUrl(baseUrl, group.slug)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <ExternalLink className="mr-2 h-4 w-4" />
+                  Open Portal
+                </a>
+              </DropdownMenuItem>
+            </>
           )}
         </DropdownMenuContent>
       </DropdownMenu>
@@ -203,15 +237,6 @@ const columns: ColumnDef<GroupPublic>[] = [
     accessorKey: "max_members",
     header: "Max Members",
     cell: ({ row }) => <span>{row.original.max_members ?? "Unlimited"}</span>,
-  },
-  {
-    accessorKey: "is_ambassador_group",
-    header: "Type",
-    cell: ({ row }) => (
-      <StatusBadge
-        status={row.original.is_ambassador_group ? "ambassador" : "regular"}
-      />
-    ),
   },
   {
     id: "actions",
@@ -250,7 +275,7 @@ function GroupsTableContent() {
       columns={columns}
       data={groups.results}
       searchPlaceholder="Search by name..."
-      hiddenOnMobile={["max_members", "is_ambassador_group"]}
+      hiddenOnMobile={["max_members"]}
       searchValue={search}
       onSearchChange={setSearch}
       onRowClick={(group) =>
@@ -298,6 +323,19 @@ function Groups() {
         </div>
         {isOperatorOrAbove && isContextReady && <AddGroupButton />}
       </div>
+      {isContextReady && (
+        <Alert>
+          <Info className="h-4 w-4" />
+          <AlertTitle>Groups vs Invites</AlertTitle>
+          <AlertDescription>
+            Groups gather multiple attendees under a shared link to manage team
+            registrations and group discounts, with leaders who manage their
+            members. Invites are individual links that grant a specific person a
+            discount or an automatic approval. Use groups for teams and invites
+            for one-off offers.
+          </AlertDescription>
+        </Alert>
+      )}
       {isContextReady && (
         <QueryErrorBoundary>
           <Suspense fallback={<Skeleton className="h-64 w-full" />}>

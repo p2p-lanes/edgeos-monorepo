@@ -94,6 +94,52 @@ export const AbandonedCartPublicSchema = {
     description: 'Abandoned cart with enriched info for backoffice.'
 } as const;
 
+export const AddMemberByApplicationRequestSchema = {
+    properties: {
+        application_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Application Id'
+        }
+    },
+    type: 'object',
+    required: ['application_id'],
+    title: 'AddMemberByApplicationRequest',
+    description: 'Request body for POST /groups/{id}/members/by-application.'
+} as const;
+
+export const AddMemberResultSchema = {
+    properties: {
+        status: {
+            type: 'string',
+            enum: ['added', 'invited'],
+            title: 'Status'
+        },
+        email: {
+            type: 'string',
+            title: 'Email'
+        },
+        member: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/GroupMemberPublic'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        }
+    },
+    type: 'object',
+    required: ['status', 'email'],
+    title: 'AddMemberResult',
+    description: `Result of a leader adding a member by email (Portal).
+
+- status="added": the email belonged to an existing human, now a member.
+- status="invited": the email is not registered yet, so it was whitelisted.
+  The human auto-joins the group when they sign up.`
+} as const;
+
 export const AdminApiKeyCreateSchema = {
     properties: {
         name: {
@@ -931,6 +977,30 @@ export const ApplicationCreateSchema = {
             ],
             title: 'Group Id'
         },
+        invite_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Invite Id'
+        },
+        referral_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Referral Id'
+        },
         scholarship_request: {
             type: 'boolean',
             title: 'Scholarship Request',
@@ -1100,6 +1170,41 @@ export const ApplicationPublicSchema = {
                 }
             ],
             title: 'Referral'
+        },
+        invite_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Invite Id'
+        },
+        referral_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Referral Id'
+        },
+        referred_by_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Referred By Name'
         },
         info_not_shared: {
             items: {
@@ -4828,6 +4933,172 @@ export const CheckoutModeSchema = {
     title: 'CheckoutMode'
 } as const;
 
+export const CheckoutPreviewLineSchema = {
+    properties: {
+        product_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Product Id'
+        },
+        quantity: {
+            type: 'integer',
+            title: 'Quantity'
+        },
+        unit_price: {
+            type: 'string',
+            pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$',
+            title: 'Unit Price'
+        },
+        line_total: {
+            type: 'string',
+            pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$',
+            title: 'Line Total'
+        },
+        discountable: {
+            type: 'boolean',
+            title: 'Discountable'
+        }
+    },
+    type: 'object',
+    required: ['product_id', 'quantity', 'unit_price', 'line_total', 'discountable'],
+    title: 'CheckoutPreviewLine'
+} as const;
+
+export const CheckoutPreviewRequestSchema = {
+    properties: {
+        products: {
+            items: {
+                '$ref': '#/components/schemas/ProductLine'
+            },
+            type: 'array',
+            minItems: 1,
+            title: 'Products'
+        },
+        coupon_code: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Coupon Code'
+        },
+        insurance: {
+            type: 'boolean',
+            title: 'Insurance',
+            default: false
+        }
+    },
+    type: 'object',
+    required: ['products'],
+    title: 'CheckoutPreviewRequest',
+    description: 'Request schema for POST /checkout/{slug}/preview.'
+} as const;
+
+export const CheckoutPreviewResponseSchema = {
+    properties: {
+        lines: {
+            items: {
+                '$ref': '#/components/schemas/CheckoutPreviewLine'
+            },
+            type: 'array',
+            title: 'Lines'
+        },
+        discountable_amount: {
+            type: 'string',
+            pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$',
+            title: 'Discountable Amount'
+        },
+        non_discountable_amount: {
+            type: 'string',
+            pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$',
+            title: 'Non Discountable Amount'
+        },
+        coupon_code: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Coupon Code'
+        },
+        discount_value: {
+            anyOf: [
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Discount Value'
+        },
+        discount_amount: {
+            type: 'string',
+            pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$',
+            title: 'Discount Amount',
+            default: '0'
+        },
+        post_discount_amount: {
+            type: 'string',
+            pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$',
+            title: 'Post Discount Amount'
+        },
+        insurance_amount: {
+            type: 'string',
+            pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$',
+            title: 'Insurance Amount',
+            default: '0'
+        },
+        contribution_amount: {
+            type: 'string',
+            pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$',
+            title: 'Contribution Amount',
+            default: '0'
+        },
+        total: {
+            type: 'string',
+            pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$',
+            title: 'Total'
+        },
+        currency: {
+            type: 'string',
+            title: 'Currency'
+        }
+    },
+    type: 'object',
+    required: ['lines', 'discountable_amount', 'non_discountable_amount', 'post_discount_amount', 'total', 'currency'],
+    title: 'CheckoutPreviewResponse',
+    description: 'Server-computed price breakdown for anonymous checkout (no side effects).'
+} as const;
+
+export const CheckoutPreviewTokenPublicSchema = {
+    properties: {
+        token: {
+            type: 'string',
+            title: 'Token'
+        },
+        expires_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Expires At'
+        }
+    },
+    type: 'object',
+    required: ['token', 'expires_at'],
+    title: 'CheckoutPreviewTokenPublic',
+    description: `Short-lived token that unlocks the checkout runtime for a live preview.
+
+Handed to the portal's preview page so it can render a popup that is still
+draft. See \`\`app.utils.checkout_preview\`\`.`
+} as const;
+
 export const CheckoutRuntimeProductSchema = {
     properties: {
         tenant_id: {
@@ -6096,6 +6367,14 @@ export const EventAvailabilityResultSchema = {
                 }
             ],
             title: 'Effective Booking Mode'
+        },
+        opaque_conflicts: {
+            items: {
+                '$ref': '#/components/schemas/EventOpaque'
+            },
+            type: 'array',
+            title: 'Opaque Conflicts',
+            default: []
         }
     },
     type: 'object',
@@ -6437,6 +6716,18 @@ export const EventCreateSchema = {
                     type: 'null'
                 }
             ]
+        },
+        group_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Group Id'
         }
     },
     type: 'object',
@@ -6576,6 +6867,55 @@ export const EventInvitationPublicSchema = {
     type: 'object',
     required: ['id', 'event_id', 'human_id', 'email', 'created_at'],
     title: 'EventInvitationPublic'
+} as const;
+
+export const EventOpaqueSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        start_time: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Start Time'
+        },
+        end_time: {
+            type: 'string',
+            format: 'date-time',
+            title: 'End Time'
+        },
+        venue_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Venue Id'
+        },
+        is_opaque: {
+            type: 'boolean',
+            const: true,
+            title: 'Is Opaque',
+            default: true
+        }
+    },
+    type: 'object',
+    required: ['id', 'start_time', 'end_time'],
+    title: 'EventOpaque',
+    description: `Opaque event projection for non-privileged viewers on availability endpoints.
+
+Contains ONLY the fields needed to communicate a booking conflict without
+leaking any event metadata. Used as the non-full-detail branch of the
+\`\`EventPublic | EventOpaque\`\` discriminated union.
+
+Fields MUST match the design's Decision 1d contract:
+  id, start_time, end_time, venue_id, is_opaque: Literal[True]`
 } as const;
 
 export const EventParticipantCreateSchema = {
@@ -7017,6 +7357,18 @@ export const EventPublicSchema = {
             minimum: 0,
             title: 'Ical Sequence',
             default: 0
+        },
+        group_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Group Id'
         },
         created_at: {
             type: 'string',
@@ -8045,6 +8397,18 @@ export const EventUpdateSchema = {
                 }
             ],
             title: 'Highlighted'
+        },
+        group_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Group Id'
         }
     },
     type: 'object',
@@ -9260,6 +9624,67 @@ export const FormSectionUpdateSchema = {
     title: 'FormSectionUpdate'
 } as const;
 
+export const GoogleFontSchema = {
+    properties: {
+        family: {
+            type: 'string',
+            title: 'Family'
+        },
+        category: {
+            type: 'string',
+            enum: ['sans-serif', 'serif', 'display', 'handwriting', 'monospace'],
+            title: 'Category'
+        },
+        variants: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Variants'
+        },
+        subsets: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Subsets'
+        }
+    },
+    type: 'object',
+    required: ['family', 'category', 'variants', 'subsets'],
+    title: 'GoogleFont',
+    description: `A single family, trimmed to what the picker actually renders.
+
+Google's payload carries a \`files\` map with one CDN URL per variant, which
+is ~80% of the response weight and useless to us — the portal loads fonts
+through the \`css2\` stylesheet endpoint, not the raw files.`
+} as const;
+
+export const GoogleFontsCatalogSchema = {
+    properties: {
+        source: {
+            type: 'string',
+            enum: ['google', 'fallback'],
+            title: 'Source'
+        },
+        fonts: {
+            items: {
+                '$ref': '#/components/schemas/GoogleFont'
+            },
+            type: 'array',
+            title: 'Fonts'
+        }
+    },
+    type: 'object',
+    required: ['source', 'fonts'],
+    title: 'GoogleFontsCatalog',
+    description: `Catalog response.
+
+\`source\` lets the backoffice tell a real catalog from the degraded one and
+surface a hint to the admin rather than silently offering 40 fonts when
+1800 were expected.`
+} as const;
+
 export const GrantCreditRequestSchema = {
     properties: {
         amount: {
@@ -9434,29 +9859,6 @@ export const GroupAdminUpdateSchema = {
             ],
             title: 'Welcome Message'
         },
-        is_ambassador_group: {
-            anyOf: [
-                {
-                    type: 'boolean'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Is Ambassador Group'
-        },
-        ambassador_id: {
-            anyOf: [
-                {
-                    type: 'string',
-                    format: 'uuid'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Ambassador Id'
-        },
         whitelisted_emails: {
             anyOf: [
                 {
@@ -9470,6 +9872,39 @@ export const GroupAdminUpdateSchema = {
                 }
             ],
             title: 'Whitelisted Emails'
+        },
+        auto_approve_applications: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Auto Approve Applications'
+        },
+        express_checkout: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Express Checkout'
+        },
+        enable_private_events: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Enable Private Events'
         }
     },
     type: 'object',
@@ -9545,23 +9980,6 @@ export const GroupCreateSchema = {
             ],
             title: 'Welcome Message'
         },
-        is_ambassador_group: {
-            type: 'boolean',
-            title: 'Is Ambassador Group',
-            default: false
-        },
-        ambassador_id: {
-            anyOf: [
-                {
-                    type: 'string',
-                    format: 'uuid'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Ambassador Id'
-        },
         whitelisted_emails: {
             anyOf: [
                 {
@@ -9581,6 +9999,20 @@ export const GroupCreateSchema = {
     required: ['popup_id', 'name'],
     title: 'GroupCreate',
     description: 'Group schema for creation.'
+} as const;
+
+export const GroupLeaderAssignSchema = {
+    properties: {
+        human_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Human Id'
+        }
+    },
+    type: 'object',
+    required: ['human_id'],
+    title: 'GroupLeaderAssign',
+    description: 'Request body for POST /groups/{id}/leaders (BO admin).'
 } as const;
 
 export const GroupMemberBatchSchema = {
@@ -9678,6 +10110,11 @@ export const GroupMemberBatchResultSchema = {
             ],
             title: 'Local Resident'
         },
+        is_leader: {
+            type: 'boolean',
+            title: 'Is Leader',
+            default: false
+        },
         products: {
             items: {},
             type: 'array',
@@ -9760,6 +10197,22 @@ export const GroupMemberCreateSchema = {
     description: 'Schema for adding a member to a group.'
 } as const;
 
+export const GroupMemberInviteSchema = {
+    properties: {
+        email: {
+            type: 'string',
+            title: 'Email'
+        }
+    },
+    type: 'object',
+    required: ['email'],
+    title: 'GroupMemberInvite',
+    description: `Schema for inviting a member to a group by email (Portal leader).
+
+Only the email is needed: an existing human is added using their own
+profile (never overwritten); an unregistered email is whitelisted.`
+} as const;
+
 export const GroupMemberPublicSchema = {
     properties: {
         id: {
@@ -9833,6 +10286,11 @@ export const GroupMemberPublicSchema = {
                 }
             ],
             title: 'Local Resident'
+        },
+        is_leader: {
+            type: 'boolean',
+            title: 'Is Leader',
+            default: false
         },
         products: {
             items: {},
@@ -9980,22 +10438,20 @@ export const GroupPublicSchema = {
             ],
             title: 'Welcome Message'
         },
-        is_ambassador_group: {
+        auto_approve_applications: {
             type: 'boolean',
-            title: 'Is Ambassador Group',
+            title: 'Auto Approve Applications',
             default: false
         },
-        ambassador_id: {
-            anyOf: [
-                {
-                    type: 'string',
-                    format: 'uuid'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Ambassador Id'
+        express_checkout: {
+            type: 'boolean',
+            title: 'Express Checkout',
+            default: false
+        },
+        enable_private_events: {
+            type: 'boolean',
+            title: 'Enable Private Events',
+            default: false
         },
         id: {
             type: 'string',
@@ -10044,6 +10500,55 @@ export const GroupPublicSchema = {
     required: ['tenant_id', 'popup_id', 'name', 'slug', 'id'],
     title: 'GroupPublic',
     description: 'Group schema for API responses.'
+} as const;
+
+export const GroupSlugResolutionSchema = {
+    properties: {
+        kind: {
+            type: 'string',
+            title: 'Kind'
+        },
+        group: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/GroupPublic'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        invite: {
+            anyOf: [
+                {
+                    additionalProperties: true,
+                    type: 'object'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Invite'
+        }
+    },
+    type: 'object',
+    required: ['kind'],
+    title: 'GroupSlugResolution',
+    description: `Response for GET /api/v1/portal/groups/{slug} — URL compat resolver.
+
+Design: Decision 1e — same-shape response with kind discriminator.
+Spec: REQ-GR-027 (slug resolver fallback to invites), REQ-GR-028 (canonical endpoint).
+
+Resolution order:
+  1. groups_crud.get_by_slug → kind="group"
+  2. invites_crud.get_by_token → kind="invite"
+  3. 404
+
+Caller (portal) branches once on kind. When kind="invite", the portal
+redirects to /invite/{token} for canonical redemption flow.
+
+invite field is typed as dict to avoid a circular schema import at module load;
+the router populates it from InvitePublicPreview.model_dump().`
 } as const;
 
 export const GroupUpdateSchema = {
@@ -10169,22 +10674,20 @@ export const GroupWithMembersSchema = {
             ],
             title: 'Welcome Message'
         },
-        is_ambassador_group: {
+        auto_approve_applications: {
             type: 'boolean',
-            title: 'Is Ambassador Group',
+            title: 'Auto Approve Applications',
             default: false
         },
-        ambassador_id: {
-            anyOf: [
-                {
-                    type: 'string',
-                    format: 'uuid'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Ambassador Id'
+        express_checkout: {
+            type: 'boolean',
+            title: 'Express Checkout',
+            default: false
+        },
+        enable_private_events: {
+            type: 'boolean',
+            title: 'Enable Private Events',
+            default: false
         },
         id: {
             type: 'string',
@@ -10294,14 +10797,10 @@ export const HardDeleteSummarySchema = {
         group_memberships: {
             type: 'integer',
             title: 'Group Memberships'
-        },
-        ambassador_groups: {
-            type: 'integer',
-            title: 'Ambassador Groups'
         }
     },
     type: 'object',
-    required: ['applications', 'attendees', 'payments', 'attendee_products', 'payment_products', 'payment_installments', 'application_snapshots', 'carts', 'group_memberships', 'ambassador_groups'],
+    required: ['applications', 'attendees', 'payments', 'attendee_products', 'payment_products', 'payment_installments', 'application_snapshots', 'carts', 'group_memberships'],
     title: 'HardDeleteSummary'
 } as const;
 
@@ -11390,6 +11889,506 @@ export const InstallmentIntervalSchema = {
     description: "Billing interval for installment plans (mirrors SimpleFi's InstallmentInterval)."
 } as const;
 
+export const InviteCreateSchema = {
+    properties: {
+        popup_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Popup Id'
+        },
+        token: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Token'
+        },
+        recipient_email: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Recipient Email'
+        },
+        discount_percentage: {
+            anyOf: [
+                {
+                    type: 'number'
+                },
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$'
+                }
+            ],
+            title: 'Discount Percentage',
+            default: '0'
+        },
+        auto_approve: {
+            type: 'boolean',
+            title: 'Auto Approve',
+            default: true
+        },
+        express_checkout: {
+            type: 'boolean',
+            title: 'Express Checkout',
+            default: true
+        },
+        max_uses: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Max Uses',
+            default: 1
+        }
+    },
+    type: 'object',
+    required: ['popup_id'],
+    title: 'InviteCreate',
+    description: `Admin request body for POST /invites.
+
+token: auto-generated via secrets.token_urlsafe(16) when omitted.
+recipient_email: stored lowercase; NULL means open invite.`
+} as const;
+
+export const InvitePortalCreateSchema = {
+    properties: {
+        popup_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Popup Id'
+        },
+        token: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Token'
+        },
+        max_uses: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Max Uses'
+        },
+        expires_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Expires At'
+        }
+    },
+    type: 'object',
+    required: ['popup_id'],
+    title: 'InvitePortalCreate',
+    description: `Attendee request body for POST /portal/invites.
+
+An attendee sets far less than an admin: the policy fields (discount,
+auto_approve) stay admin-only, and max_uses is dictated by the popup's
+max_referrals_per_attendee quota.`
+} as const;
+
+export const InvitePortalUpdateSchema = {
+    properties: {
+        expires_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Expires At'
+        },
+        max_uses: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Max Uses'
+        }
+    },
+    type: 'object',
+    title: 'InvitePortalUpdate',
+    description: 'Attendee request body for PATCH /portal/invites/{id} — owner-mutable only.'
+} as const;
+
+export const InvitePublicSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        popup_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Popup Id'
+        },
+        token: {
+            type: 'string',
+            title: 'Token'
+        },
+        recipient_email: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Recipient Email'
+        },
+        discount_percentage: {
+            type: 'string',
+            pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$',
+            title: 'Discount Percentage'
+        },
+        auto_approve: {
+            type: 'boolean',
+            title: 'Auto Approve'
+        },
+        express_checkout: {
+            type: 'boolean',
+            title: 'Express Checkout'
+        },
+        is_disabled: {
+            type: 'boolean',
+            title: 'Is Disabled',
+            default: false
+        },
+        max_uses: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Max Uses'
+        },
+        current_uses: {
+            type: 'integer',
+            title: 'Current Uses'
+        },
+        used_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Used At'
+        },
+        redeemed_by_human_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Redeemed By Human Id'
+        },
+        expires_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Expires At'
+        },
+        created_by: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Created By'
+        },
+        referrer_human_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Referrer Human Id'
+        },
+        created_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Created At'
+        },
+        updated_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Updated At'
+        }
+    },
+    type: 'object',
+    required: ['id', 'popup_id', 'token', 'discount_percentage', 'auto_approve', 'express_checkout', 'current_uses', 'created_at', 'updated_at'],
+    title: 'InvitePublic',
+    description: `Full link detail — admin, or the owning attendee for their own link.
+
+Exposes all fields including token and recipient_email.
+Never sent to unauthenticated callers.
+
+Exactly one issuer is set: \`\`created_by\`\` for a backoffice link,
+\`\`referrer_human_id\`\` for one an attendee created from the portal.`
+} as const;
+
+export const InvitePublicPreviewSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        popup_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Popup Id'
+        },
+        token: {
+            type: 'string',
+            title: 'Token'
+        },
+        inviter_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Inviter Name'
+        },
+        is_email_restricted: {
+            type: 'boolean',
+            title: 'Is Email Restricted'
+        },
+        discount_percentage: {
+            type: 'string',
+            pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$',
+            title: 'Discount Percentage'
+        },
+        max_uses: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Max Uses'
+        },
+        current_uses: {
+            type: 'integer',
+            title: 'Current Uses'
+        },
+        expires_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Expires At'
+        },
+        already_redeemed: {
+            type: 'boolean',
+            title: 'Already Redeemed',
+            default: false
+        }
+    },
+    type: 'object',
+    required: ['id', 'popup_id', 'token', 'is_email_restricted', 'discount_percentage', 'current_uses'],
+    title: 'InvitePublicPreview',
+    description: `Unauthenticated preview — GET /invites/redeem/{token}.
+
+Spec: REQ-GR-005 — exposes inviter_name and is_email_restricted.
+recipient_email is intentionally ABSENT to prevent harvesting.
+id is included so the portal can pass invite_id on application create
+(the checkout flow needs the UUID, not the token string).`
+} as const;
+
+export const InviteRedeemRequestSchema = {
+    properties: {
+        popup_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Popup Id'
+        }
+    },
+    type: 'object',
+    required: ['popup_id'],
+    title: 'InviteRedeemRequest',
+    description: 'Portal redemption body — POST /invites/redeem/{token}.'
+} as const;
+
+export const InviteRedeemResponseSchema = {
+    properties: {
+        invite_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Invite Id'
+        },
+        application_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Application Id'
+        },
+        application_status: {
+            type: 'string',
+            title: 'Application Status'
+        }
+    },
+    type: 'object',
+    required: ['invite_id', 'application_id', 'application_status'],
+    title: 'InviteRedeemResponse',
+    description: `Response after successful redemption.
+
+Includes the created application's public representation.`
+} as const;
+
+export const InviteUpdateSchema = {
+    properties: {
+        expires_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Expires At'
+        },
+        max_uses: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Max Uses'
+        },
+        discount_percentage: {
+            anyOf: [
+                {
+                    type: 'number'
+                },
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Discount Percentage'
+        },
+        auto_approve: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Auto Approve'
+        },
+        express_checkout: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Express Checkout'
+        },
+        is_disabled: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Is Disabled'
+        }
+    },
+    type: 'object',
+    title: 'InviteUpdate',
+    description: `Admin request body for PATCH /invites/{id}.
+
+token and recipient_email are immutable post-create.`
+} as const;
+
 export const KeyMetricsSchema = {
     properties: {
         people: {
@@ -11902,6 +12901,42 @@ export const ListModel_HumanPublic_Schema = {
     title: 'ListModel[HumanPublic]'
 } as const;
 
+export const ListModel_InvitePublic_Schema = {
+    properties: {
+        results: {
+            items: {
+                '$ref': '#/components/schemas/InvitePublic'
+            },
+            type: 'array',
+            title: 'Results'
+        },
+        paging: {
+            '$ref': '#/components/schemas/Paging'
+        }
+    },
+    type: 'object',
+    required: ['results', 'paging'],
+    title: 'ListModel[InvitePublic]'
+} as const;
+
+export const ListModel_MyGroupPublic_Schema = {
+    properties: {
+        results: {
+            items: {
+                '$ref': '#/components/schemas/MyGroupPublic'
+            },
+            type: 'array',
+            title: 'Results'
+        },
+        paging: {
+            '$ref': '#/components/schemas/Paging'
+        }
+    },
+    type: 'object',
+    required: ['results', 'paging'],
+    title: 'ListModel[MyGroupPublic]'
+} as const;
+
 export const ListModel_PaymentPublic_Schema = {
     properties: {
         results: {
@@ -12143,6 +13178,270 @@ export const MeAccessSchema = {
     required: ['app_name', 'scopes', 'api_key_scopes'],
     title: 'MeAccess',
     description: 'Response shape for GET /me/access.'
+} as const;
+
+export const MyGroupPublicSchema = {
+    properties: {
+        tenant_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Tenant Id'
+        },
+        popup_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Popup Id'
+        },
+        name: {
+            type: 'string',
+            title: 'Name'
+        },
+        slug: {
+            type: 'string',
+            title: 'Slug'
+        },
+        description: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Description'
+        },
+        discount_percentage: {
+            type: 'string',
+            pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$',
+            title: 'Discount Percentage',
+            default: '0'
+        },
+        max_members: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Max Members'
+        },
+        welcome_message: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Welcome Message'
+        },
+        auto_approve_applications: {
+            type: 'boolean',
+            title: 'Auto Approve Applications',
+            default: false
+        },
+        express_checkout: {
+            type: 'boolean',
+            title: 'Express Checkout',
+            default: false
+        },
+        enable_private_events: {
+            type: 'boolean',
+            title: 'Enable Private Events',
+            default: false
+        },
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        created_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Created At'
+        },
+        updated_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Updated At'
+        },
+        whitelisted_emails: {
+            items: {
+                '$ref': '#/components/schemas/GroupWhitelistedEmailPublic'
+            },
+            type: 'array',
+            title: 'Whitelisted Emails',
+            default: []
+        },
+        is_open: {
+            type: 'boolean',
+            title: 'Is Open',
+            default: true
+        },
+        is_leader: {
+            type: 'boolean',
+            title: 'Is Leader',
+            default: false
+        }
+    },
+    type: 'object',
+    required: ['tenant_id', 'popup_id', 'name', 'slug', 'id'],
+    title: 'MyGroupPublic',
+    description: "Group public schema augmented with the viewer's role (portal)."
+} as const;
+
+export const MyGroupWithMembersSchema = {
+    properties: {
+        tenant_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Tenant Id'
+        },
+        popup_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Popup Id'
+        },
+        name: {
+            type: 'string',
+            title: 'Name'
+        },
+        slug: {
+            type: 'string',
+            title: 'Slug'
+        },
+        description: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Description'
+        },
+        discount_percentage: {
+            type: 'string',
+            pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$',
+            title: 'Discount Percentage',
+            default: '0'
+        },
+        max_members: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Max Members'
+        },
+        welcome_message: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Welcome Message'
+        },
+        auto_approve_applications: {
+            type: 'boolean',
+            title: 'Auto Approve Applications',
+            default: false
+        },
+        express_checkout: {
+            type: 'boolean',
+            title: 'Express Checkout',
+            default: false
+        },
+        enable_private_events: {
+            type: 'boolean',
+            title: 'Enable Private Events',
+            default: false
+        },
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        created_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Created At'
+        },
+        updated_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Updated At'
+        },
+        whitelisted_emails: {
+            items: {
+                '$ref': '#/components/schemas/GroupWhitelistedEmailPublic'
+            },
+            type: 'array',
+            title: 'Whitelisted Emails',
+            default: []
+        },
+        is_open: {
+            type: 'boolean',
+            title: 'Is Open',
+            default: true
+        },
+        members: {
+            items: {
+                '$ref': '#/components/schemas/GroupMemberPublic'
+            },
+            type: 'array',
+            title: 'Members',
+            default: []
+        },
+        is_leader: {
+            type: 'boolean',
+            title: 'Is Leader',
+            default: false
+        }
+    },
+    type: 'object',
+    required: ['tenant_id', 'popup_id', 'name', 'slug', 'id'],
+    title: 'MyGroupWithMembers',
+    description: 'Group with members and viewer role (portal detail).'
 } as const;
 
 export const NoParticipationSchema = {
@@ -13907,6 +15206,33 @@ export const PopupAdminSchema = {
             title: 'Edit Passes Enabled',
             default: false
         },
+        invites_enabled: {
+            type: 'boolean',
+            title: 'Invites Enabled',
+            default: false
+        },
+        referrals_enabled: {
+            type: 'boolean',
+            title: 'Referrals Enabled',
+            default: false
+        },
+        group_private_events_enabled: {
+            type: 'boolean',
+            title: 'Group Private Events Enabled',
+            default: false
+        },
+        max_referrals_per_attendee: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Max Referrals Per Attendee',
+            default: 10
+        },
         installments_enabled: {
             type: 'boolean',
             title: 'Installments Enabled',
@@ -14949,6 +16275,33 @@ export const PopupPublicSchema = {
             title: 'Edit Passes Enabled',
             default: false
         },
+        invites_enabled: {
+            type: 'boolean',
+            title: 'Invites Enabled',
+            default: false
+        },
+        referrals_enabled: {
+            type: 'boolean',
+            title: 'Referrals Enabled',
+            default: false
+        },
+        group_private_events_enabled: {
+            type: 'boolean',
+            title: 'Group Private Events Enabled',
+            default: false
+        },
+        max_referrals_per_attendee: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Max Referrals Per Attendee',
+            default: 10
+        },
         installments_enabled: {
             type: 'boolean',
             title: 'Installments Enabled',
@@ -15701,6 +17054,50 @@ export const PopupUpdateSchema = {
             ],
             title: 'Checkin Pass Lead Days'
         },
+        invites_enabled: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Invites Enabled'
+        },
+        referrals_enabled: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Referrals Enabled'
+        },
+        group_private_events_enabled: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Group Private Events Enabled'
+        },
+        max_referrals_per_attendee: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Max Referrals Per Attendee'
+        },
         abandoned_cart_delay_days: {
             anyOf: [
                 {
@@ -15921,6 +17318,114 @@ export const PreviewResponseSchema = {
     type: 'object',
     required: ['rendered_html'],
     title: 'PreviewResponse'
+} as const;
+
+export const PreviousApplicationSpendSchema = {
+    properties: {
+        currency: {
+            type: 'string',
+            title: 'Currency'
+        },
+        amount: {
+            type: 'string',
+            pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$',
+            title: 'Amount'
+        }
+    },
+    type: 'object',
+    required: ['currency', 'amount'],
+    title: 'PreviousApplicationSpend',
+    description: `One money total, in one currency.
+
+Payments carry their own currency, so an application's spend can span more
+than one. Collapsing them into a single number would misstate the amount.`
+} as const;
+
+export const PreviousApplicationSummarySchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        popup_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Popup Id'
+        },
+        popup_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Popup Name'
+        },
+        popup_start_date: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Popup Start Date'
+        },
+        status: {
+            type: 'string',
+            title: 'Status'
+        },
+        tickets_count: {
+            type: 'integer',
+            title: 'Tickets Count',
+            default: 0
+        },
+        spend: {
+            items: {
+                '$ref': '#/components/schemas/PreviousApplicationSpend'
+            },
+            type: 'array',
+            title: 'Spend',
+            default: []
+        },
+        submitted_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Submitted At'
+        },
+        created_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Created At'
+        }
+    },
+    type: 'object',
+    required: ['id', 'popup_id', 'status'],
+    title: 'PreviousApplicationSummary',
+    description: `One application by the same human, in a different popup.
+
+Powers the "Previous applications" block of the BO application detail: it
+tells a reviewer whether this person already took part in other popups of
+the tenant, and how much they bought when they did.`
 } as const;
 
 export const ProductBatchSchema = {
@@ -17220,6 +18725,170 @@ export const PublishPermissionSchema = {
     type: 'string',
     enum: ['admin_only', 'everyone'],
     title: 'PublishPermission'
+} as const;
+
+export const PublishableKeyCreateSchema = {
+    properties: {
+        name: {
+            type: 'string',
+            maxLength: 100,
+            minLength: 1,
+            title: 'Name'
+        },
+        allowed_origins: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Allowed Origins'
+        }
+    },
+    type: 'object',
+    required: ['name'],
+    title: 'PublishableKeyCreate'
+} as const;
+
+export const PublishableKeyCreatedSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        popup_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Popup Id'
+        },
+        name: {
+            type: 'string',
+            title: 'Name'
+        },
+        key_prefix: {
+            type: 'string',
+            title: 'Key Prefix'
+        },
+        allowed_origins: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Allowed Origins'
+        },
+        created_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Created At'
+        },
+        last_used_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Last Used At'
+        },
+        revoked_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Revoked At'
+        },
+        key: {
+            type: 'string',
+            title: 'Key'
+        }
+    },
+    type: 'object',
+    required: ['id', 'name', 'key_prefix', 'allowed_origins', 'created_at', 'key'],
+    title: 'PublishableKeyCreated',
+    description: 'Returned only at creation — carries the raw browser-safe token once.'
+} as const;
+
+export const PublishableKeyPublicSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        popup_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Popup Id'
+        },
+        name: {
+            type: 'string',
+            title: 'Name'
+        },
+        key_prefix: {
+            type: 'string',
+            title: 'Key Prefix'
+        },
+        allowed_origins: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Allowed Origins'
+        },
+        created_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Created At'
+        },
+        last_used_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Last Used At'
+        },
+        revoked_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Revoked At'
+        }
+    },
+    type: 'object',
+    required: ['id', 'name', 'key_prefix', 'allowed_origins', 'created_at'],
+    title: 'PublishableKeyPublic'
 } as const;
 
 export const RecurrenceRuleSchema = {

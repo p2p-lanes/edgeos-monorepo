@@ -1,7 +1,16 @@
 import { useForm } from "@tanstack/react-form"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useNavigate } from "@tanstack/react-router"
-import { Mail, MessageSquare, Percent, Users } from "lucide-react"
+import {
+  CalendarX,
+  Mail,
+  MessageSquare,
+  Percent,
+  Power,
+  ShieldCheck,
+  Users,
+} from "lucide-react"
+import type { ReactNode } from "react"
 import {
   type GroupAdminUpdate,
   type GroupCreate,
@@ -22,6 +31,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { LoadingButton } from "@/components/ui/loading-button"
 import { Separator } from "@/components/ui/separator"
+import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
 import useAuth from "@/hooks/useAuth"
@@ -35,9 +45,15 @@ import { createErrorHandler } from "@/utils"
 interface GroupFormProps {
   defaultValues?: GroupPublic
   onSuccess: () => void
+  /** Extra content rendered between the form and the Danger Zone (e.g. members). */
+  children?: ReactNode
 }
 
-export function GroupForm({ defaultValues, onSuccess }: GroupFormProps) {
+export function GroupForm({
+  defaultValues,
+  onSuccess,
+  children,
+}: GroupFormProps) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { showSuccessToast, showErrorToast } = useCustomToast()
@@ -52,7 +68,7 @@ export function GroupForm({ defaultValues, onSuccess }: GroupFormProps) {
       PopupsService.getPopup({
         popupId: defaultValues?.popup_id ?? selectedPopupId!,
       }),
-    enabled: isEdit && !!(defaultValues?.popup_id ?? selectedPopupId),
+    enabled: !!(defaultValues?.popup_id ?? selectedPopupId),
   })
 
   const createMutation = useMutation({
@@ -108,6 +124,10 @@ export function GroupForm({ defaultValues, onSuccess }: GroupFormProps) {
         defaultValues?.whitelisted_emails
           ?.map((e: { email: string }) => e.email)
           .join("\n") ?? "",
+      auto_approve_applications:
+        defaultValues?.auto_approve_applications ?? false,
+      express_checkout: defaultValues?.express_checkout ?? false,
+      enable_private_events: defaultValues?.enable_private_events ?? false,
     },
     onSubmit: ({ value }) => {
       if (readOnly) return
@@ -124,6 +144,9 @@ export function GroupForm({ defaultValues, onSuccess }: GroupFormProps) {
                 .map((e: string) => e.trim())
                 .filter(Boolean)
             : undefined,
+          auto_approve_applications: value.auto_approve_applications,
+          express_checkout: value.express_checkout,
+          enable_private_events: value.enable_private_events,
         })
       } else {
         if (!selectedPopupId) {
@@ -274,6 +297,69 @@ export function GroupForm({ defaultValues, onSuccess }: GroupFormProps) {
 
         <Separator />
 
+        {/* Behavior */}
+        <InlineSection title="Behavior">
+          <form.Field name="auto_approve_applications">
+            {(field) => (
+              <InlineRow
+                icon={<ShieldCheck className="h-4 w-4 text-muted-foreground" />}
+                label="Auto Approve Applications"
+                description="Automatically approve applications submitted via this group"
+              >
+                <Switch
+                  id="auto_approve_applications"
+                  checked={field.state.value}
+                  onCheckedChange={(checked) => field.handleChange(checked)}
+                  disabled={readOnly}
+                />
+              </InlineRow>
+            )}
+          </form.Field>
+
+          <form.Field name="express_checkout">
+            {(field) => (
+              <InlineRow
+                icon={<Power className="h-4 w-4 text-muted-foreground" />}
+                label="Express Checkout"
+                description="Skip the full application form and require only the essential fields"
+              >
+                <Switch
+                  id="group_express_checkout"
+                  checked={field.state.value}
+                  onCheckedChange={(checked) => field.handleChange(checked)}
+                  disabled={readOnly}
+                />
+              </InlineRow>
+            )}
+          </form.Field>
+
+          <form.Field name="enable_private_events">
+            {(field) => (
+              <InlineRow
+                icon={<CalendarX className="h-4 w-4 text-muted-foreground" />}
+                label="Enable Private Events"
+                description="Allow group members to create private events scoped to this group"
+              >
+                <Switch
+                  id="enable_private_events"
+                  checked={field.state.value}
+                  onCheckedChange={(checked) => field.handleChange(checked)}
+                  disabled={
+                    readOnly || !popupData?.group_private_events_enabled
+                  }
+                  title={
+                    !popupData?.group_private_events_enabled
+                      ? "Enable group private events in popup settings first"
+                      : undefined
+                  }
+                />
+              </InlineRow>
+            )}
+          </form.Field>
+        </InlineSection>
+
+        <Separator />
+
         {/* Communication */}
         <div className="space-y-2">
           <div className="flex items-center gap-3 px-1">
@@ -364,6 +450,8 @@ export function GroupForm({ defaultValues, onSuccess }: GroupFormProps) {
           )}
         </div>
       </form>
+
+      {children}
 
       {isEdit && !readOnly && (
         <div className="mx-auto max-w-2xl">

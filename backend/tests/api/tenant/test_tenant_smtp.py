@@ -5,7 +5,7 @@ from sqlmodel import Session
 
 from app.api.tenant.models import Tenants
 from app.services.email.service import EmailService
-from app.utils.encryption import decrypt
+from app.utils.encryption import decrypt, encrypt
 
 
 def _headers(token: str) -> dict[str, str]:
@@ -187,3 +187,40 @@ def test_admin_cannot_send_smtp_test_email_for_other_tenant(
     )
 
     assert response.status_code == 403, response.text
+
+
+def test_unrelated_patch_preserves_smtp_config(
+    client: TestClient,
+    db: Session,
+    admin_token_tenant_a: str,
+    tenant_a: Tenants,
+) -> None:
+    """Regression: renaming the organization used to clear its SMTP host.
+
+    ``TenantUpdate.validate_smtp`` normalized ``smtp_host`` unconditionally, and
+    assigning to the attribute put it in ``model_fields_set`` — so
+    ``BaseCRUD.update``'s ``exclude_unset=True`` dump carried
+    ``smtp_host=None`` on every PATCH, whatever the caller actually sent, and
+    the router's own ``effective_smtp_host`` read the same poisoned set. A
+    tenant with credentials on file could not be renamed at all: the merged
+    state came out as "credentials but no host" and 422'd.
+    """
+    tenant_a.smtp_host = "smtp.keepme.test"
+    tenant_a.smtp_port = 1025
+    tenant_a.smtp_user = "keepme-user"
+    tenant_a.smtp_password_encrypted = encrypt("keepme-pass")
+    db.add(tenant_a)
+    db.commit()
+
+    response = client.patch(
+        f"/api/v1/tenants/{tenant_a.id}",
+        headers=_headers(admin_token_tenant_a),
+        json={"name": f"Renamed {uuid.uuid4().hex[:6]}"},
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.json()["smtp_host"] == "smtp.keepme.test"
+
+    db.refresh(tenant_a)
+    assert tenant_a.smtp_host == "smtp.keepme.test"
+    assert tenant_a.smtp_user == "keepme-user"

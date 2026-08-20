@@ -1,8 +1,8 @@
 import uuid
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
-from sqlalchemy import Index, UniqueConstraint
+from sqlalchemy import UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlmodel import Column, DateTime, Field, Relationship, SQLModel, func
 
@@ -72,10 +72,7 @@ class GroupWhitelistedEmails(SQLModel, table=True):
 class Groups(GroupBase, table=True):
     """Group model for organizing applications and providing discounts."""
 
-    __table_args__ = (
-        UniqueConstraint("slug", "popup_id", name="uq_group_slug_popup"),
-        Index("ix_groups_popup_ambassador", "popup_id", "is_ambassador_group"),
-    )
+    __table_args__ = (UniqueConstraint("slug", "popup_id", name="uq_group_slug_popup"),)
 
     id: uuid.UUID = Field(
         default_factory=uuid.uuid4,
@@ -127,13 +124,6 @@ class Groups(GroupBase, table=True):
     # Many-to-many with products
     products: list["Products"] = Relationship(
         link_model=GroupProducts,
-    )
-
-    # Ambassador relationship
-    ambassador: Optional["Humans"] = Relationship(
-        sa_relationship_kwargs={
-            "foreign_keys": "[Groups.ambassador_id]",
-        }
     )
 
     # Payments associated with this group's discount
