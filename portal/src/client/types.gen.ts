@@ -2657,6 +2657,7 @@ export type InvitePublicPreview = {
     inviter_name?: (string | null);
     is_email_restricted: boolean;
     discount_percentage: string;
+    auto_approve: boolean;
     max_uses?: (number | null);
     current_uses: number;
     expires_at?: (string | null);

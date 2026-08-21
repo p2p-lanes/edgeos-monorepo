@@ -205,6 +205,8 @@
     "processing": "Processing your registration",
     "processing_subtitle": "This might take a few moments",
     "success": "Registration successful!",
+    "application_pending_title": "Application under review",
+    "application_pending_description": "Your application was submitted. An organizer must approve it before you can select products.",
     "loading_passes": "Loading your passes...",
     "send_code": "Send Code",
     "verify_code": "Verify Code",
