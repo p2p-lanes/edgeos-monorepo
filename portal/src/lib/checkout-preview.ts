@@ -37,20 +37,36 @@ export interface PreviewStateMessage {
 
 export type PreviewMessage = PreviewReadyMessage | PreviewStateMessage
 
-/** Origins allowed to drive a preview, from NEXT_PUBLIC_BACKOFFICE_ORIGIN
- *  (comma-separated). Empty means no origin is trusted and the preview stays
- *  idle — deliberately fail-closed, since a message decides what this page
- *  renders and which token it spends. */
-export function allowedPreviewOrigins(): string[] {
-  return (process.env.NEXT_PUBLIC_BACKOFFICE_ORIGIN ?? "")
+/**
+ * Parse the configured origins (comma-separated) into a match list.
+ *
+ * Each value is normalized through `URL.origin`, so a trailing slash or a path
+ * — `https://app.example.com/` — still matches the bare origin a message
+ * carries, instead of silently never matching. Anything unparseable is
+ * dropped.
+ *
+ * An empty result means no origin is trusted and the preview stays idle:
+ * deliberately fail-closed, since a message decides what this page renders and
+ * which token it spends.
+ */
+export function parsePreviewOrigins(raw: string | null | undefined): string[] {
+  if (!raw) return []
+  return raw
     .split(",")
-    .map((origin) => origin.trim())
+    .map((value) => value.trim())
     .filter(Boolean)
+    .flatMap((value) => {
+      try {
+        return [new URL(value).origin]
+      } catch {
+        return []
+      }
+    })
 }
 
 export function isAllowedPreviewOrigin(
   origin: string,
-  allowed: string[] = allowedPreviewOrigins(),
+  allowed: string[],
 ): boolean {
   return allowed.includes(origin)
 }

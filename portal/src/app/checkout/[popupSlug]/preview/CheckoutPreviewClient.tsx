@@ -6,7 +6,6 @@ import { CheckoutService, type TicketingStepPublic } from "@/client"
 import { OpenCheckoutRuntime } from "@/components/checkout-flow/OpenCheckoutRuntime"
 import { Loader } from "@/components/ui/Loader"
 import {
-  allowedPreviewOrigins,
   applyStepDraft,
   isAllowedPreviewOrigin,
   PREVIEW_MESSAGE_SOURCE,
@@ -37,11 +36,18 @@ interface PreviewState {
  */
 export default function CheckoutPreviewClient({
   popupSlug,
+  allowedOrigins,
 }: {
   popupSlug: string
+  /** Resolved on the server, per request — see the route's page.tsx. */
+  allowedOrigins: string[]
 }) {
   const [state, setState] = useState<PreviewState | null>(null)
-  const origins = useMemo(() => allowedPreviewOrigins(), [])
+  // Prop identity changes on every server render; the effect below only cares
+  // about the values.
+  const originsKey = allowedOrigins.join(",")
+  // biome-ignore lint/correctness/useExhaustiveDependencies: keyed on the joined value so a re-render with an equal list doesn't re-run the handshake
+  const origins = useMemo(() => allowedOrigins, [originsKey])
 
   useEffect(() => {
     if (typeof window === "undefined") return
@@ -110,7 +116,7 @@ export default function CheckoutPreviewClient({
     return (
       <PreviewNotice
         title="Preview not configured"
-        detail="Set NEXT_PUBLIC_BACKOFFICE_ORIGIN on the portal to allow the backoffice to drive this preview."
+        detail="This portal does not know which backoffice may drive the preview. Set BACKOFFICE_URL (or BACKOFFICE_ORIGIN, for more than one) on the portal service and restart it."
       />
     )
   }
