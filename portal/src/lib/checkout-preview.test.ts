@@ -2,9 +2,7 @@ import { describe, expect, it } from "vitest"
 import type { CheckoutRuntimeResponse, TicketingStepPublic } from "@/client"
 import {
   applyStepDraft,
-  isAllowedPreviewOrigin,
   PREVIEW_MESSAGE_SOURCE,
-  parsePreviewOrigins,
   parsePreviewStateMessage,
 } from "./checkout-preview"
 
@@ -89,91 +87,6 @@ describe("applyStepDraft", () => {
     applyStepDraft(base, step("a", { title: "Draft A" }))
 
     expect(base.ticketing_steps[0].title).toBe("Saved A")
-  })
-})
-
-describe("parsePreviewOrigins", () => {
-  it("splits a comma-separated list", () => {
-    expect(
-      parsePreviewOrigins("https://app.edgeos.world, http://localhost:5173"),
-    ).toEqual(["https://app.edgeos.world", "http://localhost:5173"])
-  })
-
-  // BACKOFFICE_URL is the fallback and is written by hand in every
-  // deployment's env, so a trailing slash is likely — and it used to make the
-  // origin never match, with no clue as to why.
-  it("normalizes a trailing slash or a path away", () => {
-    expect(parsePreviewOrigins("https://app.edgeos.world/")).toEqual([
-      "https://app.edgeos.world",
-    ])
-    expect(parsePreviewOrigins("https://app.edgeos.world/login")).toEqual([
-      "https://app.edgeos.world",
-    ])
-  })
-
-  it("drops values that are not URLs, and trusts nobody when unset", () => {
-    expect(parsePreviewOrigins("not a url")).toEqual([])
-    expect(parsePreviewOrigins("")).toEqual([])
-    expect(parsePreviewOrigins(null)).toEqual([])
-    expect(parsePreviewOrigins(undefined)).toEqual([])
-  })
-
-  it("unions several sources", () => {
-    expect(
-      parsePreviewOrigins([
-        "http://localhost:5173",
-        "https://app.edgeos.world",
-      ]),
-    ).toEqual(["http://localhost:5173", "https://app.edgeos.world"])
-  })
-
-  // The regression this guards: compose renders an unset BACKOFFICE_ORIGIN as
-  // "", and the page used to read `BACKOFFICE_ORIGIN ?? BACKOFFICE_URL` — which
-  // stops at "" and reports "Preview not configured" on a deployment whose
-  // BACKOFFICE_URL was set correctly all along.
-  it("ignores a blank source instead of letting it mask a good one", () => {
-    expect(parsePreviewOrigins(["", "https://app.edgeos.world"])).toEqual([
-      "https://app.edgeos.world",
-    ])
-    expect(
-      parsePreviewOrigins([undefined, null, "https://app.edgeos.world"]),
-    ).toEqual(["https://app.edgeos.world"])
-    expect(parsePreviewOrigins(["", null, undefined])).toEqual([])
-  })
-
-  it("deduplicates, so the same origin is not posted to twice", () => {
-    expect(
-      parsePreviewOrigins([
-        "https://app.edgeos.world/",
-        "https://app.edgeos.world",
-      ]),
-    ).toEqual(["https://app.edgeos.world"])
-  })
-})
-
-describe("isAllowedPreviewOrigin", () => {
-  it("accepts an exact origin match", () => {
-    expect(
-      isAllowedPreviewOrigin("https://app.edgeos.world", [
-        "https://app.edgeos.world",
-      ]),
-    ).toBe(true)
-  })
-
-  it("rejects anything else, including look-alike hosts", () => {
-    const allowed = ["https://app.edgeos.world"]
-
-    expect(
-      isAllowedPreviewOrigin("https://app.edgeos.world.evil.com", allowed),
-    ).toBe(false)
-    expect(isAllowedPreviewOrigin("http://app.edgeos.world", allowed)).toBe(
-      false,
-    )
-    expect(isAllowedPreviewOrigin("https://evil.com", allowed)).toBe(false)
-  })
-
-  it("trusts nobody when no origin is configured", () => {
-    expect(isAllowedPreviewOrigin("https://app.edgeos.world", [])).toBe(false)
   })
 })
 

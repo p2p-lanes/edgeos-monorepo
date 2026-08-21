@@ -77,14 +77,8 @@ services:
       - "3000:3000"
     environment:
       - NEXT_PUBLIC_API_URL=${BACKEND_URL?Variable not set}
-      # Origins allowed to drive the ticketing-step live preview. Read at
-      # request time, so changing it needs a restart, not a rebuild. The
-      # backoffice's own URL is always trusted; BACKOFFICE_ORIGIN adds more,
-      # comma-separated. Passed through by name (no `=`) so that leaving it
-      # unset leaves it unset in the container, rather than defining it as an
-      # empty string.
-      - BACKOFFICE_URL=${BACKOFFICE_URL?Variable not set}
-      - BACKOFFICE_ORIGIN
+      # The ticketing-step live preview needs nothing here: the backoffice
+      # drives it with an API-minted token, which is what authorizes it.
     build:
       context: .
       dockerfile: portal/Dockerfile
