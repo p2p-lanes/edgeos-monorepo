@@ -38,10 +38,10 @@ class ApplicationReviewCreate(BaseModel):
 
 
 class ApplicationReviewUpdate(BaseModel):
-    """Schema for updating a review."""
+    """Schema for changing the current reviewer's vote while review is open."""
 
-    decision: ReviewDecision | None = None
-    notes: str | None = None
+    decision: ReviewDecision
+    expected_updated_at: datetime | None = None
 
 
 class ApplicationReviewPublic(BaseModel):

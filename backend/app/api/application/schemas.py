@@ -117,6 +117,19 @@ class ApplicationBase(SQLModel):
         default=None, nullable=True, sa_type=DateTime(timezone=True)
     )
 
+    # Latest explicit backoffice status override. Actor identity is snapshotted
+    # because tenant sessions cannot join the control-plane users table and the
+    # explanation must remain readable if that user is later removed.
+    status_override_reason: str | None = Field(
+        default=None, sa_column=Column(Text(), nullable=True)
+    )
+    status_overridden_at: datetime | None = Field(
+        default=None, nullable=True, sa_type=DateTime(timezone=True)
+    )
+    status_overridden_by_user_id: uuid.UUID | None = Field(default=None, nullable=True)
+    status_overridden_by_name: str | None = Field(default=None, nullable=True)
+    status_overridden_by_email: str | None = Field(default=None, nullable=True)
+
     # Scholarship request fields (human-submitted)
     scholarship_request: bool = Field(
         default=False,
@@ -199,6 +212,13 @@ class ApplicationPublic(BaseModel):
     accepted_at: datetime | None = None
     created_at: datetime | None = None
     updated_at: datetime | None = None
+
+    # Latest explicit backoffice status override
+    status_override_reason: str | None = None
+    status_overridden_at: datetime | None = None
+    status_overridden_by_user_id: uuid.UUID | None = None
+    status_overridden_by_name: str | None = None
+    status_overridden_by_email: str | None = None
 
     # Scholarship fields
     scholarship_request: bool = False
@@ -389,6 +409,22 @@ class ApplicationAdminCreate(BaseModel):
     @classmethod
     def clean_email(cls, v: str) -> str:
         return v.lower().strip()
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+
+class ApplicationStatusOverride(BaseModel):
+    """Explicit final-status override performed by an administrator."""
+
+    status: ApplicationStatus
+    reason: str = PydanticField(min_length=3, max_length=1000)
+
+    @field_validator("status")
+    @classmethod
+    def validate_final_status(cls, value: ApplicationStatus) -> ApplicationStatus:
+        if value not in (ApplicationStatus.ACCEPTED, ApplicationStatus.REJECTED):
+            raise ValueError("Admin overrides may only set accepted or rejected")
+        return value
 
     model_config = ConfigDict(str_strip_whitespace=True)
 

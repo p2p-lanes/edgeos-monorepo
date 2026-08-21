@@ -28,10 +28,15 @@ class AuditAction:
     # Portal edit-passes settlement (edit-pass swap completed).
     PASSES_EDITED = "passes.edited"
 
+    # Application review/status decision history.
+    APPLICATION_REVIEW_CHANGED = "application.review_changed"
+    APPLICATION_STATUS_OVERRIDDEN = "application.status_overridden"
+
 
 class AuditEntityType:
     """Type of the primary entity an event is grouped under."""
 
+    APPLICATION = "application"
     ATTENDEE = "attendee"
     EVENT = "event"
     HUMAN = "human"

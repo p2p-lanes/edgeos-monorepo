@@ -8,6 +8,7 @@ import {
   GraduationCap,
   MapPin,
   MessageCircle,
+  ShieldAlert,
   SkipForward,
   ThumbsDown,
   ThumbsUp,
@@ -17,6 +18,7 @@ import { type ReactNode, useState } from "react"
 import {
   type ApiError,
   type ApplicationPublic,
+  type ApplicationReviewPublic,
   ApplicationReviewsService,
   ApplicationsService,
   ApprovalStrategiesService,
@@ -30,6 +32,7 @@ import { ApplicationCommentThread } from "@/components/applications/ApplicationC
 import { ApplicationRelatedRecords } from "@/components/applications/ApplicationRelatedRecords"
 import { StatusBadge } from "@/components/Common/StatusBadge"
 import { HumanRatingBadge } from "@/components/Humans/HumanRatingBadge"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -86,9 +89,11 @@ interface ApplicationSchema {
 
 function WeightedVoting({
   application,
+  currentReview,
   onSuccess,
 }: {
   application: ApplicationPublic
+  currentReview?: ApplicationReviewPublic
   onSuccess: () => void
 }) {
   const { showSuccessToast, showErrorToast } = useCustomToast()
@@ -98,17 +103,30 @@ function WeightedVoting({
 
   const mutation = useMutation({
     mutationFn: (decision: ReviewDecision) =>
-      ApplicationReviewsService.submitReview({
-        applicationId: application.id,
-        requestBody: { decision },
-      }),
+      currentReview
+        ? ApplicationReviewsService.changeMyReview({
+            applicationId: application.id,
+            requestBody: {
+              decision,
+              expected_updated_at: currentReview.updated_at,
+            },
+          })
+        : ApplicationReviewsService.submitReview({
+            applicationId: application.id,
+            requestBody: { decision },
+          }),
     onSuccess: (_, decision) => {
-      showSuccessToast(`Review submitted: ${decision.replace("_", " ")}`)
+      showSuccessToast(
+        `Review ${currentReview ? "changed" : "submitted"}: ${decision.replace("_", " ")}`,
+      )
       setDialogOpen(false)
       setSelectedDecision(null)
       onSuccess()
     },
-    onError: (err) => createErrorHandler(showErrorToast)(err as ApiError),
+    onError: (err) => {
+      createErrorHandler(showErrorToast)(err as ApiError)
+      onSuccess()
+    },
   })
 
   const handleVote = (decision: ReviewDecision) => {
@@ -126,14 +144,18 @@ function WeightedVoting({
   return (
     <>
       <div className="space-y-2">
-        <p className="px-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-          Cast Your Vote
-        </p>
+        <div className="flex items-center justify-between px-1">
+          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+            {currentReview ? "Your Review" : "Cast Your Vote"}
+          </p>
+          {currentReview && <StatusBadge status={currentReview.decision} />}
+        </div>
         <div className="flex flex-col gap-1">
           <Button
             size="sm"
             className="w-full justify-start bg-success hover:bg-success/90 text-success-foreground"
             onClick={() => handleVote("strong_yes")}
+            disabled={currentReview?.decision === "strong_yes"}
           >
             <ChevronUp className="h-3.5 w-3.5" />
             <ChevronUp className="-ml-2 h-3.5 w-3.5" />
@@ -143,6 +165,7 @@ function WeightedVoting({
             size="sm"
             className="w-full justify-start bg-success/80 hover:bg-success/70 text-success-foreground"
             onClick={() => handleVote("yes")}
+            disabled={currentReview?.decision === "yes"}
           >
             <ThumbsUp className="h-3.5 w-3.5" />
             Yes
@@ -151,6 +174,7 @@ function WeightedVoting({
             size="sm"
             className="w-full justify-start bg-destructive/80 hover:bg-destructive/70 text-destructive-foreground"
             onClick={() => handleVote("no")}
+            disabled={currentReview?.decision === "no"}
           >
             <ThumbsDown className="h-3.5 w-3.5" />
             No
@@ -159,6 +183,7 @@ function WeightedVoting({
             size="sm"
             className="w-full justify-start bg-destructive hover:bg-destructive/90 text-destructive-foreground"
             onClick={() => handleVote("strong_no")}
+            disabled={currentReview?.decision === "strong_no"}
           >
             <ChevronDown className="h-3.5 w-3.5" />
             <ChevronDown className="-ml-2 h-3.5 w-3.5" />
@@ -171,14 +196,25 @@ function WeightedVoting({
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              Confirm Vote: {selectedDecision && labels[selectedDecision]}
+              {currentReview ? "Change" : "Confirm"} Vote:{" "}
+              {selectedDecision && labels[selectedDecision]}
             </DialogTitle>
             <DialogDescription>
-              Are you sure you want to vote "
-              {selectedDecision && labels[selectedDecision]}" for the
-              application from "{application.human?.first_name}{" "}
-              {application.human?.last_name}"? This will submit your review and
-              may update the application status.
+              {currentReview ? (
+                <>
+                  Change your review from "{labels[currentReview.decision]}" to{" "}
+                  "{selectedDecision && labels[selectedDecision]}"? This may
+                  update the application status and notify the applicant.
+                </>
+              ) : (
+                <>
+                  Are you sure you want to vote "
+                  {selectedDecision && labels[selectedDecision]}" for the
+                  application from "{application.human?.first_name}{" "}
+                  {application.human?.last_name}"? This may update the
+                  application status.
+                </>
+              )}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -196,7 +232,7 @@ function WeightedVoting({
                 selectedDecision && mutation.mutate(selectedDecision)
               }
             >
-              Submit Vote
+              {currentReview ? "Change Vote" : "Submit Vote"}
             </LoadingButton>
           </DialogFooter>
         </DialogContent>
@@ -207,9 +243,11 @@ function WeightedVoting({
 
 function SimpleVoting({
   application,
+  currentReview,
   onSuccess,
 }: {
   application: ApplicationPublic
+  currentReview?: ApplicationReviewPublic
   onSuccess: () => void
 }) {
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -220,19 +258,32 @@ function SimpleVoting({
 
   const mutation = useMutation({
     mutationFn: (decision: ReviewDecision) =>
-      ApplicationReviewsService.submitReview({
-        applicationId: application.id,
-        requestBody: { decision },
-      }),
+      currentReview
+        ? ApplicationReviewsService.changeMyReview({
+            applicationId: application.id,
+            requestBody: {
+              decision,
+              expected_updated_at: currentReview.updated_at,
+            },
+          })
+        : ApplicationReviewsService.submitReview({
+            applicationId: application.id,
+            requestBody: { decision },
+          }),
     onSuccess: (_, decision) => {
       const action = decision === "yes" ? "Approved" : "Rejected"
       showSuccessToast(
-        `${action}: ${application.human?.first_name} ${application.human?.last_name}`,
+        currentReview
+          ? `Review changed: ${action}`
+          : `${action}: ${application.human?.first_name} ${application.human?.last_name}`,
       )
       setDialogOpen(false)
       onSuccess()
     },
-    onError: createErrorHandler(showErrorToast),
+    onError: (err) => {
+      createErrorHandler(showErrorToast)(err as ApiError)
+      onSuccess()
+    },
   })
 
   const handleClick = (decision: ReviewDecision) => {
@@ -243,14 +294,18 @@ function SimpleVoting({
   return (
     <>
       <div className="space-y-2">
-        <p className="px-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-          Review
-        </p>
+        <div className="flex items-center justify-between px-1">
+          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+            {currentReview ? "Your Review" : "Review"}
+          </p>
+          {currentReview && <StatusBadge status={currentReview.decision} />}
+        </div>
         <div className="flex flex-col gap-1">
           <Button
             size="sm"
             className="w-full justify-start bg-success hover:bg-success/90 text-success-foreground border-0"
             onClick={() => handleClick("yes")}
+            disabled={currentReview?.decision === "yes"}
           >
             <ThumbsUp className="h-3.5 w-3.5" />
             Approve
@@ -259,6 +314,7 @@ function SimpleVoting({
             size="sm"
             className="w-full justify-start bg-destructive hover:bg-destructive/90 text-destructive-foreground border-0"
             onClick={() => handleClick("no")}
+            disabled={currentReview?.decision === "no"}
           >
             <ThumbsDown className="h-3.5 w-3.5" />
             Reject
@@ -270,13 +326,28 @@ function SimpleVoting({
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              {pendingDecision === "yes" ? "Approve" : "Reject"} Application
+              {currentReview
+                ? "Change Review"
+                : pendingDecision === "yes"
+                  ? "Approve"
+                  : "Reject"}
             </DialogTitle>
             <DialogDescription>
-              Are you sure you want to{" "}
-              {pendingDecision === "yes" ? "approve" : "reject"} the application
-              from "{application.human?.first_name}{" "}
-              {application.human?.last_name}"?
+              {currentReview ? (
+                <>
+                  Change your review from "
+                  {currentReview.decision === "yes" ? "Approve" : "Reject"}" to{" "}
+                  "{pendingDecision === "yes" ? "Approve" : "Reject"}"? This may
+                  update the application status and notify the applicant.
+                </>
+              ) : (
+                <>
+                  Are you sure you want to{" "}
+                  {pendingDecision === "yes" ? "approve" : "reject"} the
+                  application from "{application.human?.first_name}{" "}
+                  {application.human?.last_name}"?
+                </>
+              )}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -290,7 +361,11 @@ function SimpleVoting({
                 pendingDecision && mutation.mutate(pendingDecision)
               }
             >
-              {pendingDecision === "yes" ? "Approve" : "Reject"}
+              {currentReview
+                ? "Change Vote"
+                : pendingDecision === "yes"
+                  ? "Approve"
+                  : "Reject"}
             </LoadingButton>
           </DialogFooter>
         </DialogContent>
@@ -417,10 +492,12 @@ function ReviewSummary({
     total_reviews: number
     reviews: Array<{
       id: string
+      reviewer_id: string
       reviewer_full_name?: string | null
       reviewer_email?: string | null
-      decision: string
+      decision: ReviewDecision
       notes?: string | null
+      updated_at?: string | null
     }>
   }
 }) {
@@ -469,6 +546,194 @@ function ToolCard({
       </div>
       {children}
     </section>
+  )
+}
+
+// ========================
+// Admin Status Override
+// ========================
+
+type OverrideTarget = "accepted" | "rejected"
+
+function AdminStatusOverridePanel({
+  application,
+  onSuccess,
+}: {
+  application: ApplicationPublic
+  onSuccess: () => void
+}) {
+  const { showSuccessToast, showErrorToast } = useCustomToast()
+  const [targetStatus, setTargetStatus] = useState<OverrideTarget | null>(null)
+  const [reason, setReason] = useState("")
+
+  const scholarshipPending = Boolean(
+    application.scholarship_request &&
+      application.scholarship_status !== "approved" &&
+      application.scholarship_status !== "rejected",
+  )
+  const acceptBlocked = Boolean(application.red_flag || scholarshipPending)
+
+  const mutation = useMutation({
+    mutationFn: (target: OverrideTarget) =>
+      ApplicationsService.overrideApplicationStatus({
+        applicationId: application.id,
+        requestBody: { status: target, reason: reason.trim() },
+      }),
+    onSuccess: (_, target) => {
+      showSuccessToast(
+        `Application manually ${target === "accepted" ? "accepted" : "rejected"}`,
+      )
+      setTargetStatus(null)
+      setReason("")
+      onSuccess()
+    },
+    onError: (err) => createErrorHandler(showErrorToast)(err as ApiError),
+  })
+
+  const openOverride = (target: OverrideTarget) => {
+    setReason("")
+    setTargetStatus(target)
+  }
+
+  const canSubmit = reason.trim().length >= 3
+  const targetLabel = targetStatus === "accepted" ? "Accept" : "Reject"
+
+  return (
+    <>
+      <ToolCard
+        title="Admin Decision"
+        icon={<ShieldAlert className="h-4 w-4 text-muted-foreground" />}
+        action={
+          application.status_overridden_at ? (
+            <span className="text-xs text-muted-foreground">Overridden</span>
+          ) : undefined
+        }
+      >
+        <div className="space-y-3">
+          {application.status_overridden_at && (
+            <div className="rounded-md border bg-muted/30 p-3 text-sm">
+              <p className="font-medium">
+                Last override by{" "}
+                {application.status_overridden_by_name ||
+                  application.status_overridden_by_email ||
+                  "an admin"}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {new Date(application.status_overridden_at).toLocaleString()}
+              </p>
+              {application.status_override_reason && (
+                <p className="mt-2 whitespace-pre-wrap text-sm">
+                  {application.status_override_reason}
+                </p>
+              )}
+            </div>
+          )}
+
+          {application.red_flag && application.status !== "accepted" && (
+            <p className="text-xs text-destructive">
+              Remove the human&apos;s red flag before accepting this
+              application.
+            </p>
+          )}
+          {scholarshipPending && application.status !== "accepted" && (
+            <p className="text-xs text-warning">
+              Resolve the scholarship request before accepting this application.
+            </p>
+          )}
+
+          <div className="flex flex-col gap-2">
+            {application.status !== "accepted" && (
+              <Button
+                size="sm"
+                className="w-full bg-success text-success-foreground hover:bg-success/90"
+                disabled={acceptBlocked}
+                onClick={() => openOverride("accepted")}
+              >
+                <ThumbsUp className="h-3.5 w-3.5" />
+                {application.status === "in review"
+                  ? "Accept Manually"
+                  : "Approve Application"}
+              </Button>
+            )}
+            {application.status !== "rejected" && (
+              <Button
+                size="sm"
+                variant="destructive"
+                className="w-full"
+                onClick={() => openOverride("rejected")}
+              >
+                <ThumbsDown className="h-3.5 w-3.5" />
+                {application.status === "in review"
+                  ? "Reject Manually"
+                  : "Reject Application"}
+              </Button>
+            )}
+          </div>
+        </div>
+      </ToolCard>
+
+      <Dialog
+        open={targetStatus !== null}
+        onOpenChange={(open) => !open && setTargetStatus(null)}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{targetLabel} Application Manually</DialogTitle>
+            <DialogDescription>
+              This bypasses the configured review strategy. Existing reviewer
+              votes will not be changed.
+            </DialogDescription>
+          </DialogHeader>
+
+          <Alert
+            variant={targetStatus === "rejected" ? "destructive" : "default"}
+          >
+            <ShieldAlert />
+            <AlertTitle>Consequences of this override</AlertTitle>
+            <AlertDescription>
+              <p>
+                The application will change from {application.status} to{" "}
+                {targetStatus}. The applicant will receive the corresponding
+                status email, if applicable.
+              </p>
+              <p>
+                Existing payments, tickets, event registrations, group
+                membership, and credit movements will remain intact.
+              </p>
+            </AlertDescription>
+          </Alert>
+
+          <div className="space-y-2">
+            <Label htmlFor="status-override-reason">Reason</Label>
+            <Textarea
+              id="status-override-reason"
+              rows={4}
+              maxLength={1000}
+              placeholder="Explain why the review outcome is being overridden..."
+              value={reason}
+              onChange={(event) => setReason(event.target.value)}
+            />
+            <p className="text-xs text-muted-foreground">
+              Required. This explanation is stored in the audit history.
+            </p>
+          </div>
+
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button variant="outline">Cancel</Button>
+            </DialogClose>
+            <LoadingButton
+              variant={targetStatus === "rejected" ? "destructive" : "default"}
+              loading={mutation.isPending}
+              disabled={!canSubmit}
+              onClick={() => targetStatus && mutation.mutate(targetStatus)}
+            >
+              {targetLabel} Application
+            </LoadingButton>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }
 
@@ -882,7 +1147,7 @@ export function ApplicationDetail({
   onReviewSuccess,
   headerExtra,
 }: ApplicationDetailProps) {
-  const { isAdmin, isOperatorOrAbove } = useAuth()
+  const { user, isAdmin, isOperatorOrAbove } = useAuth()
 
   const { data: schema } = useQuery({
     queryKey: ["form-fields", "schema", application.popup_id],
@@ -894,7 +1159,11 @@ export function ApplicationDetail({
     },
   })
 
-  const { data: reviewSummary, refetch: refetchReviews } = useQuery({
+  const {
+    data: reviewSummary,
+    isLoading: reviewsLoading,
+    refetch: refetchReviews,
+  } = useQuery({
     queryKey: ["review-summary", application.id],
     queryFn: () =>
       ApplicationReviewsService.getReviewSummary({
@@ -918,7 +1187,11 @@ export function ApplicationDetail({
   })
 
   const isWeightedVoting = approvalStrategy?.strategy_type === "weighted"
-  const canReview = isOperatorOrAbove && application.status === "in review"
+  const canReview =
+    isOperatorOrAbove && application.status === "in review" && !reviewsLoading
+  const myReview = reviewSummary?.reviews.find(
+    (review) => review.reviewer_id === user?.id,
+  )
   const companions =
     application.attendees?.filter((a) => a.category !== "main") ?? []
 
@@ -1044,15 +1317,19 @@ export function ApplicationDetail({
       {isWeightedVoting ? (
         <WeightedVoting
           application={application}
+          currentReview={myReview}
           onSuccess={handleReviewSuccess}
         />
       ) : (
         <SimpleVoting
           application={application}
+          currentReview={myReview}
           onSuccess={handleReviewSuccess}
         />
       )}
-      <SkipReview application={application} onSuccess={handleReviewSuccess} />
+      {!myReview && (
+        <SkipReview application={application} onSuccess={handleReviewSuccess} />
+      )}
     </div>
   )
 
@@ -1065,12 +1342,22 @@ export function ApplicationDetail({
     application.scholarship_request && popup?.allows_scholarship,
   )
   const showGrantCredit = isAdmin && application.status === "accepted"
+  const showAdminOverride =
+    isAdmin &&
+    ["in review", "accepted", "rejected"].includes(application.status)
   const showComments = application.status !== "draft" && isOperatorOrAbove
-  const hasTools = showScholarship || showGrantCredit || showComments
+  const hasTools =
+    showScholarship || showGrantCredit || showAdminOverride || showComments
   const hasSidebar = canReview || Boolean(hasReviews) || hasTools
 
   const reviewTools = (
     <>
+      {showAdminOverride && (
+        <AdminStatusOverridePanel
+          application={application}
+          onSuccess={onReviewSuccess}
+        />
+      )}
       {showScholarship && popup && (
         <ScholarshipPanel
           application={application}

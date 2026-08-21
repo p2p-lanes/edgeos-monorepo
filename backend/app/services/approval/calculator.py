@@ -192,12 +192,16 @@ class ApprovalCalculator:
         from app.api.human.crud import humans_crud
         from app.api.popup_reviewer.crud import popup_reviewers_crud
 
-        # Lock the application row to prevent concurrent recalculations
-        session.exec(
+        # Lock and use the fresh application row so all review submissions and
+        # vote changes serialize on one aggregate. Callers commit the review,
+        # status transition, snapshots, credit and audit row atomically.
+        locked_application = session.exec(
             sm_select(Applications)
             .where(col(Applications.id) == application.id)
             .with_for_update()
-        )
+        ).first()
+        if locked_application is not None:
+            application = locked_application
 
         # Skip if already in a final state (accepted, rejected, withdrawn)
         if application.status not in [
@@ -214,10 +218,10 @@ class ApprovalCalculator:
         if human_red_flag:
             if application.status != ApplicationStatus.REJECTED.value:
                 application.status = ApplicationStatus.REJECTED.value
+                application.accepted_at = None
                 session.add(application)
                 applications_crud.create_snapshot(session, application, "auto_rejected")
-                session.commit()
-                session.refresh(application)
+                session.flush()
             return application
 
         # Only proceed with review-based calculation if IN_REVIEW
@@ -254,21 +258,20 @@ class ApprovalCalculator:
             ):
                 return application  # stay in IN_REVIEW
 
-        # Update if changed
+        # Update if changed. No commit here: the caller owns the transaction so
+        # the triggering review/scholarship mutation cannot diverge from status.
         if new_status.value != application.status:
             application.status = new_status.value
 
             if new_status == ApplicationStatus.ACCEPTED:
                 application.accepted_at = datetime.now(UTC)
-                # Create snapshot
                 applications_crud.create_snapshot(session, application, "accepted")
             elif new_status == ApplicationStatus.REJECTED:
-                # Create snapshot
+                application.accepted_at = None
                 applications_crud.create_snapshot(session, application, "rejected")
 
             session.add(application)
-            session.commit()
-            session.refresh(application)
+            session.flush()
 
         return application
 

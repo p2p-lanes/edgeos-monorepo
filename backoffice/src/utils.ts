@@ -2,7 +2,7 @@ import { AxiosError } from "axios"
 import type { ApiError } from "./client"
 
 interface ApiErrorBody {
-  detail?: string | Array<{ msg: string }>
+  detail?: string | Array<{ msg: string }> | { code?: string; message?: string }
 }
 
 function extractErrorMessage(err: ApiError): string {
@@ -13,6 +13,9 @@ function extractErrorMessage(err: ApiError): string {
   const errDetail = (err.body as ApiErrorBody)?.detail
   if (Array.isArray(errDetail)) {
     return errDetail.length > 0 ? errDetail[0].msg : "Something went wrong."
+  }
+  if (errDetail && typeof errDetail === "object") {
+    return errDetail.message || "Something went wrong."
   }
   return errDetail || "Something went wrong."
 }

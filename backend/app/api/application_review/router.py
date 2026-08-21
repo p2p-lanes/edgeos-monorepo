@@ -1,6 +1,7 @@
 import uuid
 
 from fastapi import APIRouter, HTTPException, status
+from loguru import logger
 from sqlmodel import select
 
 from app.api.application_review.crud import (
@@ -12,6 +13,7 @@ from app.api.application_review.schemas import (
     ApplicationReviewPublic,
     ApplicationReviewSkipCreate,
     ApplicationReviewSkipPublic,
+    ApplicationReviewUpdate,
     ReviewDecision,
     ReviewSummary,
 )
@@ -23,6 +25,26 @@ from app.core.dependencies.users import CurrentOperator, TenantSession
 from app.services.email_helpers import send_application_status_email
 
 router = APIRouter(prefix="/applications", tags=["application-reviews"])
+
+
+async def _send_status_email_best_effort(
+    application, db, *, status_before: str
+) -> None:
+    """Notify after commit without making a successful vote look rolled back."""
+    if not application.human:
+        return
+    try:
+        await send_application_status_email(
+            application,
+            application.human,
+            db,
+            status_before=status_before,
+        )
+    except Exception:
+        logger.exception(
+            "Failed to send application status email after review mutation {}",
+            application.id,
+        )
 
 
 def _review_to_public(
@@ -173,69 +195,160 @@ async def submit_review(
     db: TenantSession,
     current_user: CurrentOperator,
 ) -> ApplicationReviewPublic:
-    """Submit or update a review for an application.
-
-    If the reviewer has already reviewed this application, their review is updated.
-    After submitting, the application status is recalculated based on the approval strategy.
-    """
-    from app.api.application.crud import applications_crud
+    """Create the current user's review while the application is open."""
+    from app.api.application.crud import _maybe_grant_fee_credit
+    from app.api.application.models import Applications
     from app.api.application.schemas import ApplicationStatus
     from app.services.approval.calculator import approval_calculator
 
-    # Verify application exists
-    application = applications_crud.get(db, application_id)
+    # Every review mutation locks the application first. This serializes votes
+    # and status calculation and prevents a stale detail page from modifying a
+    # decision that another reviewer has already finalized.
+    application = db.exec(
+        select(Applications).where(Applications.id == application_id).with_for_update()
+    ).first()
     if not application:
+        raise HTTPException(status_code=404, detail="Application not found")
+    if application.status != ApplicationStatus.IN_REVIEW.value:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Application not found",
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "code": "application_not_in_review",
+                "message": "Reviews can only be submitted while the application is in review.",
+                "application_status": application.status,
+            },
         )
 
-    # Prevent reviewing draft applications - they must be submitted first
-    if application.status == ApplicationStatus.DRAFT.value:
+    existing = application_reviews_crud.get_by_application_reviewer(
+        db, application_id, current_user.id
+    )
+    if existing:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cannot review a draft application. The applicant must submit it first.",
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "code": "review_already_exists",
+                "message": "You already reviewed this application. Change it from the application detail.",
+            },
         )
 
-    # Get tenant_id
-    tenant_id = current_user.tenant_id
-    if current_user.role == UserRole.SUPERADMIN:
-        tenant_id = application.tenant_id
-
+    tenant_id = (
+        application.tenant_id
+        if current_user.role == UserRole.SUPERADMIN
+        else current_user.tenant_id
+    )
     if not tenant_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="User has no tenant assigned",
-        )
+        raise HTTPException(status_code=403, detail="User has no tenant assigned")
 
-    # Create or update the review
-    review = application_reviews_crud.upsert_review(
+    status_before = application.status
+    review = application_reviews_crud.create_review(
         db, application_id, current_user.id, tenant_id, review_in
     )
-
-    # Recalculate application status based on strategy
-    status_before = application.status
     updated_application = approval_calculator.recalculate_status(db, application)
-
-    # If the review just accepted the application, convert the paid application
-    # fee into credit. This is the backoffice manual-accept path; without it the
-    # fee-to-credit grant never fires for popups that require manual review.
-    # Flush-only helper (idempotent no-op unless ACCEPTED with an approved fee);
-    # the commit below persists it alongside the status change.
-    from app.api.application.crud import _maybe_grant_fee_credit
-
     _maybe_grant_fee_credit(db, updated_application)
     db.commit()
+    db.refresh(review)
     db.refresh(updated_application)
 
-    # Send status-change emails if the application just reached a final decision
-    if updated_application.human:
-        await send_application_status_email(
-            updated_application,
-            updated_application.human,
-            db,
-            status_before=status_before,
+    await _send_status_email_best_effort(
+        updated_application, db, status_before=status_before
+    )
+
+    return _review_to_public(review, current_user.email, current_user.full_name)
+
+
+@router.patch(
+    "/{application_id}/reviews/me",
+    response_model=ApplicationReviewPublic,
+)
+async def change_my_review(
+    application_id: uuid.UUID,
+    review_in: ApplicationReviewUpdate,
+    db: TenantSession,
+    current_user: CurrentOperator,
+) -> ApplicationReviewPublic:
+    """Change the current user's vote while the application remains in review."""
+    from app.api.application.crud import _maybe_grant_fee_credit
+    from app.api.application.models import Applications
+    from app.api.application.schemas import ApplicationStatus
+    from app.api.audit_log.actor import actor_from_user
+    from app.api.audit_log.constants import AuditAction, AuditEntityType
+    from app.api.audit_log.crud import audit_logs_crud
+    from app.services.approval.calculator import approval_calculator
+
+    application = db.exec(
+        select(Applications).where(Applications.id == application_id).with_for_update()
+    ).first()
+    if not application:
+        raise HTTPException(status_code=404, detail="Application not found")
+    if application.status != ApplicationStatus.IN_REVIEW.value:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "code": "application_no_longer_in_review",
+                "message": "This application was finalized while you were editing. Its review can no longer be changed.",
+                "application_status": application.status,
+            },
         )
+
+    review = application_reviews_crud.get_by_application_reviewer(
+        db, application_id, current_user.id
+    )
+    if not review:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="You have not reviewed this application yet",
+        )
+    if (
+        review_in.expected_updated_at is not None
+        and review.updated_at != review_in.expected_updated_at
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "code": "review_changed",
+                "message": "Your review changed in another session. Refresh and try again.",
+            },
+        )
+
+    old_decision = review.decision
+    if old_decision == review_in.decision:
+        return _review_to_public(review, current_user.email, current_user.full_name)
+
+    status_before = application.status
+    application_reviews_crud.change_decision(db, review, review_in.decision)
+    updated_application = approval_calculator.recalculate_status(db, application)
+    _maybe_grant_fee_credit(db, updated_application)
+
+    human = application.human
+    human_name = None
+    if human:
+        human_name = (
+            f"{human.first_name or ''} {human.last_name or ''}".strip() or human.email
+        )
+    audit_logs_crud.record(
+        db,
+        tenant_id=application.tenant_id,
+        actor=actor_from_user(current_user),
+        action=AuditAction.APPLICATION_REVIEW_CHANGED,
+        entity_type=AuditEntityType.APPLICATION,
+        entity_id=application.id,
+        entity_label=human_name,
+        popup_id=application.popup_id,
+        details={
+            "review_id": str(review.id),
+            "old_decision": old_decision.value,
+            "new_decision": review_in.decision.value,
+            "old_status": status_before,
+            "new_status": updated_application.status,
+        },
+    )
+    db.commit()
+    db.refresh(review)
+    db.refresh(updated_application)
+
+    await _send_status_email_best_effort(
+        updated_application, db, status_before=status_before
+    )
 
     return _review_to_public(review, current_user.email, current_user.full_name)
 

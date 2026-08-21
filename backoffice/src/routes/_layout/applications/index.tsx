@@ -737,8 +737,11 @@ function ApplicationActionsMenu({
 }) {
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const [activeDialog, setActiveDialog] = useState<DialogType>(null)
-  const { isOperatorOrAbove } = useAuth()
+  const { user, isOperatorOrAbove } = useAuth()
   const currentStatus = application.status
+  const alreadyReviewedByMe = (application.reviewers ?? []).some(
+    (reviewer) => reviewer.reviewer_id === user?.id,
+  )
 
   const openDialog = (dialog: DialogType) => {
     setDropdownOpen(false)
@@ -746,7 +749,10 @@ function ApplicationActionsMenu({
   }
 
   const canReview =
-    isOperatorOrAbove && currentStatus === "in review" && !isWeightedVoting
+    isOperatorOrAbove &&
+    currentStatus === "in review" &&
+    !isWeightedVoting &&
+    !alreadyReviewedByMe
 
   if (!canReview) return null
 
@@ -1113,7 +1119,7 @@ function ApplicationsTableContent({
   isSchemaLoaded: boolean
 }) {
   const { selectedPopupId } = useWorkspace()
-  const { isOperatorOrAbove } = useAuth()
+  const { user, isOperatorOrAbove } = useAuth()
   const queryClient = useQueryClient()
   const { showSuccessToast, showErrorToast } = useCustomToast()
   const navigate = useNavigate()
@@ -1717,7 +1723,11 @@ function ApplicationsTableContent({
         canBulkReview
           ? (selectedRows) => {
               const reviewable = (selectedRows as ApplicationPublic[]).filter(
-                (app) => app.status === "in review",
+                (app) =>
+                  app.status === "in review" &&
+                  !(app.reviewers ?? []).some(
+                    (reviewer) => reviewer.reviewer_id === user?.id,
+                  ),
               )
               return (
                 <div className="flex items-center gap-2">

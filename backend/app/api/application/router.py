@@ -26,6 +26,7 @@ from app.api.application.schemas import (
     ApplicationReviewerOption,
     ApplicationReviewerVote,
     ApplicationStatus,
+    ApplicationStatusOverride,
     ApplicationUpdate,
     AttendeeInfo,
     AttendeesDirectoryEntry,
@@ -112,6 +113,7 @@ def _build_application_public(
     comment_count=0,
     skipped_by_me=False,
     my_skip_reason: str | None = None,
+    include_status_override: bool = False,
 ) -> ApplicationPublic:
     """Build ApplicationPublic with attendees and products."""
     from app.api.attendee.schemas import AttendeeProductPublic
@@ -179,6 +181,23 @@ def _build_application_public(
         accepted_at=application.accepted_at,
         created_at=getattr(application, "created_at", None),
         updated_at=getattr(application, "updated_at", None),
+        status_override_reason=(
+            application.status_override_reason if include_status_override else None
+        ),
+        status_overridden_at=(
+            application.status_overridden_at if include_status_override else None
+        ),
+        status_overridden_by_user_id=(
+            application.status_overridden_by_user_id
+            if include_status_override
+            else None
+        ),
+        status_overridden_by_name=(
+            application.status_overridden_by_name if include_status_override else None
+        ),
+        status_overridden_by_email=(
+            application.status_overridden_by_email if include_status_override else None
+        ),
         scholarship_request=application.scholarship_request,
         scholarship_details=application.scholarship_details,
         scholarship_video_url=application.scholarship_video_url,
@@ -322,6 +341,7 @@ async def list_applications(
             comment_count=comment_counts.get(application.id, 0),
             skipped_by_me=application.id in skip_reasons,
             my_skip_reason=skip_reasons.get(application.id),
+            include_status_override=True,
         )
         for application in applications
     ]
@@ -754,6 +774,54 @@ async def grant_tickets_admin(
     return AdminGrantTicketsResponse(granted=granted)
 
 
+@router.patch(
+    "/{application_id}/status-override",
+    response_model=ApplicationPublic,
+    summary="Override an application's final status",
+)
+async def override_application_status(
+    application_id: uuid.UUID,
+    override_in: ApplicationStatusOverride,
+    db: TenantSession,
+    current_user: CurrentAdmin,
+) -> ApplicationPublic:
+    """Explicitly accept or reject an application, bypassing review strategy.
+
+    Existing reviews and financial records remain intact. The reason and actor
+    are persisted and audited; the corresponding status email is sent only
+    after the database transaction commits.
+    """
+    from app.services.application_status import application_status_service
+
+    application, status_before = application_status_service.override(
+        db,
+        application_id=application_id,
+        target_status=override_in.status,
+        reason=override_in.reason,
+        current_user=current_user,
+    )
+    db.commit()
+    db.refresh(application)
+
+    if application.human:
+        try:
+            await send_application_status_email(
+                application,
+                application.human,
+                db,
+                status_before=status_before,
+            )
+        except Exception:
+            # The override is already committed. A mail provider failure must
+            # not make the admin retry and accidentally perform another action.
+            logger.exception(
+                "Failed to send application status email after admin override {}",
+                application.id,
+            )
+
+    return _build_application_public(application, include_status_override=True)
+
+
 @router.get("/{application_id}", response_model=ApplicationPublic)
 async def get_application(
     application_id: uuid.UUID,
@@ -801,6 +869,7 @@ async def get_application(
         comment_count=comment_count,
         skipped_by_me=my_skip is not None,
         my_skip_reason=my_skip.reason if my_skip else None,
+        include_status_override=True,
     )
 
 

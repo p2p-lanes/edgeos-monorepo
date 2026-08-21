@@ -286,6 +286,11 @@ export type ApplicationPublic = {
     accepted_at?: (string | null);
     created_at?: (string | null);
     updated_at?: (string | null);
+    status_override_reason?: (string | null);
+    status_overridden_at?: (string | null);
+    status_overridden_by_user_id?: (string | null);
+    status_overridden_by_name?: (string | null);
+    status_overridden_by_email?: (string | null);
     scholarship_request?: boolean;
     scholarship_details?: (string | null);
     scholarship_video_url?: (string | null);
@@ -367,6 +372,14 @@ export type ApplicationReviewSkipPublic = {
 };
 
 /**
+ * Schema for changing the current reviewer's vote while review is open.
+ */
+export type ApplicationReviewUpdate = {
+    decision: ReviewDecision;
+    expected_updated_at?: (string | null);
+};
+
+/**
  * Statistics for applications.
  */
 export type ApplicationStats = {
@@ -383,6 +396,14 @@ export type ApplicationStats = {
  * Status for applications.
  */
 export type ApplicationStatus = 'draft' | 'pending_fee' | 'in review' | 'rejected' | 'accepted' | 'withdrawn';
+
+/**
+ * Explicit final-status override performed by an administrator.
+ */
+export type ApplicationStatusOverride = {
+    status: ApplicationStatus;
+    reason: string;
+};
 
 /**
  * Application schema for updates by the applicant.
@@ -4952,6 +4973,14 @@ export type ApplicationReviewsGetReviewSummaryData = {
 
 export type ApplicationReviewsGetReviewSummaryResponse = (ReviewSummary);
 
+export type ApplicationReviewsChangeMyReviewData = {
+    applicationId: string;
+    requestBody: ApplicationReviewUpdate;
+    xTenantId?: (string | null);
+};
+
+export type ApplicationReviewsChangeMyReviewResponse = (ApplicationReviewPublic);
+
 export type ApplicationReviewsListPendingReviewsData = {
     /**
      * Maximum number of items to return
@@ -5052,6 +5081,14 @@ export type ApplicationsGrantTicketsAdminData = {
 };
 
 export type ApplicationsGrantTicketsAdminResponse = (AdminGrantTicketsResponse);
+
+export type ApplicationsOverrideApplicationStatusData = {
+    applicationId: string;
+    requestBody: ApplicationStatusOverride;
+    xTenantId?: (string | null);
+};
+
+export type ApplicationsOverrideApplicationStatusResponse = (ApplicationPublic);
 
 export type ApplicationsGetApplicationData = {
     applicationId: string;
