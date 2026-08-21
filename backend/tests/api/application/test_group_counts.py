@@ -197,6 +197,49 @@ class TestApplicationGroupCounts:
         )
         assert response.status_code == 422
 
+    def test_reviewer_grouping_with_reviewer_filter_returns_422(
+        self, db: Session, tenant_a: Tenants, client: TestClient
+    ) -> None:
+        popup = _make_popup(db, tenant_a)
+        admin = _make_admin(db, tenant_a)
+        reviewer = _make_admin(db, tenant_a)
+
+        response = _group_counts(
+            client,
+            admin,
+            tenant_a,
+            popup,
+            "reviewed_by",
+            filters=_one("reviewed_by", "eq", str(reviewer.id)),
+        )
+
+        assert response.status_code == 422, response.text
+        assert response.json()["detail"] == (
+            "Cannot group by Reviewed by while a Reviewed by filter is active."
+        )
+
+    def test_reviewer_parent_grouping_with_reviewer_filter_returns_422(
+        self, db: Session, tenant_a: Tenants, client: TestClient
+    ) -> None:
+        popup = _make_popup(db, tenant_a)
+        admin = _make_admin(db, tenant_a)
+        reviewer = _make_admin(db, tenant_a)
+
+        response = _group_counts(
+            client,
+            admin,
+            tenant_a,
+            popup,
+            "status",
+            filters=_one("reviewed_by", "eq", str(reviewer.id)),
+            parent_group_by="reviewed_by",
+        )
+
+        assert response.status_code == 422, response.text
+        assert response.json()["detail"] == (
+            "Cannot group by Reviewed by while a Reviewed by filter is active."
+        )
+
     def test_group_by_reviewer_counts_each_application_once_per_reviewer(
         self, db: Session, tenant_a: Tenants, client: TestClient
     ) -> None:
