@@ -28,6 +28,7 @@ from app.api.application.schemas import (
     ApplicationUpdate,
     PopupAccessResponse,
     ScholarshipDecisionRequest,
+    ScholarshipStatus,
 )
 from app.api.application_review.models import (
     ApplicationReviews,
@@ -156,6 +157,7 @@ def build_application_filter_expression(
 # Fields the group-counts endpoint may group by, split by source table.
 GROUP_BY_APPLICATION_FIELDS = frozenset({"status", "scholarship_status"})
 GROUP_BY_HUMAN_FIELDS = frozenset({"gender", "age"})
+GROUP_BY_REVIEWER_FIELD = "reviewed_by"
 
 
 def _group_by_expression(group_by: str):
@@ -179,16 +181,40 @@ def _group_by_expression(group_by: str):
     )
 
 
+def _reviewer_group_scope_clause(group_value: str | None):
+    """Select applications reviewed by one user, or by no users when omitted."""
+    has_any_review = exists().where(
+        ApplicationReviews.application_id == Applications.id
+    )
+    if group_value is None:
+        return ~has_any_review
+    try:
+        reviewer_id = uuid.UUID(group_value)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="The reviewer group value must be a valid user id.",
+        ) from None
+    return has_any_review.where(ApplicationReviews.reviewer_id == reviewer_id)
+
+
 def _group_scope_clause(group_by: str, group_value: str | None):
     """Boolean clause selecting one bucket of a grouped view.
 
     Same NULL/empty-string collapsing as ``count_by_group``: omitting the
     value selects the NULL bucket. Returns (clause, needs Humans join).
     """
+    if group_by == GROUP_BY_REVIEWER_FIELD:
+        return _reviewer_group_scope_clause(group_value), False
     expression, needs_human = _group_by_expression(group_by)
     bucket = func.nullif(expression, "")
     clause = bucket.is_(None) if group_value is None else bucket == group_value
     return clause, needs_human
+
+
+def _scholarship_status_for_request(scholarship_request: bool) -> str | None:
+    """Keep the persisted scholarship status aligned with the request flag."""
+    return ScholarshipStatus.PENDING.value if scholarship_request else None
 
 
 class RedFlaggedHumanError(Exception):
@@ -383,8 +409,14 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         bucket of an outer grouped view, so a subgrouped view can count
         within each expanded parent group.
         """
-        group_expression, group_needs_human = _group_by_expression(group_by)
-        bucket = func.nullif(group_expression, "")
+        group_needs_human = False
+        if group_by == GROUP_BY_REVIEWER_FIELD:
+            bucket = col(ApplicationReviews.reviewer_id)
+            count_expression = func.count(func.distinct(Applications.id))
+        else:
+            group_expression, group_needs_human = _group_by_expression(group_by)
+            bucket = func.nullif(group_expression, "")
+            count_expression = func.count()
 
         parent_clause = None
         parent_needs_human = False
@@ -394,10 +426,15 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
             )
 
         statement = (
-            select(bucket, func.count())
+            select(bucket, count_expression)
             .select_from(Applications)
             .where(Applications.popup_id == popup_id)
         )
+        if group_by == GROUP_BY_REVIEWER_FIELD:
+            statement = statement.outerjoin(
+                ApplicationReviews,
+                ApplicationReviews.application_id == Applications.id,
+            )
         if parent_clause is not None:
             statement = statement.where(parent_clause)
 
@@ -432,7 +469,21 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
             if filter_expression is not None:
                 statement = statement.where(filter_expression)
 
-        statement = statement.group_by(bucket).order_by(func.count().desc())
+        statement = statement.group_by(bucket).order_by(count_expression.desc())
+        return list(session.exec(statement).all())
+
+    def reviewer_ids_by_popup(
+        self,
+        session: Session,
+        popup_id: uuid.UUID,
+    ) -> list[uuid.UUID]:
+        """Return every user who has submitted a review for a popup."""
+        statement = (
+            select(ApplicationReviews.reviewer_id)
+            .join(Applications, ApplicationReviews.application_id == Applications.id)
+            .where(Applications.popup_id == popup_id)
+            .distinct()
+        )
         return list(session.exec(statement).all())
 
     def find_by_status(
@@ -923,6 +974,9 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         }
         data["tenant_id"] = tenant_id
         data["human_id"] = human_id
+        data["scholarship_status"] = _scholarship_status_for_request(
+            bool(data.get("scholarship_request", False))
+        )
 
         # _referral was resolved and validated above, next to group and invite
         # (T-gr-032: referral attribution wiring, groups-rework Decision 1f).
@@ -994,9 +1048,20 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
             category_id=main_cat.id if main_cat else None,
         )
 
-        # Apply approval strategy for non-group applications still in review
+        # A referral whose auto-approval was revoked must remain in review.
+        # Falling through to the popup's AUTO_ACCEPT strategy would grant the
+        # referred attendee purchase access despite the link policy.
+        if (
+            _referral is not None
+            and application.status == ApplicationStatus.IN_REVIEW.value
+        ):
+            self.create_snapshot(session, application, "submitted")
+
+        # Apply the popup approval strategy for other non-group applications
+        # still in review.
         if (
             not data.get("group_id")
+            and _referral is None
             and application.status == ApplicationStatus.IN_REVIEW.value
         ):
             # Intercept: if popup requires application fee, gate on PENDING_FEE
@@ -1211,6 +1276,9 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         }
         data["tenant_id"] = tenant_id
         data["human_id"] = human.id
+        data["scholarship_status"] = _scholarship_status_for_request(
+            bool(data.get("scholarship_request", False))
+        )
 
         # Convert status enum to string
         if data.get("status") and hasattr(data["status"], "value"):
@@ -1463,7 +1531,15 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
             "age",
             "residence",
         ]
-        app_fields = ["referral", "info_not_shared", "custom_fields", "status"]
+        app_fields = [
+            "referral",
+            "info_not_shared",
+            "custom_fields",
+            "status",
+            "scholarship_request",
+            "scholarship_details",
+            "scholarship_video_url",
+        ]
 
         # Update human profile
         profile_update = {}
@@ -1483,6 +1559,11 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
             value = getattr(update_data, field, None)
             if value is not None:
                 app_update[field] = value
+
+        if "scholarship_request" in app_update:
+            app_update["scholarship_status"] = _scholarship_status_for_request(
+                bool(app_update["scholarship_request"])
+            )
 
         if app_update:
             for key, value in app_update.items():

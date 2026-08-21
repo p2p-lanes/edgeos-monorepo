@@ -147,6 +147,7 @@ export default function ReferralCodePage() {
         popup={popup}
         background={contentBackground}
         referralId={preview.id}
+        requiresManualApproval={!preview.auto_approve}
       />
     </>
   )

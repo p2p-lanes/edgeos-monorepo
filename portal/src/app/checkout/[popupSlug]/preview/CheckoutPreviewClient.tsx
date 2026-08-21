@@ -6,9 +6,7 @@ import { CheckoutService, type TicketingStepPublic } from "@/client"
 import { OpenCheckoutRuntime } from "@/components/checkout-flow/OpenCheckoutRuntime"
 import { Loader } from "@/components/ui/Loader"
 import {
-  allowedPreviewOrigins,
   applyStepDraft,
-  isAllowedPreviewOrigin,
   PREVIEW_MESSAGE_SOURCE,
   type PreviewReadyMessage,
   parsePreviewStateMessage,
@@ -28,10 +26,11 @@ interface PreviewState {
 /**
  * Renders the real checkout for the backoffice's ticketing-step editor.
  *
- * Nothing renders until an allowed origin posts in a preview token: that is
- * what lets the public runtime endpoint serve a popup that is still draft. The
- * flow then starts where a buyer's would. If a step is open in the editor it
- * rides along and is overlaid on the saved data, so unsaved work shows up.
+ * Nothing renders until the embedder posts in a preview token: that is what
+ * lets the public runtime endpoint serve a popup that is still draft, and it is
+ * what authorizes this page — see the trust model in `lib/checkout-preview`.
+ * The flow then starts where a buyer's would. If a step is open in the editor
+ * it rides along and is overlaid on the saved data, so unsaved work shows up.
  * Everything else — products, theme, buyer form — is fetched from the API the
  * same way a buyer's checkout fetches it, so what shows up here is what ships.
  */
@@ -41,14 +40,22 @@ export default function CheckoutPreviewClient({
   popupSlug: string
 }) {
   const [state, setState] = useState<PreviewState | null>(null)
-  const origins = useMemo(() => allowedPreviewOrigins(), [])
+  const [isFramed, setIsFramed] = useState(true)
 
   useEffect(() => {
     if (typeof window === "undefined") return
-    if (origins.length === 0) return
+    // This page is only ever an iframe in the backoffice. Standing alone it can
+    // never be driven, so say that instead of spinning forever.
+    const parent = window.parent
+    if (!parent || parent === window) {
+      setIsFramed(false)
+      return
+    }
 
     const onMessage = (event: MessageEvent) => {
-      if (!isAllowedPreviewOrigin(event.origin, origins)) return
+      // Only the embedder drives this page — not an opener, not a sibling
+      // frame. Its origin is deliberately not checked: see the trust model.
+      if (event.source !== parent) return
       const message = parsePreviewStateMessage(event.data)
       if (!message) return
       setState({
@@ -59,19 +66,19 @@ export default function CheckoutPreviewClient({
 
     window.addEventListener("message", onMessage)
 
-    // Announce readiness to the embedder. Posted to each allowed origin
-    // explicitly rather than "*", so the handshake is never broadcast to a
-    // page that happens to frame this one.
+    // Announce readiness to the embedder. Broadcast, because the whole point of
+    // this design is that the portal needs no configuration to name the
+    // backoffice — and this message carries nothing but a constant string. The
+    // token travels the other way, and that direction is pinned to an exact
+    // origin by the sender.
     const ready: PreviewReadyMessage = {
       source: PREVIEW_MESSAGE_SOURCE,
       type: "ready",
     }
-    for (const origin of origins) {
-      window.parent?.postMessage(ready, origin)
-    }
+    parent.postMessage(ready, "*")
 
     return () => window.removeEventListener("message", onMessage)
-  }, [origins])
+  }, [])
 
   // Held in state, exactly like the buyer page. Resolving it during render
   // instead would read a value the render itself changes: the language provider
@@ -106,11 +113,11 @@ export default function CheckoutPreviewClient({
     return state?.step ? applyStepDraft(runtime, state.step) : runtime
   }, [runtime, state])
 
-  if (origins.length === 0) {
+  if (!isFramed) {
     return (
       <PreviewNotice
-        title="Preview not configured"
-        detail="Set NEXT_PUBLIC_BACKOFFICE_ORIGIN on the portal to allow the backoffice to drive this preview."
+        title="Nothing to preview here"
+        detail="This page renders a checkout preview for the backoffice, which drives it from inside an editor. Open it from Ticketing steps → Preview checkout."
       />
     )
   }

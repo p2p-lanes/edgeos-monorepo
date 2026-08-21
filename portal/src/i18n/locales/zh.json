@@ -190,6 +190,8 @@
     "processing": "正在处理您的注册",
     "processing_subtitle": "这可能需要一些时间",
     "success": "注册成功！",
+    "application_pending_title": "申请审核中",
+    "application_pending_description": "您的申请已提交。组织者批准前，您无法选择商品。",
     "loading_passes": "正在加载您的通行证...",
     "send_code": "发送验证码",
     "verify_code": "验证代码",

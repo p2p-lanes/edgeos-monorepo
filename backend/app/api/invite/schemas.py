@@ -162,6 +162,7 @@ class InvitePublicPreview(BaseModel):
     inviter_name: str | None = None
     is_email_restricted: bool
     discount_percentage: Decimal
+    auto_approve: bool
     max_uses: int | None = None
     current_uses: int
     expires_at: datetime | None = None

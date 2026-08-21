@@ -12,9 +12,11 @@ export const metadata: Metadata = {
 /**
  * Checkout preview for the backoffice ticketing-step editor.
  *
- * Unlike the buyer-facing page there is no server render: the runtime is only
- * reachable with the preview token the backoffice posts in after mount, so
- * everything happens client-side.
+ * Unlike the buyer-facing page there is no server render of the checkout: the
+ * runtime is only reachable with the preview token the backoffice posts in
+ * after mount, so everything else happens client-side. That token is also the
+ * only thing authorizing the preview, which is why this route needs no
+ * configuration of its own — see the trust model in `lib/checkout-preview`.
  */
 export default async function CheckoutPreviewPage({
   params,
