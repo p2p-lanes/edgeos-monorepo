@@ -4,6 +4,7 @@ import {
   applyStepDraft,
   isAllowedPreviewOrigin,
   PREVIEW_MESSAGE_SOURCE,
+  parsePreviewOrigins,
   parsePreviewStateMessage,
 } from "./checkout-preview"
 
@@ -88,6 +89,33 @@ describe("applyStepDraft", () => {
     applyStepDraft(base, step("a", { title: "Draft A" }))
 
     expect(base.ticketing_steps[0].title).toBe("Saved A")
+  })
+})
+
+describe("parsePreviewOrigins", () => {
+  it("splits a comma-separated list", () => {
+    expect(
+      parsePreviewOrigins("https://app.edgeos.world, http://localhost:5173"),
+    ).toEqual(["https://app.edgeos.world", "http://localhost:5173"])
+  })
+
+  // BACKOFFICE_URL is the fallback and is written by hand in every
+  // deployment's env, so a trailing slash is likely — and it used to make the
+  // origin never match, with no clue as to why.
+  it("normalizes a trailing slash or a path away", () => {
+    expect(parsePreviewOrigins("https://app.edgeos.world/")).toEqual([
+      "https://app.edgeos.world",
+    ])
+    expect(parsePreviewOrigins("https://app.edgeos.world/login")).toEqual([
+      "https://app.edgeos.world",
+    ])
+  })
+
+  it("drops values that are not URLs, and trusts nobody when unset", () => {
+    expect(parsePreviewOrigins("not a url")).toEqual([])
+    expect(parsePreviewOrigins("")).toEqual([])
+    expect(parsePreviewOrigins(null)).toEqual([])
+    expect(parsePreviewOrigins(undefined)).toEqual([])
   })
 })
 
