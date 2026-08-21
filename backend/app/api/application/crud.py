@@ -1048,9 +1048,20 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
             category_id=main_cat.id if main_cat else None,
         )
 
-        # Apply approval strategy for non-group applications still in review
+        # A referral whose auto-approval was revoked must remain in review.
+        # Falling through to the popup's AUTO_ACCEPT strategy would grant the
+        # referred attendee purchase access despite the link policy.
+        if (
+            _referral is not None
+            and application.status == ApplicationStatus.IN_REVIEW.value
+        ):
+            self.create_snapshot(session, application, "submitted")
+
+        # Apply the popup approval strategy for other non-group applications
+        # still in review.
         if (
             not data.get("group_id")
+            and _referral is None
             and application.status == ApplicationStatus.IN_REVIEW.value
         ):
             # Intercept: if popup requires application fee, gate on PENDING_FEE

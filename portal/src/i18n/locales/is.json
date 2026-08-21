@@ -181,6 +181,8 @@
     "processing": "Vinn úr skráningu þinni",
     "processing_subtitle": "Þetta gæti tekið nokkur augnablik",
     "success": "Skráning tókst!",
+    "application_pending_title": "Umsókn í yfirferð",
+    "application_pending_description": "Umsóknin þín var send inn. Skipuleggjandi þarf að samþykkja hana áður en þú getur valið vörur.",
     "loading_passes": "Hleður pössunum þínum...",
     "send_code": "Senda kóða",
     "verify_code": "Staðfesta kóða",

@@ -12261,6 +12261,10 @@ export const InvitePublicPreviewSchema = {
             pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$',
             title: 'Discount Percentage'
         },
+        auto_approve: {
+            type: 'boolean',
+            title: 'Auto Approve'
+        },
         max_uses: {
             anyOf: [
                 {
@@ -12295,7 +12299,7 @@ export const InvitePublicPreviewSchema = {
         }
     },
     type: 'object',
-    required: ['id', 'popup_id', 'token', 'is_email_restricted', 'discount_percentage', 'current_uses'],
+    required: ['id', 'popup_id', 'token', 'is_email_restricted', 'discount_percentage', 'auto_approve', 'current_uses'],
     title: 'InvitePublicPreview',
     description: `Unauthenticated preview — GET /invites/redeem/{token}.
 

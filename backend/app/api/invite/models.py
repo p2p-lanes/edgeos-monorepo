@@ -22,8 +22,8 @@ class Invites(SQLModel, table=True):
     may be bound to a single recipient_email. A PORTAL link (what used to be a
     Referral) is created by an attendee to share around, and is subject to the
     popup's max_referrals_per_attendee quota. Tell them apart with
-    ``is_portal_created`` / ``referrer_human_id``; everything else -- discount,
-    auto-approve, express checkout, use limits, expiry -- behaves identically.
+    ``is_portal_created`` / ``referrer_human_id``. Portal links start with an
+    auto-approval and no discount; administrators may later adjust either.
 
     Email stored lowercase via validator when setting recipient_email.
     """
