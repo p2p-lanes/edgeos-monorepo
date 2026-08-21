@@ -6594,6 +6594,14 @@ export type GroupsRemoveGroupLeaderData = {
 
 export type GroupsRemoveGroupLeaderResponse = (GroupWithMembers);
 
+export type GroupsRemoveGroupMemberAdminData = {
+    groupId: string;
+    humanId: string;
+    xTenantId?: (string | null);
+};
+
+export type GroupsRemoveGroupMemberAdminResponse = (void);
+
 export type GroupsListMyGroupsData = {
     /**
      * Maximum number of items to return
