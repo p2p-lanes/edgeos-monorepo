@@ -101,7 +101,7 @@ class ApplicationReviewsCRUD(
         tenant_id: uuid.UUID,
         review_in: ApplicationReviewCreate,
     ) -> ApplicationReviews:
-        """Create a new review."""
+        """Stage a new review; the caller owns the transaction boundary."""
         db_obj = ApplicationReviews(
             application_id=application_id,
             reviewer_id=reviewer_id,
@@ -110,36 +110,21 @@ class ApplicationReviewsCRUD(
             notes=review_in.notes,
         )
         session.add(db_obj)
-        session.commit()
-        session.refresh(db_obj)
+        session.flush()
         return db_obj
 
-    def upsert_review(
+    def change_decision(
         self,
         session: Session,
-        application_id: uuid.UUID,
-        reviewer_id: uuid.UUID,
-        tenant_id: uuid.UUID,
-        review_in: ApplicationReviewCreate,
+        review: ApplicationReviews,
+        decision: ReviewDecision,
     ) -> ApplicationReviews:
-        """Create or update a review (reviewers can change their decision)."""
-        existing = self.get_by_application_reviewer(
-            session, application_id, reviewer_id
-        )
-
-        if existing:
-            existing.decision = review_in.decision
-            if review_in.notes is not None:
-                existing.notes = review_in.notes
-            existing.updated_at = datetime.now(UTC)
-            session.add(existing)
-            session.commit()
-            session.refresh(existing)
-            return existing
-
-        return self.create_review(
-            session, application_id, reviewer_id, tenant_id, review_in
-        )
+        """Stage a change to an existing vote; notes remain untouched."""
+        review.decision = decision
+        review.updated_at = datetime.now(UTC)
+        session.add(review)
+        session.flush()
+        return review
 
     def count_by_decision(
         self,

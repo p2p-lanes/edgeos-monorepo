@@ -1816,10 +1816,8 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         session.add(application)
         session.flush()
 
-        # 7. Re-evaluate application status (may lift AUTO_ACCEPT gate → ACCEPTED)
-        # recalculate_status only commits internally when status actually changes.
-        # If status doesn't change (e.g. application is already ACCEPTED, or strategy
-        # keeps it IN_REVIEW), it returns without committing — the flush above is dangling.
+        # 7. Re-evaluate application status (may lift AUTO_ACCEPT gate → ACCEPTED).
+        # The calculator is flush-only; this method owns the commit below.
         application = approval_calculator.recalculate_status(session, application)
 
         # Grant fee credit if the calculator reached ACCEPTED (flush-only;

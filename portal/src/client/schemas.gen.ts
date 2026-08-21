@@ -1295,6 +1295,63 @@ export const ApplicationPublicSchema = {
             ],
             title: 'Updated At'
         },
+        status_override_reason: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Status Override Reason'
+        },
+        status_overridden_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Status Overridden At'
+        },
+        status_overridden_by_user_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Status Overridden By User Id'
+        },
+        status_overridden_by_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Status Overridden By Name'
+        },
+        status_overridden_by_email: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Status Overridden By Email'
+        },
         scholarship_request: {
             type: 'boolean',
             title: 'Scholarship Request',
@@ -1625,6 +1682,30 @@ export const ApplicationReviewSkipPublicSchema = {
     description: 'ApplicationReviewSkip schema for API responses.'
 } as const;
 
+export const ApplicationReviewUpdateSchema = {
+    properties: {
+        decision: {
+            '$ref': '#/components/schemas/ReviewDecision'
+        },
+        expected_updated_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Expected Updated At'
+        }
+    },
+    type: 'object',
+    required: ['decision'],
+    title: 'ApplicationReviewUpdate',
+    description: "Schema for changing the current reviewer's vote while review is open."
+} as const;
+
 export const ApplicationReviewerOptionSchema = {
     properties: {
         id: {
@@ -1748,6 +1829,24 @@ export const ApplicationStatusSchema = {
     enum: ['draft', 'pending_fee', 'in review', 'rejected', 'accepted', 'withdrawn'],
     title: 'ApplicationStatus',
     description: 'Status for applications.'
+} as const;
+
+export const ApplicationStatusOverrideSchema = {
+    properties: {
+        status: {
+            '$ref': '#/components/schemas/ApplicationStatus'
+        },
+        reason: {
+            type: 'string',
+            maxLength: 1000,
+            minLength: 3,
+            title: 'Reason'
+        }
+    },
+    type: 'object',
+    required: ['status', 'reason'],
+    title: 'ApplicationStatusOverride',
+    description: 'Explicit final-status override performed by an administrator.'
 } as const;
 
 export const ApplicationUpdateSchema = {

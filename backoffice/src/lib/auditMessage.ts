@@ -58,6 +58,10 @@ export function describeAuditAction(log: AuditLogPublic): string {
       const names = formatProductList(d.products)
       return names ? `Granted ${names}` : "Granted tickets"
     }
+    case "application.review_changed":
+      return `Changed review from "${asString(d.old_decision)?.replace(/_/g, " ") ?? "unknown"}" to "${asString(d.new_decision)?.replace(/_/g, " ") ?? "unknown"}"`
+    case "application.status_overridden":
+      return `Overrode application status from "${asString(d.old_status) ?? "unknown"}" to "${asString(d.new_status) ?? "unknown"}"`
     default: {
       const eventVerb = EVENT_ACTION_VERBS[log.action]
       if (eventVerb) {
@@ -92,6 +96,11 @@ export const AUDIT_ACTION_OPTIONS: { value: string; label: string }[] = [
   { value: "ticket.add", label: "Ticket added" },
   { value: "ticket.remove", label: "Ticket removed" },
   { value: "ticket.grant", label: "Ticket granted" },
+  { value: "application.review_changed", label: "Review changed" },
+  {
+    value: "application.status_overridden",
+    label: "Application status overridden",
+  },
   { value: "event.created", label: "Event created" },
   { value: "event.updated", label: "Event updated" },
   { value: "event.deleted", label: "Event deleted" },
