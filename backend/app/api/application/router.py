@@ -77,6 +77,10 @@ router = APIRouter(prefix="/applications", tags=["applications"])
 # Portal router — separate prefix for the access endpoint
 portal_router = APIRouter(prefix="/portal", tags=["portal"])
 
+REVIEWER_FILTER_GROUPING_CONFLICT_DETAIL = (
+    "Cannot group by Reviewed by while a Reviewed by filter is active."
+)
+
 
 def _get_reviewer_identities(
     control_db,
@@ -362,6 +366,16 @@ async def get_application_group_counts(
             detail="The subgroup field must be different from the group field.",
         )
     parsed_filters = parse_application_filters(filters)
+    has_reviewer_filter = parsed_filters and any(
+        condition.field == "reviewed_by" for condition in parsed_filters.conditions
+    )
+    if has_reviewer_filter and (
+        group_by == "reviewed_by" or parent_group_by == "reviewed_by"
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=REVIEWER_FILTER_GROUPING_CONFLICT_DETAIL,
+        )
     rows = crud.applications_crud.count_by_group(
         db,
         popup_id=popup_id,
