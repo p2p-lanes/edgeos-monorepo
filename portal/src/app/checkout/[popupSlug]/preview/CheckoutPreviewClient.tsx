@@ -116,7 +116,7 @@ export default function CheckoutPreviewClient({
     return (
       <PreviewNotice
         title="Preview not configured"
-        detail="This portal does not know which backoffice may drive the preview. Set BACKOFFICE_URL (or BACKOFFICE_ORIGIN, for more than one) on the portal service and restart it."
+        detail="This portal does not know which backoffice may drive the preview. Set BACKOFFICE_URL on the portal service — not only on the backend — and restart it. BACKOFFICE_ORIGIN adds further origins, comma-separated."
       />
     )
   }

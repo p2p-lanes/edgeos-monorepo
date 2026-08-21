@@ -19,15 +19,22 @@ export const metadata: Metadata = {
  * running container and nothing happens. This reads the live process
  * environment instead, so the value can change without rebuilding the image.
  *
- * `BACKOFFICE_URL` is the fallback because every deployment already sets it
- * (the backend needs it), and the backoffice's own URL is exactly the origin
- * this page should trust. Set `BACKOFFICE_ORIGIN` only to allow more than one,
- * comma-separated — e.g. a local backoffice driving a deployed portal.
+ * `BACKOFFICE_URL` carries it because every deployment already sets it (the
+ * backend needs it), and the backoffice's own URL is exactly the origin this
+ * page should trust. `BACKOFFICE_ORIGIN` adds to it, comma-separated, for the
+ * cases that need more than one — e.g. a local backoffice driving a deployed
+ * portal.
+ *
+ * Both are read and unioned, rather than one falling back to the other: an
+ * unset variable often arrives as the empty string, and a `??` chain would then
+ * stop at it and trust nobody while `BACKOFFICE_URL` sat correctly set right
+ * next to it.
  */
 function allowedOrigins(): string[] {
-  return parsePreviewOrigins(
-    process.env.BACKOFFICE_ORIGIN ?? process.env.BACKOFFICE_URL,
-  )
+  return parsePreviewOrigins([
+    process.env.BACKOFFICE_ORIGIN,
+    process.env.BACKOFFICE_URL,
+  ])
 }
 
 /**

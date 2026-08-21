@@ -117,6 +117,38 @@ describe("parsePreviewOrigins", () => {
     expect(parsePreviewOrigins(null)).toEqual([])
     expect(parsePreviewOrigins(undefined)).toEqual([])
   })
+
+  it("unions several sources", () => {
+    expect(
+      parsePreviewOrigins([
+        "http://localhost:5173",
+        "https://app.edgeos.world",
+      ]),
+    ).toEqual(["http://localhost:5173", "https://app.edgeos.world"])
+  })
+
+  // The regression this guards: compose renders an unset BACKOFFICE_ORIGIN as
+  // "", and the page used to read `BACKOFFICE_ORIGIN ?? BACKOFFICE_URL` — which
+  // stops at "" and reports "Preview not configured" on a deployment whose
+  // BACKOFFICE_URL was set correctly all along.
+  it("ignores a blank source instead of letting it mask a good one", () => {
+    expect(parsePreviewOrigins(["", "https://app.edgeos.world"])).toEqual([
+      "https://app.edgeos.world",
+    ])
+    expect(
+      parsePreviewOrigins([undefined, null, "https://app.edgeos.world"]),
+    ).toEqual(["https://app.edgeos.world"])
+    expect(parsePreviewOrigins(["", null, undefined])).toEqual([])
+  })
+
+  it("deduplicates, so the same origin is not posted to twice", () => {
+    expect(
+      parsePreviewOrigins([
+        "https://app.edgeos.world/",
+        "https://app.edgeos.world",
+      ]),
+    ).toEqual(["https://app.edgeos.world"])
+  })
 })
 
 describe("isAllowedPreviewOrigin", () => {
