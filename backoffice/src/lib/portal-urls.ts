@@ -45,7 +45,10 @@ export function getPortalBaseUrl(
   }
   const root = getPortalRootDomain()
   if (tenant.slug && root) {
-    return `https://${tenant.slug}.${root}`
+    // Same scheme rule as the custom-domain branch: a local portal
+    // (`demo.localhost:3000`) is served over http, and an https URL there is
+    // simply unreachable.
+    return `${schemeFor(root)}://${tenant.slug}.${root}`
   }
   return null
 }

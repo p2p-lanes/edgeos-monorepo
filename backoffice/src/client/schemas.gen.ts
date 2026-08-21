@@ -5114,6 +5114,27 @@ export const CheckoutPreviewResponseSchema = {
     description: 'Server-computed price breakdown for anonymous checkout (no side effects).'
 } as const;
 
+export const CheckoutPreviewTokenPublicSchema = {
+    properties: {
+        token: {
+            type: 'string',
+            title: 'Token'
+        },
+        expires_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Expires At'
+        }
+    },
+    type: 'object',
+    required: ['token', 'expires_at'],
+    title: 'CheckoutPreviewTokenPublic',
+    description: `Short-lived token that unlocks the checkout runtime for a live preview.
+
+Handed to the portal's preview page so it can render a popup that is still
+draft. See \`\`app.utils.checkout_preview\`\`.`
+} as const;
+
 export const CheckoutRuntimeProductSchema = {
     properties: {
         tenant_id: {

@@ -169,7 +169,14 @@ class TenantUpdate(SQLModel):
 
     @model_validator(mode="after")
     def validate_smtp(self) -> Self:
-        self.smtp_host = _normalize_smtp_host(self.smtp_host)
+        # Trim only a host the payload actually carried. Assigning to the
+        # attribute puts it in model_fields_set, and both BaseCRUD.update
+        # (exclude_unset=True) and this router's own `in model_fields_set`
+        # checks would then read an absent field as an explicit null — so
+        # renaming the organization, or swapping its logo, would clear its
+        # SMTP host. An explicit {"smtp_host": null} still clears it.
+        if "smtp_host" in self.model_fields_set:
+            self.smtp_host = _normalize_smtp_host(self.smtp_host)
         _validate_smtp_common(
             self.smtp_host, self.smtp_port, self.smtp_tls, self.smtp_ssl
         )
