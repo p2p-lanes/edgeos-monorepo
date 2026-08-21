@@ -64,6 +64,10 @@ services:
       dockerfile: backoffice/Dockerfile
       args:
         - VITE_API_URL=${BACKEND_URL?Variable not set}
+        # Optional: unset, the backoffice derives the portal root from its own
+        # hostname (app.edgeos.world → edgeos.world). Set it when the two apps
+        # don't sit on sibling subdomains.
+        - VITE_PORTAL_DOMAIN=${VITE_PORTAL_DOMAIN-}
         - NODE_ENV=production
 
   portal:
@@ -73,11 +77,16 @@ services:
       - "3000:3000"
     environment:
       - NEXT_PUBLIC_API_URL=${BACKEND_URL?Variable not set}
+      - NEXT_PUBLIC_BACKOFFICE_ORIGIN=${NEXT_PUBLIC_BACKOFFICE_ORIGIN:-${BACKOFFICE_URL}}
     build:
       context: .
       dockerfile: portal/Dockerfile
       args:
         - NEXT_PUBLIC_API_URL=${BACKEND_URL?Variable not set}
+        # Origins allowed to drive the ticketing-step live preview. Defaults to
+        # the backoffice's own URL; set it explicitly (comma-separated) only to
+        # allow more than one, e.g. a local backoffice against this portal.
+        - NEXT_PUBLIC_BACKOFFICE_ORIGIN=${NEXT_PUBLIC_BACKOFFICE_ORIGIN:-${BACKOFFICE_URL}}
         # CDN for /_next/static (e.g. https://static.edgeos.world). Optional:
         # unset serves assets same-origin, as before.
         - ASSET_PREFIX=${ASSET_PREFIX-}

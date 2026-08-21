@@ -52,6 +52,10 @@ from app.services.meta_capi import (
     enqueue_initiate_checkout_event,
     enqueue_purchase_event,
 )
+from app.utils.checkout_preview import (
+    CHECKOUT_PREVIEW_TOKEN_HEADER,
+    resolve_preview_popup_id,
+)
 from app.utils.checkout_signing import (
     build_cart_restore_token,
     verify_cart_restore_token,
@@ -116,13 +120,36 @@ async def get_runtime(
     db: SessionDep,
     tenant: PublicTenant,
     accept_language: Annotated[str | None, Header(alias="Accept-Language")] = None,
+    preview_token: Annotated[
+        str | None, Header(alias=CHECKOUT_PREVIEW_TOKEN_HEADER)
+    ] = None,
 ) -> CheckoutRuntimeResponse:
     """Return popup metadata, products, buyer form, and ticketing steps for anonymous checkout.
 
     Fully public endpoint (no JWT). Only serves sale_type=direct active popups.
     Rate-limited 120/min/IP.
+
+    A preview token (minted for an authenticated operator by
+    POST /popups/{popup_id}/checkout-preview-token) additionally serves the
+    popup it names while it is still draft, including its disabled steps, so the
+    backoffice can render a live preview of a checkout being configured.
     """
-    return runtime_for_slug(db, slug, tenant.id, parse_accept_language(accept_language))
+    preview_popup_id = resolve_preview_popup_id(preview_token)
+    preview = False
+    if preview_popup_id is not None:
+        # The token names one popup; a token minted for another one (or for
+        # another tenant, whose popups this slug can never resolve to) falls
+        # back to the public rules instead of unlocking the draft.
+        popup = get_open_ticketing_popup(db, slug, tenant.id, preview=True)
+        preview = popup.id == preview_popup_id
+
+    return runtime_for_slug(
+        db,
+        slug,
+        tenant.id,
+        parse_accept_language(accept_language),
+        preview=preview,
+    )
 
 
 @router.post(

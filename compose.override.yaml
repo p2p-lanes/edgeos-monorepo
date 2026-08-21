@@ -92,11 +92,13 @@ services:
       - "3000:3000"
     environment:
       - NEXT_PUBLIC_API_URL=http://backend:8000
+      - NEXT_PUBLIC_BACKOFFICE_ORIGIN=http://localhost:5173
     build:
       context: .
       dockerfile: portal/Dockerfile
       args:
         - NEXT_PUBLIC_API_URL=http://localhost:8000
+        - NEXT_PUBLIC_BACKOFFICE_ORIGIN=http://localhost:5173
 
   # MinIO for local S3-compatible storage
   minio:

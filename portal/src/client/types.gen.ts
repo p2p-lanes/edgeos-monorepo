@@ -1182,6 +1182,17 @@ export type CheckoutPreviewResponse = {
 };
 
 /**
+ * Short-lived token that unlocks the checkout runtime for a live preview.
+ *
+ * Handed to the portal's preview page so it can render a popup that is still
+ * draft. See ``app.utils.checkout_preview``.
+ */
+export type CheckoutPreviewTokenPublic = {
+    token: string;
+    expires_at: string;
+};
+
+/**
  * Public product available in the checkout runtime.
  */
 export type CheckoutRuntimeProduct = {
@@ -5540,6 +5551,7 @@ export type CheckInListCheckInsResponse = (ListModel_CheckInListItem_);
 export type CheckoutGetRuntimeData = {
     acceptLanguage?: (string | null);
     slug: string;
+    xCheckoutPreviewToken?: (string | null);
     xEdgeOsPublishableKey?: (string | null);
     xTenantId?: (string | null);
 };
@@ -7142,6 +7154,13 @@ export type PopupsDeletePopupData = {
 };
 
 export type PopupsDeletePopupResponse = (void);
+
+export type PopupsCreateCheckoutPreviewTokenData = {
+    popupId: string;
+    xTenantId?: (string | null);
+};
+
+export type PopupsCreateCheckoutPreviewTokenResponse = (CheckoutPreviewTokenPublic);
 
 export type PopupsListPortalPopupsData = {
     acceptLanguage?: (string | null);

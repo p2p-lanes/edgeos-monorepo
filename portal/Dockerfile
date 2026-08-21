@@ -18,6 +18,9 @@ COPY ./packages/shared-events /app/packages/shared-events
 COPY ./portal /app/portal
 ARG NEXT_PUBLIC_API_URL
 ARG ASSET_PREFIX
+# Origin allowed to drive the checkout preview iframe (the backoffice).
+# Unset disables the preview — it accepts messages from nobody.
+ARG NEXT_PUBLIC_BACKOFFICE_ORIGIN
 ENV NODE_ENV=production
 
 RUN pnpm --filter portal run build
