@@ -78,6 +78,22 @@ def _fetch(client: TestClient, popup: Popups, token: str, **headers) -> dict:
 
 
 class TestPortalPopupDetail:
+    def test_it_reports_complete_invoice_configuration(
+        self, client: TestClient, db: Session, tenant_a: Tenants
+    ) -> None:
+        popup = _popup_taking_applications(db, tenant_a)
+        popup.invoice_company_name = "Festival Org"
+        popup.invoice_company_address = "1 Event Way"
+        popup.invoice_company_email = "billing@example.test"
+        db.add(popup)
+        db.commit()
+
+        body = _fetch(client, popup, _human_token(db, tenant_a))
+
+        assert body["invoice_company_name"] == "Festival Org"
+        assert body["invoice_company_address"] == "1 Event Way"
+        assert body["invoice_company_email"] == "billing@example.test"
+
     def test_it_reports_a_door_that_sells_on_an_application_event(
         self, client: TestClient, db: Session, tenant_a: Tenants
     ) -> None:

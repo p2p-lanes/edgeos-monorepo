@@ -647,6 +647,8 @@ class PopupPublic(SQLModel):
     currency: str = "USD"
     terms_and_conditions_url: str | None = None
     invoice_company_name: str | None = None
+    invoice_company_address: str | None = None
+    invoice_company_email: str | None = None
     requires_application_fee: bool = False
     application_fee_amount: Decimal | None = None
     theme_config: dict | None = None

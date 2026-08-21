@@ -29,6 +29,13 @@ describe("buildEndedResources", () => {
     expect(rs["sidebar.passes"]).toBe("disabled")
   })
 
+  it("keeps orders available as read-only history", () => {
+    const rs = byName(
+      buildEndedResources({ t, city: city({}), participated: false }),
+    )
+    expect(rs["sidebar.orders"]).toBe("active")
+  })
+
   it("shows events and directory to participants", () => {
     const rs = byName(
       buildEndedResources({ t, city: city({}), participated: true }),

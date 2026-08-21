@@ -3,6 +3,7 @@ import {
   FileText,
   Layers,
   MapPin,
+  ReceiptText,
   Ticket,
   Users,
 } from "lucide-react"
@@ -47,6 +48,12 @@ export function buildEndedResources({
       icon: Ticket,
       status: "disabled",
       path: `/portal/${city?.slug}/passes`,
+    },
+    {
+      name: t("sidebar.orders"),
+      icon: ReceiptText,
+      status: "active",
+      path: `/portal/${city?.slug}/orders`,
     },
     {
       name: t("sidebar.attendee_directory"),

@@ -101,6 +101,26 @@
     "estimated_total": "Total estimado",
     "definitive_total": "Total"
   },
+  "orders": {
+    "title": "Pedidos",
+    "description": "Tu historial de pagos para este evento.",
+    "empty_title": "Todavía no hay pedidos",
+    "empty_description": "Tu historial de pagos aparecerá aquí.",
+    "total": "Total",
+    "lines": "Artículos del pedido",
+    "line_quantity": "Cantidad: {{count}}",
+    "legacy_purchase": "Compra heredada",
+    "invoice": "Factura",
+    "download_invoice_error": "No se pudo descargar la factura. Inténtelo de nuevo.",
+    "status": {
+      "approved": "Aprobado",
+      "pending": "Pendiente",
+      "rejected": "Rechazado",
+      "expired": "Vencido",
+      "cancelled": "Cancelado",
+      "unknown": "Estado de pago desconocido"
+    }
+  },
   "auth": {
     "sign_up_or_log_in": "Registrarse o Iniciar Sesión",
     "enter_verification_code": "Ingresá el código de verificación",
@@ -546,6 +566,7 @@
     "soon_badge": "Próximamente",
     "application": "Aplicación",
     "shop": "Tienda",
+    "orders": "Pedidos",
     "passes": "Pases",
     "attendee_directory": "Directorio de Asistentes",
     "companion": "Acompañante",

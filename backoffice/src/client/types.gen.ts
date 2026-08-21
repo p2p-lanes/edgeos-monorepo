@@ -3522,6 +3522,8 @@ export type PopupPublic = {
     currency?: string;
     terms_and_conditions_url?: (string | null);
     invoice_company_name?: (string | null);
+    invoice_company_address?: (string | null);
+    invoice_company_email?: (string | null);
     requires_application_fee?: boolean;
     application_fee_amount?: (string | null);
     theme_config?: ({

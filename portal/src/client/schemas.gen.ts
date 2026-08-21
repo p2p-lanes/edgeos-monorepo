@@ -16551,6 +16551,28 @@ export const PopupPublicSchema = {
             ],
             title: 'Invoice Company Name'
         },
+        invoice_company_address: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Invoice Company Address'
+        },
+        invoice_company_email: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Invoice Company Email'
+        },
         requires_application_fee: {
             type: 'boolean',
             title: 'Requires Application Fee',

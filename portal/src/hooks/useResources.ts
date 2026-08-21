@@ -4,6 +4,7 @@ import {
   Layers,
   Link2,
   MapPin,
+  ReceiptText,
   ShoppingBag,
   Ticket,
   Users,
@@ -99,6 +100,12 @@ const useResources = () => {
         status: "active",
         path: `/portal/${city?.slug}/shop`,
       },
+      {
+        name: t("sidebar.orders"),
+        icon: ReceiptText,
+        status: "active",
+        path: `/portal/${city?.slug}/orders`,
+      },
     ]
 
     return { resources, doorName: null }
@@ -131,6 +138,12 @@ const useResources = () => {
         icon: ShoppingBag,
         status: "active",
         path: `/portal/${city?.slug}/shop`,
+      },
+      {
+        name: t("sidebar.orders"),
+        icon: ReceiptText,
+        status: "active",
+        path: `/portal/${city?.slug}/orders`,
       },
       {
         name: t("sidebar.events"),
@@ -197,6 +210,12 @@ const useResources = () => {
       icon: ShoppingBag,
       status: "active",
       path: `/portal/${city?.slug}/shop`,
+    },
+    {
+      name: t("sidebar.orders"),
+      icon: ReceiptText,
+      status: "active",
+      path: `/portal/${city?.slug}/orders`,
     },
     {
       name: t("sidebar.attendee_directory"),

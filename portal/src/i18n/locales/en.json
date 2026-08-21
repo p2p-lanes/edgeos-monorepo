@@ -101,6 +101,26 @@
     "estimated_total": "Estimated total",
     "definitive_total": "Total"
   },
+  "orders": {
+    "title": "Orders",
+    "description": "Your payment history for this event.",
+    "empty_title": "No orders yet",
+    "empty_description": "Your payment history will appear here.",
+    "total": "Total",
+    "lines": "Order items",
+    "line_quantity": "Quantity: {{count}}",
+    "legacy_purchase": "Legacy purchase",
+    "invoice": "Invoice",
+    "download_invoice_error": "Failed to download invoice. Please try again.",
+    "status": {
+      "approved": "Approved",
+      "pending": "Pending",
+      "rejected": "Rejected",
+      "expired": "Expired",
+      "cancelled": "Cancelled",
+      "unknown": "Unknown payment status"
+    }
+  },
   "auth": {
     "sign_up_or_log_in": "Sign Up or Log In",
     "enter_verification_code": "Enter verification code",
@@ -547,6 +567,7 @@
     "soon_badge": "Soon",
     "application": "Application",
     "shop": "Shop",
+    "orders": "Orders",
     "passes": "Passes",
     "attendee_directory": "Attendee Directory",
     "companion": "Companion",

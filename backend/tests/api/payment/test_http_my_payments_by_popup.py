@@ -233,6 +233,40 @@ class TestListMyPaymentsByPopupHttp:
         assert body["paging"]["total"] == 1
         assert body["results"][0]["id"] == str(payment.id)
 
+    def test_legacy_status_and_non_ticket_snapshot_remain_visible(
+        self, client: TestClient, db: Session, tenant_a: Tenants
+    ) -> None:
+        """The portal projection receives legacy provenance and raw payment status."""
+        popup = _make_popup(db, tenant_a, suffix="d-legacy-projection")
+        human = _make_human(db, tenant_a, suffix="d-legacy-projection")
+        payment = _make_direct_payment(db, tenant_a, popup, human)
+        payment.status = "provider_delayed"
+        payment.sales_flow_id = None
+        db.add(payment)
+        db.commit()
+
+        response = client.get(_payments_url(popup.id), headers=_auth(human))
+
+        assert response.status_code == 200
+        result = response.json()["results"][0]
+        assert result["status"] == "provider_delayed"
+        assert result["sales_flow_id"] is None
+        assert result["products_snapshot"] == [
+            {
+                "product_name": "Direct Product",
+                "product_category": "standard",
+                "quantity": 1,
+                "product_price": "50.00",
+                "product_currency": "USD",
+                "attendee_name": "Direct Buyer",
+                "product_description": None,
+                "effective_unit_price": None,
+                "product_id": result["products_snapshot"][0]["product_id"],
+                "attendee_id": result["products_snapshot"][0]["attendee_id"],
+                "created_at": result["products_snapshot"][0]["created_at"],
+            }
+        ]
+
     def test_direct_payment_reusing_application_attendee_remains_buyer_owned(
         self, client: TestClient, db: Session, tenant_a: Tenants
     ) -> None:

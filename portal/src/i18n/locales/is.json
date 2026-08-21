@@ -87,6 +87,26 @@
     "estimated_total": "Áætluð heildarupphæð",
     "definitive_total": "Heildarupphæð"
   },
+  "orders": {
+    "title": "Pantanir",
+    "description": "Greiðsluferill þinn fyrir þennan viðburð.",
+    "empty_title": "Engar pantanir enn",
+    "empty_description": "Greiðsluferillinn þinn birtist hér.",
+    "total": "Samtals",
+    "lines": "Vörur í pöntun",
+    "line_quantity": "Magn: {{count}}",
+    "legacy_purchase": "Eldri kaup",
+    "invoice": "Reikningur",
+    "download_invoice_error": "Mistókst að hlaða niður reikningi. Reyndu aftur.",
+    "status": {
+      "approved": "Samþykkt",
+      "pending": "Í bið",
+      "rejected": "Hafnað",
+      "expired": "Útrunnið",
+      "cancelled": "Hætt við",
+      "unknown": "Óþekkt greiðslustaða"
+    }
+  },
   "auth": {
     "sign_up_or_log_in": "Skráðu þig eða innskráðu",
     "enter_verification_code": "Sláðu inn staðfestingarkóða",
@@ -469,6 +489,7 @@
     "soon_badge": "Bráðum",
     "application": "Umsókn",
     "shop": "Verslun",
+    "orders": "Pantanir",
     "passes": "Passar",
     "attendee_directory": "Þátttakendaskrá",
     "companion": "Förunautur",
