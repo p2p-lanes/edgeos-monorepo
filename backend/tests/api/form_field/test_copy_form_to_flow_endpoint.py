@@ -35,12 +35,20 @@ def _create_popup_via_api(client: TestClient, admin_token: str) -> str:
     return resp.json()["id"]
 
 
-def _make_flow(db: Session, tenant: Tenants, popup_id: str, *, slug: str) -> SalesFlows:
+def _make_flow(
+    db: Session,
+    tenant: Tenants,
+    popup_id: str,
+    *,
+    slug: str,
+    flow_type: str = "application",
+) -> SalesFlows:
     flow = SalesFlows(
         tenant_id=tenant.id,
         popup_id=uuid.UUID(popup_id),
         slug=slug,
         name=slug,
+        type=flow_type,
     )
     db.add(flow)
     db.commit()
@@ -122,6 +130,55 @@ class TestCopyFormToFlowEndpoint:
             json={"source_flow_id": None},
         )
         assert resp.status_code == 404
+
+    def test_source_with_a_different_type_is_rejected_without_mutation(
+        self,
+        client: TestClient,
+        admin_token_tenant_a: str,
+        db: Session,
+        tenant_a: Tenants,
+    ) -> None:
+        popup_id = _create_popup_via_api(client, admin_token_tenant_a)
+        source = _make_flow(
+            db,
+            tenant_a,
+            popup_id,
+            slug="source-application",
+            flow_type="application",
+        )
+        target = _make_flow(
+            db,
+            tenant_a,
+            popup_id,
+            slug="target-direct",
+            flow_type="direct",
+        )
+        db.add(
+            FormFields(
+                tenant_id=tenant_a.id,
+                popup_id=uuid.UUID(popup_id),
+                sales_flow_id=target.id,
+                name="untouched",
+                label="Untouched",
+                field_type="text",
+                position=0,
+            )
+        )
+        db.commit()
+
+        resp = client.post(
+            f"/api/v1/form-fields/copy-to-flow/{target.id}",
+            headers=_headers(admin_token_tenant_a),
+            json={"source_flow_id": str(source.id)},
+        )
+
+        assert resp.status_code == 422, resp.text
+        assert resp.json()["detail"] == (
+            "Source sales flow must have the same type as the target flow"
+        )
+        target_fields, total = form_fields_crud.find_by_flow(db, target.id, limit=1000)
+        assert total == 1
+        assert target_fields[0].name == "untouched"
 
     def test_copy_replaces_target_form_no_duplicates_on_recopy(
         self,

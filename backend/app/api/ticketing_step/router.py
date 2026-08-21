@@ -343,8 +343,8 @@ async def copy_steps_to_flow(
     How a new flow gets a checkout without inheriting one
     (sdd/sales-flows-rediseno R3). The target's own steps are replaced, so
     calling twice does not append. `source_flow_id` must belong to the same
-    popup as the target — a foreign flow is rejected rather than silently
-    ignored.
+    popup and have the same type as the target — an incompatible flow is
+    rejected rather than silently ignored.
     """
     from app.api.sales_flow.crud import sales_flows_crud
 
@@ -360,6 +360,11 @@ async def copy_steps_to_flow(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Sales flow not found for this popup",
+        )
+    if source_flow.type != target_flow.type:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Source sales flow must have the same type as the target flow",
         )
 
     copied = crud.ticketing_steps_crud.copy_steps_to_flow(

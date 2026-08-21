@@ -495,9 +495,9 @@ async def copy_form_to_flow(
 
     `target_flow_id`'s own popup/tenant are resolved server-side, never
     trusted from the client. `source_flow_id` (body) names the flow to copy
-    from and must belong to the SAME popup as the target — mirrors
-    `_resolve_schema_flow_id`'s cross-popup rejection. Omitted copies from
-    the popup's compatibility default when one exists.
+    from and must belong to the SAME popup and have the same type as the
+    target. Omitted copies from the popup's compatibility default when one
+    exists.
     """
     from app.api.sales_flow.crud import sales_flows_crud
 
@@ -511,6 +511,12 @@ async def copy_form_to_flow(
     source_flow_id = _resolve_schema_flow_id(
         db, target_flow.popup_id, body.source_flow_id
     )
+    source_flow = sales_flows_crud.get(db, source_flow_id)
+    if source_flow is None or source_flow.type != target_flow.type:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Source sales flow must have the same type as the target flow",
+        )
 
     counts = crud.form_fields_crud.copy_form_to_flow(
         db,

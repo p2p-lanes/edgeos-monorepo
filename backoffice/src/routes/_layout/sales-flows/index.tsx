@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
 import useAuth from "@/hooks/useAuth"
+import { salesFlowsQueryKey } from "@/lib/salesFlowQueries"
 import { groupByReach } from "@/lib/salesFlowReach"
 
 export const Route = createFileRoute("/_layout/sales-flows/")({
@@ -50,7 +51,7 @@ function AddSalesFlowButton() {
  */
 function FlowMap({ popupId }: { popupId: string }) {
   const { data: salesFlows } = useQuery({
-    queryKey: ["sales-flows", { popupId }],
+    queryKey: salesFlowsQueryKey(popupId),
     queryFn: () =>
       SalesFlowsService.listSalesFlows({ popupId, skip: 0, limit: 100 }),
   })

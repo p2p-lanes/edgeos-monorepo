@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query"
 
 import { SalesFlowsService } from "@/client"
+import { salesFlowsQueryKey } from "@/lib/salesFlowQueries"
 
 interface FlowNameCellProps {
   popupId: string | null
@@ -16,7 +17,7 @@ interface FlowNameCellProps {
  */
 export function FlowNameCell({ popupId, flowId }: FlowNameCellProps) {
   const { data } = useQuery({
-    queryKey: ["sales-flows", { popupId }],
+    queryKey: salesFlowsQueryKey(popupId),
     queryFn: () =>
       SalesFlowsService.listSalesFlows({ popupId: popupId!, limit: 100 }),
     enabled: !!popupId,

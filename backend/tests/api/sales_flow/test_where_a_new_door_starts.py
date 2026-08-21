@@ -6,10 +6,8 @@ door on an event with a partner door inherited a five percent contribution, a
 six-month installment plan and a refusal of coupons, and had to notice each one
 to undo it.
 
-`start_from` lets them say: the defaults for this kind of door (`fresh`),
-nothing at all (`empty`), or a specific door worth copying. Omitting it keeps
-the old behaviour exactly, so no client that has not moved changes what it
-produces.
+`start_from` lets them start fresh or explicitly copy a same-type door. Omitted
+and null values start fresh too.
 
 docs/sales-flows-templates.md, slice 2.
 """
@@ -25,6 +23,7 @@ from app.api.sales_flow.crud import sales_flows_crud
 from app.api.sales_flow.models import SalesFlows
 from app.api.shared.enums import SaleType
 from app.api.tenant.models import Tenants
+from app.api.ticketing_step.models import TicketingSteps
 
 
 def _popup(db: Session, tenant: Tenants, name: str = "Start") -> Popups:
@@ -140,7 +139,7 @@ class TestCopyingAChosenDoor:
         assert flow.application_fee_amount == 25
         assert flow.allows_scholarship is True
 
-    def test_copying_across_kinds_still_drops_what_cannot_be_read(
+    def test_copying_across_kinds_is_rejected(
         self, db: Session, tenant_a: Tenants
     ) -> None:
         popup = _popup(db, tenant_a)
@@ -155,13 +154,8 @@ class TestCopyingAChosenDoor:
             contribution_label="Community fund",
         )
 
-        flow = _seed(db, popup, SaleType.application.value, str(partner.id))
-
-        # The reason someone copies a partner door: its terms.
-        assert flow.contribution_enabled is True
-        assert flow.contribution_label == "Community fund"
-        # And the reason the copy has to be narrowed.
-        assert flow.open_checkout_signing_secret is None
+        with pytest.raises(ValueError, match="same type"):
+            _seed(db, popup, SaleType.application.value, str(partner.id))
 
 
 class TestAnotherGatheringIsOutOfReach:
@@ -197,21 +191,21 @@ class TestAnotherGatheringIsOutOfReach:
             _seed(db, popup, SaleType.application.value, "the-checkout-template")
 
 
-class TestOmittingItChangesNothing:
-    def test_no_start_from_still_copies_the_door_already_selling(
+class TestOmittingItStartsFresh:
+    def test_no_start_from_does_not_copy_the_door_already_selling(
         self, db: Session, tenant_a: Tenants
     ) -> None:
-        """Every existing API client's path. It must produce what it always
-        produced."""
+        """Public creation is fresh unless an operator names a source."""
         popup = _popup(db, tenant_a)
         source = _partner_default(db, popup)
 
         flow = _seed(db, popup, SaleType.direct.value, None)
 
-        assert flow.allows_coupons == source.allows_coupons
-        assert flow.contribution_enabled == source.contribution_enabled
-        assert flow.contribution_label == source.contribution_label
-        assert flow.installments_max == source.installments_max
+        assert source.allows_coupons is False
+        assert flow.allows_coupons is None
+        assert flow.contribution_enabled is None
+        assert flow.contribution_label is None
+        assert flow.installments_max is None
 
 
 class TestThePreviewMatchesWhatYouGet:
@@ -256,7 +250,7 @@ class TestThePreviewMatchesWhatYouGet:
         for name in body["left_empty"]:
             assert getattr(flow, name) is None, name
 
-    def test_it_names_what_will_not_be_carried_over(
+    def test_cross_kind_preview_is_rejected(
         self,
         client: TestClient,
         db: Session,
@@ -273,17 +267,18 @@ class TestThePreviewMatchesWhatYouGet:
             open_checkout_signing_secret="the-key-that-signs-orders",
         )
 
-        body = self._preview(
-            client,
-            admin_token_tenant_a,
-            popup,
-            type="application",
-            start_from=str(partner.id),
+        resp = client.get(
+            "/api/v1/sales-flows/preview",
+            headers={"Authorization": f"Bearer {admin_token_tenant_a}"},
+            params={
+                "popup_id": str(popup.id),
+                "type": "application",
+                "start_from": str(partner.id),
+            },
         )
 
-        assert "open_checkout_signing_secret" in body["not_carried_over"]
-        assert body["source_name"] == "Sponsors"
-        assert body["source_kind"] == "flow"
+        assert resp.status_code == 422, resp.text
+        assert "same type" in resp.json()["detail"]
 
     def test_it_never_leaks_a_secret_it_would_not_copy(
         self,
@@ -313,6 +308,7 @@ class TestThePreviewMatchesWhatYouGet:
             },
         )
 
+        assert resp.status_code == 422, resp.text
         assert "the-key-that-signs-orders" not in resp.text
 
     def test_a_flow_from_another_gathering_is_refused(
@@ -341,6 +337,108 @@ class TestThePreviewMatchesWhatYouGet:
 
 
 class TestCreatingThroughTheApi:
+    @pytest.mark.parametrize("flow_type", ["application", "direct", "upsale"])
+    def test_omitted_and_null_start_fresh_with_a_checkout_baseline(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+        admin_token_tenant_a: str,
+        flow_type: str,
+    ) -> None:
+        popup = _popup(db, tenant_a)
+        _flow(db, popup, flow_type, allows_coupons=False)
+
+        for use_null in (False, True):
+            payload: dict[str, str | None] = {
+                "popup_id": str(popup.id),
+                "type": flow_type,
+                "slug": f"fresh-{flow_type}-{uuid.uuid4().hex[:6]}",
+                "name": "Fresh",
+            }
+            if use_null:
+                payload["start_from"] = None
+
+            resp = client.post(
+                "/api/v1/sales-flows",
+                headers={"Authorization": f"Bearer {admin_token_tenant_a}"},
+                json=payload,
+            )
+
+            assert resp.status_code == 201, resp.text
+            assert resp.json()["allows_coupons"] is None
+            steps = db.exec(
+                select(TicketingSteps).where(
+                    TicketingSteps.sales_flow_id == uuid.UUID(resp.json()["id"])
+                )
+            ).all()
+            assert steps
+
+    @pytest.mark.parametrize("flow_type", ["application", "direct", "upsale"])
+    def test_explicit_same_type_source_copies_configuration(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+        admin_token_tenant_a: str,
+        flow_type: str,
+    ) -> None:
+        popup = _popup(db, tenant_a)
+        source = _flow(db, popup, flow_type, allows_coupons=False)
+
+        resp = client.post(
+            "/api/v1/sales-flows",
+            headers={"Authorization": f"Bearer {admin_token_tenant_a}"},
+            json={
+                "popup_id": str(popup.id),
+                "type": flow_type,
+                "slug": f"copy-{flow_type}-{uuid.uuid4().hex[:6]}",
+                "name": "Copied",
+                "start_from": str(source.id),
+            },
+        )
+
+        assert resp.status_code == 201, resp.text
+        assert resp.json()["allows_coupons"] is False
+
+    @pytest.mark.parametrize(
+        ("target_type", "source_type"),
+        [("application", "direct"), ("direct", "upsale"), ("upsale", "application")],
+    )
+    def test_cross_type_source_is_rejected_without_creating_a_target(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+        admin_token_tenant_a: str,
+        target_type: str,
+        source_type: str,
+    ) -> None:
+        popup = _popup(db, tenant_a)
+        source = _flow(db, popup, source_type)
+        before = db.exec(
+            select(SalesFlows).where(SalesFlows.popup_id == popup.id)
+        ).all()
+
+        resp = client.post(
+            "/api/v1/sales-flows",
+            headers={"Authorization": f"Bearer {admin_token_tenant_a}"},
+            json={
+                "popup_id": str(popup.id),
+                "type": target_type,
+                "slug": f"rejected-{uuid.uuid4().hex[:6]}",
+                "name": "Rejected",
+                "start_from": str(source.id),
+            },
+        )
+
+        assert resp.status_code == 422, resp.text
+        assert resp.json()["detail"] == (
+            "Source sales flow must have the same type as the new sales flow"
+        )
+        after = db.exec(select(SalesFlows).where(SalesFlows.popup_id == popup.id)).all()
+        assert [flow.id for flow in after] == [flow.id for flow in before]
+
     def test_start_from_fresh_reaches_the_created_flow(
         self,
         client: TestClient,
@@ -403,16 +501,14 @@ class TestCreatingThroughTheApi:
         ).all()
         assert steps, "a way in with no steps cannot open"
 
-    def test_the_historical_path_seeds_no_steps(
+    def test_an_omitted_start_from_still_has_a_checkout(
         self,
         client: TestClient,
         db: Session,
         tenant_a: Tenants,
         admin_token_tenant_a: str,
     ) -> None:
-        """Omitting `start_from` leaves step seeding to the caller, which is
-        what the old creation form does — seeding here too would give it two
-        of everything."""
+        """Omitted `start_from` normalizes to fresh, including its baseline."""
         from app.api.ticketing_step.models import TicketingSteps
 
         popup = _popup(db, tenant_a)
@@ -435,7 +531,36 @@ class TestCreatingThroughTheApi:
                 TicketingSteps.sales_flow_id == uuid.UUID(resp.json()["id"])
             )
         ).all()
-        assert steps == []
+        assert steps
+
+    @pytest.mark.parametrize("flow_type", ["application", "direct", "upsale"])
+    @pytest.mark.parametrize("source", ["fresh", "flow"])
+    def test_preview_matches_create_seeding_for_every_flow_type(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+        admin_token_tenant_a: str,
+        flow_type: str,
+        source: str,
+    ) -> None:
+        popup = _popup(db, tenant_a)
+        source_flow = _flow(db, popup, flow_type, allows_coupons=False)
+        start_from = "fresh" if source == "fresh" else str(source_flow.id)
+
+        body = TestThePreviewMatchesWhatYouGet()._preview(
+            client,
+            admin_token_tenant_a,
+            popup,
+            type=flow_type,
+            start_from=start_from,
+        )
+        flow = _seed(db, popup, flow_type, start_from)
+
+        for name, promised in body["starts_with"].items():
+            assert str(getattr(flow, name)) == str(promised), name
+        for name in body["left_empty"]:
+            assert getattr(flow, name) is None, name
 
 
 class TestWhatEachKindOfFlowOffers:

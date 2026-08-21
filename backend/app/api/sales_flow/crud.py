@@ -322,13 +322,12 @@ class SalesFlowsCRUD(BaseCRUD[SalesFlows, SalesFlowCreate, SalesFlowUpdate]):
     ) -> SalesFlows:
         """Create a sales flow. tenant_id is always derived server-side.
 
-        Channel configuration the caller left unset is copied from the
-        popup's default flow here, so every creation path produces a usable
-        flow — a flow with no reminder cadence and no coupon setting is not a
-        smaller flow, it is a broken one.
+        A public creation starts fresh unless the caller explicitly names a
+        source flow. The checkout baseline is seeded by the route after this
+        transaction; configuration stays independent by default.
         """
         data = obj_in.model_dump()
-        start_from = data.pop("start_from", None)
+        start_from = data.pop("start_from", None) or START_FRESH
         data["tenant_id"] = tenant_id
         flow = SalesFlows(**data)
         self.seed_config(session, flow, flow.popup_id, start_from=start_from)
@@ -381,7 +380,7 @@ class SalesFlowsCRUD(BaseCRUD[SalesFlows, SalesFlowCreate, SalesFlowUpdate]):
             reviewers_mode=SalesFlowReviewersMode.inherit,
             identity_mode=SalesFlowIdentityMode.portal_auth,
         )
-        self.seed_config(session, flow, popup_id)
+        self.seed_config(session, flow, popup_id, bootstrap_from_popup=True)
         session.add(flow)
         return flow
 
@@ -393,16 +392,14 @@ class SalesFlowsCRUD(BaseCRUD[SalesFlows, SalesFlowCreate, SalesFlowUpdate]):
         start_from: str | None,
         *,
         exclude_flow_id: uuid.UUID | None = None,
+        bootstrap_from_popup: bool = False,
     ) -> "StartingPoint":
         """Where a new way in takes its configuration from.
 
         `start_from` is what the organiser chose:
 
-        - ``None``   the way in this gathering already sells through. What
-                     every caller did before this existed, so an API client
-                     that has not moved keeps its behaviour exactly.
-        - ``fresh``  nothing carried over: no sibling's contribution, no
-                     sibling's installment plan, no sibling's landing page.
+        - ``None`` or ``fresh`` nothing carried over: no sibling's contribution, no
+                      sibling's installment plan, no sibling's landing page.
         - a flow id  that door, so this one inherits the decisions somebody
                      already made about this gathering.
 
@@ -414,6 +411,9 @@ class SalesFlowsCRUD(BaseCRUD[SalesFlows, SalesFlowCreate, SalesFlowUpdate]):
         from app.api.popup.models import Popups  # noqa: PLC0415
 
         if start_from == START_FRESH:
+            return StartingPoint(kind=START_FRESH, name=None, values={})
+
+        if start_from is None and not bootstrap_from_popup:
             return StartingPoint(kind=START_FRESH, name=None, values={})
 
         if start_from:
@@ -429,12 +429,18 @@ class SalesFlowsCRUD(BaseCRUD[SalesFlows, SalesFlowCreate, SalesFlowUpdate]):
             ).first()
             if source is None:
                 raise ValueError("start_from is not a way into this gathering")
+            if source.type != flow_type:
+                raise ValueError(
+                    "Source sales flow must have the same type as the new sales flow"
+                )
             return StartingPoint(kind="flow", name=source.name, values=_attrs(source))
 
-        # The historical path: the door this gathering already sells through,
-        # falling back to the popup's own columns for the default flow itself,
-        # which has no sibling and is created alongside the popup. That
-        # fallback is the last thing reading those popup columns.
+        if not bootstrap_from_popup:
+            return StartingPoint(kind=START_FRESH, name=None, values={})
+
+        # Default-flow provisioning is intentionally different from public
+        # creation: it happens alongside a popup, before that popup has a
+        # sibling flow, and preserves the popup-derived bootstrap settings.
         source = self.get_default_flow(session, popup_id)
         if source is not None and exclude_flow_id and source.id == exclude_flow_id:
             source = None
@@ -452,6 +458,7 @@ class SalesFlowsCRUD(BaseCRUD[SalesFlows, SalesFlowCreate, SalesFlowUpdate]):
         popup_id: uuid.UUID,
         *,
         start_from: str | None = None,
+        bootstrap_from_popup: bool = False,
     ) -> SalesFlows:
         """Fill the flow's unset channel configuration from its starting point.
 
@@ -473,7 +480,12 @@ class SalesFlowsCRUD(BaseCRUD[SalesFlows, SalesFlowCreate, SalesFlowUpdate]):
         from app.api.sales_flow.schemas import fields_for  # noqa: PLC0415
 
         start = self.resolve_start(
-            session, popup_id, flow.type, start_from, exclude_flow_id=flow.id
+            session,
+            popup_id,
+            flow.type,
+            start_from,
+            exclude_flow_id=flow.id,
+            bootstrap_from_popup=bootstrap_from_popup,
         )
 
         for name in fields_for(flow.type):

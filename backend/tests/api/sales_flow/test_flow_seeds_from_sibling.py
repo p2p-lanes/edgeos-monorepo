@@ -1,4 +1,4 @@
-"""A new flow starts as a copy of the one already selling.
+"""A new flow starts fresh unless it explicitly names a same-type source.
 
 Design: sdd/sales-flows-rediseno R3 — copy, do not inherit. The channel
 configuration (coupon toggle, checkout redirects, reminder cadences) used to
@@ -7,9 +7,8 @@ longer editable anywhere: the backoffice offers them per flow, which is what
 `d4f1a72e9c85` said had to happen before they could be dropped. Seeding from
 them would mean every flow made from now on starts blank.
 
-So a new flow copies the popup's default flow, the one an operator has
-actually been configuring. Only the default flow itself has no sibling, and
-it alone still falls back to the popup.
+The popup's default flow remains the one exception: it is provisioned alongside
+the popup and intentionally bootstraps from popup-derived configuration.
 """
 
 import uuid
@@ -47,7 +46,9 @@ def _default_flow(db: Session, popup: Popups):
     return flow
 
 
-def _create_flow(db: Session, popup: Popups, *, slug: str):
+def _create_flow(
+    db: Session, popup: Popups, *, slug: str, start_from: str | None = None
+):
     return sales_flows_crud.create(
         db,
         obj_in=SalesFlowCreate(
@@ -55,12 +56,13 @@ def _create_flow(db: Session, popup: Popups, *, slug: str):
             slug=slug,
             name=slug,
             type=SaleType.direct.value,
+            start_from=start_from,
         ),
         tenant_id=popup.tenant_id,
     )
 
 
-class TestSeedsFromTheDefaultFlow:
+class TestExplicitlySeedsFromTheDefaultFlow:
     def test_a_second_flow_copies_what_the_default_flow_was_configured_with(
         self, db: Session, tenant_a: Tenants
     ) -> None:
@@ -73,7 +75,12 @@ class TestSeedsFromTheDefaultFlow:
         db.add(default)
         db.commit()
 
-        second = _create_flow(db, popup, slug=f"second-{uuid.uuid4().hex[:6]}")
+        second = _create_flow(
+            db,
+            popup,
+            slug=f"second-{uuid.uuid4().hex[:6]}",
+            start_from=str(default.id),
+        )
 
         assert second.abandoned_cart_delay_days == 4
         assert second.abandoned_cart_repeat_days == 2
@@ -90,7 +97,12 @@ class TestSeedsFromTheDefaultFlow:
         db.add(default)
         db.commit()
 
-        second = _create_flow(db, popup, slug=f"frozen-{uuid.uuid4().hex[:6]}")
+        second = _create_flow(
+            db,
+            popup,
+            slug=f"frozen-{uuid.uuid4().hex[:6]}",
+            start_from=str(default.id),
+        )
 
         default.abandoned_cart_delay_days = 30
         db.add(default)
@@ -115,12 +127,26 @@ class TestSeedsFromTheDefaultFlow:
                 slug=f"explicit-{uuid.uuid4().hex[:6]}",
                 name="Explicit",
                 type=SaleType.direct.value,
+                start_from=str(default.id),
                 abandoned_cart_delay_days=9,
             ),
             tenant_id=tenant_a.id,
         )
 
         assert explicit.abandoned_cart_delay_days == 9
+
+    def test_a_second_flow_starts_fresh_when_source_is_omitted(
+        self, db: Session, tenant_a: Tenants
+    ) -> None:
+        popup = _make_popup(db, tenant_a)
+        default = _default_flow(db, popup)
+        default.abandoned_cart_delay_days = 4
+        db.add(default)
+        db.commit()
+
+        fresh = _create_flow(db, popup, slug=f"fresh-{uuid.uuid4().hex[:6]}")
+
+        assert fresh.abandoned_cart_delay_days is None
 
 
 class TestTheDefaultFlowItself:

@@ -43,11 +43,13 @@ def _make_popup(db: Session, tenant: Tenants) -> Popups:
     return popup
 
 
-def _make_flow(db: Session, popup: Popups, *, slug: str) -> SalesFlows:
+def _make_flow(
+    db: Session, popup: Popups, *, slug: str, flow_type: str = "direct"
+) -> SalesFlows:
     flow = SalesFlows(
         tenant_id=popup.tenant_id,
         popup_id=popup.id,
-        type="direct",
+        type=flow_type,
         slug=slug,
         name=slug,
     )
@@ -161,3 +163,28 @@ class TestCopyStepsToFlow:
         assert _titles(db, target.id) == ["Untouched"], (
             "a rejected copy must not have deleted the target's steps"
         )
+
+    def test_a_source_with_a_different_type_is_rejected_without_mutation(
+        self, client: TestClient, db: Session, tenant_a: Tenants, admin_token_tenant_a
+    ) -> None:
+        popup = _make_popup(db, tenant_a)
+        source = _make_flow(
+            db,
+            popup,
+            slug=f"application-{uuid.uuid4().hex[:6]}",
+            flow_type="application",
+        )
+        target = _make_flow(db, popup, slug=f"direct-{uuid.uuid4().hex[:6]}")
+        _make_step(db, popup, target, title="Untouched")
+
+        resp = client.post(
+            f"/api/v1/ticketing-steps/copy-to-flow/{target.id}",
+            headers=_headers(admin_token_tenant_a),
+            json={"source_flow_id": str(source.id)},
+        )
+
+        assert resp.status_code == 422, resp.text
+        assert resp.json()["detail"] == (
+            "Source sales flow must have the same type as the target flow"
+        )
+        assert _titles(db, target.id) == ["Untouched"]

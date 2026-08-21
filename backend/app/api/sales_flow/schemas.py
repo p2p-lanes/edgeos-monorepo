@@ -218,12 +218,9 @@ class SalesFlowCreate(BaseModel):
     """Sales flow creation payload (BO). tenant_id is derived server-side."""
 
     popup_id: uuid.UUID
-    # Where this way in takes its configuration from: "fresh" for the defaults
-    # of its kind, "empty" for nothing, or the id of a way in to copy.
-    #
-    # Omitting it keeps the behaviour every caller had before this existed —
-    # copy the door this gathering already sells through — so no client that
-    # has not moved changes what it produces.
+    # Where this way in takes its configuration from: "fresh" for no copied
+    # configuration, or the id of a same-type flow to copy explicitly.
+    # Omitted and null values both normalize to fresh in the creation service.
     start_from: str | None = None
     type: SalesFlowType = SalesFlowType.application
     slug: str

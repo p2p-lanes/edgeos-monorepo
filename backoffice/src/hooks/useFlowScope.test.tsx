@@ -15,6 +15,7 @@ vi.mock("@/client", () => ({
 }))
 
 import { SalesFlowsService } from "@/client"
+import { salesFlowsQueryKey } from "@/lib/salesFlowQueries"
 import { useFlowScope } from "./useFlowScope"
 
 // Node's own Web Storage shadows jsdom's and is not usable here, so the
@@ -52,6 +53,14 @@ function makeWrapper() {
   return ({ children }: { children: ReactNode }) => (
     <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
   )
+}
+
+function deferred<T>() {
+  let resolve: (value: T) => void
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise
+  })
+  return { promise, resolve: resolve! }
 }
 
 function renderScope(urlFlowId?: string, onResolved = vi.fn()) {
@@ -113,6 +122,42 @@ describe("useFlowScope", () => {
     await waitFor(() =>
       expect(result.current.activeFlowId).toBe(DEFAULT_FLOW.id),
     )
+  })
+
+  it("keeps the URL flow while a stale list is refetching", async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    })
+    queryClient.setQueryData(salesFlowsQueryKey("popup-1"), {
+      results: [DEFAULT_FLOW],
+      paging: { offset: 0, limit: 100, total: 1 },
+    } as unknown as Listed)
+    const refresh = deferred<Listed>()
+    mockList.mockReturnValueOnce(refresh.promise)
+    const onResolved = vi.fn()
+
+    const { result } = renderHook(
+      () => useFlowScope("popup-1", OTHER_FLOW.id, onResolved),
+      {
+        wrapper: ({ children }: { children: ReactNode }) => (
+          <QueryClientProvider client={queryClient}>
+            {children}
+          </QueryClientProvider>
+        ),
+      },
+    )
+
+    await waitFor(() => expect(mockList).toHaveBeenCalledTimes(1))
+    expect(result.current.activeFlowId).toBeUndefined()
+    expect(onResolved).not.toHaveBeenCalled()
+
+    refresh.resolve({
+      results: [DEFAULT_FLOW, OTHER_FLOW],
+      paging: { offset: 0, limit: 100, total: 2 },
+    } as unknown as Listed)
+
+    await waitFor(() => expect(result.current.activeFlowId).toBe(OTHER_FLOW.id))
+    expect(onResolved).not.toHaveBeenCalled()
   })
 
   it("remembers a pick per gathering, not globally", async () => {

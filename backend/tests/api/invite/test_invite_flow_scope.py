@@ -62,10 +62,14 @@ def _make_flow(
         slug=f"flow-{uuid.uuid4().hex[:8]}",
         name="Volunteers",
     )
-    # A flow created through the API copies its channel configuration from the
-    # one already selling. Built directly, it would start with every setting
-    # NULL — including the one that says whether it takes invites at all.
-    sales_flows_crud.seed_config(db, flow, popup.id)
+    # Invite behavior is copied only when the fixture models a same-type
+    # source. A direct flow stays fresh because cross-type copying is invalid.
+    default_flow = sales_flows_crud.get_default_flow(db, popup.id)
+    assert default_flow is not None
+    if default_flow.type == flow.type:
+        sales_flows_crud.seed_config(
+            db, flow, popup.id, start_from=str(default_flow.id)
+        )
     db.add(flow)
     db.commit()
     db.refresh(flow)

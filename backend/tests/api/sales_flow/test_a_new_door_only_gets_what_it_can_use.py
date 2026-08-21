@@ -69,7 +69,9 @@ def _default_flow(db: Session, popup: Popups, flow_type: str, **config) -> Sales
     return flow
 
 
-def _seed_new_flow(db: Session, popup: Popups, flow_type: str) -> SalesFlows:
+def _seed_new_flow(
+    db: Session, popup: Popups, flow_type: str, start_from: str | None = None
+) -> SalesFlows:
     """Build a transient flow and run the seeding the create path runs."""
     flow = SalesFlows(
         tenant_id=popup.tenant_id,
@@ -78,7 +80,7 @@ def _seed_new_flow(db: Session, popup: Popups, flow_type: str) -> SalesFlows:
         name="New way in",
         type=flow_type,
     )
-    sales_flows_crud.seed_config(db, flow, popup.id)
+    sales_flows_crud.seed_config(db, flow, popup.id, start_from=start_from)
     return flow
 
 
@@ -166,11 +168,10 @@ class TestSeedingAcrossKinds:
         assert flow.allows_incentive is None
         assert flow.abandoned_application_delay_days is None
 
-    def test_what_both_kinds_share_still_crosses(
+    def test_fresh_flow_does_not_copy_shared_settings(
         self, db: Session, tenant_a: Tenants
     ) -> None:
-        """Narrowing the copy must not narrow it too far. A partner's terms
-        are worth inheriting whichever kind of door you are opening."""
+        """Fresh means no source configuration, including shared settings."""
         popup = _popup(db, tenant_a)
         _default_flow(
             db,
@@ -187,13 +188,13 @@ class TestSeedingAcrossKinds:
 
         flow = _seed_new_flow(db, popup, SaleType.application.value)
 
-        assert flow.allows_coupons is False
-        assert flow.contribution_enabled is True
-        assert flow.contribution_label == "Community fund"
-        assert flow.installments_enabled is True
-        assert flow.installments_max == 6
-        assert flow.invites_enabled is True
-        assert flow.abandoned_cart_delay_days == 1
+        assert flow.allows_coupons is None
+        assert flow.contribution_enabled is None
+        assert flow.contribution_label is None
+        assert flow.installments_enabled is None
+        assert flow.installments_max is None
+        assert flow.invites_enabled is None
+        assert flow.abandoned_cart_delay_days is None
 
 
 class TestSameKindIsUntouched:
@@ -224,7 +225,9 @@ class TestSameKindIsUntouched:
             abandoned_application_delay_days=3,
         )
 
-        flow = _seed_new_flow(db, popup, SaleType.application.value)
+        flow = _seed_new_flow(
+            db, popup, SaleType.application.value, start_from=str(source.id)
+        )
 
         for name in EFFECTIVE_CONFIG_FIELDS:
             assert getattr(flow, name) == getattr(source, name), name
@@ -241,6 +244,6 @@ class TestSameKindIsUntouched:
             type=SaleType.application.value,
             allows_coupons=False,
         )
-        sales_flows_crud.seed_config(db, flow, popup.id)
+        sales_flows_crud.seed_config(db, flow, popup.id, start_from="fresh")
 
         assert flow.allows_coupons is False

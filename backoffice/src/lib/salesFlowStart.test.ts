@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest"
 import type { SalesFlowPublic } from "@/client"
 import {
   autoStart,
-  notCarriedAcross,
   START_FRESH,
   slugifyFlowName,
   startChoicesFor,
@@ -49,18 +48,10 @@ describe("startChoicesFor", () => {
     ])
   })
 
-  it("keeps the other kinds out of the way rather than out of reach", () => {
-    // The reason this is a separate list: an incompatible starting point is
-    // never offered by default, so picking one cannot be an accident. It is
-    // still reachable, because somebody wanting their partner's payment terms
-    // on a reviewed door should not have to retype them.
-    const { otherKinds } = startChoicesFor("direct", DOORS)
-    expect(otherKinds.map((o) => o.name)).toEqual([
-      "A copy of Attendee",
-      "A copy of Volunteers",
-      "A copy of Workshops",
-    ])
-    expect(otherKinds.every((o) => o.crossKind)).toBe(true)
+  it("never offers flows of another kind as copy sources", () => {
+    const { offered } = startChoicesFor("direct", DOORS)
+    expect(offered.map((o) => o.name)).not.toContain("A copy of Attendee")
+    expect(offered.map((o) => o.name)).not.toContain("A copy of Workshops")
   })
 
   it("says nothing can be copied when nothing of that kind exists", () => {
@@ -82,22 +73,6 @@ describe("startChoicesFor", () => {
     const { offered } = startChoicesFor("application", DOORS)
     const attendee = offered.find((o) => o.name === "A copy of Attendee")
     expect(attendee?.description).toBe("")
-  })
-})
-
-describe("notCarriedAcross", () => {
-  it("warns a reviewed flow about the signing secret", () => {
-    expect(notCarriedAcross("application")).toContain("signing secret")
-  })
-
-  it("warns a selling flow about the application settings", () => {
-    expect(notCarriedAcross("direct")).toContain("application settings")
-  })
-
-  it("is one line, because the warning is one fact", () => {
-    for (const type of ["application", "direct", "upsale"] as const) {
-      expect(notCarriedAcross(type).split(".").filter(Boolean)).toHaveLength(1)
-    }
   })
 })
 
@@ -129,32 +104,24 @@ describe("autoStart", () => {
     ).toBe(START_FRESH)
   })
 
-  it("copies the one flow of that kind rather than asking", () => {
-    // At launch every gathering has exactly one flow, so this is the case
-    // that decides whether the step is worth a screen. It is not: the answers
-    // do not differ, and copying the sibling is what the backend did before
-    // `start_from` existed.
+  it("starts fresh even when exactly one same-kind source exists", () => {
     const decision = decide("application", [
       flow({ name: "Attendee", type: "application", is_default: true }),
     ])
-    expect(decision?.name).toBe("A copy of Attendee")
+    expect(decision?.id).toBe(START_FRESH)
   })
 
-  it("asks once there are two flows of that kind", () => {
-    // Which is also when the reason for starting clean first appears: a
-    // partner's contribution is only worth refusing once some flow has one.
-    expect(decide("application", DOORS)).toBeNull()
+  it("starts fresh when there are multiple same-kind sources", () => {
+    expect(decide("application", DOORS)?.id).toBe(START_FRESH)
   })
 
-  it("is not forced into a question by flows of another kind", () => {
-    // Copying across kinds is the deliberate path, reached by changing the
-    // answer rather than by being asked for it.
+  it("starts fresh when other kinds exist", () => {
     const decision = decide("direct", [
       flow({ name: "Attendee", type: "application" }),
       flow({ name: "Volunteers", type: "application" }),
       flow({ name: "Sponsors", type: "direct" }),
     ])
-    expect(decision?.name).toBe("A copy of Sponsors")
+    expect(decision?.id).toBe(START_FRESH)
   })
 
   it("has an answer even for a gathering with no flows at all", () => {

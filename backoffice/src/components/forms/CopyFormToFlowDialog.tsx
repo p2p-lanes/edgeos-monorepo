@@ -1,7 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Copy } from "lucide-react"
-import { useState } from "react"
-import { FormFieldsService, SalesFlowsService } from "@/client"
+import { useEffect, useState } from "react"
+import {
+  FormFieldsService,
+  SalesFlowsService,
+  type SalesFlowType,
+} from "@/client"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -21,6 +25,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import useCustomToast from "@/hooks/useCustomToast"
+import { salesFlowsQueryKey } from "@/lib/salesFlowQueries"
 import { createErrorHandler } from "@/utils"
 
 const SHARED_TIER_VALUE = "__shared__"
@@ -28,6 +33,7 @@ const SHARED_TIER_VALUE = "__shared__"
 interface CopyFormToFlowDialogProps {
   popupId: string
   targetFlowId: string
+  targetFlowType: SalesFlowType
 }
 
 /**
@@ -41,6 +47,7 @@ interface CopyFormToFlowDialogProps {
 export function CopyFormToFlowDialog({
   popupId,
   targetFlowId,
+  targetFlowType,
 }: CopyFormToFlowDialogProps) {
   const [open, setOpen] = useState(false)
   const [sourceFlowId, setSourceFlowId] = useState<string>(SHARED_TIER_VALUE)
@@ -48,12 +55,26 @@ export function CopyFormToFlowDialog({
   const queryClient = useQueryClient()
 
   const { data: flows } = useQuery({
-    queryKey: ["sales-flows", popupId],
+    queryKey: salesFlowsQueryKey(popupId),
     queryFn: () => SalesFlowsService.listSalesFlows({ popupId }),
     enabled: open,
   })
 
-  const otherFlows = (flows?.results ?? []).filter((f) => f.id !== targetFlowId)
+  const defaultFlow = (flows?.results ?? []).find(
+    (flow) => flow.is_default && flow.type === targetFlowType,
+  )
+  const otherFlows = (flows?.results ?? []).filter(
+    (flow) =>
+      flow.id !== targetFlowId &&
+      flow.id !== defaultFlow?.id &&
+      flow.type === targetFlowType,
+  )
+
+  useEffect(() => {
+    if (!flows) return
+    if (defaultFlow || sourceFlowId !== SHARED_TIER_VALUE) return
+    setSourceFlowId(otherFlows[0]?.id ?? "")
+  }, [defaultFlow, flows, otherFlows, sourceFlowId])
 
   const copyMutation = useMutation({
     mutationFn: () =>
@@ -95,9 +116,11 @@ export function CopyFormToFlowDialog({
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value={SHARED_TIER_VALUE}>
-              Event's shared form
-            </SelectItem>
+            {defaultFlow && (
+              <SelectItem value={SHARED_TIER_VALUE}>
+                Event's shared form
+              </SelectItem>
+            )}
             {otherFlows.map((flow) => (
               <SelectItem key={flow.id} value={flow.id}>
                 {flow.name}
@@ -115,6 +138,10 @@ export function CopyFormToFlowDialog({
           </Button>
           <LoadingButton
             loading={copyMutation.isPending}
+            disabled={
+              !sourceFlowId ||
+              (sourceFlowId === SHARED_TIER_VALUE && !defaultFlow)
+            }
             onClick={() => copyMutation.mutate()}
           >
             Copy

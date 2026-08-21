@@ -268,22 +268,20 @@ async def create_sales_flow(
         )
 
     try:
-        # `create` copies the popup's channel configuration into anything
-        # the caller left unset (sdd/sales-flows-rediseno slice 7).
         flow = crud.sales_flows_crud.create(db, flow_in, tenant_id=popup.tenant_id)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from exc
     except IntegrityError as exc:
         db.rollback()
         _raise_on_default_conflict(exc)
 
-    # A door with no steps has no checkout: it renders nothing and sells
-    # nothing. Somebody who asked to start fresh or start empty is asking
-    # about SETTINGS, and would not expect the answer to be a way in that
-    # cannot open.
-    #
-    # Only for that value, which is new. A caller that omits `start_from` is
-    # on the historical path, where the client copies steps from a source flow
-    # itself — seeding here as well would give it two of everything.
-    if flow_in.start_from == START_FRESH:
+    # A fresh flow needs its own type-required technical checkout baseline.
+    # An explicit source is copied separately by the caller, so seeding it
+    # here would duplicate the source's checkout steps.
+    if flow_in.start_from is None or flow_in.start_from == START_FRESH:
         seed_ticketing_steps_for_popup(
             db,
             popup_id=flow.popup_id,

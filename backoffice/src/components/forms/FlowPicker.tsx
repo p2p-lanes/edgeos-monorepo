@@ -9,6 +9,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { salesFlowsQueryKey } from "@/lib/salesFlowQueries"
 
 interface FlowPickerProps {
   popupId: string
@@ -42,7 +43,7 @@ export function FlowPicker({
   hint,
 }: FlowPickerProps) {
   const { data } = useQuery({
-    queryKey: ["sales-flows", { popupId }],
+    queryKey: salesFlowsQueryKey(popupId),
     queryFn: () => SalesFlowsService.listSalesFlows({ popupId, limit: 100 }),
     enabled: !!popupId,
   })

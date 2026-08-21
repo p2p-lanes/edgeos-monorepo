@@ -162,6 +162,7 @@ function FormBuilderContent({ popupId }: { popupId: string }) {
     activeFlowId,
     isLoading: flowsLoading,
   } = useFlowScope(popupId, flowParam, adoptFlow)
+  const activeFlow = flows.find((flow) => flow.id === activeFlowId)
 
   const queryClient = useQueryClient()
   const { showSuccessToast, showErrorToast } = useCustomToast()
@@ -737,10 +738,11 @@ function FormBuilderContent({ popupId }: { popupId: string }) {
             <Sparkles className="h-4 w-4" />
             Add predefined fields
           </Button>
-          {activeFlowId && (
+          {activeFlow?.type && (
             <CopyFormToFlowDialog
               popupId={popupId}
-              targetFlowId={activeFlowId}
+              targetFlowId={activeFlow.id}
+              targetFlowType={activeFlow.type}
             />
           )}
         </div>

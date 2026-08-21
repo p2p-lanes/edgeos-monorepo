@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useNavigate } from "@tanstack/react-router"
-import { Check, ChevronRight } from "lucide-react"
+import { Check } from "lucide-react"
 import { useMemo, useState } from "react"
 
 import {
@@ -13,9 +13,9 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import useCustomToast from "@/hooks/useCustomToast"
+import { salesFlowsQueryKey } from "@/lib/salesFlowQueries"
 import {
   autoStart,
-  notCarriedAcross,
   type StartOption,
   slugifyFlowName,
   startChoicesFor,
@@ -49,10 +49,9 @@ export function NewSalesFlowWizard({ popupId }: { popupId: string }) {
   const [flowType, setFlowType] = useState<SalesFlowType | null>(null)
   const [startFrom, setStartFrom] = useState<string | null>(null)
   const [name, setName] = useState("")
-  const [showOtherKinds, setShowOtherKinds] = useState(false)
 
   const { data: flowsData } = useQuery({
-    queryKey: ["sales-flows", popupId],
+    queryKey: salesFlowsQueryKey(popupId),
     queryFn: () => SalesFlowsService.listSalesFlows({ popupId, limit: 100 }),
   })
   const flows = useMemo(() => flowsData?.results ?? [], [flowsData])
@@ -63,11 +62,7 @@ export function NewSalesFlowWizard({ popupId }: { popupId: string }) {
   )
   const chosen: StartOption | null = useMemo(() => {
     if (!choices || !startFrom) return null
-    return (
-      [...choices.offered, ...choices.otherKinds].find(
-        (o) => o.id === startFrom,
-      ) ?? null
-    )
+    return choices.offered.find((o) => o.id === startFrom) ?? null
   }, [choices, startFrom])
 
   const { data: preview } = useQuery({
@@ -112,9 +107,13 @@ export function NewSalesFlowWizard({ popupId }: { popupId: string }) {
       return created
     },
     onSuccess: (created) => {
-      queryClient.invalidateQueries({ queryKey: ["sales-flows"] })
+      queryClient.invalidateQueries({ queryKey: salesFlowsQueryKey(popupId) })
       showSuccessToast("Sales flow created")
-      navigate({ to: "/sales-flows/$id/edit", params: { id: created.id } })
+      navigate({
+        to: "/sales-flows/$id/edit",
+        params: { id: created.id },
+        replace: true,
+      })
     },
     onError: createErrorHandler(showErrorToast),
   })
@@ -130,19 +129,10 @@ export function NewSalesFlowWizard({ popupId }: { popupId: string }) {
   ]
 
   function chooseType(next: SalesFlowType) {
-    // A source that can no longer produce this kind of flow stops being the
-    // answer, rather than waiting to be rejected at submit.
-    if (chosen?.kind === "copy" && chosen.sourceType !== next) {
-      setStartFrom(null)
-    }
     setFlowType(next)
-    setShowOtherKinds(false)
 
-    // Step two is skipped when its answers do not differ: nothing of this
-    // kind to copy, or exactly one thing, which is almost always right. It
-    // stays on the step rail with its answer, and the review says where the
-    // flow starts with a way to change it, so nothing is decided behind
-    // anyone's back — it is just not made into a question.
+    // Fresh is deliberately selected even when there is exactly one compatible
+    // source. The source picker remains available through Change.
     const automatic = autoStart(startChoicesFor(next, flows))
     if (automatic) {
       setStartFrom(automatic.id)
@@ -251,44 +241,6 @@ export function NewSalesFlowWizard({ popupId }: { popupId: string }) {
               />
             ))}
           </div>
-
-          {choices.otherKinds.length > 0 && (
-            <div className="rounded-xl border border-dashed">
-              <button
-                type="button"
-                onClick={() => setShowOtherKinds((v) => !v)}
-                className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm text-muted-foreground hover:text-foreground"
-              >
-                <ChevronRight
-                  className={cn(
-                    "h-4 w-4 transition-transform",
-                    showOtherKinds && "rotate-90",
-                  )}
-                />
-                Copy a flow of a different kind ({choices.otherKinds.length})
-              </button>
-              {showOtherKinds && (
-                <div className="flex flex-col gap-3 border-t p-4">
-                  <p className="text-sm text-warning">
-                    {notCarriedAcross(flowType)}
-                  </p>
-                  <div className="flex flex-col gap-2">
-                    {choices.otherKinds.map((option) => (
-                      <StartRow
-                        key={option.id}
-                        option={option}
-                        selected={startFrom === option.id}
-                        onSelect={() => {
-                          setStartFrom(option.id)
-                          setStep(3)
-                        }}
-                      />
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
 
           <div>
             <Button variant="outline" onClick={() => setStep(1)}>

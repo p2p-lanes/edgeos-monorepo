@@ -96,7 +96,7 @@ class TestIndependence:
         )
         db.commit()
         second = self._second_flow(db, popup)
-        sales_flows_crud.seed_config(db, second, popup.id)
+        sales_flows_crud.seed_config(db, second, popup.id, start_from=str(first.id))
         db.commit()
 
         first.theme_config = COOL

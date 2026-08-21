@@ -16,6 +16,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
 import useAuth from "@/hooks/useAuth"
+import { salesFlowsQueryKey } from "@/lib/salesFlowQueries"
 
 export const Route = createFileRoute("/_layout/theme/")({
   component: ThemePage,
@@ -65,7 +66,7 @@ function ThemePageContent({ popupId }: { popupId: string }) {
   })
 
   const { data: flowsData } = useQuery({
-    queryKey: ["sales-flows", { popupId }],
+    queryKey: salesFlowsQueryKey(popupId),
     queryFn: () => SalesFlowsService.listSalesFlows({ popupId, limit: 100 }),
   })
   const flows = flowsData?.results ?? []

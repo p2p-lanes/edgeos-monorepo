@@ -132,7 +132,7 @@ export class ApiKeysService {
             url: '/api/v1/api-keys'
         });
     }
-    
+
     /**
      * Create an API key
      * @param data The data for the request.
@@ -151,7 +151,7 @@ export class ApiKeysService {
             }
         });
     }
-    
+
     /**
      * Revoke an API key
      * @param data The data for the request.
@@ -204,7 +204,7 @@ export class ApplicationReviewsService {
             }
         });
     }
-    
+
     /**
      * Submit Review
      * Submit or update a review for an application.
@@ -2576,7 +2576,6 @@ export class CheckoutService {
             }
         });
     }
-
     /**
      * Restore Flow Cart
      * Restore a flow-scoped cart from a signed link.
@@ -2611,7 +2610,6 @@ export class CheckoutService {
             }
         });
     }
-
     /**
      * Release Pending Open
      * Opportunistically release a buyer's own prior PENDING payment on checkout return.
@@ -5455,9 +5453,9 @@ export class FormFieldsService {
      *
      * `target_flow_id`'s own popup/tenant are resolved server-side, never
      * trusted from the client. `source_flow_id` (body) names the flow to copy
-     * from and must belong to the SAME popup as the target — mirrors
-     * `_resolve_schema_flow_id`'s cross-popup rejection. Omitted copies from
-     * the popup's compatibility default when one exists.
+     * from and must belong to the SAME popup and have the same type as the
+     * target. Omitted copies from the popup's compatibility default when one
+     * exists.
      * @param data The data for the request.
      * @param data.targetFlowId
      * @param data.requestBody
@@ -8355,7 +8353,6 @@ export class SalesFlowsService {
             }
         });
     }
-
     /**
      * List Sales Flows
      * List sales flows for a popup (BO only).
@@ -9726,8 +9723,8 @@ export class TicketingStepsService {
      * How a new flow gets a checkout without inheriting one
      * (sdd/sales-flows-rediseno R3). The target's own steps are replaced, so
      * calling twice does not append. `source_flow_id` must belong to the same
-     * popup as the target — a foreign flow is rejected rather than silently
-     * ignored.
+     * popup and have the same type as the target — an incompatible flow is
+     * rejected rather than silently ignored.
      * @param data The data for the request.
      * @param data.targetFlowId
      * @param data.requestBody

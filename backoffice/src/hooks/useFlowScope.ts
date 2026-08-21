@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query"
 import { useEffect } from "react"
 
 import { type SalesFlowPublic, SalesFlowsService } from "@/client"
+import { salesFlowsQueryKey } from "@/lib/salesFlowQueries"
 
 const STORAGE_KEY = "edgeos.flow-scope"
 
@@ -65,8 +66,8 @@ export function useFlowScope(
   urlFlowId: string | undefined,
   onFlowResolved?: (flowId: string) => void,
 ): UseFlowScopeResult {
-  const { data, isLoading } = useQuery({
-    queryKey: ["sales-flows", { popupId }],
+  const { data, isFetching, isLoading } = useQuery({
+    queryKey: salesFlowsQueryKey(popupId),
     queryFn: () =>
       SalesFlowsService.listSalesFlows({ popupId: popupId!, limit: 100 }),
     enabled: !!popupId,
@@ -75,12 +76,17 @@ export function useFlowScope(
   const flows = data?.results ?? []
   // A URL naming a flow of another gathering must not win. Falling through
   // to the remembered or default flow keeps the page showing something real.
+  // A stale list cannot prove that the URL flow is missing, though: wait for
+  // its refetch before replacing the URL with a remembered/default flow.
   const fromUrl = flows.find((f) => f.id === urlFlowId)
+  const isRefreshingMissingUrlFlow = !!urlFlowId && !fromUrl && isFetching
   const remembered = popupId
     ? flows.find((f) => f.id === readRemembered(popupId))
     : undefined
   const fallback = flows.find((f) => f.is_default) ?? flows[0]
-  const activeFlow = fromUrl ?? remembered ?? fallback
+  const activeFlow = isRefreshingMissingUrlFlow
+    ? undefined
+    : (fromUrl ?? remembered ?? fallback)
 
   useEffect(() => {
     if (!activeFlow || activeFlow.id === urlFlowId) return

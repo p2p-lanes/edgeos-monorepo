@@ -4,7 +4,7 @@
  * precedent for JSX composition.
  */
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
-import { render, screen } from "@testing-library/react"
+import { render, screen, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import type { ReactNode } from "react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
@@ -45,8 +45,14 @@ describe("CopyFormToFlowDialog", () => {
     vi.clearAllMocks()
     mockListSalesFlows.mockResolvedValue({
       results: [
-        { id: "flow-2", name: "Upsale Flow" },
-        { id: "flow-1", name: "Default Flow" },
+        { id: "flow-2", name: "Application Flow", type: "application" },
+        { id: "flow-3", name: "Upsale Flow", type: "upsale" },
+        {
+          id: "flow-1",
+          name: "Default Flow",
+          type: "application",
+          is_default: true,
+        },
       ],
       paging: { limit: 100, offset: 0, total: 2 },
     } as never)
@@ -57,10 +63,14 @@ describe("CopyFormToFlowDialog", () => {
     })
   })
 
-  it("excludes the target flow itself from the source options", async () => {
+  it("offers only same-type sources and excludes the target itself", async () => {
     render(
       <Wrapper>
-        <CopyFormToFlowDialog popupId="popup-1" targetFlowId="flow-1" />
+        <CopyFormToFlowDialog
+          popupId="popup-1"
+          targetFlowId="flow-1"
+          targetFlowType="application"
+        />
       </Wrapper>,
     )
     await userEvent.click(
@@ -68,18 +78,26 @@ describe("CopyFormToFlowDialog", () => {
     )
     await userEvent.click(screen.getByRole("combobox"))
 
-    expect(await screen.findByText("Upsale Flow")).toBeInTheDocument()
+    expect(await screen.findByText("Application Flow")).toBeInTheDocument()
+    expect(screen.queryByText("Upsale Flow")).not.toBeInTheDocument()
     expect(screen.queryByText("Default Flow")).not.toBeInTheDocument()
   })
 
   it("defaults to the event's shared form and copies on confirm", async () => {
     render(
       <Wrapper>
-        <CopyFormToFlowDialog popupId="popup-1" targetFlowId="flow-1" />
+        <CopyFormToFlowDialog
+          popupId="popup-1"
+          targetFlowId="flow-1"
+          targetFlowType="application"
+        />
       </Wrapper>,
     )
     await userEvent.click(
       screen.getByRole("button", { name: /copy form from/i }),
+    )
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /^copy$/i })).toBeEnabled(),
     )
     await userEvent.click(screen.getByRole("button", { name: /^copy$/i }))
 

@@ -56,6 +56,7 @@ import {
   UnsavedChangesDialog,
   useUnsavedChanges,
 } from "@/hooks/useUnsavedChanges"
+import { salesFlowsQueryKey } from "@/lib/salesFlowQueries"
 import { createErrorHandler } from "@/utils"
 
 const FIELD_TYPES = [
@@ -102,7 +103,7 @@ export function FormFieldForm({
   // popup's default flow — named explicitly rather than left for the
   // backend to guess.
   const { data: flowsData } = useQuery({
-    queryKey: ["sales-flows", popupId],
+    queryKey: salesFlowsQueryKey(popupId),
     queryFn: () =>
       SalesFlowsService.listSalesFlows({
         popupId: popupId as string,
