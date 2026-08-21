@@ -36,6 +36,7 @@ import {
 import {
   type ApiError,
   type ApplicationPublic,
+  type ApplicationReviewerOption,
   type ApplicationReviewerVote,
   ApplicationReviewsService,
   type ApplicationStatus,
@@ -43,7 +44,6 @@ import {
   ApprovalStrategiesService,
   FormFieldsService,
   type HumanRating,
-  PopupReviewersService,
   PopupsService,
   type ReviewDecision,
 } from "@/client"
@@ -291,6 +291,7 @@ interface GroupByField {
 const FIXED_GROUP_BY_OPTIONS: { value: string; label: string }[] = [
   { value: "status", label: "Status" },
   { value: "scholarship_status", label: "Scholarship status" },
+  { value: "reviewed_by", label: "Reviewed by" },
   { value: "gender", label: "Gender" },
   { value: "age", label: "Age" },
 ]
@@ -1288,10 +1289,12 @@ function ApplicationsTableContent({
     enabled: !groupBy,
   })
 
-  const { data: popupReviewers } = useQuery({
-    queryKey: ["popup-reviewers", selectedPopupId],
+  const { data: applicationReviewers } = useQuery({
+    queryKey: ["applications", selectedPopupId, "reviewers"],
     queryFn: () =>
-      PopupReviewersService.listReviewers({ popupId: selectedPopupId! }),
+      ApplicationsService.listApplicationReviewers({
+        popupId: selectedPopupId!,
+      }),
     enabled: !!selectedPopupId,
   })
 
@@ -1335,30 +1338,17 @@ function ApplicationsTableContent({
     setFilters,
   ])
 
-  const reviewers = popupReviewers?.results ?? []
-
-  // Drop reviewer conditions that reference reviewers outside the current
-  // popup (e.g. after switching gatherings).
-  useEffect(() => {
-    if (!popupReviewers) return
-    const isInvalid = (condition: FilterCondition) =>
-      condition.field === "reviewed_by" &&
-      (!selectedPopupId ||
-        !reviewers.some((reviewer) => reviewer.user_id === condition.value))
-    if (filterConditions.some(isInvalid)) {
-      setFilters(
-        filterMatch,
-        filterConditions.filter((condition) => !isInvalid(condition)),
-      )
-    }
-  }, [
-    popupReviewers,
-    reviewers,
-    selectedPopupId,
-    filterConditions,
-    filterMatch,
-    setFilters,
-  ])
+  const reviewers = applicationReviewers ?? []
+  const reviewerLabels = useMemo(
+    () =>
+      Object.fromEntries(
+        reviewers.map((reviewer: ApplicationReviewerOption) => [
+          reviewer.id,
+          reviewer.full_name ?? reviewer.email ?? "Unknown reviewer",
+        ]),
+      ),
+    [reviewers],
+  )
 
   const bulkReviewMutation = useMutation({
     mutationFn: async ({
@@ -1574,9 +1564,8 @@ function ApplicationsTableContent({
         customFields={customFilterFields}
         baseFieldOptions={baseFieldOptions}
         reviewerOptions={reviewers.map((reviewer) => ({
-          value: reviewer.user_id,
-          label:
-            reviewer.user_full_name ?? reviewer.user_email ?? reviewer.user_id,
+          value: reviewer.id,
+          label: reviewer.full_name ?? reviewer.email ?? "Unknown reviewer",
         }))}
         match={filterMatch}
         conditions={filterConditions}
@@ -1634,6 +1623,7 @@ function ApplicationsTableContent({
           search={search}
           valueOrder={groupValueOrder}
           subValueOrder={subGroupValueOrder}
+          reviewerLabels={reviewerLabels}
           hiddenOnMobile={hiddenOnMobile}
           columnPrefs={columnPrefs}
         />
