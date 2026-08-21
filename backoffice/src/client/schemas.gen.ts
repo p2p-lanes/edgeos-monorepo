@@ -1625,6 +1625,42 @@ export const ApplicationReviewSkipPublicSchema = {
     description: 'ApplicationReviewSkip schema for API responses.'
 } as const;
 
+export const ApplicationReviewerOptionSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        full_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Full Name'
+        },
+        email: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Email'
+        }
+    },
+    type: 'object',
+    required: ['id'],
+    title: 'ApplicationReviewerOption',
+    description: 'A reviewer who has submitted at least one review for a popup.'
+} as const;
+
 export const ApplicationReviewerVoteSchema = {
     properties: {
         reviewer_id: {
@@ -19208,7 +19244,7 @@ export const SavedViewUpdateSchema = {
 export const ScholarshipDecisionRequestSchema = {
     properties: {
         scholarship_status: {
-            '$ref': '#/components/schemas/ScholarshipStatus'
+            '$ref': '#/components/schemas/ScholarshipDecisionStatus'
         },
         discount_percentage: {
             anyOf: [
@@ -19258,11 +19294,11 @@ export const ScholarshipDecisionRequestSchema = {
     description: 'Admin request body for PATCH /applications/{id}/scholarship.'
 } as const;
 
-export const ScholarshipStatusSchema = {
+export const ScholarshipDecisionStatusSchema = {
     type: 'string',
-    enum: ['pending', 'approved', 'rejected'],
-    title: 'ScholarshipStatus',
-    description: 'Status of a scholarship request on an application.'
+    enum: ['approved', 'rejected'],
+    title: 'ScholarshipDecisionStatus',
+    description: 'Scholarship outcomes an administrator may assign.'
 } as const;
 
 export const SelfCheckInOptionsSchema = {

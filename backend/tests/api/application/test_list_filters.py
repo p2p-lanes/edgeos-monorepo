@@ -48,6 +48,7 @@ def _make_application(
     residence: str | None = None,
     rating: str | None = None,
     scholarship_request: bool = False,
+    scholarship_status: str | None = None,
     scholarship_video_url: str | None = None,
 ) -> Applications:
     human = Humans(
@@ -71,6 +72,7 @@ def _make_application(
         referral=referral,
         submitted_at=submitted_at,
         scholarship_request=scholarship_request,
+        scholarship_status=scholarship_status,
         scholarship_video_url=scholarship_video_url,
     )
     db.add(application)
@@ -395,6 +397,40 @@ class TestApplicationListFilters:
         )
         assert _ids(response) == {str(incomplete.id)}
 
+    def test_scholarship_status_filter_values_are_whitelisted(
+        self, db: Session, tenant_a: Tenants, client: TestClient
+    ) -> None:
+        popup = _make_popup(db, tenant_a)
+        admin = _make_admin(db, tenant_a)
+        pending = _make_application(
+            db,
+            tenant_a,
+            popup,
+            scholarship_request=True,
+            scholarship_status="pending",
+        )
+        _make_application(
+            db,
+            tenant_a,
+            popup,
+            scholarship_request=True,
+            scholarship_status="approved",
+        )
+
+        response = _list(
+            client, admin, tenant_a, popup, _one("scholarship_status", "eq", "pending")
+        )
+        assert _ids(response) == {str(pending.id)}
+
+        response = _list(
+            client,
+            admin,
+            tenant_a,
+            popup,
+            _one("scholarship_status", "eq", "not-a-scholarship-status"),
+        )
+        assert response.status_code == 422, response.text
+
     def test_empty_conditions_is_noop(
         self, db: Session, tenant_a: Tenants, client: TestClient
     ) -> None:
@@ -515,6 +551,30 @@ class TestApplicationListFilters:
             _one("reviewed_by", "neq", str(reviewer_a.id)),
         )
         assert _ids(response) == {str(reviewed_by_b.id), str(unreviewed.id)}
+
+    def test_reviewer_options_include_non_designated_review_submitters(
+        self, db: Session, tenant_a: Tenants, client: TestClient
+    ) -> None:
+        popup = _make_popup(db, tenant_a)
+        admin = _make_admin(db, tenant_a)
+        reviewer = _make_admin(db, tenant_a)
+        application = _make_application(db, tenant_a, popup)
+        _make_review(db, tenant_a, application, reviewer)
+
+        response = client.get(
+            "/api/v1/applications/reviewers",
+            params={"popup_id": str(popup.id)},
+            headers=_auth(admin, tenant_a),
+        )
+
+        assert response.status_code == 200, response.text
+        assert response.json() == [
+            {
+                "id": str(reviewer.id),
+                "full_name": reviewer.full_name,
+                "email": reviewer.email,
+            }
+        ]
 
     def test_reviewed_by_combined_with_status(
         self, db: Session, tenant_a: Tenants, client: TestClient
