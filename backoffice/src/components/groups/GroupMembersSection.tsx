@@ -60,7 +60,7 @@ export function GroupMembersSection({ group }: GroupMembersSectionProps) {
 
   const removeMutation = useMutation({
     mutationFn: (humanId: string) =>
-      GroupsService.removeGroupMember({ groupId: group.id, humanId }),
+      GroupsService.removeGroupMemberAdmin({ groupId: group.id, humanId }),
     onSuccess: () => {
       showSuccessToast("Member removed")
       queryClient.invalidateQueries({ queryKey: ["groups", group.id] })
