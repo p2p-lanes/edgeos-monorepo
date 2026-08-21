@@ -61,13 +61,18 @@ def resolve_active_direct_popup_slug(db: Session, tenant_id: uuid.UUID) -> str |
 
 
 def get_open_ticketing_popup(
-    session: Session, slug: str, tenant_id: uuid.UUID
+    session: Session, slug: str, tenant_id: uuid.UUID, preview: bool = False
 ) -> Popups:
     """Resolve an active direct-sale popup by slug and tenant for open ticketing.
 
+    ``preview=True`` skips the sale-type and status gates so the backoffice can
+    render a live preview of a popup that is still being configured. It is only
+    reachable with a preview token minted for an authenticated operator (see
+    ``app.utils.checkout_preview``) — the popup is never exposed publicly.
+
     Raises:
         404 — popup not found by slug + tenant_id
-        403 — popup is not sale_type=direct OR is not active
+        403 — popup is not sale_type=direct OR is not active (unless preview)
     """
     popup = session.exec(
         select(Popups).where(Popups.slug == slug, Popups.tenant_id == tenant_id)
@@ -78,6 +83,9 @@ def get_open_ticketing_popup(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Popup not found",
         )
+
+    if preview:
+        return popup
 
     if popup.sale_type != SaleType.direct.value:
         raise HTTPException(
@@ -95,7 +103,11 @@ def get_open_ticketing_popup(
 
 
 def runtime_for_slug(
-    session: Session, slug: str, tenant_id: uuid.UUID, lang: str | None = None
+    session: Session,
+    slug: str,
+    tenant_id: uuid.UUID,
+    lang: str | None = None,
+    preview: bool = False,
 ) -> CheckoutRuntimeResponse:
     """Load the public runtime data for an open-ticketing checkout page.
 
@@ -103,8 +115,12 @@ def runtime_for_slug(
     overlaid with the matching translations. The overlay is default-agnostic:
     if the requested language equals the popup default (no rows exist), the
     untranslated source is returned unchanged.
+
+    ``preview=True`` (backoffice live preview) serves popups that are not yet
+    active and includes disabled ticketing steps, so an operator can see a step
+    before enabling it. Everything else is identical to the public payload.
     """
-    popup = get_open_ticketing_popup(session, slug, tenant_id)
+    popup = get_open_ticketing_popup(session, slug, tenant_id, preview=preview)
 
     # Load active products
     products = list(
@@ -127,14 +143,14 @@ def runtime_for_slug(
         ).all()
     )
 
+    steps_query = select(TicketingSteps).where(TicketingSteps.popup_id == popup.id)
+    if not preview:
+        steps_query = steps_query.where(
+            TicketingSteps.is_enabled == True,  # noqa: E712
+        )
     ticketing_steps = list(
         session.exec(
-            select(TicketingSteps)
-            .where(
-                TicketingSteps.popup_id == popup.id,
-                TicketingSteps.is_enabled == True,  # noqa: E712
-            )
-            .order_by(TicketingSteps.order)  # type: ignore[arg-type]
+            steps_query.order_by(TicketingSteps.order)  # type: ignore[arg-type]
         ).all()
     )
 

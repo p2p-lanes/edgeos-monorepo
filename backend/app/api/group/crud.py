@@ -3,13 +3,14 @@ import uuid
 from typing import Any
 
 from fastapi import HTTPException, status
-from sqlalchemy import desc
+from sqlalchemy import delete, desc, update
 from sqlalchemy.orm import selectinload
 from sqlmodel import Session, col, func, or_, select
 
 from app.api.group.models import (
     GroupLeaders,
     GroupMembers,
+    GroupProducts,
     Groups,
     GroupWhitelistedEmails,
 )
@@ -365,14 +366,50 @@ class GroupsCRUD(BaseCRUD[Groups, GroupCreate, GroupUpdate]):
     def remove_member(
         self, session: Session, group_id: uuid.UUID, human_id: uuid.UUID
     ) -> None:
-        """Remove a member from a group."""
+        """Remove a member and any leadership role from a group atomically."""
         statement = select(GroupMembers).where(
             GroupMembers.group_id == group_id, GroupMembers.human_id == human_id
         )
         member = session.exec(statement).first()
         if member:
+            session.execute(
+                delete(GroupLeaders).where(
+                    GroupLeaders.group_id == group_id,
+                    GroupLeaders.human_id == human_id,
+                )
+            )
             session.delete(member)
             session.commit()
+
+    def delete_with_associations(self, session: Session, group: Groups) -> None:
+        """Delete a group without changing the state of related records.
+
+        Application and payment group IDs are nullable associations, so they are
+        cleared before the group is removed. Membership, leadership, product,
+        and whitelist links are removed with the group; applications, humans,
+        attendees, and purchases remain intact.
+        """
+        from app.api.application.models import Applications
+        from app.api.payment.models import Payments
+
+        session.execute(
+            update(Applications)
+            .where(Applications.group_id == group.id)
+            .values(group_id=None)
+        )
+        session.execute(
+            update(Payments).where(Payments.group_id == group.id).values(group_id=None)
+        )
+        session.execute(delete(GroupLeaders).where(GroupLeaders.group_id == group.id))
+        session.execute(delete(GroupMembers).where(GroupMembers.group_id == group.id))
+        session.execute(delete(GroupProducts).where(GroupProducts.group_id == group.id))
+        session.execute(
+            delete(GroupWhitelistedEmails).where(
+                GroupWhitelistedEmails.group_id == group.id
+            )
+        )
+        session.delete(group)
+        session.commit()
 
     def is_member(
         self, session: Session, group_id: uuid.UUID, human_id: uuid.UUID

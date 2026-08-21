@@ -313,6 +313,15 @@ export type ApplicationReviewCreate = {
 };
 
 /**
+ * A reviewer who has submitted at least one review for a popup.
+ */
+export type ApplicationReviewerOption = {
+    id: string;
+    full_name?: (string | null);
+    email?: (string | null);
+};
+
+/**
  * Compact reviewer + decision pair for the applications list.
  */
 export type ApplicationReviewerVote = {
@@ -1179,6 +1188,17 @@ export type CheckoutPreviewResponse = {
     contribution_amount?: string;
     total: string;
     currency: string;
+};
+
+/**
+ * Short-lived token that unlocks the checkout runtime for a live preview.
+ *
+ * Handed to the portal's preview page so it can render a popup that is still
+ * draft. See ``app.utils.checkout_preview``.
+ */
+export type CheckoutPreviewTokenPublic = {
+    token: string;
+    expires_at: string;
 };
 
 /**
@@ -3996,16 +4016,16 @@ export type SavedViewUpdate = {
  * Admin request body for PATCH /applications/{id}/scholarship.
  */
 export type ScholarshipDecisionRequest = {
-    scholarship_status: ScholarshipStatus;
+    scholarship_status: ScholarshipDecisionStatus;
     discount_percentage?: (number | string | null);
     incentive_amount?: (number | string | null);
     incentive_currency?: (string | null);
 };
 
 /**
- * Status of a scholarship request on an application.
+ * Scholarship outcomes an administrator may assign.
  */
-export type ScholarshipStatus = 'pending' | 'approved' | 'rejected';
+export type ScholarshipDecisionStatus = 'approved' | 'rejected';
 
 export type SelfCheckInOptions = {
     popup: SelfCheckInPopup;
@@ -5019,6 +5039,13 @@ export type ApplicationsGetApplicationGroupCountsData = {
 
 export type ApplicationsGetApplicationGroupCountsResponse = (Array<ApplicationGroupCount>);
 
+export type ApplicationsListApplicationReviewersData = {
+    popupId: string;
+    xTenantId?: (string | null);
+};
+
+export type ApplicationsListApplicationReviewersResponse = (Array<ApplicationReviewerOption>);
+
 export type ApplicationsGrantTicketsAdminData = {
     requestBody: AdminGrantTicketsRequest;
     xTenantId?: (string | null);
@@ -5540,6 +5567,7 @@ export type CheckInListCheckInsResponse = (ListModel_CheckInListItem_);
 export type CheckoutGetRuntimeData = {
     acceptLanguage?: (string | null);
     slug: string;
+    xCheckoutPreviewToken?: (string | null);
     xEdgeOsPublishableKey?: (string | null);
     xTenantId?: (string | null);
 };
@@ -6594,6 +6622,14 @@ export type GroupsRemoveGroupLeaderData = {
 
 export type GroupsRemoveGroupLeaderResponse = (GroupWithMembers);
 
+export type GroupsRemoveGroupMemberAdminData = {
+    groupId: string;
+    humanId: string;
+    xTenantId?: (string | null);
+};
+
+export type GroupsRemoveGroupMemberAdminResponse = (void);
+
 export type GroupsListMyGroupsData = {
     /**
      * Maximum number of items to return
@@ -7134,6 +7170,13 @@ export type PopupsDeletePopupData = {
 };
 
 export type PopupsDeletePopupResponse = (void);
+
+export type PopupsCreateCheckoutPreviewTokenData = {
+    popupId: string;
+    xTenantId?: (string | null);
+};
+
+export type PopupsCreateCheckoutPreviewTokenResponse = (CheckoutPreviewTokenPublic);
 
 export type PopupsListPortalPopupsData = {
     acceptLanguage?: (string | null);

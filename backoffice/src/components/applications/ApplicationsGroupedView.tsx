@@ -45,12 +45,14 @@ function orderGroups(
 function GroupHeader({
   field,
   value,
+  reviewerLabels,
   count,
   open,
   onToggle,
 }: {
   field: string
   value: string | null
+  reviewerLabels?: Record<string, string>
   count: number
   open: boolean
   onToggle: () => void
@@ -72,6 +74,10 @@ function GroupHeader({
         <span className="text-sm text-muted-foreground">No value</span>
       ) : field === "status" ? (
         <StatusBadge status={value} />
+      ) : field === "reviewed_by" ? (
+        <span className="truncate text-sm font-medium">
+          {reviewerLabels?.[value] ?? "Unknown reviewer"}
+        </span>
       ) : (
         <span className="truncate text-sm font-medium">{value}</span>
       )}
@@ -94,6 +100,7 @@ interface ApplicationsGroupedViewProps {
   /** Preferred group ordering (status flow, custom field options). */
   valueOrder?: string[]
   subValueOrder?: string[]
+  reviewerLabels?: Record<string, string>
   hiddenOnMobile?: string[]
   columnPrefs?: TableColumnPrefs
 }
@@ -108,6 +115,7 @@ export function ApplicationsGroupedView({
   search,
   valueOrder,
   subValueOrder,
+  reviewerLabels,
   hiddenOnMobile,
   columnPrefs,
 }: ApplicationsGroupedViewProps) {
@@ -181,6 +189,7 @@ export function ApplicationsGroupedView({
             <GroupHeader
               field={groupBy}
               value={value}
+              reviewerLabels={reviewerLabels}
               count={group.count}
               open={open}
               onToggle={() =>
@@ -202,6 +211,7 @@ export function ApplicationsGroupedView({
                     baseFiltersJson={baseFiltersJson}
                     search={search}
                     subValueOrder={subValueOrder}
+                    reviewerLabels={reviewerLabels}
                     hiddenOnMobile={hiddenOnMobile}
                     columnPrefs={columnPrefs}
                   />
@@ -243,6 +253,7 @@ function SubGroupsList({
   baseFiltersJson,
   search,
   subValueOrder,
+  reviewerLabels,
   hiddenOnMobile,
   columnPrefs,
 }: {
@@ -256,6 +267,7 @@ function SubGroupsList({
   baseFiltersJson?: string
   search: string
   subValueOrder?: string[]
+  reviewerLabels?: Record<string, string>
   hiddenOnMobile?: string[]
   columnPrefs?: TableColumnPrefs
 }) {
@@ -314,6 +326,7 @@ function SubGroupsList({
             <GroupHeader
               field={subGroupBy}
               value={value}
+              reviewerLabels={reviewerLabels}
               count={group.count}
               open={open}
               onToggle={() =>

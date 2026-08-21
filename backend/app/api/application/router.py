@@ -23,6 +23,7 @@ from app.api.application.schemas import (
     ApplicationCreate,
     ApplicationGroupCount,
     ApplicationPublic,
+    ApplicationReviewerOption,
     ApplicationReviewerVote,
     ApplicationStatus,
     ApplicationUpdate,
@@ -39,6 +40,7 @@ from app.api.application.schemas import (
     PopupAccessResponse,
     PreviousApplicationSummary,
     ScholarshipDecisionRequest,
+    ScholarshipStatus,
     parse_application_filters,
 )
 from app.api.application_review.crud import (
@@ -74,6 +76,10 @@ router = APIRouter(prefix="/applications", tags=["applications"])
 
 # Portal router — separate prefix for the access endpoint
 portal_router = APIRouter(prefix="/portal", tags=["portal"])
+
+REVIEWER_FILTER_GROUPING_CONFLICT_DETAIL = (
+    "Cannot group by Reviewed by while a Reviewed by filter is active."
+)
 
 
 def _get_reviewer_identities(
@@ -341,10 +347,13 @@ async def get_application_group_counts(
 ) -> list[ApplicationGroupCount]:
     """Count a popup's applications grouped by one field (BO only).
 
-    ``group_by`` accepts ``status``, ``scholarship_status``, ``gender``,
-    ``age``, or ``custom.<field_name>``. ``filters`` and ``search`` behave
-    exactly like the list endpoint. NULL and empty values share one bucket
-    with ``value: null``; rows are ordered by count descending.
+    ``group_by`` accepts ``status``, ``scholarship_status``, ``reviewed_by``,
+    ``gender``, ``age``, or ``custom.<field_name>``. ``filters`` and
+    ``search`` behave exactly like the list endpoint. For ``reviewed_by``, a
+    non-null bucket identifies applications reviewed by that user and the
+    null bucket contains applications with no reviews. Other fields collapse
+    NULL and empty values into one bucket. Rows are ordered by count
+    descending.
 
     ``parent_group_by``/``parent_group_value`` scope the counts to one
     bucket of an outer grouped view (subgrouped views count within each
@@ -357,6 +366,16 @@ async def get_application_group_counts(
             detail="The subgroup field must be different from the group field.",
         )
     parsed_filters = parse_application_filters(filters)
+    has_reviewer_filter = parsed_filters and any(
+        condition.field == "reviewed_by" for condition in parsed_filters.conditions
+    )
+    if has_reviewer_filter and (
+        group_by == "reviewed_by" or parent_group_by == "reviewed_by"
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=REVIEWER_FILTER_GROUPING_CONFLICT_DETAIL,
+        )
     rows = crud.applications_crud.count_by_group(
         db,
         popup_id=popup_id,
@@ -367,7 +386,38 @@ async def get_application_group_counts(
         parent_group_by=parent_group_by,
         parent_group_value=parent_group_value,
     )
-    return [ApplicationGroupCount(value=value, count=count) for value, count in rows]
+    return [
+        ApplicationGroupCount(
+            value=str(value) if value is not None else None,
+            count=count,
+        )
+        for value, count in rows
+    ]
+
+
+@router.get("/reviewers", response_model=list[ApplicationReviewerOption])
+async def list_application_reviewers(
+    popup_id: uuid.UUID,
+    db: AdminOrApiKeySession_ApplicationsRead,
+    _: AdminOrApiKey_ApplicationsRead,
+    control_db: SessionDep,
+) -> list[ApplicationReviewerOption]:
+    """List users who have submitted at least one review for a popup."""
+    reviewer_ids = crud.applications_crud.reviewer_ids_by_popup(db, popup_id)
+    identities = _get_reviewer_identities(control_db, reviewer_ids)
+    return sorted(
+        (
+            ApplicationReviewerOption(
+                id=reviewer_id,
+                full_name=identities.get(reviewer_id, (None, None))[0],
+                email=identities.get(reviewer_id, (None, None))[1],
+            )
+            for reviewer_id in reviewer_ids
+        ),
+        key=lambda reviewer: (
+            reviewer.full_name or reviewer.email or str(reviewer.id)
+        ).lower(),
+    )
 
 
 @router.post("", response_model=ApplicationPublic, status_code=status.HTTP_201_CREATED)
@@ -1303,6 +1353,13 @@ async def update_my_application(
         if app_update["status"] == ApplicationStatus.IN_REVIEW.value:
             if not application.submitted_at:
                 app_update["submitted_at"] = datetime.now(UTC)
+
+    if "scholarship_request" in app_update:
+        app_update["scholarship_status"] = (
+            ScholarshipStatus.PENDING.value
+            if app_update["scholarship_request"]
+            else None
+        )
 
     for field, value in app_update.items():
         setattr(application, field, value)

@@ -673,3 +673,14 @@ class PopupAdmin(PopupBase):
     """Admin popup schema — all fields including sensitive ones."""
 
     id: uuid.UUID
+
+
+class CheckoutPreviewTokenPublic(SQLModel):
+    """Short-lived token that unlocks the checkout runtime for a live preview.
+
+    Handed to the portal's preview page so it can render a popup that is still
+    draft. See ``app.utils.checkout_preview``.
+    """
+
+    token: str
+    expires_at: datetime
