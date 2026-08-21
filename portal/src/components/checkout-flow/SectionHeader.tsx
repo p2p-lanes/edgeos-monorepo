@@ -137,9 +137,14 @@ function SnapSectionHeader({
           {showTitle && (
             <h2
               data-section-title
+              aria-label={title}
               className="relative text-2xl sm:text-4xl font-bold tracking-tight text-checkout-title z-10 drop-shadow-[0_0_12px_rgba(255,255,255,0.9)]"
             >
-              {title}
+              {title.split("").map((char, i) => (
+                <span key={i} style={{ display: "inline-block" }}>
+                  {char === " " ? "\u00A0" : char}
+                </span>
+              ))}
             </h2>
           )}
         </div>
