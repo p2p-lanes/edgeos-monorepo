@@ -40,6 +40,13 @@ export type PreviewMessage = PreviewReadyMessage | PreviewStateMessage
 /**
  * Parse the configured origins (comma-separated) into a match list.
  *
+ * Takes one value or several — the caller passes every variable that may carry
+ * an origin, and they are unioned rather than ranked, so a blank or missing one
+ * can never mask a good one. Orchestrators routinely materialize an unset
+ * variable as the empty string (`BACKOFFICE_ORIGIN=${BACKOFFICE_ORIGIN-}` in a
+ * compose file does exactly that), which is indistinguishable from unset here
+ * and must be treated as such.
+ *
  * Each value is normalized through `URL.origin`, so a trailing slash or a path
  * — `https://app.example.com/` — still matches the bare origin a message
  * carries, instead of silently never matching. Anything unparseable is
@@ -49,10 +56,13 @@ export type PreviewMessage = PreviewReadyMessage | PreviewStateMessage
  * deliberately fail-closed, since a message decides what this page renders and
  * which token it spends.
  */
-export function parsePreviewOrigins(raw: string | null | undefined): string[] {
-  if (!raw) return []
-  return raw
-    .split(",")
+export function parsePreviewOrigins(
+  raw: string | null | undefined | Array<string | null | undefined>,
+): string[] {
+  const sources = Array.isArray(raw) ? raw : [raw]
+  const origins = sources
+    .filter((source): source is string => typeof source === "string")
+    .flatMap((source) => source.split(","))
     .map((value) => value.trim())
     .filter(Boolean)
     .flatMap((value) => {
@@ -62,6 +72,8 @@ export function parsePreviewOrigins(raw: string | null | undefined): string[] {
         return []
       }
     })
+
+  return [...new Set(origins)]
 }
 
 export function isAllowedPreviewOrigin(
