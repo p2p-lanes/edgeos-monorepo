@@ -5028,6 +5028,16 @@ export const CheckoutPreviewRequestSchema = {
             type: 'boolean',
             title: 'Insurance',
             default: false
+        },
+        buyer: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/BuyerInfo'
+                },
+                {
+                    type: 'null'
+                }
+            ]
         }
     },
     type: 'object',
@@ -5109,10 +5119,41 @@ export const CheckoutPreviewResponseSchema = {
         currency: {
             type: 'string',
             title: 'Currency'
+        },
+        selected_flow: {
+            '$ref': '#/components/schemas/SelectedSalesFlow'
+        },
+        kind: {
+            type: 'string',
+            enum: ['estimate', 'definitive'],
+            title: 'Kind'
+        },
+        quote_token: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Quote Token'
+        },
+        quote_expires_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Quote Expires At'
         }
     },
     type: 'object',
-    required: ['lines', 'discountable_amount', 'non_discountable_amount', 'post_discount_amount', 'total', 'currency'],
+    required: ['lines', 'discountable_amount', 'non_discountable_amount', 'post_discount_amount', 'total', 'currency', 'selected_flow', 'kind'],
     title: 'CheckoutPreviewResponse',
     description: 'Server-computed price breakdown for anonymous checkout (no side effects).'
 } as const;
@@ -5328,6 +5369,9 @@ export const CheckoutRuntimeResponseSchema = {
         popup: {
             '$ref': '#/components/schemas/PopupPublic'
         },
+        selected_flow: {
+            '$ref': '#/components/schemas/SelectedSalesFlow'
+        },
         products: {
             items: {
                 '$ref': '#/components/schemas/CheckoutRuntimeProduct'
@@ -5405,7 +5449,7 @@ export const CheckoutRuntimeResponseSchema = {
         }
     },
     type: 'object',
-    required: ['popup', 'products', 'buyer_form', 'ticketing_steps'],
+    required: ['popup', 'selected_flow', 'products', 'buyer_form', 'ticketing_steps'],
     title: 'CheckoutRuntimeResponse',
     description: 'Full response for GET /checkout/{slug}/runtime.'
 } as const;
@@ -14019,6 +14063,17 @@ export const OpenTicketingPurchaseCreateSchema = {
                 }
             ],
             title: 'Sig'
+        },
+        quote_token: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Quote Token'
         }
     },
     type: 'object',
@@ -21126,6 +21181,31 @@ export const ScholarshipStatusSchema = {
     enum: ['pending', 'approved', 'rejected'],
     title: 'ScholarshipStatus',
     description: 'Status of a scholarship request on an application.'
+} as const;
+
+export const SelectedSalesFlowSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        slug: {
+            type: 'string',
+            title: 'Slug'
+        },
+        name: {
+            type: 'string',
+            title: 'Name'
+        },
+        type: {
+            '$ref': '#/components/schemas/SalesFlowType'
+        }
+    },
+    type: 'object',
+    required: ['id', 'slug', 'name', 'type'],
+    title: 'SelectedSalesFlow',
+    description: 'Safe checkout identity for the flow selected by the server.'
 } as const;
 
 export const SelfCheckInOptionsSchema = {

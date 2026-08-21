@@ -11,6 +11,7 @@ if TYPE_CHECKING:
 
 from app.api.attendee_category.crud import attendee_categories_crud
 from app.api.attendee_category.schemas import AttendeeCategoryPublic
+from app.api.checkout.gate_quote import resolve_checkout_flow, selected_flow
 from app.api.checkout.schemas import (
     CheckoutBuyerField,
     CheckoutBuyerSection,
@@ -29,7 +30,6 @@ from app.api.sales_flow.eligibility import (
     assert_application_flow_eligible,
     assert_upsale_eligible,
 )
-from app.api.sales_flow.resolver import resolve_flow
 from app.api.ticketing_step.crud import ticketing_steps_crud
 from app.api.ticketing_step.models import TicketingSteps
 from app.api.ticketing_step.schemas import TicketingStepPublic
@@ -185,7 +185,7 @@ def runtime_for_slug(
     already, rendering the same components.
     """
     popup = _get_popup_by_slug_or_404(session, slug, tenant_id)
-    flow = resolve_flow(session, popup, flow_slug)
+    flow = resolve_checkout_flow(session, popup, flow_slug)
     assert_upsale_eligible(session, flow, popup.id, tenant_id, current_human)
     assert_application_flow_eligible(session, flow, tenant_id, current_human)
 
@@ -317,6 +317,7 @@ def runtime_for_slug(
                         section_dict[key] = t_data[key]
 
     return CheckoutRuntimeResponse(
+        selected_flow=selected_flow(flow),
         flow_type=flow.type,
         theme_config=flow.theme_config,
         popup=PopupPublic.model_validate(popup_data),

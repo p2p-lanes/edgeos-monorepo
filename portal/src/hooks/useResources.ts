@@ -4,6 +4,7 @@ import {
   Layers,
   Link2,
   MapPin,
+  ShoppingBag,
   Ticket,
   Users,
 } from "lucide-react"
@@ -92,6 +93,12 @@ const useResources = () => {
         status: "active",
         path: `/portal/${city?.slug}/passes${flowQuery}`,
       },
+      {
+        name: t("sidebar.shop"),
+        icon: ShoppingBag,
+        status: "active",
+        path: `/portal/${city?.slug}/shop`,
+      },
     ]
 
     return { resources, doorName: null }
@@ -118,6 +125,12 @@ const useResources = () => {
         icon: Ticket,
         status: companionCanSeePasses ? "active" : "hidden",
         path: `/portal/${city?.slug}/passes${flowQuery}`,
+      },
+      {
+        name: t("sidebar.shop"),
+        icon: ShoppingBag,
+        status: "active",
+        path: `/portal/${city?.slug}/shop`,
       },
       {
         name: t("sidebar.events"),
@@ -178,6 +191,12 @@ const useResources = () => {
       icon: Ticket,
       status: canSeeAttendees ? "active" : "hidden",
       path: `/portal/${city?.slug}/passes${flowQuery}`,
+    },
+    {
+      name: t("sidebar.shop"),
+      icon: ShoppingBag,
+      status: "active",
+      path: `/portal/${city?.slug}/shop`,
     },
     {
       name: t("sidebar.attendee_directory"),

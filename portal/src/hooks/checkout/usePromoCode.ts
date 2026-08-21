@@ -12,6 +12,7 @@ import type { DiscountProps } from "@/types/discounts"
 
 interface UsePromoCodeParams {
   cityId: string | undefined
+  salesFlowId?: string | null
   discountAppliedValue: number
   setDiscount: (discount: DiscountProps) => void
   resetDiscount: () => void
@@ -27,6 +28,7 @@ interface UsePromoCodeParams {
 
 export function usePromoCode({
   cityId,
+  salesFlowId = null,
   discountAppliedValue,
   setDiscount,
   resetDiscount,
@@ -55,6 +57,7 @@ export function usePromoCode({
           : await CouponsService.validateCoupon({
               requestBody: {
                 popup_id: cityId!,
+                sales_flow_id: salesFlowId ?? undefined,
                 code: code.toUpperCase(),
               },
             })
@@ -92,7 +95,13 @@ export function usePromoCode({
         setIsLoading(false)
       }
     },
-    [cityId, discountAppliedValue, setDiscount, validatePromoCodeOverride],
+    [
+      cityId,
+      discountAppliedValue,
+      setDiscount,
+      validatePromoCodeOverride,
+      salesFlowId,
+    ],
   )
 
   const clearPromoCode = useCallback(() => {
@@ -174,6 +183,7 @@ export function usePromoCode({
     CouponsService.validateCoupon({
       requestBody: {
         popup_id: String(cityId),
+        sales_flow_id: salesFlowId ?? undefined,
         code: savedCart.promo_code,
       },
     })
@@ -199,6 +209,7 @@ export function usePromoCode({
   }, [
     savedCart,
     cityId,
+    salesFlowId,
     promoCode,
     setDiscount,
     hasRestoredCheckoutRef.current,

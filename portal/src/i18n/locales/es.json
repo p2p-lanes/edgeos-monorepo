@@ -89,6 +89,18 @@
       "apply": "Postularme"
     }
   },
+  "shop": {
+    "title": "Tienda",
+    "description": "Elija una opción disponible.",
+    "application": "Solicitud",
+    "direct": "Compra directa",
+    "upsale": "Disponible para usted",
+    "open": "Ver opción",
+    "empty_title": "No hay opciones disponibles por ahora",
+    "empty_description": "Vuelva más tarde para consultar nuevas opciones.",
+    "estimated_total": "Total estimado",
+    "definitive_total": "Total"
+  },
   "auth": {
     "sign_up_or_log_in": "Registrarse o Iniciar Sesión",
     "enter_verification_code": "Ingresá el código de verificación",
@@ -533,6 +545,7 @@
     "coming_soon": "(Próximamente)",
     "soon_badge": "Próximamente",
     "application": "Aplicación",
+    "shop": "Tienda",
     "passes": "Pases",
     "attendee_directory": "Directorio de Asistentes",
     "companion": "Acompañante",

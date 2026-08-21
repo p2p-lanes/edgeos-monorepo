@@ -11,7 +11,15 @@ import type { ApplicationFormSchema } from "@/types/form-schema"
 import type { ProductsPass } from "@/types/Products"
 import { CheckoutProvider, useCheckout } from "./checkoutProvider"
 
+const paymentSubmitSpy = vi.hoisted(() =>
+  vi.fn(() => ({ submitPayment: vi.fn(), isSubmitting: false })),
+)
+
 // Minimal mocks to avoid network/provider dependencies
+vi.mock("@/hooks/checkout", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/hooks/checkout")>()),
+  usePaymentSubmit: paymentSubmitSpy,
+}))
 vi.mock("@/providers/applicationProvider", () => ({
   useApplication: () => ({
     getRelevantApplication: () => null,
@@ -269,5 +277,21 @@ describe("checkoutProvider — step-aware product wiring", () => {
     expect(resolved).toHaveLength(1)
     // allProducts is still accessible for backward compat
     expect(result.current.allProducts).toHaveLength(1)
+  })
+})
+
+describe("checkoutProvider — public checkout flow propagation", () => {
+  it("forwards the named runtime flow to the payment submit hook", () => {
+    renderHook(() => useCheckout(), {
+      wrapper: makeWrapper([], [], {
+        salesFlowSlug: "merch-store",
+        submitMode: "open-ticketing",
+        submitPopupSlug: "festival-2026",
+      }),
+    })
+
+    expect(paymentSubmitSpy).toHaveBeenLastCalledWith(
+      expect.objectContaining({ salesFlowSlug: "merch-store" }),
+    )
   })
 })

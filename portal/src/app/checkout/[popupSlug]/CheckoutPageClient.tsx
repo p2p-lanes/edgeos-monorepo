@@ -33,6 +33,8 @@ interface CheckoutPageClientProps {
   initialDataUpdatedAt?: number
   /** Language the server render fetched `initialRuntime` in, if any. */
   initialRuntimeLanguage?: string | null
+  /** Show server-authoritative estimate/definitive status in an authenticated shell. */
+  showQuoteStatus?: boolean
 }
 
 export default function CheckoutPageClient({
@@ -41,6 +43,7 @@ export default function CheckoutPageClient({
   initialRuntime,
   initialDataUpdatedAt,
   initialRuntimeLanguage = null,
+  showQuoteStatus = false,
 }: CheckoutPageClientProps) {
   const { t } = useTranslation()
   // Resolved in a state initializer rather than an effect so the very first
@@ -137,7 +140,7 @@ export default function CheckoutPageClient({
     return (
       <ApplicationCheckoutRedirect
         popupSlug={popupSlug}
-        flowSlug={flowSlug ?? undefined}
+        flowId={runtime.selected_flow.id}
       />
     )
   }
@@ -170,7 +173,9 @@ export default function CheckoutPageClient({
           <OpenCheckoutRuntime
             runtime={runtime}
             popupSlug={popupSlug}
+            flowSlug={runtime.selected_flow.slug}
             prefilledBuyer={prefilledBuyer}
+            showQuoteStatus={showQuoteStatus}
           />
         </main>
       </SidebarProvider>

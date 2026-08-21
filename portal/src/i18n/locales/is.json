@@ -75,6 +75,18 @@
       "apply": "Sækja um"
     }
   },
+  "shop": {
+    "title": "Verslun",
+    "description": "Veldu tiltækan möguleika.",
+    "application": "Umsókn",
+    "direct": "Bein kaup",
+    "upsale": "Í boði fyrir þig",
+    "open": "Skoða möguleika",
+    "empty_title": "Ekkert í boði núna",
+    "empty_description": "Athugaðu aftur síðar fyrir nýja möguleika.",
+    "estimated_total": "Áætluð heildarupphæð",
+    "definitive_total": "Heildarupphæð"
+  },
   "auth": {
     "sign_up_or_log_in": "Skráðu þig eða innskráðu",
     "enter_verification_code": "Sláðu inn staðfestingarkóða",
@@ -456,6 +468,7 @@
     "coming_soon": "(Væntanlegt)",
     "soon_badge": "Bráðum",
     "application": "Umsókn",
+    "shop": "Verslun",
     "passes": "Passar",
     "attendee_directory": "Þátttakendaskrá",
     "companion": "Förunautur",

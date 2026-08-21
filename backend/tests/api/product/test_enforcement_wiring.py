@@ -37,6 +37,7 @@ from app.api.tenant.models import Tenants
 from tests._flow_helpers import (
     application_flow_id,
     offer_category,
+    seed_default_steps,
 )
 
 # ---------------------------------------------------------------------------
@@ -357,6 +358,7 @@ def _make_ot_popup(db: Session, tenant: Tenants) -> Popups:
     db.add(popup)
     db.commit()
     db.refresh(popup)
+    seed_default_steps(db, popup, sale_type=SaleType.direct.value)
     return popup
 
 
@@ -436,7 +438,7 @@ class TestOpenTicketingPaymentEnforcement:
                     db, obj=obj, popup=popup, tenant=tenant_a
                 )
         assert exc_info.value.status_code == 422
-        assert "sold_out" in exc_info.value.detail
+        assert exc_info.value.detail == {"code": "quote_unavailable"}
         # SimpleFI must NOT have been called
         mock_sf.assert_not_called()
 

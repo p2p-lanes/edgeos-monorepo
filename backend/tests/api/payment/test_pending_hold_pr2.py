@@ -39,6 +39,7 @@ from app.services.simplefi.client import CancelOutcome, CancelOutcomeAmbiguousEr
 from tests._flow_helpers import (
     application_flow_id,
     coupon_flow_id,
+    seed_default_steps,
 )
 
 # ---------------------------------------------------------------------------
@@ -972,6 +973,7 @@ class TestSupersedePendingDisabled:
         from app.core.config import settings as _app_settings
 
         popup = _make_popup(db, tenant_a, slug_prefix="b3-oc")
+        seed_default_steps(db, popup, sale_type=SaleType.direct.value)
         product = _make_product(db, tenant_a, popup)
         buyer_email = f"b3-buyer-{uuid.uuid4().hex[:8]}@example.com"
 
@@ -1053,6 +1055,7 @@ class TestContinuityProofGate:
         )
 
         popup = _make_popup(db, tenant_a, slug_prefix="proof-atk")
+        seed_default_steps(db, popup, sale_type=SaleType.direct.value)
         product = _make_product(db, tenant_a, popup)
         victim_email = f"victim-{uuid.uuid4().hex[:8]}@example.com"
 
@@ -1118,6 +1121,7 @@ class TestContinuityProofGate:
         )
         db.add(popup)
         db.flush()
+        seed_default_steps(db, popup, sale_type=SaleType.direct.value)
 
         product = _make_product(db, tenant_a, popup)
         buyer_email = f"realbuyer-{uuid.uuid4().hex[:8]}@example.com"
@@ -1200,6 +1204,7 @@ class TestContinuityProofGate:
         )
         db.add(popup)
         db.flush()
+        seed_default_steps(db, popup, sale_type=SaleType.direct.value)
 
         product = _make_product(db, tenant_a, popup)
         victim_email = f"victim-{uuid.uuid4().hex[:8]}@example.com"
@@ -1269,6 +1274,7 @@ class TestContinuityProofGate:
         )
 
         popup = _make_popup(db, tenant_a, slug_prefix="proof-none")
+        seed_default_steps(db, popup, sale_type=SaleType.direct.value)
         product = _make_product(db, tenant_a, popup)
         buyer_email = f"fresh-{uuid.uuid4().hex[:8]}@example.com"
 

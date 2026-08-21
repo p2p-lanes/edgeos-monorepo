@@ -56,6 +56,7 @@ interface PassesProviderProps {
   flowType?: string | null
   productsOverride?: ProductsPass[]
   purchasesOverride?: AttendeePurchases[]
+  salesFlowId?: string | null
 }
 
 /**
@@ -258,12 +259,13 @@ const PassesProvider = ({
   flowType = null,
   productsOverride,
   purchasesOverride,
+  salesFlowId,
 }: PassesProviderProps) => {
   const { discountApplied } = useDiscount()
   const [attendeePasses, setAttendeePasses] = useState<AttendeePassState[]>([])
 
   const [isEditing, setIsEditing] = useState(false)
-  const { products: queriedProducts } = useGetPassesData()
+  const { products: queriedProducts } = useGetPassesData(salesFlowId)
   const products = productsOverride ?? queriedProducts
   const { getCity } = useCityProvider()
   const city = getCity()
@@ -272,10 +274,13 @@ const PassesProvider = ({
   const previousCityIdRef = useRef(cityId)
   const hasInitializedRef = useRef(false)
   const hasRestoredCartRef = useRef(false)
-  const { data: savedCartPasses } = useCart(restoreFromCart ? cityId : null)
+  const { data: savedCartPasses } = useCart(
+    restoreFromCart ? cityId : null,
+    salesFlowId,
+  )
 
   // Dedicated purchases query — granular invalidation after payment
-  const { data: queriedPurchasesData } = usePurchasesQuery(cityId)
+  const { data: queriedPurchasesData } = usePurchasesQuery(cityId, attendees)
   const purchasesData = purchasesOverride ?? queriedPurchasesData
   const purchasesMap = useMemo(
     () => buildPurchasesMap(purchasesData),

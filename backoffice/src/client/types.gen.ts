@@ -1167,6 +1167,7 @@ export type CheckoutPreviewRequest = {
     products: Array<ProductLine>;
     coupon_code?: (string | null);
     insurance?: boolean;
+    buyer?: (BuyerInfo | null);
 };
 
 /**
@@ -1184,7 +1185,13 @@ export type CheckoutPreviewResponse = {
     contribution_amount?: string;
     total: string;
     currency: string;
+    selected_flow: SelectedSalesFlow;
+    kind: 'estimate' | 'definitive';
+    quote_token?: (string | null);
+    quote_expires_at?: (string | null);
 };
+
+export type kind = 'estimate' | 'definitive';
 
 /**
  * Public product available in the checkout runtime.
@@ -1222,6 +1229,7 @@ export type CheckoutRuntimeProduct = {
  */
 export type CheckoutRuntimeResponse = {
     popup: PopupPublic;
+    selected_flow: SelectedSalesFlow;
     products: Array<CheckoutRuntimeProduct>;
     buyer_form: Array<CheckoutBuyerSection>;
     ticketing_steps: Array<TicketingStepPublic>;
@@ -3088,6 +3096,7 @@ export type OpenTicketingPurchaseCreate = {
     attribution?: (Attribution | null);
     cid?: (string | null);
     sig?: (string | null);
+    quote_token?: (string | null);
 };
 
 /**
@@ -4303,6 +4312,16 @@ export type ScholarshipDecisionRequest = {
  * Status of a scholarship request on an application.
  */
 export type ScholarshipStatus = 'pending' | 'approved' | 'rejected';
+
+/**
+ * Safe checkout identity for the flow selected by the server.
+ */
+export type SelectedSalesFlow = {
+    id: string;
+    slug: string;
+    name: string;
+    type: SalesFlowType;
+};
 
 export type SelfCheckInOptions = {
     popup: SelfCheckInPopup;
@@ -5791,6 +5810,7 @@ export type CartsListAbandonedCartsResponse = (ListModel_AbandonedCartPublic_);
 
 export type CartsGetMyCartData = {
     popupId: string;
+    salesFlowId?: (string | null);
 };
 
 export type CartsGetMyCartResponse = ((CartPublic | null));
@@ -5798,12 +5818,14 @@ export type CartsGetMyCartResponse = ((CartPublic | null));
 export type CartsUpdateMyCartData = {
     popupId: string;
     requestBody: CartUpdate;
+    salesFlowId?: (string | null);
 };
 
 export type CartsUpdateMyCartResponse = (CartPublic);
 
 export type CartsDeleteMyCartData = {
     popupId: string;
+    salesFlowId?: (string | null);
 };
 
 export type CartsDeleteMyCartResponse = (void);
@@ -5894,13 +5916,7 @@ export type CheckoutUpsertOpenCartData = {
 export type CheckoutUpsertOpenCartResponse = (OpenCartPublic);
 
 export type CheckoutRestoreOpenCartData = {
-    /**
-     * Cart id from the signed restore link
-     */
     cid: string;
-    /**
-     * HMAC restore token for the cart id
-     */
     sig: string;
     slug: string;
     xEdgeOsPublishableKey?: (string | null);
@@ -5908,6 +5924,27 @@ export type CheckoutRestoreOpenCartData = {
 };
 
 export type CheckoutRestoreOpenCartResponse = (OpenCartPublic);
+
+export type CheckoutUpsertFlowCartData = {
+    flowSlug: string;
+    requestBody: OpenCartUpsert;
+    slug: string;
+    xEdgeOsPublishableKey?: (string | null);
+    xTenantId?: (string | null);
+};
+
+export type CheckoutUpsertFlowCartResponse = (OpenCartPublic);
+
+export type CheckoutRestoreFlowCartData = {
+    cid: string;
+    flowSlug: string;
+    sig: string;
+    slug: string;
+    xEdgeOsPublishableKey?: (string | null);
+    xTenantId?: (string | null);
+};
+
+export type CheckoutRestoreFlowCartResponse = (OpenCartPublic);
 
 export type CheckoutReleasePendingOpenData = {
     requestBody: PendingReleaseOpenRequest;
@@ -7571,6 +7608,7 @@ export type ProductsListPortalProductsData = {
      */
     limit?: number;
     popupId?: (string | null);
+    salesFlowId?: (string | null);
     /**
      * Number of items to skip
      */

@@ -233,6 +233,61 @@ class TestListMyPaymentsByPopupHttp:
         assert body["paging"]["total"] == 1
         assert body["results"][0]["id"] == str(payment.id)
 
+    def test_direct_payment_reusing_application_attendee_remains_buyer_owned(
+        self, client: TestClient, db: Session, tenant_a: Tenants
+    ) -> None:
+        """Direct payment history follows the buyer's real attendee identity."""
+        popup = _make_popup(db, tenant_a, suffix="d-reused-attendee")
+        human = _make_human(db, tenant_a, suffix="d-reused-attendee")
+        application = Applications(
+            sales_flow_id=application_flow_id(db, popup.id),
+            tenant_id=tenant_a.id,
+            popup_id=popup.id,
+            human_id=human.id,
+            status=ApplicationStatus.ACCEPTED.value,
+        )
+        db.add(application)
+        db.flush()
+        attendee = Attendees(
+            tenant_id=tenant_a.id,
+            application_id=application.id,
+            popup_id=popup.id,
+            human_id=human.id,
+            name="Application Buyer",
+            category="main",
+        )
+        payment = Payments(
+            tenant_id=tenant_a.id,
+            application_id=None,
+            popup_id=popup.id,
+            status=PaymentStatus.APPROVED.value,
+            amount=Decimal("50"),
+            currency="USD",
+        )
+        product = _make_product(db, tenant_a, popup, suffix="reused-attendee")
+        db.add_all([attendee, payment])
+        db.flush()
+        db.add(
+            PaymentProducts(
+                tenant_id=tenant_a.id,
+                payment_id=payment.id,
+                product_id=product.id,
+                attendee_id=attendee.id,
+                quantity=1,
+                product_name="Direct Product",
+                product_price=Decimal("50"),
+                product_category="standard",
+                product_currency="USD",
+            )
+        )
+        db.commit()
+
+        response = client.get(_payments_url(popup.id), headers=_auth(human))
+
+        assert response.status_code == 200, response.text
+        assert response.json()["paging"]["total"] == 1
+        assert response.json()["results"][0]["id"] == str(payment.id)
+
     def test_both_legs_no_duplicates(
         self, client: TestClient, db: Session, tenant_a: Tenants
     ) -> None:

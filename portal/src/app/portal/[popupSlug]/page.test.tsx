@@ -78,33 +78,30 @@ describe("portal event overview", () => {
     mocks.directPanel.mockClear()
   })
 
-  it("mounts direct sales for an event without applications", () => {
+  it("does not mount direct sales for an event without applications", () => {
     render(<Home />)
 
-    expect(screen.getByTestId("direct-sales-panel")).toBeTruthy()
-    expect(mocks.directPanel).toHaveBeenCalledWith({
-      popupSlug: "my-event",
-      popupId: "popup-1",
-    })
+    expect(screen.queryByTestId("direct-sales-panel")).toBeNull()
+    expect(mocks.directPanel).not.toHaveBeenCalled()
   })
 
-  it("mounts direct sales alongside multiple application options", () => {
+  it("does not mount direct sales alongside multiple application options", () => {
     mocks.city.takes_applications = true
     mocks.doors = [{ flowId: "application-1" }, { flowId: "application-2" }]
 
     render(<Home />)
 
-    expect(screen.getByTestId("direct-sales-panel")).toBeTruthy()
+    expect(screen.queryByTestId("direct-sales-panel")).toBeNull()
     expect(screen.getAllByTestId("application-door")).toHaveLength(2)
   })
 
-  it("mounts direct sales for a companion overview", () => {
+  it("does not mount direct sales for a companion overview", () => {
     mocks.city.takes_applications = true
     mocks.participation = { type: "companion" }
 
     render(<Home />)
 
     expect(screen.getByTestId("companion-view")).toBeTruthy()
-    expect(screen.getByTestId("direct-sales-panel")).toBeTruthy()
+    expect(screen.queryByTestId("direct-sales-panel")).toBeNull()
   })
 })

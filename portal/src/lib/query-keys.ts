@@ -6,7 +6,8 @@ export const queryKeys = {
     mine: () => ["applications", "mine"] as const,
   },
   products: {
-    byPopup: (popupId: string) => ["products", popupId] as const,
+    byPopup: (popupId: string, salesFlowId?: string | null) =>
+      ["products", popupId, salesFlowId ?? null] as const,
   },
   attendees: {
     directory: (popupId: string) =>
@@ -17,7 +18,8 @@ export const queryKeys = {
     byPopup: (popupId: string) => ["purchases", popupId] as const,
   },
   cart: {
-    byPopup: (popupId: string) => ["cart", popupId] as const,
+    byPopup: (popupId: string, salesFlowId?: string | null) =>
+      ["cart", popupId, salesFlowId ?? null] as const,
   },
   participation: {
     byPopup: (popupId: string) => ["participation", popupId] as const,

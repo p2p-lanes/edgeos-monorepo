@@ -18,6 +18,7 @@ interface BreadcrumbSegmentProps {
 const KNOWN_SEGMENTS: Record<string, string> = {
   application: "breadcrumbs.application",
   passes: "breadcrumbs.passes",
+  shop: "shop.title",
   buy: "breadcrumbs.buy",
   attendees: "breadcrumbs.attendees",
   groups: "breadcrumbs.groups",

@@ -393,6 +393,7 @@ async def list_portal_products(
     db: HumanTenantSession,
     current_human: CurrentHuman,
     popup_id: uuid.UUID | None = None,
+    sales_flow_id: uuid.UUID | None = None,
     is_active: bool | None = None,
     category: str | None = None,
     skip: PaginationSkip = 0,
@@ -421,7 +422,16 @@ async def list_portal_products(
             "is_active": is_active,
             "category": category,
         }
-        flow = sales_flows_crud.get_default_flow(db, popup_id)
+        flow = (
+            sales_flows_crud.get(db, sales_flow_id)
+            if sales_flow_id is not None
+            else sales_flows_crud.get_default_flow(db, popup_id)
+        )
+        if sales_flow_id is not None and (flow is None or flow.popup_id != popup_id):
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Not found",
+            )
         popup = None
         if flow is not None:
             from app.api.popup.crud import popups_crud

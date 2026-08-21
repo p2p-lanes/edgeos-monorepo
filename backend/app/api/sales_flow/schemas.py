@@ -70,6 +70,15 @@ class SalesFlowIdentityMode(StrEnum):
     anonymous = "anonymous"
 
 
+class SelectedSalesFlow(BaseModel):
+    """Safe checkout identity for the flow selected by the server."""
+
+    id: uuid.UUID
+    slug: str
+    name: str
+    type: SalesFlowType
+
+
 # Reserved portal path segments a flow slug must never collide with.
 # portal/src/app/checkout/[popupSlug]/thank-you/page.tsx is a static Next.js
 # segment and always wins routing priority over a dynamic [flowSlug] segment,

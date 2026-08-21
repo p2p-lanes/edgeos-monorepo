@@ -1,0 +1,81 @@
+import { render, screen } from "@testing-library/react"
+import { describe, expect, it, vi } from "vitest"
+import { resolveShopFlowSlug, ShopContent } from "./ShopContent"
+
+const mocks = vi.hoisted(() => ({
+  application: [] as Array<{ id: string; slug: string; name: string }>,
+  direct: [] as Array<{ id: string; slug: string; name: string }>,
+  upsale: [] as Array<{ id: string; slug: string; name: string }>,
+}))
+
+vi.mock("@/hooks/usePortalSalesFlows", () => ({
+  usePortalSalesFlows: () => ({ data: mocks.application }),
+}))
+
+vi.mock("@/hooks/usePortalDirectSalesFlows", () => ({
+  usePortalDirectSalesFlows: () => ({ data: mocks.direct }),
+}))
+
+vi.mock("@/hooks/usePortalUpsaleFlows", () => ({
+  usePortalUpsaleFlows: () => ({ data: mocks.upsale }),
+}))
+
+vi.mock("react-i18next", () => ({
+  useTranslation: () => ({
+    t: (key: string) =>
+      ({
+        "shop.title": "Shop",
+        "shop.description": "Choose an available option.",
+        "shop.application": "Application",
+        "shop.direct": "Direct purchase",
+        "shop.upsale": "Available to you",
+        "shop.empty_title": "Nothing available right now",
+        "shop.empty_description": "Check back later for new options.",
+        "shop.open": "View option",
+      })[key] ?? key,
+  }),
+}))
+
+describe("ShopContent", () => {
+  it("canonicalizes an authorized legacy flow id without selecting another offer", () => {
+    const flow = { id: "flow-1", slug: "merch-store", name: "Merch Store" }
+
+    expect(resolveShopFlowSlug("flow-1", [flow])).toBe("merch-store")
+    expect(resolveShopFlowSlug("unknown", [flow])).toBeNull()
+  })
+
+  it("combines the three authorized sources into readable slug routes", () => {
+    mocks.application = [
+      { id: "application", slug: "volunteer", name: "Volunteer" },
+    ]
+    mocks.direct = [{ id: "direct", slug: "weekend", name: "Weekend Pass" }]
+    mocks.upsale = [{ id: "upsale", slug: "merch-store", name: "Merch Store" }]
+
+    render(<ShopContent popupId="popup-1" popupSlug="summer-camp" />)
+
+    expect(screen.getByText("Application")).toBeTruthy()
+    expect(screen.getByText("Direct purchase")).toBeTruthy()
+    expect(screen.getByText("Available to you")).toBeTruthy()
+    expect(
+      screen.getByRole("link", { name: /Volunteer/ }).getAttribute("href"),
+    ).toBe("/portal/summer-camp/shop/volunteer")
+    expect(
+      screen.getByRole("link", { name: /Weekend Pass/ }).getAttribute("href"),
+    ).toBe("/portal/summer-camp/shop/weekend")
+    expect(
+      screen.getByRole("link", { name: /Merch Store/ }).getAttribute("href"),
+    ).toBe("/portal/summer-camp/shop/merch-store")
+  })
+
+  it("does not render an offer or restricted source when every collection is empty", () => {
+    mocks.application = []
+    mocks.direct = []
+    mocks.upsale = []
+
+    render(<ShopContent popupId="popup-1" popupSlug="summer-camp" />)
+
+    expect(screen.getByText("Nothing available right now")).toBeTruthy()
+    expect(screen.queryByRole("link")).toBeNull()
+    expect(screen.queryByText("Available to you")).toBeNull()
+  })
+})

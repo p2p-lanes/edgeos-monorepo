@@ -33,6 +33,7 @@ interface UsePaymentSubmitParams {
   applicationId: string | undefined
   popupId: string | null
   popupSlug: string | null
+  salesFlowSlug?: string | null
   appCredit: string | number | null | undefined
   checkoutMode: CheckoutMode
   attendeePasses: AttendeePassState[]
@@ -83,6 +84,7 @@ export function usePaymentSubmit({
   applicationId,
   popupId,
   popupSlug,
+  salesFlowSlug = null,
   appCredit,
   checkoutMode,
   attendeePasses,
@@ -197,6 +199,7 @@ export function usePaymentSubmit({
         submitMode === "open-ticketing"
           ? await CheckoutService.purchaseOpenTicketing({
               slug: popupSlug!,
+              flowSlug: salesFlowSlug ?? undefined,
               requestBody: {
                 ...getMetaAttribution(),
                 locale: i18n.language,
@@ -442,6 +445,7 @@ export function usePaymentSubmit({
     paymentCompleteRef,
     popupId,
     popupSlug,
+    salesFlowSlug,
     submitMode,
     popupName,
     router,

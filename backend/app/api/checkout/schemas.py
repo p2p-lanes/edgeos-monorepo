@@ -3,12 +3,13 @@
 import uuid
 from datetime import datetime
 from decimal import Decimal
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 from app.api.attendee_category.schemas import AttendeeCategoryPublic
 from app.api.popup.schemas import PopupPublic
+from app.api.sales_flow.schemas import SelectedSalesFlow
 from app.api.ticketing_step.schemas import TicketingStepPublic
 
 # ---------------------------------------------------------------------------
@@ -85,6 +86,7 @@ class CheckoutRuntimeResponse(BaseModel):
     """Full response for GET /checkout/{slug}/runtime."""
 
     popup: PopupPublic
+    selected_flow: SelectedSalesFlow
     products: list[CheckoutRuntimeProduct]
     buyer_form: list[CheckoutBuyerSection]
     ticketing_steps: list[TicketingStepPublic]
@@ -189,6 +191,7 @@ class OpenTicketingPurchaseCreate(BaseModel):
     # a 409 pending_payment_exists is returned if a PENDING payment exists.
     cid: uuid.UUID | None = None
     sig: str | None = None
+    quote_token: str | None = None
 
 
 class OpenTicketingPurchaseResponse(BaseModel):
@@ -218,6 +221,7 @@ class CheckoutPreviewRequest(BaseModel):
     products: list[ProductLine] = Field(min_length=1)
     coupon_code: str | None = None
     insurance: bool = False
+    buyer: BuyerInfo | None = None
 
 
 class CheckoutPreviewLine(BaseModel):
@@ -242,6 +246,10 @@ class CheckoutPreviewResponse(BaseModel):
     contribution_amount: Decimal = Decimal("0")
     total: Decimal
     currency: str
+    selected_flow: SelectedSalesFlow
+    kind: Literal["estimate", "definitive"]
+    quote_token: str | None = None
+    quote_expires_at: datetime | None = None
 
 
 # ---------------------------------------------------------------------------

@@ -188,6 +188,7 @@ async def preview_open_ticketing(
     request_in: CheckoutPreviewRequest,
     db: SessionDep,
     tenant: PublicTenant,
+    current_human: OptionalHuman,
     flow_slug: Annotated[str | None, Query()] = None,
 ) -> CheckoutPreviewResponse:
     """Return a server-computed price breakdown for an anonymous cart.
@@ -199,11 +200,16 @@ async def preview_open_ticketing(
     whether it takes coupons, so a preview that named no door would quote the
     default flow's prices for a buyer about to be charged another's.
     """
-    from app.api.sales_flow.resolver import resolve_flow
+    from app.api.checkout.gate_quote import resolve_checkout_flow
+    from app.api.sales_flow.schemas import SalesFlowType
 
     popup = get_open_ticketing_popup(db, slug, tenant.id)
-    flow = resolve_flow(db, popup, flow_slug)
-    return payments_crud.preview_open_ticketing(db, request_in, popup, flow)
+    flow = resolve_checkout_flow(
+        db, popup, flow_slug, require_types={SalesFlowType.direct, SalesFlowType.upsale}
+    )
+    return payments_crud.preview_open_ticketing(
+        db, request_in, popup, flow, current_human=current_human
+    )
 
 
 @router.get(
@@ -351,18 +357,12 @@ def _to_open_cart_public(cart: object, *, restore_token: str | None) -> OpenCart
     )
 
 
-@router.put(
-    "/{slug}/cart",
-    response_model=OpenCartPublic,
-    dependencies=[
-        Depends(RateLimit(limit=30, window_sec=60, key_prefix="rl:checkout-cart")),
-    ],
-)
-async def upsert_open_cart(
+async def _upsert_open_cart(
     slug: str,
     cart_in: OpenCartUpsert,
     db: SessionDep,
     tenant: PublicTenant,
+    flow_slug: str | None = None,
 ) -> OpenCartPublic:
     """Save (create or replace) the open-checkout cart for an email.
 
@@ -372,7 +372,10 @@ async def upsert_open_cart(
     `restore_token` when the popup configures an open_checkout_signing_secret so
     the client can later rebuild the cart cross-device. Rate-limited 30/min/IP.
     """
+    from app.api.checkout.gate_quote import resolve_checkout_flow
+
     popup = get_open_ticketing_popup(db, slug, tenant.id)
+    flow = resolve_checkout_flow(db, popup, flow_slug)
     # Normalize before resolving the human: SQLModel skips the HumanBase email
     # validator on table inserts, so find_or_create is case-sensitive and a
     # differently-cased email would otherwise spawn a second human and cart.
@@ -385,10 +388,81 @@ async def upsert_open_cart(
         human_id=human.id,
         email=email,
         items=cart_in.items,
+        sales_flow_id=flow.id,
     )
     secret = popup.open_checkout_signing_secret
-    restore_token = build_cart_restore_token(str(cart.id), secret) if secret else None
+    restore_token = (
+        build_cart_restore_token(
+            str(cart.id), secret, popup_id=str(popup.id), flow_id=str(flow.id)
+        )
+        if secret
+        else None
+    )
     return _to_open_cart_public(cart, restore_token=restore_token)
+
+
+@router.put(
+    "/{slug}/cart",
+    response_model=OpenCartPublic,
+    dependencies=[
+        Depends(RateLimit(limit=30, window_sec=60, key_prefix="rl:checkout-cart"))
+    ],
+)
+async def upsert_open_cart(
+    slug: str, cart_in: OpenCartUpsert, db: SessionDep, tenant: PublicTenant
+) -> OpenCartPublic:
+    """Save the compatibility-default open-checkout cart for an email."""
+    return await _upsert_open_cart(slug, cart_in, db, tenant)
+
+
+@router.put(
+    "/{slug}/{flow_slug}/cart",
+    response_model=OpenCartPublic,
+    dependencies=[
+        Depends(RateLimit(limit=30, window_sec=60, key_prefix="rl:checkout-cart"))
+    ],
+)
+async def upsert_flow_cart(
+    slug: str,
+    flow_slug: str,
+    cart_in: OpenCartUpsert,
+    db: SessionDep,
+    tenant: PublicTenant,
+) -> OpenCartPublic:
+    """Save an open-checkout cart for the resolved flow."""
+    return await _upsert_open_cart(slug, cart_in, db, tenant, flow_slug)
+
+
+async def _restore_open_cart(
+    slug: str,
+    db: SessionDep,
+    tenant: PublicTenant,
+    cid: uuid.UUID = Query(..., description="Cart id from the signed restore link"),
+    sig: str = Query(..., description="HMAC restore token for the cart id"),
+    flow_slug: str | None = None,
+) -> OpenCartPublic:
+    """Restore an anonymous cart from a signed link (cid + sig).
+
+    The cart is served only when the signature matches, so it can never be read
+    by enumerating ids or emails. Requires the popup to have an
+    open_checkout_signing_secret. Rate-limited 60/min/IP.
+    """
+    from app.api.checkout.gate_quote import resolve_checkout_flow
+
+    popup = get_open_ticketing_popup(db, slug, tenant.id)
+    flow = resolve_checkout_flow(db, popup, flow_slug)
+    secret = popup.open_checkout_signing_secret
+    if not secret:
+        raise HTTPException(status_code=404, detail="Not found")
+    if not verify_cart_restore_token(
+        str(cid), sig, secret, popup_id=str(popup.id), flow_id=str(flow.id)
+    ):
+        raise HTTPException(status_code=404, detail="Not found")
+
+    cart = carts_crud.find_by_id_popup(db, cid, popup.id, flow.id)
+    if cart is None:
+        raise HTTPException(status_code=404, detail="Not found")
+    return _to_open_cart_public(cart, restore_token=sig)
 
 
 @router.get(
@@ -397,33 +471,35 @@ async def upsert_open_cart(
     dependencies=[
         Depends(
             RateLimit(limit=60, window_sec=60, key_prefix="rl:checkout-cart-restore")
-        ),
+        )
     ],
 )
 async def restore_open_cart(
+    slug: str, db: SessionDep, tenant: PublicTenant, cid: uuid.UUID, sig: str
+) -> OpenCartPublic:
+    """Restore the compatibility-default cart from a signed link."""
+    return await _restore_open_cart(slug, db, tenant, cid, sig)
+
+
+@router.get(
+    "/{slug}/{flow_slug}/cart",
+    response_model=OpenCartPublic,
+    dependencies=[
+        Depends(
+            RateLimit(limit=60, window_sec=60, key_prefix="rl:checkout-cart-restore")
+        )
+    ],
+)
+async def restore_flow_cart(
     slug: str,
+    flow_slug: str,
     db: SessionDep,
     tenant: PublicTenant,
-    cid: uuid.UUID = Query(..., description="Cart id from the signed restore link"),
-    sig: str = Query(..., description="HMAC restore token for the cart id"),
+    cid: uuid.UUID,
+    sig: str,
 ) -> OpenCartPublic:
-    """Restore an anonymous cart from a signed link (cid + sig).
-
-    The cart is served only when the signature matches, so it can never be read
-    by enumerating ids or emails. Requires the popup to have an
-    open_checkout_signing_secret. Rate-limited 60/min/IP.
-    """
-    popup = get_open_ticketing_popup(db, slug, tenant.id)
-    secret = popup.open_checkout_signing_secret
-    if not secret:
-        raise HTTPException(status_code=404, detail="Cart restore is not available")
-    if not verify_cart_restore_token(str(cid), sig, secret):
-        raise HTTPException(status_code=403, detail="Invalid cart link")
-
-    cart = carts_crud.find_by_id_popup(db, cid, popup.id)
-    if cart is None:
-        raise HTTPException(status_code=404, detail="Cart not found")
-    return _to_open_cart_public(cart, restore_token=sig)
+    """Restore a flow-scoped cart from a signed link."""
+    return await _restore_open_cart(slug, db, tenant, cid, sig, flow_slug)
 
 
 @router.post(

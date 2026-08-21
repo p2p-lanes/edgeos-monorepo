@@ -15,6 +15,7 @@ read-through change (design's "Fallback-authority rule").
 
 import uuid
 from collections.abc import Iterable
+from datetime import UTC, datetime
 
 from fastapi import HTTPException, status
 from sqlmodel import Session, select
@@ -22,7 +23,7 @@ from sqlmodel import Session, select
 from app.api.popup.models import Popups
 from app.api.popup.schemas import PopupStatus
 from app.api.sales_flow.crud import sales_flows_crud
-from app.api.sales_flow.models import SalesFlows
+from app.api.sales_flow.models import SalesFlowAliases, SalesFlows
 from app.api.sales_flow.schemas import (
     EFFECTIVE_CONFIG_FIELDS,
     EffectiveFlowConfig,
@@ -66,6 +67,23 @@ def resolve_flow(
             )
     else:
         flow = sales_flows_crud.get_by_slug(session, popup.id, flow_slug)
+        if flow is None:
+            alias = session.exec(
+                select(SalesFlowAliases).where(
+                    SalesFlowAliases.tenant_id == popup.tenant_id,
+                    SalesFlowAliases.popup_id == popup.id,
+                    SalesFlowAliases.alias == flow_slug,
+                    (SalesFlowAliases.expires_at.is_(None))
+                    | (SalesFlowAliases.expires_at > datetime.now(UTC)),  # type: ignore[operator]
+                )
+            ).first()
+            flow = (
+                session.get(SalesFlows, alias.sales_flow_id)
+                if alias is not None and alias.sales_flow_id is not None
+                else None
+            )
+            if flow is not None and flow.visibility != "portal_listed":
+                flow = None
         if flow is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,

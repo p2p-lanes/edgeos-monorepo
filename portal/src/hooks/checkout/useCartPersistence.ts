@@ -46,6 +46,7 @@ export interface RestorationSetters {
 interface UseCartPersistenceParams {
   enabled?: boolean
   cityId: string | null
+  salesFlowId?: string | null
   initialStep: CheckoutStep
   products: ProductsPass[]
   housingPricePerDay: boolean
@@ -59,6 +60,7 @@ interface UseCartPersistenceParams {
 export function useCartPersistence({
   enabled = true,
   cityId,
+  salesFlowId,
   initialStep,
   products,
   housingPricePerDay,
@@ -71,10 +73,15 @@ export function useCartPersistence({
   const effectiveCityId = enabled ? cityId : null
 
   // Cart API hooks (internalized)
-  const { data: savedCart, isSuccess: cartLoaded } = useCart(effectiveCityId)
-  const { save, saveImmediate, cancelPendingSave } =
-    useSaveCart(effectiveCityId)
-  const clearCartMutation = useClearCart(effectiveCityId)
+  const { data: savedCart, isSuccess: cartLoaded } = useCart(
+    effectiveCityId,
+    salesFlowId,
+  )
+  const { save, saveImmediate, cancelPendingSave } = useSaveCart(
+    effectiveCityId,
+    salesFlowId,
+  )
+  const clearCartMutation = useClearCart(effectiveCityId, salesFlowId)
 
   // --- Build CartState from the ref's current value ---
   const buildCartState = useCallback((): CartState => {

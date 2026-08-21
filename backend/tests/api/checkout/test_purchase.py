@@ -1232,7 +1232,7 @@ def test_purchase_with_ended_sale_window_returns_422(
     )
 
     assert response.status_code == 422, response.text
-    assert "not on sale" in response.json()["detail"]
+    assert response.json()["detail"] == {"code": "quote_unavailable"}
 
 
 def test_purchase_with_upcoming_sale_window_returns_422(
@@ -1265,7 +1265,7 @@ def test_purchase_with_upcoming_sale_window_returns_422(
     )
 
     assert response.status_code == 422, response.text
-    assert "not on sale" in response.json()["detail"]
+    assert response.json()["detail"] == {"code": "quote_unavailable"}
 
 
 def test_purchase_rate_limit_returns_429(

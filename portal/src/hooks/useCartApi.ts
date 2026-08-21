@@ -68,15 +68,16 @@ const EMPTY_CART: CartState = {
   current_step: null,
 }
 
-export function useCart(popupId: string | null) {
+export function useCart(popupId: string | null, salesFlowId?: string | null) {
   const isAuthenticated = useIsAuthenticated()
   return useQuery({
-    queryKey: queryKeys.cart.byPopup(popupId ?? ""),
+    queryKey: queryKeys.cart.byPopup(popupId ?? "", salesFlowId),
     queryFn: async (): Promise<CartState> => {
       const result = await request<CartPublic | null>(OpenAPI, {
         method: "GET",
         url: "/api/v1/carts/my/{popup_id}",
         path: { popup_id: popupId! },
+        query: { sales_flow_id: salesFlowId ?? undefined },
       })
       return result?.items ?? EMPTY_CART
     },
@@ -85,7 +86,10 @@ export function useCart(popupId: string | null) {
   })
 }
 
-export function useSaveCart(popupId: string | null) {
+export function useSaveCart(
+  popupId: string | null,
+  salesFlowId?: string | null,
+) {
   const queryClient = useQueryClient()
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const mutationRef =
@@ -97,11 +101,15 @@ export function useSaveCart(popupId: string | null) {
         method: "PUT",
         url: "/api/v1/carts/my/{popup_id}",
         path: { popup_id: popupId! },
+        query: { sales_flow_id: salesFlowId ?? undefined },
         body: { items },
       })
     },
     onSuccess: (_data, variables) => {
-      queryClient.setQueryData(queryKeys.cart.byPopup(popupId ?? ""), variables)
+      queryClient.setQueryData(
+        queryKeys.cart.byPopup(popupId ?? "", salesFlowId),
+        variables,
+      )
     },
   })
   mutationRef.current = mutation
@@ -131,10 +139,13 @@ export function useSaveCart(popupId: string | null) {
       }
 
       // Optimistically update the RQ cache before the server responds
-      queryClient.setQueryData(queryKeys.cart.byPopup(popupId), items)
+      queryClient.setQueryData(
+        queryKeys.cart.byPopup(popupId, salesFlowId),
+        items,
+      )
       mutationRef.current?.mutate(items)
     },
-    [popupId, queryClient],
+    [popupId, queryClient, salesFlowId],
   )
 
   const cancelPendingSave = useCallback(() => {
@@ -147,7 +158,10 @@ export function useSaveCart(popupId: string | null) {
   return { save: debouncedSave, saveImmediate, cancelPendingSave, ...mutation }
 }
 
-export function useClearCart(popupId: string | null) {
+export function useClearCart(
+  popupId: string | null,
+  salesFlowId?: string | null,
+) {
   const queryClient = useQueryClient()
 
   return useMutation({
@@ -156,11 +170,12 @@ export function useClearCart(popupId: string | null) {
         method: "DELETE",
         url: "/api/v1/carts/my/{popup_id}",
         path: { popup_id: popupId! },
+        query: { sales_flow_id: salesFlowId ?? undefined },
       })
     },
     onSuccess: () => {
       queryClient.setQueryData(
-        queryKeys.cart.byPopup(popupId ?? ""),
+        queryKeys.cart.byPopup(popupId ?? "", salesFlowId),
         EMPTY_CART,
       )
     },

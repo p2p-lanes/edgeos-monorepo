@@ -16,9 +16,11 @@ from app.api.cart.models import Carts
 from app.api.human.crud import humans_crud
 from app.api.popup.models import Popups
 from app.api.product.models import Products
+from app.api.sales_flow.crud import sales_flows_crud
 from app.api.shared.enums import SaleType
 from app.api.tenant.models import Tenants
 from app.utils.checkout_signing import build_cart_restore_token
+from tests._flow_helpers import seed_default_steps
 
 
 @pytest.fixture(autouse=True)
@@ -48,6 +50,7 @@ def _make_popup(
     )
     db.add(popup)
     db.flush()
+    seed_default_steps(db, popup, sale_type=SaleType.direct.value)
     return popup
 
 
@@ -100,7 +103,11 @@ def test_upsert_open_cart_creates_cart_and_returns_restore_token(
     body = response.json()
     assert body["email"] == "buyer@test.com"
     assert body["items"]["promo_code"] == "X10"
-    assert body["restore_token"] == build_cart_restore_token(body["id"], "s3cr3t")
+    flow = sales_flows_crud.get_default_flow(db, popup.id)
+    assert flow is not None
+    assert body["restore_token"] == build_cart_restore_token(
+        body["id"], "s3cr3t", popup_id=str(popup.id), flow_id=str(flow.id)
+    )
 
     cart = db.exec(
         select(Carts).where(Carts.popup_id == popup.id, Carts.human_id.is_not(None))
@@ -289,7 +296,7 @@ def test_restore_open_cart_invalid_signature_returns_403(
         headers={"X-Tenant-Id": str(tenant_a.id)},
     )
 
-    assert response.status_code == 403, response.text
+    assert response.status_code == 404, response.text
 
 
 def test_restore_open_cart_without_secret_returns_404(

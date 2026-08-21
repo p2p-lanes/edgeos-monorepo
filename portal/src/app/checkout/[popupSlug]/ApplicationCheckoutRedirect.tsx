@@ -7,7 +7,7 @@ import { Loader } from "@/components/ui/Loader"
 
 interface ApplicationCheckoutRedirectProps {
   popupSlug: string
-  flowSlug?: string
+  flowId: string
 }
 
 /**
@@ -26,20 +26,19 @@ interface ApplicationCheckoutRedirectProps {
  * nothing. So the URL resolves and hands over to the portal page that
  * already does this correctly.
  *
- * `flowSlug` rides along so the destination can scope itself once it
- * learns to: `/portal/{popup}/passes/buy` is not flow-aware yet, which is
- * its own gap rather than something this redirect can paper over.
+ * The selected flow UUID travels in the query so the portal checkout keeps
+ * its application, quote, and purchase context without resolving a default.
  */
 export function ApplicationCheckoutRedirect({
   popupSlug,
-  flowSlug,
+  flowId,
 }: ApplicationCheckoutRedirectProps) {
   const router = useRouter()
 
   useEffect(() => {
     const target = `/portal/${popupSlug}/passes/buy`
-    router.replace(flowSlug ? `${target}?flow=${flowSlug}` : target)
-  }, [popupSlug, flowSlug, router])
+    router.replace(`${target}?flow=${flowId}`)
+  }, [popupSlug, flowId, router])
 
   return (
     <div className="flex min-h-screen items-center justify-center">

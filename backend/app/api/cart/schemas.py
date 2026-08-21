@@ -79,6 +79,9 @@ class CartBase(SQLModel):
         default=None, foreign_key="humans.id", index=True
     )
     popup_id: uuid.UUID = Field(foreign_key="popups.id", index=True)
+    sales_flow_id: uuid.UUID | None = Field(
+        default=None, foreign_key="sales_flows.id", index=True
+    )
     # Set only for anonymous open-checkout carts, which are keyed by email
     # instead of a human. Stored in clear so backoffice can show it in the
     # abandoned-cart list. Authenticated carts read the email from the human.

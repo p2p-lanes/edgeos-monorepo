@@ -89,6 +89,18 @@
       "apply": "Apply"
     }
   },
+  "shop": {
+    "title": "Shop",
+    "description": "Choose an available option.",
+    "application": "Application",
+    "direct": "Direct purchase",
+    "upsale": "Available to you",
+    "open": "View option",
+    "empty_title": "Nothing available right now",
+    "empty_description": "Check back later for new options.",
+    "estimated_total": "Estimated total",
+    "definitive_total": "Total"
+  },
   "auth": {
     "sign_up_or_log_in": "Sign Up or Log In",
     "enter_verification_code": "Enter verification code",
@@ -534,6 +546,7 @@
     "coming_soon": "(Coming Soon)",
     "soon_badge": "Soon",
     "application": "Application",
+    "shop": "Shop",
     "passes": "Passes",
     "attendee_directory": "Attendee Directory",
     "companion": "Companion",

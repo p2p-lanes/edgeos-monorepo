@@ -46,7 +46,6 @@ from app.api.payment.schemas import (
 )
 from app.api.product.models import Products
 from app.api.product.product_state import ProductSaleState, derive_product_state
-from app.api.product.schemas import ProductPublic
 from app.api.shared.crud import BaseCRUD
 from app.core.filters import build_filter_expression
 from app.utils.checkout_signing import (
@@ -904,93 +903,25 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         obj: "CheckoutPreviewRequest",
         popup: "Popups",
         flow: "Any | None" = None,
+        current_human: "HumanPublic | None" = None,
     ) -> "CheckoutPreviewResponse":
-        """Compute the authoritative price breakdown without creating anything.
-
-        Same product validation (membership + sale window) and same money math
-        as ``create_open_ticketing_payment``; no side effects.
-
-        ``flow`` is the door the buyer is looking through. Omitted, the popup's
-        compatibility default answers; if none exists, the legacy entry point
-        is unavailable.
-        """
-        from app.api.sales_flow.resolver import resolve_flow  # noqa: PLC0415
-        from app.api.sales_flow.schemas import SalesFlowType  # noqa: PLC0415
-
-        if flow is None:
-            flow = resolve_flow(session, popup)
-        # Same gate the purchase applies. A quote for something this door
-        # cannot sell is a price nobody can pay, and the two staying in step is
-        # the reason this math is shared at all.
-        if flow is not None and flow.type not in (
-            SalesFlowType.direct.value,
-            SalesFlowType.upsale.value,
-        ):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="This way in does not support open ticketing",
-            )
-        from app.api.checkout.schemas import (
-            CheckoutPreviewLine,
-            CheckoutPreviewResponse,
+        """Evaluate the shared checkout gate and return its quote."""
+        from app.api.checkout.gate_quote import (
+            evaluate_gate_quote,
+            resolve_checkout_flow,
         )
 
-        product_ids = [line.product_id for line in obj.products]
-        products_statement = select(Products).where(
-            Products.id.in_(product_ids),  # type: ignore[attr-defined]
-            Products.popup_id == popup.id,
-            Products.is_active == True,  # noqa: E712
-            Products.deleted_at.is_(None),  # type: ignore[attr-defined]
-        )
-        valid_products = list(session.exec(products_statement).all())
-        if {p.id for p in valid_products} != set(product_ids):
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="Some products are not available or inactive",
-            )
-        for product in valid_products:
-            state = derive_product_state(ProductPublic.model_validate(product))
-            if state != ProductSaleState.on_sale:
-                raise HTTPException(
-                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                    detail=(
-                        f"Product '{product.name}' is not on sale "
-                        f"(state: {state.value})"
-                    ),
-                )
-
-        products_map = {p.id: p for p in valid_products}
-        amounts = compute_open_ticketing_amounts(
+        selected = flow or resolve_checkout_flow(session, popup, None)
+        return evaluate_gate_quote(
             session,
             popup,
-            flow,
-            products_map,
+            selected,
             obj.products,
             coupon_code=obj.coupon_code,
             insurance=obj.insurance,
-        )
-        return CheckoutPreviewResponse(
-            lines=[
-                CheckoutPreviewLine(
-                    product_id=line.product_id,
-                    quantity=line.quantity,
-                    unit_price=line.unit_price,
-                    line_total=line.line_total,
-                    discountable=line.discountable,
-                )
-                for line in amounts.lines
-            ],
-            discountable_amount=amounts.discountable_amount,
-            non_discountable_amount=amounts.non_discountable_amount,
-            coupon_code=amounts.coupon_code,
-            discount_value=amounts.discount_value,
-            discount_amount=amounts.discount_amount,
-            post_discount_amount=amounts.post_discount_amount,
-            insurance_amount=amounts.insurance_amount,
-            contribution_amount=amounts.contribution_amount,
-            total=amounts.total_amount,
-            currency=amounts.currency,
-        )
+            buyer=obj.buyer,
+            current_human=current_human,
+        ).response
 
     def create_open_ticketing_payment(
         self,
@@ -1017,23 +948,16 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         silent fallback). `assert_upsale_eligible` is a no-op unless the
         resolved flow is upsale-type.
         """
-        from app.api.popup.schemas import PopupStatus
-        from app.api.sales_flow.eligibility import assert_upsale_eligible
-        from app.api.sales_flow.resolver import (
-            build_effective_config,
-            resolve_flow,
+        from app.api.checkout.gate_quote import (
+            assert_quote_current,
+            evaluate_gate_quote,
+            resolve_checkout_flow,
         )
+        from app.api.popup.schemas import PopupStatus
+        from app.api.sales_flow.resolver import build_effective_config
         from app.api.sales_flow.schemas import SalesFlowType
         from app.api.tenant.utils import get_portal_url
         from app.services.simplefi import get_simplefi_client
-
-        popup_statement = (
-            select(FormSections)
-            .where(FormSections.popup_id == popup.id)
-            .options(selectinload(FormSections.form_fields))  # ty: ignore[invalid-argument-type]
-            .order_by(FormSections.order)  # type: ignore[arg-type]
-        )
-        popup.form_sections = list(session.exec(popup_statement).all())
 
         if popup.status != PopupStatus.active.value:
             raise HTTPException(
@@ -1044,42 +968,34 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         # `resolve_flow`; an unnamed one falls to the popup's default, which
         # has to be able to sell without an application or there is nothing
         # for an anonymous buyer to do here.
-        target_flow = resolve_flow(
+        target_flow = resolve_checkout_flow(
             session,
             popup,
             flow_slug,
             require_types={SalesFlowType.direct, SalesFlowType.upsale},
         )
-        assert_upsale_eligible(session, target_flow, popup.id, tenant.id, current_human)
-
-        # sdd/sales-flows slice 12 (design D5/D6, call-site table): the
-        # restriction gate (restriction_rule + D3 flow-exclusivity) is a
-        # read-only check and must run BEFORE any side effect — before
-        # humans_crud.find_or_create below, before the buyer/form
-        # validation, and before the SUPERSEDE_PENDING_ENABLED machinery
-        # further down. Subsumes slice 13's inline product-assignment EXISTS
-        # predicate (previously OR'd into the products_statement further
-        # below, after find_or_create) into this properly-placed helper.
-        from app.services.restrictions.context import build_context
-        from app.services.restrictions.enforcement import (
-            assert_products_allowed,
-        )
-
-        _restriction_context = build_context(
+        gate = evaluate_gate_quote(
             session,
             popup,
             target_flow,
-            human=current_human,
-            buyer_form_data=obj.buyer.form_data,
-            buyer_email=obj.buyer.email,
+            obj.products,
+            coupon_code=obj.coupon_code,
+            insurance=obj.insurance,
+            buyer=obj.buyer,
+            current_human=current_human,
+            lock_products=True,
+            require_complete=True,
         )
-        assert_products_allowed(
-            session,
-            target_flow,
-            popup,
-            [line.product_id for line in obj.products],
-            _restriction_context,
+        if obj.quote_token:
+            assert_quote_current(obj.quote_token, gate)
+
+        popup_statement = (
+            select(FormSections)
+            .where(FormSections.sales_flow_id == target_flow.id)
+            .options(selectinload(FormSections.form_fields))  # ty: ignore[invalid-argument-type]
+            .order_by(FormSections.order)  # type: ignore[arg-type]
         )
+        popup.form_sections = list(session.exec(popup_statement).all())
 
         buyer = humans_crud.find_or_create(
             session,
@@ -1107,40 +1023,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             buyer.last_name = obj.buyer.last_name
         session.add(buyer)
 
-        self._validate_open_ticketing_form_data(popup, obj.buyer.form_data)
-
-        # Flow-scoped product restriction (design D3) is already enforced
-        # above via `assert_products_allowed`, before any side effect — this
-        # query only needs the ordinary active/in-popup/not-deleted validity
-        # gate now (sdd/sales-flows slice 12 subsumed the product
-        # membership check that used to live here, see above).
-        product_ids = [line.product_id for line in obj.products]
-        products_statement = select(Products).where(
-            Products.id.in_(product_ids),  # type: ignore[attr-defined]
-            Products.popup_id == popup.id,
-            Products.is_active == True,  # noqa: E712
-            Products.deleted_at.is_(None),  # type: ignore[attr-defined]
-        )
-        valid_products = list(session.exec(products_statement).all())
-        if {product.id for product in valid_products} != set(product_ids):
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="Some products are not available or inactive",
-            )
-
-        # Reject products outside their sale window. Closes the stale-tab
-        # loophole where the UI was rendered before sale_ends_at passed.
-        for product in valid_products:
-            state = derive_product_state(ProductPublic.model_validate(product))
-            if state != ProductSaleState.on_sale:
-                raise HTTPException(
-                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                    detail=(
-                        f"Product '{product.name}' is not on sale "
-                        f"(state: {state.value})"
-                    ),
-                )
-
+        valid_products = gate.products
         products_map = {product.id: product for product in valid_products}
         fabricated_requests = [
             PaymentProductRequest(
@@ -1190,7 +1073,12 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             #   pending_payment_exists (NO SimpleFi call made).
             # Missing/invalid proof + no pending payment → proceed normally.
             _has_proof = self._validate_cart_continuity_proof(
-                session, popup, obj.buyer.email, obj.cid, obj.sig
+                session,
+                popup,
+                obj.buyer.email,
+                obj.cid,
+                obj.sig,
+                sales_flow_id=target_flow.id,
             )
 
             if _has_proof:
@@ -1267,8 +1155,6 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                     session, obj.buyer.email, popup.id
                 )
 
-            # Validate per-order caps (cheap in-memory check, fail fast before DB).
-            self._validate_max_per_order(fabricated_requests, valid_products)
             # Atomically decrement total-stock counters (409 if sold out).
             self._decrement_total_stocks(session, fabricated_requests, valid_products)
 
@@ -1334,15 +1220,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             # Authoritative amounts — the SAME math POST /checkout/{slug}/preview
             # serves, so the displayed total always matches what is charged.
             # Coupon consumption stays deferred below (this computes only).
-            amounts = compute_open_ticketing_amounts(
-                session,
-                popup,
-                target_flow,
-                products_map,
-                obj.products,
-                coupon_code=obj.coupon_code,
-                insurance=obj.insurance,
-            )
+            amounts = gate.amounts
             if amounts.coupon_id is not None:
                 payment.coupon_id = amounts.coupon_id
                 payment.coupon_code = amounts.coupon_code
@@ -1587,16 +1465,17 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             )
         )
 
-        # Direct-sale leg: payment has a product snapshot linked to an attendee
-        # with human_id == human_id and popup_id == popup_id (no application)
+        # Direct-sale leg: payment itself has no application, but its product
+        # snapshot can legitimately reuse an attendee linked to one. Ownership
+        # follows that real attendee's Human, not the attendee's origin.
         direct_leg = (
             select(Payments.id)
             .join(PaymentProducts, PaymentProducts.payment_id == Payments.id)  # type: ignore[arg-type]
             .join(Attendees, PaymentProducts.attendee_id == Attendees.id)  # type: ignore[arg-type]
             .where(
+                Payments.application_id.is_(None),  # type: ignore[union-attr]
                 Attendees.human_id == human_id,
                 Attendees.popup_id == popup_id,
-                Attendees.application_id.is_(None),  # type: ignore[union-attr]
             )
         )
 
@@ -2842,7 +2721,10 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             from app.api.cart.crud import carts_crud
 
             carts_crud.delete_by_human_popup(
-                session, human_id=application.human_id, popup_id=application.popup_id
+                session,
+                human_id=application.human_id,
+                popup_id=application.popup_id,
+                sales_flow_id=application.sales_flow_id,
             )
 
             session.add(application)
@@ -3171,14 +3053,17 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                     session,
                     human_id=payment.application.human_id,
                     popup_id=payment.application.popup_id,
+                    sales_flow_id=payment.sales_flow_id
+                    or payment.application.sales_flow_id,
                 )
-            elif payment.popup_id:
+            elif payment.popup_id and payment.sales_flow_id:
                 buyer_human_id = self._direct_buyer_human_id(session, payment)
                 if buyer_human_id:
                     carts_crud.delete_by_human_popup(
                         session,
                         human_id=buyer_human_id,
                         popup_id=payment.popup_id,
+                        sales_flow_id=payment.sales_flow_id,
                     )
 
             # Single atomic commit for the entire operation
@@ -3431,6 +3316,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         buyer_email: str,
         cid: uuid.UUID | None,
         sig: str | None,
+        sales_flow_id: uuid.UUID | None = None,
     ) -> bool:
         """Return True iff cid+sig constitute a valid cart continuity proof for this buyer+popup.
 
@@ -3457,12 +3343,34 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         secret = popup.open_checkout_signing_secret
         if not secret:
             return False
-        if not verify_cart_restore_token(str(cid), sig, secret):
-            return False
         from app.api.cart.crud import carts_crud as _carts_crud  # noqa: PLC0415
 
-        cart = _carts_crud.find_by_id_popup(session, cid, popup.id)
+        cart = _carts_crud.find_by_id_popup(session, cid, popup.id, sales_flow_id)
+        legacy_proof = False
+        if cart is None and sales_flow_id is not None:
+            candidate = _carts_crud.find_by_id_popup(session, cid, popup.id)
+            from app.api.sales_flow.crud import sales_flows_crud  # noqa: PLC0415
+
+            default = sales_flows_crud.get_default_flow(session, popup.id)
+            if (
+                candidate is not None
+                and candidate.sales_flow_id is None
+                and default is not None
+                and default.id == sales_flow_id
+            ):
+                cart = candidate
+                legacy_proof = True
         if cart is None:
+            return False
+        cart_flow_id = cart.sales_flow_id
+        valid = verify_cart_restore_token(
+            str(cid),
+            sig,
+            secret,
+            popup_id=str(popup.id),
+            flow_id=str(cart_flow_id or ""),
+        ) or (legacy_proof and verify_cart_restore_token(str(cid), sig, secret))
+        if not valid:
             return False
         cart_email: str = getattr(cart, "email", None) or ""
         return cart_email.lower() == buyer_email.lower()

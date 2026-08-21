@@ -75,6 +75,18 @@
       "apply": "申请"
     }
   },
+  "shop": {
+    "title": "商店",
+    "description": "请选择可用选项。",
+    "application": "申请",
+    "direct": "直接购买",
+    "upsale": "为您提供",
+    "open": "查看选项",
+    "empty_title": "目前没有可用选项",
+    "empty_description": "请稍后回来查看新选项。",
+    "estimated_total": "预估总额",
+    "definitive_total": "总额"
+  },
   "auth": {
     "sign_up_or_log_in": "注册或登录",
     "enter_verification_code": "输入验证码",
@@ -466,6 +478,7 @@
     "coming_soon": "（即将推出）",
     "soon_badge": "即将推出",
     "application": "申请",
+    "shop": "商店",
     "passes": "通行证",
     "attendee_directory": "参与者名录",
     "companion": "同伴",

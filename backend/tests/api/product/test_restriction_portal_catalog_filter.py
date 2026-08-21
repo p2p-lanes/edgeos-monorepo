@@ -16,8 +16,10 @@ from sqlmodel import Session
 from app.api.human.models import Humans
 from app.api.popup.models import Popups
 from app.api.product.models import Products
+from app.api.sales_flow.models import SalesFlows
 from app.api.shared.enums import SaleType
 from app.api.tenant.models import Tenants
+from app.api.ticketing_step.models import TicketingSteps
 from app.core.security import create_access_token
 from tests._flow_helpers import seed_default_steps
 
@@ -73,6 +75,54 @@ def _human_token(human: Humans) -> str:
 
 
 class TestPortalProductListingCatalogFilter:
+    def test_named_flow_uses_its_own_catalog_membership(
+        self, client: TestClient, db: Session, tenant_a: Tenants
+    ) -> None:
+        """An explicit sales flow must not inherit the default flow catalog."""
+        popup = _make_popup_with_default_flow(db, tenant_a, slug_prefix="pcf-named")
+        default_product = _make_product(db, popup, name="Default Product")
+        named_product = _make_product(
+            db, popup, name="Named Flow Product", category="merch"
+        )
+        named_flow = SalesFlows(
+            tenant_id=tenant_a.id,
+            popup_id=popup.id,
+            slug="named-flow",
+            name="Named flow",
+            type=SaleType.application.value,
+        )
+        db.add(named_flow)
+        db.flush()
+        db.add(
+            TicketingSteps(
+                tenant_id=tenant_a.id,
+                popup_id=popup.id,
+                sales_flow_id=named_flow.id,
+                step_type="merch",
+                title="Merch",
+                product_category="merch",
+            )
+        )
+        human = _make_human(db, tenant_a)
+        db.commit()
+
+        response = client.get(
+            "/api/v1/products/portal/products",
+            params={
+                "popup_id": str(popup.id),
+                "sales_flow_id": str(named_flow.id),
+            },
+            headers={
+                "X-Tenant-Id": str(tenant_a.id),
+                "Authorization": f"Bearer {_human_token(human)}",
+            },
+        )
+
+        assert response.status_code == 200, response.text
+        product_ids = {product["id"] for product in response.json()["results"]}
+        assert str(named_product.id) in product_ids
+        assert str(default_product.id) not in product_ids
+
     def test_product_no_step_offers_is_hidden(
         self, client: TestClient, db: Session, tenant_a: Tenants
     ) -> None:

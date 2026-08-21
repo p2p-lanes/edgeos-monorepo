@@ -11,6 +11,7 @@ import {
   type ProductPublic,
 } from "@/client"
 import FaviconOverride from "@/components/checkout-flow/FaviconOverride"
+import { OpenCheckoutQuoteStatus } from "@/components/checkout-flow/OpenCheckoutQuoteStatus"
 import ScrollyCheckoutFlow from "@/components/checkout-flow/ScrollyCheckoutFlow"
 import StepperCheckoutFlow from "@/components/checkout-flow/StepperCheckoutFlow"
 import { LanguageSwitcher } from "@/components/common/LanguageSwitcher"
@@ -38,11 +39,13 @@ import type { ProductsPass } from "@/types/Products"
 interface OpenCheckoutRuntimeProps {
   runtime: CheckoutRuntimeResponse
   popupSlug: string
+  flowSlug?: string
   prefilledBuyer?: {
     email?: string
     firstName?: string
     lastName?: string
   }
+  showQuoteStatus?: boolean
 }
 
 function toProductsPass(product: CheckoutRuntimeProduct): ProductsPass {
@@ -138,7 +141,9 @@ function buildOpenBuyerSchema(
 export function OpenCheckoutRuntime({
   runtime,
   popupSlug,
+  flowSlug,
   prefilledBuyer,
+  showQuoteStatus = false,
 }: OpenCheckoutRuntimeProps) {
   const { t } = useTranslation()
   const searchParams = useSearchParams()
@@ -247,6 +252,8 @@ export function OpenCheckoutRuntime({
               >
                 <CheckoutProvider
                   initialStep="passes"
+                  salesFlowId={runtime.selected_flow.id}
+                  salesFlowSlug={flowSlug}
                   flowType={runtime.flow_type ?? null}
                   productsOverride={products}
                   emptyCatalogReason={runtime.empty_catalog_reason ?? null}
@@ -268,6 +275,7 @@ export function OpenCheckoutRuntime({
                       requestBody: {
                         popup_slug: popupSlug,
                         code,
+                        flow_slug: flowSlug,
                       },
                     })
                     return Number(result.discount_value)
@@ -282,7 +290,17 @@ export function OpenCheckoutRuntime({
                     }
                   />
                   <Flow
-                    navExtraContent={<LanguageSwitcher compact />}
+                    navExtraContent={
+                      <div className="flex items-center gap-3">
+                        {showQuoteStatus && (
+                          <OpenCheckoutQuoteStatus
+                            popupSlug={popupSlug}
+                            flowSlug={flowSlug}
+                          />
+                        )}
+                        <LanguageSwitcher compact />
+                      </div>
+                    }
                     brandLogoUrl={
                       (popup as { icon_url?: string | null }).icon_url ?? null
                     }

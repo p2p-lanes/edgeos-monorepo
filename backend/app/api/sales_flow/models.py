@@ -3,7 +3,7 @@ from datetime import UTC, datetime
 
 from sqlalchemy import CheckConstraint, Index, UniqueConstraint, text
 from sqlalchemy.dialects.postgresql import UUID
-from sqlmodel import Column, DateTime, Field, func
+from sqlmodel import Column, DateTime, Field, SQLModel, func
 
 from app.api.sales_flow.schemas import SalesFlowBase
 
@@ -63,3 +63,19 @@ class SalesFlows(SalesFlowBase, table=True):
             nullable=False,
         ),
     )
+
+
+class SalesFlowAliases(SQLModel, table=True):
+    """A bounded historical slug for one flow in one popup."""
+
+    __tablename__ = "sales_flow_aliases"
+    __table_args__ = (
+        UniqueConstraint("popup_id", "alias", name="uq_sales_flow_alias"),
+    )
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    tenant_id: uuid.UUID = Field(foreign_key="tenants.id", index=True)
+    popup_id: uuid.UUID = Field(foreign_key="popups.id", index=True)
+    sales_flow_id: uuid.UUID = Field(foreign_key="sales_flows.id", index=True)
+    alias: str = Field(index=True)
+    expires_at: datetime | None = Field(default=None, index=True)

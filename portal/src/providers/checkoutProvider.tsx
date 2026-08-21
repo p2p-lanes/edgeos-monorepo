@@ -232,6 +232,7 @@ interface CheckoutProviderProps {
    * which is what a single-door gathering has.
    */
   salesFlowId?: string | null
+  salesFlowSlug?: string | null
   /** How that door sells. `null` while it is still being resolved, which is
    *  the same default the portal has always started from. */
   flowType?: string | null
@@ -258,6 +259,7 @@ export function CheckoutProvider({
   emptyCatalogReason = null,
   configuredStepsOverride,
   salesFlowId,
+  salesFlowSlug,
   flowType = null,
   accountCreditOverride,
   validatePromoCodeOverride,
@@ -283,7 +285,7 @@ export function CheckoutProvider({
   const { getRelevantApplication } = useApplication()
   const { getCity } = useCityProvider()
   const { products: queriedProducts, loading: isLoadingProducts } =
-    useGetPassesData()
+    useGetPassesData(salesFlowId)
   const products = productsOverride ?? queriedProducts
   const isAuthenticated = useIsAuthenticated()
   // The application of THIS door. It decides the attendees, the balance and
@@ -540,6 +542,7 @@ export function CheckoutProvider({
   } = useCartPersistence({
     enabled: cartPersistenceEnabled,
     cityId,
+    salesFlowId,
     initialStep,
     products,
     housingPricePerDay,
@@ -578,6 +581,7 @@ export function CheckoutProvider({
     setPromoError,
   } = usePromoCode({
     cityId: city?.id,
+    salesFlowId,
     discountAppliedValue: discountApplied.discount_value,
     setDiscount,
     resetDiscount,
@@ -601,6 +605,7 @@ export function CheckoutProvider({
     restorationPromise: openCartRestorationPromise,
   } = useOpenCartPersistence({
     popupSlug: openCartPopupSlug ?? "",
+    flowSlug: salesFlowSlug,
     selectionStateRef,
     products,
     housingPricePerDay,
@@ -626,7 +631,7 @@ export function CheckoutProvider({
   // local convenience so a refresh doesn't wipe a half-filled form. Only for
   // open checkout — authenticated flows carry buyer data on the account.
   const buyerStorageKey = openCartPopupSlug
-    ? `open-checkout-buyer:${openCartPopupSlug}`
+    ? `open-checkout-buyer:${openCartPopupSlug}:${salesFlowSlug ?? "default"}`
     : null
   const buyerRestoredRef = useRef(false)
   useEffect(() => {
@@ -1356,6 +1361,7 @@ export function CheckoutProvider({
     applicationId: application?.id,
     popupId: cityId,
     popupSlug: submitPopupSlug ?? city?.slug ?? null,
+    salesFlowSlug,
     appCredit,
     checkoutMode: checkoutPolicy.checkoutMode,
     attendeePasses,

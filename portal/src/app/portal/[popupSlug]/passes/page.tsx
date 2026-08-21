@@ -15,7 +15,6 @@ import { useRequireDoor } from "@/hooks/useRequireDoor"
 import { useApplication } from "@/providers/applicationProvider"
 import { useCityProvider } from "@/providers/cityProvider"
 import { usePassesProvider } from "@/providers/passesProvider"
-import { UpsaleFlowsPanel } from "./components/UpsaleFlowsPanel"
 import YourPasses from "./Tabs/YourPasses"
 
 export default function HomePasses() {
@@ -126,7 +125,7 @@ export default function HomePasses() {
   // application it is selling into (sdd/sales-flows-rediseno).
   const flowQuery = flowId ? `?flow=${flowId}` : ""
   const buyHref = nobodyApplies
-    ? `/checkout/${params.popupSlug}`
+    ? `/portal/${params.popupSlug}/shop`
     : `/portal/${params.popupSlug}/passes/buy${flowQuery}`
   const emptyState = (
     <div className="w-full md:mt-0 mx-auto items-center max-w-3xl p-6 bg-transparent">
@@ -180,16 +179,12 @@ export default function HomePasses() {
 
   return (
     <div className="w-full md:mt-0 mx-auto items-center max-w-3xl p-6 bg-transparent">
-      <UpsaleFlowsPanel
-        popupSlug={String(params.popupSlug)}
-        popupId={popupId ?? undefined}
-      />
       <YourPasses
         access={access}
         onSwitchToBuy={() =>
           router.push(
             nobodyApplies
-              ? `/checkout/${params.popupSlug}`
+              ? `/portal/${params.popupSlug}/shop`
               : `/portal/${params.popupSlug}/passes/buy${flowQuery}`,
           )
         }
