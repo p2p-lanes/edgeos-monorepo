@@ -107,6 +107,27 @@
       "unknown": "付款状态未知"
     }
   },
+  "people": {
+    "title": "人员",
+    "description": "您可以为此活动管理的人员。",
+    "primary": "主要参与者",
+    "dependent": "受抚养人",
+    "can_manage": "由您管理",
+    "empty_title": "暂无人员",
+    "empty_description": "您管理的人员将显示在这里。"
+  },
+  "tickets_access": {
+    "title": "票券和访问权限",
+    "description": "您的可扫描活动访问权限。",
+    "empty_title": "暂无票券",
+    "empty_description": "可扫描票券将显示在这里。",
+    "show_code": "显示 {{ticket}} 的访问代码",
+    "checked_in": "已签到",
+    "active": "可签到",
+    "code_title": "访问代码",
+    "code_description": "使用此代码签到。",
+    "qr_alt": "二维码"
+  },
   "auth": {
     "sign_up_or_log_in": "注册或登录",
     "enter_verification_code": "输入验证码",

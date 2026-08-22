@@ -121,6 +121,27 @@
       "unknown": "Unknown payment status"
     }
   },
+  "people": {
+    "title": "People",
+    "description": "People you can manage for this event.",
+    "primary": "Primary attendee",
+    "dependent": "Dependent",
+    "can_manage": "Managed by you",
+    "empty_title": "No people yet",
+    "empty_description": "People you manage will appear here."
+  },
+  "tickets_access": {
+    "title": "Tickets & Access",
+    "description": "Your scannable event access.",
+    "empty_title": "No tickets yet",
+    "empty_description": "Scannable tickets will appear here.",
+    "show_code": "Show access code for {{ticket}}",
+    "checked_in": "Checked in",
+    "active": "Ready for check-in",
+    "code_title": "Access code",
+    "code_description": "Use this code to check in.",
+    "qr_alt": "QR code"
+  },
   "auth": {
     "sign_up_or_log_in": "Sign Up or Log In",
     "enter_verification_code": "Enter verification code",

@@ -121,6 +121,27 @@
       "unknown": "Estado de pago desconocido"
     }
   },
+  "people": {
+    "title": "Personas",
+    "description": "Personas que puedes administrar para este evento.",
+    "primary": "Asistente principal",
+    "dependent": "Dependiente",
+    "can_manage": "Administrado por ti",
+    "empty_title": "Aún no hay personas",
+    "empty_description": "Las personas que administras aparecerán aquí."
+  },
+  "tickets_access": {
+    "title": "Pases y acceso",
+    "description": "Tu acceso escaneable al evento.",
+    "empty_title": "Aún no hay pases",
+    "empty_description": "Los pases escaneables aparecerán aquí.",
+    "show_code": "Mostrar código de acceso para {{ticket}}",
+    "checked_in": "Registro completado",
+    "active": "Listo para registrarse",
+    "code_title": "Código de acceso",
+    "code_description": "Usa este código para registrarte.",
+    "qr_alt": "Código QR"
+  },
   "auth": {
     "sign_up_or_log_in": "Registrarse o Iniciar Sesión",
     "enter_verification_code": "Ingresá el código de verificación",

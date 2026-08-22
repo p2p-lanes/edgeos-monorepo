@@ -107,6 +107,27 @@
       "unknown": "Óþekkt greiðslustaða"
     }
   },
+  "people": {
+    "title": "Fólk",
+    "description": "Fólk sem þú getur stýrt fyrir þennan viðburð.",
+    "primary": "Aðalþátttakandi",
+    "dependent": "Aðstandandi",
+    "can_manage": "Stýrt af þér",
+    "empty_title": "Ekkert fólk enn",
+    "empty_description": "Fólkið sem þú stýrir birtist hér."
+  },
+  "tickets_access": {
+    "title": "Passar og aðgangur",
+    "description": "Skannanlegur aðgangur þinn að viðburðinum.",
+    "empty_title": "Engir passar enn",
+    "empty_description": "Skannanlegir passar birtast hér.",
+    "show_code": "Sýna aðgangskóða fyrir {{ticket}}",
+    "checked_in": "Innritað",
+    "active": "Tilbúið fyrir innritun",
+    "code_title": "Aðgangskóði",
+    "code_description": "Notaðu þennan kóða til að innrita þig.",
+    "qr_alt": "QR-kóði"
+  },
   "auth": {
     "sign_up_or_log_in": "Skráðu þig eða innskráðu",
     "enter_verification_code": "Sláðu inn staðfestingarkóða",
