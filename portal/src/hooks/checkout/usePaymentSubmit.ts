@@ -26,6 +26,7 @@ import { buildPaymentProducts } from "./buildPaymentProducts"
 import {
   dispatchPaymentError,
   extractCartMeta,
+  extractServerErrorMessage,
   POPUP_ENDED_READ_ONLY_DETAIL,
 } from "./errorDispatch"
 
@@ -368,10 +369,10 @@ export function usePaymentSubmit({
     } catch (err: unknown) {
       console.error("Payment failed:", err)
 
-      const apiBody =
-        err instanceof ApiError
-          ? (err.body as Record<string, unknown> | null)
-          : null
+      const apiError = err instanceof ApiError ? err : null
+      const apiBody = apiError
+        ? (apiError.body as Record<string, unknown> | null)
+        : null
 
       // Machine-code branch: detail is an object carrying a .code field.
       // Checked before the string-detail coupon branch so structured errors
@@ -422,7 +423,16 @@ export function usePaymentSubmit({
         setIsSubmitting(false)
         return { success: false, error: errorMsg }
       }
-      const errorMsg = t("checkout.payment_error")
+      // Nothing matched a known code or special case. Rather than telling the
+      // buyer only that "something went wrong", show the reason the backend
+      // gave — e.g. "Application must be accepted before purchasing products"
+      // — which is the difference between a dead end and an actionable one.
+      // extractServerErrorMessage returns null for bodies unfit to display, and
+      // we fall back to the generic translated copy then.
+      const errorMsg =
+        (apiError
+          ? extractServerErrorMessage(apiError.body, apiError.status)
+          : null) ?? t("checkout.payment_error")
       setPromoError(errorMsg)
       toast.error(errorMsg)
       setIsSubmitting(false)
