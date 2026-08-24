@@ -313,6 +313,15 @@ export type ApplicationReviewCreate = {
 };
 
 /**
+ * A reviewer who has submitted at least one review for a popup.
+ */
+export type ApplicationReviewerOption = {
+    id: string;
+    full_name?: (string | null);
+    email?: (string | null);
+};
+
+/**
  * Compact reviewer + decision pair for the applications list.
  */
 export type ApplicationReviewerVote = {
@@ -2648,6 +2657,7 @@ export type InvitePublicPreview = {
     inviter_name?: (string | null);
     is_email_restricted: boolean;
     discount_percentage: string;
+    auto_approve: boolean;
     max_uses?: (number | null);
     current_uses: number;
     expires_at?: (string | null);
@@ -4007,16 +4017,16 @@ export type SavedViewUpdate = {
  * Admin request body for PATCH /applications/{id}/scholarship.
  */
 export type ScholarshipDecisionRequest = {
-    scholarship_status: ScholarshipStatus;
+    scholarship_status: ScholarshipDecisionStatus;
     discount_percentage?: (number | string | null);
     incentive_amount?: (number | string | null);
     incentive_currency?: (string | null);
 };
 
 /**
- * Status of a scholarship request on an application.
+ * Scholarship outcomes an administrator may assign.
  */
-export type ScholarshipStatus = 'pending' | 'approved' | 'rejected';
+export type ScholarshipDecisionStatus = 'approved' | 'rejected';
 
 export type SelfCheckInOptions = {
     popup: SelfCheckInPopup;
@@ -5029,6 +5039,13 @@ export type ApplicationsGetApplicationGroupCountsData = {
 };
 
 export type ApplicationsGetApplicationGroupCountsResponse = (Array<ApplicationGroupCount>);
+
+export type ApplicationsListApplicationReviewersData = {
+    popupId: string;
+    xTenantId?: (string | null);
+};
+
+export type ApplicationsListApplicationReviewersResponse = (Array<ApplicationReviewerOption>);
 
 export type ApplicationsGrantTicketsAdminData = {
     requestBody: AdminGrantTicketsRequest;
@@ -6605,6 +6622,14 @@ export type GroupsRemoveGroupLeaderData = {
 };
 
 export type GroupsRemoveGroupLeaderResponse = (GroupWithMembers);
+
+export type GroupsRemoveGroupMemberAdminData = {
+    groupId: string;
+    humanId: string;
+    xTenantId?: (string | null);
+};
+
+export type GroupsRemoveGroupMemberAdminResponse = (void);
 
 export type GroupsListMyGroupsData = {
     /**

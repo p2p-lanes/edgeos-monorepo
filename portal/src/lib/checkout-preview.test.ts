@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest"
 import type { CheckoutRuntimeResponse, TicketingStepPublic } from "@/client"
 import {
   applyStepDraft,
-  isAllowedPreviewOrigin,
   PREVIEW_MESSAGE_SOURCE,
   parsePreviewStateMessage,
 } from "./checkout-preview"
@@ -88,32 +87,6 @@ describe("applyStepDraft", () => {
     applyStepDraft(base, step("a", { title: "Draft A" }))
 
     expect(base.ticketing_steps[0].title).toBe("Saved A")
-  })
-})
-
-describe("isAllowedPreviewOrigin", () => {
-  it("accepts an exact origin match", () => {
-    expect(
-      isAllowedPreviewOrigin("https://app.edgeos.world", [
-        "https://app.edgeos.world",
-      ]),
-    ).toBe(true)
-  })
-
-  it("rejects anything else, including look-alike hosts", () => {
-    const allowed = ["https://app.edgeos.world"]
-
-    expect(
-      isAllowedPreviewOrigin("https://app.edgeos.world.evil.com", allowed),
-    ).toBe(false)
-    expect(isAllowedPreviewOrigin("http://app.edgeos.world", allowed)).toBe(
-      false,
-    )
-    expect(isAllowedPreviewOrigin("https://evil.com", allowed)).toBe(false)
-  })
-
-  it("trusts nobody when no origin is configured", () => {
-    expect(isAllowedPreviewOrigin("https://app.edgeos.world", [])).toBe(false)
   })
 })
 

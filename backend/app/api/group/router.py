@@ -228,17 +228,8 @@ async def delete_group(
             detail="Group not found",
         )
 
-    # Check if group has applications with products
-    for app in group.applications:
-        for attendee in app.attendees:
-            if attendee.products:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Cannot delete group with members that have purchased products",
-                )
-
     delete_translations_for_entity(db, "group", group.id)
-    crud.groups_crud.delete(db, group)
+    crud.groups_crud.delete_with_associations(db, group)
 
 
 @router.post(
@@ -301,6 +292,30 @@ async def remove_group_leader(
         **GroupPublic.model_validate(group).model_dump(),
         members=_build_members(group),
     )
+
+
+@router.delete("/{group_id}/members/{human_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def remove_group_member_admin(
+    group_id: uuid.UUID,
+    human_id: uuid.UUID,
+    db: AdminOrApiKeySession_GroupsWrite,
+    _: AdminOrApiKey_GroupsWrite,
+) -> None:
+    """Remove a current group member (BO admin only)."""
+    group = crud.groups_crud.get(db, group_id)
+    if not group:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Group not found",
+        )
+
+    if not crud.groups_crud.is_member(db, group.id, human_id):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Member not found in group",
+        )
+
+    crud.groups_crud.remove_member(db, group.id, human_id)
 
 
 @router.get("/my/groups", response_model=ListModel[MyGroupPublic])
@@ -961,6 +976,7 @@ async def resolve_group_slug(
             inviter_name=inviter_name,
             is_email_restricted=invite.recipient_email is not None,
             discount_percentage=invite.discount_percentage,
+            auto_approve=invite.auto_approve,
             max_uses=invite.max_uses,
             current_uses=invite.current_uses,
             expires_at=invite.expires_at,
@@ -1023,6 +1039,7 @@ async def canonical_invite_forward(
         inviter_name=inviter_name,
         is_email_restricted=invite.recipient_email is not None,
         discount_percentage=invite.discount_percentage,
+        auto_approve=invite.auto_approve,
         max_uses=invite.max_uses,
         current_uses=invite.current_uses,
         expires_at=invite.expires_at,

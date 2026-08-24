@@ -137,6 +137,7 @@ export default function InviteCheckoutPage() {
         popup={popup}
         background={contentBackground}
         inviteId={preview.id}
+        requiresManualApproval={!preview.auto_approve}
       />
     </>
   )

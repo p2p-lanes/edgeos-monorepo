@@ -52,11 +52,12 @@ function baseFieldDef(
   return { key, label, kind: "text", ops: textOps }
 }
 
-function buildFieldDefs(
+export function buildApplicationFilterFieldDefs(
   statusOptions: { value: string; label: string }[],
   customFields: CustomFilterField[],
   reviewerOptions: { value: string; label: string }[] = [],
   baseFieldOptions: Record<string, string[]> = {},
+  hideReviewedBy = false,
 ): FilterFieldDef[] {
   const fixed: FilterFieldDef[] = [
     {
@@ -107,7 +108,7 @@ function buildFieldDefs(
       kind: "boolean",
       ops: ["eq"],
     },
-    ...(reviewerOptions.length
+    ...(reviewerOptions.length && !hideReviewedBy
       ? [
           {
             key: "reviewed_by",
@@ -144,6 +145,7 @@ export function ApplicationFilterBuilder({
   customFields,
   reviewerOptions,
   baseFieldOptions,
+  hideReviewedBy,
   match,
   conditions,
   onChange,
@@ -152,17 +154,19 @@ export function ApplicationFilterBuilder({
   customFields: CustomFilterField[]
   reviewerOptions?: { value: string; label: string }[]
   baseFieldOptions?: Record<string, string[]>
+  hideReviewedBy?: boolean
   match: FilterMatch
   conditions: FilterCondition[]
   onChange: (match: FilterMatch, conditions: FilterCondition[]) => void
 }) {
   return (
     <FilterBuilder
-      fields={buildFieldDefs(
+      fields={buildApplicationFilterFieldDefs(
         statusOptions,
         customFields,
         reviewerOptions,
         baseFieldOptions,
+        hideReviewedBy,
       )}
       match={match}
       conditions={conditions}

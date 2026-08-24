@@ -125,7 +125,7 @@ class TestPortalLinkEndpoints:
         assert body["referrer_human_id"] == str(human.id)
         assert body["created_by"] is None, "an attendee link has no admin behind it"
         assert body["express_checkout"] is True
-        assert body["auto_approve"] is False
+        assert body["auto_approve"] is True
 
         listed = client.get(
             f"/api/v1/portal/invites?popup_id={popup.id}", headers=headers
@@ -250,6 +250,7 @@ class TestUnifiedPreview:
         body = resp.json()
         assert body["id"] == str(invite.id)
         assert body["inviter_name"] is not None
+        assert body["auto_approve"] is False
 
     def test_preview_resolves_an_attendee_link_without_naming_its_owner(
         self, client: TestClient, db: Session, tenant_a: Tenants

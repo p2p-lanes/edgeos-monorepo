@@ -55,6 +55,13 @@ class ScholarshipStatus(StrEnum):
     REJECTED = "rejected"
 
 
+class ScholarshipDecisionStatus(StrEnum):
+    """Scholarship outcomes an administrator may assign."""
+
+    APPROVED = "approved"
+    REJECTED = "rejected"
+
+
 class ApplicationBase(SQLModel):
     """Base schema for applications.
 
@@ -152,6 +159,14 @@ class ApplicationReviewerVote(BaseModel):
     decision: ReviewDecision
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class ApplicationReviewerOption(BaseModel):
+    """A reviewer who has submitted at least one review for a popup."""
+
+    id: uuid.UUID
+    full_name: str | None = None
+    email: str | None = None
 
 
 class ApplicationPublic(BaseModel):
@@ -466,7 +481,9 @@ APPLICATION_FILTER_FIELDS: dict[str, FilterField] = {
         frozenset(s.value for s in ApplicationStatus),
     ),
     "scholarship_request": FilterField("boolean", frozenset({"eq"})),
-    "scholarship_status": FilterField("select", ENUMISH_OPS),
+    "scholarship_status": FilterField(
+        "select", ENUMISH_OPS, frozenset(status.value for status in ScholarshipStatus)
+    ),
     "submitted_at": FilterField("date", DATE_OPS),
     "accepted_at": FilterField("date", DATE_OPS),
     "referral": FilterField("text", TEXT_OPS),
@@ -577,7 +594,7 @@ class ApplicationGroupCount(BaseModel):
 class ScholarshipDecisionRequest(BaseModel):
     """Admin request body for PATCH /applications/{id}/scholarship."""
 
-    scholarship_status: ScholarshipStatus  # required: "approved" | "rejected"
+    scholarship_status: ScholarshipDecisionStatus
     discount_percentage: Decimal | None = None  # 0–100, required when approved
     incentive_amount: Decimal | None = None  # only if popup.allows_incentive
     incentive_currency: str | None = None  # required if incentive_amount set
