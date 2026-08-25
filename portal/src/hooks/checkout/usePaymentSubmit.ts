@@ -11,6 +11,7 @@ import { withCheckoutLocale } from "@/helpers/checkout"
 import { getAttribution } from "@/lib/attribution"
 import { trackGAPurchase } from "@/lib/google-analytics"
 import { getMetaAttribution, trackMetaPurchase } from "@/lib/meta-pixel"
+import { trackPortalTelemetry } from "@/lib/portal-telemetry"
 import { queryKeys } from "@/lib/query-keys"
 import type { AttendeePassState } from "@/types/Attendee"
 import type {
@@ -300,6 +301,7 @@ export function usePaymentSubmit({
           }
           trackMetaPurchase(purchasePayload)
           trackGAPurchase(purchasePayload)
+          trackPortalTelemetry("checkout_completed")
         }
         toast.success(
           isEditing
@@ -365,6 +367,7 @@ export function usePaymentSubmit({
       return { success: true }
     } catch (err: unknown) {
       console.error("Payment failed:", err)
+      trackPortalTelemetry("checkout_failed")
 
       const apiBody =
         err instanceof ApiError

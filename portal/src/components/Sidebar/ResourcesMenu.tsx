@@ -2,6 +2,7 @@ import { usePathname, useRouter } from "next/navigation"
 import { useCallback } from "react"
 import { useTranslation } from "react-i18next"
 import useResources from "@/hooks/useResources"
+import { trackPortalTelemetry } from "@/lib/portal-telemetry"
 import type { Resource } from "@/types/resources"
 import { Separator } from "../ui/separator"
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip"
@@ -82,6 +83,7 @@ const ResourcesMenu = () => {
 
   const handleNavigate = useCallback(
     (path: string) => {
+      trackPortalTelemetry("portal_navigation")
       router.push(path)
     },
     [router],

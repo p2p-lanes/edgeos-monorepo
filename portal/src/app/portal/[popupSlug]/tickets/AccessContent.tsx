@@ -12,6 +12,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { trackPortalTelemetry } from "@/lib/portal-telemetry"
 import type {
   ScannableAccessHolder,
   ScannableAccessTicket,
@@ -81,7 +82,10 @@ export function AccessContent({ access }: { access: ScannableAccessHolder[] }) {
                       aria-label={t("tickets_access.show_code", {
                         ticket: ticket.name,
                       })}
-                      onClick={() => setActiveTicket(ticket)}
+                      onClick={() => {
+                        trackPortalTelemetry("access_code_opened")
+                        setActiveTicket(ticket)
+                      }}
                     >
                       <QrCode className="size-5" />
                     </button>

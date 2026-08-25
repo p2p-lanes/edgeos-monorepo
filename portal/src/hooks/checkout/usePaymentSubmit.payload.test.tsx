@@ -7,6 +7,7 @@ import type { ProductsPass } from "@/types/Products"
 const purchaseOpenTicketing = vi.hoisted(() =>
   vi.fn().mockResolvedValue({ status: "created" }),
 )
+const telemetry = vi.hoisted(() => ({ trackPortalTelemetry: vi.fn() }))
 
 vi.mock("@/client", () => ({
   ApiError: class ApiError extends Error {},
@@ -29,6 +30,7 @@ vi.mock("@/lib/attribution", () => ({
   getAttribution: () => ({}),
 }))
 vi.mock("@/lib/google-analytics", () => ({ trackGAPurchase: vi.fn() }))
+vi.mock("@/lib/portal-telemetry", () => telemetry)
 vi.mock("@/lib/meta-pixel", () => ({
   getMetaAttribution: () => ({}),
   trackMetaPurchase: vi.fn(),
@@ -113,6 +115,7 @@ function renderPaymentSubmit(salesFlowSlug: string | null) {
 describe("usePaymentSubmit public purchase payload", () => {
   beforeEach(() => {
     purchaseOpenTicketing.mockClear()
+    telemetry.trackPortalTelemetry.mockClear()
   })
 
   it.each([
@@ -138,5 +141,20 @@ describe("usePaymentSubmit public purchase payload", () => {
         },
       }),
     })
+  })
+
+  it("records a checkout failure without forwarding the rejected response", async () => {
+    purchaseOpenTicketing.mockRejectedValueOnce(
+      new Error("payment token and buyer@example.com"),
+    )
+    const { result } = renderPaymentSubmit("merch-store")
+
+    await act(async () => {
+      await result.current.submitPayment()
+    })
+
+    expect(telemetry.trackPortalTelemetry).toHaveBeenCalledWith(
+      "checkout_failed",
+    )
   })
 })
