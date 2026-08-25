@@ -17,13 +17,13 @@ describe("projectPeople", () => {
             check_in_code: "A",
           },
         ],
-      } as AttendeeWithOriginPublic,
+      } as unknown as AttendeeWithOriginPublic,
       {
         id: "dependent",
         name: "Jamie Morgan",
         category: "spouse",
         products: [],
-      } as AttendeeWithOriginPublic,
+      } as unknown as AttendeeWithOriginPublic,
     ])
 
     expect(people).toEqual([
@@ -56,7 +56,7 @@ describe("projectPeople", () => {
             check_in_code: "M",
           },
         ],
-      } as AttendeeWithOriginPublic,
+      } as unknown as AttendeeWithOriginPublic,
     ])
 
     expect(people).toEqual([

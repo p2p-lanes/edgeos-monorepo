@@ -51,6 +51,7 @@ describe("AccessContent", () => {
     expect(screen.getByText("Alex Morgan")).toBeTruthy()
     expect(screen.getByText("General Admission")).toBeTruthy()
     expect(screen.getByText("Ready for check-in")).toBeTruthy()
+    expect(screen.getByText("CHECK-IN-1")).toBeTruthy()
 
     fireEvent.click(
       screen.getByRole("button", {
@@ -58,7 +59,7 @@ describe("AccessContent", () => {
       }),
     )
 
-    expect(screen.getByText("CHECK-IN-1")).toBeTruthy()
+    expect(screen.getAllByText("CHECK-IN-1")).toHaveLength(2)
     expect(screen.getByLabelText("QR code")).toBeTruthy()
   })
 

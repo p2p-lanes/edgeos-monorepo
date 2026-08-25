@@ -75,11 +75,11 @@ export function OrdersContent({
 
   return (
     <section
-      className="mx-auto max-w-3xl space-y-6 p-6"
+      className="mx-auto max-w-4xl space-y-6 p-6"
       aria-labelledby="orders-title"
     >
       <div>
-        <h1 id="orders-title" className="text-2xl font-semibold">
+        <h1 id="orders-title" className="text-3xl font-semibold tracking-tight">
           {t("orders.title")}
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
@@ -88,8 +88,10 @@ export function OrdersContent({
       </div>
 
       {orders.length === 0 ? (
-        <div className="rounded-2xl border bg-card p-8 text-center">
-          <FileText className="mx-auto size-8 text-muted-foreground" />
+        <div className="rounded-xl border bg-card px-6 py-10 text-center shadow-sm">
+          <div className="mx-auto grid size-12 place-items-center rounded-full bg-muted">
+            <FileText className="size-6 text-muted-foreground" />
+          </div>
           <h2 className="mt-3 font-semibold">{t("orders.empty_title")}</h2>
           <p className="mt-1 text-sm text-muted-foreground">
             {t("orders.empty_description")}
@@ -98,8 +100,11 @@ export function OrdersContent({
       ) : (
         <div className="space-y-4">
           {orders.map((order) => (
-            <article key={order.id} className="rounded-2xl border bg-card p-5">
-              <div className="flex flex-wrap items-start justify-between gap-3">
+            <article
+              key={order.id}
+              className="overflow-hidden rounded-xl border bg-card shadow-sm"
+            >
+              <div className="flex flex-wrap items-start justify-between gap-3 border-b bg-muted/30 p-4 sm:p-5">
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
                     <Badge variant={statusVariant[order.status]}>
@@ -121,20 +126,17 @@ export function OrdersContent({
                   <p className="text-xs text-muted-foreground">
                     {t("orders.total")}
                   </p>
-                  <p className="font-semibold">
+                  <p className="text-xl font-semibold tracking-tight">
                     {formattedAmount(order.total, order.currency)}
                   </p>
                 </div>
               </div>
 
-              <ul
-                className="mt-4 divide-y rounded-lg border"
-                aria-label={t("orders.lines")}
-              >
+              <ul className="divide-y" aria-label={t("orders.lines")}>
                 {order.lines.map((line) => (
                   <li
                     key={line.id}
-                    className="flex items-center justify-between gap-4 p-3 text-sm"
+                    className="flex items-center justify-between gap-4 px-4 py-3 text-sm sm:px-5"
                   >
                     <div>
                       <p className="font-medium">{line.name}</p>
@@ -149,7 +151,7 @@ export function OrdersContent({
               </ul>
 
               {order.invoiceAvailable && (
-                <div className="mt-4">
+                <div className="border-t bg-muted/20 px-4 py-3 sm:px-5">
                   <Button
                     variant="outline"
                     size="sm"

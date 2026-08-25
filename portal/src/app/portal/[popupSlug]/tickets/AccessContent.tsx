@@ -25,11 +25,14 @@ export function AccessContent({ access }: { access: ScannableAccessHolder[] }) {
 
   return (
     <section
-      className="mx-auto max-w-3xl space-y-6 p-6"
+      className="mx-auto max-w-4xl space-y-6 p-6"
       aria-labelledby="tickets-access-title"
     >
       <div>
-        <h1 id="tickets-access-title" className="text-2xl font-semibold">
+        <h1
+          id="tickets-access-title"
+          className="text-3xl font-semibold tracking-tight"
+        >
           {t("tickets_access.title")}
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
@@ -38,8 +41,10 @@ export function AccessContent({ access }: { access: ScannableAccessHolder[] }) {
       </div>
 
       {access.length === 0 ? (
-        <div className="rounded-2xl border bg-card p-8 text-center">
-          <Ticket className="mx-auto size-8 text-muted-foreground" />
+        <div className="rounded-xl border bg-card px-6 py-10 text-center shadow-sm">
+          <div className="mx-auto grid size-12 place-items-center rounded-full bg-muted">
+            <Ticket className="size-6 text-muted-foreground" />
+          </div>
           <h2 className="mt-3 font-semibold">
             {t("tickets_access.empty_title")}
           </h2>
@@ -48,37 +53,55 @@ export function AccessContent({ access }: { access: ScannableAccessHolder[] }) {
           </p>
         </div>
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-6">
           {access.map((holder) => (
             <section
               key={holder.holderId}
-              className="rounded-2xl border bg-card p-5"
+              className="overflow-hidden rounded-xl border bg-card shadow-sm"
               aria-label={holder.holderName}
             >
-              <div className="flex items-center gap-2">
-                <Users className="size-4 text-muted-foreground" />
-                <h2 className="font-medium">{holder.holderName}</h2>
+              <div className="flex items-center gap-3 border-b bg-muted/40 px-4 py-3 sm:px-5">
+                <span className="grid size-9 place-items-center rounded-full bg-background text-sm font-semibold text-muted-foreground">
+                  {holder.holderName
+                    .split(" ")
+                    .filter(Boolean)
+                    .slice(0, 2)
+                    .map((part) => part[0])
+                    .join("")
+                    .toUpperCase()}
+                </span>
+                <div>
+                  <Users
+                    className="mb-1 size-3 text-muted-foreground"
+                    aria-hidden="true"
+                  />
+                  <h2 className="font-semibold">{holder.holderName}</h2>
+                </div>
               </div>
-              <ul className="mt-4 divide-y rounded-lg border">
+              <ul className="divide-y">
                 {holder.tickets.map((ticket) => (
                   <li
                     key={ticket.id}
-                    className="flex items-center justify-between gap-4 p-3"
+                    className="flex items-center justify-between gap-4 p-4 sm:p-5"
                   >
                     <div>
                       <p className="font-medium">{ticket.name}</p>
-                      <Badge
-                        className="mt-2"
-                        variant={ticket.lastScanAt ? "secondary" : "outline"}
-                      >
-                        {ticket.lastScanAt
-                          ? t("tickets_access.checked_in")
-                          : t("tickets_access.active")}
-                      </Badge>
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                        <Badge
+                          variant={ticket.lastScanAt ? "secondary" : "default"}
+                        >
+                          {ticket.lastScanAt
+                            ? t("tickets_access.checked_in")
+                            : t("tickets_access.active")}
+                        </Badge>
+                        <code className="rounded bg-muted px-2 py-1 text-xs text-muted-foreground">
+                          {ticket.checkInCode}
+                        </code>
+                      </div>
                     </div>
                     <button
                       type="button"
-                      className="rounded-md p-2 text-muted-foreground hover:bg-muted hover:text-foreground"
+                      className="grid size-11 shrink-0 place-items-center rounded-lg border bg-background text-muted-foreground shadow-sm transition-colors hover:bg-muted hover:text-foreground"
                       aria-label={t("tickets_access.show_code", {
                         ticket: ticket.name,
                       })}
