@@ -83,7 +83,7 @@ class SelectedSalesFlow(BaseModel):
 # portal/src/app/checkout/[popupSlug]/thank-you/page.tsx is a static Next.js
 # segment and always wins routing priority over a dynamic [flowSlug] segment,
 # so a flow with either slug would be permanently unreachable.
-RESERVED_FLOW_SLUGS = frozenset({"thank-you", "success"})
+RESERVED_FLOW_SLUGS = frozenset({"default", "thank-you", "success"})
 
 
 def validate_flow_slug(value: str) -> str:
@@ -530,7 +530,7 @@ class FlowStartPreview(BaseModel):
     """
 
     flow_type: SalesFlowType
-    # What was resolved: "fresh", "empty", "flow" (a sibling), or "default"
+    # What was resolved: "fresh", "empty", "flow" (a sibling), or "primary"
     # (the way in this gathering already sells through).
     source_kind: str
     source_name: str | None = None

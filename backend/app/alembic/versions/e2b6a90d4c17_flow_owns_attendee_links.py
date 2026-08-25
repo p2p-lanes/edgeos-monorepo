@@ -17,7 +17,7 @@ the day this runs.
 Idempotent: only flow columns that are NULL are filled.
 
 Revision ID: e2b6a90d4c17
-Revises: d5a81c4e7b60
+Revises: c3d9f6e02a48
 Create Date: 2026-08-13 00:00:00.000000
 
 """
@@ -27,7 +27,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "e2b6a90d4c17"
-down_revision = "d5a81c4e7b60"
+down_revision = "c3d9f6e02a48"
 branch_labels = None
 depends_on = None
 

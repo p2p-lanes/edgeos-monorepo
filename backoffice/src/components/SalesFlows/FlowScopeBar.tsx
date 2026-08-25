@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query"
 import { CircleAlert, Workflow } from "lucide-react"
 
 import { type SalesFlowPublic, SalesFlowsService } from "@/client"
+import { formatSalesFlowLabel } from "@/components/SalesFlows/flowLabel"
 import {
   Select,
   SelectContent,
@@ -76,8 +77,7 @@ export function FlowScopeBar({
         <SelectContent>
           {flows.map((flow) => (
             <SelectItem key={flow.id} value={flow.id}>
-              {flow.name}
-              {flow.is_default ? " (default)" : ""}
+              {formatSalesFlowLabel(flow)}
             </SelectItem>
           ))}
         </SelectContent>

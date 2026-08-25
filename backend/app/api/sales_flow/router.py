@@ -102,7 +102,7 @@ def _raise_on_default_conflict(exc: IntegrityError) -> NoReturn:
     if "uq_sales_flows_default_per_popup" in str(getattr(exc, "orig", exc)):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="This popup already has a default sales flow",
+            detail="This popup already has a primary sales flow",
         ) from exc
     raise exc
 

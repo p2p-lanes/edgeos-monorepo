@@ -49,7 +49,7 @@ describe("CopyFormToFlowDialog", () => {
         { id: "flow-3", name: "Upsale Flow", type: "upsale" },
         {
           id: "flow-1",
-          name: "Default Flow",
+          name: "Attendee",
           type: "application",
           is_default: true,
         },
@@ -80,7 +80,7 @@ describe("CopyFormToFlowDialog", () => {
 
     expect(await screen.findByText("Application Flow")).toBeInTheDocument()
     expect(screen.queryByText("Upsale Flow")).not.toBeInTheDocument()
-    expect(screen.queryByText("Default Flow")).not.toBeInTheDocument()
+    expect(screen.queryByText("Attendee")).not.toBeInTheDocument()
   })
 
   it("defaults to the event's shared form and copies on confirm", async () => {

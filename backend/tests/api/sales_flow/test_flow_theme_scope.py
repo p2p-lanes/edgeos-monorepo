@@ -131,7 +131,7 @@ class TestCheckoutRuntime:
         db.add(flow)
         db.commit()
 
-        runtime = runtime_for_slug(db, popup.slug, tenant_a.id)
+        runtime = runtime_for_slug(db, popup.slug, tenant_a.id, flow.slug)
 
         assert runtime.theme_config == COOL
         assert runtime.popup.theme_config == WARM, (

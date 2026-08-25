@@ -53,7 +53,7 @@ export function FlowMapCard({ flow, readiness }: FlowMapCardProps) {
             </div>
             <div className="flex shrink-0 items-center gap-1.5">
               {closed && <Badge variant="outline">Closed</Badge>}
-              {flow.is_default && <Badge variant="secondary">Default</Badge>}
+              {flow.is_default && <Badge variant="secondary">Primary</Badge>}
               <Badge variant="outline" className="capitalize">
                 {flow.type}
               </Badge>

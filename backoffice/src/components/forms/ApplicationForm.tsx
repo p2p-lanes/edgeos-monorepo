@@ -18,6 +18,7 @@ import {
 import { FieldError } from "@/components/Common/FieldError"
 import { FormErrorSummary } from "@/components/Common/FormErrorSummary"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
+import { formatSalesFlowLabel } from "@/components/SalesFlows/flowLabel"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -83,7 +84,7 @@ export function ApplicationForm({ onSuccess }: ApplicationFormProps) {
   const [savingAsDraft, setSavingAsDraft] = useState(false)
 
   // sdd/sales-flows task 14.2: explicit target flow for this application.
-  // "" means "let the backend resolve the popup's default flow" (the
+  // "" means "let the backend resolve the popup's primary flow" (the
   // pre-existing behavior). Reset whenever the selected popup changes so a
   // stale flow id from a previous gathering is never submitted.
   const [salesFlowId, setSalesFlowId] = useState<string>("")
@@ -395,13 +396,12 @@ export function ApplicationForm({ onSuccess }: ApplicationFormProps) {
                     <Label htmlFor="sales-flow">Sales Flow</Label>
                     <Select value={salesFlowId} onValueChange={setSalesFlowId}>
                       <SelectTrigger id="sales-flow" className="w-full">
-                        <SelectValue placeholder="Default flow" />
+                        <SelectValue placeholder="Choose an application flow" />
                       </SelectTrigger>
                       <SelectContent>
                         {applicationFlows.map((flow) => (
                           <SelectItem key={flow.id} value={flow.id}>
-                            {flow.name}
-                            {flow.is_default ? " (default)" : ""}
+                            {formatSalesFlowLabel(flow)}
                           </SelectItem>
                         ))}
                       </SelectContent>

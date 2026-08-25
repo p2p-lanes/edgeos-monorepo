@@ -41,7 +41,7 @@ function installStorage(): Storage {
 
 const mockList = vi.mocked(SalesFlowsService.listSalesFlows)
 
-const DEFAULT_FLOW = { id: "flow-default", name: "Default", is_default: true }
+const PRIMARY_FLOW = { id: "flow-primary", name: "Attendee", is_default: true }
 const OTHER_FLOW = { id: "flow-other", name: "Volunteers", is_default: false }
 
 type Listed = Awaited<ReturnType<typeof SalesFlowsService.listSalesFlows>>
@@ -77,7 +77,7 @@ describe("useFlowScope", () => {
     vi.clearAllMocks()
     installStorage()
     mockList.mockResolvedValue({
-      results: [DEFAULT_FLOW, OTHER_FLOW],
+      results: [PRIMARY_FLOW, OTHER_FLOW],
       paging: { offset: 0, limit: 100, total: 2 },
     } as unknown as Listed)
   })
@@ -92,7 +92,7 @@ describe("useFlowScope", () => {
     const { result } = renderScope(undefined)
 
     await waitFor(() =>
-      expect(result.current.activeFlowId).toBe(DEFAULT_FLOW.id),
+      expect(result.current.activeFlowId).toBe(PRIMARY_FLOW.id),
     )
   })
 
@@ -100,7 +100,7 @@ describe("useFlowScope", () => {
     const { onResolved } = renderScope(undefined)
 
     await waitFor(() =>
-      expect(onResolved).toHaveBeenCalledWith(DEFAULT_FLOW.id),
+      expect(onResolved).toHaveBeenCalledWith(PRIMARY_FLOW.id),
     )
   })
 
@@ -120,7 +120,7 @@ describe("useFlowScope", () => {
     const { result } = renderScope("flow-from-somewhere-else")
 
     await waitFor(() =>
-      expect(result.current.activeFlowId).toBe(DEFAULT_FLOW.id),
+      expect(result.current.activeFlowId).toBe(PRIMARY_FLOW.id),
     )
   })
 
@@ -129,7 +129,7 @@ describe("useFlowScope", () => {
       defaultOptions: { queries: { retry: false } },
     })
     queryClient.setQueryData(salesFlowsQueryKey("popup-1"), {
-      results: [DEFAULT_FLOW],
+      results: [PRIMARY_FLOW],
       paging: { offset: 0, limit: 100, total: 1 },
     } as unknown as Listed)
     const refresh = deferred<Listed>()
@@ -152,7 +152,7 @@ describe("useFlowScope", () => {
     expect(onResolved).not.toHaveBeenCalled()
 
     refresh.resolve({
-      results: [DEFAULT_FLOW, OTHER_FLOW],
+      results: [PRIMARY_FLOW, OTHER_FLOW],
       paging: { offset: 0, limit: 100, total: 2 },
     } as unknown as Listed)
 

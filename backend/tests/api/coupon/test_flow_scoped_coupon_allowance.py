@@ -173,7 +173,7 @@ class TestValidateCouponInheritance:
     ) -> None:
         popup = _make_popup(db, tenant_a, allows_coupons=True)
         flow = _make_flow(
-            db, popup, slug="default", is_default=True, allows_coupons=False
+            db, popup, slug="checkout", is_default=True, allows_coupons=False
         )
         _make_coupon(db, popup, code="OVERRIDEOFF", flow_id=flow.id)
         db.commit()
@@ -189,7 +189,7 @@ class TestValidateCouponInheritance:
     ) -> None:
         popup = _make_popup(db, tenant_a, allows_coupons=False)
         flow = _make_flow(
-            db, popup, slug="default", is_default=True, allows_coupons=True
+            db, popup, slug="checkout", is_default=True, allows_coupons=True
         )
         _make_coupon(db, popup, code="OVERRIDEON", flow_id=flow.id)
         db.commit()

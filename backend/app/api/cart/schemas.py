@@ -122,7 +122,7 @@ class OpenCartPublic(BaseModel):
     """Anonymous open-checkout cart response.
 
     `restore_token` is the HMAC for the signed restore link
-    (GET /checkout/{slug}/cart?cid=<id>&sig=<restore_token>). It is only
+    (GET /checkout/{slug}/{flow_slug}/cart?cid=<id>&sig=<restore_token>). It is only
     present when the popup configures an open_checkout_signing_secret; the
     client stores it to rebuild the cart on a later visit.
     """

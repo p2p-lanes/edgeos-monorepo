@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query"
 import { useEffect } from "react"
 
 import { SalesFlowsService } from "@/client"
+import { formatSalesFlowLabel } from "@/components/SalesFlows/flowLabel"
 import {
   Select,
   SelectContent,
@@ -52,7 +53,7 @@ export function FlowPicker({
     ? (data?.results ?? []).filter((f) => f.type === restrictTo)
     : (data?.results ?? [])
 
-  // Start on the default flow, which is where every invite landed people
+  // Start on the primary flow, which is where every invite landed people
   // before it could say otherwise.
   useEffect(() => {
     if (value || flows.length === 0) return
@@ -78,8 +79,7 @@ export function FlowPicker({
         <SelectContent>
           {flows.map((flow) => (
             <SelectItem key={flow.id} value={flow.id}>
-              {flow.name}
-              {flow.is_default ? " (default)" : ""}
+              {formatSalesFlowLabel(flow)}
             </SelectItem>
           ))}
         </SelectContent>

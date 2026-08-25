@@ -22,13 +22,15 @@ describe("getSalesFlowUrl", () => {
     ).toBe("https://demo.edgeos.world/checkout/spring-fest/add-workshop")
   })
 
-  it("builds the portal application entry path for an application flow", () => {
+  it("builds the portal application entry path with the application's flow slug", () => {
     expect(
       getSalesFlowUrl("https://demo.edgeos.world", "spring-fest", {
         type: "application",
-        slug: "default",
+        slug: "attendee",
       }),
-    ).toBe("https://demo.edgeos.world/portal/spring-fest/application")
+    ).toBe(
+      "https://demo.edgeos.world/portal/spring-fest/application?flow=attendee",
+    )
   })
 })
 
@@ -57,21 +59,21 @@ describe("SalesFlowUrlCard", () => {
     )
   })
 
-  it("renders the portal application entry note for application flows", () => {
+  it("renders the flow-specific portal application entry link", () => {
     render(
       <SalesFlowUrlCard
         portalBaseUrl="https://demo.edgeos.world"
         popupSlug="spring-fest"
-        flow={{ type: "application", slug: "default" }}
+        flow={{ type: "application", slug: "attendee" }}
       />,
     )
 
     expect(
       screen.getByText(
-        "https://demo.edgeos.world/portal/spring-fest/application",
+        "https://demo.edgeos.world/portal/spring-fest/application?flow=attendee",
       ),
     ).toBeInTheDocument()
-    expect(screen.getByText(/portal's flow picker/i)).toBeInTheDocument()
+    expect(screen.getByText(/opens this application flow/i)).toBeInTheDocument()
   })
 
   it("disables the actions and explains the missing link when there is no portal domain", () => {

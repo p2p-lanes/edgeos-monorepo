@@ -76,7 +76,7 @@ def _partner_default(db: Session, popup: Popups) -> SalesFlows:
         db,
         popup,
         SaleType.direct.value,
-        slug="default",
+        slug="attendee",
         name="Checkout",
         is_default=True,
         allows_coupons=False,
@@ -122,7 +122,7 @@ class TestCopyingAChosenDoor:
         self, db: Session, tenant_a: Tenants
     ) -> None:
         popup = _popup(db, tenant_a)
-        _flow(db, popup, SaleType.application.value, slug="default", is_default=True)
+        _flow(db, popup, SaleType.application.value, slug="attendee", is_default=True)
         scholarship = _flow(
             db,
             popup,
@@ -143,7 +143,7 @@ class TestCopyingAChosenDoor:
         self, db: Session, tenant_a: Tenants
     ) -> None:
         popup = _popup(db, tenant_a)
-        _flow(db, popup, SaleType.application.value, slug="default", is_default=True)
+        _flow(db, popup, SaleType.application.value, slug="attendee", is_default=True)
         partner = _flow(
             db,
             popup,
@@ -166,7 +166,7 @@ class TestAnotherGatheringIsOutOfReach:
         can name — including another gathering's signing secret, which is the
         key an external thank-you page verifies orders against."""
         mine = _popup(db, tenant_a, "Mine")
-        _flow(db, mine, SaleType.application.value, slug="default", is_default=True)
+        _flow(db, mine, SaleType.application.value, slug="attendee", is_default=True)
 
         theirs = _popup(db, tenant_a, "Theirs")
         stranger = _flow(
@@ -184,7 +184,7 @@ class TestAnotherGatheringIsOutOfReach:
         self, db: Session, tenant_a: Tenants
     ) -> None:
         popup = _popup(db, tenant_a)
-        _flow(db, popup, SaleType.application.value, slug="default", is_default=True)
+        _flow(db, popup, SaleType.application.value, slug="attendee", is_default=True)
 
         with_bad_value = pytest.raises(ValueError)
         with with_bad_value:
@@ -319,7 +319,7 @@ class TestThePreviewMatchesWhatYouGet:
         admin_token_tenant_a: str,
     ) -> None:
         mine = _popup(db, tenant_a, "Mine")
-        _flow(db, mine, SaleType.application.value, slug="default", is_default=True)
+        _flow(db, mine, SaleType.application.value, slug="attendee", is_default=True)
         theirs = _popup(db, tenant_a, "Theirs")
         stranger = _flow(db, theirs, SaleType.direct.value, name="Theirs")
 

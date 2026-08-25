@@ -73,7 +73,7 @@ class TestResolveFlowGateOrder:
         self, db: Session, tenant_a: Tenants
     ) -> None:
         popup = _make_popup(db, tenant_a)
-        default_flow = _make_flow(db, popup, slug="default", is_default=True)
+        default_flow = _make_flow(db, popup, slug="checkout", is_default=True)
         db.commit()
 
         flow = resolver.resolve_flow(db, popup, None)
@@ -88,7 +88,7 @@ class TestResolveFlowGateOrder:
         with pytest.raises(HTTPException) as exc_info:
             resolver.resolve_flow(db, popup, None)
         assert exc_info.value.status_code == 404
-        assert exc_info.value.detail == "Default sales flow not found"
+        assert exc_info.value.detail == "Sales flow not found"
 
     def test_named_flow_resolves_without_a_default(
         self, db: Session, tenant_a: Tenants
@@ -103,7 +103,7 @@ class TestResolveFlowGateOrder:
 
     def test_unknown_slug_raises_404(self, db: Session, tenant_a: Tenants) -> None:
         popup = _make_popup(db, tenant_a)
-        _make_flow(db, popup, slug="default", is_default=True)
+        _make_flow(db, popup, slug="checkout", is_default=True)
         db.commit()
 
         with pytest.raises(HTTPException) as exc_info:
@@ -114,7 +114,7 @@ class TestResolveFlowGateOrder:
         self, db: Session, tenant_a: Tenants
     ) -> None:
         popup = _make_popup(db, tenant_a, status="draft")
-        flow = _make_flow(db, popup, slug="default", is_default=True)
+        flow = _make_flow(db, popup, slug="checkout", is_default=True)
         db.commit()
 
         with pytest.raises(HTTPException) as exc_info:
@@ -139,7 +139,7 @@ class TestResolveFlowGateOrder:
     ) -> None:
         popup = _make_popup(db, tenant_a, sale_type="application")
         flow = _make_flow(
-            db, popup, slug="default", is_default=True, type="application"
+            db, popup, slug="attendee", is_default=True, type="application"
         )
         db.commit()
 
@@ -156,7 +156,7 @@ class TestResolveFlowGateOrder:
         self, db: Session, tenant_a: Tenants
     ) -> None:
         popup = _make_popup(db, tenant_a)
-        flow = _make_flow(db, popup, slug="default", is_default=True, type="direct")
+        flow = _make_flow(db, popup, slug="checkout", is_default=True, type="direct")
         db.commit()
 
         resolved = resolver.resolve_flow(
@@ -172,7 +172,7 @@ class TestResolveFlowGateOrder:
     ) -> None:
         """Threat matrix: visibility is listing-only, never an access gate."""
         popup = _make_popup(db, tenant_a)
-        _make_flow(db, popup, slug="default", is_default=True)
+        _make_flow(db, popup, slug="checkout", is_default=True)
         hidden = _make_flow(db, popup, slug="unlisted", visibility="direct_url_only")
         db.commit()
 
@@ -185,7 +185,7 @@ class TestResolveFlowGateOrder:
         """Threat matrix: cross-popup flow reference is blocked."""
         popup_a = _make_popup(db, tenant_a)
         popup_b = _make_popup(db, tenant_a)
-        _make_flow(db, popup_a, slug="default", is_default=True)
+        _make_flow(db, popup_a, slug="checkout", is_default=True)
         other_flow = _make_flow(db, popup_b, slug="only-on-b", is_default=True)
         db.commit()
 
@@ -212,7 +212,7 @@ class TestGetDefaultFlow:
         with pytest.raises(HTTPException) as exc_info:
             resolver.get_default_flow(db, popup.id)
         assert exc_info.value.status_code == 404
-        assert exc_info.value.detail == "Default sales flow not found"
+        assert exc_info.value.detail == "Sales flow not found"
 
 
 class TestResolveActiveDirectFlow:

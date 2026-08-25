@@ -6,7 +6,6 @@ from sqlmodel import Session, col, select
 
 from app.api.sales_flow.models import SalesFlows
 from app.api.sales_flow.schemas import (
-    RESERVED_FLOW_SLUGS,
     SalesFlowCreate,
     SalesFlowIdentityMode,
     SalesFlowReviewersMode,
@@ -17,7 +16,11 @@ from app.api.sales_flow.schemas import (
 )
 from app.api.shared.crud import BaseCRUD
 
-DEFAULT_FLOW_SLUG = "default"
+PRIMARY_FLOW_SLUGS = {
+    "application": "attendee",
+    "direct": "checkout",
+}
+PRIMARY_FLOW_SLUG_FALLBACK = "checkout"
 
 # The starting point that is not an existing flow: take nothing from anywhere.
 #
@@ -70,6 +73,11 @@ DEFAULT_FLOW_NAME_FALLBACK = "Checkout"
 def default_flow_name(flow_type: str) -> str:
     """The name a popup's first flow is created with."""
     return DEFAULT_FLOW_NAMES.get(str(flow_type), DEFAULT_FLOW_NAME_FALLBACK)
+
+
+def primary_flow_slug(flow_type: str) -> str:
+    """The canonical URL slug for a popup's first sales flow."""
+    return PRIMARY_FLOW_SLUGS.get(str(flow_type), PRIMARY_FLOW_SLUG_FALLBACK)
 
 
 def flow_kinds_for_popups(
@@ -211,30 +219,6 @@ def delete_flow_and_its_configuration(session: Session, flow: SalesFlows) -> Non
     session.commit()
 
 
-def resolve_default_flow_slug(
-    candidate: str,
-    taken: frozenset[str] = frozenset(),
-    reserved: frozenset[str] = RESERVED_FLOW_SLUGS,
-) -> str:
-    """Deterministically de-collide a candidate slug against reserved and
-    already-taken slugs (`taken` must be scoped to a single popup).
-
-    Pure function (no I/O). Mirrors the slice-2 backfill migration's own
-    `resolve_default_flow_slug` (4a983282b8aa) — kept as a separate copy
-    here (not imported) for the same reason that migration doesn't import
-    this module: the two call sites evolve independently.
-    """
-    blocked = reserved | taken
-    if candidate not in blocked:
-        return candidate
-    suffixed = f"{candidate}-flow"
-    n = 2
-    while suffixed in blocked:
-        suffixed = f"{candidate}-flow-{n}"
-        n += 1
-    return suffixed
-
-
 class SalesFlowsCRUD(BaseCRUD[SalesFlows, SalesFlowCreate, SalesFlowUpdate]):
     """CRUD operations for SalesFlows."""
 
@@ -361,18 +345,11 @@ class SalesFlowsCRUD(BaseCRUD[SalesFlows, SalesFlowCreate, SalesFlowUpdate]):
         if existing:
             return existing
 
-        taken_slugs = frozenset(
-            session.exec(
-                select(SalesFlows.slug).where(SalesFlows.popup_id == popup_id)
-            ).all()
-        )
-        slug = resolve_default_flow_slug(DEFAULT_FLOW_SLUG, taken=taken_slugs)
-
         flow = SalesFlows(
             tenant_id=tenant_id,
             popup_id=popup_id,
             type=sale_type,
-            slug=slug,
+            slug=primary_flow_slug(sale_type),
             name=default_flow_name(sale_type),
             visibility=recommended_visibility_for_type(sale_type),
             is_default=True,
@@ -449,7 +426,7 @@ class SalesFlowsCRUD(BaseCRUD[SalesFlows, SalesFlowCreate, SalesFlowUpdate]):
             if popup is None:
                 return StartingPoint(kind="none", name=None, values={})
             return StartingPoint(kind="popup", name=None, values=_attrs(popup))
-        return StartingPoint(kind="default", name=source.name, values=_attrs(source))
+        return StartingPoint(kind="primary", name=source.name, values=_attrs(source))
 
     def seed_config(
         self,

@@ -431,8 +431,8 @@ export function SalesFlowForm({
             {(field) => (
               <InlineRow
                 icon={<ShieldCheck className="h-4 w-4 text-muted-foreground" />}
-                label="Default Flow"
-                description="Used as the fallback when a link or request does not specify a flow"
+                label="Primary Flow"
+                description="Identifies the primary flow for this event"
               >
                 <Switch
                   checked={field.state.value}

@@ -96,8 +96,8 @@ const FLOW_BASE = {
   id: "flow-1",
   tenant_id: "tenant-1",
   popup_id: "popup-1",
-  slug: "default",
-  name: "Default Flow",
+  slug: "attendee",
+  name: "Attendee",
   type: "application" as const,
   visibility: "portal_listed" as const,
   is_default: true,
@@ -154,7 +154,16 @@ describe("SalesFlowForm - flow-owned settings", () => {
     mockSettingsByType.mockResolvedValue(SETTINGS_BY_TYPE as never)
   })
 
-  it("allows an unused default flow to be deleted", async () => {
+  it("uses primary terminology for the flow identity field", async () => {
+    renderForm()
+
+    expect(await screen.findByText("Primary Flow")).toBeInTheDocument()
+    expect(
+      screen.getByText("Identifies the primary flow for this event"),
+    ).toBeInTheDocument()
+  })
+
+  it("allows an unused primary flow to be deleted", async () => {
     renderForm()
 
     expect(
@@ -162,9 +171,6 @@ describe("SalesFlowForm - flow-owned settings", () => {
         "Once you delete this unused sales flow, it and its configuration will be permanently removed.",
       ),
     ).toBeInTheDocument()
-    expect(
-      screen.queryByText(/default flow of a popup cannot be deleted/i),
-    ).not.toBeInTheDocument()
   })
 
   it("never offers a settings value a second source", async () => {

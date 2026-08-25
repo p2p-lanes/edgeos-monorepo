@@ -474,7 +474,7 @@ def _resolve_schema_flow_id(
     if default_flow is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Default sales flow not found",
+            detail="Sales flow not found",
         )
     return default_flow.id
 
@@ -541,7 +541,7 @@ async def get_application_schema(
     fields defined for the resolved sales flow (falling back to the
     popup-shared tier — see ``build_schema_for_flow``). ``sales_flow_id``
     resolves an explicit flow (sdd/sales-flows D6 URL scheme, task 9.8);
-    omitted resolves the popup's default flow, as before.
+    omitted resolves the popup's primary flow, as before.
     """
     from app.api.popup.crud import popups_crud
 
@@ -568,7 +568,7 @@ async def get_portal_application_schema(
 
     Resolves the sales flow named by ``sales_flow_id`` (sdd/sales-flows D6
     URL scheme, task 9.8 — for the FlowPicker, task 9.4), falling back to
-    the popup's default flow when omitted (falling back further to the
+    the popup's primary flow when omitted (falling back further to the
     popup-shared tier — see ``build_schema_for_flow``).
     """
     from app.api.popup.crud import popups_crud

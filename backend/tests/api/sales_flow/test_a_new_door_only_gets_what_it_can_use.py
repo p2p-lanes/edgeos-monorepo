@@ -57,8 +57,8 @@ def _default_flow(db: Session, popup: Popups, flow_type: str, **config) -> Sales
     flow = SalesFlows(
         tenant_id=popup.tenant_id,
         popup_id=popup.id,
-        slug="default",
-        name="Default",
+        slug="attendee",
+        name="Primary",
         type=flow_type,
         is_default=True,
         **config,

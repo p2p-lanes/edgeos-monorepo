@@ -42,7 +42,8 @@ async def validate_coupon_public(
 ) -> CouponValidatePublicResponse:
     """Validate a coupon code for an anonymous open-ticketing checkout (no JWT required).
 
-    Resolves the sales flow (default flow when `flow_slug` is omitted) and
+    Resolves the requested sales flow, or the popup's primary flow when
+    `flow_slug` is omitted, and
     gates on `direct`/`upsale` flow types. Returns coupon details on
     success. Returns 400 with the uniform "Invalid or expired coupon"
     message for every failure state — unknown popup, unknown flow slug,
@@ -136,7 +137,7 @@ def _resolve_coupon_flow_id(
                 )
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Default sales flow not found",
+                detail="Sales flow not found",
             )
         return default_flow.id
 

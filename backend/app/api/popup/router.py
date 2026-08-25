@@ -62,7 +62,7 @@ def _default_flow_or_404(db, popup_id: uuid.UUID):
     if flow is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Default sales flow not found",
+            detail="Sales flow not found",
         )
     return flow
 
@@ -286,7 +286,7 @@ async def create_popup(
     if default_flow is None:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Popup was created without a default sales flow",
+            detail="Popup was created without a sales flow",
         )
 
     # A door that sells directly skips the application-centric bootstrap (no

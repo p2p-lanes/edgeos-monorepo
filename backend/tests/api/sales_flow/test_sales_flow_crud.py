@@ -141,6 +141,20 @@ class TestSalesFlowCreate:
         )
         assert response.status_code == 422
 
+    def test_create_sales_flow_default_slug_rejected(
+        self,
+        client: TestClient,
+        admin_token_tenant_a: str,
+        popup_tenant_a: Popups,
+    ) -> None:
+        """The retired primary-flow slug cannot be introduced through the API."""
+        response = client.post(
+            "/api/v1/sales-flows",
+            headers={"Authorization": f"Bearer {admin_token_tenant_a}"},
+            json=_create_payload(popup_tenant_a.id, slug="default"),
+        )
+        assert response.status_code == 422
+
     def test_create_sales_flow_duplicate_slug_in_popup_rejected(
         self,
         client: TestClient,

@@ -76,7 +76,7 @@ def _seed_popup_with_default_flow(
             "INSERT INTO sales_flows "
             "(id, tenant_id, popup_id, type, slug, name, visibility, is_default, "
             '"order", reviewers_mode, identity_mode) '
-            "VALUES (:id, :tid, :pid, 'application', 'default', 'Default', "
+            "VALUES (:id, :tid, :pid, 'application', 'attendee', 'Attendee', "
             "'portal_listed', true, 0, 'inherit', 'portal_auth')"
         ).bindparams(id=flow_id, tid=tenant_id, pid=popup_id)
     )

@@ -20,7 +20,7 @@ Asserts a coverage invariant before returning: after the backfill, zero
 `applications`/`payments` rows may have `sales_flow_id IS NULL` while their
 owning popup has a default sales_flow. A violation raises `RuntimeError`
 and rolls back the whole migration transaction (mirrors
-`4a983282b8aa_backfill_default_sales_flows.py`'s own invariant check). Rows
+`4a983282b8aa_backfill_primary_sales_flows.py`'s own invariant check). Rows
 whose popup genuinely has no default flow are left NULL — that state is
 a slice-2 invariant violation, not something this migration can fix.
 

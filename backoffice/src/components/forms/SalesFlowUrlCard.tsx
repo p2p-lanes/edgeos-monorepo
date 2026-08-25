@@ -3,15 +3,14 @@ import { ExternalLink } from "lucide-react"
 import type { SalesFlowPublic, SalesFlowType } from "@/client"
 import { CopyLinkButton } from "@/components/Common/CopyLinkButton"
 import { Button } from "@/components/ui/button"
-import { getPopupCheckoutUrl, getPopupPortalUrl } from "@/lib/portal-urls"
+import { getFlowCheckoutUrl, getPopupPortalUrl } from "@/lib/portal-urls"
 
 type FlowUrlInfo = Pick<SalesFlowPublic, "slug"> & { type?: SalesFlowType }
 
 /**
  * The portal URL where a flow is actually reachable (sales-flows D6 URL
- * scheme). Application flows never get a dedicated URL - buyers land on the
- * event's application entry point and pick a flow there when more than one
- * is listed.
+ * scheme). Application flow URLs carry the flow slug to open that exact
+ * application entry point.
  */
 export function getSalesFlowUrl(
   portalBaseUrl: string,
@@ -19,9 +18,9 @@ export function getSalesFlowUrl(
   flow: FlowUrlInfo,
 ): string {
   if (flow.type === "application") {
-    return `${getPopupPortalUrl(portalBaseUrl, popupSlug)}/application`
+    return `${getPopupPortalUrl(portalBaseUrl, popupSlug)}/application?flow=${encodeURIComponent(flow.slug)}`
   }
-  return `${getPopupCheckoutUrl(portalBaseUrl, popupSlug)}/${flow.slug}`
+  return getFlowCheckoutUrl(portalBaseUrl, popupSlug, flow.slug)
 }
 
 interface SalesFlowUrlCardProps {
@@ -73,8 +72,7 @@ export function SalesFlowUrlCard({
       </div>
       {isApplication && (
         <p className="mt-2 text-xs text-muted-foreground">
-          Applicants pick this flow from the portal's flow picker when more than
-          one application flow is listed for this event.
+          This link opens this application flow directly.
         </p>
       )}
     </div>

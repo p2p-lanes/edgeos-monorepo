@@ -34,7 +34,7 @@ import {
   validateTableSearch,
 } from "@/hooks/useTableSearchParams"
 import {
-  getPopupCheckoutUrl,
+  getFlowCheckoutUrl,
   getPopupPortalUrl,
   getPortalBaseUrl,
 } from "@/lib/portal-urls"
@@ -102,7 +102,7 @@ function PopupActionsMenu({ popup }: { popup: PopupAdmin }) {
         </DropdownMenuItem>
         <DropdownMenuItem asChild>
           <a
-            href={getPopupCheckoutUrl(baseUrl, popup.slug)}
+            href={getFlowCheckoutUrl(baseUrl, popup.slug, "checkout")}
             target="_blank"
             rel="noopener noreferrer"
           >

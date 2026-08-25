@@ -318,7 +318,7 @@ class InvitesCRUD(BaseCRUD[Invites, InviteCreate, InviteUpdate]):
         if default_flow is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Default sales flow not found",
+                detail="Sales flow not found",
             )
         return default_flow.id
 

@@ -16,7 +16,6 @@ import uuid
 from fastapi.testclient import TestClient
 from sqlmodel import Session, select
 
-from app.api.sales_flow.crud import resolve_default_flow_slug
 from app.api.sales_flow.models import SalesFlows
 
 
@@ -42,9 +41,7 @@ class TestPopupCreateProvisionsDefaultFlow:
         flow = flows[0]
         assert flow.is_default is True
         assert flow.type == "direct"
-        assert flow.slug == "default"
-        # Named for what it does. The slug stays "default" — that one is a URL
-        # and an operator may already have shared it.
+        assert flow.slug == "checkout"
         assert flow.name == "Checkout"
         assert flow.visibility == "direct_url_only"
         assert flow.reviewers_mode == "inherit"
@@ -86,29 +83,5 @@ class TestPopupCreateProvisionsDefaultFlow:
 
         flow = db.exec(select(SalesFlows).where(SalesFlows.popup_id == popup_id)).one()
         assert flow.type == "application"
+        assert flow.slug == "attendee"
         assert flow.visibility == "portal_listed"
-
-
-class TestResolveDefaultFlowSlugDecollision:
-    """Pure function, mirrors the slice-2 backfill migration's own
-    `resolve_default_flow_slug` de-collision logic (design task 5.0)."""
-
-    def test_returns_candidate_when_free(self) -> None:
-        assert resolve_default_flow_slug("default", taken=frozenset()) == "default"
-
-    def test_suffixes_when_candidate_taken(self) -> None:
-        assert (
-            resolve_default_flow_slug("default", taken=frozenset({"default"}))
-            == "default-flow"
-        )
-
-    def test_increments_suffix_until_free(self) -> None:
-        assert (
-            resolve_default_flow_slug(
-                "default", taken=frozenset({"default", "default-flow"})
-            )
-            == "default-flow-2"
-        )
-
-    def test_reserved_slugs_are_always_blocked(self) -> None:
-        assert resolve_default_flow_slug("thank-you", taken=frozenset()) != "thank-you"

@@ -44,7 +44,7 @@ async def list_portal_ticketing_steps(
 
     Resolves the flow named by `sales_flow_id` (sdd/sales-flows D6 URL
     scheme — must belong to this popup, mirrors `_get_flow_or_404`), or the
-    popup's default flow when omitted. The resolved flow's own steps are
+    popup's primary flow when omitted. The resolved flow's own steps are
     the answer: since slice 2 nothing is inherited, so an empty list means
     this flow has no steps.
     """
@@ -79,7 +79,7 @@ async def list_ticketing_steps(
     """List ticketing steps.
 
     With `popup_id`, returns the step list of one flow: the one named by
-    `sales_flow_id`, or the popup's default flow when omitted. That list is
+    `sales_flow_id`, or the popup's primary flow when omitted. That list is
     exactly what the flow owns — since slice 2 there is no shared tier to
     fall back to.
     """
@@ -148,7 +148,7 @@ def _resolve_flow_or_404(db, popup_id: uuid.UUID, flow_id: uuid.UUID | None):
     if default_flow is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Default sales flow not found",
+            detail="Sales flow not found",
         )
     return default_flow
 

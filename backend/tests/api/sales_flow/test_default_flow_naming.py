@@ -65,11 +65,9 @@ class TestDefaultFlowName:
 
         assert flow.name == "Checkout"
 
-    def test_the_slug_does_not_move_with_the_name(
+    def test_an_application_flow_uses_the_attendee_slug(
         self, db: Session, tenant_a: Tenants
     ) -> None:
-        """The slug is a URL an operator may already have shared, and the
-        resolver falls back to it. Only the label a buyer reads changed."""
         popup = _popup(db, tenant_a, SaleType.application.value)
 
         flow = sales_flows_crud.provision_default_flow(
@@ -80,7 +78,7 @@ class TestDefaultFlowName:
         )
         db.commit()
 
-        assert flow.slug == "default"
+        assert flow.slug == "attendee"
 
     def test_an_unknown_type_still_gets_a_name_a_buyer_can_read(self) -> None:
         """A default flow is never an upsale today. If one ever is, it should

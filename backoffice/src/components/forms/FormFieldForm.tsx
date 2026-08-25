@@ -100,7 +100,7 @@ export function FormFieldForm({
   const popupId = isEdit ? defaultValues.popup_id : selectedPopupId
 
   // These standalone routes carry no flow context, so the row joins the
-  // popup's default flow — named explicitly rather than left for the
+  // popup's primary flow — named explicitly rather than left for the
   // backend to guess.
   const { data: flowsData } = useQuery({
     queryKey: salesFlowsQueryKey(popupId),
