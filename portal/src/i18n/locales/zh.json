@@ -912,7 +912,7 @@
       "visibility_private": "私密(仅限受邀者)",
       "visibility_unlisted": "不公开列出(隐藏,可分享链接)",
       "host_label": "显示的主办方(可选)",
-      "host_placeholder_default": "{{name}}(默认)",
+      "host_placeholder_popup": "{{name}}",
       "host_placeholder_optional": "可选",
       "host_use_popup": "使用 {{name}}",
       "host_use_me": "使用我的姓名",

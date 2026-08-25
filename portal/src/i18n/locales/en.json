@@ -1017,7 +1017,7 @@
       "visibility_private": "Private (invitees only)",
       "visibility_unlisted": "Unlisted (hidden, shareable link)",
       "host_label": "Displayed host (optional)",
-      "host_placeholder_default": "{{name}} (default)",
+      "host_placeholder_popup": "{{name}}",
       "host_placeholder_optional": "Optional",
       "host_use_popup": "Use {{name}}",
       "host_use_me": "Use my name",

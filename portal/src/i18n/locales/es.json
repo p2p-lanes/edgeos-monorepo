@@ -1014,7 +1014,7 @@
       "visibility_private": "Privado (solo invitados)",
       "visibility_unlisted": "No listado (oculto, link compartible)",
       "host_label": "Organizador visible (opcional)",
-      "host_placeholder_default": "{{name}} (por defecto)",
+      "host_placeholder_popup": "{{name}}",
       "host_placeholder_optional": "Opcional",
       "host_use_popup": "Usar {{name}}",
       "host_use_me": "Usar mi nombre",

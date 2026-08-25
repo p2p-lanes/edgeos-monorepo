@@ -902,7 +902,7 @@
       "visibility_private": "Einkamál (aðeins boðnum)",
       "visibility_unlisted": "Óskráð (falinn, deilanlegur tengill)",
       "host_label": "Birtur gestgjafi (valfrjálst)",
-      "host_placeholder_default": "{{name}} (sjálfgefið)",
+      "host_placeholder_popup": "{{name}}",
       "host_placeholder_optional": "Valfrjálst",
       "host_use_popup": "Nota {{name}}",
       "host_use_me": "Nota nafnið mitt",
