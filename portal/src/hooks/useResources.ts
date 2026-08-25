@@ -11,11 +11,15 @@ import {
 } from "lucide-react"
 import { useSearchParams } from "next/navigation"
 import { useTranslation } from "react-i18next"
+import { getEligibleShopOffers } from "@/app/portal/[popupSlug]/shop/components/shopOffers"
 import { OpenClaw } from "@/components/Icons/OpenClaw"
 import { buildEndedResources } from "@/hooks/endedResources"
 import useAuth from "@/hooks/useAuth"
 import { useGatheringDoors } from "@/hooks/useGatheringDoors"
 import { useHumanPopupAccess } from "@/hooks/useHumanPopupAccess"
+import { usePortalDirectSalesFlows } from "@/hooks/usePortalDirectSalesFlows"
+import { usePortalSalesFlows } from "@/hooks/usePortalSalesFlows"
+import { usePortalUpsaleFlows } from "@/hooks/usePortalUpsaleFlows"
 import { useApplication } from "@/providers/applicationProvider"
 import { useCityProvider } from "@/providers/cityProvider"
 import type { Resource } from "@/types/resources"
@@ -36,6 +40,10 @@ const useResources = () => {
   const { user } = useAuth()
   const application = getRelevantApplication(flowId)
   const city = getCity()
+  const popupId = city?.id ? String(city.id) : undefined
+  const applicationFlows = usePortalSalesFlows(popupId).data ?? []
+  const directFlows = usePortalDirectSalesFlows(popupId).data ?? []
+  const upsaleFlows = usePortalUpsaleFlows(popupId).data ?? []
   const { doors } = useGatheringDoors(city?.id ? String(city.id) : null)
   // Named only when there is more than one way in. With a single door the
   // sidebar has nothing to disambiguate and saying its name would be noise.
@@ -52,7 +60,7 @@ const useResources = () => {
   // another, so the popup's `sale_type` can no longer answer it.
   const nobodyApplies = city?.takes_applications === false
 
-  if (city?.status === "ended" && !nobodyApplies) {
+  if (city?.status === "ended") {
     const resources = buildEndedResources({
       t,
       city,
@@ -75,6 +83,16 @@ const useResources = () => {
   const companionApplicationAccepted =
     participation?.type === "companion" &&
     participation?.application_status === "accepted"
+  const isApplicationApproved = isCompanion
+    ? participation?.application_status === "accepted"
+    : application?.status === "accepted"
+  const hasEligibleShopOptions =
+    getEligibleShopOffers({
+      application: applicationFlows,
+      direct: directFlows,
+      upsale: upsaleFlows,
+      isApplicationApproved,
+    }).length > 0
 
   // Where nobody applies there is no application and no reviewer-controlled
   // attendee list, just an event overview that links to checkout plus a
@@ -87,24 +105,35 @@ const useResources = () => {
         icon: Ticket,
         status: "active",
         path: `/portal/${city?.slug}${flowQuery}`,
+        group: "general",
       },
       {
-        name: t("sidebar.passes"),
+        name: t("sidebar.people"),
+        icon: Users,
+        status: "active",
+        path: `/portal/${city?.slug}/people`,
+        group: "participation",
+      },
+      {
+        name: t("sidebar.tickets_access"),
         icon: Ticket,
         status: "active",
-        path: `/portal/${city?.slug}/passes${flowQuery}`,
+        path: `/portal/${city?.slug}/tickets`,
+        group: "participation",
       },
       {
         name: t("sidebar.shop"),
         icon: ShoppingBag,
-        status: "active",
+        status: hasEligibleShopOptions ? "active" : "hidden",
         path: `/portal/${city?.slug}/shop`,
+        group: "commerce",
       },
       {
         name: t("sidebar.orders"),
         icon: ReceiptText,
         status: "active",
         path: `/portal/${city?.slug}/orders`,
+        group: "commerce",
       },
     ]
 
@@ -119,6 +148,7 @@ const useResources = () => {
         icon: Users,
         status: "active",
         path: `/portal/${city?.slug}${flowQuery}`,
+        group: "general",
         children: [
           {
             name: t("sidebar.status"),
@@ -128,28 +158,39 @@ const useResources = () => {
         ],
       },
       {
-        name: t("sidebar.passes"),
+        name: t("sidebar.people"),
+        icon: Users,
+        status: "active",
+        path: `/portal/${city?.slug}/people`,
+        group: "participation",
+      },
+      {
+        name: t("sidebar.tickets_access"),
         icon: Ticket,
         status: companionCanSeePasses ? "active" : "hidden",
-        path: `/portal/${city?.slug}/passes${flowQuery}`,
+        path: `/portal/${city?.slug}/tickets`,
+        group: "participation",
       },
       {
         name: t("sidebar.shop"),
         icon: ShoppingBag,
-        status: "active",
+        status: hasEligibleShopOptions ? "active" : "hidden",
         path: `/portal/${city?.slug}/shop`,
+        group: "commerce",
       },
       {
         name: t("sidebar.orders"),
         icon: ReceiptText,
         status: "active",
         path: `/portal/${city?.slug}/orders`,
+        group: "commerce",
       },
       {
         name: t("sidebar.events"),
         icon: CalendarDays,
         status: companionEventsVisible ? "active" : "hidden",
         path: `/portal/${city?.slug}/events${flowQuery}`,
+        group: "community",
         children: [
           {
             name: t("sidebar.tracks", { defaultValue: "Tracks" }),
@@ -184,6 +225,7 @@ const useResources = () => {
       icon: FileText,
       status: "active",
       path: `/portal/${city?.slug}${flowQuery}`,
+      group: "general",
       // The status is omitted rather than guessed when several doors are
       // open and none is named: "not started" alongside two accepted
       // applications is not an incomplete answer, it is a wrong one
@@ -200,34 +242,46 @@ const useResources = () => {
             ],
     },
     {
-      name: t("sidebar.passes"),
+      name: t("sidebar.people"),
+      icon: Users,
+      status: canSeeAttendees ? "active" : "hidden",
+      path: `/portal/${city?.slug}/people`,
+      group: "participation",
+    },
+    {
+      name: t("sidebar.tickets_access"),
       icon: Ticket,
       status: canSeeAttendees ? "active" : "hidden",
-      path: `/portal/${city?.slug}/passes${flowQuery}`,
+      path: `/portal/${city?.slug}/tickets`,
+      group: "participation",
     },
     {
       name: t("sidebar.shop"),
       icon: ShoppingBag,
-      status: "active",
+      status: hasEligibleShopOptions ? "active" : "hidden",
       path: `/portal/${city?.slug}/shop`,
+      group: "commerce",
     },
     {
       name: t("sidebar.orders"),
       icon: ReceiptText,
       status: "active",
       path: `/portal/${city?.slug}/orders`,
+      group: "commerce",
     },
     {
       name: t("sidebar.attendee_directory"),
       icon: Users,
       status: canSeeAttendees && attendeeDirectoryEnabled ? "active" : "hidden",
       path: `/portal/${city?.slug}/attendees${flowQuery}`,
+      group: "community",
     },
     {
       name: t("sidebar.events"),
       icon: CalendarDays,
       status: canSeeAttendees && eventsEnabled ? "active" : "hidden",
       path: `/portal/${city?.slug}/events${flowQuery}`,
+      group: "community",
       children: [
         {
           name: t("sidebar.tracks", { defaultValue: "Tracks" }),
@@ -254,6 +308,7 @@ const useResources = () => {
       icon: Link2,
       status: canSeeAttendees && referralsEnabled ? "active" : "hidden",
       path: `/portal/${city?.slug}/referrals${flowQuery}`,
+      group: "community",
     },
   ]
 

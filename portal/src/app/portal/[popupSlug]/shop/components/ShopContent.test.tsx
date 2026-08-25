@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   application: [] as Array<{ id: string; slug: string; name: string }>,
   direct: [] as Array<{ id: string; slug: string; name: string }>,
   upsale: [] as Array<{ id: string; slug: string; name: string }>,
+  applicationStatus: "accepted" as string | null,
 }))
 
 vi.mock("@/hooks/usePortalSalesFlows", () => ({
@@ -18,6 +19,14 @@ vi.mock("@/hooks/usePortalDirectSalesFlows", () => ({
 
 vi.mock("@/hooks/usePortalUpsaleFlows", () => ({
   usePortalUpsaleFlows: () => ({ data: mocks.upsale }),
+}))
+
+vi.mock("@/providers/applicationProvider", () => ({
+  useApplication: () => ({
+    getRelevantApplication: () =>
+      mocks.applicationStatus ? { status: mocks.applicationStatus } : null,
+    participation: null,
+  }),
 }))
 
 vi.mock("react-i18next", () => ({
@@ -37,10 +46,23 @@ vi.mock("react-i18next", () => ({
 }))
 
 describe("ShopContent", () => {
-  it("canonicalizes an authorized legacy flow id without selecting another offer", () => {
-    const flow = { id: "flow-1", slug: "merch-store", name: "Merch Store" }
+  it("canonicalizes an authorized UUID link to the flow's current slug", () => {
+    const flow = {
+      id: "flow-1",
+      slug: "merch-store-2026",
+      name: "Merch Store",
+    }
 
-    expect(resolveShopFlowSlug("flow-1", [flow])).toBe("merch-store")
+    expect(resolveShopFlowSlug("flow-1", [flow])).toBe("merch-store-2026")
+  })
+
+  it("does not canonicalize an unknown link to another authorized offer", () => {
+    const flow = {
+      id: "flow-1",
+      slug: "merch-store-2026",
+      name: "Merch Store",
+    }
+
     expect(resolveShopFlowSlug("unknown", [flow])).toBeNull()
   })
 
@@ -77,5 +99,19 @@ describe("ShopContent", () => {
     expect(screen.getByText("Nothing available right now")).toBeTruthy()
     expect(screen.queryByRole("link")).toBeNull()
     expect(screen.queryByText("Available to you")).toBeNull()
+  })
+
+  it("does not expose attendee checkout as a Shop option before approval", () => {
+    mocks.applicationStatus = "in review"
+    mocks.application = [
+      { id: "application", slug: "attendee", name: "Attendee" },
+    ]
+    mocks.direct = []
+    mocks.upsale = []
+
+    render(<ShopContent popupId="popup-1" popupSlug="summer-camp" />)
+
+    expect(screen.getByText("Nothing available right now")).toBeTruthy()
+    expect(screen.queryByRole("link")).toBeNull()
   })
 })

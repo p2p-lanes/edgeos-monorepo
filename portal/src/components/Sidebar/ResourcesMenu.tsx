@@ -3,7 +3,7 @@ import { useCallback } from "react"
 import { useTranslation } from "react-i18next"
 import useResources from "@/hooks/useResources"
 import { trackPortalTelemetry } from "@/lib/portal-telemetry"
-import type { Resource } from "@/types/resources"
+import type { Resource, ResourceGroup } from "@/types/resources"
 import { Separator } from "../ui/separator"
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip"
 import GroupsResources from "./Groups/GroupsResources"
@@ -26,6 +26,13 @@ const statusColor = (status: string) => {
   if (status === "withdrawn") return "bg-slate-300 text-slate-700"
   return "bg-gray-100 text-gray-800"
 }
+
+const resourceGroups: ResourceGroup[] = [
+  "general",
+  "participation",
+  "commerce",
+  "community",
+]
 
 const ResourceItem: React.FC<{
   resource: Resource
@@ -91,29 +98,47 @@ const ResourcesMenu = () => {
 
   return (
     <SidebarContent>
-      <SidebarGroup>
-        {/* Says which way in the sidebar is describing. Only when there
-            is more than one — otherwise there is nothing to tell apart. */}
-        <SidebarGroupLabel>
-          {doorName ?? t("sidebar.your_participation")}
-        </SidebarGroupLabel>
-        <SidebarGroupContent>
-          <SidebarMenu>
-            {resources
-              .filter((resource) => resource.status !== "hidden")
-              .map((resource) => (
-                <ResourceItem
-                  key={resource.name}
-                  resource={resource}
-                  onNavigate={handleNavigate}
-                  pathname={pathname}
-                />
-              ))}
-            <Separator className="my-4" />
-            <GroupsResources onNavigate={handleNavigate} />
-          </SidebarMenu>
-        </SidebarGroupContent>
-      </SidebarGroup>
+      <nav aria-label={t("sidebar.navigation")}>
+        {resourceGroups.map((group) => {
+          const groupResources = resources.filter(
+            (resource) =>
+              resource.status !== "hidden" &&
+              (resource.group ?? "general") === group,
+          )
+
+          if (groupResources.length === 0) return null
+
+          return (
+            <SidebarGroup key={group}>
+              <SidebarGroupLabel asChild>
+                <h2>
+                  {group === "general" && doorName
+                    ? doorName
+                    : t(`sidebar.${group}`)}
+                </h2>
+              </SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu>
+                  {groupResources.map((resource) => (
+                    <ResourceItem
+                      key={resource.name}
+                      resource={resource}
+                      onNavigate={handleNavigate}
+                      pathname={pathname}
+                    />
+                  ))}
+                  {group === "community" && (
+                    <>
+                      <Separator className="my-4" />
+                      <GroupsResources onNavigate={handleNavigate} />
+                    </>
+                  )}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          )
+        })}
+      </nav>
     </SidebarContent>
   )
 }

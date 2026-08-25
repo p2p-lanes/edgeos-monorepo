@@ -5,6 +5,8 @@ import { useTranslation } from "react-i18next"
 import { usePortalDirectSalesFlows } from "@/hooks/usePortalDirectSalesFlows"
 import { usePortalSalesFlows } from "@/hooks/usePortalSalesFlows"
 import { usePortalUpsaleFlows } from "@/hooks/usePortalUpsaleFlows"
+import { useApplication } from "@/providers/applicationProvider"
+import { getEligibleShopOffers } from "./shopOffers"
 
 interface ShopContentProps {
   popupId: string | undefined
@@ -21,24 +23,25 @@ export function resolveShopFlowSlug(
   )
 }
 
-const sources = [
-  { key: "application", useFlows: usePortalSalesFlows },
-  { key: "direct", useFlows: usePortalDirectSalesFlows },
-  { key: "upsale", useFlows: usePortalUpsaleFlows },
-] as const
-
 export function ShopContent({ popupId, popupSlug }: ShopContentProps) {
   const { t } = useTranslation()
-  const application = sources[0].useFlows(popupId).data ?? []
-  const direct = sources[1].useFlows(popupId).data ?? []
-  const upsale = sources[2].useFlows(popupId).data ?? []
-  const offers = [
-    { key: sources[0].key, flows: application },
-    { key: sources[1].key, flows: direct },
-    { key: sources[2].key, flows: upsale },
-  ]
+  const { getRelevantApplication, participation } = useApplication()
+  const application = usePortalSalesFlows(popupId).data ?? []
+  const direct = usePortalDirectSalesFlows(popupId).data ?? []
+  const upsale = usePortalUpsaleFlows(popupId).data ?? []
+  const currentApplication = getRelevantApplication()
+  const isApplicationApproved =
+    participation?.type === "companion"
+      ? participation.application_status === "accepted"
+      : currentApplication?.status === "accepted"
+  const offers = getEligibleShopOffers({
+    application,
+    direct,
+    upsale,
+    isApplicationApproved,
+  })
 
-  if (offers.every(({ flows }) => flows.length === 0)) {
+  if (offers.length === 0) {
     return (
       <section className="mx-auto max-w-5xl p-6" aria-labelledby="shop-title">
         <h1 id="shop-title" className="text-2xl font-semibold">

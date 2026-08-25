@@ -21,12 +21,13 @@ const byName = (rs: ReturnType<typeof buildEndedResources>) =>
   Object.fromEntries(rs.map((r) => [r.name, r.status]))
 
 describe("buildEndedResources", () => {
-  it("keeps application active and locks passes", () => {
+  it("keeps application active and exposes read-only access", () => {
     const rs = byName(
       buildEndedResources({ t, city: city({}), participated: true }),
     )
     expect(rs["sidebar.application"]).toBe("active")
-    expect(rs["sidebar.passes"]).toBe("disabled")
+    expect(rs["sidebar.tickets_access"]).toBe("active")
+    expect(rs["sidebar.passes"]).toBeUndefined()
   })
 
   it("keeps orders available as read-only history", () => {
