@@ -44,7 +44,7 @@ export const queryKeys = {
   formSchema: {
     // `salesFlowId` (sdd/sales-flows D6 URL scheme, task 9.4) is part of the
     // identity — a named flow's schema must never be served from the
-    // default flow's cache entry.
+    // another flow's cache entry.
     portal: (popupId: string, salesFlowId?: string | null) =>
       salesFlowId
         ? (["form-schema", "portal", popupId, salesFlowId] as const)
@@ -54,7 +54,7 @@ export const queryKeys = {
     // The runtime payload is translated server-side from Accept-Language, so
     // the language is part of the cache identity. `flowSlug` (sdd/sales-flows
     // D6 URL scheme) is part of the identity too — a named flow's runtime
-    // must never be served from the default flow's cache entry, or vice
+    // must never be served from another flow's cache entry, or vice
     // versa. Both dimensions are labeled keys of a trailing filter object
     // (not positional slots) so a flow slugged e.g. "es" can never collide
     // with the "es" language, and `runtime(slug)` alone still yields `{}` —

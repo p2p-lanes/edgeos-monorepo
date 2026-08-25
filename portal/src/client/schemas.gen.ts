@@ -5043,7 +5043,7 @@ export const CheckoutPreviewRequestSchema = {
     type: 'object',
     required: ['products'],
     title: 'CheckoutPreviewRequest',
-    description: 'Request schema for POST /checkout/{slug}/preview.'
+    description: 'Request schema for POST /checkout/{slug}/{flow_slug}/preview.'
 } as const;
 
 export const CheckoutPreviewResponseSchema = {
@@ -5451,7 +5451,7 @@ export const CheckoutRuntimeResponseSchema = {
     type: 'object',
     required: ['popup', 'selected_flow', 'products', 'buyer_form', 'ticketing_steps'],
     title: 'CheckoutRuntimeResponse',
-    description: 'Full response for GET /checkout/{slug}/runtime.'
+    description: 'Full response for GET /checkout/{slug}/{flow_slug}/runtime.'
 } as const;
 
 export const CheckoutShareMetaSchema = {
@@ -5504,7 +5504,7 @@ export const CheckoutShareMetaSchema = {
     title: 'CheckoutShareMeta',
     description: `Tiny, unauthenticated projection for social/OpenGraph share previews.
 
-Returned by the public \`\`/{slug}/share\`\` endpoint so social crawlers (which
+Returned by the public \`\`/{slug}/{flow_slug}/share\`\` endpoint so social crawlers (which
 send no JWT) can render the popup name, tagline/location snippet and cover
 image without loading the full checkout runtime payload.`
 } as const;
@@ -13944,7 +13944,7 @@ export const OpenCartPublicSchema = {
     description: `Anonymous open-checkout cart response.
 
 \`restore_token\` is the HMAC for the signed restore link
-(GET /checkout/{slug}/cart?cid=<id>&sig=<restore_token>). It is only
+(GET /checkout/{slug}/{flow_slug}/cart?cid=<id>&sig=<restore_token>). It is only
 present when the popup configures an open_checkout_signing_secret; the
 client stores it to rebuild the cart on a later visit.`
 } as const;
@@ -14079,7 +14079,7 @@ export const OpenTicketingPurchaseCreateSchema = {
     type: 'object',
     required: ['products', 'buyer'],
     title: 'OpenTicketingPurchaseCreate',
-    description: 'Request schema for POST /checkout/{slug}/purchase.'
+    description: 'Request schema for POST /checkout/{slug}/{flow_slug}/purchase.'
 } as const;
 
 export const OpenTicketingPurchaseResponseSchema = {
@@ -14121,7 +14121,7 @@ export const OpenTicketingPurchaseResponseSchema = {
     type: 'object',
     required: ['payment_id', 'status', 'checkout_url', 'amount', 'currency'],
     title: 'OpenTicketingPurchaseResponse',
-    description: 'Response schema for POST /checkout/{slug}/purchase.'
+    description: 'Response schema for POST /checkout/{slug}/{flow_slug}/purchase.'
 } as const;
 
 export const PagingSchema = {
@@ -15066,7 +15066,7 @@ export const PendingReleaseOpenRequestSchema = {
     type: 'object',
     required: ['email', 'cid', 'sig'],
     title: 'PendingReleaseOpenRequest',
-    description: `Request body for POST /checkout/{slug}/pending/release (anonymous surface).
+    description: `Request body for POST /checkout/{slug}/{flow_slug}/pending/release (anonymous surface).
 
 cid + sig constitute the cart continuity proof (HMAC). email is the buyer's
 address used as the payment lookup key (must match the cart's stored email).`

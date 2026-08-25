@@ -1,13 +1,40 @@
 export const dynamic = "force-dynamic"
 
+import type { Metadata } from "next"
 import { cookies } from "next/headers"
 import { fetchCheckoutRuntime } from "@/lib/checkout-runtime"
+import {
+  checkoutShareDescription,
+  fetchCheckoutShareMeta,
+} from "@/lib/checkout-share"
 import {
   LANGUAGE_COOKIE_KEY,
   normalizeLanguageTag,
 } from "@/lib/language-storage"
+import { buildShareMetadata } from "@/lib/share-metadata"
 import { resolveTenantForMetadata } from "@/lib/tenant-metadata"
 import CheckoutPageClient from "../CheckoutPageClient"
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ popupSlug: string; flowSlug: string }>
+}): Promise<Metadata> {
+  const { popupSlug, flowSlug } = await params
+  const tenant = await resolveTenantForMetadata()
+  if (!tenant) return {}
+
+  const meta = await fetchCheckoutShareMeta(popupSlug, flowSlug, tenant.id)
+  if (!meta) return {}
+
+  return buildShareMetadata({
+    title: meta.name,
+    socialTitle: `${meta.name} · ${tenant.name}`,
+    description: checkoutShareDescription(meta),
+    imageUrl: meta.image_url ?? tenant.image_url ?? tenant.icon_url,
+    imageAlt: meta.name,
+  })
+}
 
 /**
  * Named-flow checkout page (sdd/sales-flows D6 URL scheme —
@@ -48,8 +75,8 @@ export default async function FlowCheckoutPage({
   const runtime = await fetchCheckoutRuntime(
     popupSlug,
     tenant.id,
-    ssrLanguage ?? undefined,
     flowSlug,
+    ssrLanguage ?? undefined,
   )
   if (!runtime) {
     return <CheckoutPageClient popupSlug={popupSlug} flowSlug={flowSlug} />

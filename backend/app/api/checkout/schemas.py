@@ -13,7 +13,7 @@ from app.api.sales_flow.schemas import SelectedSalesFlow
 from app.api.ticketing_step.schemas import TicketingStepPublic
 
 # ---------------------------------------------------------------------------
-# Runtime schemas (GET /checkout/{slug}/runtime)
+# Runtime schemas (GET /checkout/{slug}/{flow_slug}/runtime)
 # ---------------------------------------------------------------------------
 
 
@@ -83,7 +83,7 @@ class CheckoutRuntimeProduct(BaseModel):
 
 
 class CheckoutRuntimeResponse(BaseModel):
-    """Full response for GET /checkout/{slug}/runtime."""
+    """Full response for GET /checkout/{slug}/{flow_slug}/runtime."""
 
     popup: PopupPublic
     selected_flow: SelectedSalesFlow
@@ -117,7 +117,7 @@ class CheckoutRuntimeResponse(BaseModel):
 class CheckoutShareMeta(BaseModel):
     """Tiny, unauthenticated projection for social/OpenGraph share previews.
 
-    Returned by the public ``/{slug}/share`` endpoint so social crawlers (which
+    Returned by the public ``/{slug}/{flow_slug}/share`` endpoint so social crawlers (which
     send no JWT) can render the popup name, tagline/location snippet and cover
     image without loading the full checkout runtime payload.
     """
@@ -130,7 +130,7 @@ class CheckoutShareMeta(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# Purchase schemas (POST /checkout/{slug}/purchase)
+# Purchase schemas (POST /checkout/{slug}/{flow_slug}/purchase)
 # ---------------------------------------------------------------------------
 
 
@@ -169,7 +169,7 @@ class Attribution(BaseModel):
 
 
 class OpenTicketingPurchaseCreate(BaseModel):
-    """Request schema for POST /checkout/{slug}/purchase."""
+    """Request schema for POST /checkout/{slug}/{flow_slug}/purchase."""
 
     products: list[ProductLine] = Field(min_length=1)
     buyer: BuyerInfo
@@ -185,7 +185,7 @@ class OpenTicketingPurchaseCreate(BaseModel):
     locale: str | None = Field(default=None, max_length=8)
     attribution: Attribution | None = None
     # Cart continuity proof: signed cart identifier from the abandoned-cart
-    # restore link (GET /checkout/{slug}/cart?cid=&sig=).  When both are
+    # restore link (GET /checkout/{slug}/{flow_slug}/cart?cid=&sig=).  When both are
     # present and valid for this buyer+popup, the system is allowed to supersede
     # a prior PENDING payment.  Missing or invalid → supersede is blocked;
     # a 409 pending_payment_exists is returned if a PENDING payment exists.
@@ -195,7 +195,7 @@ class OpenTicketingPurchaseCreate(BaseModel):
 
 
 class OpenTicketingPurchaseResponse(BaseModel):
-    """Response schema for POST /checkout/{slug}/purchase."""
+    """Response schema for POST /checkout/{slug}/{flow_slug}/purchase."""
 
     payment_id: uuid.UUID
     status: str
@@ -211,12 +211,12 @@ class OpenTicketingPurchaseResponse(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# Preview schemas (POST /checkout/{slug}/preview)
+# Preview schemas (POST /checkout/{slug}/{flow_slug}/preview)
 # ---------------------------------------------------------------------------
 
 
 class CheckoutPreviewRequest(BaseModel):
-    """Request schema for POST /checkout/{slug}/preview."""
+    """Request schema for POST /checkout/{slug}/{flow_slug}/preview."""
 
     products: list[ProductLine] = Field(min_length=1)
     coupon_code: str | None = None
@@ -253,12 +253,12 @@ class CheckoutPreviewResponse(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# Release-on-return schemas (POST /checkout/{slug}/pending/release)
+# Release-on-return schemas (POST /checkout/{slug}/{flow_slug}/pending/release)
 # ---------------------------------------------------------------------------
 
 
 class PendingReleaseOpenRequest(BaseModel):
-    """Request body for POST /checkout/{slug}/pending/release (anonymous surface).
+    """Request body for POST /checkout/{slug}/{flow_slug}/pending/release (anonymous surface).
 
     cid + sig constitute the cart continuity proof (HMAC). email is the buyer's
     address used as the payment lookup key (must match the cart's stored email).

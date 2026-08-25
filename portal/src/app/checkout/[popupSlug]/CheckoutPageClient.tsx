@@ -24,11 +24,9 @@ import { useCheckoutRuntime } from "./hooks/useCheckoutRuntime"
 interface CheckoutPageClientProps {
   popupSlug: string
   /**
-   * Named sales flow (sdd/sales-flows D6 URL scheme —
-   * `/checkout/{popupSlug}/{flowSlug}`). Omitted resolves the popup's
-   * default flow, matching the legacy 2-segment route.
+   * Canonical sales flow URL segment.
    */
-  flowSlug?: string
+  flowSlug: string
   initialRuntime?: CheckoutRuntimeResponse
   initialDataUpdatedAt?: number
   /** Language the server render fetched `initialRuntime` in, if any. */
@@ -92,9 +90,7 @@ export default function CheckoutPageClient({
   // attendees (e.g. upsale flows). The link is valid; the visitor just needs
   // to sign in, so send them to the auth flow and back to this checkout.
   if (error instanceof ApiError && error.status === 401) {
-    const checkoutPath = flowSlug
-      ? `/checkout/${popupSlug}/${flowSlug}`
-      : `/checkout/${popupSlug}`
+    const checkoutPath = `/checkout/${popupSlug}/${flowSlug}`
     return (
       <div className="flex min-h-screen items-center justify-center p-6">
         <div className="rounded-2xl border bg-card p-8 text-center shadow-sm">

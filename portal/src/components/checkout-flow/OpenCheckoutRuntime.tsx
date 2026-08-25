@@ -39,7 +39,7 @@ import type { ProductsPass } from "@/types/Products"
 interface OpenCheckoutRuntimeProps {
   runtime: CheckoutRuntimeResponse
   popupSlug: string
-  flowSlug?: string
+  flowSlug: string
   prefilledBuyer?: {
     email?: string
     firstName?: string

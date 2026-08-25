@@ -173,6 +173,12 @@ export function usePaymentSubmit({
     setPromoError(null)
 
     // Flush any pending debounced save BEFORE building the purchase body so
+    const openFlowSlug = salesFlowSlug
+    if (submitMode === "open-ticketing" && !openFlowSlug) {
+      setIsSubmitting(false)
+      return { success: false, error: "Checkout flow is unavailable" }
+    }
+
     // cartMetaRef has fresh cid/restore_token (ADR-R8).
     if (submitMode === "open-ticketing" && flushOpenCartSave) {
       await flushOpenCartSave()
@@ -199,7 +205,7 @@ export function usePaymentSubmit({
         submitMode === "open-ticketing"
           ? await CheckoutService.purchaseOpenTicketing({
               slug: popupSlug!,
-              flowSlug: salesFlowSlug ?? undefined,
+              flowSlug: openFlowSlug!,
               requestBody: {
                 ...getMetaAttribution(),
                 locale: i18n.language,

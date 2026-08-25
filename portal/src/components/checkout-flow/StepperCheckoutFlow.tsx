@@ -312,7 +312,7 @@ export default function StepperCheckoutFlow({
     const activeId = sections[active]?.id
     const btn = activeId ? pillRefs.current.get(activeId) : undefined
     const nav = navRef.current
-    if (btn && nav) {
+    if (btn && typeof nav?.scrollTo === "function") {
       const target = btn.offsetLeft + btn.offsetWidth / 2 - nav.clientWidth / 2
       nav.scrollTo({ left: Math.max(0, target), behavior: "smooth" })
     }

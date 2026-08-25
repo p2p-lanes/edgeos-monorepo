@@ -40,7 +40,7 @@ export default async function PopupRoutePage({ params }: PopupRoutePageProps) {
   // that takes applications belongs in the portal even when some of its doors
   // also sell, which is why this cannot read `sale_type` any more.
   if (popup.takes_applications === false) {
-    redirect(`/checkout/${popup.slug}`)
+    redirect(`/checkout/${popup.slug}/checkout`)
   }
 
   redirect(`/portal/${popup.slug}`)

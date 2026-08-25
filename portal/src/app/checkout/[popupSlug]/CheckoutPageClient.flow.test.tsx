@@ -27,8 +27,8 @@ vi.mock("./hooks/useCheckoutRuntime", () => ({
 }))
 
 vi.mock("@/components/checkout-flow/OpenCheckoutRuntime", () => ({
-  OpenCheckoutRuntime: ({ flowSlug }: { flowSlug?: string }) => (
-    <div>selected-flow:{flowSlug ?? "default"}</div>
+  OpenCheckoutRuntime: ({ flowSlug }: { flowSlug: string }) => (
+    <div>selected-flow:{flowSlug}</div>
   ),
 }))
 

@@ -71,7 +71,7 @@ class TestCheckoutRuntimeCatalogFilter:
         db.commit()
 
         response = client.get(
-            f"/api/v1/checkout/{popup.slug}/runtime",
+            f"/api/v1/checkout/{popup.slug}/checkout/runtime",
             headers={"X-Tenant-Id": str(tenant_a.id)},
         )
         assert response.status_code == 200, response.text
@@ -95,7 +95,7 @@ class TestCheckoutRuntimeCatalogFilter:
         db.commit()
 
         response = client.get(
-            f"/api/v1/checkout/{popup.slug}/runtime",
+            f"/api/v1/checkout/{popup.slug}/checkout/runtime",
             headers={"X-Tenant-Id": str(tenant_a.id)},
         )
         assert response.status_code == 200, response.text
@@ -109,7 +109,7 @@ class TestCheckoutRuntimeCatalogFilter:
         db.commit()
 
         response = client.get(
-            f"/api/v1/checkout/{popup.slug}/runtime",
+            f"/api/v1/checkout/{popup.slug}/checkout/runtime",
             headers={"X-Tenant-Id": str(tenant_a.id)},
         )
         assert response.status_code == 200, response.text

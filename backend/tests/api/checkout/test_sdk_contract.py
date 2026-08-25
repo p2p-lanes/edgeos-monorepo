@@ -3,10 +3,10 @@
 An external client consumes the anonymous checkout API exclusively through a
 per-popup **publishable key** (no JWT, no X-Tenant-Id), walking:
 
-    GET  /checkout/{slug}/runtime        → products + steps + form schema
+    GET  /checkout/{slug}/{flow_slug}/runtime → products + steps + form schema
     POST /coupons/validate-public        → coupon check
-    POST /checkout/{slug}/preview        → authoritative price breakdown
-    POST /checkout/{slug}/purchase       → payment + SimpleFi checkout url
+    POST /checkout/{slug}/{flow_slug}/preview → authoritative price breakdown
+    POST /checkout/{slug}/{flow_slug}/purchase → payment + SimpleFi checkout url
 
 The SDK re-declares the response shapes by hand in
 ``packages/checkout-core/src/types/api.ts`` (money fields as decimal strings).
@@ -122,8 +122,10 @@ def test_sdk_journey_via_publishable_key_matches_core_types(
     popup, product, field, raw = _seed(db, tenant_a)
     headers = _pk_headers(raw)
 
-    # 1) GET /runtime — resolves tenant via the publishable key alone.
-    runtime = client.get(f"/api/v1/checkout/{popup.slug}/runtime", headers=headers)
+    # 1) GET named-flow runtime — resolves tenant via the publishable key alone.
+    runtime = client.get(
+        f"/api/v1/checkout/{popup.slug}/checkout/runtime", headers=headers
+    )
     assert runtime.status_code == 200, runtime.text
     rt = runtime.json()
     assert RUNTIME_KEYS <= rt.keys(), rt.keys()
@@ -146,9 +148,9 @@ def test_sdk_journey_via_publishable_key_matches_core_types(
     assert cp["valid"] is True
     assert cp["code"] == "HALF"
 
-    # 3) POST /preview — authoritative price breakdown for 2 units, coupon applied.
+    # 3) POST named-flow preview — authoritative price breakdown for 2 units, coupon applied.
     preview = client.post(
-        f"/api/v1/checkout/{popup.slug}/preview",
+        f"/api/v1/checkout/{popup.slug}/checkout/preview",
         json={
             "products": [{"product_id": str(product.id), "quantity": 2}],
             "coupon_code": "HALF",
@@ -171,7 +173,7 @@ def test_sdk_journey_via_publishable_key_matches_core_types(
     assert pv["lines"][0]["line_total"] == "240.00"  # gross, pre-discount
     assert isinstance(pv["total"], str)
 
-    # 4) POST /purchase — same inputs; SimpleFi mocked. The money authority
+    # 4) POST named-flow purchase — same inputs; SimpleFi mocked. The money authority
     #    contract: purchase.amount MUST equal preview.total for identical inputs.
     with patch("app.services.simplefi.get_simplefi_client") as mock_client:
         mock_client.return_value.create_payment.return_value = SimpleNamespace(
@@ -181,7 +183,7 @@ def test_sdk_journey_via_publishable_key_matches_core_types(
             is_installment_plan=False,
         )
         purchase = client.post(
-            f"/api/v1/checkout/{popup.slug}/purchase",
+            f"/api/v1/checkout/{popup.slug}/checkout/purchase",
             json={
                 "products": [{"product_id": str(product.id), "quantity": 2}],
                 "coupon_code": "HALF",
@@ -204,6 +206,56 @@ def test_sdk_journey_via_publishable_key_matches_core_types(
     assert pu["currency"] == "USD"
 
 
+@pytest.mark.parametrize(
+    ("method", "suffix", "payload"),
+    [
+        ("get", "runtime", None),
+        ("post", "preview", {"products": []}),
+        (
+            "post",
+            "purchase",
+            {
+                "products": [],
+                "buyer": {
+                    "email": "buyer@acme.example",
+                    "first_name": "Ada",
+                    "last_name": "Lovelace",
+                },
+            },
+        ),
+        ("put", "cart", {"email": "buyer@acme.example", "items": {}}),
+        (
+            "post",
+            "pending/release",
+            {
+                "email": "buyer@acme.example",
+                "cid": "00000000-0000-0000-0000-000000000000",
+                "sig": "invalid",
+            },
+        ),
+        ("get", "share", None),
+    ],
+)
+def test_bare_flow_bound_checkout_operations_are_not_registered(
+    client: TestClient,
+    db: Session,
+    tenant_a: Tenants,
+    method: str,
+    suffix: str,
+    payload: dict,
+) -> None:
+    popup, _product, _field, raw = _seed(db, tenant_a)
+
+    response = client.request(
+        method.upper(),
+        f"/api/v1/checkout/{popup.slug}/{suffix}",
+        json=payload,
+        headers=_pk_headers(raw),
+    )
+
+    assert response.status_code == 404, response.text
+
+
 def test_sdk_purchase_rejected_when_origin_not_allowed(
     client: TestClient, db: Session, tenant_a: Tenants
 ) -> None:
@@ -211,7 +263,7 @@ def test_sdk_purchase_rejected_when_origin_not_allowed(
     popup, product, field, raw = _seed(db, tenant_a)
 
     resp = client.post(
-        f"/api/v1/checkout/{popup.slug}/purchase",
+        f"/api/v1/checkout/{popup.slug}/checkout/purchase",
         json={
             "products": [{"product_id": str(product.id), "quantity": 1}],
             "buyer": {
@@ -237,7 +289,7 @@ def test_cors_preflight_allows_publishable_key_header(client: TestClient) -> Non
     for the header being added to the auth path but not to CORS.
     """
     resp = client.options(
-        "/api/v1/checkout/any/preview",
+        "/api/v1/checkout/any/checkout/preview",
         headers={
             "Origin": "http://localhost:5173",
             "Access-Control-Request-Method": "POST",

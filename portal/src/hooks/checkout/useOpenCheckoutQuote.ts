@@ -50,7 +50,7 @@ export function useOpenCheckoutQuote({
   flowSlug,
 }: {
   popupSlug: string
-  flowSlug: string | undefined
+  flowSlug: string
 }) {
   const { cart, buyerValues, isBuyerInfoComplete } = useCheckout()
   const request = buildOpenCheckoutPreviewRequest(cart)
@@ -64,14 +64,7 @@ export function useOpenCheckoutQuote({
     : null
 
   return useQuery({
-    queryKey: [
-      "checkout",
-      "preview",
-      popupSlug,
-      flowSlug ?? null,
-      request,
-      buyer,
-    ],
+    queryKey: ["checkout", "preview", popupSlug, flowSlug, request, buyer],
     queryFn: () =>
       CheckoutService.previewOpenTicketing({
         slug: popupSlug,

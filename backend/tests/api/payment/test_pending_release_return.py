@@ -31,6 +31,7 @@ from app.services.simplefi.client import CancelOutcome
 from tests._flow_helpers import (
     application_flow_id,
     coupon_flow_id,
+    provision_default_flow,
     set_open_checkout_landing,
 )
 
@@ -147,10 +148,12 @@ def _make_pending_payment(
     buyer_email: str | None = None,
     external_id: str | None = None,
 ) -> Payments:
+    flow = provision_default_flow(db, popup, sale_type=popup.sale_type)
     payment = Payments(
         id=uuid.uuid4(),
         tenant_id=tenant.id,
         popup_id=popup.id,
+        sales_flow_id=flow.id,
         application_id=application_id,
         status=PaymentStatus.PENDING.value,
         amount=Decimal("100"),
@@ -166,6 +169,11 @@ def _make_pending_payment(
     db.commit()
     db.refresh(payment)
     return payment
+
+
+def _checkout_flow_slug(db: Session, popup: Popups) -> str:
+    flow = provision_default_flow(db, popup, sale_type=popup.sale_type)
+    return flow.slug
 
 
 def _fresh_coupon_uses(db: Session, coupon_id: uuid.UUID) -> int:
@@ -902,7 +910,7 @@ class TestReleasePendingAuthenticated:
 
 
 class TestReleasePendingOpenEndpoint:
-    """Integration tests for POST /checkout/{slug}/pending/release (TASK-06).
+    """Integration tests for POST /checkout/{slug}/{flow_slug}/pending/release.
 
     Uses the TestClient fixture.  Spec: TASK-06.
     """
@@ -934,7 +942,7 @@ class TestReleasePendingOpenEndpoint:
             mock_factory.return_value = mock_client
 
             resp = client.post(
-                f"/api/v1/checkout/{popup.slug}/pending/release",
+                f"/api/v1/checkout/{popup.slug}/{_checkout_flow_slug(db, popup)}/pending/release",
                 json={
                     "email": email,
                     "cid": str(uuid.uuid4()),
@@ -961,7 +969,7 @@ class TestReleasePendingOpenEndpoint:
             payments_crud, "_validate_cart_continuity_proof", return_value=False
         ):
             resp = client.post(
-                f"/api/v1/checkout/{popup.slug}/pending/release",
+                f"/api/v1/checkout/{popup.slug}/{_checkout_flow_slug(db, popup)}/pending/release",
                 json={"email": email, "cid": str(uuid.uuid4()), "sig": "bad-sig"},
                 headers=self._tenant_headers(tenant_a),
             )
@@ -985,7 +993,7 @@ class TestReleasePendingOpenEndpoint:
             payments_crud, "_validate_cart_continuity_proof", return_value=True
         ):
             resp = client.post(
-                f"/api/v1/checkout/{popup.slug}/pending/release",
+                f"/api/v1/checkout/{popup.slug}/{_checkout_flow_slug(db, popup)}/pending/release",
                 json={"email": email, "cid": str(uuid.uuid4()), "sig": "valid-sig"},
                 headers=self._tenant_headers(tenant_a),
             )
@@ -1020,7 +1028,7 @@ class TestReleasePendingOpenEndpoint:
             mock_factory.return_value = mock_client
 
             resp = client.post(
-                f"/api/v1/checkout/{popup.slug}/pending/release",
+                f"/api/v1/checkout/{popup.slug}/{_checkout_flow_slug(db, popup)}/pending/release",
                 json={"email": email, "cid": str(uuid.uuid4()), "sig": "valid-sig"},
                 headers=self._tenant_headers(tenant_a),
             )
@@ -1053,7 +1061,7 @@ class TestReleasePendingOpenEndpoint:
             mock_factory.return_value = mock_client
 
             resp = client.post(
-                f"/api/v1/checkout/{popup.slug}/pending/release",
+                f"/api/v1/checkout/{popup.slug}/{_checkout_flow_slug(db, popup)}/pending/release",
                 json={"email": email, "cid": str(uuid.uuid4()), "sig": "valid-sig"},
                 headers=self._tenant_headers(tenant_a),
             )

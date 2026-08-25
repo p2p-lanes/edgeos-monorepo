@@ -145,16 +145,16 @@ def runtime_for_slug(
     session: Session,
     slug: str,
     tenant_id: uuid.UUID,
-    flow_slug: str | None = None,
+    flow_slug: str,
     lang: str | None = None,
     current_human: "HumanPublic | None" = None,
 ) -> CheckoutRuntimeResponse:
     """Load the public runtime data for an open-ticketing checkout page.
 
-    sdd/sales-flows slice 9 (task 9.2/9.8): resolves the sales flow named by
-    ``flow_slug`` (or the popup's default flow when omitted) through
-    `resolve_flow` — gate order, status codes, and the direct/upsale type
-    restriction all live there now (design's Flow-Resolution Contract).
+    sdd/sales-flows slice 9 (task 9.2/9.8): resolves the required sales flow
+    named by ``flow_slug`` through `resolve_flow` — gate order, status codes,
+    and the direct/upsale type restriction all live there now (design's
+    Flow-Resolution Contract).
     Products, buyer-form sections/fields, and ticketing steps are then all
     resolved through THAT SAME flow, closing two disclosed slice-8 gaps:
     - risk-001: fields come from the flow's own `find_by_flow` list,
@@ -339,24 +339,19 @@ def runtime_for_slug(
 
 
 def share_meta_for_slug(
-    session: Session, slug: str, tenant_id: uuid.UUID
+    session: Session, slug: str, tenant_id: uuid.UUID, flow_slug: str
 ) -> CheckoutShareMeta:
     """Load the minimal popup projection for social/OpenGraph share previews.
 
-    A share card describes a checkout link, so it exists only where something
-    can actually be bought without applying. That used to be a popup-level
-    question; it is a question about doors now, and a gathering that takes
-    applications through one and sells through another has a link worth
-    previewing.
+    A share card describes one canonical public checkout link, so it exists
+    only for that active direct flow.
     """
-    from app.api.sales_flow.crud import popup_sells_directly  # noqa: PLC0415
+    from app.api.sales_flow.schemas import SalesFlowType  # noqa: PLC0415
 
     popup = get_open_ticketing_popup(session, slug, tenant_id)
-    if not popup_sells_directly(session, popup.id):
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Popup not found",
-        )
+    resolve_checkout_flow(
+        session, popup, flow_slug, require_types={SalesFlowType.direct}
+    )
     return CheckoutShareMeta(
         id=popup.id,
         name=popup.name,

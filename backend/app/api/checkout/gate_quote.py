@@ -51,7 +51,7 @@ def selected_flow(flow: "SalesFlows") -> SelectedSalesFlow:
 def resolve_checkout_flow(
     session: Session,
     popup: "Popups",
-    flow_slug: str | None,
+    flow_slug: str,
     *,
     require_types: Iterable[SalesFlowType] | None = None,
 ) -> "SalesFlows":

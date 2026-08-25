@@ -1161,7 +1161,7 @@ export type CheckoutPreviewLine = {
 };
 
 /**
- * Request schema for POST /checkout/{slug}/preview.
+ * Request schema for POST /checkout/{slug}/{flow_slug}/preview.
  */
 export type CheckoutPreviewRequest = {
     products: Array<ProductLine>;
@@ -1225,7 +1225,7 @@ export type CheckoutRuntimeProduct = {
 };
 
 /**
- * Full response for GET /checkout/{slug}/runtime.
+ * Full response for GET /checkout/{slug}/{flow_slug}/runtime.
  */
 export type CheckoutRuntimeResponse = {
     popup: PopupPublic;
@@ -1247,7 +1247,7 @@ export type CheckoutRuntimeResponse = {
 /**
  * Tiny, unauthenticated projection for social/OpenGraph share previews.
  *
- * Returned by the public ``/{slug}/share`` endpoint so social crawlers (which
+ * Returned by the public ``/{slug}/{flow_slug}/share`` endpoint so social crawlers (which
  * send no JWT) can render the popup name, tagline/location snippet and cover
  * image without loading the full checkout runtime payload.
  */
@@ -3060,7 +3060,7 @@ export type OccurrenceRef = {
  * Anonymous open-checkout cart response.
  *
  * `restore_token` is the HMAC for the signed restore link
- * (GET /checkout/{slug}/cart?cid=<id>&sig=<restore_token>). It is only
+ * (GET /checkout/{slug}/{flow_slug}/cart?cid=<id>&sig=<restore_token>). It is only
  * present when the popup configures an open_checkout_signing_secret; the
  * client stores it to rebuild the cart on a later visit.
  */
@@ -3083,7 +3083,7 @@ export type OpenCartUpsert = {
 };
 
 /**
- * Request schema for POST /checkout/{slug}/purchase.
+ * Request schema for POST /checkout/{slug}/{flow_slug}/purchase.
  */
 export type OpenTicketingPurchaseCreate = {
     products: Array<ProductLine>;
@@ -3100,7 +3100,7 @@ export type OpenTicketingPurchaseCreate = {
 };
 
 /**
- * Response schema for POST /checkout/{slug}/purchase.
+ * Response schema for POST /checkout/{slug}/{flow_slug}/purchase.
  */
 export type OpenTicketingPurchaseResponse = {
     payment_id: string;
@@ -3305,7 +3305,7 @@ export type PendingReleaseAuthRequest = {
 };
 
 /**
- * Request body for POST /checkout/{slug}/pending/release (anonymous surface).
+ * Request body for POST /checkout/{slug}/{flow_slug}/pending/release (anonymous surface).
  *
  * cid + sig constitute the cart continuity proof (HMAC). email is the buyer's
  * address used as the payment lookup key (must match the cart's stored email).
@@ -5861,15 +5861,6 @@ export type CheckInListCheckInsData = {
 
 export type CheckInListCheckInsResponse = (ListModel_CheckInListItem_);
 
-export type CheckoutGetRuntimeData = {
-    acceptLanguage?: (string | null);
-    slug: string;
-    xEdgeOsPublishableKey?: (string | null);
-    xTenantId?: (string | null);
-};
-
-export type CheckoutGetRuntimeResponse = (CheckoutRuntimeResponse);
-
 export type CheckoutGetFlowRuntimeData = {
     acceptLanguage?: (string | null);
     flowSlug: string;
@@ -5881,7 +5872,7 @@ export type CheckoutGetFlowRuntimeData = {
 export type CheckoutGetFlowRuntimeResponse = (CheckoutRuntimeResponse);
 
 export type CheckoutPreviewOpenTicketingData = {
-    flowSlug?: (string | null);
+    flowSlug: string;
     requestBody: CheckoutPreviewRequest;
     slug: string;
     xEdgeOsPublishableKey?: (string | null);
@@ -5891,6 +5882,7 @@ export type CheckoutPreviewOpenTicketingData = {
 export type CheckoutPreviewOpenTicketingResponse = (CheckoutPreviewResponse);
 
 export type CheckoutGetCheckoutShareMetaData = {
+    flowSlug: string;
     slug: string;
     xEdgeOsPublishableKey?: (string | null);
     xTenantId?: (string | null);
@@ -5899,7 +5891,7 @@ export type CheckoutGetCheckoutShareMetaData = {
 export type CheckoutGetCheckoutShareMetaResponse = (CheckoutShareMeta);
 
 export type CheckoutPurchaseOpenTicketingData = {
-    flowSlug?: (string | null);
+    flowSlug: string;
     requestBody: OpenTicketingPurchaseCreate;
     slug: string;
     xEdgeOsPublishableKey?: (string | null);
@@ -5907,25 +5899,6 @@ export type CheckoutPurchaseOpenTicketingData = {
 };
 
 export type CheckoutPurchaseOpenTicketingResponse = (OpenTicketingPurchaseResponse);
-
-export type CheckoutUpsertOpenCartData = {
-    requestBody: OpenCartUpsert;
-    slug: string;
-    xEdgeOsPublishableKey?: (string | null);
-    xTenantId?: (string | null);
-};
-
-export type CheckoutUpsertOpenCartResponse = (OpenCartPublic);
-
-export type CheckoutRestoreOpenCartData = {
-    cid: string;
-    sig: string;
-    slug: string;
-    xEdgeOsPublishableKey?: (string | null);
-    xTenantId?: (string | null);
-};
-
-export type CheckoutRestoreOpenCartResponse = (OpenCartPublic);
 
 export type CheckoutUpsertFlowCartData = {
     flowSlug: string;
@@ -5949,6 +5922,7 @@ export type CheckoutRestoreFlowCartData = {
 export type CheckoutRestoreFlowCartResponse = (OpenCartPublic);
 
 export type CheckoutReleasePendingOpenData = {
+    flowSlug: string;
     requestBody: PendingReleaseOpenRequest;
     slug: string;
     xEdgeOsPublishableKey?: (string | null);

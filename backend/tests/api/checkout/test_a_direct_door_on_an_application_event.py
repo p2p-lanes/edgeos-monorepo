@@ -86,9 +86,9 @@ def _product(db: Session, popup: Popups, *, price: str) -> Products:
 
 
 def _preview(client: TestClient, tenant: Tenants, popup: Popups, product, flow=None):
-    query = f"?flow_slug={flow.slug}" if flow is not None else ""
+    flow_path = f"/{flow.slug}" if flow is not None else ""
     return client.post(
-        f"/api/v1/checkout/{popup.slug}/preview{query}",
+        f"/api/v1/checkout/{popup.slug}{flow_path}/preview",
         json={"products": [{"product_id": str(product.id), "quantity": 1}]},
         headers={"X-Tenant-Id": str(tenant.id)},
     )
@@ -125,18 +125,17 @@ class TestOpenCheckoutThroughADirectDoor:
         assert resp.status_code == 200, resp.text
         assert Decimal(resp.json()["contribution_amount"]) == Decimal("29.95")
 
-    def test_a_door_that_takes_applications_still_refuses(
+    def test_unnamed_preview_is_not_registered(
         self, client: TestClient, db: Session, tenant_a: Tenants
     ) -> None:
-        """Naming no door falls to the default one, which here takes
-        applications: there is nothing for an anonymous buyer to do."""
+        """Checkout requests must name their target flow."""
         popup = _application_popup(db, tenant_a)
         _direct_door(db, popup)
         product = _product(db, popup, price="599.00")
 
         resp = _preview(client, tenant_a, popup, product)
 
-        assert resp.status_code == 403, resp.text
+        assert resp.status_code == 404, resp.text
 
     def test_the_share_card_exists_because_one_door_sells(
         self, client: TestClient, db: Session, tenant_a: Tenants
@@ -144,10 +143,10 @@ class TestOpenCheckoutThroughADirectDoor:
         """The link is worth previewing when any way in can be bought through,
         which used to be answered by the popup and hid this case."""
         popup = _application_popup(db, tenant_a)
-        _direct_door(db, popup)
+        door = _direct_door(db, popup)
 
         resp = client.get(
-            f"/api/v1/checkout/{popup.slug}/share",
+            f"/api/v1/checkout/{popup.slug}/{door.slug}/share",
             headers={"X-Tenant-Id": str(tenant_a.id)},
         )
 

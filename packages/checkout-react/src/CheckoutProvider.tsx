@@ -18,6 +18,8 @@ export interface CheckoutProviderProps {
   client?: CheckoutClient
   /** Or build a client from these (slug required unless `store`/`client` given). */
   slug?: string
+  /** Canonical sales flow for every checkout request. */
+  flowSlug: string
   baseUrl?: string
   publishableKey?: string
   transport?: Transport
@@ -34,6 +36,7 @@ function buildStore(props: CheckoutProviderProps): CheckoutStore {
     createCheckoutClient(
       {
         slug: props.slug ?? "",
+        flowSlug: props.flowSlug,
         baseUrl: props.baseUrl,
         publishableKey: props.publishableKey,
       },

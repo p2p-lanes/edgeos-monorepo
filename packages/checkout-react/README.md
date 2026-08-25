@@ -16,10 +16,11 @@ npm install @edgeos/checkout-react
 
 ## What you need
 
-Two values, from your EdgeOS backoffice (**Organization → Checkout SDK Keys**):
+Three values, from your EdgeOS backoffice (**Organization → Checkout SDK Keys**):
 
 - a **publishable key** (`pk_live_…`)
 - your **popup slug**
+- a **canonical sales flow slug**
 
 The API URL defaults to the EdgeOS production API; pass `baseUrl` only to point at
 a non-prod backend.
@@ -31,7 +32,7 @@ import { CheckoutProvider, useCheckout, useCart, usePreview } from "@edgeos/chec
 
 function App() {
   return (
-    <CheckoutProvider slug="my-popup" publishableKey="pk_live_…">
+    <CheckoutProvider slug="my-popup" flowSlug="checkout" publishableKey="pk_live_…">
       <Checkout />
     </CheckoutProvider>
   )

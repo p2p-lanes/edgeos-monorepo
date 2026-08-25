@@ -1,9 +1,9 @@
 """Router for the open-ticketing checkout API.
 
 Endpoints:
-- GET  /checkout/{slug}/runtime  — public/anonymous for direct flows; upsale flows require sign-in and eligibility (design D8), rate-limited 120/min/IP
-- GET  /checkout/{slug}/share    — public, anonymous, rate-limited 120/min/IP
-- POST /checkout/{slug}/purchase — public/anonymous for direct flows; upsale flows require sign-in and eligibility (design D8), rate-limited 10/min/IP
+- GET  /checkout/{slug}/{flow_slug}/runtime  — public/anonymous for direct flows; upsale flows require sign-in and eligibility (design D8), rate-limited 120/min/IP
+ - GET  /checkout/{slug}/{flow_slug}/share — public, anonymous, rate-limited 120/min/IP
+- POST /checkout/{slug}/{flow_slug}/purchase — public/anonymous for direct flows; upsale flows require sign-in and eligibility (design D8), rate-limited 10/min/IP
 """
 
 import uuid
@@ -15,7 +15,6 @@ from fastapi import (
     Depends,
     Header,
     HTTPException,
-    Query,
     Request,
     status,
 )
@@ -103,43 +102,6 @@ def _enqueue_checkout_purchase_event(
 
 
 @router.get(
-    "/{slug}/runtime",
-    response_model=CheckoutRuntimeResponse,
-    dependencies=[
-        Depends(
-            RateLimit(limit=120, window_sec=60, key_prefix="rl:checkout-bootstrap")
-        ),
-    ],
-)
-async def get_runtime(
-    slug: str,
-    db: SessionDep,
-    tenant: PublicTenant,
-    current_human: OptionalHuman,
-    accept_language: Annotated[str | None, Header(alias="Accept-Language")] = None,
-) -> CheckoutRuntimeResponse:
-    """Return popup metadata, products, buyer form, and ticketing steps for checkout — public/anonymous for direct flows, sign-in and eligibility required for upsale flows.
-
-    Resolves the popup's default
-    sales flow (sdd/sales-flows D6 URL scheme — this is the legacy
-    2-segment path; see `/{slug}/{flow_slug}/runtime` for a named flow).
-    Only serves direct/upsale-type active flows. An upsale-type default
-    flow additionally requires a portal-authenticated, eligible human
-    (sdd/sales-flows slice 13) — a bearer token is honored when present via
-    `OptionalHuman`, but is not required unless the resolved flow is
-    upsale-type. Rate-limited 120/min/IP.
-    """
-    return runtime_for_slug(
-        db,
-        slug,
-        tenant.id,
-        None,
-        parse_accept_language(accept_language),
-        current_human,
-    )
-
-
-@router.get(
     "/{slug}/{flow_slug}/runtime",
     response_model=CheckoutRuntimeResponse,
     dependencies=[
@@ -156,12 +118,11 @@ async def get_flow_runtime(
     current_human: OptionalHuman,
     accept_language: Annotated[str | None, Header(alias="Accept-Language")] = None,
 ) -> CheckoutRuntimeResponse:
-    """Named-flow variant of the checkout runtime — public/anonymous for direct flows, sign-in and eligibility required for upsale flows (sdd/sales-flows D6 URL scheme: `/checkout/{popupSlug}/{flowSlug}`).
+    """Return checkout runtime data for a canonical flow URL.
 
     Unknown or reserved flow
     slugs, a flow belonging to a different popup, or a flow whose effective
-    status isn't active all resolve to 404/403 — never a silent fallback to
-    the default flow. An upsale-type flow additionally requires a
+    status isn't active all resolve to 404/403. An upsale-type flow additionally requires a
     portal-authenticated, eligible human (sdd/sales-flows slice 13, design
     D8): anonymous -> 401, authenticated-but-ineligible -> 403. Rate-limited
     120/min/IP.
@@ -177,7 +138,7 @@ async def get_flow_runtime(
 
 
 @router.post(
-    "/{slug}/preview",
+    "/{slug}/{flow_slug}/preview",
     response_model=CheckoutPreviewResponse,
     dependencies=[
         Depends(RateLimit(limit=60, window_sec=60, key_prefix="rl:checkout-preview")),
@@ -185,20 +146,16 @@ async def get_flow_runtime(
 )
 async def preview_open_ticketing(
     slug: str,
+    flow_slug: str,
     request_in: CheckoutPreviewRequest,
     db: SessionDep,
     tenant: PublicTenant,
     current_human: OptionalHuman,
-    flow_slug: Annotated[str | None, Query()] = None,
 ) -> CheckoutPreviewResponse:
     """Return a server-computed price breakdown for an anonymous cart.
 
-    Authoritative for display; identical math to POST /purchase. No side effects.
+    Authoritative for display; identical math to the named purchase endpoint. No side effects.
     Rate-limited 60/min/IP.
-
-    ``flow_slug`` mirrors /purchase. A door sets its own fee rates and decides
-    whether it takes coupons, so a preview that named no door would quote the
-    default flow's prices for a buyer about to be charged another's.
     """
     from app.api.checkout.gate_quote import resolve_checkout_flow
     from app.api.sales_flow.schemas import SalesFlowType
@@ -213,7 +170,7 @@ async def preview_open_ticketing(
 
 
 @router.get(
-    "/{slug}/share",
+    "/{slug}/{flow_slug}/share",
     response_model=CheckoutShareMeta,
     dependencies=[
         Depends(
@@ -223,6 +180,7 @@ async def preview_open_ticketing(
 )
 async def get_checkout_share_meta(
     slug: str,
+    flow_slug: str,
     db: SessionDep,
     tenant: PublicTenant,
 ) -> CheckoutShareMeta:
@@ -232,11 +190,11 @@ async def get_checkout_share_meta(
     exposes only the popup name, tagline, location and cover image — never
     products, buyer forms or ticketing steps.
 
-    Only active ``sale_type=direct`` popups for the resolved tenant are
-    returned; everything else gets an opaque 404.
+    Only active direct flows for the resolved tenant are returned; everything
+    else gets an opaque 404.
     """
     try:
-        return share_meta_for_slug(db, slug, tenant.id)
+        return share_meta_for_slug(db, slug, tenant.id, flow_slug)
     except HTTPException as exc:
         if exc.status_code in {
             status.HTTP_403_FORBIDDEN,
@@ -249,7 +207,7 @@ async def get_checkout_share_meta(
 
 
 @router.post(
-    "/{slug}/purchase",
+    "/{slug}/{flow_slug}/purchase",
     response_model=OpenTicketingPurchaseResponse,
     dependencies=[
         Depends(RateLimit(limit=10, window_sec=60, key_prefix="rl:checkout-purchase")),
@@ -274,22 +232,20 @@ async def get_checkout_share_meta(
 )
 async def purchase_open_ticketing(
     slug: str,
+    flow_slug: str,
     request_in: OpenTicketingPurchaseCreate,
     request: Request,
     background_tasks: BackgroundTasks,
     db: SessionDep,
     tenant: PublicTenant,
     current_human: OptionalHuman,
-    flow_slug: Annotated[str | None, Query()] = None,
 ) -> OpenTicketingPurchaseResponse:
     """Create an open-ticketing payment and return provider checkout data — public/anonymous for direct flows, sign-in and eligibility required for upsale flows.
 
-    ``flow_slug`` is optional (sdd/sales-flows slice 13) and mirrors the
-    runtime's own fallback semantics: omitted -> the popup's default flow.
-    When the resolved flow is upsale-type, the same portal-auth + approved-
-    payment gate as the runtime applies server-side (design D8) — UI-only
-    gating is never sufficient, since this is the endpoint that actually
-    creates the payment.
+    The route always names the canonical flow. When the resolved flow is
+    upsale-type, the same portal-auth + approved-payment gate as the runtime
+    applies server-side (design D8) — UI-only gating is never sufficient,
+    since this is the endpoint that actually creates the payment.
     """
     popup = get_open_ticketing_popup(db, slug, tenant.id)
 
@@ -362,7 +318,7 @@ async def _upsert_open_cart(
     cart_in: OpenCartUpsert,
     db: SessionDep,
     tenant: PublicTenant,
-    flow_slug: str | None = None,
+    flow_slug: str,
 ) -> OpenCartPublic:
     """Save (create or replace) the open-checkout cart for an email.
 
@@ -402,20 +358,6 @@ async def _upsert_open_cart(
 
 
 @router.put(
-    "/{slug}/cart",
-    response_model=OpenCartPublic,
-    dependencies=[
-        Depends(RateLimit(limit=30, window_sec=60, key_prefix="rl:checkout-cart"))
-    ],
-)
-async def upsert_open_cart(
-    slug: str, cart_in: OpenCartUpsert, db: SessionDep, tenant: PublicTenant
-) -> OpenCartPublic:
-    """Save the compatibility-default open-checkout cart for an email."""
-    return await _upsert_open_cart(slug, cart_in, db, tenant)
-
-
-@router.put(
     "/{slug}/{flow_slug}/cart",
     response_model=OpenCartPublic,
     dependencies=[
@@ -437,9 +379,9 @@ async def _restore_open_cart(
     slug: str,
     db: SessionDep,
     tenant: PublicTenant,
-    cid: uuid.UUID = Query(..., description="Cart id from the signed restore link"),
-    sig: str = Query(..., description="HMAC restore token for the cart id"),
-    flow_slug: str | None = None,
+    cid: uuid.UUID,
+    sig: str,
+    flow_slug: str,
 ) -> OpenCartPublic:
     """Restore an anonymous cart from a signed link (cid + sig).
 
@@ -466,22 +408,6 @@ async def _restore_open_cart(
 
 
 @router.get(
-    "/{slug}/cart",
-    response_model=OpenCartPublic,
-    dependencies=[
-        Depends(
-            RateLimit(limit=60, window_sec=60, key_prefix="rl:checkout-cart-restore")
-        )
-    ],
-)
-async def restore_open_cart(
-    slug: str, db: SessionDep, tenant: PublicTenant, cid: uuid.UUID, sig: str
-) -> OpenCartPublic:
-    """Restore the compatibility-default cart from a signed link."""
-    return await _restore_open_cart(slug, db, tenant, cid, sig)
-
-
-@router.get(
     "/{slug}/{flow_slug}/cart",
     response_model=OpenCartPublic,
     dependencies=[
@@ -503,7 +429,7 @@ async def restore_flow_cart(
 
 
 @router.post(
-    "/{slug}/pending/release",
+    "/{slug}/{flow_slug}/pending/release",
     response_model=PendingReleaseResponse,
     dependencies=[
         Depends(
@@ -529,6 +455,7 @@ async def restore_flow_cart(
 )
 async def release_pending_open(
     slug: str,
+    flow_slug: str,
     request_in: PendingReleaseOpenRequest,
     db: SessionDep,
     tenant: PublicTenant,
@@ -550,10 +477,17 @@ async def release_pending_open(
 
     Rate-limited 30/min/IP (matching the neighboring cart endpoint).
     """
+    from app.api.checkout.gate_quote import resolve_checkout_flow
+    from app.api.sales_flow.schemas import SalesFlowType
+
     popup = get_open_ticketing_popup(db, slug, tenant.id)
+    flow = resolve_checkout_flow(
+        db, popup, flow_slug, require_types={SalesFlowType.direct}
+    )
     result = payments_crud.release_pending_open(
         db,
         popup=popup,
+        sales_flow_id=flow.id,
         email=str(request_in.email),
         cid=request_in.cid,
         sig=request_in.sig,

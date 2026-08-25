@@ -65,8 +65,10 @@ interface CartItemsSnapshot {
 interface UseOpenCartPersistenceParams {
   /** The popup slug — used as localStorage key and in API calls */
   popupSlug: string
-  /** Named flows use their own browser and server cart scope. */
-  flowSlug?: string | null
+  /** Canonical flow used for every anonymous cart operation. */
+  flowSlug: string
+  /** Enables persistence only for the anonymous checkout surface. */
+  enabled: boolean
   /** Mutable ref that the provider keeps in sync with latest selection state */
   selectionStateRef: MutableRefObject<CartSelectionState>
   /** Products for availability validation during restore */
@@ -153,25 +155,30 @@ function clearLocalStorage(storageKey: string): void {
 
 function restoreScopedOpenCart(
   popupSlug: string,
-  flowSlug: string | null | undefined,
+  flowSlug: string,
   cid: string,
   sig: string,
 ) {
-  return flowSlug
-    ? CheckoutService.restoreFlowCart({ slug: popupSlug, flowSlug, cid, sig })
-    : CheckoutService.restoreOpenCart({ slug: popupSlug, cid, sig })
+  return CheckoutService.restoreFlowCart({
+    slug: popupSlug,
+    flowSlug,
+    cid,
+    sig,
+  })
 }
 
 function upsertScopedOpenCart(
   popupSlug: string,
-  flowSlug: string | null | undefined,
+  flowSlug: string,
   email: string,
   items: CartItemsSnapshot,
 ) {
   const requestBody = { email, items }
-  return flowSlug
-    ? CheckoutService.upsertFlowCart({ slug: popupSlug, flowSlug, requestBody })
-    : CheckoutService.upsertOpenCart({ slug: popupSlug, requestBody })
+  return CheckoutService.upsertFlowCart({
+    slug: popupSlug,
+    flowSlug,
+    requestBody,
+  })
 }
 
 /** Build a CartItemsSnapshot from the selection state ref. Mirrors useCartPersistence.buildCartState. */

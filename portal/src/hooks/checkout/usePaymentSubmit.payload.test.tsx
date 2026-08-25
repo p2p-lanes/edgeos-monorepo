@@ -117,8 +117,7 @@ describe("usePaymentSubmit public purchase payload", () => {
 
   it.each([
     ["named", "merch-store"],
-    ["compatibility default", null],
-    ["no-default", null],
+    ["direct", "checkout"],
   ] as const)("sends the %s checkout flow without substituting another flow", async (_, salesFlowSlug) => {
     const { result } = renderPaymentSubmit(salesFlowSlug)
 
@@ -128,7 +127,7 @@ describe("usePaymentSubmit public purchase payload", () => {
 
     expect(purchaseOpenTicketing).toHaveBeenCalledWith({
       slug: "festival-2026",
-      flowSlug: salesFlowSlug ?? undefined,
+      flowSlug: salesFlowSlug,
       requestBody: expect.objectContaining({
         products: [{ product_id: "product-1", quantity: 2 }],
         buyer: {

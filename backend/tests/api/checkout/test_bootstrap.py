@@ -192,7 +192,7 @@ def test_runtime_valid_direct_popup(
     db.commit()
 
     response = client.get(
-        f"/api/v1/checkout/{popup.slug}/runtime",
+        f"/api/v1/checkout/{popup.slug}/checkout/runtime",
         headers={"X-Tenant-Id": str(tenant_a.id)},
     )
 
@@ -248,7 +248,7 @@ def test_runtime_includes_attendee_categories(
     db.commit()
 
     response = client.get(
-        f"/api/v1/checkout/{popup.slug}/runtime",
+        f"/api/v1/checkout/{popup.slug}/checkout/runtime",
         headers={"X-Tenant-Id": str(tenant_a.id)},
     )
 
@@ -268,7 +268,7 @@ def test_runtime_products_use_popup_currency(
     db.commit()
 
     response = client.get(
-        f"/api/v1/checkout/{popup.slug}/runtime",
+        f"/api/v1/checkout/{popup.slug}/checkout/runtime",
         headers={"X-Tenant-Id": str(tenant_a.id)},
     )
 
@@ -292,7 +292,7 @@ def test_runtime_only_enabled_ticketing_steps(
     db.commit()
 
     response = client.get(
-        f"/api/v1/checkout/{popup.slug}/runtime",
+        f"/api/v1/checkout/{popup.slug}/checkout/runtime",
         headers={"X-Tenant-Id": str(tenant_a.id)},
     )
 
@@ -304,7 +304,7 @@ def test_runtime_only_enabled_ticketing_steps(
 def test_runtime_returns_only_the_resolved_flows_steps(
     client: TestClient, db: Session, tenant_a: Tenants
 ) -> None:
-    """Without a flow slug the runtime resolves the popup's default flow and
+    """The primary flow runtime resolves the popup's primary flow and
     returns exactly its steps (sdd/sales-flows-rediseno slice 2). Another
     flow's list must never appear."""
     from app.api.sales_flow.crud import sales_flows_crud
@@ -340,7 +340,7 @@ def test_runtime_returns_only_the_resolved_flows_steps(
     db.commit()
 
     response = client.get(
-        f"/api/v1/checkout/{popup.slug}/runtime",
+        f"/api/v1/checkout/{popup.slug}/{default_flow.slug}/runtime",
         headers={"X-Tenant-Id": str(tenant_a.id)},
     )
 
@@ -366,7 +366,7 @@ def test_runtime_excludes_hidden_sections_and_their_fields(
     db.commit()
 
     response = client.get(
-        f"/api/v1/checkout/{popup.slug}/runtime",
+        f"/api/v1/checkout/{popup.slug}/checkout/runtime",
         headers={"X-Tenant-Id": str(tenant_a.id)},
     )
 
@@ -416,7 +416,7 @@ def test_runtime_unknown_slug_returns_404(
 ) -> None:
     """Unknown popup slug returns 404."""
     response = client.get(
-        "/api/v1/checkout/does-not-exist-xyz/runtime",
+        "/api/v1/checkout/does-not-exist-xyz/checkout/runtime",
         headers={"X-Tenant-Id": str(tenant_a.id)},
     )
     assert response.status_code == 404, response.text
@@ -455,7 +455,7 @@ def test_runtime_application_popup_asks_an_anonymous_caller_to_sign_in(
     db.commit()
 
     response = client.get(
-        f"/api/v1/checkout/{popup.slug}/runtime",
+        f"/api/v1/checkout/{popup.slug}/attendee/runtime",
         headers={"X-Tenant-Id": str(tenant_a.id)},
     )
     assert response.status_code == 401, response.text
@@ -469,7 +469,7 @@ def test_runtime_inactive_direct_popup_returns_403(
     db.commit()
 
     response = client.get(
-        f"/api/v1/checkout/{popup.slug}/runtime",
+        f"/api/v1/checkout/{popup.slug}/checkout/runtime",
         headers={"X-Tenant-Id": str(tenant_a.id)},
     )
     assert response.status_code == 403, response.text
@@ -486,7 +486,7 @@ def test_runtime_only_active_products(
     db.commit()
 
     response = client.get(
-        f"/api/v1/checkout/{popup.slug}/runtime",
+        f"/api/v1/checkout/{popup.slug}/checkout/runtime",
         headers={"X-Tenant-Id": str(tenant_a.id)},
     )
 
@@ -509,7 +509,7 @@ def test_runtime_exposes_sold_out_override(
     db.commit()
 
     response = client.get(
-        f"/api/v1/checkout/{popup.slug}/runtime",
+        f"/api/v1/checkout/{popup.slug}/checkout/runtime",
         headers={"X-Tenant-Id": str(tenant_a.id)},
     )
 
@@ -532,7 +532,7 @@ def test_runtime_rate_limit_triggers_429(
 
     with patch("app.core.rate_limit.get_redis", return_value=mock_redis):
         response = client.get(
-            f"/api/v1/checkout/{popup.slug}/runtime",
+            f"/api/v1/checkout/{popup.slug}/checkout/runtime",
             headers={"X-Forwarded-For": "8.8.8.8", "X-Tenant-Id": str(tenant_a.id)},
         )
 
@@ -552,7 +552,7 @@ def test_runtime_resolves_per_tenant_slug_collision(
 ) -> None:
     """Slug collision: origin resolves to tenant A → tenant A's popup returned."""
     response = client.get(
-        "/api/v1/checkout/summer-fest/runtime",
+        "/api/v1/checkout/summer-fest/checkout/runtime",
         headers=with_origin("test-tenant-a.localhost"),
     )
 
@@ -588,7 +588,7 @@ def test_runtime_cross_tenant_slug_returns_404(
     db.commit()
 
     response = client.get(
-        f"/api/v1/checkout/{unique_slug}/runtime",
+        f"/api/v1/checkout/{unique_slug}/checkout/runtime",
         headers=with_origin("test-tenant-a.localhost"),
     )
 
@@ -599,7 +599,7 @@ def test_runtime_unknown_origin_returns_404(
     client: TestClient,
 ) -> None:
     """No Origin header and no X-Tenant-Id → 404 from resolver."""
-    response = client.get("/api/v1/checkout/summer-fest/runtime")
+    response = client.get("/api/v1/checkout/summer-fest/checkout/runtime")
     assert response.status_code == 404, response.text
 
 
@@ -610,7 +610,7 @@ def test_runtime_x_tenant_id_fallback(
 ) -> None:
     """No Origin header, X-Tenant-Id present → returns correct popup."""
     response = client.get(
-        "/api/v1/checkout/summer-fest/runtime",
+        "/api/v1/checkout/summer-fest/checkout/runtime",
         headers={"X-Tenant-Id": str(tenant_a.id)},
     )
 

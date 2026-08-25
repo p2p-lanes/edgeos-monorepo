@@ -8,7 +8,7 @@ export function OpenCheckoutQuoteStatus({
   flowSlug,
 }: {
   popupSlug: string
-  flowSlug: string | undefined
+  flowSlug: string
 }) {
   const { t } = useTranslation()
   const { data: quote } = useOpenCheckoutQuote({ popupSlug, flowSlug })

@@ -144,7 +144,7 @@ class TestFlowSlugRouting:
         default_flow = sales_flows_crud.get_default_flow(db, popup.id)
         flow = _make_flow(db, popup, slug="vip")
         _make_ticketing_step(
-            db, popup, title="Default Step", sales_flow_id=default_flow.id
+            db, popup, title="Primary Step", sales_flow_id=default_flow.id
         )
         _make_ticketing_step(db, popup, title="VIP Step", sales_flow_id=flow.id)
         db.commit()
@@ -157,25 +157,38 @@ class TestFlowSlugRouting:
         titles = [s["title"] for s in response.json()["ticketing_steps"]]
         assert titles == ["VIP Step"]
 
-    def test_omitted_flow_slug_resolves_default_flow(
+    def test_primary_flow_slug_resolves_primary_flow(
         self, client: TestClient, db: Session, tenant_a: Tenants
     ) -> None:
         popup = _make_direct_popup(db, tenant_a)
         default_flow = sales_flows_crud.get_default_flow(db, popup.id)
         flow = _make_flow(db, popup, slug="vip")
         _make_ticketing_step(
-            db, popup, title="Default Step", sales_flow_id=default_flow.id
+            db, popup, title="Primary Step", sales_flow_id=default_flow.id
         )
         _make_ticketing_step(db, popup, title="VIP Step", sales_flow_id=flow.id)
+        db.commit()
+
+        response = client.get(
+            f"/api/v1/checkout/{popup.slug}/{default_flow.slug}/runtime",
+            headers={"X-Tenant-Id": str(tenant_a.id)},
+        )
+        assert response.status_code == 200, response.text
+        titles = [s["title"] for s in response.json()["ticketing_steps"]]
+        assert titles == ["Primary Step"]
+
+    def test_omitted_flow_slug_returns_404(
+        self, client: TestClient, db: Session, tenant_a: Tenants
+    ) -> None:
+        popup = _make_direct_popup(db, tenant_a)
         db.commit()
 
         response = client.get(
             f"/api/v1/checkout/{popup.slug}/runtime",
             headers={"X-Tenant-Id": str(tenant_a.id)},
         )
-        assert response.status_code == 200, response.text
-        titles = [s["title"] for s in response.json()["ticketing_steps"]]
-        assert titles == ["Default Step"]
+
+        assert response.status_code == 404, response.text
 
     def test_unknown_flow_slug_returns_404_not_200(
         self, client: TestClient, db: Session, tenant_a: Tenants
@@ -321,8 +334,9 @@ class TestTranslationParity:
         )
         db.commit()
 
+        primary_flow = sales_flows_crud.get_default_flow(db, popup.id)
         response = client.get(
-            f"/api/v1/checkout/{popup.slug}/runtime",
+            f"/api/v1/checkout/{popup.slug}/{primary_flow.slug}/runtime",
             headers={
                 "X-Tenant-Id": str(tenant_a.id),
                 "Accept-Language": "en",

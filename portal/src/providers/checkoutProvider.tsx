@@ -605,7 +605,8 @@ export function CheckoutProvider({
     restorationPromise: openCartRestorationPromise,
   } = useOpenCartPersistence({
     popupSlug: openCartPopupSlug ?? "",
-    flowSlug: salesFlowSlug,
+    flowSlug: salesFlowSlug ?? "",
+    enabled: openCartEnabled,
     selectionStateRef,
     products,
     housingPricePerDay,

@@ -902,20 +902,16 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         session: Session,
         obj: "CheckoutPreviewRequest",
         popup: "Popups",
-        flow: "Any | None" = None,
+        flow: "Any",
         current_human: "HumanPublic | None" = None,
     ) -> "CheckoutPreviewResponse":
         """Evaluate the shared checkout gate and return its quote."""
-        from app.api.checkout.gate_quote import (
-            evaluate_gate_quote,
-            resolve_checkout_flow,
-        )
+        from app.api.checkout.gate_quote import evaluate_gate_quote
 
-        selected = flow or resolve_checkout_flow(session, popup, None)
         return evaluate_gate_quote(
             session,
             popup,
-            selected,
+            flow,
             obj.products,
             coupon_code=obj.coupon_code,
             insurance=obj.insurance,
@@ -929,8 +925,8 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         obj: "OpenTicketingPurchaseCreate",
         popup: "Popups",
         tenant: "Tenants",
+        flow_slug: str,
         attribution: dict[str, str | None] | None = None,
-        flow_slug: str | None = None,
         current_human: "HumanPublic | None" = None,
     ) -> tuple[Payments, str, str | None]:
         """Create an anonymous open-ticketing payment with per-ticket attendees.
@@ -941,12 +937,10 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         configures a custom open-checkout success URL — paid flows redirect via
         SimpleFi and return None.
 
-        sdd/sales-flows slice 13 (task 13.1/13.2): mirrors the checkout
-        runtime's upsale eligibility gate (design D8). Named and omitted
-        ``flow_slug`` values resolve through the full `resolve_flow` contract
-        (unknown, unavailable, inactive, or wrong-type -> 404/403, never a
-        silent fallback). `assert_upsale_eligible` is a no-op unless the
-        resolved flow is upsale-type.
+        The canonical flow slug resolves through the full `resolve_flow`
+        contract (unknown, unavailable, inactive, or wrong-type -> 404/403).
+        `assert_upsale_eligible` is a no-op unless the resolved flow is
+        upsale-type.
         """
         from app.api.checkout.gate_quote import (
             assert_quote_current,
@@ -964,10 +958,8 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Popup is not active",
             )
-        # The door decides, not the gathering. A named flow is checked by
-        # `resolve_flow`; an unnamed one falls to the popup's default, which
-        # has to be able to sell without an application or there is nothing
-        # for an anonymous buyer to do here.
+        # The flow decides. It is required at every anonymous checkout entry
+        # point, so no popup-level fallback can price or charge another flow.
         target_flow = resolve_checkout_flow(
             session,
             popup,
@@ -3289,6 +3281,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         session: Session,
         email: str,
         popup_id: uuid.UUID,
+        sales_flow_id: uuid.UUID | None = None,
     ) -> Payments | None:
         """Return the first PENDING SimpleFi open-checkout payment for email+popup, or None.
 
@@ -3296,7 +3289,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         payment exists without triggering any SimpleFi calls.  Same query as
         supersede_pending_payments (email path) so they stay in sync.
         """
-        return session.exec(
+        statement = (
             select(Payments)
             .where(
                 Payments.popup_id == popup_id,
@@ -3307,7 +3300,10 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             )
             .where(text("buyer_snapshot->>'buyer_email' = :email"))
             .params(email=email.lower())
-        ).first()
+        )
+        if sales_flow_id is not None:
+            statement = statement.where(Payments.sales_flow_id == sales_flow_id)
+        return session.exec(statement).first()
 
     def _validate_cart_continuity_proof(
         self,
@@ -3720,6 +3716,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         session: Session,
         *,
         popup: "Popups",
+        sales_flow_id: uuid.UUID | None = None,
         email: str,
         cid: uuid.UUID | None,
         sig: str | None,
@@ -3760,11 +3757,15 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
 
         # Validate proof BEFORE any DB read that could leak payment existence.
         # Invalid/missing proof → immediate no-op (enumeration-safe).
-        if not self._validate_cart_continuity_proof(session, popup, email, cid, sig):
+        if not self._validate_cart_continuity_proof(
+            session, popup, email, cid, sig, sales_flow_id
+        ):
             return ReleaseResult(released=False)
 
         # Locate PENDING payment for this email+popup.
-        prior = self._find_pending_by_email_popup(session, email, popup.id)
+        prior = self._find_pending_by_email_popup(
+            session, email, popup.id, sales_flow_id
+        )
         if prior is None:
             return ReleaseResult(released=False)
 
@@ -3789,7 +3790,9 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             return ReleaseResult(released=False)
 
         # Re-locate after lock: a concurrent caller may have cancelled it already.
-        prior = self._find_pending_by_email_popup(session, email, popup.id)
+        prior = self._find_pending_by_email_popup(
+            session, email, popup.id, sales_flow_id
+        )
         if prior is None:
             return ReleaseResult(released=False)
 

@@ -21,7 +21,7 @@ export interface ToCartOptions {
   currentStep?: string | null
 }
 
-/** Serialize a selection into a CartState for `PUT /checkout/{slug}/cart`. */
+/** Serialize a selection into a CartState for `PUT /checkout/{slug}/{flowSlug}/cart`. */
 export function selectionToCartState(
   selection: SelectionState,
   opts: ToCartOptions = {},

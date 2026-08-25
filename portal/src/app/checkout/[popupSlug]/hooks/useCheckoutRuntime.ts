@@ -10,7 +10,7 @@ import { queryKeys } from "@/lib/query-keys"
 
 export function useCheckoutRuntime(
   slug: string,
-  opts?: {
+  opts: {
     /**
      * Language the request will carry (see `resolveRequestLanguage`). Part of
      * the key because the response is translated: without it the server render's
@@ -20,26 +20,22 @@ export function useCheckoutRuntime(
      */
     language?: string | null
     /**
-     * Named sales flow (sdd/sales-flows D6 URL scheme —
-     * `/checkout/{popupSlug}/{flowSlug}`). Omitted resolves the popup's
-     * default flow, matching the legacy 2-segment route.
+     * Canonical sales flow URL segment.
      */
-    flowSlug?: string | null
+    flowSlug: string
     initialData?: CheckoutRuntimeResponse
     initialDataUpdatedAt?: number
   },
 ) {
   return useQuery({
-    queryKey: queryKeys.checkout.runtime(slug, opts?.flowSlug, opts?.language),
+    queryKey: queryKeys.checkout.runtime(slug, opts.flowSlug, opts.language),
     queryFn: () =>
-      opts?.flowSlug
-        ? CheckoutService.getFlowRuntime({ slug, flowSlug: opts.flowSlug })
-        : CheckoutService.getRuntime({ slug }),
+      CheckoutService.getFlowRuntime({ slug, flowSlug: opts.flowSlug }),
     enabled: slug.length > 0,
     staleTime: 30_000,
     gcTime: 60_000,
-    initialData: opts?.initialData,
-    initialDataUpdatedAt: opts?.initialDataUpdatedAt,
+    initialData: opts.initialData,
+    initialDataUpdatedAt: opts.initialDataUpdatedAt,
     retry: (failureCount, error) => {
       if (
         error instanceof ApiError &&

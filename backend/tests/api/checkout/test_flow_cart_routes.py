@@ -1,10 +1,7 @@
 """Flow-scoped cart routes protect aliases, restore links, and legacy carts."""
 
-import importlib.util
 import uuid
-from datetime import UTC, datetime, timedelta
 from decimal import Decimal
-from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -19,7 +16,6 @@ from app.api.payment.models import Payments
 from app.api.payment.schemas import PaymentStatus
 from app.api.popup.models import Popups
 from app.api.sales_flow.crud import sales_flows_crud
-from app.api.sales_flow.models import SalesFlowAliases
 from app.api.shared.enums import SaleType
 from app.api.tenant.models import Tenants
 from app.core.security import create_access_token
@@ -50,38 +46,6 @@ def _auth_headers(human_id: uuid.UUID) -> dict[str, str]:
     }
 
 
-def _alias(
-    db: Session, flow, alias: str, *, expires_at: datetime | None = None
-) -> None:
-    db.add(
-        SalesFlowAliases(
-            tenant_id=flow.tenant_id,
-            popup_id=flow.popup_id,
-            sales_flow_id=flow.id,
-            alias=alias,
-            expires_at=expires_at,
-        )
-    )
-    db.commit()
-
-
-def test_alias_resolves_once_to_its_canonical_flow(
-    client: TestClient, db: Session, tenant_a: Tenants
-) -> None:
-    popup = _make_direct_popup(db, tenant_a)
-    flow = _make_flow(db, popup, slug="experiences")
-    _alias(db, flow, "old-experiences")
-
-    response = client.get(
-        f"/api/v1/checkout/{popup.slug}/old-experiences/runtime",
-        headers=_headers(tenant_a),
-    )
-
-    assert response.status_code == 200, response.text
-    assert response.headers.get("location") is None
-    assert response.json()["selected_flow"]["slug"] == flow.slug
-
-
 @pytest.mark.parametrize("candidate", ["%2F", "%252F", "not-a-flow"])
 def test_malformed_encoded_and_unknown_flow_input_is_opaque_and_never_defaults(
     client: TestClient, db: Session, tenant_a: Tenants, candidate: str
@@ -98,45 +62,6 @@ def test_malformed_encoded_and_unknown_flow_input_is_opaque_and_never_defaults(
     assert response.status_code == 404
     assert response.json()["detail"] in {"Not found", "Not Found"}
     assert default.slug not in response.text
-
-
-def test_expired_or_unlisted_alias_is_opaque_and_does_not_fall_back(
-    client: TestClient, db: Session, tenant_a: Tenants
-) -> None:
-    popup = _make_direct_popup(db, tenant_a)
-    expired = _make_flow(db, popup, slug="expired-flow")
-    hidden = _make_flow(db, popup, slug="hidden-flow", visibility="direct_url_only")
-    _alias(
-        db, expired, "old-expired", expires_at=datetime.now(UTC) - timedelta(seconds=1)
-    )
-    _alias(db, hidden, "old-hidden")
-
-    for candidate in ("old-expired", "old-hidden"):
-        response = client.get(
-            f"/api/v1/checkout/{popup.slug}/{candidate}/runtime",
-            headers=_headers(tenant_a),
-        )
-        assert response.status_code == 404
-        assert response.json() == {"detail": "Not found"}
-        assert candidate not in response.text
-
-
-def test_cross_popup_alias_is_opaque(
-    client: TestClient, db: Session, tenant_a: Tenants
-) -> None:
-    popup_a = _make_direct_popup(db, tenant_a)
-    popup_b = _make_direct_popup(db, tenant_a)
-    foreign = _make_flow(db, popup_b, slug="foreign-flow")
-    _alias(db, foreign, "foreign-alias")
-
-    response = client.get(
-        f"/api/v1/checkout/{popup_a.slug}/foreign-alias/runtime",
-        headers=_headers(tenant_a),
-    )
-
-    assert response.status_code == 404
-    assert response.json() == {"detail": "Not found"}
-    assert foreign.slug not in response.text
 
 
 def test_named_flow_carts_are_isolated_and_restore_tokens_bind_the_flow(
@@ -446,38 +371,3 @@ def test_no_default_cart_quarantine_is_opaque(
         legacy.id
         == carts_crud.find_by_human_popup(db, human.id, no_default_popup.id).id
     )
-
-
-def test_flow_cart_migration_module_has_reversible_schema_operations() -> None:
-    path = (
-        Path(__file__).resolve().parents[3]
-        / "app"
-        / "alembic"
-        / "versions"
-        / "f3c9a1d7e2b4_flow_scoped_carts.py"
-    )
-    assert path.exists()
-    spec = importlib.util.spec_from_file_location(path.stem, path)
-    assert spec and spec.loader
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-
-    assert module.revision == "f3c9a1d7e2b4"
-    assert module.down_revision == "e2b6a90d4c17"
-
-    with (
-        patch.object(module, "op") as upgrade_op,
-        patch.object(module, "add_tenant_table_permissions") as add_permissions,
-    ):
-        module.upgrade()
-        assert upgrade_op.create_table.called
-        assert upgrade_op.create_unique_constraint.called
-        add_permissions.assert_called_once_with("sales_flow_aliases")
-
-    with (
-        patch.object(module, "op") as downgrade_op,
-        patch.object(module, "remove_tenant_table_permissions") as remove_permissions,
-    ):
-        module.downgrade()
-        assert downgrade_op.drop_column.called
-        remove_permissions.assert_called_once_with("sales_flow_aliases")

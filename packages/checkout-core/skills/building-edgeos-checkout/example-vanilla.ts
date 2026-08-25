@@ -31,6 +31,7 @@ import {
 // EdgeOS tells you to point at a dev/staging backend.
 
 const SLUG = "amanita"
+const FLOW_SLUG = "checkout"
 const PUBLISHABLE_KEY = "pk_live_xxxxxxxxxxxxxxxx"
 
 // ---- boot ------------------------------------------------------------------
@@ -38,6 +39,7 @@ const PUBLISHABLE_KEY = "pk_live_xxxxxxxxxxxxxxxx"
 export async function mountCheckout(root: HTMLElement): Promise<() => void> {
   const client = createCheckoutClient({
     slug: SLUG,
+    flowSlug: FLOW_SLUG,
     publishableKey: PUBLISHABLE_KEY,
     // baseUrl: "http://localhost:8000/api/v1", // dev/staging override only
   })
