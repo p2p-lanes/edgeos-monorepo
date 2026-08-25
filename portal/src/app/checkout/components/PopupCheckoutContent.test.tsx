@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
-import { render, screen, waitFor } from "@testing-library/react"
+import { fireEvent, render, screen, waitFor } from "@testing-library/react"
 import type { ReactNode } from "react"
 import { PopupCheckoutContent } from "./PopupCheckoutContent"
 
@@ -75,7 +75,24 @@ vi.mock("@/providers/cityProvider", () => ({
 }))
 
 vi.mock("@/components/checkout-flow/ScrollyCheckoutFlow", () => ({
-  default: () => <div>passes-flow</div>,
+  default: ({ navExtraContent }: { navExtraContent?: ReactNode }) => (
+    <div>
+      {navExtraContent}
+      passes-flow
+    </div>
+  ),
+}))
+
+vi.mock("@/components/Sidebar/SidebarComponents", () => ({
+  SidebarProvider: ({ children }: { children: ReactNode }) => <>{children}</>,
+}))
+
+vi.mock("@/providers/passesProvider", () => ({
+  default: ({ children }: { children: ReactNode }) => <>{children}</>,
+}))
+
+vi.mock("@/providers/checkoutProvider", () => ({
+  CheckoutProvider: ({ children }: { children: ReactNode }) => <>{children}</>,
 }))
 
 vi.mock("./UserInfoForm", () => ({
@@ -102,6 +119,11 @@ const popup = {
   name: "Popup",
   sale_type: "application",
   checkout_mode: "pass_system",
+} as const
+
+const directPopup = {
+  ...popup,
+  takes_applications: false,
 } as const
 
 describe("PopupCheckoutContent application schema gating", () => {
@@ -221,5 +243,35 @@ describe("PopupCheckoutContent application schema gating", () => {
     )
 
     expect(screen.getByText("schema-form")).toBeTruthy()
+  })
+
+  it("clears every query before returning a direct checkout to email entry", async () => {
+    const clear = vi.fn()
+    const removeQueries = vi.fn()
+    const setCheckoutState = vi.fn()
+    mockUseQueryClient.mockReturnValue({ clear, removeQueries })
+    mockUseCheckoutState.mockReturnValue({
+      checkoutState: "passes",
+      isSubmitting: false,
+      errorMessage: null,
+      handleSubmit: vi.fn(),
+      setCheckoutState,
+    })
+
+    renderWithClient(
+      <PopupCheckoutContent
+        popup={directPopup as never}
+        background={{ className: "bg" }}
+      />,
+    )
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Signed in as human@example.com" }),
+    )
+    fireEvent.click(await screen.findByRole("button", { name: "Change email" }))
+
+    expect(clear).toHaveBeenCalledOnce()
+    expect(removeQueries).not.toHaveBeenCalled()
+    expect(setCheckoutState).toHaveBeenCalledWith("form")
   })
 })

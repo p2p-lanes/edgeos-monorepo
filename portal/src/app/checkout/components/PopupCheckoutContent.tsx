@@ -266,12 +266,7 @@ export const PopupCheckoutContent = ({
   const handleChangeEmailForDirectCheckout = () => {
     localStorage.removeItem("token")
     dispatchAuthChange()
-    queryClient.removeQueries({ queryKey: queryKeys.profile.current })
-    queryClient.removeQueries({ queryKey: queryKeys.applications.mine() })
-    queryClient.removeQueries({ queryKey: queryKeys.cart.byPopup(popup.id) })
-    queryClient.removeQueries({
-      queryKey: queryKeys.purchases.byPopup(popup.id),
-    })
+    queryClient.clear()
     hasSkippedForm.current = false
     setCheckoutState("form")
   }
