@@ -10,7 +10,7 @@ vi.mock("@/client", () => ({
   SalesFlowsService: {
     listPortalSalesFlows: vi.fn().mockResolvedValue({
       results: [
-        { id: "flow-1", slug: "default", name: "Default", order: 0 },
+        { id: "flow-1", slug: "attendee", name: "Attendee", order: 0 },
         { id: "flow-2", slug: "vip", name: "VIP", order: 1 },
       ],
       paging: { offset: 0, limit: 2, total: 2 },

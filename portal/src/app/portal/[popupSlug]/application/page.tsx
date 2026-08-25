@@ -18,6 +18,7 @@ import { FlowPicker } from "./components/FlowPicker"
 import { FeePaymentBanner } from "./components/fee-payment-banner"
 import { FormHeader } from "./components/form-header"
 import { SectionSeparator } from "./components/section-separator"
+import { resolveApplicationFlowId } from "./lib/resolveApplicationFlowId"
 import { resolvedApplicationDestination } from "./lib/resolvedApplicationDestination"
 import { shouldRedirectToStatus } from "./lib/shouldRedirectToStatus"
 
@@ -82,12 +83,11 @@ export default function FormPage() {
   // Referral UUID carried from /r/{code} consumption page (REQ-GR-009)
   const referralId = searchParams.get("referral_id")
 
-  // Which way into the gathering this form is for. Seeded from `?flow=`,
-  // which is how the home hands over: the door card already asked, so the
-  // FlowPicker below would be asking twice (sdd/sales-flows-rediseno).
-  const [selectedFlowId, setSelectedFlowId] = useState<string | null>(
-    searchParams.get("flow"),
-  )
+  // Which way into the gathering this form is for. Entry links carry a
+  // readable flow slug; authenticated portal handoffs carry the internal id.
+  // Both resolve to the id required by the application API.
+  const flowIdentifier = searchParams.get("flow")
+  const [selectedFlowId, setSelectedFlowId] = useState<string | null>(null)
   // Declared after the door, not before it: asking which application this
   // is without saying which way in used to answer with whichever came last.
   const application = getRelevantApplication(selectedFlowId)
@@ -96,9 +96,14 @@ export default function FormPage() {
   // before we know whether it's even safe to reach the JSX that mounts
   // FlowPicker. Same query, shared cache — no extra request.
   const { data: portalFlows } = usePortalSalesFlows(city?.id)
+  useEffect(() => {
+    if (!portalFlows || selectedFlowId) return
+    const resolvedFlowId = resolveApplicationFlowId(flowIdentifier, portalFlows)
+    if (resolvedFlowId) setSelectedFlowId(resolvedFlowId)
+  }, [flowIdentifier, portalFlows, selectedFlowId])
   // Whether a door still has to be picked before the form means anything.
   // Its only job now is holding the form back: without a door, the schema
-  // query falls to the default flow and would show the wrong questions.
+  // query could show the wrong questions.
   //
   // It used to gate the terminal-status redirect too, because `application`
   // was resolved by human and gathering and might belong to another door —

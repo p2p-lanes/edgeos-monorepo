@@ -58,7 +58,7 @@ function renderWithClient(ui: ReactNode) {
 describe("FlowPicker", () => {
   it("renders nothing when only one portal-listed flow exists", async () => {
     vi.mocked(SalesFlowsService.listPortalSalesFlows).mockResolvedValue({
-      results: [{ id: "flow-1", slug: "default", name: "Default", order: 0 }],
+      results: [{ id: "flow-1", slug: "attendee", name: "Attendee", order: 0 }],
       paging: { offset: 0, limit: 1, total: 1 },
     } as never)
 
@@ -75,7 +75,7 @@ describe("FlowPicker", () => {
 
   it("auto-selects the single flow via onSelect (no picker shown)", async () => {
     vi.mocked(SalesFlowsService.listPortalSalesFlows).mockResolvedValue({
-      results: [{ id: "flow-1", slug: "default", name: "Default", order: 0 }],
+      results: [{ id: "flow-1", slug: "attendee", name: "Attendee", order: 0 }],
       paging: { offset: 0, limit: 1, total: 1 },
     } as never)
 
@@ -90,7 +90,7 @@ describe("FlowPicker", () => {
   it("renders a picker and calls onSelect when >1 flow exists", async () => {
     vi.mocked(SalesFlowsService.listPortalSalesFlows).mockResolvedValue({
       results: [
-        { id: "flow-1", slug: "default", name: "Default", order: 0 },
+        { id: "flow-1", slug: "attendee", name: "Attendee", order: 0 },
         { id: "flow-2", slug: "vip", name: "VIP Track", order: 1 },
       ],
       paging: { offset: 0, limit: 2, total: 2 },
@@ -101,14 +101,14 @@ describe("FlowPicker", () => {
     await waitFor(() => {
       expect(screen.getByText("application.flow_picker_title")).toBeTruthy()
     })
-    expect(screen.getByText("Default")).toBeTruthy()
+    expect(screen.getByText("Attendee")).toBeTruthy()
     expect(screen.getByText("VIP Track")).toBeTruthy()
   })
 
   it("calls onSelect with the chosen flow id when the user picks a card", async () => {
     vi.mocked(SalesFlowsService.listPortalSalesFlows).mockResolvedValue({
       results: [
-        { id: "flow-1", slug: "default", name: "Default", order: 0 },
+        { id: "flow-1", slug: "attendee", name: "Attendee", order: 0 },
         { id: "flow-2", slug: "vip", name: "VIP Track", order: 1 },
       ],
       paging: { offset: 0, limit: 2, total: 2 },

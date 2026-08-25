@@ -77,7 +77,7 @@ export default function Home() {
 
   const onClickApply = () => {
     if (nobodyApplies) {
-      router.push(`/checkout/${city.slug}`)
+      router.push(`/checkout/${city.slug}/checkout`)
       return
     }
     if (status === "accepted") {

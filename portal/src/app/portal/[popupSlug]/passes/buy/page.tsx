@@ -18,11 +18,11 @@ export default function BuyPassesPage() {
   const access = useHumanPopupAccess(city?.id ? String(city.id) : null)
 
   useEffect(() => {
-    // Direct-sale popups own their checkout flow at /checkout/[slug]; this
+    // Direct-sale popups own their checkout flow at /checkout/[slug]/checkout; this
     // route is application-only. Forward direct-sale buyers to the canonical
     // anonymous flow (which prefills buyer info when authed).
     if (nobodyApplies) {
-      router.replace(`/checkout/${params.popupSlug}`)
+      router.replace(`/checkout/${params.popupSlug}/checkout`)
       return
     }
     if (access.state === "denied") {

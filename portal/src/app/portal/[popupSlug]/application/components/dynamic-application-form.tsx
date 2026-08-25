@@ -145,7 +145,7 @@ interface DynamicApplicationFormProps {
   referralId?: string | null
   /**
    * Explicit target sales flow chosen via the FlowPicker (sdd/sales-flows
-   * D6 URL scheme, task 9.4). Omitted keeps the backend's default-flow
+   * D6 URL scheme, task 9.4). Omitted keeps the backend's primary-flow
    * resolution.
    */
   salesFlowId?: string | null
