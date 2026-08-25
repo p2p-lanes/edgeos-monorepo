@@ -9,10 +9,13 @@ describe("getOpenCartScope", () => {
     })
   })
 
-  it("preserves the compatibility-default cart key when the flow is omitted", () => {
-    expect(getOpenCartScope("festival-2026")).toEqual({
+  it("preserves the compatibility cart key when an optional flow is omitted", () => {
+    const scope = getOpenCartScope("festival-2026")
+
+    expect(scope).toEqual({
       storageKey: "open-cart:festival-2026",
       isNamedFlow: false,
     })
+    expect(scope.storageKey).not.toContain("undefined")
   })
 })

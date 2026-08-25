@@ -173,13 +173,13 @@ export function usePaymentSubmit({
     setIsSubmitting(true)
     setPromoError(null)
 
-    // Flush any pending debounced save BEFORE building the purchase body so
     const openFlowSlug = salesFlowSlug
     if (submitMode === "open-ticketing" && !openFlowSlug) {
       setIsSubmitting(false)
       return { success: false, error: "Checkout flow is unavailable" }
     }
 
+    // Flush any pending debounced save BEFORE building the purchase body so
     // cartMetaRef has fresh cid/restore_token (ADR-R8).
     if (submitMode === "open-ticketing" && flushOpenCartSave) {
       await flushOpenCartSave()

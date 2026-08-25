@@ -394,6 +394,7 @@ function hydrateFromSnapshot(
 export function useOpenCartPersistence({
   popupSlug,
   flowSlug,
+  enabled,
   selectionStateRef,
   products,
   housingPricePerDay,
@@ -438,6 +439,10 @@ export function useOpenCartPersistence({
   // --- Restore: signed-link takes precedence over localStorage ---
   // biome-ignore lint/correctness/useExhaustiveDependencies: one-shot restore; products must be stable before hydrating
   useEffect(() => {
+    if (!enabled) {
+      restorationResolveRef.current?.()
+      return
+    }
     if (hasRestoredCheckoutRef.current) return
 
     // P5 fix: when products have not loaded yet, we cannot restore — do NOT
@@ -563,10 +568,11 @@ export function useOpenCartPersistence({
       // No localStorage data — nothing to restore.
       restorationResolveRef.current?.()
     }
-  }, [products, popupSlug, flowSlug, scope.storageKey, initialStep])
+  }, [enabled, products, popupSlug, flowSlug, scope.storageKey, initialStep])
 
   // --- Debounced save: localStorage + backend upsert ---
   const scheduleSave = useCallback(() => {
+    if (!enabled) return
     if (!hasRestoredCheckoutRef.current) return
     if (paymentCompleteRef.current) return
 
@@ -623,6 +629,7 @@ export function useOpenCartPersistence({
       )
     }, 800)
   }, [
+    enabled,
     popupSlug,
     flowSlug,
     scope.storageKey,
@@ -656,6 +663,7 @@ export function useOpenCartPersistence({
   // Called by usePaymentSubmit at the START of submitPayment (open-ticketing mode)
   // so that cartMetaRef has fresh cid/restore_token before the purchase body is built.
   const flushSave = useCallback(async (): Promise<void> => {
+    if (!enabled) return
     if (!hasRestoredCheckoutRef.current) return
     if (paymentCompleteRef.current) return
 
@@ -711,6 +719,7 @@ export function useOpenCartPersistence({
       )
     }
   }, [
+    enabled,
     popupSlug,
     flowSlug,
     scope.storageKey,

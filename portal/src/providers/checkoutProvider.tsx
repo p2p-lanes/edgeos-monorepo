@@ -632,7 +632,7 @@ export function CheckoutProvider({
   // local convenience so a refresh doesn't wipe a half-filled form. Only for
   // open checkout — authenticated flows carry buyer data on the account.
   const buyerStorageKey = openCartPopupSlug
-    ? `open-checkout-buyer:${openCartPopupSlug}:${salesFlowSlug ?? "default"}`
+    ? `open-checkout-buyer:${openCartPopupSlug}:${salesFlowSlug ?? ""}`
     : null
   const buyerRestoredRef = useRef(false)
   useEffect(() => {
@@ -702,6 +702,7 @@ export function CheckoutProvider({
     // Only fire in open-cart mode or authenticated mode with an application.
     const effectiveSubmitMode = submitMode
     const slug = submitPopupSlug ?? city?.slug ?? null
+    const flowSlug = salesFlowSlug
     const appId = application?.id
 
     if (effectiveSubmitMode !== "open-ticketing" && !appId) {
@@ -726,7 +727,10 @@ export function CheckoutProvider({
 
     restorationReady.then(() => {
       const releasePromise: Promise<{ released: boolean }> =
-        effectiveSubmitMode === "open-ticketing" && openCartEnabled && slug
+        effectiveSubmitMode === "open-ticketing" &&
+        openCartEnabled &&
+        slug &&
+        flowSlug
           ? (() => {
               const cartId = openCartMetaRef.current.cartId ?? undefined
               const restoreToken =
@@ -738,6 +742,7 @@ export function CheckoutProvider({
               }
               return CheckoutService.releasePendingOpen({
                 slug,
+                flowSlug,
                 requestBody: { cid: cartId, sig: restoreToken, email },
               })
             })()
@@ -754,7 +759,7 @@ export function CheckoutProvider({
               // Release succeeded — invalidate the checkout runtime so
               // stock/availability reflects the freed hold on the next render.
               queryClient.invalidateQueries({
-                queryKey: queryKeys.checkout.runtime(slug),
+                queryKey: queryKeys.checkout.runtime(slug, flowSlug),
               })
             }
             // The freed hold also restores application credit; refetch the
