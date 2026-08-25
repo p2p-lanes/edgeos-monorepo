@@ -92,6 +92,7 @@
   "shop": {
     "title": "Tienda",
     "description": "Elija una opción disponible.",
+    "catalog": "Opciones disponibles",
     "application": "Solicitud",
     "direct": "Compra directa",
     "upsale": "Disponible para usted",
@@ -590,6 +591,7 @@
     "soon_badge": "Próximamente",
     "application": "Aplicación",
     "navigation": "Navegación del portal",
+    "mobile_navigation": "Menú de navegación del portal",
     "general": "General",
     "participation": "Participación",
     "commerce": "Comercio",

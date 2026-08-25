@@ -78,6 +78,7 @@
   "shop": {
     "title": "商店",
     "description": "请选择可用选项。",
+    "catalog": "可用选项",
     "application": "申请",
     "direct": "直接购买",
     "upsale": "为您提供",
@@ -523,6 +524,7 @@
     "soon_badge": "即将推出",
     "application": "申请",
     "navigation": "门户导航",
+    "mobile_navigation": "门户导航菜单",
     "general": "常规",
     "participation": "参与",
     "commerce": "购物",

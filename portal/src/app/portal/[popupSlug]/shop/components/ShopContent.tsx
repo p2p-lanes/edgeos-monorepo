@@ -77,20 +77,27 @@ export function ShopContent({ popupId, popupSlug }: ShopContentProps) {
               <h2 id={`shop-${key}`} className="mb-3 text-lg font-semibold">
                 {t(`shop.${key}`)}
               </h2>
-              <div className="grid gap-3 sm:grid-cols-2">
+              <ul
+                className="grid gap-3 sm:grid-cols-2"
+                aria-label={t("shop.catalog")}
+              >
                 {flows.map((flow) => (
-                  <Link
-                    key={flow.id}
-                    href={`/portal/${popupSlug}/shop/${flow.slug}`}
-                    className="rounded-2xl border bg-card p-5 transition-colors hover:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  >
-                    <span className="block font-medium">{flow.name}</span>
-                    <span className="mt-2 block text-sm text-muted-foreground">
-                      {t("shop.open")}
-                    </span>
-                  </Link>
+                  <li key={flow.id}>
+                    <Link
+                      href={`/portal/${popupSlug}/shop/${flow.slug}`}
+                      className="block rounded-xl border bg-card p-5 shadow-sm transition-colors hover:border-primary hover:bg-accent/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      <span className="block text-xs font-semibold tracking-[0.08em] text-muted-foreground uppercase">
+                        {t(`shop.${key}`)}
+                      </span>
+                      <span className="block font-medium">{flow.name}</span>
+                      <span className="mt-2 block text-sm text-muted-foreground">
+                        {t("shop.open")}
+                      </span>
+                    </Link>
+                  </li>
                 ))}
-              </div>
+              </ul>
             </section>
           ),
       )}

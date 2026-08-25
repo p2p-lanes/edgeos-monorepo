@@ -20,7 +20,7 @@ export default function PortalShell({
     <Authentication>
       <Providers>
         <BackofficeSidebar collapsible="icon" />
-        <SidebarInset className="max-h-svh overflow-hidden">
+        <SidebarInset className="max-h-svh overflow-hidden bg-muted/30">
           {!isProfilePage && <HeaderBar />}
           {/* `id` lets pages target this exact element for scroll-position
               save/restore. `document.querySelector("main")` would resolve to
@@ -29,7 +29,7 @@ export default function PortalShell({
               writes are no-ops. Keep this id stable. */}
           <main
             id="portal-scroll"
-            className="flex-1 overflow-y-auto bg-background"
+            className="flex-1 overflow-y-auto bg-gradient-to-b from-background via-background to-muted/30"
           >
             {children}
           </main>

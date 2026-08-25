@@ -1,5 +1,10 @@
 import { render, screen } from "@testing-library/react"
+import { useEffect } from "react"
 import { describe, expect, it, vi } from "vitest"
+
+const SidebarComponents = await vi.importActual<
+  typeof import("./SidebarComponents")
+>("./SidebarComponents")
 
 const resources = [
   {
@@ -54,6 +59,7 @@ vi.mock("react-i18next", () => ({
         "sidebar.participation": "Participation",
         "sidebar.commerce": "Commerce",
         "sidebar.community": "Community",
+        "sidebar.mobile_navigation": "Portal navigation menu",
       })[key] ?? key,
   }),
 }))
@@ -62,17 +68,32 @@ vi.mock("@/hooks/useResources", () => ({
   default: () => ({ resources, doorName: null }),
 }))
 
+vi.mock("@/hooks/useIsMobile", () => ({
+  useIsMobile: () => true,
+}))
+
 vi.mock("./Groups/GroupsResources", () => ({ default: () => null }))
 
 vi.mock("./StatusResource/ResourceMenuItem", () => ({
-  default: ({ resource }: { resource: { name: string } }) => (
-    <span>{resource.name}</span>
+  default: ({
+    resource,
+    isActive,
+  }: {
+    resource: { name: string; path: string }
+    isActive: boolean
+  }) => (
+    <a aria-current={isActive ? "page" : undefined} href={resource.path}>
+      {resource.name}
+    </a>
   ),
 }))
 
 vi.mock("../ui/separator", () => ({ Separator: () => null }))
 
 vi.mock("../ui/tooltip", () => ({
+  TooltipProvider: ({ children }: { children: React.ReactNode }) => (
+    <>{children}</>
+  ),
   Tooltip: ({ children }: { children: React.ReactNode }) => <>{children}</>,
   TooltipContent: ({ children }: { children: React.ReactNode }) => (
     <>{children}</>
@@ -86,15 +107,13 @@ vi.mock("./SidebarComponents", () => ({
   SidebarContent: ({ children, ...props }: React.ComponentProps<"div">) => (
     <div {...props}>{children}</div>
   ),
-  SidebarGroup: ({ children }: { children: React.ReactNode }) => (
-    <section>{children}</section>
+  SidebarGroup: ({ children, ...props }: React.ComponentProps<"section">) => (
+    <section {...props}>{children}</section>
   ),
   SidebarGroupContent: ({ children }: { children: React.ReactNode }) => (
     <div>{children}</div>
   ),
-  SidebarGroupLabel: ({ children }: { children: React.ReactNode }) => (
-    <>{children}</>
-  ),
+  SidebarGroupLabel: ({ children }: { children: React.ReactNode }) => children,
   SidebarMenu: ({ children }: { children: React.ReactNode }) => (
     <div>{children}</div>
   ),
@@ -123,5 +142,35 @@ describe("ResourcesMenu", () => {
     expect(screen.getAllByText("Tickets & Access")).not.toHaveLength(0)
     expect(screen.getAllByText("Shop")).not.toHaveLength(0)
     expect(screen.getAllByText("Orders")).not.toHaveLength(0)
+    expect(screen.getByRole("region", { name: "Commerce" })).toBeTruthy()
+    expect(
+      screen.getByRole("link", { name: "Shop" }).getAttribute("aria-current"),
+    ).toBe("page")
+  })
+
+  it("uses the localized name for the mobile navigation sheet", () => {
+    const { Sidebar, SidebarProvider, useSidebar } = SidebarComponents
+
+    const OpenMobileSidebar = () => {
+      const { setOpenMobile } = useSidebar()
+
+      useEffect(() => {
+        setOpenMobile(true)
+      }, [setOpenMobile])
+
+      return (
+        <Sidebar>
+          <span>Portal content</span>
+        </Sidebar>
+      )
+    }
+
+    render(
+      <SidebarProvider>
+        <OpenMobileSidebar />
+      </SidebarProvider>,
+    )
+
+    expect(screen.getByText("Portal navigation menu")).toBeTruthy()
   })
 })

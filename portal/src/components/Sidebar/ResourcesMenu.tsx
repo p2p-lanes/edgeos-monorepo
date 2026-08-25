@@ -108,16 +108,21 @@ const ResourcesMenu = () => {
 
           if (groupResources.length === 0) return null
 
+          const groupLabelId = `portal-navigation-${group}`
+
           return (
-            <SidebarGroup key={group}>
+            <SidebarGroup key={group} aria-labelledby={groupLabelId}>
               <SidebarGroupLabel asChild>
-                <h2>
+                <h2
+                  id={groupLabelId}
+                  className="px-2 text-[11px] font-semibold tracking-[0.08em] text-sidebar-foreground/60 uppercase"
+                >
                   {group === "general" && doorName
                     ? doorName
                     : t(`sidebar.${group}`)}
                 </h2>
               </SidebarGroupLabel>
-              <SidebarGroupContent>
+              <SidebarGroupContent className="pt-1">
                 <SidebarMenu>
                   {groupResources.map((resource) => (
                     <ResourceItem

@@ -92,6 +92,7 @@
   "shop": {
     "title": "Shop",
     "description": "Choose an available option.",
+    "catalog": "Available options",
     "application": "Application",
     "direct": "Direct purchase",
     "upsale": "Available to you",
@@ -591,6 +592,7 @@
     "soon_badge": "Soon",
     "application": "Application",
     "navigation": "Portal navigation",
+    "mobile_navigation": "Portal navigation menu",
     "general": "General",
     "participation": "Participation",
     "commerce": "Commerce",

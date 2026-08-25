@@ -78,6 +78,7 @@
   "shop": {
     "title": "Verslun",
     "description": "Veldu tiltækan möguleika.",
+    "catalog": "Tiltækir möguleikar",
     "application": "Umsókn",
     "direct": "Bein kaup",
     "upsale": "Í boði fyrir þig",
@@ -513,6 +514,7 @@
     "soon_badge": "Bráðum",
     "application": "Umsókn",
     "navigation": "Leiðsögn á vefgátt",
+    "mobile_navigation": "Leiðsögn á vefgátt",
     "general": "Almennt",
     "participation": "Þátttaka",
     "commerce": "Verslun",

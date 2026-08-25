@@ -35,6 +35,7 @@ vi.mock("react-i18next", () => ({
       ({
         "shop.title": "Shop",
         "shop.description": "Choose an available option.",
+        "shop.catalog": "Available options",
         "shop.application": "Application",
         "shop.direct": "Direct purchase",
         "shop.upsale": "Available to you",
@@ -75,17 +76,29 @@ describe("ShopContent", () => {
 
     render(<ShopContent popupId="popup-1" popupSlug="summer-camp" />)
 
-    expect(screen.getByText("Application")).toBeTruthy()
-    expect(screen.getByText("Direct purchase")).toBeTruthy()
-    expect(screen.getByText("Available to you")).toBeTruthy()
+    expect(screen.getByRole("heading", { name: "Application" })).toBeTruthy()
     expect(
-      screen.getByRole("link", { name: /Volunteer/ }).getAttribute("href"),
+      screen.getByRole("heading", { name: "Direct purchase" }),
+    ).toBeTruthy()
+    expect(
+      screen.getByRole("heading", { name: "Available to you" }),
+    ).toBeTruthy()
+    expect(
+      screen
+        .getByRole("link", { name: "Application Volunteer View option" })
+        .getAttribute("href"),
     ).toBe("/portal/summer-camp/shop/volunteer")
     expect(
-      screen.getByRole("link", { name: /Weekend Pass/ }).getAttribute("href"),
+      screen
+        .getByRole("link", {
+          name: "Direct purchase Weekend Pass View option",
+        })
+        .getAttribute("href"),
     ).toBe("/portal/summer-camp/shop/weekend")
     expect(
-      screen.getByRole("link", { name: /Merch Store/ }).getAttribute("href"),
+      screen
+        .getByRole("link", { name: "Available to you Merch Store View option" })
+        .getAttribute("href"),
     ).toBe("/portal/summer-camp/shop/merch-store")
   })
 
@@ -106,12 +119,18 @@ describe("ShopContent", () => {
     mocks.application = [
       { id: "application", slug: "attendee", name: "Attendee" },
     ]
-    mocks.direct = []
+    mocks.direct = [{ id: "direct", slug: "weekend", name: "Weekend Pass" }]
     mocks.upsale = []
 
     render(<ShopContent popupId="popup-1" popupSlug="summer-camp" />)
 
-    expect(screen.getByText("Nothing available right now")).toBeTruthy()
-    expect(screen.queryByRole("link")).toBeNull()
+    expect(screen.queryByText("Attendee")).toBeNull()
+    expect(
+      screen
+        .getByRole("link", {
+          name: "Direct purchase Weekend Pass View option",
+        })
+        .getAttribute("href"),
+    ).toBe("/portal/summer-camp/shop/weekend")
   })
 })
