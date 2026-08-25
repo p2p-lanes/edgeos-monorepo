@@ -39,6 +39,10 @@ vi.mock("@/providers/checkoutProvider", () => ({
   }),
 }))
 
+vi.mock("react-i18next", () => ({
+  useTranslation: () => ({ t: (key: string) => key }),
+}))
+
 // -------------------------------------------------------------------
 // Helpers
 // -------------------------------------------------------------------
@@ -102,9 +106,12 @@ describe("VariantPatronPreset — preset rendering", () => {
     expect(presetButtons.length).toBeGreaterThanOrEqual(3)
   })
 
-  it("renders 'No contribution options available' when products array is empty", () => {
+  it("renders translated empty-state and continue keys when products array is empty", () => {
     renderVariant([], null)
-    expect(screen.getByText("No contribution options available.")).toBeDefined()
+    expect(screen.getByText("checkout.no_contributions")).toBeDefined()
+    expect(
+      screen.getByRole("button", { name: "common.continue" }),
+    ).toBeDefined()
   })
 })
 

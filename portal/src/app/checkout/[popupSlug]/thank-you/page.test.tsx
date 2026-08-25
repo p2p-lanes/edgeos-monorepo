@@ -11,6 +11,7 @@ const mockUseTenant = vi.fn()
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: mockPush }),
   useParams: () => ({ popupSlug: "summer-fest" }),
+  useSearchParams: () => new URLSearchParams(),
 }))
 
 vi.mock("react-i18next", () => ({
